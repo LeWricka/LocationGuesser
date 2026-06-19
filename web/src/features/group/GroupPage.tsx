@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Badge, Card, Row, Spinner, Stack } from '../../ui'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Badge, Card, Row, Spinner, Stack, useToast } from '../../ui'
 import { aggregateLeaderboard, getGroupVotes } from '../../lib/leaderboard'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import { getVotes } from '../../lib/votes'
@@ -20,6 +20,9 @@ export function GroupPage({ groupId }: Props) {
   const [challenges, setChallenges] = useState<Challenge[] | null>(null)
   const [votes, setVotes] = useState<Vote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
+  // Evita re-avisar de un mismo voto si Realtime reenvía el evento (un toast por id).
+  const announcedVotes = useRef<Set<string>>(new Set())
 
   // Carga conjunta de retos + votos del grupo. Se reutiliza en el primer
   // montaje y en cada cambio de Realtime para mantener la vista consistente.
@@ -41,10 +44,22 @@ export function GroupPage({ groupId }: Props) {
     void refresh()
     const channel = supabase
       .channel(`group-${groupId}`)
-      .on(
+      .on<Vote>(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'votes', filter: `group_id=eq.${groupId}` },
-        () => {
+        (payload) => {
+          // Solo los INSERT en vivo disparan aviso; la carga inicial no pasa por
+          // aquí, así que no hay riesgo de avisar de votos antiguos.
+          if (payload.eventType === 'INSERT') {
+            const vote = payload.new
+            if (vote.id && !announcedVotes.current.has(vote.id)) {
+              announcedVotes.current.add(vote.id)
+              const name = vote.player_name?.trim()
+              toast.show(name ? `${name} acaba de votar` : 'Alguien acaba de votar', {
+                tone: 'success',
+              })
+            }
+          }
           void refresh()
         },
       )
@@ -52,7 +67,7 @@ export function GroupPage({ groupId }: Props) {
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [groupId, refresh])
+  }, [groupId, refresh, toast])
 
   const leaderboard = useMemo(() => (votes ? aggregateLeaderboard(votes) : []), [votes])
 
