@@ -1,0 +1,13 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Node (por si más adelante hay tooling)
+node_modules/
+npm-debug.log*
+dist/
+.env
+.env.*
