@@ -3,6 +3,7 @@ import { MapPicker } from './MapPicker'
 import type { LatLng } from '../../lib/geo'
 import { createChallenge } from '../../lib/challenges'
 import { newGroupCode } from '../../lib/group'
+import { resolveMapsUrl } from '../../lib/mapsUrl'
 import { supabase } from '../../lib/supabase'
 import { uploadImage } from '../../lib/storage'
 import { useIdentity } from '../identity'
@@ -54,6 +55,8 @@ export function CreateChallenge({ onBack }: Props) {
   const [search, setSearch] = useState('')
   const [suggestions, setSuggestions] = useState<NominatimHit[]>([])
   const [searching, setSearching] = useState(false)
+  const [mapsLink, setMapsLink] = useState('')
+  const [resolving, setResolving] = useState(false)
   const [locating, setLocating] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [link, setLink] = useState<string | null>(null)
@@ -116,6 +119,28 @@ export function CreateChallenge({ onBack }: Props) {
     setSearch(hit.display_name)
     setSuggestions([])
     setStatus(null)
+  }
+
+  // Pegar enlace de Maps: el parser local resuelve URLs largas y coordenadas al
+  // instante; los enlaces cortos (botón Compartir de Maps en móvil) pasan por la
+  // Edge Function, de ahí el spinner. `resolveMapsUrl` ya distingue ambos casos.
+  async function resolveLink(raw: string) {
+    const value = raw.trim()
+    if (!value) return
+    setResolving(true)
+    try {
+      const p = await resolveMapsUrl(value)
+      if (!p) {
+        toast.show('No pude leer ese enlace; usa el mapa, GPS o búsqueda.', { tone: 'danger' })
+        return
+      }
+      setPoint(p)
+      setFlyTo(p)
+      setStatus(null)
+      setMapsLink('')
+    } finally {
+      setResolving(false)
+    }
   }
 
   function useGps() {
@@ -304,6 +329,49 @@ export function CreateChallenge({ onBack }: Props) {
             </ul>
           )}
         </div>
+
+        <Field
+          label="Pega un enlace de Google Maps"
+          hint="Funciona con el botón «Compartir» de Maps o con coordenadas."
+        >
+          {(fieldProps) => (
+            <Row gap={2}>
+              <div className={styles.searchField}>
+                <Input
+                  {...fieldProps}
+                  className={styles.searchInput}
+                  placeholder="https://maps.app.goo.gl/… o 40.4,-3.7"
+                  autoComplete="off"
+                  value={mapsLink}
+                  onChange={(e) => setMapsLink(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void resolveLink(mapsLink)
+                    }
+                  }}
+                  onPaste={(e) => {
+                    const text = e.clipboardData.getData('text')
+                    if (text) void resolveLink(text)
+                  }}
+                />
+                {resolving && (
+                  <span className={styles.searchSpinner}>
+                    <Spinner size={16} label="Resolviendo enlace" />
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="secondary"
+                loading={resolving}
+                disabled={!mapsLink.trim()}
+                onClick={() => void resolveLink(mapsLink)}
+              >
+                Usar enlace
+              </Button>
+            </Row>
+          )}
+        </Field>
 
         <MapPicker value={point} flyTo={flyTo} center={SPAIN} zoom={5} onPick={setPoint} />
 
