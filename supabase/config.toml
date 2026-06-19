@@ -1,0 +1,6 @@
+# Config mínima del CLI de Supabase para LocationGuesser.
+# Aplicar migraciones contra el proyecto remoto:
+#   npx supabase login          # una vez (interactivo)
+#   npx supabase link --project-ref ykquigyjvgxisgdxryxr
+#   npx supabase db push
+project_id = "locationguesser"
