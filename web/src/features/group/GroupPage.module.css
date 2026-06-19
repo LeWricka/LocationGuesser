@@ -1,0 +1,151 @@
+.title {
+  font-size: var(--font-size-xl);
+}
+
+.code {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-lg);
+  margin-bottom: var(--space-3);
+}
+
+.empty,
+.error {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+/* --- Clasificación general --- */
+
+.ranking {
+  display: flex;
+  flex-direction: column;
+}
+
+.rankRow {
+  display: grid;
+  grid-template-columns: 2rem 1fr auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.rankRow:last-child {
+  border-bottom: none;
+}
+
+.rankPos {
+  font-size: var(--font-size-lg);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.rankName {
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rankPlays {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+}
+
+.rankPoints {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Tarjetas de reto --- */
+
+.challengeTitle {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.scoreboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.scoreRow {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.scoreName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scoreDist {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.scorePoints {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.playLink {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.playLink:hover {
+  text-decoration: underline;
+}
+
+/* --- Disclosure de "anteriores" --- */
+
+.disclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--tap-target);
+  padding: var(--space-4);
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chevron {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.reveal {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.photo {
+  width: 100%;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
