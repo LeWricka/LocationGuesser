@@ -6,7 +6,7 @@ import { newGroupCode } from '../../lib/group'
 import { supabase } from '../../lib/supabase'
 import { uploadImage } from '../../lib/storage'
 import { useIdentity } from '../identity'
-import { Badge, Button, Card, Field, Input, Row, Stack, useToast } from '../../ui'
+import { Badge, Button, Card, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
 import styles from './CreateChallenge.module.css'
 
 interface Props {
@@ -53,6 +53,8 @@ export function CreateChallenge({ onBack }: Props) {
   const [flyTo, setFlyTo] = useState<LatLng | null>(null)
   const [search, setSearch] = useState('')
   const [suggestions, setSuggestions] = useState<NominatimHit[]>([])
+  const [searching, setSearching] = useState(false)
+  const [locating, setLocating] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [link, setLink] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -75,15 +77,17 @@ export function CreateChallenge({ onBack }: Props) {
   }, [imagePreview])
 
   // Autocompletado Nominatim con debounce; respeta su uso (300ms, solo > 2 car).
+  // `searching` enciende el spinner del buscador para que el usuario vea que pasa algo.
   useEffect(() => {
     const q = search.trim()
     const ctrl = new AbortController()
-    // El clear/fetch va dentro del timer: nada de setState síncrono en el efecto.
     const timer = setTimeout(() => {
       if (q.length < 3) {
         setSuggestions([])
+        setSearching(false)
         return
       }
+      setSearching(true)
       void (async () => {
         try {
           const res = await fetch(
@@ -94,6 +98,8 @@ export function CreateChallenge({ onBack }: Props) {
           setSuggestions(data)
         } catch {
           // Búsqueda fallida o abortada: silenciamos; el mapa sigue disponible.
+        } finally {
+          setSearching(false)
         }
       })()
     }, 300)
@@ -114,18 +120,20 @@ export function CreateChallenge({ onBack }: Props) {
 
   function useGps() {
     if (!navigator.geolocation) {
-      setStatus('Tu navegador no permite geolocalización.')
+      toast.show('Tu navegador no permite geolocalización.', { tone: 'danger' })
       return
     }
-    setStatus('Buscando tu ubicación…')
+    setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        setPoint(p)
-        setFlyTo(p)
-        setStatus(null)
+        setPoint({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setFlyTo({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setLocating(false)
       },
-      () => setStatus('No se pudo obtener tu ubicación. Toca el mapa.'),
+      () => {
+        setLocating(false)
+        toast.show('No se pudo obtener tu ubicación. Toca el mapa.', { tone: 'danger' })
+      },
       { enableHighAccuracy: true, timeout: 8000 },
     )
   }
@@ -133,41 +141,43 @@ export function CreateChallenge({ onBack }: Props) {
   function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null
     if (file && !file.type.startsWith('image/')) {
-      setStatus('Elige un archivo de imagen.')
+      toast.show('Elige un archivo de imagen.', { tone: 'danger' })
       return
     }
     setImageFile(file)
-    setStatus(null)
   }
 
   async function generate() {
     if (!point) {
-      setStatus('Marca primero el punto en el mapa.')
+      toast.show('Marca primero el punto en el mapa.', { tone: 'danger' })
       return
     }
     if (!imageFile) {
-      setStatus('Añade una foto del reto.')
+      toast.show('Añade una foto del reto.', { tone: 'danger' })
       return
     }
-    // El grupo ("el viaje") nace aquí: necesitamos su fila para registrar al
-    // jugador (FK players→groups) antes de identificar a quien crea el reto.
-    const groupId = newGroupCode()
-    const { error: groupError } = await supabase.from('groups').insert({ id: groupId })
-    if (groupError) {
-      setStatus(`Error al crear el grupo: ${groupError.message}`)
-      return
-    }
-
-    // Identidad sin login: con identidad global no pide nada; navegador limpio
-    // → modal con nombre + PIN. Devuelve null si el usuario cancela.
-    const name = await ensureIdentity(groupId)
-    if (!name) return
 
     setBusy(true)
-    setStatus('Subiendo foto…')
     try {
+      // El grupo ("el viaje") nace aquí: necesitamos su fila para registrar al
+      // jugador (FK players→groups) antes de identificar a quien crea el reto.
+      setStatus('Creando el grupo…')
+      const groupId = newGroupCode()
+      const { error: groupError } = await supabase.from('groups').insert({ id: groupId })
+      if (groupError) throw new Error(groupError.message)
+
+      // Identidad sin login: con identidad global no pide nada; navegador limpio
+      // → modal con nombre + PIN. Devuelve null si el usuario cancela.
+      setStatus(null)
+      const name = await ensureIdentity(groupId)
+      if (!name) {
+        setBusy(false)
+        return
+      }
+
+      setStatus('Subiendo foto…')
       const imagePath = await uploadImage(imageFile)
-      setStatus('Guardando…')
+      setStatus('Guardando el reto…')
       const { challenge } = await createChallenge({
         title: title.trim() || '¿Dónde estoy? 🌍',
         lat: point.lat,
@@ -181,7 +191,9 @@ export function CreateChallenge({ onBack }: Props) {
       setLink(`${location.origin}${location.pathname}#g=${groupId}&c=${challenge.id}`)
       setStatus(null)
     } catch (err) {
-      setStatus(`Error al guardar: ${err instanceof Error ? err.message : String(err)}`)
+      const msg = err instanceof Error ? err.message : String(err)
+      setStatus(null)
+      toast.show(`No se pudo crear el reto: ${msg}`, { tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -257,17 +269,24 @@ export function CreateChallenge({ onBack }: Props) {
 
         <div className={styles.searchWrap}>
           <Row gap={2}>
-            <Button variant="secondary" onClick={useGps}>
+            <Button variant="secondary" loading={locating} onClick={useGps}>
               📡 Mi ubicación
             </Button>
-            <Input
-              className={styles.searchInput}
-              placeholder="Buscar un lugar…"
-              aria-label="Buscar un lugar"
-              autoComplete="off"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className={styles.searchField}>
+              <Input
+                className={styles.searchInput}
+                placeholder="Buscar un lugar…"
+                aria-label="Buscar un lugar"
+                autoComplete="off"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {searching && (
+                <span className={styles.searchSpinner}>
+                  <Spinner size={16} label="Buscando" />
+                </span>
+              )}
+            </div>
           </Row>
           {suggestions.length > 0 && (
             <ul className={styles.suggestions}>
@@ -357,7 +376,12 @@ export function CreateChallenge({ onBack }: Props) {
           Generar enlace
         </Button>
 
-        {status && <p className={styles.status}>{status}</p>}
+        {status && (
+          <Row gap={2} className={styles.status}>
+            <Spinner size={16} />
+            <span>{status}</span>
+          </Row>
+        )}
 
         {link && (
           <Card padding="md" raised>
