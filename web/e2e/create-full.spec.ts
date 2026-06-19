@@ -1,26 +1,41 @@
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { test, expect, type ConsoleMessage, type Page, type Request } from '@playwright/test'
 
-// E2E del flujo COMPLETO de crear reto (issue #47): sube una imagen real,
-// marca el punto, genera el enlace pasando por el IdentityModal (nombre + PIN) y
-// comprueba que el enlace resultante apunta al grupo y reto creados.
+// E2E del flujo COMPLETO de crear reto con Street View (pivote #54): ya NO se
+// sube foto. Se marca un punto con cobertura de SV (Madrid), se espera a que el
+// panorama encaje y aparezca la previa, se genera el enlace pasando por el
+// IdentityModal (nombre + PIN) y se comprueba que el enlace apunta al grupo y
+// reto creados.
 //
-// OJO: a diferencia del smoke, este test SÍ escribe en la BD real (grupo + reto
-// + imagen en Storage). Es un throwaway aceptable para validar el guardado de
-// punta a punta contra Supabase.
+// OJO: a diferencia del smoke, este test SÍ escribe en la BD real (grupo +
+// reto). La previa de Street View hace llamadas reales a Google Maps con la key
+// pública (localhost está en los referrers permitidos). Es un throwaway
+// aceptable para validar el guardado de punta a punta contra Supabase.
 
-// Ruido tolerado: tiles de mapa (CARTO/Esri) y Nominatim son terceros y pueden
-// devolver 4xx/5xx puntuales sin que la app esté rota.
+// Ruido tolerado: tiles de mapa (CARTO/Esri), Nominatim y Google Maps/Street
+// View son terceros y pueden devolver 4xx/5xx puntuales sin que la app esté
+// rota.
 const THIRD_PARTY = [
   'basemaps.cartocdn.com',
   'arcgisonline.com',
   'nominatim.openstreetmap.org',
   'tile.openstreetmap.org',
+  'maps.googleapis.com',
+  'maps.gstatic.com',
+  'streetviewpixels',
+  'google.com',
+  // El render del panorama puede quejarse si la API key no tiene este referrer
+  // exacto autorizado (config de Google Cloud, no de la app). El encaje del
+  // panorama vía StreetViewService sí funciona; lo tratamos como ruido externo.
+  'Google Maps JavaScript API',
 ]
 
 function isThirdPartyNoise(text: string): boolean {
-  return THIRD_PARTY.some((host) => text.includes(host))
+  if (THIRD_PARTY.some((host) => text.includes(host))) return true
+  // "Failed to load resource: ... status of 4xx/5xx": el navegador no incluye el
+  // host en este console.error, pero solo lo emiten recursos externos (tiles,
+  // Nominatim con 429 por rate-limit, Google). La app no genera este texto.
+  return /Failed to load resource.*status of \d{3}/.test(text)
 }
 
 // Engancha los listeners de higiene y devuelve el array donde se acumulan los
@@ -48,13 +63,8 @@ function trackErrors(page: Page): string[] {
   return errors
 }
 
-// Imagen de prueba: un JPEG real y pequeño versionado en e2e/fixtures.
-// El runner es ESM, así que derivamos el dir del propio módulo.
-const here = path.dirname(fileURLToPath(import.meta.url))
-const FIXTURE = path.join(here, 'fixtures', 'foto.jpg')
-
 test.describe('crear completo', () => {
-  test('home → crear → foto → punto → identidad → enlace, sin errores', async ({
+  test('home → crear → punto con Street View → identidad → enlace, sin errores', async ({
     page,
   }, testInfo) => {
     const errors = trackErrors(page)
@@ -64,34 +74,37 @@ test.describe('crear completo', () => {
     await page.getByRole('button', { name: 'Crear un reto' }).click()
     await expect(page.getByRole('heading', { name: 'Crear un reto' })).toBeVisible()
 
-    // 2. Subir imagen real. El input file está oculto (lo dispara un botón), pero
-    // setInputFiles lo rellena directamente. Tras procesarse aparece la vista previa.
-    await page.locator('input[type="file"]').setInputFiles(FIXTURE)
-    await expect(page.getByRole('img', { name: 'Vista previa del reto' })).toBeVisible()
-
-    // 3. Marcar punto via buscador + primera sugerencia (patrón del smoke).
+    // 2. Marcar punto via buscador + primera sugerencia (patrón del smoke).
+    // Madrid tiene cobertura de Street View garantizada.
     const searchBox = page.getByRole('textbox', { name: 'Buscar un lugar' })
-    await searchBox.fill('Madrid')
+    await searchBox.fill('Puerta del Sol, Madrid')
     const suggestions = page.getByRole('list').getByRole('button')
     await expect(suggestions.first()).toBeVisible({ timeout: 15_000 })
     await suggestions.first().click()
     await expect(page.getByText('Punto marcado')).toBeVisible()
 
+    // 3. Tras elegir el punto, findPanorama (StreetViewService) encaja el
+    // panorama más cercano y aparece la sección de previa. El render del
+    // panorama es una llamada real a Google; aquí basta con confirmar que hubo
+    // cobertura: aparece la previa y se habilita "Generar enlace" (que solo se
+    // activa cuando hay panorama y terminó la comprobación).
+    await expect(page.getByLabel('Vista previa de Street View')).toBeVisible({ timeout: 20_000 })
+
     // 4. Plazo y tiempo: dejamos los defaults (Fin del día / 2 min).
 
     // 5. Generar enlace → con localStorage limpio aparece el IdentityModal.
-    await page.getByRole('button', { name: 'Generar enlace' }).click()
+    const generate = page.getByRole('button', { name: 'Generar enlace' })
+    await expect(generate).toBeEnabled({ timeout: 20_000 })
+    await generate.click()
     await expect(page.getByRole('heading', { name: '¿Quién juega?' })).toBeVisible()
 
-    // Nombre único por ejecución para no chocar en el grupo (que es nuevo, pero
-    // así también evitamos colisiones si el código de grupo se repitiese).
+    // Nombre único por ejecución para no chocar en el grupo.
     const uniqueName = `e2e-${Date.now().toString(36)}`
     await page.getByRole('textbox', { name: 'Tu nombre' }).fill(uniqueName)
     await page.getByRole('textbox', { name: 'PIN de 4 dígitos' }).fill('1234')
     await page.getByRole('button', { name: 'Entrar' }).click()
 
     // 6. Resultado: el enlace para compartir contiene el grupo (#g=) y el reto (&c=).
-    // Damos margen amplio: subida a Storage + insert del reto en Supabase.
     const shareInput = page.getByRole('textbox', { name: 'Mensaje para compartir el reto' })
     await expect(shareInput).toBeVisible({ timeout: 30_000 })
     const shareValue = await shareInput.inputValue()

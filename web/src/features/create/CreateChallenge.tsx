@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MapPicker } from './MapPicker'
+import { StreetViewPreview } from './StreetViewPreview'
 import type { LatLng } from '../../lib/geo'
 import { createChallenge } from '../../lib/challenges'
+import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { newGroupCode } from '../../lib/group'
 import { resolveMapsUrl } from '../../lib/mapsUrl'
 import { supabase } from '../../lib/supabase'
-import { uploadImage } from '../../lib/storage'
 import { useIdentity } from '../identity'
 import { Badge, Button, Card, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
 import styles from './CreateChallenge.module.css'
@@ -61,23 +62,44 @@ export function CreateChallenge({ onBack }: Props) {
   const [status, setStatus] = useState<string | null>(null)
   const [link, setLink] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [imageFile, setImageFile] = useState<File | null>(null)
+  // Panorama encajado al punto elegido (pivote #54): si es null no hay cobertura
+  // de Street View y no dejamos crear el reto.
+  const [pano, setPano] = useState<PanoramaMatch | null>(null)
+  const [checkingPano, setCheckingPano] = useState(false)
+  // POV con el que arrancarán los jugadores; el creador puede girar la previa.
+  const [pov, setPov] = useState({ heading: 0, pitch: 0 })
   const [deadline, setDeadline] = useState<DeadlinePreset>('eod')
   const [guessSeconds, setGuessSeconds] = useState<number | null>(120)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
   const { ensureIdentity, modal: identityModal } = useIdentity()
 
-  // Vista previa local derivada del archivo; el efecto solo revoca el URL al
-  // cambiar/desmontar (no hace falta estado).
-  const imagePreview = useMemo(
-    () => (imageFile ? URL.createObjectURL(imageFile) : null),
-    [imageFile],
-  )
+  // Al elegir el punto (por cualquier método) encajamos el panorama de Street
+  // View más cercano. Sin cobertura → avisamos y bloqueamos la creación.
   useEffect(() => {
-    if (!imagePreview) return
-    return () => URL.revokeObjectURL(imagePreview)
-  }, [imagePreview])
+    if (!point) return
+    let cancelled = false
+    void (async () => {
+      setCheckingPano(true)
+      setPano(null)
+      try {
+        const match = await findPanorama(point.lat, point.lng)
+        if (cancelled) return
+        if (!match) {
+          toast.show('No hay Street View aquí; elige otro punto.', { tone: 'danger' })
+          return
+        }
+        setPano(match)
+        setPov({ heading: 0, pitch: 0 })
+      } finally {
+        if (!cancelled) setCheckingPano(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+    // toast es estable (contexto); solo reaccionamos al punto elegido.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [point])
 
   // Autocompletado Nominatim con debounce; respeta su uso (300ms, solo > 2 car).
   // `searching` enciende el spinner del buscador para que el usuario vea que pasa algo.
@@ -163,22 +185,9 @@ export function CreateChallenge({ onBack }: Props) {
     )
   }
 
-  function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null
-    if (file && !file.type.startsWith('image/')) {
-      toast.show('Elige un archivo de imagen.', { tone: 'danger' })
-      return
-    }
-    setImageFile(file)
-  }
-
   async function generate() {
-    if (!point) {
-      toast.show('Marca primero el punto en el mapa.', { tone: 'danger' })
-      return
-    }
-    if (!imageFile) {
-      toast.show('Añade una foto del reto.', { tone: 'danger' })
+    if (!pano) {
+      toast.show('Elige un punto con cobertura de Street View.', { tone: 'danger' })
       return
     }
 
@@ -200,16 +209,18 @@ export function CreateChallenge({ onBack }: Props) {
         return
       }
 
-      setStatus('Subiendo foto…')
-      const imagePath = await uploadImage(imageFile)
       setStatus('Guardando el reto…')
+      // Guardamos la lat/lng encajada al panorama (la respuesta real para el
+      // scoring) y el panorama exacto + POV inicial.
       const { challenge } = await createChallenge({
         title: title.trim() || '¿Dónde estoy? 🌍',
-        lat: point.lat,
-        lng: point.lng,
+        lat: pano.lat,
+        lng: pano.lng,
         createdBy: name,
         groupId,
-        imagePath,
+        svPanoId: pano.panoId,
+        svHeading: pov.heading,
+        svPitch: pov.pitch,
         deadlineAt: deadlineISO(deadline),
         guessSeconds,
       })
@@ -266,39 +277,10 @@ export function CreateChallenge({ onBack }: Props) {
           <h1 className={styles.title}>Crear un reto</h1>
         </Row>
 
-        <Field label="Foto del reto" hint="Obligatoria. La comprimimos y le quitamos el GPS.">
-          {(fieldProps) => (
-            <div {...fieldProps}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className={styles.fileInput}
-                onChange={onPickFile}
-              />
-              {imagePreview ? (
-                <div className={styles.preview}>
-                  <img
-                    src={imagePreview}
-                    alt="Vista previa del reto"
-                    className={styles.previewImg}
-                  />
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    Cambiar foto
-                  </Button>
-                </div>
-              ) : (
-                <Button variant="secondary" fullWidth onClick={() => fileInputRef.current?.click()}>
-                  📷 Añadir foto
-                </Button>
-              )}
-            </div>
-          )}
-        </Field>
+        <p className={styles.intro}>
+          Elige un punto con cobertura de Street View. Los demás explorarán el panorama y adivinarán
+          dónde es.
+        </p>
 
         <div className={styles.searchWrap}>
           <Row gap={2}>
@@ -392,6 +374,26 @@ export function CreateChallenge({ onBack }: Props) {
           </Row>
         )}
 
+        {checkingPano && (
+          <Row gap={2} className={styles.status}>
+            <Spinner size={16} />
+            <span>Buscando Street View…</span>
+          </Row>
+        )}
+
+        {pano && (
+          <Field label="Vista previa" hint="Gira la cámara para fijar cómo arrancarán los demás.">
+            {() => (
+              <StreetViewPreview
+                panoId={pano.panoId}
+                heading={pov.heading}
+                pitch={pov.pitch}
+                onPovChange={setPov}
+              />
+            )}
+          </Field>
+        )}
+
         <Field
           label="Título del reto"
           hint="Opcional. Si lo dejas vacío usamos «¿Dónde estoy? 🌍»."
@@ -446,7 +448,7 @@ export function CreateChallenge({ onBack }: Props) {
           size="lg"
           fullWidth
           loading={busy}
-          disabled={!point || !imageFile}
+          disabled={!pano || checkingPano}
           onClick={() => void generate()}
         >
           Generar enlace
