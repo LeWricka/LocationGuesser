@@ -49,3 +49,10 @@ export async function createChallenge(
   if (error) throw error
   return { challenge: data, groupId }
 }
+
+/** Lee un reto por su id. Lanza si no existe o hay error de red. */
+export async function getChallenge(id: string): Promise<Challenge> {
+  const { data, error } = await supabase.from('challenges').select().eq('id', id).single()
+  if (error) throw error
+  return data
+}
