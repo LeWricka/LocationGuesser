@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { PlayMap } from './PlayMap'
+import { StreetViewPano } from './StreetViewPano'
+import { sceneMedium } from './sceneMedium'
 import { getChallenge } from '../../lib/challenges'
 import { getExistingVote, saveVote } from '../../lib/votes'
 import { computeResult, type Result } from '../../lib/result'
@@ -37,6 +39,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [remaining, setRemaining] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Mapa de adivinar como panel expandible estilo GeoGuessr: mini en la esquina,
+  // se abre a grande para colocar el pin con precisión.
+  const [mapOpen, setMapOpen] = useState(false)
   const toast = useToast()
   const { ensureIdentity, modal: identityModal } = useIdentity()
 
@@ -171,7 +176,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     )
   }
 
-  const imageUrl = challenge.image_path ? publicImageUrl(challenge.image_path) : null
+  // Retos nuevos traen Street View; los legacy solo tienen foto. El render
+  // decide: si hay panorama → panorama interactivo; si no, foto (modo legacy,
+  // retos antiguos no se rompen).
+  const medium = sceneMedium(challenge)
+  const hasStreetView = medium === 'streetview'
+  const imageUrl =
+    medium === 'photo' && challenge.image_path ? publicImageUrl(challenge.image_path) : null
   const revealed = phase === 'revealed'
   const answer: LatLng | null = revealed ? { lat: challenge.lat, lng: challenge.lng } : null
   const urgent = remaining != null && remaining <= 10
@@ -192,9 +203,43 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           </Row>
         </Stack>
 
-        {imageUrl && <img className={styles.photo} src={imageUrl} alt={challenge.title} />}
+        {/* Escena del reto: panorama explorable (nuevo) o foto fija (legacy). */}
+        <div className={styles.scene}>
+          {hasStreetView ? (
+            <StreetViewPano
+              panoId={challenge.sv_pano_id}
+              position={{ lat: challenge.lat, lng: challenge.lng }}
+              heading={challenge.sv_heading}
+              pitch={challenge.sv_pitch}
+            />
+          ) : imageUrl ? (
+            <img className={styles.photo} src={imageUrl} alt={challenge.title} />
+          ) : (
+            <p className={styles.status}>Este reto no tiene imagen ni Street View.</p>
+          )}
 
-        <PlayMap guess={guess} answer={answer} locked={revealed} onPick={setGuess} />
+          {/* Mapa de adivinar superpuesto estilo GeoGuessr: mini-mapa en la
+              esquina que se expande para afinar el pin. Tras revelar siempre
+              expandido para ver 🎯 + distancia. */}
+          <div
+            className={`${styles.mapPanel} ${mapOpen || revealed ? styles.mapPanelOpen : ''}`}
+            onMouseEnter={() => !revealed && setMapOpen(true)}
+          >
+            {!revealed && (
+              <button
+                type="button"
+                className={styles.mapToggle}
+                aria-expanded={mapOpen}
+                onClick={() => setMapOpen((v) => !v)}
+              >
+                {mapOpen ? '✕' : '🗺️ Adivinar'}
+              </button>
+            )}
+            <div className={styles.mapInner}>
+              <PlayMap guess={guess} answer={answer} locked={revealed} onPick={setGuess} />
+            </div>
+          </div>
+        </div>
 
         {!revealed && (
           <>
@@ -206,7 +251,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 </span>
               </Row>
             ) : (
-              <p className={styles.status}>Toca el mapa para colocar tu pin.</p>
+              <p className={styles.status}>Abre el mapa y toca para colocar tu pin.</p>
             )}
             <Button size="lg" fullWidth disabled={!guess} onClick={confirm}>
               Confirmar y revelar
@@ -269,7 +314,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               🌍
             </span>
             <p>
-              Cuando pulses <strong>Empezar</strong>, verás la foto y el mapa.
+              Cuando pulses <strong>Empezar</strong>, podrás{' '}
+              {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y adivinar en el mapa.
             </p>
             {challenge.guess_seconds != null ? (
               <p className={styles.status}>
