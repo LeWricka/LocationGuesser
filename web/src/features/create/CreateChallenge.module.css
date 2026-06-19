@@ -6,9 +6,27 @@
   font-size: var(--font-size-xl);
 }
 
-/* Barra de búsqueda + GPS: el input crece, el botón mantiene su tamaño. */
-.searchInput {
+/* Barra de búsqueda + GPS: el campo crece, el botón mantiene su tamaño. */
+.searchField {
+  position: relative;
   flex: 1;
+}
+
+.searchInput {
+  width: 100%;
+  /* Hueco para el spinner de carga a la derecha. */
+  padding-right: var(--space-6);
+}
+
+/* Spinner dentro del buscador mientras Nominatim responde. */
+.searchSpinner {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--color-text-muted);
+  pointer-events: none;
 }
 
 /* Wrapper relativo para colgar la lista de sugerencias bajo el buscador. */
