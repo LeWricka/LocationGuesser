@@ -13,6 +13,12 @@ const THIRD_PARTY = [
   'arcgisonline.com',
   'nominatim.openstreetmap.org',
   'tile.openstreetmap.org',
+  // Marcar el punto dispara findPanorama (Street View, pivote #54); su tráfico a
+  // Google es ruido de tercero, no un fallo de la app.
+  'maps.googleapis.com',
+  'maps.gstatic.com',
+  'streetviewpixels',
+  'google.com',
 ]
 
 function isThirdPartyNoise(text: string): boolean {

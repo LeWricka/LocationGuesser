@@ -66,24 +66,10 @@
   background: var(--color-surface-hover);
 }
 
-/* Input de archivo nativo oculto; lo disparamos desde un Button del kit. */
-.fileInput {
-  display: none;
-}
-
-.preview {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  align-items: flex-start;
-}
-
-.previewImg {
-  width: 100%;
-  max-height: 280px;
-  object-fit: cover;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
+/* Texto introductorio del flujo: explica que el reto es Street View. */
+.intro {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 .coords {

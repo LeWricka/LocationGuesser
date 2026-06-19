@@ -13,8 +13,14 @@ export interface NewChallengeInput {
   guessSeconds?: number | null
   /** Plazo del reto en ISO; por defecto, fin del día del creador. (#13.) */
   deadlineAt?: string
-  /** Path en Storage de la imagen del reto. (#4.) */
+  /** Path en Storage de la imagen del reto. Legacy: el pivote (#54) usa Street View. */
   imagePath?: string
+  /** Panorama de Street View encajado al punto. (#54.) */
+  svPanoId?: string
+  /** POV inicial del panorama: rumbo en grados. (#54.) */
+  svHeading?: number
+  /** POV inicial del panorama: inclinación en grados. (#54.) */
+  svPitch?: number
 }
 
 function endOfTodayISO(): string {
@@ -43,6 +49,9 @@ export async function createChallenge(
       lat: input.lat,
       lng: input.lng,
       image_path: input.imagePath ?? null,
+      sv_pano_id: input.svPanoId ?? null,
+      sv_heading: input.svHeading ?? null,
+      sv_pitch: input.svPitch ?? null,
       guess_seconds: input.guessSeconds ?? null,
       deadline_at: input.deadlineAt ?? endOfTodayISO(),
       created_by: input.createdBy,
