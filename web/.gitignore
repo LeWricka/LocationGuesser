@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Salida del build de Storybook
+storybook-static
+
 # Variables de entorno: la real (.env.local) es local; el ejemplo sí se versiona
 .env
 .env.*
