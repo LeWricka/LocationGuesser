@@ -1,0 +1,29 @@
+.header {
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  font-size: var(--font-size-xl);
+}
+
+/* Barra de búsqueda + GPS: el input crece, el botón mantiene su tamaño. */
+.searchInput {
+  flex: 1;
+}
+
+.coords {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-2);
+}
+
+/* Enlace generado en solo lectura, en monospace para que se lea entero. */
+.linkInput {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}

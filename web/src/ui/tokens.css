@@ -1,0 +1,136 @@
+/*
+ * LocationGuesser — Design tokens
+ *
+ * Una sola fuente de verdad para color, tipografía, espaciado, etc.
+ * Todo el UI kit consume estas variables; no se hardcodean valores en los
+ * CSS Modules. Tema oscuro nativo ("viaje de noche": mapas y fotos resaltan
+ * sobre fondo oscuro). El acento de marca es el rojo "señal de mapa".
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ----------------------------------------------------------------------
+   * Color — paleta base
+   * Fondos en grises azulados fríos (sensación de mapa nocturno) y un acento
+   * rojo cálido (el "pin" de GeoGuessr). El rojo v0.1 (#e6332a) se refina a
+   * un tono ligeramente más luminoso (#ff453a) para mejor contraste sobre
+   * oscuro y para que el botón primario "cante" sin chillar.
+   * -------------------------------------------------------------------- */
+
+  /* Superficies (de más al fondo a más al frente) */
+  --color-bg: #0e0f14; /* fondo de página */
+  --color-surface: #181a22; /* tarjetas, paneles */
+  --color-surface-raised: #21242e; /* inputs, elementos elevados sobre surface */
+  --color-surface-hover: #2a2d39; /* hover de superficies interactivas */
+
+  /* Bordes / separadores */
+  --color-border: #2e313d;
+  --color-border-strong: #3c404e;
+
+  /* Texto */
+  --color-text: #eceef3; /* texto principal */
+  --color-text-muted: #99a0b0; /* secundario, ayudas */
+  --color-text-faint: #6b7180; /* deshabilitado, placeholders */
+
+  /* Acento de marca (rojo pin) */
+  --color-accent: #ff453a;
+  --color-accent-hover: #ff5f55;
+  --color-accent-active: #e23b31;
+  --color-accent-soft: rgba(255, 69, 58, 0.14); /* fondos tenues, badges */
+  --color-on-accent: #ffffff; /* texto sobre acento */
+
+  /* Acento secundario (violeta "ruta") — para estados/realtime, no para CTA */
+  --color-accent-2: #c084fc;
+  --color-accent-2-soft: rgba(192, 132, 252, 0.16);
+
+  /* Semánticos */
+  --color-success: #34d399;
+  --color-success-soft: rgba(52, 211, 153, 0.16);
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgba(251, 191, 36, 0.16);
+  --color-danger: #f87171;
+  --color-danger-soft: rgba(248, 113, 113, 0.16);
+
+  /* Anillo de foco accesible (visible sobre cualquier superficie) */
+  --color-focus-ring: #7aa2ff;
+
+  /* ----------------------------------------------------------------------
+   * Tipografía
+   * System UI: cero coste de carga, look nativo en cada dispositivo.
+   * Escala modular ~1.25 (mayor third) redondeada a píxeles cómodos.
+   * -------------------------------------------------------------------- */
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+
+  --font-size-xs: 0.75rem; /* 12px — micro-ayudas */
+  --font-size-sm: 0.875rem; /* 14px — texto secundario */
+  --font-size-md: 1rem; /* 16px — cuerpo (evita zoom en iOS) */
+  --font-size-lg: 1.25rem; /* 20px — subtítulos */
+  --font-size-xl: 1.75rem; /* 28px — títulos de sección */
+  --font-size-2xl: 2.5rem; /* 40px — hero */
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.15;
+  --line-height-normal: 1.45;
+
+  /* ----------------------------------------------------------------------
+   * Espaciado — escala de 4px. Nombres por tamaño, no por uso.
+   * -------------------------------------------------------------------- */
+  --space-1: 0.25rem; /* 4 */
+  --space-2: 0.5rem; /* 8 */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-5: 1.5rem; /* 24 */
+  --space-6: 2rem; /* 32 */
+  --space-7: 3rem; /* 48 */
+  --space-8: 4rem; /* 64 */
+
+  /* ----------------------------------------------------------------------
+   * Radios
+   * -------------------------------------------------------------------- */
+  --radius-sm: 8px; /* inputs, botones */
+  --radius-md: 12px; /* tarjetas */
+  --radius-lg: 16px; /* paneles grandes, mapa */
+  --radius-full: 999px; /* badges, pills, spinner */
+
+  /* ----------------------------------------------------------------------
+   * Sombras — suaves; en tema oscuro la elevación se nota poco, se apoya
+   * también en el cambio de superficie.
+   * -------------------------------------------------------------------- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.55);
+
+  /* ----------------------------------------------------------------------
+   * Layout
+   * -------------------------------------------------------------------- */
+  --tap-target: 44px; /* objetivo táctil mínimo (WCAG / iOS) */
+  --container-max: 720px; /* ancho de lectura cómodo en desktop */
+
+  /* ----------------------------------------------------------------------
+   * Animación
+   * -------------------------------------------------------------------- */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+
+  /* ----------------------------------------------------------------------
+   * z-index — capas con nombre para evitar el "z-index: 99999"
+   * -------------------------------------------------------------------- */
+  --z-base: 0;
+  --z-sticky: 100; /* cabeceras pegadas */
+  --z-overlay: 1000; /* modales / pantallas completas */
+  --z-toast: 1100; /* avisos por encima de todo */
+}
+
+/*
+ * Breakpoints (documentación — CSS no permite variables en media queries):
+ *   --bp-sm: 480px   teléfono grande
+ *   --bp-md: 768px   tablet / desktop pequeño
+ *   --bp-lg: 1024px  desktop
+ * Mobile-first: estilos base = móvil; min-width para subir de tamaño.
+ */

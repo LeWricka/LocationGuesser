@@ -1,0 +1,22 @@
+.spinner {
+  display: inline-block;
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  border-radius: var(--radius-full);
+  border: 2px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-top-color: var(--spinner-color, currentColor);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respeta a quien pide menos movimiento. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 1.6s;
+  }
+}
