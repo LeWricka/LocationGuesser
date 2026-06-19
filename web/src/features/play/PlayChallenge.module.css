@@ -1,0 +1,60 @@
+.header {
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  font-size: var(--font-size-xl);
+}
+
+/* Foto del reto: encuadre consistente y recorte limpio sobre fondo oscuro. */
+.photo {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+}
+
+/* Cuenta atrás: número grande, tabular para que no "baile" al cambiar. */
+.timer {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+}
+.timerUrgent {
+  color: var(--color-danger);
+}
+
+.coords {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Resultado del revelado: puntos protagonistas. */
+.points {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-accent);
+  line-height: var(--line-height-tight);
+}
+
+.resultDist {
+  color: var(--color-text-muted);
+}
+
+/* Overlay "Empezar": tapa todo, centra el contenido. */
+.startBody {
+  text-align: center;
+}
+
+.centered {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
