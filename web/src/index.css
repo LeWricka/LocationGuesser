@@ -88,6 +88,9 @@ img {
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--color-border);
+  /* Contiene los z-index internos de Leaflet (panes/controles llegan a ~1000)
+   * para que no tapen overlays externos como el buscador o el selector de capa. */
+  isolation: isolate;
 }
 
 @media (min-width: 768px) {
