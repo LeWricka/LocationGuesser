@@ -1,0 +1,38 @@
+.wrap {
+  position: relative;
+}
+
+/* Selector de capa flotando sobre la esquina del mapa. */
+.layers {
+  display: flex;
+  gap: var(--space-1);
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  z-index: var(--z-sticky);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-1);
+  box-shadow: var(--shadow-sm);
+}
+
+.layer,
+.layerActive {
+  border: none;
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.layer {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.layerActive {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}

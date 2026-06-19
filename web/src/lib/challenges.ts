@@ -13,6 +13,8 @@ export interface NewChallengeInput {
   guessSeconds?: number | null
   /** Plazo del reto en ISO; por defecto, fin del día del creador. (#13.) */
   deadlineAt?: string
+  /** Path en Storage de la imagen del reto. (#4.) */
+  imagePath?: string
 }
 
 function endOfTodayISO(): string {
@@ -40,6 +42,7 @@ export async function createChallenge(
       title: input.title,
       lat: input.lat,
       lng: input.lng,
+      image_path: input.imagePath ?? null,
       guess_seconds: input.guessSeconds ?? null,
       deadline_at: input.deadlineAt ?? endOfTodayISO(),
       created_by: input.createdBy,
