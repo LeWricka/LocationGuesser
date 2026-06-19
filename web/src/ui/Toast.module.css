@@ -1,0 +1,81 @@
+.region {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-4);
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(420px, calc(100vw - var(--space-6)));
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+  /* Re-activa los clics: el contenedor los desactiva para no tapar la UI. */
+  pointer-events: auto;
+  animation: toast-in var(--transition-base);
+}
+
+.message {
+  flex: 1;
+  font-size: var(--font-size-sm);
+}
+
+.close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.close:hover {
+  color: var(--color-text);
+}
+.close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Tonos: solo cambia el borde izquierdo para no gritar. */
+.neutral {
+  border-left: 3px solid var(--color-accent-2);
+}
+.success {
+  border-left: 3px solid var(--color-success);
+}
+.danger {
+  border-left: 3px solid var(--color-danger);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

@@ -1,140 +1,115 @@
-:root {
-  --bg: #16171d;
-  --panel: #1f2028;
-  --text: #e6e7ea;
-  --muted: #9ca3af;
-  --border: #2e303a;
-  --accent: #e6332a;
-  --accent-2: #c084fc;
-  font:
-    16px/1.45 system-ui,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
-  color-scheme: dark;
+@import './ui/tokens.css';
+
+/*
+ * Estilos globales. Reset suave + base de tipografía/color desde tokens.
+ * Todo lo específico de componente vive en su CSS Module.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-* {
-  box-sizing: border-box;
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--text);
-}
-
-.app {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   min-height: 100svh;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-.home {
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+h1,
+h2,
+h3,
+p {
+  margin: 0;
 }
 
 h1 {
-  font-size: 32px;
-  margin: 0;
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-bold);
 }
 
 h2 {
-  font-size: 20px;
-  margin: 0;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
 }
 
-.muted {
-  color: var(--muted);
+h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
 }
 
-.small {
-  font-size: 13px;
+a {
+  color: var(--color-accent);
 }
 
-.row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+img {
+  max-width: 100%;
+  display: block;
 }
 
-.toolbar {
-  display: flex;
-  gap: 8px;
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
-.toolbar .input {
-  flex: 1;
-}
-
-.input {
+/*
+ * Contenedor de página: ancho cómodo de lectura, centrado en desktop.
+ * Los pies de página/CTA respiran con el safe-area de iOS.
+ */
+.lg-page {
   width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 15px;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: var(--space-4);
+  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
+  min-height: 100svh;
 }
 
-.btn {
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-  color: var(--text);
-  font-size: 15px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-.btn.ghost {
-  background: transparent;
-}
-
+/* ----------------------------------------------------------------------
+ * Mapa (Leaflet). Necesita altura explícita o no se renderiza.
+ * Clase de v0.1 conservada para no romper MapPicker.
+ * -------------------------------------------------------------------- */
 .lg-map {
   height: 340px;
   width: 100%;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid var(--color-border);
 }
 
+@media (min-width: 768px) {
+  .lg-map {
+    height: 420px;
+  }
+}
+
+/* Pin emoji del marcador de Leaflet. */
 .lg-pin {
   font-size: 26px;
   line-height: 1;
   text-align: center;
 }
 
-.status {
-  color: var(--accent-2);
-  font-size: 14px;
+/* Controles de zoom de Leaflet en tema oscuro. */
+.leaflet-bar a {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
-
-.result {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--panel);
+.leaflet-bar a:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
 }

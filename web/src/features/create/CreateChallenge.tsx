@@ -3,6 +3,8 @@ import { MapPicker } from './MapPicker'
 import type { LatLng } from '../../lib/geo'
 import { createChallenge } from '../../lib/challenges'
 import { getName, setName } from '../../lib/identity'
+import { Badge, Button, Card, Field, Input, Row, Stack, useToast } from '../../ui'
+import styles from './CreateChallenge.module.css'
 
 interface Props {
   onBack: () => void
@@ -23,6 +25,7 @@ export function CreateChallenge({ onBack }: Props) {
   const [status, setStatus] = useState<string | null>(null)
   const [link, setLink] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const toast = useToast()
 
   function useGps() {
     if (!navigator.geolocation) {
@@ -94,71 +97,95 @@ export function CreateChallenge({ onBack }: Props) {
   }
 
   function copy() {
-    if (link) void navigator.clipboard.writeText(link)
+    if (!link) return
+    void navigator.clipboard.writeText(link)
+    toast.show('Enlace copiado', { tone: 'success' })
   }
 
   return (
-    <main className="app">
-      <header className="row">
-        <button type="button" className="btn ghost" onClick={onBack}>
-          ← Volver
-        </button>
-        <h2>Crear un reto</h2>
-      </header>
+    <main className="lg-page">
+      <Stack gap={4}>
+        <Row gap={3} className={styles.header}>
+          <Button variant="ghost" size="sm" onClick={onBack}>
+            ← Volver
+          </Button>
+          <h1 className={styles.title}>Crear un reto</h1>
+        </Row>
 
-      <div className="toolbar">
-        <button type="button" className="btn" onClick={useGps}>
-          📡 Mi ubicación
-        </button>
-        <input
-          className="input"
-          placeholder="Buscar un lugar…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              void runSearch()
-            }
-          }}
-        />
-      </div>
+        <Row gap={2}>
+          <Button variant="secondary" onClick={useGps}>
+            📡 Mi ubicación
+          </Button>
+          <Input
+            className={styles.searchInput}
+            placeholder="Buscar un lugar…"
+            aria-label="Buscar un lugar"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                void runSearch()
+              }
+            }}
+          />
+        </Row>
 
-      <MapPicker value={point} flyTo={flyTo} center={SPAIN} zoom={5} onPick={setPoint} />
+        <MapPicker value={point} flyTo={flyTo} center={SPAIN} zoom={5} onPick={setPoint} />
 
-      {point && (
-        <p className="muted small">
-          📍 {point.lat.toFixed(5)}, {point.lng.toFixed(5)}
-        </p>
-      )}
+        {point && (
+          <Row gap={2}>
+            <Badge tone="accent">📍 Punto marcado</Badge>
+            <span className={styles.coords}>
+              {point.lat.toFixed(5)}, {point.lng.toFixed(5)}
+            </span>
+          </Row>
+        )}
 
-      <input
-        className="input"
-        placeholder="Título del reto (opcional)"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-      />
+        <Field
+          label="Título del reto"
+          hint="Opcional. Si lo dejas vacío usamos «¿Dónde estoy? 🌍»."
+        >
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              placeholder="¿Dónde estoy? 🌍"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          )}
+        </Field>
 
-      <button
-        type="button"
-        className="btn primary"
-        disabled={!point || busy}
-        onClick={() => void generate()}
-      >
-        Generar enlace
-      </button>
+        <Button
+          size="lg"
+          fullWidth
+          loading={busy}
+          disabled={!point}
+          onClick={() => void generate()}
+        >
+          Generar enlace
+        </Button>
 
-      {status && <p className="status">{status}</p>}
+        {status && <p className={styles.status}>{status}</p>}
 
-      {link && (
-        <div className="result">
-          <p className="muted small">¡Reto creado! Comparte este enlace:</p>
-          <input className="input" readOnly value={link} onFocus={(e) => e.target.select()} />
-          <button type="button" className="btn" onClick={copy}>
-            Copiar enlace
-          </button>
-        </div>
-      )}
+        {link && (
+          <Card padding="md" raised>
+            <Stack gap={3}>
+              <strong>¡Reto creado! Comparte este enlace:</strong>
+              <Input
+                className={styles.linkInput}
+                readOnly
+                value={link}
+                aria-label="Enlace del reto"
+                onFocus={(e) => e.target.select()}
+              />
+              <Button variant="secondary" onClick={copy}>
+                Copiar enlace
+              </Button>
+            </Stack>
+          </Card>
+        )}
+      </Stack>
     </main>
   )
 }
