@@ -15,6 +15,11 @@ dist-ssr
 # Salida del build de Storybook
 storybook-static
 
+# Artefactos de Playwright (smoke E2E)
+test-results
+playwright-report
+e2e/.screenshots
+
 # Variables de entorno: la real (.env.local) es local; el ejemplo sí se versiona
 .env
 .env.*

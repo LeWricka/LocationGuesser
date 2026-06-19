@@ -7,5 +7,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test/setup.ts',
+    // Los smoke E2E (e2e/*.spec.ts) corren con Playwright, no con Vitest.
+    exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
   },
 })
