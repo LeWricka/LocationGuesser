@@ -47,6 +47,19 @@ npm run format && npm run lint && npm run type-check && npm run test && npm run 
 
 Todo en verde. El CI repite estos checks en cada PR.
 
+**Smoke E2E (el orquestador lo corre ANTES de pasar nada al usuario):**
+
+```
+cd web && npx playwright install chromium   # una vez
+npm run e2e        # local (levanta el dev server)
+npm run e2e:prod   # producción (https://locationguesser-sage.vercel.app)
+```
+
+Playwright dirige un navegador real y caza lo que los unit tests no ven:
+errores de consola, peticiones fallidas, flujos rotos y regresiones de
+interacción/z-index (un click sobre un elemento tapado falla). El usuario solo
+hace la validación final; el orquestador valida primero.
+
 ## 5. Estilo de código (estilo Sunner, ligero)
 
 - **Prettier:** sin punto y coma, comillas simples, `trailingComma: all`, `printWidth: 100`.
