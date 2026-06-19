@@ -1,5 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CreateChallenge } from './features/create/CreateChallenge'
+import { PlayChallenge } from './features/play/PlayChallenge'
+import { GroupPage } from './features/group/GroupPage'
+import { parseHash } from './lib/route'
 import { Button, Card, Stack } from './ui'
 import styles from './App.module.css'
 
@@ -14,8 +17,24 @@ const STEPS = [
 ]
 
 function App() {
+  // Routing por hash: #g=<grupo>&c=<reto>. El orquestador posee este router;
+  // cada feature vive en su carpeta y no toca App.tsx.
+  const [route, setRoute] = useState(parseHash())
   const [view, setView] = useState<View>('home')
 
+  useEffect(() => {
+    const onHash = () => setRoute(parseHash())
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  // Un reto concreto → jugar. Solo el grupo → página del viaje (histórico).
+  if (route.challenge) {
+    return <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+  }
+  if (route.group) {
+    return <GroupPage groupId={route.group} />
+  }
   if (view === 'create') {
     return <CreateChallenge onBack={() => setView('home')} />
   }
