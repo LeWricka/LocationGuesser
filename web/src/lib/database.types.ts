@@ -48,6 +48,9 @@ export interface Database {
           lat: number
           lng: number
           image_path: string | null
+          sv_pano_id: string | null
+          sv_heading: number | null
+          sv_pitch: number | null
           guess_seconds: number | null
           deadline_at: string
           created_by: string
@@ -60,6 +63,9 @@ export interface Database {
           lat: number
           lng: number
           image_path?: string | null
+          sv_pano_id?: string | null
+          sv_heading?: number | null
+          sv_pitch?: number | null
           guess_seconds?: number | null
           deadline_at: string
           created_by: string
@@ -72,6 +78,9 @@ export interface Database {
           lat?: number
           lng?: number
           image_path?: string | null
+          sv_pano_id?: string | null
+          sv_heading?: number | null
+          sv_pitch?: number | null
           guess_seconds?: number | null
           deadline_at?: string
           created_by?: string
