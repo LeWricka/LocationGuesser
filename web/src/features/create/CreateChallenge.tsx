@@ -218,7 +218,15 @@ export function CreateChallenge({ onBack }: Props) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setStatus(null)
-      toast.show(`No se pudo crear el reto: ${msg}`, { tone: 'danger' })
+      // "Failed to fetch" suele ser la red/navegador del usuario bloqueando la
+      // conexión (VPN, DNS privado, bloqueador, ahorro de datos), no la app.
+      const networkish = /failed to fetch|networkerror|load failed/i.test(msg)
+      toast.show(
+        networkish
+          ? 'Sin conexión con el servidor. Prueba con datos en vez de WiFi (o al revés) y desactiva VPN, DNS privado o bloqueador; luego reinténtalo.'
+          : `No se pudo crear el reto: ${msg}`,
+        { tone: 'danger' },
+      )
     } finally {
       setBusy(false)
     }
