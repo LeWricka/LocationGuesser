@@ -364,21 +364,21 @@ Each feature area can be split further:
   - "Can we avoid doing it entirely?"
   - "Let's remove it and monitor the impact"
 
-## Encaje en el flujo de Discovery de Saltoki
+## Encaje en LocationGuesser
 
-This skill is used in **Fase 4 — Kickoff** of the Discovery flow: once a case is `Shaping-ok` and presented to the dev team, the épica is split into user stories that each deliver value on their own, are small enough for the 6-week cycle, and have clear acceptance criteria.
+Usa esta skill al convertir el diseño (`docs/estrategia/`) en issues de trabajo, antes de crear casos de uso con `create-use-cases`.
 
-**Use this skill when:**
-- A use case (épica) needs to be broken into stories at kickoff
-- A story contains obvious red flags ("manage", "and", "or", "including")
-- A story feels too big or vague before moving to `In Progress`
+**Úsala cuando:**
+- Un caso de uso necesita partirse en slices verticales antes de crear las issues
+- Un requisito contiene red flags ("gestionar", "y", "o", "incluyendo")
+- Un caso parece demasiado grande o vago antes de pasar a `In progress`
 
-It pairs with `refine-iteration-scope`: run that first (before/at kickoff) to remove domain/integration/implementability gaps, **then** split the clarified scope into stories.
+Pasa los slices resultantes a `create-use-cases`, que crea las issues en `LeWricka/LocationGuesser` y las añade al Project #14.
 
-**Integration example:**
-- Original: "El instalador puede gestionar presupuestos y proyectos, incluyendo crear, editar y aprobar"
-- Apply story-splitting → Split into: (1) "Crear presupuesto", (2) "Editar líneas del presupuesto", (3) "Enviar a aprobación"
-- Choose the smallest vertical slice that delivers value first.
+**Ejemplo de integración (dominio LocationGuesser):**
+- Original: "El jugador puede crear un reto fijando el punto por clic, GPS, búsqueda o URL de Google Maps, y subir la foto"
+- Aplica story-splitting (red flags "o", "y") → (1) "Crear reto fijando punto por clic/GPS/búsqueda + título", (2) "Subir y procesar la foto del reto", (3) "Fijar punto pegando URL de Google Maps".
+- Elige primero el slice vertical más pequeño que aporte valor.
 
 ---
 

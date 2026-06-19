@@ -1,30 +1,31 @@
 ---
 name: create-use-cases
-description: Crea issues de caso de uso (type Project) en SaltokiVanOirschot/SaltokiOnline siguiendo la plantilla Shape Up del equipo de Discovery, las añade al proyecto Saltoki Projects #18 y rellena los campos (Status, Impact, Apetito) y relaciones padre/hijo y bloqueo. Usar al crear casos de uso o requisitos para Saltoki Online.
+description: Crea issues de caso de uso en LeWricka/LocationGuesser siguiendo una plantilla Shape Up ligera, las añade al Project 14 y rellena campos (Status, Priority, Size) y relaciones padre/hijo y bloqueo. Usar al crear casos de uso o requisitos para LocationGuesser.
 ---
 
 STARTER_CHARACTER = 📋⚡
 
 ## Target
 
-- **Repositorio:** `SaltokiVanOirschot/SaltokiOnline`
-- **Proyecto:** Saltoki Projects #18 — `PROJECT_ID = PVT_kwDOAq0XsM4AMHhT` (org `SaltokiVanOirschot`)
-- **Issue type:** `Project`
-- **Plantilla de cuerpo:** [plantilla-caso-de-uso.md](../../../flujo/plantilla-caso-de-uso.md) (formato Shape Up)
-- **Flujo:** un caso recién creado entra en `On the bench`. Solo cruza a `Shaping-ok` cuando cumple el Definition of Ready. Ver [flujo-discovery.md](../../../flujo/flujo-discovery.md).
+- **Repositorio:** `LeWricka/LocationGuesser`
+- **Proyecto:** Project #14 (usuario `LeWricka`) — `PROJECT_ID = PVT_kwHOABkrCM4BbIkS`
+- **Plantilla de cuerpo:** Shape Up ligera (ver Paso 2). En español, lenguaje de producto.
+- **Flujo:** un caso recién creado entra en `Backlog`. Pasa a `Ready` cuando está bien definido y listo para construir.
 
-### IDs del proyecto #18 (verificados)
+> ⚠️ Esta skill SOLO opera sobre `LeWricka/LocationGuesser` y su Project #14. Nunca crear issues en otros repos.
 
-| Campo | Field ID | Tipo | Opciones / notas |
-|-------|----------|------|------------------|
-| Status | `PVTSSF_lADOAq0XsM4AMHhTzgHurQE` | single-select | On the bench=`bed56f10`, Shaping=`8ba0f952`, Shaping-ok=`7e8bb721`, To do=`f75ad846`, In Progress=`47fc9ee4`, Blocked=`f30bced7`, Validation=`1623e4db`, Done=`98236657` |
-| Impact | `PVTF_lADOAq0XsM4AMHhTzgIycjk` | number | — |
-| Apetito | `PVTF_lADOAq0XsM4AMHhTzgKEqFw` | number (semanas) | — |
-| Ciclo | `PVTIF_lADOAq0XsM4AMHhTzgKFDe8` | iteration | opcional |
+### IDs del Project #14 (verificados)
 
-> Si los IDs fallaran (cambio de configuración del proyecto), redescúbrelos:
+| Campo | Field ID | Tipo | Opciones |
+|-------|----------|------|----------|
+| Status | `PVTSSF_lAHOABkrCM4BbIkSzhV7ReQ` | single-select | Backlog=`f75ad846`, Ready=`61e4505c`, In progress=`47fc9ee4`, In review=`df73e18b`, Done=`98236657` |
+| Priority | `PVTSSF_lAHOABkrCM4BbIkSzhV7RhY` | single-select | P0=`79628723`, P1=`0a877460`, P2=`da944a9c` |
+| Size | `PVTSSF_lAHOABkrCM4BbIkSzhV7Rhc` | single-select | XS=`6c6483d2`, S=`f784b110`, M=`7515a9f1`, L=`817d0097`, XL=`db339eb2` |
+| Estimate | `PVTF_lAHOABkrCM4BbIkSzhV7Rhg` | number | — |
+
+> Si los IDs fallaran (cambio de configuración), redescúbrelos:
 > ```bash
-> gh api graphql -f query='query{organization(login:"SaltokiVanOirschot"){projectV2(number:18){id fields(first:30){nodes{... on ProjectV2FieldCommon{id name dataType} ... on ProjectV2SingleSelectField{id name options{id name}}}}}}}'
+> gh api graphql -f query='query{user(login:"LeWricka"){projectV2(number:14){id fields(first:30){nodes{... on ProjectV2FieldCommon{id name dataType} ... on ProjectV2SingleSelectField{id name options{id name}}}}}}}'
 > ```
 
 ## Paso 1 — Recopilar casos de uso
@@ -33,134 +34,95 @@ Pide input al usuario. Dos modos:
 
 **Modo lista:** el usuario da una lista de casos (títulos + descripción breve). Confirma la lista antes de continuar.
 
-**Modo contexto:** el usuario apunta a un contexto existente (documento, conversación, página de Notion, Figma, issue). Este es el **documento padre**. Usa la skill `story-splitting` (vía subagente) para partir el contexto en casos bien dimensionados — detecta red flags lingüísticos (y, o, gestionar, incluyendo) y produce slices verticales. Presenta los casos resultantes para confirmación antes de crear nada.
+**Modo contexto:** el usuario apunta a un documento existente (p.ej. `docs/estrategia/prueba-de-un-dia.md`). Usa la skill `story-splitting` para partir el contexto en slices verticales bien dimensionados — detecta red flags lingüísticos (y, o, gestionar, incluyendo) y produce casos que aporten valor por sí solos. Presenta los casos para confirmación antes de crear nada.
 
-**Código de Saltoki Online (preguntar, no precargar):** antes de escribir las dependencias técnicas, pregunta *"¿Quieres que mire el código de Saltoki Online para validar factibilidad / bounded contexts de estos casos?"*. Si confirma, **localiza el repo (remoto `SaltokiVanOirschot/SaltokiOnline`) y gestiona su ausencia según la regla de contexto** (`.claude/rules/trazabilidad-y-estilo.md`): no asumas la ruta, y si no puedes acceder, marca la factibilidad como `pendiente`/`REVISAR`.
-
-**Extracción de contexto (solo modo contexto):** antes de escribir los cuerpos, analiza el documento padre y extrae por cada caso:
-- **Términos de dominio:** conceptos, acrónimos, segmentos o sistemas externos del padre relevantes para ESTE caso. Defínelos brevemente.
-- **Detalles de integración externa:** fuentes de datos, protocolos, APIs, frecuencias, contratos — lo que el desarrollador necesita (IBMi/AS400, Elasticsearch, Stripe/Redsys/Bizum, Ariba/cXML, sync nocturna…).
-- **Bloqueantes heredados:** cualquier "Pendiente", "Duda" o dependencia sin resolver del padre que afecte a ESTE caso. Pasan a ser bloqueantes explícitos.
-
-Por cada caso, pregunta o infiere del contexto:
-- **Segmento afectado:** instalador individual | empresa de instalación | enterprise punchout | SAT | proveedor
-- **Status inicial:** `On the bench` (por defecto, recién capturado) o `Shaping` (si ya se va a definir)
-- **Impact:** número (escala del equipo)
-- **Apetito:** número de semanas (presupuesto, no estimación)
-- **Relaciones:** ¿bloquea o depende de otros? ¿es hijo de una issue existente?
-- **Labels:** etiquetas de workspace que apliquen
+Por cada caso, pregunta o infiere:
+- **Status inicial:** `Backlog` (por defecto) o `Ready` (si ya está definido).
+- **Priority:** `P0` (crítico para jugar hoy) | `P1` | `P2`.
+- **Size:** `XS`–`XL` (apetito, no estimación precisa).
+- **Relaciones:** ¿bloquea o depende de otros? ¿es hijo de una issue/épica existente?
+- **Labels:** etiquetas que apliquen (`feat`, `chore`, área…).
 
 Presenta una **tabla resumen** de todos los casos con sus campos antes de crear nada. Espera aprobación.
 
 ## Paso 2 — Escribir el cuerpo de la issue
 
-Cada caso sigue la **plantilla Shape Up** del equipo (no inventes secciones). Escribe en español, lenguaje de negocio. Sin jerga técnica interna (nombres de servicios, clases, patrones) — pero los términos técnicos externos que son parte del requisito (protocolos, APIs, sistemas externos) sí son lenguaje de negocio legítimo.
-
-Rellena solo lo que tengas con evidencia; lo que falte se marca como pendiente, no se inventa. Estructura:
+Plantilla Shape Up ligera. Escribe en español, lenguaje de producto. Rellena solo lo que tengas con evidencia; lo que falte se marca como pendiente, no se inventa.
 
 ```
 # [Título del caso de uso]
 
-## 1. Problema
-- **Qué problema resuelve y para quién** (segmento concreto)
-- **Estado actual:** cómo se resuelve hoy y por qué duele
-- **Evidencia:** encuesta / dato analítica / ticket de soporte / sesión con stakeholder — siempre con fuente
+## Problema
+- Qué resuelve y para quién
+- Estado actual: cómo se hace hoy y por qué duele
 
-## 2. Apetito
-- **Semanas:** [N]  ·  **Equipo asumido:** [N] personas (el campo Apetito del #18 = semanas)
-- **Trade-off explícito:** si se desborda, qué recortamos primero (no se añade gente ni se mueve fecha)
+## Apetito
+- **Size:** [XS–XL]  ·  **Priority:** [P0–P2]
+- **Trade-off:** si se desborda, qué recortamos primero
 
-## 3. Hipótesis de impacto
-> Creemos que [solución] provocará [resultado medible] porque [razón]
-- **Métrica primaria:** [KPI] — baseline: [X] → target: [Y]
-- **Métricas guardarraíl:** [qué NO debe empeorar]
-> Si no admite métrica (refactor, integración contractual, deuda), marcar `N/A` y justificar en una línea.
+## Solución
+- Flujo funcional (breadboarding)
+- Reglas / detalles relevantes
+- Dependencias técnicas (Supabase, Leaflet, Edge Function, localStorage…)
 
-## 4. Solución
-### 4.1 Flujo funcional (breadboarding)
-### 4.2 Concepto de interfaz (link a Figma)
-### 4.3 Reglas de negocio / Casos de uso
-### 4.4 Dependencias técnicas
-- Sistemas implicados (IBMi/AS400, Auth, CMS, Elastic, Stripe, Ariba…)
-- Integraciones / endpoints nuevos · Datos / sync nocturna · Bounded contexts afectados
+## Fuera de alcance (No-Gos)
 
-## 5. Rabbit Holes
-## 6. No-Gos (Exclusiones)
-## 7. Criterios de aceptación
-- [ ] Funcional: …
-- [ ] Analítica instrumentada: eventos [X], [Y]
-- [ ] No regresión en: …
-
-## 8. Validaciones — Definition of Ready (para mover a `Shaping-ok`)
-- [ ] Problema con evidencia · [ ] Apetito numérico · [ ] Hipótesis con métrica+baseline+target (o N/A)
-- [ ] Flujo cerrado · [ ] Figma · [ ] Reglas de negocio · [ ] Firma técnica: [David, o tech designado]
-- [ ] Rabbit Holes y No-Gos · [ ] Criterios de aceptación · [ ] OK Nacho (bloqueante final)
+## Criterios de aceptación
+- [ ] …
 ```
-
-### Buenas y malas señales
-
-- ✅ "El instalador no puede reutilizar la lista de materiales de un proyecto anterior y la reconstruye a mano cada vez." (problema, segmento, dolor)
-- ✅ "Los datos de stock se sincronizan desde IBMi/AS400 en la sync nocturna." (detalle de integración como negocio)
-- ❌ "Refactorizar el servicio de carrito para inyección de dependencias." (jerga interna)
-- ❌ "Implementar un endpoint REST que devuelva…" (detalle de implementación)
-- ❌ Copiar el documento padre entero en el contexto — extrae solo lo que ESTE caso necesita.
 
 ## Paso 3 — Crear las issues
 
-Comprueba si el MCP de GitHub está disponible (`mcp__github__issue_write` en tus tools). Úsalo si está; si no, usa `gh`.
+Usa `gh`. Comprueba antes que el remoto y el repo son `LeWricka/LocationGuesser`.
 
 ### 3.1 Crear la issue
 
-**Con MCP:** `mcp__github__issue_write` con `method: create`, `owner: SaltokiVanOirschot`, `repo: SaltokiOnline`, `type: Project`, más `title`, `body`, `labels`.
-
-**Con gh CLI:**
 ```bash
-gh issue create --repo SaltokiVanOirschot/SaltokiOnline \
-  --title "<título>" --body "<cuerpo>" --label "<label>" --type "Project"
+gh issue create --repo LeWricka/LocationGuesser \
+  --title "<título>" --body "<cuerpo>" --label "<label>"
 ```
 
-### 3.2 Añadir al proyecto y fijar campos
+### 3.2 Añadir al Project #14 y fijar campos
 
 ```bash
-PROJECT_ID="PVT_kwDOAq0XsM4AMHhT"
-# Node ID de la issue
-CONTENT_ID=$(gh issue view <número> --repo SaltokiVanOirschot/SaltokiOnline --json id -q .id)
+PROJECT_ID="PVT_kwHOABkrCM4BbIkS"
+CONTENT_ID=$(gh issue view <número> --repo LeWricka/LocationGuesser --json id -q .id)
 
-# Añadir al proyecto #18 → devuelve el item id
+# Añadir al proyecto → devuelve el item id
 ITEM_ID=$(gh api graphql -f query='
 mutation($p:ID!,$c:ID!){ addProjectV2ItemById(input:{projectId:$p, contentId:$c}){ item{ id } } }' \
   -f p="$PROJECT_ID" -f c="$CONTENT_ID" --jq '.data.addProjectV2ItemById.item.id')
 
-# Status (por defecto On the bench = bed56f10)
+# Status (por defecto Backlog = f75ad846)
 gh api graphql -f query='
 mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){ updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){ projectV2Item{ id } } }' \
-  -f p="$PROJECT_ID" -f i="$ITEM_ID" -f f="PVTSSF_lADOAq0XsM4AMHhTzgHurQE" -f o="bed56f10"
+  -f p="$PROJECT_ID" -f i="$ITEM_ID" -f f="PVTSSF_lAHOABkrCM4BbIkSzhV7ReQ" -f o="f75ad846"
 
-# Impact (number)
+# Priority (p.ej. P0 = 79628723)
 gh api graphql -f query='
-mutation($p:ID!,$i:ID!,$f:ID!,$n:Float!){ updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{number:$n}}){ projectV2Item{ id } } }' \
-  -f p="$PROJECT_ID" -f i="$ITEM_ID" -f f="PVTF_lADOAq0XsM4AMHhTzgIycjk" -F n=<impact>
+mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){ updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){ projectV2Item{ id } } }' \
+  -f p="$PROJECT_ID" -f i="$ITEM_ID" -f f="PVTSSF_lAHOABkrCM4BbIkSzhV7RhY" -f o="79628723"
 
-# Apetito (number, semanas)
+# Size (p.ej. S = f784b110)
 gh api graphql -f query='
-mutation($p:ID!,$i:ID!,$f:ID!,$n:Float!){ updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{number:$n}}){ projectV2Item{ id } } }' \
-  -f p="$PROJECT_ID" -f i="$ITEM_ID" -f f="PVTF_lADOAq0XsM4AMHhTzgKEqFw" -F n=<semanas>
+mutation($p:ID!,$i:ID!,$f:ID!,$o:String!){ updateProjectV2ItemFieldValue(input:{projectId:$p,itemId:$i,fieldId:$f,value:{singleSelectOptionId:$o}}){ projectV2Item{ id } } }' \
+  -f p="$PROJECT_ID" -f i="$ITEM_ID" -f f="PVTSSF_lAHOABkrCM4BbIkSzhV7Rhc" -f o="f784b110"
 ```
 
 ### 3.3 Relaciones
 
 **Padre/hijo (sub-issue):**
 ```bash
-PARENT_NODE=$(gh issue view <padre> --repo SaltokiVanOirschot/SaltokiOnline --json id -q .id)
-CHILD_NODE=$(gh issue view <hijo> --repo SaltokiVanOirschot/SaltokiOnline --json id -q .id)
+PARENT_NODE=$(gh issue view <padre> --repo LeWricka/LocationGuesser --json id -q .id)
+CHILD_NODE=$(gh issue view <hijo> --repo LeWricka/LocationGuesser --json id -q .id)
 gh api graphql -f query='mutation($p:ID!,$c:ID!){ addSubIssue(input:{issueId:$p, subIssueId:$c}){ issue{ number } } }' \
   -f p="$PARENT_NODE" -f c="$CHILD_NODE"
 ```
 
 **Bloqueo (BLOCKING bloquea a BLOCKED):**
 ```bash
-BLOCKED_ID=$(gh issue view <bloqueada> --repo SaltokiVanOirschot/SaltokiOnline --json id -q .id)
-BLOCKING_ID=$(gh issue view <bloqueante> --repo SaltokiVanOirschot/SaltokiOnline --json id -q .id)
+BLOCKED_ID=$(gh issue view <bloqueada> --repo LeWricka/LocationGuesser --json id -q .id)
+BLOCKING_ID=$(gh issue view <bloqueante> --repo LeWricka/LocationGuesser --json id -q .id)
 gh api graphql -f query='
 mutation($i:ID!,$b:ID!){ addBlockedBy(input:{issueId:$i, blockingIssueId:$b}){ issue{ number } blockingIssue{ number } } }' \
   -f i="$BLOCKED_ID" -f b="$BLOCKING_ID"
@@ -168,16 +130,16 @@ mutation($i:ID!,$b:ID!){ addBlockedBy(input:{issueId:$i, blockingIssueId:$b}){ i
 
 ## Paso 4 — Reportar resultados
 
-| # | Título | Segmento | Status | Impact | Apetito | Relaciones |
-|---|--------|----------|--------|--------|---------|------------|
-| #XXXX | … | instalador | On the bench | 3 | 4 sem | padre de #YYYY |
+| # | Título | Status | Priority | Size | Relaciones |
+|---|--------|--------|----------|------|------------|
+| #N | … | Backlog | P0 | S | hijo de #M |
 
 Incluye el link a cada issue creada.
 
 ## Reglas de comportamiento
 
-- **No inventar evidencia ni métricas.** Lo que no se sepa, se marca como pendiente en la issue.
-- **Respetar la plantilla Shape Up** — es el contrato del DoR para cruzar a `Shaping-ok`.
-- **Estado inicial por defecto `On the bench`** salvo que el usuario indique que ya entra en `Shaping`.
+- **Solo `LeWricka/LocationGuesser` y Project #14.** Nunca otro repo/proyecto.
+- **No inventar evidencia ni criterios.** Lo que no se sepa, se marca como pendiente.
+- **Estado inicial por defecto `Backlog`** salvo que el usuario indique `Ready`.
 - **Confirmar la tabla resumen antes de crear** cualquier issue.
-- **No marcar el DoR como completo** automáticamente — el OK final es de Nacho (humano), fuera del alcance de esta skill.
+- **Slices verticales:** cada caso debe aportar valor por sí solo (apóyate en `story-splitting`).
