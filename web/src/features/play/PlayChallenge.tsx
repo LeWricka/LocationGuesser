@@ -4,7 +4,8 @@ import { getChallenge } from '../../lib/challenges'
 import { getExistingVote, saveVote } from '../../lib/votes'
 import { computeResult, type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
-import { getName, setName } from '../../lib/identity'
+import { getIdentity } from '../../lib/identity'
+import { useIdentity } from '../identity'
 import { supabase } from '../../lib/supabase'
 import type { Challenge } from '../../lib/database.types'
 import { Badge, Button, Card, Modal, Row, Spinner, Stack, useToast } from '../../ui'
@@ -37,6 +38,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [timedOut, setTimedOut] = useState(false)
   const [saving, setSaving] = useState(false)
   const toast = useToast()
+  const { ensureIdentity, modal: identityModal } = useIdentity()
 
   // Revelar: calcula resultado contra la respuesta real, fija el pin y, si hay
   // pin, persiste el voto. Sin pin (timeout) -> "no diste a tiempo".
@@ -52,14 +54,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       const r = computeResult(playedGuess, answer)
       setResult(r)
 
-      let name = getName()
+      const name = await ensureIdentity(current.group_id)
       if (!name) {
-        name = window.prompt('¿Tu nombre? (para guardar tu jugada)')?.trim() ?? ''
-        if (!name) {
-          toast.show('No se guardó tu voto (sin nombre)', { tone: 'neutral' })
-          return
-        }
-        setName(name)
+        toast.show('No se guardó tu voto (sin nombre)', { tone: 'neutral' })
+        return
       }
       setSaving(true)
       try {
@@ -81,7 +79,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         setSaving(false)
       }
     },
-    [toast],
+    [toast, ensureIdentity],
   )
 
   // Carga del reto. Si el jugador ya votó, salta directo a revelado mostrando
@@ -94,7 +92,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         if (cancelled) return
         setChallenge(c)
 
-        const name = getName()
+        const name = getIdentity()?.name ?? null
         const existing = name ? await getExistingVote(challengeId, name) : null
         if (cancelled) return
         if (existing) {
@@ -283,6 +281,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           </Stack>
         </div>
       </Modal>
+
+      {identityModal}
     </main>
   )
 }

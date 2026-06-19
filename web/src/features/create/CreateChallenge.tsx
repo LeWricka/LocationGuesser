@@ -2,8 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { MapPicker } from './MapPicker'
 import type { LatLng } from '../../lib/geo'
 import { createChallenge } from '../../lib/challenges'
+import { newGroupCode } from '../../lib/group'
+import { supabase } from '../../lib/supabase'
 import { uploadImage } from '../../lib/storage'
-import { getName, setName } from '../../lib/identity'
+import { useIdentity } from '../identity'
 import { Badge, Button, Card, Field, Input, Row, Stack, useToast } from '../../ui'
 import styles from './CreateChallenge.module.css'
 
@@ -59,6 +61,7 @@ export function CreateChallenge({ onBack }: Props) {
   const [guessSeconds, setGuessSeconds] = useState<number | null>(120)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const toast = useToast()
+  const { ensureIdentity, modal: identityModal } = useIdentity()
 
   // Vista previa local derivada del archivo; el efecto solo revoca el URL al
   // cambiar/desmontar (no hace falta estado).
@@ -146,22 +149,31 @@ export function CreateChallenge({ onBack }: Props) {
       setStatus('Añade una foto del reto.')
       return
     }
-    let name = getName()
-    if (!name) {
-      name = window.prompt('¿Tu nombre? (para firmar el reto)')?.trim() ?? ''
-      if (!name) return
-      setName(name)
+    // El grupo ("el viaje") nace aquí: necesitamos su fila para registrar al
+    // jugador (FK players→groups) antes de identificar a quien crea el reto.
+    const groupId = newGroupCode()
+    const { error: groupError } = await supabase.from('groups').insert({ id: groupId })
+    if (groupError) {
+      setStatus(`Error al crear el grupo: ${groupError.message}`)
+      return
     }
+
+    // Identidad sin login: con identidad global no pide nada; navegador limpio
+    // → modal con nombre + PIN. Devuelve null si el usuario cancela.
+    const name = await ensureIdentity(groupId)
+    if (!name) return
+
     setBusy(true)
     setStatus('Subiendo foto…')
     try {
       const imagePath = await uploadImage(imageFile)
       setStatus('Guardando…')
-      const { challenge, groupId } = await createChallenge({
+      const { challenge } = await createChallenge({
         title: title.trim() || '¿Dónde estoy? 🌍',
         lat: point.lat,
         lng: point.lng,
         createdBy: name,
+        groupId,
         imagePath,
         deadlineAt: deadlineISO(deadline),
         guessSeconds,
@@ -175,10 +187,28 @@ export function CreateChallenge({ onBack }: Props) {
     }
   }
 
+  // Texto listo para pegar en el chat del grupo (#8): gancho + enlace.
+  const shareText = link ? `🌍 ¿Dónde estoy? Adivina en el mapa: ${link}` : ''
+
   function copy() {
     if (!link) return
-    void navigator.clipboard.writeText(link)
-    toast.show('Enlace copiado', { tone: 'success' })
+    void navigator.clipboard.writeText(shareText)
+    toast.show('Texto copiado, pégalo en el grupo', { tone: 'success' })
+  }
+
+  async function share() {
+    if (!link) return
+    // Web Share API (móvil): abre la hoja nativa para mandarlo al chat. Si el
+    // usuario cancela, no es error. Sin soporte → copiamos como respaldo.
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '¿Dónde estoy? 🌍', text: shareText })
+        return
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+      }
+    }
+    copy()
   }
 
   return (
@@ -332,21 +362,28 @@ export function CreateChallenge({ onBack }: Props) {
         {link && (
           <Card padding="md" raised>
             <Stack gap={3}>
-              <strong>¡Reto creado! Comparte este enlace:</strong>
+              <strong>¡Reto creado! Compártelo en el grupo:</strong>
               <Input
                 className={styles.linkInput}
                 readOnly
-                value={link}
-                aria-label="Enlace del reto"
+                value={shareText}
+                aria-label="Mensaje para compartir el reto"
                 onFocus={(e) => e.target.select()}
               />
-              <Button variant="secondary" onClick={copy}>
-                Copiar enlace
-              </Button>
+              <Row gap={2}>
+                {typeof navigator !== 'undefined' && 'share' in navigator && (
+                  <Button onClick={() => void share()}>Compartir</Button>
+                )}
+                <Button variant="secondary" onClick={copy}>
+                  Copiar
+                </Button>
+              </Row>
             </Stack>
           </Card>
         )}
       </Stack>
+
+      {identityModal}
     </main>
   )
 }
