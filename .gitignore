@@ -11,3 +11,6 @@ npm-debug.log*
 dist/
 .env
 .env.*
+
+# Worktrees de agentes paralelos
+.claude/worktrees/

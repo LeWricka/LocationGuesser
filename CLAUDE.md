@@ -14,7 +14,7 @@
 | Diseño v0.2 (prueba de un día) | ✅ [docs/estrategia/prueba-de-un-dia.md](docs/estrategia/prueba-de-un-dia.md) |
 | App v0.1 (web estática) | 🗄️ archivada en `legacy/v0.1/` (referencia) |
 | App v0.2 (React + Supabase) | 🔨 en construcción en `web/` |
-| Despliegue | ⏳ Vercel (front) + Supabase (datos) |
+| Despliegue | ✅ en vivo — [locationguesser-sage.vercel.app](https://locationguesser-sage.vercel.app) (Vercel + Supabase) |
 | Push real, login real, privacidad | 🔜 next |
 
 ---
@@ -25,6 +25,12 @@
 - **Filosofía:** lo más simple posible e iterar; no bloquearse. Lanzar y validar. Antes de añadir login/cuentas de verdad, validar que el bucle social funciona (se juega y se repite).
 - **Monolito:** la definición (`docs/`), el código v0.2 (`web/`) y la v0.1 archivada (`legacy/`) viven en el mismo repo.
 - **Frameworks** (metodología del usuario): Kernel de **Rumelt** (diagnóstico → política guía → acciones), **OST** (outcome → oportunidad → iniciativa). Oportunidades priorizadas por **impacto** y **apetito** (Shape Up), no por estimación.
+
+## Orquestación y reglas
+
+- El hilo principal de Claude actúa como **orquestador**: descompone, crea issues, **lanza agentes en paralelo** (en worktrees, por áreas que no se pisan) y mergea.
+- **Playbook obligatorio para todo agente:** [.claude/rules/always.md](.claude/rules/always.md) — seguridad, flujo issue→rama→PR, Conventional Commits, estilo, verificación, acceso a Supabase, Project #14 y áreas de trabajo.
+- Trabajo en GitHub **Project #14**; un issue → una rama → un PR → merge (squash).
 
 ## Arquitectura (v0.2)
 
