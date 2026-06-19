@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>LocationGuesser · adivina dónde están tus amigos</title>
+<meta name="description" content="GeoGuessr con las fotos de tus amigos. Adivina dónde están y mira quién se acerca más." />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>" />
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="#"><span class="pin">📍</span> Location<b>Guesser</b></a>
+  <span class="tagline">adivina dónde están tus amigos</span>
+</header>
+
+<main id="app">
+
+  <!-- HOME -->
+  <section class="view" id="view-home">
+    <div class="hero">
+      <h1>¿Dónde está tu amigo? 🌍</h1>
+      <p>Tu colega de viaje marca su sitio exacto y manda una foto al grupo. Los demás colocan su pin en el mapa… <b>gana quien más se acerque</b>.</p>
+      <div class="home-actions">
+        <button class="btn btn-primary" id="go-create">Crear un reto</button>
+        <button class="btn btn-ghost" id="go-demo">Probar con un ejemplo</button>
+      </div>
+      <ol class="how">
+        <li><b>1.</b> Estás de viaje → marca dónde estás y crea el reto.</li>
+        <li><b>2.</b> Comparte el enlace + la foto en el grupo.</li>
+        <li><b>3.</b> Cada amigo adivina en el mapa. ¡A ver quién gana!</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- CREAR RETO -->
+  <section class="view hidden" id="view-create">
+    <h2 class="vtitle">Crear un reto</h2>
+    <div class="field">
+      <label>Título <span class="hint">— lo que verán tus amigos</span></label>
+      <input id="c-title" type="text" placeholder="¿Dónde está Samu? 🕵️" maxlength="80" />
+    </div>
+
+    <div class="field">
+      <label>¿Dónde estás? <span class="hint">— pulsa el mapa o usa tu GPS</span></label>
+      <div class="search-row">
+        <input id="c-search" type="text" placeholder="Buscar un lugar (opcional)…" />
+        <button class="btn btn-sm" id="c-gps" title="Usar mi ubicación">📡 Mi ubicación</button>
+      </div>
+      <div id="map-create" class="map"></div>
+      <div class="coords" id="c-coords">Sin ubicación todavía</div>
+    </div>
+
+    <div class="field">
+      <label>Foto <span class="hint">— opcional, para verla junto al mapa</span></label>
+      <div class="search-row">
+        <input id="c-imgurl" type="text" placeholder="Pega una URL de imagen (opcional)" />
+        <label class="btn btn-sm" for="c-imgfile">🖼️ Subir</label>
+        <input id="c-imgfile" type="file" accept="image/*" hidden />
+      </div>
+      <div class="img-note">La foto que subas se incluye en el enlace solo si es pequeña; lo normal es mandarla por el grupo y tus amigos la suben al jugar.</div>
+      <img id="c-imgprev" class="img-prev hidden" alt="vista previa" />
+    </div>
+
+    <div class="field">
+      <label>Tiempo para adivinar</label>
+      <div class="seg" id="c-timer">
+        <button data-t="0">Sin límite</button>
+        <button data-t="30">30 s</button>
+        <button data-t="60" class="on">60 s</button>
+        <button data-t="120">2 min</button>
+      </div>
+    </div>
+
+    <div class="create-foot">
+      <button class="btn btn-primary" id="c-generate" disabled>Generar enlace del reto</button>
+      <button class="btn btn-ghost btn-sm" id="c-back">← Volver</button>
+    </div>
+
+    <div id="c-result" class="result-link hidden">
+      <p class="ok">¡Reto listo! 🎉 Comparte este enlace (y la foto) en el grupo:</p>
+      <div class="link-row">
+        <input id="c-link" type="text" readonly />
+        <button class="btn btn-sm" id="c-copy">Copiar</button>
+      </div>
+      <div class="link-actions">
+        <a id="c-open" class="btn btn-ghost btn-sm" target="_blank">Abrir como jugador ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- JUGAR -->
+  <section class="view hidden" id="view-play">
+    <div class="play-head">
+      <h2 class="vtitle" id="p-title">Adivina dónde está</h2>
+      <div class="timer hidden" id="p-timer">⏱ <span id="p-time">--</span></div>
+    </div>
+
+    <div class="play-photo" id="p-photo">
+      <div class="photo-drop" id="p-drop">
+        <p>📷 ¿Te han pasado la foto?</p>
+        <label class="btn btn-sm" for="p-imgfile">Subir la foto</label>
+        <input id="p-imgfile" type="file" accept="image/*" hidden />
+        <span class="or">o búscala en tu chat</span>
+      </div>
+    </div>
+
+    <p class="play-hint" id="p-hint">Pulsa en el mapa donde crees que está, y confirma.</p>
+    <div id="map-play" class="map map-tall"></div>
+
+    <div class="play-foot">
+      <button class="btn btn-primary" id="p-confirm" disabled>Confirmar mi apuesta</button>
+    </div>
+
+    <!-- RESULTADO -->
+    <div id="p-result" class="result hidden">
+      <div class="score-big"><span id="r-score">0</span><small>puntos</small></div>
+      <div class="dist">Te has quedado a <b id="r-dist">–</b></div>
+      <div class="share-row">
+        <input id="r-share" type="text" readonly />
+        <button class="btn btn-sm" id="r-copy">Copiar resultado</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="r-again">Crear mi propio reto →</button>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <span>LocationGuesser · v0.1</span>
+  <span class="sep">·</span>
+  <span>mapa © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
