@@ -110,3 +110,27 @@ npx supabase functions deploy resolve-maps-url \
 - `--no-verify-jwt` → la función se invoca sin sesión de usuario (no requiere JWT).
 
 Requiere estar logueado en el CLI (`npx supabase login`).
+
+---
+
+## Email transaccional (magic link de login)
+
+El login es **passwordless por magic link**: Supabase Auth manda el email. El
+email integrado de Supabase está limitado (~2/hora) → se usa **SMTP propio**.
+
+- **Proveedor:** Brevo (`smtp-relay.brevo.com:587`). Dominio `540deg.com` dado de
+  alta en Brevo para autenticación (DKIM/SPF/DMARC) y evitar el spam.
+- **Dónde vive la config:** Supabase → Authentication → SMTP Settings (o vía
+  Management API `PATCH /v1/projects/<ref>/config/auth`). Campos: `smtp_host`,
+  `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_admin_email` (remitente),
+  `smtp_sender_name`. `rate_limit_email_sent` subido (el GET de la API **oculta**
+  los campos `smtp_*` por seguridad; el PATCH sí los refleja).
+- **Secretos:** la SMTP key y la API key de Brevo viven **solo en la config de
+  Supabase (cifradas)**. NUNCA en git ni en `web/`. Si se filtran, regenerar en
+  Brevo (SMTP & API) y re-aplicar el `PATCH` en Supabase.
+- **Gotchas resueltos:** (1) Brevo restringe por **IP autorizada** por defecto →
+  hay que **desactivar la restricción** (Supabase envía desde IPs variables).
+  (2) La key SMTP es `xsmtpsib-…` (pestaña SMTP), NO la API key `xkeysib-…`
+  (pestaña API Keys). (3) El remitente debe estar **verificado** en Brevo.
+- **Config de redirect (URL Configuration):** Site URL + Redirect URLs
+  (`https://locationguesser-sage.vercel.app/**`, `http://localhost:5173/**`).
