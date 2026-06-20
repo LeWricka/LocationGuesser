@@ -92,16 +92,51 @@
   color: var(--color-text-muted);
 }
 
-/* Resultado del revelado: puntos protagonistas. */
+/*
+ * Mapa de resultado: protagonista tras revelar. Grande, ocupa el ancho y una
+ * altura cómoda para ver tu pin + 🎯 + la línea entre ambos.
+ */
+.resultMap :global(.lg-map) {
+  height: 50svh;
+  min-height: 280px;
+  border-radius: var(--radius-lg);
+}
+
+@media (min-width: 768px) {
+  .resultMap :global(.lg-map) {
+    height: 460px;
+  }
+}
+
+/* Resultado del revelado: puntos protagonistas, centrados y muy visuales. */
+.scoreboard {
+  text-align: center;
+}
+
+.scoreLabel {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .points {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
-  color: var(--color-accent);
+  color: var(--color-text);
   line-height: var(--line-height-tight);
+  font-variant-numeric: tabular-nums;
 }
 
 .resultDist {
   color: var(--color-text-muted);
+}
+
+/* Bloque secundario (Street View / foto tras botón): separa de los puntos. */
+.secondary {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
 }
 
 /* Overlay "Empezar": tapa todo, centra el contenido. */

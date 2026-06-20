@@ -1,4 +1,5 @@
-import { MapContainer, TileLayer, Marker, Polyline, useMapEvents } from 'react-leaflet'
+import { useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { LatLng } from '../../lib/geo'
@@ -40,6 +41,23 @@ function ClickHandler({ locked, onPick }: { locked: boolean; onPick: (p: LatLng)
   return null
 }
 
+// Al revelar, encuadra ambos puntos (tu pin + 🎯) con margen para que se vean
+// los dos con el zoom adecuado. El mapa debe estar dimensionado a su tamaño
+// final antes de calcular, por eso `invalidateSize` previo al `fitBounds`.
+function FitToReveal({ guess, answer }: { guess: LatLng | null; answer: LatLng | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!guess || !answer) return
+    map.invalidateSize()
+    const bounds = L.latLngBounds([
+      [guess.lat, guess.lng],
+      [answer.lat, answer.lng],
+    ]).pad(0.3)
+    map.fitBounds(bounds, { maxZoom: 12 })
+  }, [map, guess, answer])
+  return null
+}
+
 export function PlayMap({ guess, answer, locked, onPick }: Props) {
   return (
     <MapContainer center={[SPAIN.lat, SPAIN.lng]} zoom={5} className="lg-map">
@@ -48,6 +66,7 @@ export function PlayMap({ guess, answer, locked, onPick }: Props) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <ClickHandler locked={locked} onPick={onPick} />
+      <FitToReveal guess={guess} answer={answer} />
       {guess && <Marker position={[guess.lat, guess.lng]} icon={guessIcon} />}
       {answer && <Marker position={[answer.lat, answer.lng]} icon={answerIcon} />}
       {guess && answer && (
