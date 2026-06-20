@@ -1,28 +1,54 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { formatDeadline, isPast } from './time'
+import { deadlineFromNow, formatDeadline, isPast } from './time'
 
 describe('time', () => {
   beforeEach(() => {
-    // Fijamos "ahora" para que hoy/mañana sean deterministas.
+    // Fijamos "ahora" para que la cuenta atrás sea determinista.
     vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-06-20T10:00:00'))
+    vi.setSystemTime(new Date('2026-06-20T10:00:00Z'))
   })
   afterEach(() => vi.useRealTimers())
 
-  test('mismo día → "hasta hoy"', () => {
-    expect(formatDeadline('2026-06-20T23:59:00')).toMatch(/^hasta hoy a las/)
+  describe('formatDeadline (cuenta atrás)', () => {
+    test('horas y minutos', () => {
+      // +3 h 12 m
+      expect(formatDeadline('2026-06-20T13:12:00Z')).toBe('quedan 3 h 12 m')
+    })
+
+    test('horas exactas → sin minutos', () => {
+      expect(formatDeadline('2026-06-20T14:00:00Z')).toBe('quedan 4 h')
+    })
+
+    test('solo minutos', () => {
+      expect(formatDeadline('2026-06-20T10:45:00Z')).toBe('quedan 45 m')
+    })
+
+    test('menos de un minuto → segundos', () => {
+      expect(formatDeadline('2026-06-20T10:00:30Z')).toBe('quedan 30 s')
+    })
+
+    test('más de un día → días y horas', () => {
+      // +1 d 5 h
+      expect(formatDeadline('2026-06-21T15:00:00Z')).toBe('quedan 1 d 5 h')
+    })
+
+    test('plazo vencido → cerrado', () => {
+      expect(formatDeadline('2026-06-20T09:00:00Z')).toBe('cerrado')
+    })
   })
 
-  test('día siguiente → "hasta mañana"', () => {
-    expect(formatDeadline('2026-06-21T14:00:00')).toMatch(/^hasta mañana a las/)
-  })
+  describe('deadlineFromNow', () => {
+    test('suma horas y devuelve ISO absoluto', () => {
+      expect(deadlineFromNow(4)).toBe('2026-06-20T14:00:00.000Z')
+    })
 
-  test('más adelante → fecha concreta', () => {
-    expect(formatDeadline('2026-06-25T14:00:00')).toMatch(/^hasta el .* a las/)
+    test('admite fracciones de hora', () => {
+      expect(deadlineFromNow(0.5)).toBe('2026-06-20T10:30:00.000Z')
+    })
   })
 
   test('isPast', () => {
-    expect(isPast('2026-06-20T09:00:00')).toBe(true)
-    expect(isPast('2026-06-20T11:00:00')).toBe(false)
+    expect(isPast('2026-06-20T09:00:00Z')).toBe(true)
+    expect(isPast('2026-06-20T11:00:00Z')).toBe(false)
   })
 })
