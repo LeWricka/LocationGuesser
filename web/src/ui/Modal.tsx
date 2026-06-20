@@ -29,8 +29,10 @@ export function Modal({ open, onClose, title, footer, children }: Props) {
   // Cerrar con Escape.
   useEffect(() => {
     if (!open || !onClose) return
+    // Capturamos en const para que TS conserve el narrowing dentro del closure.
+    const close = onClose
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') close()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
