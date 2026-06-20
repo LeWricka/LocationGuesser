@@ -9,22 +9,43 @@
   cursor: default;
 }
 
-/* Variante interactiva (cuando viene onClick → se renderiza como <button>). */
+/* Variante interactiva (cuando viene onClick → se renderiza como <button>). Se
+ * eleva con muelle y un halo cálido al pasar el ratón: la tarjeta "responde". */
 .card:is(button) {
   cursor: pointer;
 }
 .card:is(button):hover {
-  border-color: var(--color-border-strong);
-  background-color: var(--color-surface-hover);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border-strong));
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-3px);
 }
 .card:is(button):active {
-  transform: scale(0.99);
+  transform: translateY(0) scale(0.99);
+  transition-duration: var(--duration-fast);
 }
 
-/* "Te toca": resaltado con un filo de acento cálido (atención sin chillar). */
+/* "Te toca": resaltado con un filo de acento cálido que PALPITA (esta tarjeta
+ * reclama acción ya). El filo izquierdo late de intensidad. */
 .highlight {
-  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
-  box-shadow: inset 3px 0 0 0 var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 50%, var(--color-border));
+  box-shadow:
+    inset 4px 0 0 0 var(--color-warning),
+    var(--glow-accent);
+  animation: lg-card-attention 2.6s var(--ease-smooth) infinite;
+}
+
+@keyframes lg-card-attention {
+  0%,
+  100% {
+    box-shadow:
+      inset 4px 0 0 0 var(--color-warning),
+      var(--glow-accent);
+  }
+  50% {
+    box-shadow:
+      inset 4px 0 0 0 var(--color-accent-hover),
+      var(--glow-accent-strong);
+  }
 }
 
 .body {
@@ -66,7 +87,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .card:is(button):hover,
   .card:is(button):active {
     transform: none;
+  }
+  .highlight {
+    animation: none;
   }
 }

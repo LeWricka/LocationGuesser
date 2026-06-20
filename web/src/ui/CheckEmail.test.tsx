@@ -23,4 +23,12 @@ describe('CheckEmail', () => {
     render(<CheckEmail email="x@y.com" resending />)
     expect(screen.getByRole('button', { name: /Reenviar/ })).toBeDisabled()
   })
+
+  test('la cabecera ofrece un "volver" (Cambiar correo) que no deja sin salida', async () => {
+    const onChangeEmail = vi.fn()
+    render(<CheckEmail email="x@y.com" onChangeEmail={onChangeEmail} />)
+    // El control de cabecera reutiliza onChangeEmail: vuelve al paso de email.
+    await userEvent.click(screen.getByRole('button', { name: 'Cambiar correo' }))
+    expect(onChangeEmail).toHaveBeenCalledOnce()
+  })
 })

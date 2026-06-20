@@ -3,13 +3,19 @@
 // huso de quien lo lee (a diferencia del antiguo "hasta hoy/mañana", ambiguo
 // entre zonas horarias). Si ya venció → "cerrado".
 
-/** Devuelve el ISO (instante absoluto) de "ahora + `hours` horas". Sirve para la
- * duración relativa del reto: el creador elige cuánto dura y congelamos el fin
- * como timestamp absoluto. */
-export function deadlineFromNow(hours: number): string {
+/** Devuelve el ISO (instante absoluto) de "ahora + `minutes` minutos". Sirve para
+ * la duración relativa del reto: el creador elige cuánto dura y congelamos el fin
+ * como timestamp absoluto. Permite plazos cortos ("express" de 5/10 min). */
+export function deadlineFromMinutes(minutes: number): string {
   const d = new Date()
-  d.setTime(d.getTime() + hours * 3_600_000)
+  d.setTime(d.getTime() + minutes * 60_000)
   return d.toISOString()
+}
+
+/** Igual que `deadlineFromMinutes` pero en horas. Se mantiene por compatibilidad
+ * con los usos existentes (createChallenge usa una duración por defecto en horas). */
+export function deadlineFromNow(hours: number): string {
+  return deadlineFromMinutes(hours * 60)
 }
 
 /**

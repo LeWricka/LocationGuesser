@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { Lightbox } from './Lightbox'
 import styles from './ChallengePhoto.module.css'
 
 type Ratio = 'square' | 'photo' | 'wide'
@@ -13,14 +15,19 @@ interface Props {
   size?: Size
   /** Etiqueta superpuesta opcional (p.ej. la distancia o "reto de Ana"). */
   caption?: string
-  /** Si es interactiva, abre la foto a tamaño completo (lo cablea features). */
+  /** Acción al pulsar. Si se pasa, tiene prioridad sobre el lightbox interno
+   * (lo cablea features para, p. ej., navegar). */
   onClick?: () => void
+  /** Permite abrir la foto a tamaño completo en un lightbox al pulsarla.
+   * Por defecto sí, siempre que haya `src` y no se pase `onClick`. */
+  zoomable?: boolean
   className?: string
 }
 
-// Marco de la FOTO de un reto (vamos a reactivar la foto opcional por reto).
-// Presentacional y mockeable por `src`. Mantiene proporción y recorta con
-// object-fit para que la galería sea uniforme. Si no hay foto, placeholder.
+// Marco de la FOTO de un reto. Presentacional y mockeable por `src`. Mantiene
+// proporción y recorta con object-fit para que la galería sea uniforme. Si no
+// hay foto, placeholder. Por defecto la foto es pulsable para verla grande en
+// un lightbox (no requiere cableado desde las pantallas).
 export function ChallengePhoto({
   src,
   alt = 'Foto del reto',
@@ -28,9 +35,16 @@ export function ChallengePhoto({
   size = 'md',
   caption,
   onClick,
+  zoomable = true,
   className,
 }: Props) {
-  const isButton = typeof onClick === 'function'
+  const [open, setOpen] = useState(false)
+
+  // Prioridad: onClick explícito > lightbox interno (si hay foto y es zoomable).
+  const opensLightbox = !onClick && zoomable && Boolean(src)
+  const handleClick = onClick ?? (opensLightbox ? () => setOpen(true) : undefined)
+  const isButton = typeof handleClick === 'function'
+
   const classes = [styles.frame, styles[`ratio-${ratio}`], styles[size], className]
     .filter(Boolean)
     .join(' ')
@@ -48,12 +62,22 @@ export function ChallengePhoto({
     </>
   )
 
-  if (isButton) {
-    return (
-      <button type="button" className={classes} onClick={onClick} aria-label={alt}>
-        {content}
-      </button>
-    )
-  }
-  return <div className={classes}>{content}</div>
+  // aria-label del botón: si abre el lightbox, lo decimos explícitamente para
+  // que el usuario de lector de pantalla sepa que la acción amplía la foto.
+  const buttonLabel = opensLightbox ? `Ampliar foto: ${alt}` : alt
+
+  return (
+    <>
+      {isButton ? (
+        <button type="button" className={classes} onClick={handleClick} aria-label={buttonLabel}>
+          {content}
+        </button>
+      ) : (
+        <div className={classes}>{content}</div>
+      )}
+      {opensLightbox && src && (
+        <Lightbox open={open} src={src} alt={alt} onClose={() => setOpen(false)} />
+      )}
+    </>
+  )
 }

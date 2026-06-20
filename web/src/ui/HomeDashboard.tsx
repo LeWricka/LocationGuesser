@@ -7,7 +7,6 @@ import { CreateGroupFab } from './CreateGroupFab'
 import { GroupCard } from './GroupCard'
 import type { GroupStatus } from './GroupCard'
 import { HomeEmptyState } from './HomeEmptyState'
-import { Row } from './Row'
 import { Stack } from './Stack'
 import styles from './HomeDashboard.module.css'
 
@@ -74,7 +73,7 @@ export function HomeDashboard({
 
   return (
     <div className={[styles.home, className].filter(Boolean).join(' ')}>
-      <Stack gap={6}>
+      <Stack gap={6} className="lg-stagger">
         {/* Cabecera: saludo + acceso al perfil por el avatar. */}
         <header className={styles.header}>
           <div className={styles.greeting}>
@@ -91,7 +90,8 @@ export function HomeDashboard({
           </button>
         </header>
 
-        {/* 🔔 Te toca jugar — solo si hay retos pendientes (no ocupa en vacío). */}
+        {/* 🔔 Te toca jugar — solo si hay retos pendientes (no ocupa en vacío).
+            Tarjeta-héroe: degradado cálido, halo pulsante y reloj "en vivo". */}
         {turns.length > 0 && (
           <section aria-labelledby="home-turns">
             <h2 id="home-turns" className={styles.sectionTitle}>
@@ -100,14 +100,17 @@ export function HomeDashboard({
             <Stack gap={3}>
               {turns.map((turn) => (
                 <Card key={turn.id} padding="md" raised className={styles.turn}>
+                  <span className={styles.turnSpark} aria-hidden="true" />
                   <div className={styles.turnInfo}>
                     <span className={styles.turnGroup}>{turn.groupName}</span>
-                    <span className={styles.turnMeta}>
-                      reto de {turn.author} · <span aria-hidden="true">⏳</span> {turn.countdown}
+                    <span className={styles.turnMeta}>reto de {turn.author}</span>
+                    <span className={styles.turnClock}>
+                      <span className={styles.turnDot} aria-hidden="true" />
+                      {turn.countdown}
                     </span>
                   </div>
                   <Button size="sm" onClick={onPlayTurn ? () => onPlayTurn(turn.id) : undefined}>
-                    Jugar
+                    Jugar <span aria-hidden="true">▸</span>
                   </Button>
                 </Card>
               ))}
@@ -145,27 +148,34 @@ export function HomeDashboard({
               <span aria-hidden="true">🏆</span> Tus números
             </h2>
             {stats ? (
-              <Card padding="md">
-                <Row gap={5} wrap justify="start" align="baseline">
-                  <div className={styles.stat}>
-                    <CountUp
-                      value={stats.totalPoints}
-                      className={`${styles.statValue} ${styles.statValueAccent}`}
+              <div className={styles.statGrid}>
+                <Card padding="md" className={`${styles.statCard} ${styles.statCardAccent}`}>
+                  <CountUp
+                    value={stats.totalPoints}
+                    className={`${styles.statValue} ${styles.statValueAccent}`}
+                  />
+                  <span className={styles.statLabel}>puntos</span>
+                  <span
+                    className={`${styles.statBar} ${styles.statBarAccent}`}
+                    aria-hidden="true"
+                  />
+                </Card>
+                <Card padding="md" className={styles.statCard}>
+                  <span className={styles.statValue}>{stats.groupsPlayed}</span>
+                  <span className={styles.statLabel}>grupos</span>
+                  <span className={`${styles.statBar} ${styles.statBarTeal}`} aria-hidden="true" />
+                </Card>
+                {stats.best && (
+                  <Card padding="md" className={styles.statCard}>
+                    <span className={styles.statValueSm}>{stats.best}</span>
+                    <span className={styles.statLabel}>mejor reto</span>
+                    <span
+                      className={`${styles.statBar} ${styles.statBarTeal}`}
+                      aria-hidden="true"
                     />
-                    <span className={styles.statLabel}>puntos</span>
-                  </div>
-                  <div className={styles.stat}>
-                    <span className={styles.statValue}>{stats.groupsPlayed}</span>
-                    <span className={styles.statLabel}>grupos</span>
-                  </div>
-                  {stats.best && (
-                    <div className={styles.stat}>
-                      <span className={styles.statValueSm}>{stats.best}</span>
-                      <span className={styles.statLabel}>mejor reto</span>
-                    </div>
-                  )}
-                </Row>
-              </Card>
+                  </Card>
+                )}
+              </div>
             ) : (
               <Card padding="md">
                 <p className={styles.statsEmpty}>

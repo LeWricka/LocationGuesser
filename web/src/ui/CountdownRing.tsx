@@ -25,7 +25,7 @@ export function CountdownRing({ remaining, total, size = 56, urgent = false }: P
 
   return (
     <div
-      className={styles.wrap}
+      className={`${styles.wrap} ${urgent ? styles.urgentWrap : ''}`}
       style={{ width: size, height: size }}
       role="timer"
       aria-label={`Quedan ${remaining} segundos`}

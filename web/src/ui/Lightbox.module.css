@@ -1,0 +1,117 @@
+/* Visor de imagen a pantalla completa: fondo casi opaco para que la foto
+   sea la protagonista absoluta. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.9);
+  animation: overlay-in var(--transition-base) ease;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  animation: zoom-in var(--transition-base) var(--ease-emphasized);
+}
+
+.close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border: none;
+  border-radius: var(--radius-sm);
+  /* Pastilla translúcida: el ✕ se lee sobre fotos claras u oscuras. */
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+.close:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* El contenedor de la imagen es el botón de zoom: ocupa el visor y centra. */
+.imageButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+  /* Permite hacer scroll/pan táctil sobre la imagen acercada. */
+  overflow: auto;
+}
+.imageButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 2 * var(--space-4));
+  object-fit: contain;
+  transition: transform var(--transition-base);
+}
+
+/* Estado acercado: la imagen crece y deja al contenedor hacer scroll/pan. */
+.zoomed {
+  max-width: none;
+  max-height: none;
+  width: auto;
+  height: auto;
+  transform: scale(1.8);
+  cursor: zoom-out;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes zoom-in {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .panel {
+    animation: none;
+  }
+  .img {
+    transition: none;
+  }
+}
