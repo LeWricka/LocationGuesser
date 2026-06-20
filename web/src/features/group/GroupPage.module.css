@@ -1,3 +1,13 @@
+/* Cabecera: nombre/código a la izquierda, acciones a la derecha; envuelven en
+   móvil cuando no caben en una línea. */
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 .title {
   font-size: var(--font-size-xl);
 }
@@ -6,6 +16,12 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
   font-family: var(--font-mono);
+}
+
+/* Enlace generado en solo lectura, en monospace para que se lea entero. */
+.linkInput {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
 }
 
 .sectionTitle {

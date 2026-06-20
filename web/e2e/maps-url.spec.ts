@@ -9,8 +9,18 @@ import { test, expect } from '@playwright/test'
 
 test.describe('pegar enlace de Maps', () => {
   test('URL larga → punto marcado (sin red)', async ({ page }) => {
+    // Flujo grupo-primero (#79): hay que crear un grupo y entrar a "añadir reto"
+    // para llegar al formulario. Crear el grupo es un insert ligero throwaway.
     await page.goto('/')
-    await page.getByRole('button', { name: 'Crear un reto' }).click()
+    await page.getByRole('button', { name: 'Crear un grupo' }).click()
+    await expect(page.getByRole('heading', { name: 'Crear un grupo' })).toBeVisible()
+
+    const groupName = `mapsurl-${Date.now().toString(36)}`
+    await page.getByRole('textbox', { name: 'Nombre del grupo' }).fill(groupName)
+    await page.getByRole('button', { name: 'Crear grupo' }).click()
+
+    await expect(page.getByRole('heading', { name: groupName })).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: '➕ Añadir reto' }).first().click()
     await expect(page.getByRole('heading', { name: 'Crear un reto' })).toBeVisible()
 
     // Pegamos una URL larga con coordenadas embebidas (@lat,lng). El parser local
