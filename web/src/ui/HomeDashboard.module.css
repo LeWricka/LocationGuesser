@@ -6,7 +6,7 @@
 
 .header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
 }
@@ -15,17 +15,29 @@
   min-width: 0;
 }
 
+/* Saludo editorial: eyebrow cálido pequeño sobre el nombre gigante. */
 .hello {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
   color: var(--color-text-muted);
-  font-size: var(--font-size-md);
   line-height: 1.2;
 }
 
 .name {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-tighter);
+  line-height: var(--line-height-tight);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* El nombre capta el degradado cálido sobre el frío: protagonista cálido. */
+  background: linear-gradient(120deg, var(--color-text) 0%, #bfe9e3 55%, var(--color-accent) 130%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* Botón que envuelve el avatar (acceso a perfil): reset + foco redondo. */
@@ -37,13 +49,22 @@
   border-radius: var(--radius-full);
   cursor: pointer;
   line-height: 0;
+  transition: transform var(--transition-fast);
+}
+.profileButton:active {
+  transform: scale(0.94);
 }
 
+/* Título de sección como eyebrow editorial: mayúsculas, tracking ancho. */
 .sectionTitle {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
   margin-bottom: var(--space-3);
 }
 
@@ -53,6 +74,18 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
+  /* Filo cálido a la izquierda: este reto reclama atención (acento con disciplina). */
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--color-accent) 36%, var(--glass-border));
+}
+.turn::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--gradient-accent);
 }
 
 .turnInfo {
@@ -63,8 +96,9 @@
 }
 
 .turnGroup {
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  letter-spacing: var(--letter-spacing-tight);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -75,7 +109,7 @@
   color: var(--color-text-muted);
 }
 
-/* --- Tus números --- */
+/* --- Tus números — fila de datos gigantes separados por hairlines verticales. --- */
 .stat {
   display: flex;
   flex-direction: column;
@@ -84,22 +118,30 @@
 
 .statValue {
   font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-tight);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tighter);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* El número de puntos totales es el dato más cálido del panel (acento con disciplina). */
+.statValueAccent {
+  color: var(--color-accent);
 }
 
 .statValueSm {
   font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   line-height: 1.1;
+  font-variant-numeric: tabular-nums;
 }
 
 .statLabel {
   font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+  color: var(--color-text-faint);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
 }
 
 .statsEmpty {

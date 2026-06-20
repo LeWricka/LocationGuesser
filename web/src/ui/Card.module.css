@@ -1,11 +1,15 @@
+/* Panel de vidrio esmerilado que flota sobre el atlas: blur del fondo, borde de
+ * luz y sheen cenital. La unidad visual base del producto. */
 .card {
   position: relative;
-  background-color: var(--color-surface);
-  /* Sheen superior muy tenue: la tarjeta capta una luz cenital y deja de ser
-   * un rectángulo plano. */
-  background-image: linear-gradient(var(--color-surface-sheen), transparent 120px);
-  border: 1px solid var(--color-border);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  /* Sheen superior de luz cenital sobre el vidrio (no un rectángulo plano). */
+  background-image: linear-gradient(var(--glass-sheen), transparent 96px);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   transition:
     box-shadow var(--transition-base),
     border-color var(--transition-base),
@@ -13,6 +17,7 @@
 }
 
 .raised {
+  background: var(--glass-bg-strong);
   border-color: var(--color-border-strong);
   box-shadow: var(--shadow-md);
 }

@@ -1,10 +1,19 @@
 /*
- * LocationGuesser — Design tokens
+ * LocationGuesser — Design tokens · "Atlas Editorial"
  *
  * Una sola fuente de verdad para color, tipografía, espaciado, etc.
  * Todo el UI kit consume estas variables; no se hardcodean valores en los
- * CSS Modules. Tema oscuro nativo ("viaje de noche": mapas y fotos resaltan
- * sobre fondo oscuro). El acento de marca es el rojo "señal de mapa".
+ * CSS Modules.
+ *
+ * Dirección visual (fusión B-Editorial + C-Atlas):
+ *  - El MAPA es el alma: superficies frías de océano/tierra, fondo de atlas
+ *    inmersivo, profundidad en capas (sombras difusas + viñeta).
+ *  - PANELES DE VIDRIO (backdrop-filter blur) con borde de luz, que flotan
+ *    sobre el fondo en vez de cajas opacas planas.
+ *  - ACENTO CÁLIDO (ámbar/coral) reservado a lo crítico: CTAs, pines, cuenta
+ *    atrás y la fila propia del ranking. Resalta sobre el frío.
+ *  - Rigor editorial: alto contraste, jerarquía por TAMAÑO tipográfico,
+ *    números gigantes tabulares para los datos.
  */
 
 :root {
@@ -12,91 +21,117 @@
 
   /* ----------------------------------------------------------------------
    * Color — paleta base
-   * Fondos en grises azulados fríos (sensación de mapa nocturno) y un acento
-   * rojo cálido (el "pin" de GeoGuessr). El rojo v0.1 (#e6332a) se refina a
-   * un tono ligeramente más luminoso (#ff453a) para mejor contraste sobre
-   * oscuro y para que el botón primario "cante" sin chillar.
+   * Frío de mapa (océano profundo + tierra verde-cian) como superficies, y un
+   * acento cálido ámbar→coral como única nota caliente. El contraste cálido /
+   * frío hace que los CTAs y datos críticos "canten".
    * -------------------------------------------------------------------- */
 
-  /* Superficies (de más al fondo a más al frente).
-   * Azulado frío con un punto más de profundidad: el fondo baja un pelín y las
-   * superficies suben para que la elevación se lea de verdad en oscuro. */
-  --color-bg: #0b0c11; /* fondo de página */
-  --color-surface: #161821; /* tarjetas, paneles */
-  --color-surface-raised: #1f222d; /* inputs, elementos elevados sobre surface */
-  --color-surface-hover: #282c39; /* hover de superficies interactivas */
+  /* Océano (frío) — base de las superficies, de más al fondo a más al frente. */
+  --ocean-900: #04141d; /* fondo de página, lo más profundo */
+  --ocean-800: #081f2b; /* tarjetas base (tras el vidrio) */
+  --ocean-700: #0d2c3b; /* superficies elevadas */
+  --ocean-600: #123a4c; /* hover de superficies */
 
-  /* Realce sutil en bordes superiores de superficies (luz cenital). */
-  --color-surface-sheen: rgba(255, 255, 255, 0.06);
+  /* Tierra (verde-cian) — para chips de mapa, pines de respuesta, barras. */
+  --land-600: #1a6b5d;
+  --land-500: #237d6c;
+  --land-400: #2f9b86;
+  --teal-bright: #45c9b0; /* respuesta real / barras de ranking */
 
-  /* Fondo de página con un halo de marca muy tenue (radiales fijos). */
+  /* Superficies (semántico). Tras el vidrio hay océano; las tarjetas reales
+   * usan los tokens de vidrio (--glass-*). */
+  --color-bg: var(--ocean-900);
+  --color-surface: var(--ocean-800);
+  --color-surface-raised: var(--ocean-700);
+  --color-surface-hover: var(--ocean-600);
+
+  /* Realce sutil en bordes superiores de superficies (luz cenital sobre vidrio). */
+  --color-surface-sheen: rgba(180, 235, 240, 0.1);
+
+  /* Fondo de página: atlas vivo. Halo cálido arriba (sol bajo), océano que se
+   * hunde hacia el fondo y una viñeta para dar profundidad real de escena. */
   --gradient-app-bg:
-    radial-gradient(1100px 620px at 12% -8%, rgba(255, 69, 58, 0.1), transparent 60%),
-    radial-gradient(900px 560px at 100% 0%, rgba(192, 132, 252, 0.08), transparent 55%);
+    radial-gradient(1200px 760px at 50% -12%, rgba(255, 178, 77, 0.1), transparent 52%),
+    radial-gradient(1100px 900px at 18% 8%, rgba(69, 201, 176, 0.08), transparent 55%),
+    radial-gradient(1400px 1100px at 50% 120%, var(--ocean-900) 35%, transparent 60%),
+    radial-gradient(140% 130% at 50% 40%, transparent 52%, rgba(2, 10, 16, 0.62) 100%);
 
-  /* Bordes / separadores */
-  --color-border: #2e313d;
-  --color-border-strong: #3c404e;
+  /* Rejilla de coordenadas tenue (sensación de carta náutica) para fondos de mapa. */
+  --line-grid: rgba(150, 220, 225, 0.1);
 
-  /* Texto */
-  --color-text: #eceef3; /* texto principal */
-  --color-text-muted: #99a0b0; /* secundario, ayudas */
-  --color-text-faint: #6b7180; /* deshabilitado, placeholders */
+  /* Vidrio — paneles que flotan sobre el atlas. */
+  --glass-bg: rgba(10, 36, 49, 0.62);
+  --glass-bg-strong: rgba(12, 42, 56, 0.78);
+  --glass-border: rgba(170, 230, 235, 0.22);
+  --glass-sheen: rgba(255, 255, 255, 0.1);
+  --glass-blur: blur(18px) saturate(140%);
 
-  /* Acento de marca (rojo pin) */
-  --color-accent: #ff453a;
-  --color-accent-hover: #ff5f55;
-  --color-accent-active: #e23b31;
-  --color-accent-soft: rgba(255, 69, 58, 0.14); /* fondos tenues, badges */
-  --color-on-accent: #ffffff; /* texto sobre acento */
+  /* Bordes / separadores (hairlines editoriales sobre frío). */
+  --color-border: rgba(150, 220, 225, 0.16);
+  --color-border-strong: rgba(170, 230, 235, 0.3);
 
-  /* Gradiente de marca: rojo pin → coral cálido. Para el CTA primario y
-   * realces de marca. Diagonal para dar dirección/energía. */
-  --gradient-accent: linear-gradient(135deg, #ff5a4d 0%, #ff453a 45%, #e23b31 100%);
-  --gradient-accent-hover: linear-gradient(135deg, #ff6f63 0%, #ff5750 45%, #f04438 100%);
+  /* Texto — alto contraste sobre el frío. */
+  --color-text: #eef8f8; /* principal */
+  --color-text-muted: #aecdd1; /* secundario, ayudas */
+  --color-text-faint: #7299a0; /* deshabilitado, placeholders */
 
-  /* Acento secundario (violeta "ruta") — para estados/realtime, no para CTA */
-  --color-accent-2: #c084fc;
-  --color-accent-2-soft: rgba(192, 132, 252, 0.16);
+  /* Acento de marca: ámbar → coral cálido (pin / CTA / dato crítico). */
+  --color-accent: #ffb24d;
+  --color-accent-hover: #ffc36b;
+  --color-accent-active: #f0603c;
+  --color-accent-soft: rgba(255, 178, 77, 0.14); /* fondos tenues, badges */
+  --color-on-accent: #2a1500; /* texto sobre acento (oscuro: cálido es claro) */
 
-  /* Semánticos */
-  --color-success: #34d399;
-  --color-success-soft: rgba(52, 211, 153, 0.16);
-  --color-warning: #fbbf24;
-  --color-warning-soft: rgba(251, 191, 36, 0.16);
-  --color-danger: #f87171;
-  --color-danger-soft: rgba(248, 113, 113, 0.16);
+  /* Gradiente de marca: ámbar → coral. Para CTA primario, FAB, pines, anillos. */
+  --gradient-accent: linear-gradient(135deg, #ffc36b 0%, #ffb24d 45%, #ff7a59 100%);
+  --gradient-accent-hover: linear-gradient(135deg, #ffce82 0%, #ffbe5f 45%, #ff8d6f 100%);
 
-  /* Anillo de foco accesible (visible sobre cualquier superficie) */
-  --color-focus-ring: #7aa2ff;
+  /* Acento secundario (teal "mapa") — para estados/realtime y data-viz fría. */
+  --color-accent-2: var(--teal-bright);
+  --color-accent-2-soft: rgba(69, 201, 176, 0.16);
+
+  /* Semánticos. "warning"/"toplay" se alinea con el ámbar de marca. */
+  --color-success: #45c9b0;
+  --color-success-soft: rgba(69, 201, 176, 0.16);
+  --color-warning: #ffb24d;
+  --color-warning-soft: rgba(255, 178, 77, 0.18);
+  --color-danger: #ff7a59;
+  --color-danger-soft: rgba(255, 122, 89, 0.18);
+
+  /* Anillo de foco accesible (visible sobre cualquier superficie fría). */
+  --color-focus-ring: #8fd6d0;
 
   /* ----------------------------------------------------------------------
    * Tipografía
-   * System UI: cero coste de carga, look nativo en cada dispositivo.
-   * Escala modular ~1.25 (mayor third) redondeada a píxeles cómodos.
+   * System UI: cero coste de carga, look nativo. Escala MÁS contrastada que
+   * antes (rigor editorial): el salto de tamaño marca la jerarquía, no el
+   * color de fondo. Números gigantes para los datos clave.
    * -------------------------------------------------------------------- */
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
 
-  --font-size-xs: 0.75rem; /* 12px — micro-ayudas */
+  --font-size-xs: 0.75rem; /* 12px — micro-ayudas, eyebrows */
   --font-size-sm: 0.875rem; /* 14px — texto secundario */
   --font-size-md: 1rem; /* 16px — cuerpo (evita zoom en iOS) */
-  --font-size-lg: 1.25rem; /* 20px — subtítulos */
-  --font-size-xl: 1.75rem; /* 28px — títulos de sección */
-  --font-size-2xl: 2.5rem; /* 40px — hero */
+  --font-size-lg: 1.375rem; /* 22px — subtítulos */
+  --font-size-xl: 2rem; /* 32px — títulos de sección */
+  --font-size-2xl: 3rem; /* 48px — hero / saludo */
+  --font-size-data: 3.5rem; /* 56px — números gigantes de dato */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
+  --font-weight-black: 800; /* títulos y números gigantes */
 
-  --line-height-tight: 1.15;
+  --line-height-tight: 1.05;
   --line-height-normal: 1.45;
 
-  /* Tracking: títulos grandes respiran mejor con tracking negativo. */
+  /* Tracking: títulos grandes y números respiran mejor con tracking negativo. */
   --letter-spacing-tight: -0.02em;
-  --letter-spacing-tighter: -0.03em;
+  --letter-spacing-tighter: -0.04em;
   --letter-spacing-wide: 0.04em; /* mayúsculas pequeñas, badges */
+  --letter-spacing-eyebrow: 0.22em; /* eyebrows editoriales */
 
   /* ----------------------------------------------------------------------
    * Espaciado — escala de 4px. Nombres por tamaño, no por uso.
@@ -111,73 +146,59 @@
   --space-8: 4rem; /* 64 */
 
   /* ----------------------------------------------------------------------
-   * Radios
+   * Radios — algo más generosos (paneles de vidrio suaves).
    * -------------------------------------------------------------------- */
-  --radius-sm: 8px; /* inputs, botones */
-  --radius-md: 12px; /* tarjetas */
-  --radius-lg: 16px; /* paneles grandes, mapa */
+  --radius-sm: 12px; /* inputs, botones */
+  --radius-md: 18px; /* tarjetas */
+  --radius-lg: 22px; /* paneles grandes, mapa */
   --radius-full: 999px; /* badges, pills, spinner */
 
   /* ----------------------------------------------------------------------
-   * Sombras — suaves; en tema oscuro la elevación se nota poco, se apoya
-   * también en el cambio de superficie.
+   * Sombras — profundidad en capas: difusa y larga (el panel "flota" sobre el
+   * atlas) + sheen interior de luz. La elevación se LEE de verdad.
    * -------------------------------------------------------------------- */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-md:
-    0 1px 0 0 rgba(255, 255, 255, 0.04) inset, 0 6px 22px rgba(0, 0, 0, 0.5),
-    0 2px 6px rgba(0, 0, 0, 0.35);
+    0 1px 0 0 var(--glass-sheen) inset, 0 18px 40px -12px rgba(0, 0, 0, 0.55),
+    0 6px 14px -6px rgba(0, 0, 0, 0.5);
   --shadow-lg:
-    0 1px 0 0 rgba(255, 255, 255, 0.05) inset, 0 18px 50px rgba(0, 0, 0, 0.6),
-    0 6px 16px rgba(0, 0, 0, 0.4);
+    0 1px 0 0 var(--glass-sheen) inset, 0 30px 70px -16px rgba(0, 0, 0, 0.65),
+    0 12px 28px -10px rgba(0, 0, 0, 0.5);
 
-  /* Resplandor de marca: glow tenue bajo el CTA primario. */
-  --shadow-accent: 0 8px 24px rgba(255, 69, 58, 0.35);
-  --shadow-accent-hover: 0 10px 30px rgba(255, 69, 58, 0.45);
+  /* Resplandor de marca: glow cálido bajo el CTA primario / FAB / anillos. */
+  --shadow-accent: 0 14px 30px -10px rgba(255, 122, 89, 0.6);
+  --shadow-accent-hover: 0 18px 38px -10px rgba(255, 122, 89, 0.72);
 
   /* ----------------------------------------------------------------------
    * Layout
    * -------------------------------------------------------------------- */
   --tap-target: 44px; /* objetivo táctil mínimo (WCAG / iOS) */
-  --container-max: 720px; /* ancho de lectura cómodo en desktop */
+  --container-max: 560px; /* columna estrecha tipo "atlas de bolsillo" */
 
   /* ----------------------------------------------------------------------
-   * Animación / Motion
-   *
-   * Sistema de motion tokenizado (tendencia 2026: duraciones, easing y
-   * amplitud definidos globalmente para consistencia). Feedback rápido
-   * (120–220ms); transiciones de layout/entrada algo más largas (260–480ms).
-   * Todo el motion respeta `prefers-reduced-motion` (ver index.css).
-   * Refs: Material 3 motion, Apple HIG motion, guías de motion 2026.
+   * Animación / Motion (conservado del primer pase; respeta reduced-motion).
    * -------------------------------------------------------------------- */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --duration-slower: 480ms;
 
-  /* Duraciones */
-  --duration-fast: 120ms; /* micro-feedback (press, hover) */
-  --duration-base: 200ms; /* transiciones de UI estándar */
-  --duration-slow: 320ms; /* entradas, reveals */
-  --duration-slower: 480ms; /* secuencias destacadas (resultado) */
-
-  /* Easings.
-   * - emphasized: salida decelerada con carácter (entradas, microinteracción).
-   * - spring: overshoot suave tipo muelle (pins que caen, badges que entran).
-   * - smooth: easeInOut neutro para movimientos largos. */
   --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Transiciones compuestas listas para usar. */
   --transition-fast: var(--duration-fast) var(--ease-emphasized);
   --transition-base: var(--duration-base) var(--ease-emphasized);
 
-  /* Stagger: retardo incremental entre hijos de una lista al entrar. */
   --stagger-step: 55ms;
 
   /* ----------------------------------------------------------------------
-   * z-index — capas con nombre para evitar el "z-index: 99999"
+   * z-index — capas con nombre.
    * -------------------------------------------------------------------- */
   --z-base: 0;
-  --z-sticky: 100; /* cabeceras pegadas */
-  --z-overlay: 1000; /* modales / pantallas completas */
-  --z-toast: 1100; /* avisos por encima de todo */
+  --z-sticky: 100;
+  --z-overlay: 1000;
+  --z-toast: 1100;
 }
 
 /*

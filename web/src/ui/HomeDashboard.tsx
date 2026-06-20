@@ -148,7 +148,10 @@ export function HomeDashboard({
               <Card padding="md">
                 <Row gap={5} wrap justify="start" align="baseline">
                   <div className={styles.stat}>
-                    <CountUp value={stats.totalPoints} className={styles.statValue} />
+                    <CountUp
+                      value={stats.totalPoints}
+                      className={`${styles.statValue} ${styles.statValueAccent}`}
+                    />
                     <span className={styles.statLabel}>puntos</span>
                   </div>
                   <div className={styles.stat}>
