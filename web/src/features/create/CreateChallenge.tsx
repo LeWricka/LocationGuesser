@@ -6,6 +6,7 @@ import { createChallenge } from '../../lib/challenges'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { newGroupCode } from '../../lib/group'
 import { resolveMapsUrl } from '../../lib/mapsUrl'
+import { formatDeadline } from '../../lib/time'
 import { supabase } from '../../lib/supabase'
 import { useIdentity } from '../identity'
 import { Badge, Button, Card, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
@@ -51,6 +52,7 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
 
 export function CreateChallenge({ onBack }: Props) {
   const [title, setTitle] = useState('')
+  const [tripName, setTripName] = useState('')
   const [point, setPoint] = useState<LatLng | null>(null)
   const [flyTo, setFlyTo] = useState<LatLng | null>(null)
   const [search, setSearch] = useState('')
@@ -61,6 +63,9 @@ export function CreateChallenge({ onBack }: Props) {
   const [locating, setLocating] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [link, setLink] = useState<string | null>(null)
+  // Datos congelados al crear el reto, para el texto de compartir.
+  const [shareTrip, setShareTrip] = useState<string | null>(null)
+  const [shareDeadline, setShareDeadline] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   // Panorama encajado al punto elegido (pivote #54): si es null no hay cobertura
   // de Street View y no dejamos crear el reto.
@@ -197,7 +202,10 @@ export function CreateChallenge({ onBack }: Props) {
       // jugador (FK players→groups) antes de identificar a quien crea el reto.
       setStatus('Creando el grupo…')
       const groupId = newGroupCode()
-      const { error: groupError } = await supabase.from('groups').insert({ id: groupId })
+      const trip = tripName.trim() || null
+      const { error: groupError } = await supabase
+        .from('groups')
+        .insert({ id: groupId, name: trip })
       if (groupError) throw new Error(groupError.message)
 
       // Identidad sin login: con identidad global no pide nada; navegador limpio
@@ -210,6 +218,7 @@ export function CreateChallenge({ onBack }: Props) {
       }
 
       setStatus('Guardando el reto…')
+      const deadlineAt = deadlineISO(deadline)
       // Guardamos la lat/lng encajada al panorama (la respuesta real para el
       // scoring) y el panorama exacto + POV inicial.
       const { challenge } = await createChallenge({
@@ -221,10 +230,12 @@ export function CreateChallenge({ onBack }: Props) {
         svPanoId: pano.panoId,
         svHeading: pov.heading,
         svPitch: pov.pitch,
-        deadlineAt: deadlineISO(deadline),
+        deadlineAt,
         guessSeconds,
       })
       setLink(`${location.origin}${location.pathname}#g=${groupId}&c=${challenge.id}`)
+      setShareTrip(trip)
+      setShareDeadline(deadlineAt)
       setStatus(null)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -243,8 +254,13 @@ export function CreateChallenge({ onBack }: Props) {
     }
   }
 
-  // Texto listo para pegar en el chat del grupo (#8): gancho + enlace.
-  const shareText = link ? `🌍 ¿Dónde estoy? Adivina en el mapa: ${link}` : ''
+  // Texto listo para pegar en el chat del grupo (#8): gancho + nombre del viaje
+  // (si lo hay) + plazo en lenguaje claro + enlace.
+  const shareText = link
+    ? `🌍 ${shareTrip ? `[${shareTrip}] ` : ''}¿Dónde estoy? Adivina en el mapa${
+        shareDeadline ? ` (responde ${formatDeadline(shareDeadline)})` : ''
+      }: ${link}`
+    : ''
 
   function copy() {
     if (!link) return
@@ -393,6 +409,17 @@ export function CreateChallenge({ onBack }: Props) {
             )}
           </Field>
         )}
+
+        <Field label="Nombre del viaje" hint="Opcional. Aparece en el mensaje que compartes.">
+          {(fieldProps) => (
+            <Input
+              {...fieldProps}
+              placeholder="Viaje a Japón"
+              value={tripName}
+              onChange={(e) => setTripName(e.target.value)}
+            />
+          )}
+        </Field>
 
         <Field
           label="Título del reto"
