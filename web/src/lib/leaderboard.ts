@@ -42,25 +42,26 @@ export function aggregateLeaderboard(votes: VoteWithName[]): LeaderboardEntry[] 
   return [...byUser.values()].sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
 }
 
-// Forma de la fila del join votes → profiles que pide PostgREST.
-interface VoteRow extends Vote {
-  profiles: { display_name: string } | null
-}
-
 /**
- * Todos los votos de un grupo con el display_name del votante (join a profiles),
- * para alimentar `aggregateLeaderboard`. Si el perfil faltara (no debería),
- * cae a un guion para no romper la vista.
+ * Todos los votos de un grupo con el display_name del votante, para alimentar
+ * `aggregateLeaderboard`. En dos consultas (votos + perfiles) en vez de un embed
+ * de PostgREST: `votes.user_id` referencia `auth.users`, no `public.profiles`,
+ * así que no existe la relación que el embed `profiles(...)` necesita (rompía con
+ * "Could not find a relationship"). Si el perfil faltara, cae a un guion.
  */
 export async function getGroupVotes(groupId: string): Promise<VoteWithName[]> {
-  const { data, error } = await supabase
-    .from('votes')
-    .select('*, profiles ( display_name )')
-    .eq('group_id', groupId)
+  const { data, error } = await supabase.from('votes').select('*').eq('group_id', groupId)
   if (error) throw error
-  const rows = (data ?? []) as unknown as VoteRow[]
-  return rows.map(({ profiles, ...vote }) => ({
-    ...vote,
-    display_name: profiles?.display_name ?? '—',
-  }))
+  const votes = (data ?? []) as Vote[]
+  if (votes.length === 0) return []
+
+  const ids = [...new Set(votes.map((v) => v.user_id))]
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .in('id', ids)
+  if (profilesError) throw profilesError
+  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name]))
+
+  return votes.map((vote) => ({ ...vote, display_name: nameById.get(vote.user_id) ?? '—' }))
 }
