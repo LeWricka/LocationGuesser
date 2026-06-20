@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { CreateChallenge } from './features/create/CreateChallenge'
+import { CreateGroup } from './features/create/CreateGroup'
 import { PlayChallenge } from './features/play/PlayChallenge'
 import { GroupPage } from './features/group/GroupPage'
 import { parseHash } from './lib/route'
@@ -9,11 +9,12 @@ import styles from './App.module.css'
 type View = 'home' | 'create'
 
 // Cómo funciona, en tres pasos. Pequeño "onboarding" que sienta el tono de
-// producto sin necesitar texto largo.
+// producto sin necesitar texto largo. Copy social y genérica: el contenedor es
+// un "grupo" (viaje, despedida, finde, partida…), no solo un viaje.
 const STEPS = [
-  'Saca una foto en algún punto del viaje y marca dónde estás.',
-  'Comparte el enlace en el grupo.',
-  'Quien más se acerque en el mapa, gana.',
+  'Crea un grupo para tu plan: un viaje, una despedida, un finde…',
+  'Añade retos con una foto y su sitio, y comparte el enlace.',
+  'Quien más se acerque en el mapa, gana. La clasificación se acumula.',
 ]
 
 function App() {
@@ -28,7 +29,8 @@ function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  // Un reto concreto → jugar. Solo el grupo → página del viaje (histórico).
+  // Un reto concreto → jugar. Solo el grupo → página del grupo (histórico y
+  // clasificación). Sin hash → Home (flujo grupo-primero).
   if (route.challenge) {
     return <PlayChallenge challengeId={route.challenge} groupId={route.group} />
   }
@@ -36,7 +38,7 @@ function App() {
     return <GroupPage groupId={route.group} />
   }
   if (view === 'create') {
-    return <CreateChallenge onBack={() => setView('home')} />
+    return <CreateGroup onBack={() => setView('home')} />
   }
 
   return (
@@ -48,11 +50,11 @@ function App() {
         <h1 className={styles.title}>
           Location<span className={styles.accent}>Guesser</span>
         </h1>
-        <p className={styles.tagline}>GeoGuessr con las fotos de tus amigos.</p>
+        <p className={styles.tagline}>GeoGuessr con las fotos de tu grupo.</p>
       </Stack>
 
       <Button size="lg" className={styles.cta} onClick={() => setView('create')}>
-        Crear un reto
+        Crear un grupo
       </Button>
 
       <Card as="ol" padding="md" className={styles.steps}>

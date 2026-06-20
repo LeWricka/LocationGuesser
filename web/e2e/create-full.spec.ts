@@ -1,11 +1,11 @@
 import path from 'node:path'
 import { test, expect, type ConsoleMessage, type Page, type Request } from '@playwright/test'
 
-// E2E del flujo COMPLETO de crear reto con Street View (pivote #54): ya NO se
-// sube foto. Se marca un punto con cobertura de SV (Madrid), se espera a que el
-// panorama encaje y aparezca la previa, se genera el enlace pasando por el
-// IdentityModal (nombre + PIN) y se comprueba que el enlace apunta al grupo y
-// reto creados.
+// E2E del flujo COMPLETO grupo-primero (#79): Home → crear grupo (con nombre) →
+// página del grupo → añadir reto → marcar un punto con cobertura de Street View
+// (Madrid) → esperar a que encaje el panorama → generar el reto pasando por el
+// IdentityModal (nombre + PIN) → comprobar que aparece el enlace del reto
+// (#g=…&c=…) para compartir.
 //
 // OJO: a diferencia del smoke, este test SÍ escribe en la BD real (grupo +
 // reto). La previa de Street View hace llamadas reales a Google Maps con la key
@@ -64,18 +64,31 @@ function trackErrors(page: Page): string[] {
 }
 
 test.describe('crear completo', () => {
-  test('home → crear → punto con Street View → identidad → enlace, sin errores', async ({
+  test('home → crear grupo → añadir reto con Street View → identidad → enlace, sin errores', async ({
     page,
   }, testInfo) => {
     const errors = trackErrors(page)
 
-    // 1. Home → pantalla de crear.
+    // 1. Home → crear grupo.
     await page.goto('/')
-    await page.getByRole('button', { name: 'Crear un reto' }).click()
+    await page.getByRole('button', { name: 'Crear un grupo' }).click()
+    await expect(page.getByRole('heading', { name: 'Crear un grupo' })).toBeVisible()
+
+    // 2. Nombrar el grupo y crearlo. Nombre único por ejecución.
+    const groupName = `e2e-grupo-${Date.now().toString(36)}`
+    await page.getByRole('textbox', { name: 'Nombre del grupo' }).fill(groupName)
+    await page.getByRole('button', { name: 'Crear grupo' }).click()
+
+    // 3. Página del grupo: aparece su nombre y el estado vacío.
+    await expect(page.getByRole('heading', { name: groupName })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByText('Aún no hay retos — añade el primero.')).toBeVisible()
+
+    // 4. Añadir reto → pantalla de crear reto.
+    await page.getByRole('button', { name: '➕ Añadir reto' }).first().click()
     await expect(page.getByRole('heading', { name: 'Crear un reto' })).toBeVisible()
 
-    // 2. Marcar punto via buscador + primera sugerencia (patrón del smoke).
-    // Madrid tiene cobertura de Street View garantizada.
+    // 5. Marcar punto via buscador + primera sugerencia. Madrid tiene cobertura
+    // de Street View garantizada.
     const searchBox = page.getByRole('textbox', { name: 'Buscar un lugar' })
     await searchBox.fill('Puerta del Sol, Madrid')
     const suggestions = page.getByRole('list').getByRole('button')
@@ -83,21 +96,15 @@ test.describe('crear completo', () => {
     await suggestions.first().click()
     await expect(page.getByText('Punto marcado')).toBeVisible()
 
-    // 3. Tras elegir el punto, findPanorama (StreetViewService) encaja el
-    // panorama más cercano y aparece la sección de previa. El render del
-    // panorama es una llamada real a Google; aquí basta con confirmar que hubo
-    // cobertura: aparece la previa y se habilita "Generar enlace" (que solo se
-    // activa cuando hay panorama y terminó la comprobación).
+    // 6. Tras elegir el punto, findPanorama (StreetViewService) encaja el
+    // panorama más cercano y aparece la sección de previa, que habilita "Crear
+    // reto" (solo activo cuando hay panorama y terminó la comprobación).
     await expect(page.getByLabel('Vista previa de Street View')).toBeVisible({ timeout: 20_000 })
 
-    // 4. Plazo y tiempo: dejamos los defaults (Fin del día / 2 min).
-
-    // 5. Generar enlace → con localStorage limpio aparece el IdentityModal.
-    const generate = page.getByRole('button', { name: 'Generar enlace' })
-    await expect(generate).toBeEnabled({ timeout: 20_000 })
-    await generate.click()
-    // Generar hace un insert de red antes de mostrar el modal; en prod hay más
-    // latencia, así que damos margen (como las demás esperas del flujo).
+    // 7. Crear reto → con localStorage limpio aparece el IdentityModal.
+    const create = page.getByRole('button', { name: 'Crear reto' })
+    await expect(create).toBeEnabled({ timeout: 20_000 })
+    await create.click()
     await expect(page.getByRole('heading', { name: '¿Quién juega?' })).toBeVisible({
       timeout: 20_000,
     })
@@ -108,19 +115,20 @@ test.describe('crear completo', () => {
     await page.getByRole('textbox', { name: 'PIN de 4 dígitos' }).fill('1234')
     await page.getByRole('button', { name: 'Entrar' }).click()
 
-    // 6. Resultado: el enlace para compartir contiene el grupo (#g=) y el reto (&c=).
+    // 8. De vuelta en el grupo: aparece el panel del reto creado con su enlace
+    // (#g= y &c=) para compartir.
     const shareInput = page.getByRole('textbox', { name: 'Mensaje para compartir el reto' })
     await expect(shareInput).toBeVisible({ timeout: 30_000 })
     const shareValue = await shareInput.inputValue()
     expect(shareValue, `Enlace inesperado: ${shareValue}`).toContain('#g=')
     expect(shareValue, `Enlace inesperado: ${shareValue}`).toContain('&c=')
 
-    // Captura del estado final (enlace creado) para el reporte.
+    // Captura del estado final (reto creado en el grupo) para el reporte.
     const shotPath = path.join(testInfo.project.testDir, '.screenshots', 'crear-completo.png')
     const shot = await page.screenshot({ path: shotPath, fullPage: true })
     await testInfo.attach('crear-completo', { body: shot, contentType: 'image/png' })
 
-    // 7. Higiene: ningún error de consola/JS/petición (salvo ruido de terceros).
+    // 9. Higiene: ningún error de consola/JS/petición (salvo ruido de terceros).
     expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
   })
 })

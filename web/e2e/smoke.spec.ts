@@ -1,9 +1,10 @@
 import path from 'node:path'
 import { test, expect, type ConsoleMessage, type Page, type Request } from '@playwright/test'
 
-// Smoke E2E del bucle de creación (issue #44). NO crea retos reales: el flujo
-// llega solo hasta marcar el punto en el mapa, nunca pulsa "Generar enlace",
-// así no ensucia la BD ni en prod.
+// Smoke E2E del flujo grupo-primero (#79). Recorre Home → crear grupo → página
+// del grupo → añadir reto → buscar y marcar un punto en el mapa → capa satélite.
+// NO pulsa "Crear reto", así que no escribe retos ni votos; solo crea un grupo
+// (un insert ligero y throwaway) para poder llegar a la pantalla de crear reto.
 
 // Ruido tolerado. Los tiles de mapa (CARTO/Esri) y Nominatim son terceros y
 // pueden devolver 4xx/5xx puntuales o avisos de atribución sin que la app esté
@@ -51,21 +52,29 @@ function trackErrors(page: Page): string[] {
 }
 
 test.describe('smoke', () => {
-  test('home → crear → buscar → marcar punto → capa satélite, sin errores', async ({
+  test('home → crear grupo → añadir reto → buscar → marcar punto → satélite, sin errores', async ({
     page,
   }, testInfo) => {
     const errors = trackErrors(page)
 
     // 1. Home: carga y CTA visible.
     await page.goto('/')
-    const cta = page.getByRole('button', { name: 'Crear un reto' })
+    const cta = page.getByRole('button', { name: 'Crear un grupo' })
     await expect(cta).toBeVisible()
-
-    // Al pulsar el CTA aparece la pantalla de crear.
     await cta.click()
+    await expect(page.getByRole('heading', { name: 'Crear un grupo' })).toBeVisible()
+
+    // 2. Crear el grupo (nombre único por ejecución).
+    const groupName = `smoke-${Date.now().toString(36)}`
+    await page.getByRole('textbox', { name: 'Nombre del grupo' }).fill(groupName)
+    await page.getByRole('button', { name: 'Crear grupo' }).click()
+
+    // 3. Página del grupo → añadir reto.
+    await expect(page.getByRole('heading', { name: groupName })).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: '➕ Añadir reto' }).first().click()
     await expect(page.getByRole('heading', { name: 'Crear un reto' })).toBeVisible()
 
-    // 2. Buscar (guard de z-index): escribe, espera sugerencias y clica la
+    // 4. Buscar (guard de z-index): escribe, espera sugerencias y clica la
     // primera. Si el mapa la tapase (z-index roto), Playwright no podría hacer
     // click y el test fallaría — justo el tipo de bug que queremos cazar.
     const searchBox = page.getByRole('textbox', { name: 'Buscar un lugar' })
@@ -79,18 +88,18 @@ test.describe('smoke', () => {
     // El badge confirma que el punto quedó marcado.
     await expect(page.getByText('Punto marcado')).toBeVisible()
 
-    // Captura de la pantalla de crear con el punto ya marcado. La guardamos en
-    // e2e/.screenshots (gitignoreado) y la adjuntamos también al reporte.
+    // Captura de la pantalla de crear reto con el punto ya marcado. La guardamos
+    // en e2e/.screenshots (gitignoreado) y la adjuntamos también al reporte.
     const shotPath = path.join(testInfo.project.testDir, '.screenshots', 'crear-con-punto.png')
     const shot = await page.screenshot({ path: shotPath, fullPage: true })
     await testInfo.attach('crear-con-punto', { body: shot, contentType: 'image/png' })
 
-    // 3. Capa de mapa: activar Satélite y comprobar su estado.
+    // 5. Capa de mapa: activar Satélite y comprobar su estado.
     const satellite = page.getByRole('button', { name: 'Satélite' })
     await satellite.click()
     await expect(satellite).toHaveAttribute('aria-pressed', 'true')
 
-    // 4. Higiene: ningún error de consola/JS/petición (salvo ruido de terceros).
+    // 6. Higiene: ningún error de consola/JS/petición (salvo ruido de terceros).
     expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
   })
 })

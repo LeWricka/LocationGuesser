@@ -3,17 +3,20 @@ import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import type { LatLng } from '../../lib/geo'
 import { createChallenge } from '../../lib/challenges'
+import type { Challenge } from '../../lib/database.types'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
-import { newGroupCode } from '../../lib/group'
 import { resolveMapsUrl } from '../../lib/mapsUrl'
-import { formatDeadline } from '../../lib/time'
-import { supabase } from '../../lib/supabase'
 import { useIdentity } from '../identity'
-import { Badge, Button, Card, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
+import { Badge, Button, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
 import styles from './CreateChallenge.module.css'
 
 interface Props {
+  /** Grupo al que se añade el reto. El grupo ya existe (flujo grupo-primero). */
+  groupId: string
+  /** Vuelve atrás sin crear (cancelar). */
   onBack: () => void
+  /** Reto creado: el grupo lo usa para volver a la lista y ofrecer su enlace. */
+  onCreated: (challenge: Challenge) => void
 }
 
 const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
@@ -50,9 +53,8 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: 'Sin límite' },
 ]
 
-export function CreateChallenge({ onBack }: Props) {
+export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   const [title, setTitle] = useState('')
-  const [tripName, setTripName] = useState('')
   const [point, setPoint] = useState<LatLng | null>(null)
   const [flyTo, setFlyTo] = useState<LatLng | null>(null)
   const [search, setSearch] = useState('')
@@ -62,10 +64,6 @@ export function CreateChallenge({ onBack }: Props) {
   const [resolving, setResolving] = useState(false)
   const [locating, setLocating] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
-  const [link, setLink] = useState<string | null>(null)
-  // Datos congelados al crear el reto, para el texto de compartir.
-  const [shareTrip, setShareTrip] = useState<string | null>(null)
-  const [shareDeadline, setShareDeadline] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   // Panorama encajado al punto elegido (pivote #54): si es null no hay cobertura
   // de Street View y no dejamos crear el reto.
@@ -198,19 +196,9 @@ export function CreateChallenge({ onBack }: Props) {
 
     setBusy(true)
     try {
-      // El grupo ("el viaje") nace aquí: necesitamos su fila para registrar al
-      // jugador (FK players→groups) antes de identificar a quien crea el reto.
-      setStatus('Creando el grupo…')
-      const groupId = newGroupCode()
-      const trip = tripName.trim() || null
-      const { error: groupError } = await supabase
-        .from('groups')
-        .insert({ id: groupId, name: trip })
-      if (groupError) throw new Error(groupError.message)
-
       // Identidad sin login: con identidad global no pide nada; navegador limpio
-      // → modal con nombre + PIN. Devuelve null si el usuario cancela.
-      setStatus(null)
+      // → modal con nombre + PIN. El grupo ya existe (lo creó CreateGroup), así
+      // que solo registramos/reclamamos el nombre en él. Devuelve null si cancela.
       const name = await ensureIdentity(groupId)
       if (!name) {
         setBusy(false)
@@ -233,10 +221,9 @@ export function CreateChallenge({ onBack }: Props) {
         deadlineAt,
         guessSeconds,
       })
-      setLink(`${location.origin}${location.pathname}#g=${groupId}&c=${challenge.id}`)
-      setShareTrip(trip)
-      setShareDeadline(deadlineAt)
       setStatus(null)
+      // El grupo recoge el reto, vuelve a la lista y ofrece su enlace.
+      onCreated(challenge)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setStatus(null)
@@ -249,38 +236,8 @@ export function CreateChallenge({ onBack }: Props) {
           : `No se pudo crear el reto: ${msg}`,
         { tone: 'danger' },
       )
-    } finally {
       setBusy(false)
     }
-  }
-
-  // Texto listo para pegar en el chat del grupo (#8): gancho + nombre del viaje
-  // (si lo hay) + plazo en lenguaje claro + enlace.
-  const shareText = link
-    ? `🌍 ${shareTrip ? `[${shareTrip}] ` : ''}¿Dónde estoy? Adivina en el mapa${
-        shareDeadline ? ` (responde ${formatDeadline(shareDeadline)})` : ''
-      }: ${link}`
-    : ''
-
-  function copy() {
-    if (!link) return
-    void navigator.clipboard.writeText(shareText)
-    toast.show('Texto copiado, pégalo en el grupo', { tone: 'success' })
-  }
-
-  async function share() {
-    if (!link) return
-    // Web Share API (móvil): abre la hoja nativa para mandarlo al chat. Si el
-    // usuario cancela, no es error. Sin soporte → copiamos como respaldo.
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: '¿Dónde estoy? 🌍', text: shareText })
-        return
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-      }
-    }
-    copy()
   }
 
   return (
@@ -410,17 +367,6 @@ export function CreateChallenge({ onBack }: Props) {
           </Field>
         )}
 
-        <Field label="Nombre del viaje" hint="Opcional. Aparece en el mensaje que compartes.">
-          {(fieldProps) => (
-            <Input
-              {...fieldProps}
-              placeholder="Viaje a Japón"
-              value={tripName}
-              onChange={(e) => setTripName(e.target.value)}
-            />
-          )}
-        </Field>
-
         <Field
           label="Título del reto"
           hint="Opcional. Si lo dejas vacío usamos «¿Dónde estoy? 🌍»."
@@ -478,7 +424,7 @@ export function CreateChallenge({ onBack }: Props) {
           disabled={!pano || checkingPano}
           onClick={() => void generate()}
         >
-          Generar enlace
+          Crear reto
         </Button>
 
         {status && (
@@ -486,29 +432,6 @@ export function CreateChallenge({ onBack }: Props) {
             <Spinner size={16} />
             <span>{status}</span>
           </Row>
-        )}
-
-        {link && (
-          <Card padding="md" raised>
-            <Stack gap={3}>
-              <strong>¡Reto creado! Compártelo en el grupo:</strong>
-              <Input
-                className={styles.linkInput}
-                readOnly
-                value={shareText}
-                aria-label="Mensaje para compartir el reto"
-                onFocus={(e) => e.target.select()}
-              />
-              <Row gap={2}>
-                {typeof navigator !== 'undefined' && 'share' in navigator && (
-                  <Button onClick={() => void share()}>Compartir</Button>
-                )}
-                <Button variant="secondary" onClick={copy}>
-                  Copiar
-                </Button>
-              </Row>
-            </Stack>
-          </Card>
         )}
       </Stack>
 

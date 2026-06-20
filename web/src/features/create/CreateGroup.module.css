@@ -1,0 +1,18 @@
+.header {
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  font-size: var(--font-size-xl);
+}
+
+/* Texto introductorio: explica qué es un grupo en términos sociales. */
+.intro {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.status {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent-2);
+}

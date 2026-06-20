@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Badge, Card, Row, Spinner, Stack, useToast } from '../../ui'
+import { Badge, Button, Card, Input, Row, Spinner, Stack, useToast } from '../../ui'
 import { aggregateLeaderboard, getGroupVotes } from '../../lib/leaderboard'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import { getVotes } from '../../lib/votes'
@@ -10,11 +10,22 @@ import type { Challenge, Vote } from '../../lib/database.types'
 import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
 import { challengeImageUrl, getGroup, getGroupChallenges, splitByStatus } from '../../lib/groupData'
+import { CreateChallenge } from '../create/CreateChallenge'
 import { RevealMap } from './RevealMap'
 import styles from './GroupPage.module.css'
 
 interface Props {
   groupId: string
+}
+
+/** Enlace del grupo (#g=) para compartir en el chat. */
+function groupLink(groupId: string): string {
+  return `${location.origin}${location.pathname}#g=${encodeURIComponent(groupId)}`
+}
+
+/** Enlace de un reto concreto (#g=…&c=…) para compartir tras crearlo. */
+function challengeLink(groupId: string, challengeId: string): string {
+  return `${groupLink(groupId)}&c=${encodeURIComponent(challengeId)}`
 }
 
 // Página del grupo ("el viaje"): clasificación general, retos en vivo y
@@ -24,6 +35,11 @@ export function GroupPage({ groupId }: Props) {
   const [challenges, setChallenges] = useState<Challenge[] | null>(null)
   const [votes, setVotes] = useState<Vote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // "Añadir reto" es un estado interno de la página (no una ruta nueva):
+  // `adding` muestra el formulario; `created` muestra el reto recién creado con
+  // su enlace para compartir, sin salir del grupo.
+  const [adding, setAdding] = useState(false)
+  const [created, setCreated] = useState<Challenge | null>(null)
   const toast = useToast()
   // Evita re-avisar de un mismo voto si Realtime reenvía el evento (un toast por id).
   const announcedVotes = useRef<Set<string>>(new Set())
@@ -93,6 +109,22 @@ export function GroupPage({ groupId }: Props) {
 
   const { live, past } = useMemo(() => splitByStatus(challenges ?? []), [challenges])
 
+  // Añadir reto al grupo existente. Al terminar, refrescamos para que aparezca
+  // en "en vivo" y mostramos el enlace del reto para compartir.
+  if (adding) {
+    return (
+      <CreateChallenge
+        groupId={groupId}
+        onBack={() => setAdding(false)}
+        onCreated={(challenge) => {
+          setAdding(false)
+          setCreated(challenge)
+          void refresh()
+        }}
+      />
+    )
+  }
+
   if (error) {
     return (
       <main className="lg-page">
@@ -114,22 +146,132 @@ export function GroupPage({ groupId }: Props) {
     )
   }
 
+  const hasChallenges = challenges.length > 0
+
   return (
     <main className="lg-page">
       <Stack gap={6}>
-        <header>
-          <h1 className={styles.title}>{group?.name?.trim() || groupId}</h1>
-          {/* El código siempre visible (en secundario) para poder compartirlo. */}
-          <p className={styles.code}>Código {groupId}</p>
+        <header className={styles.header}>
+          <div>
+            <h1 className={styles.title}>{group?.name?.trim() || groupId}</h1>
+            {/* El código siempre visible (en secundario) para poder compartirlo. */}
+            <p className={styles.code}>Código {groupId}</p>
+          </div>
+          <Row gap={2} wrap>
+            <Button variant="secondary" size="sm" onClick={() => void shareGroup(groupId, toast)}>
+              Compartir grupo
+            </Button>
+            <Button size="sm" onClick={() => setAdding(true)}>
+              ➕ Añadir reto
+            </Button>
+          </Row>
         </header>
+
+        {created && (
+          <ChallengeCreated
+            groupId={groupId}
+            challenge={created}
+            onDismiss={() => setCreated(null)}
+          />
+        )}
 
         <Leaderboard entries={leaderboard} />
 
-        <LiveSection challenges={live} votesByChallenge={votesByChallenge} groupId={groupId} />
-
-        <PastSection challenges={past} />
+        {hasChallenges ? (
+          <>
+            <LiveSection challenges={live} votesByChallenge={votesByChallenge} groupId={groupId} />
+            <PastSection challenges={past} />
+          </>
+        ) : (
+          <Card>
+            <Stack gap={3} align="start">
+              <p className={styles.empty}>Aún no hay retos — añade el primero.</p>
+              <Button size="sm" onClick={() => setAdding(true)}>
+                ➕ Añadir reto
+              </Button>
+            </Stack>
+          </Card>
+        )}
       </Stack>
     </main>
+  )
+}
+
+// Comparte el enlace del grupo (#g=…): Web Share en móvil, copiar como respaldo.
+async function shareGroup(groupId: string, toast: ReturnType<typeof useToast>) {
+  const link = groupLink(groupId)
+  const text = `Únete a nuestro grupo en LocationGuesser y adivina dónde son las fotos: ${link}`
+  if (typeof navigator !== 'undefined' && 'share' in navigator) {
+    try {
+      await navigator.share({ title: 'LocationGuesser', text })
+      return
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+    }
+  }
+  await navigator.clipboard.writeText(text)
+  toast.show('Enlace del grupo copiado, pégalo en el chat', { tone: 'success' })
+}
+
+// Panel que aparece tras crear un reto: ofrece su enlace para compartir en el
+// chat del grupo. El reto ya está en la lista "en vivo"; esto solo facilita el
+// reparto del enlace concreto.
+function ChallengeCreated({
+  groupId,
+  challenge,
+  onDismiss,
+}: {
+  groupId: string
+  challenge: Challenge
+  onDismiss: () => void
+}) {
+  const toast = useToast()
+  const link = challengeLink(groupId, challenge.id)
+  const shareText = `🌍 ${challenge.title} — adivina dónde es${
+    challenge.deadline_at ? ` (responde ${formatDeadline(challenge.deadline_at)})` : ''
+  }: ${link}`
+
+  function copy() {
+    void navigator.clipboard.writeText(shareText)
+    toast.show('Texto copiado, pégalo en el grupo', { tone: 'success' })
+  }
+
+  async function share() {
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      try {
+        await navigator.share({ title: challenge.title, text: shareText })
+        return
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return
+      }
+    }
+    copy()
+  }
+
+  return (
+    <Card padding="md" raised>
+      <Stack gap={3}>
+        <strong>¡Reto creado! Compártelo en el grupo:</strong>
+        <Input
+          className={styles.linkInput}
+          readOnly
+          value={shareText}
+          aria-label="Mensaje para compartir el reto"
+          onFocus={(e) => e.target.select()}
+        />
+        <Row gap={2}>
+          {typeof navigator !== 'undefined' && 'share' in navigator && (
+            <Button onClick={() => void share()}>Compartir</Button>
+          )}
+          <Button variant="secondary" onClick={copy}>
+            Copiar
+          </Button>
+          <Button variant="ghost" onClick={onDismiss}>
+            Hecho
+          </Button>
+        </Row>
+      </Stack>
+    </Card>
   )
 }
 
