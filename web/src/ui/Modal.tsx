@@ -30,7 +30,7 @@ export function Modal({ open, onClose, title, footer, children }: Props) {
   useEffect(() => {
     if (!open || !onClose) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onClose?.()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
