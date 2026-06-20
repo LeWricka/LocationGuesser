@@ -1,6 +1,24 @@
 import { supabase } from './supabase'
 import type { Challenge } from './database.types'
 
+/** Id + nombre del grupo. El nombre del viaje titula la página; si falta, la
+ * vista cae al código (id). */
+export interface GroupInfo {
+  id: string
+  name: string | null
+}
+
+/** Lee el grupo (id + nombre) para titular la página, o null si no existe. */
+export async function getGroup(groupId: string): Promise<GroupInfo | null> {
+  const { data, error } = await supabase
+    .from('groups')
+    .select('id, name')
+    .eq('id', groupId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
 /**
  * Retos de un grupo, del más reciente al más antiguo. Alimenta la página del
  * grupo: separamos "en vivo" (deadline futura) de "anteriores" en la vista.
