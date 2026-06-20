@@ -247,7 +247,7 @@ export function GroupPage({ groupId, onBack }: Props) {
           />
         )}
 
-        <Leaderboard entries={leaderboard} />
+        <Leaderboard entries={leaderboard} meId={user?.id} />
 
         <PhotoSection photos={photos} />
 
@@ -429,7 +429,10 @@ function PhotoSection({ photos }: { photos: PhotoStripItem[] }) {
 
 // --- Clasificación general -------------------------------------------------
 
-function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
+function Leaderboard({ entries, meId }: { entries: LeaderboardEntry[]; meId?: string }) {
+  // Barra relativa al líder: el primero llena al 100% y el resto en proporción a
+  // sus puntos. Visualiza la distancia en la tabla sin números extra.
+  const top = entries[0]?.points ?? 0
   return (
     <section>
       <h2 className={styles.sectionTitle}>🏆 Clasificación general</h2>
@@ -440,23 +443,32 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
       ) : (
         <Card padding="none">
           <ol className={styles.ranking}>
-            {entries.map((entry, i) => (
-              <li
-                key={entry.userId}
-                className={styles.rankRow}
-                // --i alimenta el retardo de la entrada escalonada (ver CSS).
-                style={{ '--i': i } as CSSProperties}
-              >
-                <span className={styles.rankPos} aria-hidden="true">
-                  {medal(i)}
-                </span>
-                <span className={styles.rankName}>{entry.name}</span>
-                <span className={styles.rankPlays}>
-                  {entry.plays} {entry.plays === 1 ? 'reto' : 'retos'}
-                </span>
-                <span className={styles.rankPoints}>{entry.points.toLocaleString('es-ES')}</span>
-              </li>
-            ))}
+            {entries.map((entry, i) => {
+              const isMe = meId != null && entry.userId === meId
+              const width = top > 0 ? Math.max(6, Math.round((entry.points / top) * 100)) : 0
+              return (
+                <li
+                  key={entry.userId}
+                  className={`${styles.rankRow} ${isMe ? styles.rankMe : ''}`}
+                  // --i alimenta el retardo de la entrada escalonada (ver CSS).
+                  style={{ '--i': i } as CSSProperties}
+                >
+                  <span className={`${styles.medal} ${medalClass(i)}`} aria-hidden="true">
+                    {medal(i)}
+                  </span>
+                  <div className={styles.rankMid}>
+                    <span className={styles.rankName}>
+                      {entry.name}
+                      {isMe && <span className={styles.youTag}>Tú</span>}
+                    </span>
+                    <span className={styles.rankBar} aria-hidden="true">
+                      <i style={{ width: `${width}%` } as CSSProperties} />
+                    </span>
+                  </div>
+                  <span className={styles.rankPoints}>{entry.points.toLocaleString('es-ES')}</span>
+                </li>
+              )
+            })}
           </ol>
         </Card>
       )}
@@ -464,11 +476,18 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
   )
 }
 
+// Clase de medalla por puesto (oro/plata/bronce/resto): da el color del disco.
+function medalClass(index: number): string {
+  if (index === 0) return styles.medalGold
+  if (index === 1) return styles.medalSilver
+  if (index === 2) return styles.medalBronze
+  return styles.medalOther
+}
+
+// Número del puesto, que vive dentro del disco de medalla (su color lo distingue:
+// oro / plata / bronce / neutro). Más limpio que un emoji dentro del disco.
 function medal(index: number): string {
-  if (index === 0) return '🥇'
-  if (index === 1) return '🥈'
-  if (index === 2) return '🥉'
-  return `${index + 1}.`
+  return `${index + 1}`
 }
 
 // --- En vivo ---------------------------------------------------------------

@@ -25,7 +25,11 @@
 }
 
 .sectionTitle {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
   margin-bottom: var(--space-3);
 }
 
@@ -57,7 +61,7 @@
 
 .rankRow {
   display: grid;
-  grid-template-columns: 2rem 1fr auto auto;
+  grid-template-columns: 28px 1fr auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -77,35 +81,112 @@
   border-bottom: none;
 }
 
+/* Fila propia: realce cálido (única nota caliente de la tabla). */
+.rankMe {
+  background: var(--color-accent-soft);
+}
+.rankMe:hover {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rankRow {
     animation: none;
   }
 }
 
-.rankPos {
-  font-size: var(--font-size-lg);
-  text-align: center;
-  color: var(--color-text-muted);
+/* Disco de medalla con el número del puesto. El color distingue oro/plata/bronce. */
+.medal {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-black);
   font-variant-numeric: tabular-nums;
+  color: #14202a;
+}
+.medalGold {
+  background: linear-gradient(135deg, #ffe08a, #ffb24d);
+}
+.medalSilver {
+  background: linear-gradient(135deg, #e7eef0, #aab9bd);
+}
+.medalBronze {
+  background: linear-gradient(135deg, #f0a878, #c9743f);
+}
+.medalOther {
+  background: rgba(150, 220, 225, 0.14);
+  color: var(--color-text-faint);
+}
+
+/* Centro de la fila: nombre + barra de progreso relativa al líder. */
+.rankMid {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .rankName {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rankPlays {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-faint);
+/* Etiqueta "Tú" en la fila propia. */
+.youTag {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-on-accent);
+  background: var(--gradient-accent);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+/* Barra de ranking: pista fría que se rellena en teal; cálida en la fila propia. */
+.rankBar {
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: rgba(150, 220, 225, 0.12);
+  overflow: hidden;
+}
+.rankBar i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--land-400), var(--teal-bright));
+  transition: width var(--duration-slower) var(--ease-emphasized);
+}
+.rankMe .rankBar i {
+  background: var(--gradient-accent);
 }
 
 .rankPoints {
-  font-weight: var(--font-weight-bold);
-  color: var(--color-accent-2);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-black);
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-tight);
+}
+.rankMe .rankPoints {
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rankBar i {
+    transition: none;
+  }
 }
 
 /* --- Tarjetas de reto --- */

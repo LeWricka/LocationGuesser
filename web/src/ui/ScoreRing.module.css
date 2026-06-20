@@ -1,0 +1,29 @@
+.wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.wrap svg {
+  display: block;
+}
+
+/* Relleno del anillo: anima el offset del trazo al montar (sensación de carga). */
+.progress {
+  transition: stroke-dashoffset var(--duration-slower) var(--ease-emphasized);
+}
+
+.center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress {
+    transition: none;
+  }
+}

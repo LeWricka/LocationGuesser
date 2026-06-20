@@ -1,0 +1,35 @@
+.wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.wrap svg {
+  display: block;
+}
+
+/* El vaciado del anillo sigue al reloj (tick cada 250ms): transición corta para
+ * que el movimiento sea fluido sin "saltos". */
+.progress {
+  transition: stroke-dashoffset var(--duration-base) linear;
+}
+
+.num {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-black);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+}
+
+.urgent {
+  color: var(--color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress {
+    transition: none;
+  }
+}

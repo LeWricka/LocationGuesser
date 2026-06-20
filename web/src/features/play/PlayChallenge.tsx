@@ -14,14 +14,20 @@ import {
   Button,
   Card,
   ChallengePhoto,
+  CountdownRing,
   CountUp,
   Modal,
   Row,
+  ScoreRing,
   Skeleton,
   Spinner,
   Stack,
   useToast,
 } from '../../ui'
+
+// Puntuación máxima del scoring `5000·e^(−km/2000)`: base del % del anillo de
+// resultado. No cambia el scoring (vive en lib/result); solo lo visualiza.
+const MAX_POINTS = 5000
 import styles from './PlayChallenge.module.css'
 
 interface Props {
@@ -224,12 +230,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         <Stack gap={2} className={styles.header}>
           <Row gap={3} justify="between">
             <h1 className={styles.title}>{challenge.title}</h1>
-            {phase === 'playing' && remaining != null && (
-              <Badge tone={urgent ? 'danger' : 'neutral'}>
-                <span className={`${styles.timer} ${urgent ? styles.timerUrgent : ''}`}>
-                  {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
-                </span>
-              </Badge>
+            {phase === 'playing' && remaining != null && challenge.guess_seconds != null && (
+              <CountdownRing
+                remaining={remaining}
+                total={challenge.guess_seconds}
+                urgent={urgent}
+              />
             )}
           </Row>
         </Stack>
@@ -310,19 +316,21 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 </Stack>
               ) : result ? (
                 <Stack gap={3}>
-                  <Stack
-                    gap={1}
-                    align="center"
-                    className={`${styles.scoreboard} ${styles.scoreReveal}`}
-                  >
-                    <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
-                    {/* Count-up: la puntuación "sube" desde 0 al revelar (sensación
-                        de recuento). Respeta reduced-motion (muestra el final). */}
-                    <CountUp className={styles.points} value={result.points} />
-                    <span className={styles.resultDist}>
-                      puntos · a {fmtDist(result.km)} del objetivo
-                    </span>
-                  </Stack>
+                  <Row gap={4} align="center" className={styles.scoreReveal}>
+                    {/* Anillo de acierto: % de la puntuación máxima, con los puntos
+                        (count-up) en el centro. El dato manda; el anillo lo apoya. */}
+                    <ScoreRing value={result.points} max={MAX_POINTS} size={104}>
+                      <CountUp className={styles.ringPoints} value={result.points} />
+                      <span className={styles.ringUnit}>pts</span>
+                    </ScoreRing>
+                    <Stack gap={2} className={styles.scoreText}>
+                      <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
+                      <span className={styles.resultDist}>
+                        a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del
+                        objetivo
+                      </span>
+                    </Stack>
+                  </Row>
                   {saving && (
                     <Row gap={2} justify="center">
                       <Spinner size={16} />

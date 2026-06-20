@@ -1,4 +1,4 @@
 .group {
-  color: var(--color-text);
-  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  font-weight: var(--font-weight-bold);
 }

@@ -14,13 +14,24 @@
   text-align: center;
 }
 
+/* Ícono de cabecera dentro de un disco cálido con glow: ancla visual de marca
+ * (el pin) que rompe el frío del fondo. */
 .icon {
-  font-size: var(--font-size-2xl);
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xl);
   line-height: 1;
+  background: var(--color-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  box-shadow: var(--shadow-accent);
 }
 
 .title {
   font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-tight);
 }
 

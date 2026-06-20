@@ -48,17 +48,20 @@
   top: var(--space-2);
   left: var(--space-2);
   z-index: 3;
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-surface-raised);
+  border: 1px solid var(--glass-border);
+  /* Pastilla de vidrio sobre el mapa para que el control flote y se lea. */
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
   color: var(--color-text);
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-3);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-bold);
   cursor: pointer;
 }
 .mapToggle:hover {
-  background: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
 }
 
 /* El mapa colapsado es un teaser pequeño; abierto, alto cómodo para apuntar. */
@@ -70,15 +73,6 @@
 }
 .mapPanelOpen .mapInner :global(.lg-map) {
   height: 300px;
-}
-
-/* Cuenta atrás: número grande, tabular para que no "baile" al cambiar. */
-.timer {
-  font-variant-numeric: tabular-nums;
-  font-weight: var(--font-weight-semibold);
-}
-.timerUrgent {
-  color: var(--color-danger);
 }
 
 .coords {
@@ -108,11 +102,6 @@
   }
 }
 
-/* Resultado del revelado: puntos protagonistas, centrados y muy visuales. */
-.scoreboard {
-  text-align: center;
-}
-
 /* Entrada del bloque de puntuación: aparece con muelle al revelar, en sincronía
  * con el count-up. Se desactiva bajo reduced-motion. */
 .scoreReveal {
@@ -130,26 +119,31 @@
   }
 }
 
-.scoreLabel {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-accent);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.scoreText {
+  min-width: 0;
 }
 
-.points {
-  /* Puntuación protagonista: más grande aún que el hero para que "cante", con
-   * el degradado de marca aplicado al número. */
-  font-size: 3.25rem;
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-tight);
+.scoreLabel {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+/* Puntos en el centro del anillo: número tabular, cálido y compacto. */
+.ringPoints {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-black);
+  line-height: 1;
   font-variant-numeric: tabular-nums;
-  letter-spacing: var(--letter-spacing-tighter);
-  background: var(--gradient-accent);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}
+
+.ringUnit {
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -160,6 +154,14 @@
 
 .resultDist {
   color: var(--color-text-muted);
+  font-size: var(--font-size-md);
+}
+
+/* La distancia es el dato cálido: número resaltado bajo regla de acento. */
+.resultKm {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-black);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Bloque secundario (Street View / foto tras botón): separa de los puntos. */
