@@ -118,8 +118,11 @@ Requiere estar logueado en el CLI (`npx supabase login`).
 El login es **passwordless por magic link**: Supabase Auth manda el email. El
 email integrado de Supabase está limitado (~2/hora) → se usa **SMTP propio**.
 
-- **Proveedor:** Brevo (`smtp-relay.brevo.com:587`). Dominio `540deg.com` dado de
-  alta en Brevo para autenticación (DKIM/SPF/DMARC) y evitar el spam.
+- **Proveedor:** **Gmail SMTP** (`smtp.gmail.com:587`), remitente `icka69@gmail.com`
+  (nombre "LocationGuesser"). Se eligió Gmail porque Google ya firma `@gmail.com`
+  (SPF/DKIM) → no cae en spam SIN tocar DNS. Se descartó Brevo desde `@540deg.com`
+  porque autenticar ese dominio exige acceso al DNS (IONOS), que no tenemos → caía en spam.
+  Password = **contraseña de aplicación** de Google (2FA), no la del correo.
 - **Dónde vive la config:** Supabase → Authentication → SMTP Settings (o vía
   Management API `PATCH /v1/projects/<ref>/config/auth`). Campos: `smtp_host`,
   `smtp_port`, `smtp_user`, `smtp_pass`, `smtp_admin_email` (remitente),
