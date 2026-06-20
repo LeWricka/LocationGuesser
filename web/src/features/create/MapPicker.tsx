@@ -88,7 +88,17 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
         ))}
       </div>
       <MapContainer center={[center.lat, center.lng]} zoom={zoom} className="lg-map">
-        <TileLayer key={layer} attribution={base.attribution} url={base.url} />
+        {/* keepBuffer + updateWhenZooming reducen el parpadeo gris al hacer
+            zoom (mismo motivo que en PlayMap). Sin `subdomains` porque la capa
+            satélite (Esri) no usa el placeholder {s}. */}
+        <TileLayer
+          key={layer}
+          attribution={base.attribution}
+          url={base.url}
+          maxZoom={20}
+          keepBuffer={4}
+          updateWhenZooming={false}
+        />
         <ClickHandler onPick={onPick} />
         <Recenter flyTo={flyTo} />
         {value && <Marker position={[value.lat, value.lng]} icon={pinIcon} />}

@@ -61,9 +61,18 @@ function FitToReveal({ guess, answer }: { guess: LatLng | null; answer: LatLng |
 export function PlayMap({ guess, answer, locked, onPick }: Props) {
   return (
     <MapContainer center={[SPAIN.lat, SPAIN.lng]} zoom={5} className="lg-map">
+      {/* CDN de CARTO (rápido, con tiles retina {r}) en vez de los tiles
+          estándar de OSM, que iban lentos y se quedaban en gris al hacer zoom.
+          keepBuffer precarga más tiles alrededor del viewport y
+          updateWhenZooming=false evita pedir tiles intermedios durante la
+          animación de zoom: menos parpadeo gris. */}
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        subdomains="abcd"
+        maxZoom={20}
+        keepBuffer={4}
+        updateWhenZooming={false}
       />
       <ClickHandler locked={locked} onPick={onPick} />
       <FitToReveal guess={guess} answer={answer} />
