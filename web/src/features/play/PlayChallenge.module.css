@@ -46,8 +46,9 @@
     height 0.18s ease;
 }
 
+/* Abierto = casi toda la pantalla, para apuntar con la máxima precisión. */
 .mapPanelOpen {
-  width: min(440px, calc(100% - var(--space-5)));
+  width: min(820px, calc(100% - var(--space-4)));
 }
 
 .mapToggle {
@@ -79,7 +80,7 @@
   transition: height 0.18s ease;
 }
 .mapPanelOpen .mapInner :global(.lg-map) {
-  height: 300px;
+  height: min(64svh, 560px);
 }
 
 .coords {
@@ -98,14 +99,14 @@
  * altura cómoda para ver tu pin + 🎯 + la línea entre ambos.
  */
 .resultMap :global(.lg-map) {
-  height: 50svh;
-  min-height: 280px;
+  height: 62svh;
+  min-height: 320px;
   border-radius: var(--radius-lg);
 }
 
 @media (min-width: 768px) {
   .resultMap :global(.lg-map) {
-    height: 460px;
+    height: 560px;
   }
 }
 

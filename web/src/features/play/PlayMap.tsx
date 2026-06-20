@@ -112,6 +112,13 @@ export function PlayMap({ guess, answer, locked, onPick }: Props) {
       zoom={WORLD_ZOOM}
       minZoom={2}
       worldCopyJump
+      // Zoom rápido para llegar a un punto pequeño sin mil scrolls (nivel 1):
+      // doble-clic/doble-tap acercan HACIA el punto (zoomDelta=2 → +2 niveles);
+      // la rueda es más sensible (wheelPxPerZoomLevel 60→40) y zoomSnap 0.5 da
+      // pasos finos para afinar al final. doubleClickZoom va de serie.
+      zoomDelta={2}
+      zoomSnap={0.5}
+      wheelPxPerZoomLevel={40}
       className="lg-map"
     >
       {/* CDN de CARTO (rápido, con tiles retina {r}) en vez de los tiles
