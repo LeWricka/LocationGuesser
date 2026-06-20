@@ -15,7 +15,7 @@
 | App v0.1 (web estática) | 🗄️ archivada en `legacy/v0.1/` (referencia) |
 | App v0.2 (React + Supabase) | 🔨 en construcción en `web/` |
 | Despliegue | ✅ en vivo — [locationguesser-sage.vercel.app](https://locationguesser-sage.vercel.app) (Vercel + Supabase) |
-| Hito Cuentas + Home (login magic link, perfil, membresía, propiedad, foto opcional, duración relativa) | 🔨 completo e integrado en rama `feat/cuentas-home` (verde) — diseño en [docs/estrategia/cuentas-y-home.md](docs/estrategia/cuentas-y-home.md). Pendiente: validar, configurar Supabase Auth (redirect URLs) y mergear a `main` + aplicar migración `0004`. |
+| Hito Cuentas + Home (login magic link, perfil, membresía, propiedad, foto opcional, duración relativa) | ✅ **en vivo** — mergeado a `main`, migración `0004` aplicada en Supabase, Auth configurado (redirect URLs + plantilla email). Diseño en [docs/estrategia/cuentas-y-home.md](docs/estrategia/cuentas-y-home.md). Pendiente: reescribir E2E (`web/e2e`) para el flujo con login. |
 
 ---
 
