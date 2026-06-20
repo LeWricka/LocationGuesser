@@ -11,6 +11,7 @@ import { useSignedImage } from '../../lib/useSignedImage'
 import type { Challenge } from '../../lib/database.types'
 import {
   Badge,
+  BackHomeButton,
   Button,
   Card,
   ChallengePhoto,
@@ -182,15 +183,26 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     if (challenge && guess) void reveal(challenge, guess)
   }
 
+  // Salida siempre disponible: nunca dejar al jugador atrapado en el reto. Si
+  // venimos de un grupo (deep link `#g=…&c=…`) volvemos a su clasificación; si
+  // no, a la home (hash vacío). El `start_at` persistido deja el reloj intacto
+  // si se vuelve a entrar a media jugada.
+  function goBack() {
+    location.hash = groupId ? `#g=${groupId}` : ''
+  }
+
   if (loadError) {
     return (
       <main className="lg-page">
-        <Card padding="md">
-          <Stack gap={2}>
-            <strong>No se pudo cargar el reto.</strong>
-            <span className={styles.status}>{loadError}</span>
-          </Stack>
-        </Card>
+        <Stack gap={4}>
+          <BackHomeButton onClick={goBack} label={groupId ? 'Volver al grupo' : 'Inicio'} />
+          <Card padding="md">
+            <Stack gap={2}>
+              <strong>No se pudo cargar el reto.</strong>
+              <span className={styles.status}>{loadError}</span>
+            </Stack>
+          </Card>
+        </Stack>
       </main>
     )
   }
@@ -227,6 +239,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   return (
     <main className="lg-page">
       <Stack gap={4}>
+        {/* Salida siempre visible: volver al grupo (o a la home) sin quedar
+            atrapado en el reto. */}
+        <BackHomeButton onClick={goBack} label={groupId ? 'Volver al grupo' : 'Inicio'} />
         <Stack gap={2} className={styles.header}>
           <Row gap={3} justify="between">
             <h1 className={styles.title}>{challenge.title}</h1>
@@ -410,6 +425,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
 
       <Modal
         open={phase === 'idle'}
+        // Descartable: la ✕, Escape o tocar fuera salen del reto (al grupo o a
+        // la home). Sin esto el overlay "Empezar" sería un callejón sin salida.
+        onClose={goBack}
         title="¿Listo para jugar?"
         footer={
           <Button size="lg" fullWidth onClick={start}>
