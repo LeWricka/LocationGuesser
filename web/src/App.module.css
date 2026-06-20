@@ -8,6 +8,16 @@
   text-align: center;
 }
 
+/* Arranque: spinner centrado mientras AuthProvider resuelve la sesión persistida.
+ * Pantalla mínima para que no parpadee contenido antes de saber si hay sesión. */
+.boot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  color: var(--color-accent);
+}
+
 /* Globo de marca sobre fondo con halo de acento. El pin "respira": un halo
  * radial que late suavemente da sensación de app viva al abrir (sin distraer). */
 .mark {
