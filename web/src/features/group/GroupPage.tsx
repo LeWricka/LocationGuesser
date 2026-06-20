@@ -4,9 +4,12 @@ import { aggregateLeaderboard, getGroupVotes } from '../../lib/leaderboard'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import { getVotes } from '../../lib/votes'
 import { fmtDist } from '../../lib/geo'
+import { formatDeadline } from '../../lib/time'
+import { getIdentity } from '../../lib/identity'
 import type { Challenge, Vote } from '../../lib/database.types'
 import { supabase } from '../../lib/supabase'
-import { challengeImageUrl, getGroupChallenges, splitByStatus } from '../../lib/groupData'
+import type { GroupInfo } from '../../lib/groupData'
+import { challengeImageUrl, getGroup, getGroupChallenges, splitByStatus } from '../../lib/groupData'
 import { RevealMap } from './RevealMap'
 import styles from './GroupPage.module.css'
 
@@ -17,6 +20,7 @@ interface Props {
 // Página del grupo ("el viaje"): clasificación general, retos en vivo y
 // anteriores. Se refresca en tiempo real al entrar cualquier voto del grupo.
 export function GroupPage({ groupId }: Props) {
+  const [group, setGroup] = useState<GroupInfo | null>(null)
   const [challenges, setChallenges] = useState<Challenge[] | null>(null)
   const [votes, setVotes] = useState<Vote[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +32,12 @@ export function GroupPage({ groupId }: Props) {
   // montaje y en cada cambio de Realtime para mantener la vista consistente.
   const refresh = useCallback(async () => {
     try {
-      const [c, v] = await Promise.all([getGroupChallenges(groupId), getGroupVotes(groupId)])
+      const [g, c, v] = await Promise.all([
+        getGroup(groupId),
+        getGroupChallenges(groupId),
+        getGroupVotes(groupId),
+      ])
+      setGroup(g)
       setChallenges(c)
       setVotes(v)
     } catch {
@@ -109,8 +118,9 @@ export function GroupPage({ groupId }: Props) {
     <main className="lg-page">
       <Stack gap={6}>
         <header>
-          <h1 className={styles.title}>El viaje</h1>
-          <p className={styles.code}>Grupo {groupId}</p>
+          <h1 className={styles.title}>{group?.name?.trim() || groupId}</h1>
+          {/* El código siempre visible (en secundario) para poder compartirlo. */}
+          <p className={styles.code}>Código {groupId}</p>
         </header>
 
         <Leaderboard entries={leaderboard} />
@@ -204,6 +214,10 @@ function LiveCard({
 }) {
   const ranked = [...votes].sort((a, b) => b.points - a.points)
   const playHref = `#g=${encodeURIComponent(groupId)}&c=${encodeURIComponent(challenge.id)}`
+  // El voto del jugador actual (por nombre): si ya jugó, no puede re-jugar aunque
+  // el reto siga en vivo. Comparamos por nombre, la identidad estable del juego.
+  const myName = getIdentity()?.name?.trim()
+  const myVote = myName ? votes.find((v) => v.player_name === myName) : undefined
   return (
     <Card>
       <Stack gap={3}>
@@ -213,6 +227,7 @@ function LiveCard({
             en vivo
           </Badge>
         </Row>
+        <p className={styles.deadline}>{formatDeadline(challenge.deadline_at)}</p>
         {ranked.length === 0 ? (
           <p className={styles.empty}>Nadie ha jugado todavía. ¡Sé el primero!</p>
         ) : (
@@ -225,9 +240,13 @@ function LiveCard({
             ))}
           </ul>
         )}
-        <a className={styles.playLink} href={playHref}>
-          Jugar este reto →
-        </a>
+        {myVote ? (
+          <p className={styles.played}>Ya jugaste · {myVote.points.toLocaleString('es-ES')} pts</p>
+        ) : (
+          <a className={styles.playLink} href={playHref}>
+            Jugar este reto →
+          </a>
+        )}
       </Stack>
     </Card>
   )
@@ -238,7 +257,7 @@ function LiveCard({
 function PastSection({ challenges }: { challenges: Challenge[] }) {
   return (
     <section>
-      <h2 className={styles.sectionTitle}>📁 Anteriores</h2>
+      <h2 className={styles.sectionTitle}>Anteriores</h2>
       {challenges.length === 0 ? (
         <Card>
           <p className={styles.empty}>Todavía no hay retos cerrados.</p>
