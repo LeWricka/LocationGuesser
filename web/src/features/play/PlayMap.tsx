@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -13,12 +13,17 @@ const guessIcon = L.divIcon({
   iconAnchor: [15, 28],
 })
 
+// El 🎯 (respuesta real) cae con muelle al revelar: clase extra que dispara la
+// animación CSS `lg-pin-drop` (definida en index.css, respeta reduced-motion).
 const answerIcon = L.divIcon({
-  className: 'lg-pin',
+  className: 'lg-pin lg-pin-drop',
   html: '🎯',
   iconSize: [30, 30],
   iconAnchor: [15, 28],
 })
+
+const respectsMotion = () =>
+  typeof window !== 'undefined' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
 interface Props {
   /** Pin del jugador; null hasta que toca el mapa. */
@@ -58,6 +63,44 @@ function FitToReveal({ guess, answer }: { guess: LatLng | null; answer: LatLng |
   return null
 }
 
+// Línea pin → 🎯 que se "dibuja" al revelar. Truco SVG: igualamos dasharray a
+// la longitud del trazo y animamos dashoffset de longitud→0 con la Web
+// Animations API. Sobre el path real que pinta Leaflet (Polyline). Bajo
+// reduced-motion la línea aparece ya dibujada (sin animar). No altera geometría
+// ni el fit-to-bounds: solo anima el trazo de un path ya posicionado.
+function DrawnLine({ guess, answer }: { guess: LatLng; answer: LatLng }) {
+  const lineRef = useRef<L.Polyline | null>(null)
+
+  useEffect(() => {
+    const path = lineRef.current?.getElement() as SVGPathElement | null
+    if (!path || !respectsMotion() || typeof path.getTotalLength !== 'function') return
+    const len = path.getTotalLength()
+    if (!len) return
+    const anim = path.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], {
+      duration: 600,
+      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
+      fill: 'forwards',
+      delay: 120,
+    })
+    // Igualamos el patrón de guiones a la longitud para que el offset "tape" toda
+    // la línea al empezar. Lo dejamos sólido al acabar.
+    path.style.strokeDasharray = `${len}`
+    path.style.strokeDashoffset = `${len}`
+    return () => anim.cancel()
+  }, [guess, answer])
+
+  return (
+    <Polyline
+      ref={lineRef}
+      positions={[
+        [guess.lat, guess.lng],
+        [answer.lat, answer.lng],
+      ]}
+      pathOptions={{ color: '#ff453a', weight: 3 }}
+    />
+  )
+}
+
 export function PlayMap({ guess, answer, locked, onPick }: Props) {
   return (
     <MapContainer center={[SPAIN.lat, SPAIN.lng]} zoom={5} className="lg-map">
@@ -78,15 +121,7 @@ export function PlayMap({ guess, answer, locked, onPick }: Props) {
       <FitToReveal guess={guess} answer={answer} />
       {guess && <Marker position={[guess.lat, guess.lng]} icon={guessIcon} />}
       {answer && <Marker position={[answer.lat, answer.lng]} icon={answerIcon} />}
-      {guess && answer && (
-        <Polyline
-          positions={[
-            [guess.lat, guess.lng],
-            [answer.lat, answer.lng],
-          ]}
-          pathOptions={{ color: '#ff453a', weight: 2, dashArray: '6 6' }}
-        />
-      )}
+      {guess && answer && <DrawnLine guess={guess} answer={answer} />}
     </MapContainer>
   )
 }

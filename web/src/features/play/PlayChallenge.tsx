@@ -10,7 +10,18 @@ import { getIdentity } from '../../lib/identity'
 import { useIdentity } from '../identity'
 import { supabase } from '../../lib/supabase'
 import type { Challenge } from '../../lib/database.types'
-import { Badge, Button, Card, Modal, Row, Spinner, Stack, useToast } from '../../ui'
+import {
+  Badge,
+  Button,
+  Card,
+  CountUp,
+  Modal,
+  Row,
+  Skeleton,
+  Spinner,
+  Stack,
+  useToast,
+} from '../../ui'
 import styles from './PlayChallenge.module.css'
 
 interface Props {
@@ -189,10 +200,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
 
   if (phase === 'loading' || !challenge) {
     return (
-      <main className="lg-page">
-        <div className={styles.centered}>
-          <Spinner size={32} />
-        </div>
+      <main className="lg-page" role="status" aria-label="Cargando el reto">
+        {/* Esqueleto con la silueta del reto (título + escena + CTA): la espera
+            se percibe más corta que con un spinner suelto. */}
+        <Stack gap={4}>
+          <Skeleton width="55%" height={28} radius="md" />
+          <Skeleton width="100%" height="46svh" radius="lg" />
+          <Skeleton width="100%" height={52} radius="sm" />
+        </Stack>
         {/* Imprescindible: en incógnito se pide el nombre durante la carga; si
             no montamos el modal aquí, se quedaría cargando para siempre. */}
         {identityModal}
@@ -266,7 +281,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         ) : (
           /* Fase revelada: el mapa pasa a protagonista, a tamaño grande, con tu
              pin + 🎯 real + línea, encuadrado a los dos puntos. */
-          <div className={styles.resultMap}>
+          <div className={`${styles.resultMap} lg-rise`}>
             <PlayMap guess={guess} answer={answer} locked onPick={setGuess} />
           </div>
         )}
@@ -299,9 +314,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 </Stack>
               ) : result ? (
                 <Stack gap={3}>
-                  <Stack gap={1} align="center" className={styles.scoreboard}>
+                  <Stack
+                    gap={1}
+                    align="center"
+                    className={`${styles.scoreboard} ${styles.scoreReveal}`}
+                  >
                     <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
-                    <span className={styles.points}>{result.points}</span>
+                    {/* Count-up: la puntuación "sube" desde 0 al revelar (sensación
+                        de recuento). Respeta reduced-motion (muestra el final). */}
+                    <CountUp className={styles.points} value={result.points} />
                     <span className={styles.resultDist}>
                       puntos · a {fmtDist(result.km)} del objetivo
                     </span>

@@ -39,6 +39,15 @@
   color: var(--color-danger);
 }
 
+/* Fila del esqueleto de carga: mismo padding que una fila real del ranking. */
+.skelRow {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.skelRow:last-child {
+  border-bottom: none;
+}
+
 /* --- Clasificación general --- */
 
 .ranking {
@@ -53,10 +62,25 @@
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
+  /* Entrada escalonada de cada puesto al pintar la tabla. El retardo lo fija el
+   * índice como variable inline (--i) desde el TSX. */
+  animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger-step));
+  transition: background-color var(--transition-fast);
+}
+
+.rankRow:hover {
+  background-color: var(--color-surface-hover);
 }
 
 .rankRow:last-child {
   border-bottom: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rankRow {
+    animation: none;
+  }
 }
 
 .rankPos {

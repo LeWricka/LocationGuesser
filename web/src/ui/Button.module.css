@@ -1,4 +1,7 @@
 .button {
+  position: relative;
+  /* Recorta el barrido de brillo del CTA primario (::after). */
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -66,14 +69,41 @@
   color: var(--color-on-accent);
   box-shadow: var(--shadow-accent);
 }
+/* Barrido de brillo diagonal que recorre el botón al pasar el ratón: le da
+ * "vida" sin parpadeos (un solo gesto, no en bucle). */
+.primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.28) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  transition: transform var(--duration-slow) var(--ease-smooth);
+  pointer-events: none;
+}
 .primary:hover:not(:disabled) {
   background-image: var(--gradient-accent-hover);
   box-shadow: var(--shadow-accent-hover);
+}
+.primary:hover:not(:disabled)::after {
+  transform: translateX(120%);
 }
 .primary:active:not(:disabled) {
   background-image: none;
   background-color: var(--color-accent-active);
   box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary::after {
+    transition: none;
+    /* Sin barrido: lo mantenemos fuera de vista para que no destelle. */
+    opacity: 0;
+  }
 }
 
 .secondary {

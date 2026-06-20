@@ -3,7 +3,7 @@ import { CreateGroup } from './features/create/CreateGroup'
 import { PlayChallenge } from './features/play/PlayChallenge'
 import { GroupPage } from './features/group/GroupPage'
 import { parseHash } from './lib/route'
-import { Button, Card, Stack } from './ui'
+import { Button, Card, Stack, withViewTransition } from './ui'
 import styles from './App.module.css'
 
 type View = 'home' | 'create'
@@ -24,10 +24,17 @@ function App() {
   const [view, setView] = useState<View>('home')
 
   useEffect(() => {
-    const onHash = () => setRoute(parseHash())
+    // Al cambiar de vista envolvemos el setState en la View Transitions API para
+    // un cross-fade nativo entre pantallas (Home → grupo → jugar → resultado).
+    // Donde no exista (Firefox hoy) cae a un setState normal: cambio instantáneo.
+    const onHash = () => withViewTransition(() => setRoute(parseHash()))
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  // Mismo cross-fade al entrar/salir del formulario de crear grupo, que no pasa
+  // por el hash (es estado interno de la Home).
+  const goView = (next: View) => withViewTransition(() => setView(next))
 
   // Un reto concreto → jugar. Solo el grupo → página del grupo (histórico y
   // clasificación). Sin hash → Home (flujo grupo-primero).
@@ -38,13 +45,13 @@ function App() {
     return <GroupPage groupId={route.group} />
   }
   if (view === 'create') {
-    return <CreateGroup onBack={() => setView('home')} />
+    return <CreateGroup onBack={() => goView('home')} />
   }
 
   return (
-    <main className={`lg-page ${styles.home}`}>
+    <main className={`lg-page ${styles.home} lg-stagger`}>
       <Stack gap={4} align="center">
-        <span className={styles.mark} aria-hidden="true">
+        <span className={`${styles.mark} lg-pop`} aria-hidden="true">
           📍
         </span>
         <h1 className={styles.title}>
@@ -53,7 +60,7 @@ function App() {
         <p className={styles.tagline}>GeoGuessr con las fotos de tu grupo.</p>
       </Stack>
 
-      <Button size="lg" className={styles.cta} onClick={() => setView('create')}>
+      <Button size="lg" className={styles.cta} onClick={() => goView('create')}>
         Crear un grupo
       </Button>
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Badge, Button, Card, Input, Row, Spinner, Stack, useToast } from '../../ui'
+import type { CSSProperties } from 'react'
+import { Badge, Button, Card, Input, Row, Skeleton, Spinner, Stack, useToast } from '../../ui'
 import { aggregateLeaderboard, getGroupVotes } from '../../lib/leaderboard'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import { getVotes } from '../../lib/votes'
@@ -136,21 +137,14 @@ export function GroupPage({ groupId }: Props) {
   }
 
   if (!challenges || !votes) {
-    return (
-      <main className="lg-page">
-        <Row gap={2} justify="center">
-          <Spinner />
-          <span>Cargando el viaje…</span>
-        </Row>
-      </main>
-    )
+    return <GroupSkeleton />
   }
 
   const hasChallenges = challenges.length > 0
 
   return (
     <main className="lg-page">
-      <Stack gap={6}>
+      <Stack gap={6} className="lg-stagger">
         <header className={styles.header}>
           <div>
             <h1 className={styles.title}>{group?.name?.trim() || groupId}</h1>
@@ -192,6 +186,54 @@ export function GroupPage({ groupId }: Props) {
             </Stack>
           </Card>
         )}
+      </Stack>
+    </main>
+  )
+}
+
+// Esqueleto de carga de la página del grupo: reproduce el layout real (cabecera
+// + clasificación + tarjetas) con shimmer. Reduce la espera percibida frente a
+// un spinner suelto (el ojo ya "lee" la estructura). role=status anuncia la
+// carga al lector de pantalla; los bloques shimmer van aria-hidden.
+function GroupSkeleton() {
+  return (
+    <main className="lg-page" role="status" aria-label="Cargando el viaje">
+      <Stack gap={6}>
+        <Row justify="between" align="center" gap={3}>
+          <Stack gap={2}>
+            <Skeleton width={180} height={28} radius="md" />
+            <Skeleton width={110} height={14} />
+          </Stack>
+          <Skeleton width={120} height={36} radius="sm" />
+        </Row>
+
+        <Stack gap={3}>
+          <Skeleton width={200} height={22} radius="md" />
+          <Card padding="none">
+            <div>
+              {[0, 1, 2].map((i) => (
+                <Row key={i} justify="between" align="center" gap={3} className={styles.skelRow}>
+                  <Skeleton width={28} height={20} radius="full" />
+                  <Skeleton width="40%" height={16} />
+                  <Skeleton width={48} height={16} />
+                </Row>
+              ))}
+            </div>
+          </Card>
+        </Stack>
+
+        <Stack gap={3}>
+          <Skeleton width={150} height={22} radius="md" />
+          {[0, 1].map((i) => (
+            <Card key={i}>
+              <Stack gap={3}>
+                <Skeleton width="60%" height={18} />
+                <Skeleton width="35%" height={14} />
+                <Skeleton width="100%" height={14} />
+              </Stack>
+            </Card>
+          ))}
+        </Stack>
       </Stack>
     </main>
   )
@@ -289,7 +331,12 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
         <Card padding="none">
           <ol className={styles.ranking}>
             {entries.map((entry, i) => (
-              <li key={entry.name} className={styles.rankRow}>
+              <li
+                key={entry.name}
+                className={styles.rankRow}
+                // --i alimenta el retardo de la entrada escalonada (ver CSS).
+                style={{ '--i': i } as CSSProperties}
+              >
                 <span className={styles.rankPos} aria-hidden="true">
                   {medal(i)}
                 </span>
