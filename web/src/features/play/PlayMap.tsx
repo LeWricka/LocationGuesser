@@ -4,7 +4,11 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { LatLng } from '../../lib/geo'
 
-const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
+// Vista inicial: el MUNDO entero (estilo GeoGuessr). Antes arrancaba en España
+// (zoom 5), lo que obligaba a alejar para buscar sitios fuera y volver a acercar.
+// Empezando alejado, el jugador va de lejos a cerca directo.
+const WORLD: LatLng = { lat: 25, lng: 0 }
+const WORLD_ZOOM = 2
 
 const guessIcon = L.divIcon({
   className: 'lg-pin',
@@ -103,7 +107,13 @@ function DrawnLine({ guess, answer }: { guess: LatLng; answer: LatLng }) {
 
 export function PlayMap({ guess, answer, locked, onPick }: Props) {
   return (
-    <MapContainer center={[SPAIN.lat, SPAIN.lng]} zoom={5} className="lg-map">
+    <MapContainer
+      center={[WORLD.lat, WORLD.lng]}
+      zoom={WORLD_ZOOM}
+      minZoom={2}
+      worldCopyJump
+      className="lg-map"
+    >
       {/* CDN de CARTO (rápido, con tiles retina {r}) en vez de los tiles
           estándar de OSM, que iban lentos y se quedaban en gris al hacer zoom.
           keepBuffer precarga más tiles alrededor del viewport y
