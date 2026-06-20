@@ -1,0 +1,89 @@
+/* Marco de foto: superficie con proporción fija y recorte uniforme. */
+.frame {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-raised);
+  padding: 0;
+  /* Cuando es <button> reseteamos su apariencia. */
+  font: inherit;
+  color: inherit;
+}
+
+.frame:is(button) {
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+.frame:is(button):hover {
+  border-color: var(--color-border-strong);
+}
+.frame:is(button):active {
+  transform: scale(0.98);
+}
+
+/* Proporciones. */
+.ratio-square {
+  aspect-ratio: 1 / 1;
+}
+.ratio-photo {
+  aspect-ratio: 4 / 3;
+}
+.ratio-wide {
+  aspect-ratio: 16 / 9;
+}
+
+/* Tamaños orientativos (ancho máximo; en flex/grid se adaptan). */
+.sm {
+  width: 72px;
+}
+.md {
+  width: 100%;
+  max-width: 240px;
+}
+.lg {
+  width: 100%;
+  max-width: none;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: var(--font-size-2xl);
+  /* Halo tenue de marca para que el hueco no se vea muerto. */
+  background-image: var(--gradient-app-bg);
+  color: var(--color-text-faint);
+}
+
+/* Etiqueta superpuesta en la esquina inferior, sobre degradado para legible. */
+.caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-4) var(--space-2) var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame:is(button) {
+    transition: none;
+  }
+  .frame:is(button):active {
+    transform: none;
+  }
+}

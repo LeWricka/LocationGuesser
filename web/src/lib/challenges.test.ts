@@ -45,7 +45,8 @@ const sampleChallenge: Challenge = {
   sv_pitch: 0,
   guess_seconds: 120,
   deadline_at: '2026-06-19T23:59:59.999Z',
-  created_by: 'Ana',
+  photo_is_hint: true,
+  created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
 }
 

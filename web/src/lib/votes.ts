@@ -4,7 +4,7 @@ import type { Vote } from './database.types'
 export interface SaveVoteInput {
   groupId: string
   challengeId: string
-  playerName: string
+  userId: string
   guessLat: number
   guessLng: number
   distanceKm: number
@@ -12,9 +12,9 @@ export interface SaveVoteInput {
 }
 
 /**
- * Guarda (o reemplaza) el voto de un jugador en un reto. Upsert por la unique
- * `(challenge_id, player_name)`: si el jugador recarga o reenvía, no duplica;
- * actualiza su fila. Devuelve la fila final.
+ * Guarda (o reemplaza) el voto de un usuario en un reto. Upsert por la unique
+ * `(challenge_id, user_id)`: si el usuario recarga o reenvía, no duplica;
+ * actualiza su fila. RLS exige `user_id = auth.uid()`. Devuelve la fila final.
  */
 export async function saveVote(input: SaveVoteInput): Promise<Vote> {
   const { data, error } = await supabase
@@ -23,13 +23,13 @@ export async function saveVote(input: SaveVoteInput): Promise<Vote> {
       {
         group_id: input.groupId,
         challenge_id: input.challengeId,
-        player_name: input.playerName,
+        user_id: input.userId,
         guess_lat: input.guessLat,
         guess_lng: input.guessLng,
         distance_km: input.distanceKm,
         points: input.points,
       },
-      { onConflict: 'challenge_id,player_name' },
+      { onConflict: 'challenge_id,user_id' },
     )
     .select()
     .single()
@@ -38,18 +38,15 @@ export async function saveVote(input: SaveVoteInput): Promise<Vote> {
 }
 
 /**
- * Voto previo de un jugador en un reto, o null si aún no ha jugado.
+ * Voto previo de un usuario en un reto, o null si aún no ha jugado.
  * `maybeSingle` para que "no hay fila" no sea un error.
  */
-export async function getExistingVote(
-  challengeId: string,
-  playerName: string,
-): Promise<Vote | null> {
+export async function getExistingVote(challengeId: string, userId: string): Promise<Vote | null> {
   const { data, error } = await supabase
     .from('votes')
     .select()
     .eq('challenge_id', challengeId)
-    .eq('player_name', playerName)
+    .eq('user_id', userId)
     .maybeSingle()
   if (error) throw error
   return data

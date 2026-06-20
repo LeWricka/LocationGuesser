@@ -1,0 +1,43 @@
+/* Enlace de navegación discreto (ghost) con objetivo táctil cómodo. */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: var(--space-1) var(--space-2);
+  margin-left: calc(var(--space-2) * -1); /* alinea el texto con el borde del contenido */
+
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+
+  transition: color var(--transition-fast);
+}
+
+.back:hover {
+  color: var(--color-text);
+}
+
+.arrow {
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  transition: transform var(--transition-fast);
+}
+
+.back:hover .arrow {
+  transform: translateX(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arrow,
+  .back {
+    transition: none;
+  }
+  .back:hover .arrow {
+    transform: none;
+  }
+}

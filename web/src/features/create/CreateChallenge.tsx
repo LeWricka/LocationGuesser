@@ -3,11 +3,23 @@ import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import type { LatLng } from '../../lib/geo'
 import { createChallenge } from '../../lib/challenges'
+import { deadlineFromNow } from '../../lib/time'
 import type { Challenge } from '../../lib/database.types'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { resolveMapsUrl } from '../../lib/mapsUrl'
-import { useIdentity } from '../identity'
-import { Badge, Button, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
+import { uploadImage } from '../../lib/storage'
+import { useSession } from '../../lib/session-context'
+import {
+  Badge,
+  Button,
+  ChallengePhoto,
+  Field,
+  Input,
+  Row,
+  Spinner,
+  Stack,
+  useToast,
+} from '../../ui'
 import styles from './CreateChallenge.module.css'
 
 interface Props {
@@ -27,23 +39,16 @@ interface NominatimHit {
   display_name: string
 }
 
-// Plazo del reto: presets relativos al momento de crear. "Fin del día" =
-// medianoche del creador, congelada como timestamp absoluto.
-type DeadlinePreset = '1h' | '4h' | 'eod'
-
-const DEADLINE_OPTIONS: { value: DeadlinePreset; label: string }[] = [
-  { value: '1h', label: '1 hora' },
-  { value: '4h', label: '4 horas' },
-  { value: 'eod', label: 'Fin del día' },
+// Plazo del reto: DURACIÓN relativa al momento de crear (en horas). Sustituye al
+// ambiguo "fin del día" por una cuenta atrás clara. El valor es el nº de horas;
+// createChallenge lo congela como instante absoluto (deadlineFromNow).
+const DEADLINE_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: '1 h' },
+  { value: 4, label: '4 h' },
+  { value: 8, label: '8 h' },
+  { value: 24, label: '24 h' },
+  { value: 48, label: '48 h' },
 ]
-
-function deadlineISO(preset: DeadlinePreset): string {
-  const d = new Date()
-  if (preset === '1h') d.setHours(d.getHours() + 1)
-  else if (preset === '4h') d.setHours(d.getHours() + 4)
-  else d.setHours(23, 59, 59, 999)
-  return d.toISOString()
-}
 
 // Tiempo por jugada en segundos; null = sin límite.
 const GUESS_OPTIONS: { value: number | null; label: string }[] = [
@@ -71,10 +76,26 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   const [checkingPano, setCheckingPano] = useState(false)
   // POV con el que arrancarán los jugadores; el creador puede girar la previa.
   const [pov, setPov] = useState({ heading: 0, pitch: 0 })
-  const [deadline, setDeadline] = useState<DeadlinePreset>('eod')
+  // Duración del reto en horas (ver DEADLINE_OPTIONS); 24 h por defecto.
+  const [durationHours, setDurationHours] = useState(24)
   const [guessSeconds, setGuessSeconds] = useState<number | null>(120)
+  // Foto opcional del reto (se sube sin EXIF). `photoIsHint` decide si se ve al
+  // jugar (pista) o se reserva para el revelado (sorpresa). `photoPreview` es un
+  // object URL que gestionamos en el handler (revocar el anterior al cambiar)
+  // para no fugar memoria sin recurrir a un efecto.
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoIsHint, setPhotoIsHint] = useState(true)
   const toast = useToast()
-  const { ensureIdentity, modal: identityModal } = useIdentity()
+  const { user } = useSession()
+
+  function pickPhoto(file: File | null) {
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return file ? URL.createObjectURL(file) : null
+    })
+    setPhotoFile(file)
+  }
 
   // Al elegir el punto (por cualquier método) encajamos el panorama de Street
   // View más cercano. Sin cobertura → avisamos y bloqueamos la creación.
@@ -193,33 +214,39 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
       toast.show('Elige un punto con cobertura de Street View.', { tone: 'danger' })
       return
     }
+    if (!user) {
+      toast.show('Inicia sesión para crear un reto.', { tone: 'danger' })
+      return
+    }
 
     setBusy(true)
     try {
-      // Identidad sin login: con identidad global no pide nada; navegador limpio
-      // → modal con nombre + PIN. El grupo ya existe (lo creó CreateGroup), así
-      // que solo registramos/reclamamos el nombre en él. Devuelve null si cancela.
-      const name = await ensureIdentity(groupId)
-      if (!name) {
-        setBusy(false)
-        return
+      // Foto opcional: la subimos comprimida y SIN EXIF (uploadImage estripa el
+      // GPS, que sería la respuesta). Solo si el creador adjuntó una.
+      let imagePath: string | undefined
+      if (photoFile) {
+        setStatus('Subiendo la foto…')
+        imagePath = await uploadImage(photoFile)
       }
 
       setStatus('Guardando el reto…')
-      const deadlineAt = deadlineISO(deadline)
-      // Guardamos la lat/lng encajada al panorama (la respuesta real para el
-      // scoring) y el panorama exacto + POV inicial.
+      // El plazo es relativo: congelamos "ahora + durationHours" como instante
+      // absoluto. Guardamos la lat/lng encajada al panorama (la respuesta real
+      // para el scoring) y el panorama exacto + POV inicial. El creador es el
+      // user_id de la sesión.
       const { challenge } = await createChallenge({
         title: title.trim() || '¿Dónde estoy? 🌍',
         lat: pano.lat,
         lng: pano.lng,
-        createdBy: name,
+        createdBy: user.id,
         groupId,
         svPanoId: pano.panoId,
         svHeading: pov.heading,
         svPitch: pov.pitch,
-        deadlineAt,
+        deadlineAt: deadlineFromNow(durationHours),
         guessSeconds,
+        imagePath,
+        photoIsHint,
       })
       setStatus(null)
       // El grupo recoge el reto, vuelve a la lista y ofrece su enlace.
@@ -381,16 +408,64 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
           )}
         </Field>
 
-        <Field label="Plazo para contestar">
+        <Field
+          label="Foto del reto"
+          hint="Opcional. Se sube sin datos de ubicación (sin EXIF). Por ejemplo, una foto tuya en el sitio."
+        >
+          {(fieldProps) => (
+            <Stack gap={3} align="start">
+              <input
+                {...fieldProps}
+                type="file"
+                accept="image/*"
+                className={styles.fileInput}
+                onChange={(e) => pickPhoto(e.target.files?.[0] ?? null)}
+              />
+              {photoPreview && (
+                <>
+                  <ChallengePhoto src={photoPreview} alt="Vista previa de la foto del reto" />
+                  <Row gap={2} wrap>
+                    <Button
+                      variant={photoIsHint ? 'primary' : 'secondary'}
+                      size="sm"
+                      aria-pressed={photoIsHint}
+                      onClick={() => setPhotoIsHint(true)}
+                    >
+                      Foto como pista
+                    </Button>
+                    <Button
+                      variant={!photoIsHint ? 'primary' : 'secondary'}
+                      size="sm"
+                      aria-pressed={!photoIsHint}
+                      onClick={() => setPhotoIsHint(false)}
+                    >
+                      Foto sorpresa
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => pickPhoto(null)}>
+                      Quitar foto
+                    </Button>
+                  </Row>
+                  <p className={styles.hint}>
+                    {photoIsHint
+                      ? 'Visible al jugar, junto al Street View.'
+                      : 'Oculta hasta el revelado (al votar).'}
+                  </p>
+                </>
+              )}
+            </Stack>
+          )}
+        </Field>
+
+        <Field label="Duración del reto" hint="Cuánto tiempo queda abierto para contestar.">
           {() => (
             <Row gap={2} wrap>
               {DEADLINE_OPTIONS.map((opt) => (
                 <Button
                   key={opt.value}
-                  variant={deadline === opt.value ? 'primary' : 'secondary'}
+                  variant={durationHours === opt.value ? 'primary' : 'secondary'}
                   size="sm"
-                  aria-pressed={deadline === opt.value}
-                  onClick={() => setDeadline(opt.value)}
+                  aria-pressed={durationHours === opt.value}
+                  onClick={() => setDurationHours(opt.value)}
                 >
                   {opt.label}
                 </Button>
@@ -434,8 +509,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
           </Row>
         )}
       </Stack>
-
-      {identityModal}
     </main>
   )
 }
