@@ -1,4 +1,5 @@
 import { AuthScreen } from './AuthScreen'
+import { BackHomeButton } from './BackHomeButton'
 import { Button } from './Button'
 import { Row } from './Row'
 import { Stack } from './Stack'
@@ -18,6 +19,10 @@ interface Props {
 
 // Pantalla "revisa tu correo" tras pedir el enlace mágico (§2.2). Copy claro,
 // reenviar y cambiar email visibles. Presentacional.
+//
+// "Volver" obligatorio: esta pantalla NO puede ser un callejón sin salida. El
+// control de cabecera (← Cambiar correo) reutiliza `onChangeEmail` para regresar
+// al paso de email, que es el inicio del flujo de login.
 export function CheckEmail({
   email,
   onResend,
@@ -30,6 +35,7 @@ export function CheckEmail({
       className={className}
       icon="📬"
       title="Mira tu correo"
+      header={onChangeEmail && <BackHomeButton onClick={onChangeEmail} label="Cambiar correo" />}
       subtitle={
         <>
           Pulsa el enlace que mandamos a <strong className={styles.email}>{email}</strong> para

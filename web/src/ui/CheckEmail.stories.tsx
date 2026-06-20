@@ -5,7 +5,7 @@ const meta = {
   title: 'Cuentas/CheckEmail',
   component: CheckEmail,
   parameters: { layout: 'fullscreen' },
-  args: { email: 'lewis@ejemplo.com' },
+  args: { email: 'lewis@ejemplo.com', onChangeEmail: () => {}, onResend: () => {} },
 } satisfies Meta<typeof CheckEmail>
 
 export default meta

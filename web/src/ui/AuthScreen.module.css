@@ -14,6 +14,15 @@
   text-align: center;
 }
 
+/* Control de "volver" alineado a la izquierda, sobre el bloque centrado. El
+ * margen negativo inferior lo acerca al contenido sin robar aire a la tarjeta. */
+.header {
+  display: flex;
+  justify-content: flex-start;
+  text-align: left;
+  margin-bottom: calc(var(--space-2) * -1);
+}
+
 /* Ícono de cabecera dentro de un disco cálido con glow: ancla visual de marca
  * (el pin) que rompe el frío del fondo. */
 .icon {

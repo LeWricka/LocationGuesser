@@ -4,6 +4,11 @@ import { Stack } from './Stack'
 import styles from './AuthScreen.module.css'
 
 interface Props {
+  /**
+   * Cabecera opcional alineada arriba a la izquierda, fuera del bloque centrado:
+   * sitio para un control de "volver" que nunca deje la pantalla sin salida.
+   */
+  header?: ReactNode
   /** Emoji/ícono grande de cabecera (p.ej. 📍, 📬). */
   icon?: ReactNode
   title: ReactNode
@@ -18,10 +23,11 @@ interface Props {
 
 // Lienzo común de las pantallas de onboarding (login, revisa-tu-correo, perfil):
 // tarjeta centrada vertical y horizontalmente, mobile-first. Presentacional.
-export function AuthScreen({ icon, title, subtitle, children, footer, className }: Props) {
+export function AuthScreen({ header, icon, title, subtitle, children, footer, className }: Props) {
   return (
     <div className={[styles.screen, className].filter(Boolean).join(' ')}>
       <Card as="main" padding="lg" raised className={styles.card}>
+        {header && <div className={styles.header}>{header}</div>}
         <Stack gap={5}>
           <Stack gap={3} align="center">
             {icon && (
