@@ -1,0 +1,35 @@
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+
+  /* Inicial de respaldo: sobre fondo de marca secundaria (violeta "ruta"). */
+  background: var(--avatar-initial-bg, var(--color-accent-2-soft));
+  color: var(--color-accent-2);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  border: 1px solid var(--color-border);
+  user-select: none;
+}
+
+.sm {
+  width: 28px;
+  height: 28px;
+  font-size: var(--font-size-sm);
+}
+
+.md {
+  width: 40px;
+  height: 40px;
+  font-size: var(--font-size-md);
+}
+
+.lg {
+  width: 64px;
+  height: 64px;
+  font-size: var(--font-size-xl);
+}

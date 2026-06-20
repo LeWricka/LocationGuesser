@@ -1,0 +1,23 @@
+.empty {
+  text-align: center;
+}
+
+.wave {
+  font-size: var(--font-size-2xl);
+  line-height: 1;
+}
+
+.title {
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.lead {
+  color: var(--color-text-muted);
+  max-width: 36ch;
+}
+
+.hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+  max-width: 38ch;
+}

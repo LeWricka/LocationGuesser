@@ -1,0 +1,79 @@
+/* FAB fijo abajo-derecha, respetando el safe-area de iOS. Gradiente de marca
+ * + glow para que "cante" como acción primaria. */
+.fab {
+  position: fixed;
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  z-index: var(--z-sticky);
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  /* Círculo en móvil: alto = ancho = objetivo táctil holgado. */
+  height: 56px;
+  min-width: 56px;
+  padding: 0;
+  justify-content: center;
+
+  border: none;
+  border-radius: var(--radius-full);
+  background-image: var(--gradient-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-accent);
+  cursor: pointer;
+
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-base),
+    background-image var(--transition-base);
+}
+
+.fab:hover {
+  background-image: var(--gradient-accent-hover);
+  box-shadow: var(--shadow-accent-hover);
+  transform: translateY(-1px);
+}
+
+.fab:active {
+  transform: scale(0.96);
+}
+
+.icon {
+  font-size: 1.75rem;
+  line-height: 1;
+  /* Centrado óptico del glifo "+". */
+  margin-top: -2px;
+}
+
+/* En móvil solo el "+" (círculo). La etiqueta queda para lectores de pantalla. */
+.label {
+  display: none;
+}
+
+/* A partir de tablet, FAB expandido (pill con texto). */
+@media (min-width: 768px) {
+  .fab {
+    padding: 0 var(--space-5);
+  }
+  .icon {
+    margin-top: -1px;
+  }
+  .label {
+    display: inline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab {
+    transition: none;
+  }
+  .fab:hover,
+  .fab:active {
+    transform: none;
+  }
+}
