@@ -101,6 +101,12 @@ alter table public.challenges drop column if exists created_by;
 alter table public.challenges
   add column created_by uuid not null references auth.users (id) on delete cascade;
 
+-- Foto opcional por reto (re-activada): el creador elige si la foto es PISTA visible
+-- al jugar (true) o SORPRESA que solo se revela tras votar (false). Por defecto, pista.
+-- La foto en sí va en image_path (nullable, ya existente); esto solo gobierna cuándo se muestra.
+alter table public.challenges
+  add column photo_is_hint boolean not null default true;
+
 -- ════════════════════════════════════════════════════════════════════════════
 -- 5. votes — el votante pasa de player_name a user_id (1 voto por reto y usuario)
 -- ════════════════════════════════════════════════════════════════════════════

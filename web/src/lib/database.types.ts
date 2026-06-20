@@ -78,6 +78,7 @@ export interface Database {
           sv_pitch: number | null
           guess_seconds: number | null
           deadline_at: string
+          photo_is_hint: boolean
           created_by: string
           created_at: string
         }
@@ -93,6 +94,7 @@ export interface Database {
           sv_pitch?: number | null
           guess_seconds?: number | null
           deadline_at: string
+          photo_is_hint?: boolean
           created_by: string
           created_at?: string
         }
@@ -108,6 +110,7 @@ export interface Database {
           sv_pitch?: number | null
           guess_seconds?: number | null
           deadline_at?: string
+          photo_is_hint?: boolean
           created_by?: string
           created_at?: string
         }
