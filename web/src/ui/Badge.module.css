@@ -3,9 +3,11 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3);
+  border: 1px solid transparent;
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
   line-height: 1.4;
   white-space: nowrap;
 }
@@ -24,6 +26,7 @@
 
 .accent {
   background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
   color: var(--color-accent);
 }
 
@@ -42,27 +45,56 @@
   color: var(--color-danger);
 }
 
-/* "En vivo": rojo de marca con punto pulsante. */
+/* "En vivo": rojo de marca con punto pulsante y halo de anillo. */
 .live {
   background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
   color: var(--color-accent);
 }
 .live .dot {
+  position: relative;
   animation: pulse 1.6s ease-in-out infinite;
+}
+/* Onda expansiva alrededor del punto (efecto "radar"). */
+.live .dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  animation: ping 1.6s var(--ease-emphasized) infinite;
 }
 
 @keyframes pulse {
   0%,
   100% {
     opacity: 1;
+    transform: scale(1);
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes ping {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.6);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .live .dot {
+  .live .dot,
+  .live .dot::after {
     animation: none;
+  }
+  .live .dot::after {
+    display: none;
   }
 }

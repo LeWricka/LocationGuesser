@@ -12,14 +12,21 @@
   white-space: nowrap;
   cursor: pointer;
   user-select: none;
+  letter-spacing: var(--letter-spacing-tight);
   transition:
     background-color var(--transition-fast),
     border-color var(--transition-fast),
-    transform var(--transition-fast);
+    box-shadow var(--transition-base),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
 }
 
 .button:active:not(:disabled) {
   transform: translateY(1px);
+  transition-duration: 60ms;
 }
 
 .button:focus-visible {
@@ -55,23 +62,30 @@
 
 /* ---- Variantes ---- */
 .primary {
-  background: var(--color-accent);
+  background-image: var(--gradient-accent);
   color: var(--color-on-accent);
+  box-shadow: var(--shadow-accent);
 }
 .primary:hover:not(:disabled) {
-  background: var(--color-accent-hover);
+  background-image: var(--gradient-accent-hover);
+  box-shadow: var(--shadow-accent-hover);
 }
 .primary:active:not(:disabled) {
-  background: var(--color-accent-active);
+  background-image: none;
+  background-color: var(--color-accent-active);
+  box-shadow: var(--shadow-sm);
 }
 
 .secondary {
-  background: var(--color-surface-raised);
+  background-color: var(--color-surface-raised);
+  /* Sheen superior: leve luz cenital que da relieve a la superficie. */
+  background-image: linear-gradient(var(--color-surface-sheen), transparent 40%);
   border-color: var(--color-border-strong);
   color: var(--color-text);
 }
 .secondary:hover:not(:disabled) {
-  background: var(--color-surface-hover);
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
 }
 
 .ghost {
@@ -89,4 +103,11 @@
 .label {
   display: inline-flex;
   align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button:hover:not(:disabled),
+  .button:active:not(:disabled) {
+    transform: none;
+  }
 }

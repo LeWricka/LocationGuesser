@@ -18,12 +18,13 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
+  background-color: var(--color-surface-raised);
+  background-image: linear-gradient(var(--color-surface-sheen), transparent 40%);
   color: var(--color-text);
   box-shadow: var(--shadow-lg);
   /* Re-activa los clics: el contenedor los desactiva para no tapar la UI. */
   pointer-events: auto;
-  animation: toast-in var(--transition-base);
+  animation: toast-in var(--transition-base) var(--ease-emphasized);
 }
 
 .message {

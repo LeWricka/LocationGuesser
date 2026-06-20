@@ -26,6 +26,16 @@ type Phase = 'loading' | 'idle' | 'playing' | 'revealed'
 // tiempo (el reloj se reconstruye desde el instante en que se pulsó Empezar).
 const startKey = (challengeId: string) => `lg.play.startAt.${challengeId}`
 
+// Etiqueta cualitativa según la distancia del acierto. Da feedback emocional
+// inmediato sin tocar el scoring (que sigue siendo `computeResult`).
+function distanceLabel(km: number): string {
+  if (km < 1) return '¡Clavado!'
+  if (km < 25) return 'Muy cerca'
+  if (km < 200) return 'Cerca'
+  if (km < 1000) return 'Lejos'
+  return 'Muy lejos'
+}
+
 function publicImageUrl(imagePath: string): string {
   return supabase.storage.from('images').getPublicUrl(imagePath).data.publicUrl
 }
@@ -42,6 +52,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // Mapa de adivinar como panel expandible estilo GeoGuessr: mini en la esquina,
   // se abre a grande para colocar el pin con precisión.
   const [mapOpen, setMapOpen] = useState(false)
+  // Tras revelar el Street View es secundario: oculto hasta que se pide verlo.
+  const [showStreetView, setShowStreetView] = useState(false)
   const toast = useToast()
   const { ensureIdentity, modal: identityModal } = useIdentity()
 
@@ -212,29 +224,29 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           </Row>
         </Stack>
 
-        {/* Escena del reto: panorama explorable (nuevo) o foto fija (legacy). */}
-        <div className={styles.scene}>
-          {hasStreetView ? (
-            <StreetViewPano
-              panoId={challenge.sv_pano_id}
-              position={{ lat: challenge.lat, lng: challenge.lng }}
-              heading={challenge.sv_heading}
-              pitch={challenge.sv_pitch}
-            />
-          ) : imageUrl ? (
-            <img className={styles.photo} src={imageUrl} alt={challenge.title} />
-          ) : (
-            <p className={styles.status}>Este reto no tiene imagen ni Street View.</p>
-          )}
+        {!revealed ? (
+          /* Fase de jugar: escena protagonista (panorama o foto) con el mapa de
+             adivinar superpuesto estilo GeoGuessr. */
+          <div className={styles.scene}>
+            {hasStreetView ? (
+              <StreetViewPano
+                panoId={challenge.sv_pano_id}
+                position={{ lat: challenge.lat, lng: challenge.lng }}
+                heading={challenge.sv_heading}
+                pitch={challenge.sv_pitch}
+              />
+            ) : imageUrl ? (
+              <img className={styles.photo} src={imageUrl} alt={challenge.title} />
+            ) : (
+              <p className={styles.status}>Este reto no tiene imagen ni Street View.</p>
+            )}
 
-          {/* Mapa de adivinar superpuesto estilo GeoGuessr: mini-mapa en la
-              esquina que se expande para afinar el pin. Tras revelar siempre
-              expandido para ver 🎯 + distancia. */}
-          <div
-            className={`${styles.mapPanel} ${mapOpen || revealed ? styles.mapPanelOpen : ''}`}
-            onMouseEnter={() => !revealed && setMapOpen(true)}
-          >
-            {!revealed && (
+            {/* Mini-mapa en la esquina que se expande para afinar el pin. En
+                desktop se abre al pasar el ratón; en móvil con el botón. */}
+            <div
+              className={`${styles.mapPanel} ${mapOpen ? styles.mapPanelOpen : ''}`}
+              onMouseEnter={() => setMapOpen(true)}
+            >
               <button
                 type="button"
                 className={styles.mapToggle}
@@ -243,12 +255,18 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               >
                 {mapOpen ? '✕' : '🗺️ Adivinar'}
               </button>
-            )}
-            <div className={styles.mapInner}>
-              <PlayMap guess={guess} answer={answer} locked={revealed} onPick={setGuess} />
+              <div className={styles.mapInner}>
+                <PlayMap guess={guess} answer={null} locked={false} onPick={setGuess} />
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          /* Fase revelada: el mapa pasa a protagonista, a tamaño grande, con tu
+             pin + 🎯 real + línea, encuadrado a los dos puntos. */
+          <div className={styles.resultMap}>
+            <PlayMap guess={guess} answer={answer} locked onPick={setGuess} />
+          </div>
+        )}
 
         {!revealed && (
           <>
@@ -270,40 +288,79 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
 
         {revealed && (
           <Card padding="md" raised>
-            {timedOut ? (
-              <Stack gap={2}>
-                <strong>⏰ No diste a tiempo</strong>
-                <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
-              </Stack>
-            ) : result ? (
-              <Stack gap={3}>
-                <Row gap={3} align="baseline">
-                  <span className={styles.points}>{result.points}</span>
-                  <span className={styles.resultDist}>puntos · {fmtDist(result.km)}</span>
+            <Stack gap={4}>
+              {timedOut ? (
+                <Stack gap={2}>
+                  <strong>⏰ No diste a tiempo</strong>
+                  <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
+                </Stack>
+              ) : result ? (
+                <Stack gap={3}>
+                  <Stack gap={1} align="center" className={styles.scoreboard}>
+                    <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
+                    <span className={styles.points}>{result.points}</span>
+                    <span className={styles.resultDist}>
+                      puntos · a {fmtDist(result.km)} del objetivo
+                    </span>
+                  </Stack>
+                  {saving && (
+                    <Row gap={2} justify="center">
+                      <Spinner size={16} />
+                      <span className={styles.status}>Guardando tu voto…</span>
+                    </Row>
+                  )}
+                </Stack>
+              ) : (
+                <span className={styles.status}>Revelado.</span>
+              )}
+
+              {/* Street View secundario: oculto tras un botón. Solo si el reto lo
+                tiene; los legacy con foto la muestran directa, también plegada. */}
+              {(hasStreetView || imageUrl) && (
+                <Stack gap={2} className={styles.secondary}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowStreetView((v) => !v)}
+                    aria-expanded={showStreetView}
+                  >
+                    {showStreetView
+                      ? '✕ Ocultar'
+                      : hasStreetView
+                        ? '👀 Ver Street View'
+                        : '👀 Ver la foto'}
+                  </Button>
+                  {showStreetView && (
+                    <div className={styles.scene}>
+                      {hasStreetView ? (
+                        <StreetViewPano
+                          panoId={challenge.sv_pano_id}
+                          position={{ lat: challenge.lat, lng: challenge.lng }}
+                          heading={challenge.sv_heading}
+                          pitch={challenge.sv_pitch}
+                        />
+                      ) : imageUrl ? (
+                        <img className={styles.photo} src={imageUrl} alt={challenge.title} />
+                      ) : null}
+                    </div>
+                  )}
+                </Stack>
+              )}
+
+              {groupId && (
+                <Row gap={2} justify="end">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      location.hash = `#g=${groupId}`
+                    }}
+                  >
+                    Ver clasificación →
+                  </Button>
                 </Row>
-                {saving && (
-                  <Row gap={2}>
-                    <Spinner size={16} />
-                    <span className={styles.status}>Guardando tu voto…</span>
-                  </Row>
-                )}
-              </Stack>
-            ) : (
-              <span className={styles.status}>Revelado.</span>
-            )}
-            {groupId && (
-              <Row gap={2} justify="end">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    location.hash = `#g=${groupId}`
-                  }}
-                >
-                  Ver clasificación →
-                </Button>
-              </Row>
-            )}
+              )}
+            </Stack>
           </Card>
         )}
       </Stack>
