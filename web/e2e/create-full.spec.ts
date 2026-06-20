@@ -96,7 +96,11 @@ test.describe('crear completo', () => {
     const generate = page.getByRole('button', { name: 'Generar enlace' })
     await expect(generate).toBeEnabled({ timeout: 20_000 })
     await generate.click()
-    await expect(page.getByRole('heading', { name: '¿Quién juega?' })).toBeVisible()
+    // Generar hace un insert de red antes de mostrar el modal; en prod hay más
+    // latencia, así que damos margen (como las demás esperas del flujo).
+    await expect(page.getByRole('heading', { name: '¿Quién juega?' })).toBeVisible({
+      timeout: 20_000,
+    })
 
     // Nombre único por ejecución para no chocar en el grupo.
     const uniqueName = `e2e-${Date.now().toString(36)}`
