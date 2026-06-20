@@ -121,17 +121,19 @@ export function PlayMap({ guess, answer, locked, onPick }: Props) {
       wheelPxPerZoomLevel={40}
       className="lg-map"
     >
-      {/* CDN de CARTO (rápido, con tiles retina {r}) en vez de los tiles
-          estándar de OSM, que iban lentos y se quedaban en gris al hacer zoom.
-          keepBuffer precarga más tiles alrededor del viewport y
-          updateWhenZooming=false evita pedir tiles intermedios durante la
-          animación de zoom: menos parpadeo gris. */}
+      {/* CDN de CARTO. Anti-gris al hacer zoom:
+          - SIN retina {r}: tiles 256px (4× más ligeros) → cargan antes.
+          - maxNativeZoom=19: más allá de 19 CARTO no tiene tiles; en vez de
+            pedir uno inexistente (gris), Leaflet REESCALA el de 19 al instante.
+          - keepBuffer precarga alrededor; updateWhenZooming=false mantiene los
+            tiles viejos escalados durante la animación (no parpadea gris). */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
         subdomains="abcd"
+        maxNativeZoom={19}
         maxZoom={20}
-        keepBuffer={4}
+        keepBuffer={6}
         updateWhenZooming={false}
       />
       <ClickHandler locked={locked} onPick={onPick} />

@@ -18,7 +18,7 @@ type BaseLayer = 'street' | 'satellite'
 const LAYERS: Record<BaseLayer, { label: string; url: string; attribution: string }> = {
   street: {
     label: 'Callejero',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
   },
@@ -95,8 +95,9 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
           key={layer}
           attribution={base.attribution}
           url={base.url}
+          maxNativeZoom={19}
           maxZoom={20}
-          keepBuffer={4}
+          keepBuffer={6}
           updateWhenZooming={false}
         />
         <ClickHandler onPick={onPick} />

@@ -205,6 +205,13 @@ img {
   isolation: isolate;
 }
 
+/* Fondo oscuro del lienzo del mapa: mientras un tile carga (al hacer zoom) el
+ * hueco se ve OSCURO, no el gris claro por defecto de Leaflet (que en un tema
+ * oscuro canta mucho). No acelera la carga, pero el "gris" deja de molestar. */
+.lg-map .leaflet-container {
+  background: var(--ocean-900);
+}
+
 @media (min-width: 768px) {
   .lg-map {
     height: 420px;

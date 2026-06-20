@@ -51,10 +51,11 @@ export function RevealMap({ answer, votes }: Props) {
       {/* Mismo CDN rápido de CARTO que el resto de mapas (ver PlayMap). */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
         subdomains="abcd"
+        maxNativeZoom={19}
         maxZoom={20}
-        keepBuffer={4}
+        keepBuffer={6}
         updateWhenZooming={false}
       />
       <FitBounds answer={answer} votes={votes} />
