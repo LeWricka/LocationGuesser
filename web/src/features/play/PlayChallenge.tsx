@@ -193,6 +193,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         <div className={styles.centered}>
           <Spinner size={32} />
         </div>
+        {/* Imprescindible: en incógnito se pide el nombre durante la carga; si
+            no montamos el modal aquí, se quedaría cargando para siempre. */}
+        {identityModal}
       </main>
     )
   }
