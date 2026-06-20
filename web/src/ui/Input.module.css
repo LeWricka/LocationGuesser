@@ -25,8 +25,9 @@
 
 .input:focus {
   outline: none;
+  background: var(--color-surface-hover);
   border-color: var(--color-focus-ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus-ring) 30%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus-ring) 32%, transparent);
 }
 
 .input:disabled {

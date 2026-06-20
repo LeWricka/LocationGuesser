@@ -3,7 +3,11 @@
   inset: 0;
   z-index: var(--z-overlay);
   display: flex;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.62);
+  /* Desenfoque del fondo: el diálogo se separa del resto de la app. */
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: overlay-in var(--transition-base) ease;
   /* Móvil: el panel ocupa toda la pantalla. */
   padding: 0;
 }
@@ -12,11 +16,12 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  background: var(--color-surface);
+  background-color: var(--color-surface);
+  background-image: linear-gradient(var(--color-surface-sheen), transparent 160px);
   /* Móvil: full-screen, sin radios. */
   border-radius: 0;
   outline: none;
-  animation: slide-up var(--transition-base);
+  animation: slide-up var(--transition-base) var(--ease-emphasized);
 }
 
 .header {
@@ -86,18 +91,28 @@
   }
 }
 
-@keyframes slide-up {
+@keyframes overlay-in {
   from {
-    transform: translateY(12px);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(16px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .overlay,
   .panel {
     animation: none;
   }
