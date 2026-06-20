@@ -18,11 +18,21 @@
    * oscuro y para que el botón primario "cante" sin chillar.
    * -------------------------------------------------------------------- */
 
-  /* Superficies (de más al fondo a más al frente) */
-  --color-bg: #0e0f14; /* fondo de página */
-  --color-surface: #181a22; /* tarjetas, paneles */
-  --color-surface-raised: #21242e; /* inputs, elementos elevados sobre surface */
-  --color-surface-hover: #2a2d39; /* hover de superficies interactivas */
+  /* Superficies (de más al fondo a más al frente).
+   * Azulado frío con un punto más de profundidad: el fondo baja un pelín y las
+   * superficies suben para que la elevación se lea de verdad en oscuro. */
+  --color-bg: #0b0c11; /* fondo de página */
+  --color-surface: #161821; /* tarjetas, paneles */
+  --color-surface-raised: #1f222d; /* inputs, elementos elevados sobre surface */
+  --color-surface-hover: #282c39; /* hover de superficies interactivas */
+
+  /* Realce sutil en bordes superiores de superficies (luz cenital). */
+  --color-surface-sheen: rgba(255, 255, 255, 0.06);
+
+  /* Fondo de página con un halo de marca muy tenue (radiales fijos). */
+  --gradient-app-bg:
+    radial-gradient(1100px 620px at 12% -8%, rgba(255, 69, 58, 0.1), transparent 60%),
+    radial-gradient(900px 560px at 100% 0%, rgba(192, 132, 252, 0.08), transparent 55%);
 
   /* Bordes / separadores */
   --color-border: #2e313d;
@@ -39,6 +49,11 @@
   --color-accent-active: #e23b31;
   --color-accent-soft: rgba(255, 69, 58, 0.14); /* fondos tenues, badges */
   --color-on-accent: #ffffff; /* texto sobre acento */
+
+  /* Gradiente de marca: rojo pin → coral cálido. Para el CTA primario y
+   * realces de marca. Diagonal para dar dirección/energía. */
+  --gradient-accent: linear-gradient(135deg, #ff5a4d 0%, #ff453a 45%, #e23b31 100%);
+  --gradient-accent-hover: linear-gradient(135deg, #ff6f63 0%, #ff5750 45%, #f04438 100%);
 
   /* Acento secundario (violeta "ruta") — para estados/realtime, no para CTA */
   --color-accent-2: #c084fc;
@@ -78,6 +93,11 @@
   --line-height-tight: 1.15;
   --line-height-normal: 1.45;
 
+  /* Tracking: títulos grandes respiran mejor con tracking negativo. */
+  --letter-spacing-tight: -0.02em;
+  --letter-spacing-tighter: -0.03em;
+  --letter-spacing-wide: 0.04em; /* mayúsculas pequeñas, badges */
+
   /* ----------------------------------------------------------------------
    * Espaciado — escala de 4px. Nombres por tamaño, no por uso.
    * -------------------------------------------------------------------- */
@@ -103,8 +123,16 @@
    * también en el cambio de superficie.
    * -------------------------------------------------------------------- */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
-  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.55);
+  --shadow-md:
+    0 1px 0 0 rgba(255, 255, 255, 0.04) inset, 0 6px 22px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-lg:
+    0 1px 0 0 rgba(255, 255, 255, 0.05) inset, 0 18px 50px rgba(0, 0, 0, 0.6),
+    0 6px 16px rgba(0, 0, 0, 0.4);
+
+  /* Resplandor de marca: glow tenue bajo el CTA primario. */
+  --shadow-accent: 0 8px 24px rgba(255, 69, 58, 0.35);
+  --shadow-accent-hover: 0 10px 30px rgba(255, 69, 58, 0.45);
 
   /* ----------------------------------------------------------------------
    * Layout
@@ -117,6 +145,8 @@
    * -------------------------------------------------------------------- */
   --transition-fast: 120ms ease;
   --transition-base: 200ms ease;
+  /* Curva con un punto de "muelle" para microinteracciones (hover/entrada). */
+  --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* ----------------------------------------------------------------------
    * z-index — capas con nombre para evitar el "z-index: 99999"
