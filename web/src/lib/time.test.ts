@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { deadlineFromNow, formatDeadline, isPast } from './time'
+import { deadlineFromMinutes, deadlineFromNow, formatDeadline, isPast } from './time'
 
 describe('time', () => {
   beforeEach(() => {
@@ -44,6 +44,20 @@ describe('time', () => {
 
     test('admite fracciones de hora', () => {
       expect(deadlineFromNow(0.5)).toBe('2026-06-20T10:30:00.000Z')
+    })
+  })
+
+  describe('deadlineFromMinutes', () => {
+    test('suma minutos y devuelve ISO absoluto', () => {
+      expect(deadlineFromMinutes(30)).toBe('2026-06-20T10:30:00.000Z')
+    })
+
+    test('admite plazos express muy cortos', () => {
+      expect(deadlineFromMinutes(5)).toBe('2026-06-20T10:05:00.000Z')
+    })
+
+    test('coincide con deadlineFromNow (horas = minutos/60)', () => {
+      expect(deadlineFromMinutes(240)).toBe(deadlineFromNow(4))
     })
   })
 
