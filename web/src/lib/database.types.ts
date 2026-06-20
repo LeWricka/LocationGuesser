@@ -7,35 +7,60 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
-      groups: {
-        Row: { id: string; name: string | null; created_at: string }
-        Insert: { id: string; name?: string | null; created_at?: string }
-        Update: { id?: string; name?: string | null; created_at?: string }
-        Relationships: []
-      }
-      players: {
+      profiles: {
         Row: {
           id: string
-          group_id: string
-          name: string
-          client_id: string
-          pin_hash: string
+          display_name: string
+          avatar_url: string | null
           created_at: string
         }
         Insert: {
-          id?: string
-          group_id: string
-          name: string
-          client_id: string
-          pin_hash: string
+          id: string
+          display_name: string
+          avatar_url?: string | null
           created_at?: string
         }
         Update: {
           id?: string
+          display_name?: string
+          avatar_url?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      group_members: {
+        Row: {
+          group_id: string
+          user_id: string
+          role: string
+          joined_at: string
+        }
+        Insert: {
+          group_id: string
+          user_id: string
+          role?: string
+          joined_at?: string
+        }
+        Update: {
           group_id?: string
-          name?: string
-          client_id?: string
-          pin_hash?: string
+          user_id?: string
+          role?: string
+          joined_at?: string
+        }
+        Relationships: []
+      }
+      groups: {
+        Row: { id: string; name: string | null; created_by: string | null; created_at: string }
+        Insert: {
+          id: string
+          name?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string | null
+          created_by?: string | null
           created_at?: string
         }
         Relationships: []
@@ -53,6 +78,7 @@ export interface Database {
           sv_pitch: number | null
           guess_seconds: number | null
           deadline_at: string
+          photo_is_hint: boolean
           created_by: string
           created_at: string
         }
@@ -68,6 +94,7 @@ export interface Database {
           sv_pitch?: number | null
           guess_seconds?: number | null
           deadline_at: string
+          photo_is_hint?: boolean
           created_by: string
           created_at?: string
         }
@@ -83,6 +110,7 @@ export interface Database {
           sv_pitch?: number | null
           guess_seconds?: number | null
           deadline_at?: string
+          photo_is_hint?: boolean
           created_by?: string
           created_at?: string
         }
@@ -93,7 +121,7 @@ export interface Database {
           id: string
           group_id: string
           challenge_id: string
-          player_name: string
+          user_id: string
           guess_lat: number
           guess_lng: number
           distance_km: number
@@ -104,7 +132,7 @@ export interface Database {
           id?: string
           group_id: string
           challenge_id: string
-          player_name: string
+          user_id: string
           guess_lat: number
           guess_lng: number
           distance_km: number
@@ -115,7 +143,7 @@ export interface Database {
           id?: string
           group_id?: string
           challenge_id?: string
-          player_name?: string
+          user_id?: string
           guess_lat?: number
           guess_lng?: number
           distance_km?: number
@@ -133,7 +161,8 @@ export interface Database {
 }
 
 // Atajos de dominio para uso en la app.
+export type Profile = Database['public']['Tables']['profiles']['Row']
+export type GroupMember = Database['public']['Tables']['group_members']['Row']
 export type Group = Database['public']['Tables']['groups']['Row']
-export type Player = Database['public']['Tables']['players']['Row']
 export type Challenge = Database['public']['Tables']['challenges']['Row']
 export type Vote = Database['public']['Tables']['votes']['Row']
