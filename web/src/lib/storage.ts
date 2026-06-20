@@ -107,7 +107,15 @@ export async function uploadImage(file: File): Promise<string> {
   return path
 }
 
-/** URL pública de una imagen del bucket a partir de su `path`. */
-export function publicImageUrl(path: string): string {
-  return supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+/**
+ * URL firmada (temporal) de una imagen del bucket a partir de su `path`. El
+ * bucket es PRIVADO (la foto puede revelar el sitio = la respuesta, sobre todo
+ * en modo sorpresa), así que no vale `getPublicUrl`: se firma con caducidad y
+ * solo un usuario autenticado (miembro) puede generarla (RLS de storage). Null
+ * si no se puede firmar. Async: se resuelve en el cliente.
+ */
+export async function signedImageUrl(path: string, expiresIn = 3600): Promise<string | null> {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresIn)
+  if (error) return null
+  return data?.signedUrl ?? null
 }
