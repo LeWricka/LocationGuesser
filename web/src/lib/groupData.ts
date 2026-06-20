@@ -54,9 +54,3 @@ export function splitByStatus<T extends Pick<Challenge, 'deadline_at'>>(
   }
   return { live, past }
 }
-
-/** URL pública de la imagen de un reto en el bucket `images`, o null si no hay. */
-export function challengeImageUrl(imagePath: string | null): string | null {
-  if (!imagePath) return null
-  return supabase.storage.from('images').getPublicUrl(imagePath).data.publicUrl
-}

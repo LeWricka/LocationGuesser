@@ -7,7 +7,7 @@ import { getExistingVote, saveVote } from '../../lib/votes'
 import { computeResult, type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
 import { useSession } from '../../lib/session-context'
-import { publicImageUrl } from '../../lib/storage'
+import { useSignedImage } from '../../lib/useSignedImage'
 import type { Challenge } from '../../lib/database.types'
 import {
   Badge,
@@ -64,6 +64,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const toast = useToast()
   // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
   const { user } = useSession()
+  // URL firmada de la foto del reto (bucket privado). Hook al tope del componente
+  // —no tras los early-return de carga— para no romper el orden de hooks.
+  const photoUrl = useSignedImage(challenge?.image_path ?? null)
 
   // Revelar: calcula resultado contra la respuesta real, fija el pin y, si hay
   // pin, persiste el voto. Sin pin (timeout) -> "no diste a tiempo".
@@ -205,9 +208,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // retos antiguos no se rompen).
   const medium = sceneMedium(challenge)
   const hasStreetView = medium === 'streetview'
-  // Foto del reto (puede acompañar a un reto de Street View como pista/sorpresa,
-  // o ser la escena en sí en los retos legacy sin panorama).
-  const photoUrl = challenge.image_path ? publicImageUrl(challenge.image_path) : null
   // Escena legacy: el reto es solo foto (sin SV). Entonces la foto ES la escena.
   const imageUrl = !hasStreetView ? photoUrl : null
   const revealed = phase === 'revealed'

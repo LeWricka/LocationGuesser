@@ -23,7 +23,9 @@ import { isMember, myGroups } from '../../lib/membership'
 import type { Challenge } from '../../lib/database.types'
 import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
-import { challengeImageUrl, getGroup, getGroupChallenges, splitByStatus } from '../../lib/groupData'
+import { getGroup, getGroupChallenges, splitByStatus } from '../../lib/groupData'
+import { signedImageUrl } from '../../lib/storage'
+import { useSignedImage } from '../../lib/useSignedImage'
 import { CreateChallenge } from '../create/CreateChallenge'
 import { RevealMap } from './RevealMap'
 import styles from './GroupPage.module.css'
@@ -150,19 +152,31 @@ export function GroupPage({ groupId, onBack }: Props) {
 
   const { live, past } = useMemo(() => splitByStatus(challenges ?? []), [challenges])
 
-  // Histórico de fotos del grupo: las fotos de los retos que tienen imagen, de
-  // la más reciente a la más antigua (mismo orden que getGroupChallenges).
+  // Histórico de fotos del grupo. Las imágenes viven en un bucket privado y se
+  // sirven con URL firmada (async), así que resolvemos las de los retos con
+  // imagen en estado y construimos la tira con ellas (de la más reciente a la
+  // más antigua, mismo orden que getGroupChallenges).
+  const [photoSrcById, setPhotoSrcById] = useState<Record<string, string>>({})
+  useEffect(() => {
+    let cancelled = false
+    const withImage = (challenges ?? []).filter((c) => c.image_path)
+    void Promise.all(
+      withImage.map(async (c) => [c.id, await signedImageUrl(c.image_path as string)] as const),
+    ).then((pairs) => {
+      if (cancelled) return
+      setPhotoSrcById(Object.fromEntries(pairs.filter((p): p is [string, string] => p[1] != null)))
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [challenges])
+
   const photos = useMemo<PhotoStripItem[]>(
     () =>
       (challenges ?? [])
-        .filter((c) => c.image_path)
-        .map((c) => ({
-          id: c.id,
-          src: challengeImageUrl(c.image_path),
-          alt: c.title,
-          caption: c.title,
-        })),
-    [challenges],
+        .filter((c) => c.image_path && photoSrcById[c.id])
+        .map((c) => ({ id: c.id, src: photoSrcById[c.id], alt: c.title, caption: c.title })),
+    [challenges, photoSrcById],
   )
 
   const goBack =
@@ -640,7 +654,7 @@ function PastCard({
   onDeleted: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const imageUrl = challengeImageUrl(challenge.image_path)
+  const imageUrl = useSignedImage(challenge.image_path)
   const ranked = [...votes].sort((a, b) => b.points - a.points)
 
   return (
