@@ -114,6 +114,32 @@ img {
   text-align: center;
 }
 
+/* El 🎯 de la respuesta "cae" al revelar: entra desde arriba con un rebote
+ * (muelle). transform-origin abajo para que el rebote nazca de la punta del pin.
+ * Se aplica al icono del marcador (ver PlayMap → answerIcon). */
+.lg-pin-drop {
+  animation: lg-pin-drop 520ms var(--ease-spring) both;
+  animation-delay: 560ms; /* tras dibujarse la línea (draw ≈ 120 + 600ms) */
+  transform-origin: 50% 90%;
+}
+
+@keyframes lg-pin-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-22px) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-pin-drop {
+    animation: none;
+  }
+}
+
 /* Controles de zoom de Leaflet en tema oscuro. */
 .leaflet-bar a {
   background: var(--color-surface-raised);
@@ -123,4 +149,112 @@ img {
 .leaflet-bar a:hover {
   background: var(--color-surface-hover);
   color: var(--color-text);
+}
+
+/* ----------------------------------------------------------------------
+ * Motion global — entradas y transiciones entre vistas
+ *
+ * El producto debe notarse "vivo" al abrirlo. Dos piezas, ambas nativas
+ * (sin librerías; el front sigue siendo estático y ligero):
+ *   1) Entradas con stagger: clases reutilizables (`lg-rise`, `lg-stagger`).
+ *   2) View Transitions API: cross-fade suave al cambiar de vista (hash router).
+ * Todo se desactiva bajo `prefers-reduced-motion` al final del fichero.
+ * -------------------------------------------------------------------- */
+
+/* Entrada base: sube y aparece. La usan cabeceras, héroes y CTAs. */
+@keyframes lg-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Entrada con muelle: escala desde 0.86 con overshoot. Para marcas/iconos. */
+@keyframes lg-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Aplica la entrada base a un elemento. */
+.lg-rise {
+  animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
+}
+
+.lg-pop {
+  animation: lg-pop var(--duration-slow) var(--ease-spring) both;
+}
+
+/*
+ * Stagger: cada hijo directo entra con un retardo incremental. Pensado para
+ * listas, rankings y secuencias de bloques. Limitado a ~8 hijos para no
+ * arrastrar la última entrada demasiado tarde; el resto entra con el último
+ * retardo. El padre marca el ritmo; los hijos heredan la entrada base.
+ */
+.lg-stagger > * {
+  animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
+}
+.lg-stagger > *:nth-child(1) {
+  animation-delay: calc(var(--stagger-step) * 0);
+}
+.lg-stagger > *:nth-child(2) {
+  animation-delay: calc(var(--stagger-step) * 1);
+}
+.lg-stagger > *:nth-child(3) {
+  animation-delay: calc(var(--stagger-step) * 2);
+}
+.lg-stagger > *:nth-child(4) {
+  animation-delay: calc(var(--stagger-step) * 3);
+}
+.lg-stagger > *:nth-child(5) {
+  animation-delay: calc(var(--stagger-step) * 4);
+}
+.lg-stagger > *:nth-child(6) {
+  animation-delay: calc(var(--stagger-step) * 5);
+}
+.lg-stagger > *:nth-child(7) {
+  animation-delay: calc(var(--stagger-step) * 6);
+}
+.lg-stagger > *:nth-child(n + 8) {
+  animation-delay: calc(var(--stagger-step) * 7);
+}
+
+/*
+ * View Transitions API: al cambiar de vista (Home → grupo → jugar → resultado)
+ * el navegador hace un cross-fade del viewport. Disparamos la transición desde
+ * el router (App.tsx → startViewTransition al cambiar el hash). Soportado en
+ * Chromium y Safari 18+ (~92% del tráfico en 2026); donde no exista, el cambio
+ * es instantáneo sin romper nada.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--duration-base);
+  animation-timing-function: var(--ease-smooth);
+}
+
+/* ----------------------------------------------------------------------
+ * Accesibilidad: respetar a quien pide menos movimiento.
+ * Neutraliza entradas, stagger y las transiciones de vista de golpe.
+ * -------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .lg-rise,
+  .lg-pop,
+  .lg-stagger > * {
+    animation: none;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

@@ -141,12 +141,35 @@
   --container-max: 720px; /* ancho de lectura cómodo en desktop */
 
   /* ----------------------------------------------------------------------
-   * Animación
+   * Animación / Motion
+   *
+   * Sistema de motion tokenizado (tendencia 2026: duraciones, easing y
+   * amplitud definidos globalmente para consistencia). Feedback rápido
+   * (120–220ms); transiciones de layout/entrada algo más largas (260–480ms).
+   * Todo el motion respeta `prefers-reduced-motion` (ver index.css).
+   * Refs: Material 3 motion, Apple HIG motion, guías de motion 2026.
    * -------------------------------------------------------------------- */
-  --transition-fast: 120ms ease;
-  --transition-base: 200ms ease;
-  /* Curva con un punto de "muelle" para microinteracciones (hover/entrada). */
+
+  /* Duraciones */
+  --duration-fast: 120ms; /* micro-feedback (press, hover) */
+  --duration-base: 200ms; /* transiciones de UI estándar */
+  --duration-slow: 320ms; /* entradas, reveals */
+  --duration-slower: 480ms; /* secuencias destacadas (resultado) */
+
+  /* Easings.
+   * - emphasized: salida decelerada con carácter (entradas, microinteracción).
+   * - spring: overshoot suave tipo muelle (pins que caen, badges que entran).
+   * - smooth: easeInOut neutro para movimientos largos. */
   --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Transiciones compuestas listas para usar. */
+  --transition-fast: var(--duration-fast) var(--ease-emphasized);
+  --transition-base: var(--duration-base) var(--ease-emphasized);
+
+  /* Stagger: retardo incremental entre hijos de una lista al entrar. */
+  --stagger-step: 55ms;
 
   /* ----------------------------------------------------------------------
    * z-index — capas con nombre para evitar el "z-index: 99999"

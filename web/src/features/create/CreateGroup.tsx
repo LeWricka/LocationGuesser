@@ -44,7 +44,7 @@ export function CreateGroup({ onBack }: Props) {
 
   return (
     <main className="lg-page">
-      <Stack gap={4}>
+      <Stack gap={4} className="lg-stagger">
         <Row gap={3} className={styles.header}>
           <Button variant="ghost" size="sm" onClick={onBack}>
             ← Volver

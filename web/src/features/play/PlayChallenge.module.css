@@ -113,6 +113,23 @@
   text-align: center;
 }
 
+/* Entrada del bloque de puntuación: aparece con muelle al revelar, en sincronía
+ * con el count-up. Se desactiva bajo reduced-motion. */
+.scoreReveal {
+  animation: score-pop var(--duration-slower) var(--ease-spring) both;
+}
+
+@keyframes score-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .scoreLabel {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
@@ -122,11 +139,23 @@
 }
 
 .points {
-  font-size: var(--font-size-2xl);
+  /* Puntuación protagonista: más grande aún que el hero para que "cante", con
+   * el degradado de marca aplicado al número. */
+  font-size: 3.25rem;
   font-weight: var(--font-weight-bold);
-  color: var(--color-text);
   line-height: var(--line-height-tight);
   font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-tighter);
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scoreReveal {
+    animation: none;
+  }
 }
 
 .resultDist {
@@ -142,11 +171,4 @@
 /* Overlay "Empezar": tapa todo, centra el contenido. */
 .startBody {
   text-align: center;
-}
-
-.centered {
-  min-height: 60vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
