@@ -2,7 +2,7 @@
 
 **Fecha:** 20 junio 2026 · **Estado:** diseño cerrado (decisión de producto tomada), listo para crear issues · **Framework:** Kernel de Rumelt (diagnóstico → política guía → acciones)
 
-> **Decisión de producto YA TOMADA (no se cuestiona, se diseña):** el producto pasa a tener **cuentas para todos con login obligatorio vía magic link (email)** y un **modelo unificado de usuario**. Esto **sustituye** la identidad ligera (nombre único por grupo + PIN + navegador en `localStorage`). La cuenta es la identidad; el usuario tiene un **perfil con nombre/display global** y una **home/dashboard personal** desde la que crea viajes, entra a sus grupos y ve su histórico.
+> **Decisión de producto YA TOMADA (no se cuestiona, se diseña):** el producto pasa a tener **cuentas para todos con login obligatorio vía magic link (email)** y un **modelo unificado de usuario**. Esto **sustituye** la identidad ligera (nombre único por grupo + PIN + navegador en `localStorage`). La cuenta es la identidad; el usuario tiene un **perfil con nombre/display global** y una **home/dashboard personal** desde la que crea grupos, entra a sus grupos y ve su histórico.
 
 > **Fuente de verdad única.** Este documento **revierte y deja obsoleto** `docs/estrategia/identidad-y-sesiones.md` (que defendía "NO meter login aún — validar el bucle primero"). Esa decisión queda **anulada**. Donde haya conflicto, **manda este documento**. _Nota para el orquestador: ese fichero vive hoy en otra rama/worktree y aún no está en `main`; al integrarlo, bórralo o redirígelo a este doc para no dejar dos verdades. Ver §10._
 
@@ -15,10 +15,10 @@
 La identidad ligera (nombre por grupo + PIN, identidad de navegador en `localStorage`) se diseñó para **lanzar rápido y validar el bucle social sin fricción** [[prueba-de-un-dia.md §4](prueba-de-un-dia.md)]. Cumplió su función, pero arrastra **tres tensiones estructurales** que ya bloquean el siguiente salto del producto:
 
 1. **La identidad no es portable ni fiable.** La identidad estable es el *nombre* y el dispositivo guarda un `client_id` + `pin_hash` en `localStorage` [[identity.ts](../../web/src/lib/identity.ts)]. Borrar datos del navegador, cambiar de móvil o jugar desde el portátil **parte la identidad** o exige reclamar el nombre con un PIN de 4 dígitos. Es un candado **blando, no seguridad real** (el `pin_hash` es público y forzable) [[prueba-de-un-dia.md §4, §9](prueba-de-un-dia.md)].
-2. **No hay concepto de "mis viajes".** Hoy un grupo solo existe si tienes el enlace (`#g=…`) guardado en algún chat [[route.ts](../../web/src/lib/route.ts)]. No hay forma de que la app te diga *"estos son tus grupos, en este te toca jugar"*. Sin home, no hay retención fuera del momento del chat ni reenganche entre viajes.
-3. **No hay propiedad ni permisos.** Cualquiera con el enlace puede crear, editar o borrar (RLS es **pública** en lectura y escritura, validada solo en cliente) [[0001_init.sql](../../supabase/migrations/0001_init.sql)]. No se puede decir "este viaje es mío" ni proteger sus retos.
+2. **No hay concepto de "mis grupos".** Hoy un grupo solo existe si tienes el enlace (`#g=…`) guardado en algún chat [[route.ts](../../web/src/lib/route.ts)]. No hay forma de que la app te diga *"estos son tus grupos, en este te toca jugar"*. Sin home, no hay retención fuera del momento del chat ni reenganche entre grupos.
+3. **No hay propiedad ni permisos.** Cualquiera con el enlace puede crear, editar o borrar (RLS es **pública** en lectura y escritura, validada solo en cliente) [[0001_init.sql](../../supabase/migrations/0001_init.sql)]. No se puede decir "este grupo es mío" ni proteger sus retos.
 
-El **desafío crítico** ya no es *"¿se juega?"* (eso lo valida la identidad ligera), sino: **convertir un juego que ocurre dentro de un chat en un producto al que la gente vuelve por su cuenta, con una identidad real y persistente que sostenga viajes, histórico y propiedad** — aceptando conscientemente la fricción de un registro la primera vez.
+El **desafío crítico** ya no es *"¿se juega?"* (eso lo valida la identidad ligera), sino: **convertir un juego que ocurre dentro de un chat en un producto al que la gente vuelve por su cuenta, con una identidad real y persistente que sostenga grupos, histórico y propiedad** — aceptando conscientemente la fricción de un registro la primera vez.
 
 ### 1.2 Política guía
 
@@ -57,7 +57,7 @@ Qué **descarta** explícitamente esta política:
 ```
 Abre  …/#g=ABC&c=uuid   (sin sesión)
   └─► Pantalla "Únete para jugar este reto"
-        · muestra contexto: nombre del viaje + miniatura/“te han retado”
+        · muestra contexto: nombre del grupo + miniatura/“te han retado”
         · campo email  →  [Enviar enlace mágico]
         · guardamos el destino (#g=ABC&c=uuid) antes de salir (localStorage `lg.next`)
   └─► "📬 Revisa tu correo" (con reenviar / cambiar email)
@@ -91,12 +91,12 @@ Abre cualquier URL con sesión viva
 
 ```
 DUEÑO (groups.created_by == auth.uid):
-  · ve el grupo con acciones de gestión: editar nombre, crear reto, borrar reto, borrar viaje
+  · ve el grupo con acciones de gestión: editar nombre, crear reto, borrar reto, borrar grupo
 MIEMBRO (fila en group_members, no dueño):
   · ve el grupo y juega; NO ve editar/borrar (RLS lo bloquea aunque la UI fallara)
 ```
 
-> **Microcopys clave (ES).** Login con link: _"Únete para jugar este reto"_ · _"Te mandamos un enlace mágico a tu correo. Sin contraseñas."_ · _"📬 Mira tu correo — pulsa el enlace para entrar."_ · _"¿No te llega? Reenviar / Cambiar email."_ · Primer perfil: _"¿Con qué nombre juegas?"_ (placeholder: _"Lewis"_) · Auto-join: _"¡Estás dentro de **{viaje}**! A jugar."_
+> **Microcopys clave (ES).** Login con link: _"Únete para jugar este reto"_ · _"Te mandamos un enlace mágico a tu correo. Sin contraseñas."_ · _"📬 Mira tu correo — pulsa el enlace para entrar."_ · _"¿No te llega? Reenviar / Cambiar email."_ · Primer perfil: _"¿Con qué nombre juegas?"_ (placeholder: _"Lewis"_) · Auto-join: _"¡Estás dentro de **{grupo}**! A jugar."_
 
 ---
 
@@ -108,15 +108,15 @@ El **centro de gravedad** del producto para sesión iniciada. Objetivo: que al a
 
 De arriba abajo, por prioridad de atención:
 
-1. **Cabecera / saludo + perfil.** _"Hola, {display_name}"_ + avatar (acceso a Perfil). Acción primaria persistente: **[+ Crear viaje]**.
-2. **🔔 Te toca jugar** (lo más accionable). Retos **abiertos** en mis grupos que **aún no he votado**, ordenados por deadline más próximo. Cada tarjeta: viaje, "reto de {creador}", cuenta atrás del plazo, botón **Jugar**. Si no hay → no se muestra esta sección (no ocupa espacio en vacío).
-3. **🧳 Tus viajes.** Lista de mis grupos (de `group_members`). Cada tarjeta con **estado**:
+1. **Cabecera / saludo + perfil.** _"Hola, {display_name}"_ + avatar (acceso a Perfil). Acción primaria **[+ Crear grupo]** como **botón flotante (FAB)** siempre accesible (decisión del usuario: que no sea un botón grande fijo arriba).
+2. **🔔 Te toca jugar** (lo más accionable). Retos **abiertos** en mis grupos que **aún no he votado**, ordenados por deadline más próximo. Cada tarjeta: grupo, "reto de {creador}", cuenta atrás del plazo, botón **Jugar**. Si no hay → no se muestra esta sección (no ocupa espacio en vacío).
+3. **👥 Tus grupos.** Lista de mis grupos (de `group_members`). Cada tarjeta con **estado**:
    - 🔴 **En vivo** — hay reto(s) abierto(s).
    - 🟡 **Te toca** — reto abierto sin tu voto (resaltado).
    - ⚪ **Al día** — sin retos abiertos pendientes.
    - 👑 chip **"Tuyo"** si eres el dueño.
    Tap → página del grupo.
-4. **🏆 Históricos y ranking.** Acceso a tu rendimiento agregado (puntos totales, viajes jugados, mejor reto) y atajo a los rankings por viaje. _v1 puede ser un simple "Tus números" + lista de viajes cerrados; el agregado fino es iterable._
+4. **🏆 Históricos y ranking.** Acceso a tu rendimiento agregado (puntos totales, grupos jugados, mejor reto) y atajo a los rankings por grupo. _v1 puede ser un simple "Tus números" + lista de grupos cerrados; el agregado fino es iterable._
 5. **Perfil** (puede vivir en la cabecera): editar `display_name`, avatar, **cerrar sesión**.
 
 ### 3.2 Wireframe (ASCII)
@@ -125,7 +125,7 @@ De arriba abajo, por prioridad de atención:
 ┌───────────────────────────────────────────────┐
 │  LocationGuesser            (avatar) Lewis  ▾   │
 │                                                 │
-│            [ +  Crear viaje ]                   │  ← acción primaria
+│            [ +  Crear grupo ]                   │  ← acción primaria
 │                                                 │
 │  🔔 Te toca jugar                               │
 │  ┌───────────────────────────────────────────┐ │
@@ -133,7 +133,7 @@ De arriba abajo, por prioridad de atención:
 │  │                                  [ Jugar ]│ │
 │  └───────────────────────────────────────────┘ │
 │                                                 │
-│  🧳 Tus viajes                                  │
+│  👥 Tus grupos                                  │
 │  ┌───────────────────────────────────────────┐ │
 │  │ Interrail '26     🟡 Te toca        👑 Tuyo│ │
 │  ├───────────────────────────────────────────┤ │
@@ -143,7 +143,7 @@ De arriba abajo, por prioridad de atención:
 │  └───────────────────────────────────────────┘ │
 │                                                 │
 │  🏆 Tus números                                 │
-│  └ 12 480 pts · 3 viajes · mejor: 4 932 (Lisboa)│
+│  └ 12 480 pts · 3 grupos · mejor: 4 932 (Lisboa)│
 └───────────────────────────────────────────────┘
 ```
 
@@ -155,25 +155,25 @@ Buen estado vacío = **explica por qué está vacío + UNA acción clara**, y ay
 ┌───────────────────────────────────────────────┐
 │            👋  ¡Bienvenido, Lewis!              │
 │                                                 │
-│   Aún no tienes viajes. Un viaje es un grupo    │
+│   Aún no tienes grupos. Un grupo es un grupo    │
 │   donde tú y tus amigos os retáis a adivinar    │
 │   sitios en el mapa.                            │
 │                                                 │
-│            [ +  Crear mi primer viaje ]         │
+│            [ +  Crear mi primer grupo ]         │
 │                                                 │
 │   ¿Te han pasado un enlace? Ábrelo y entrarás   │
-│   al viaje automáticamente.                     │
+│   al grupo automáticamente.                     │
 └───────────────────────────────────────────────┘
 ```
 
-Microcopys de vacío: sección *Te toca jugar* vacía → no se muestra. *Tus viajes* vacío → bloque de bienvenida de arriba. *Históricos* vacío → _"Cuando juegues tu primer reto, aquí verás tus puntos."_
+Microcopys de vacío: sección *Te toca jugar* vacía → no se muestra. *Tus grupos* vacío → bloque de bienvenida de arriba. *Históricos* vacío → _"Cuando juegues tu primer reto, aquí verás tus puntos."_
 
 ### 3.4 Navegación (home ↔ grupo ↔ jugar)
 
 ```
         ┌──────── HOME (raíz con sesión) ────────┐
-        │  Crear viaje → (nuevo grupo) → GRUPO    │
-        │  Tarjeta de viaje ───────────► GRUPO    │
+        │  Crear grupo → (nuevo grupo) → GRUPO    │
+        │  Tarjeta de grupo ───────────► GRUPO    │
         │  "Te toca jugar" ────────────► JUGAR    │
         └─────────────────────────────────────────┘
 GRUPO  ──(reto abierto)──► JUGAR ──(votas)──► revelado ──► GRUPO
@@ -218,14 +218,14 @@ group_members(
 )
 ```
 - **Cómo se entra:** al abrir un link `#g=CODE` con sesión, **upsert** de `(group_id, user_id)` → auto-join (idempotente). El dueño se inserta con `role='owner'` al crear el grupo.
-- **"Mis grupos"** = `select group_id from group_members where user_id = auth.uid()`. Resuelve la sección *Tus viajes* de la home sin depender de enlaces guardados.
+- **"Mis grupos"** = `select group_id from group_members where user_id = auth.uid()`. Resuelve la sección *Tus grupos* de la home sin depender de enlaces guardados.
 - `role` redundante con `groups.created_by` para el dueño, pero útil para una futura noción de admins/co-dueños sin tocar el esquema.
 
 ### 4.3 `groups`, `challenges`, `votes` — qué cambia
 
 ```sql
 -- groups: añadir propiedad
-groups: + created_by uuid references auth.users(id)   -- dueño del viaje
+groups: + created_by uuid references auth.users(id)   -- dueño del grupo
         ( id text pk, name text, created_at … )        -- resto igual
 
 -- challenges: el creador pasa de "nombre de jugador" a user_id
@@ -241,7 +241,7 @@ votes: player_name text  →  user_id uuid references auth.users(id)
 
 - **`players` (identidad ligera) DESAPARECE.** Su rol (atribuir votos y sumar puntos a una persona estable) lo asume `auth.users` + `profiles`. No se mapea automáticamente (los datos actuales son de prueba; ver §5).
 - **Ranking/histórico por persona** se deriva ahora por `user_id` y se muestra con `profiles.display_name`:
-  - Clasificación del viaje: `sum(points) … group by user_id` en los retos del grupo.
+  - Clasificación del grupo: `sum(points) … group by user_id` en los retos del grupo.
   - "Tus números" (home): agregado del usuario sobre todos sus grupos.
 
 ### 4.4 Endurecimiento de RLS (de público a solo-auth)
@@ -274,7 +274,7 @@ Hoy todo es público (lectura y escritura, validado solo en cliente) [[0001_init
 | **CreateChallenge** | `created_by` pasa a `user_id` (de la sesión, no input). Solo el **dueño** del grupo puede crear/editar/borrar retos (UI + RLS). |
 | **GroupPage** | Cabecera con **estado** y acciones de **dueño** vs **miembro**. Ranking por `user_id`+`display_name`. Botón "← Inicio". Auto-join al entrar por link si aún no eres miembro. |
 | **PlayChallenge** | El voto se atribuye al `user_id` de la sesión (no `player_name`). `unique (challenge_id, user_id)`. Resto del flujo (panorama SV, pin Leaflet, scoring `5000·e^(−km/2000)`) **sin cambios**. |
-| **Nueva: Home/Dashboard** | Pantalla nueva (§3): te-toca-jugar, tus viajes, tus números, perfil. |
+| **Nueva: Home/Dashboard** | Pantalla nueva (§3): te-toca-jugar, tus grupos, tus números, perfil. |
 | **Nueva: Login + paso de perfil** | Pantallas nuevas (§2): email→enlace, "revisa tu correo", primer `display_name`. |
 
 ### 5.2 Datos de prueba / legacy
@@ -304,7 +304,7 @@ Hoy todo es público (lectura y escritura, validado solo en cliente) [[0001_init
 - **Tiempo medio link→jugando** (abrir reto → primer voto).
 - **% de reenganche fuera del chat:** sesiones que entran por la **home** (sin hash) / total.
 - **Tasa de auto-join correcto** (entrar por link y quedar como miembro sin error).
-- **Retención entre viajes:** usuarios con ≥2 grupos.
+- **Retención entre grupos:** usuarios con ≥2 grupos.
 
 ---
 
@@ -317,10 +317,10 @@ Hoy todo es público (lectura y escritura, validado solo en cliente) [[0001_init
 | **0** | **Rediseño visual / sistema de pantallas** (tokens y layout de Home, Login, paso de perfil, cabeceras de grupo dueño/miembro; sin lógica de auth aún — pantallas mockeadas) | `web/src/ui` + `index.css` | **P0** | ~1 sem | — |
 | **1** | **Datos: membresía + propiedad + RLS solo-auth** (migración: `profiles`, `group_members`, `groups.created_by`, `challenges.created_by→uuid`, `votes.user_id`, drop `players`; policies `auth.uid()`; regenerar `database.types.ts`) | `supabase/**` | **P0** | ~1–1.5 sem | — |
 | **2** | **Cliente de auth + sesión** (Supabase Auth magic link: `lib/auth.ts`, provider de sesión, persistencia, `emailRedirectTo`, guard de rutas; retira `lib/identity.ts`/`players.ts`) | `web/src/lib` | **P0** | ~1 sem | 1 |
-| **3** | **Home / dashboard UI** (te-toca-jugar, tus viajes con estado, tus números, perfil, estados vacíos §3) | `web/src/features` (+ piezas de UI de #0) | **P0** | ~1–1.5 sem | 0, 1, 2 |
+| **3** | **Home / dashboard UI** (te-toca-jugar, tus grupos con estado, tus números, perfil, estados vacíos §3) | `web/src/features` (+ piezas de UI de #0) | **P0** | ~1–1.5 sem | 0, 1, 2 |
 | **4** | **Onboarding + deep-link join** (pantalla login con/sin link, "revisa tu correo", paso de perfil 1er login, preservar y restaurar `#g&c`, auto-join `group_members`) | `web/src/features` + `App.tsx`/`lib/route.ts` | **P0** | ~1 sem | 1, 2 |
 | **5** | **Migrar pantallas existentes a user_id** (CreateGroup→owner, CreateChallenge `created_by` uuid + gate dueño, GroupPage dueño/miembro + ranking por user_id, PlayChallenge voto por user_id) | `web/src/features` | **P0** | ~1–1.5 sem | 1, 2 |
-| **6** | **Históricos/ranking agregado por persona** ("Tus números" fino, rankings por viaje con `display_name`) | `web/src/lib` + `web/src/features` | **P1** | ~0.5 sem | 1, 5 |
+| **6** | **Históricos/ranking agregado por persona** ("Tus números" fino, rankings por grupo con `display_name`) | `web/src/lib` + `web/src/features` | **P1** | ~0.5 sem | 1, 5 |
 | **7** | **Config + docs + verificación** (Supabase Auth en dashboard: redirect URLs prod+localhost, plantilla email; `CLAUDE.md` estado; smoke E2E del login con magic link en local) | `docs/**`, `.claude/**`, `.github/**` | **P1** | ~0.5 sem | 2, 4 |
 
 **Orden / dependencias sugerido:**
@@ -345,7 +345,7 @@ Hoy todo es público (lectura y escritura, validado solo en cliente) [[0001_init
 ## 9. Resumen de la decisión (TL;DR)
 
 - **Qué:** cuentas para todos, login obligatorio **magic link** (passwordless), **perfil global** (`display_name`+avatar), **home/dashboard** como raíz, **membresía** (`group_members`) y **propiedad** (`created_by`). Adiós a nombre-por-grupo + PIN.
-- **Por qué ahora:** la identidad ligera no es portable ni fiable, no hay "mis viajes" ni propiedad; el siguiente salto (retención, viajes, permisos) lo exige. Se acepta la fricción del primer login a cambio de identidad real.
+- **Por qué ahora:** la identidad ligera no es portable ni fiable, no hay "mis grupos" ni propiedad; el siguiente salto (retención, grupos, permisos) lo exige. Se acepta la fricción del primer login a cambio de identidad real.
 - **Cómo no duele:** sesión persistente (molesta 1 vez), deep-link que devuelve al reto, onboarding de 2 toques, estados vacíos que guían.
 - **Coste estructural:** RLS pasa de público a solo-auth/dueño; `players` desaparece; votos y `created_by` pasan a `user_id`. Datos actuales = prueba → se descartan.
 
