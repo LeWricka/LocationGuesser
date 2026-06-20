@@ -1,0 +1,6 @@
+/* La home solo aporta el estilo de su mensaje de error; el resto del layout lo
+   resuelve el componente presentacional HomeDashboard (UI kit). */
+.error {
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
