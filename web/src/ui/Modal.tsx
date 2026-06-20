@@ -19,12 +19,18 @@ export function Modal({ open, onClose, title, footer, children }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Cerrar con Escape y mover el foco al panel al abrir.
+  // Enfocar el panel SOLO al abrir. Depender de `onClose` (que se recrea en
+  // cada render) hacía que el efecto corriera en cada tecla y robara el foco al
+  // input que estuvieras escribiendo.
   useEffect(() => {
-    if (!open) return
-    panelRef.current?.focus()
-    if (!onClose) return
+    if (open) panelRef.current?.focus()
+  }, [open])
+
+  // Cerrar con Escape.
+  useEffect(() => {
+    if (!open || !onClose) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose?.()
+      if (e.key === 'Escape') onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

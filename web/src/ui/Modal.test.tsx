@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, test, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -69,6 +70,26 @@ describe('Modal', () => {
     )
     await user.click(screen.getByText('dentro'))
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  test('escribir en un input del modal NO roba el foco (regresión)', async () => {
+    const user = userEvent.setup()
+    // onClose se recrea en cada render (función inline), como en el caso real:
+    // el modal no debe re-enfocar el panel en cada tecla.
+    function Harness() {
+      const [v, setV] = useState('')
+      return (
+        <Modal open onClose={() => undefined} title="T">
+          <input aria-label="nombre" value={v} onChange={(e) => setV(e.target.value)} />
+        </Modal>
+      )
+    }
+    render(<Harness />)
+    const input = screen.getByLabelText('nombre')
+    input.focus()
+    await user.type(input, 'Ana')
+    expect(input).toHaveValue('Ana')
+    expect(input).toHaveFocus()
   })
 
   test('sin onClose no es descartable (Escape no rompe ni cierra)', async () => {
