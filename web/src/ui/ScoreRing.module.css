@@ -1,15 +1,28 @@
 .wrap {
   position: relative;
   flex-shrink: 0;
+  border-radius: var(--radius-full);
 }
 
 .wrap svg {
   display: block;
+  /* Sombra cálida bajo el trazo: el anillo "flota" y se lee como dato caliente. */
+  filter: drop-shadow(0 2px 10px rgba(255, 122, 89, 0.35));
 }
 
-/* Relleno del anillo: anima el offset del trazo al montar (sensación de carga). */
+/* Puntuación alta: halo cálido que palpita alrededor del anillo (celebración
+ * contenida, una nota caliente fuerte). */
+.high {
+  animation: lg-pulse-glow 2.4s var(--ease-smooth) infinite;
+}
+.high svg {
+  filter: drop-shadow(0 2px 16px rgba(255, 122, 89, 0.6));
+}
+
+/* Relleno del anillo: anima el offset del trazo al montar (sensación de carga).
+ * Más lento + muelle para que el llenado se note y "aterrice". */
 .progress {
-  transition: stroke-dashoffset var(--duration-slower) var(--ease-emphasized);
+  transition: stroke-dashoffset 900ms var(--ease-spring);
 }
 
 .center {
@@ -25,5 +38,9 @@
 @media (prefers-reduced-motion: reduce) {
   .progress {
     transition: none;
+  }
+  .high {
+    animation: none;
+    box-shadow: var(--glow-accent);
   }
 }

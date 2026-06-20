@@ -61,14 +61,14 @@
 
 .rankRow {
   display: grid;
-  grid-template-columns: 28px 1fr auto;
+  grid-template-columns: 32px 1fr auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-border);
   /* Entrada escalonada de cada puesto al pintar la tabla. El retardo lo fija el
    * índice como variable inline (--i) desde el TSX. */
-  animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
+  animation: lg-rise-pop var(--duration-slower) var(--ease-spring) both;
   animation-delay: calc(var(--i, 0) * var(--stagger-step));
   transition: background-color var(--transition-fast);
 }
@@ -81,9 +81,12 @@
   border-bottom: none;
 }
 
-/* Fila propia: realce cálido (única nota caliente de la tabla). */
+/* Fila propia: realce cálido con filo de acento a la izquierda (eres tú: te
+ * encuentras de un vistazo en la tabla). */
 .rankMe {
+  position: relative;
   background: var(--color-accent-soft);
+  box-shadow: inset 4px 0 0 0 var(--color-accent);
 }
 .rankMe:hover {
   background: color-mix(in srgb, var(--color-accent) 18%, transparent);
@@ -97,21 +100,24 @@
 
 /* Disco de medalla con el número del puesto. El color distingue oro/plata/bronce. */
 .medal {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--radius-full);
   display: grid;
   place-items: center;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md);
   font-weight: var(--font-weight-black);
   font-variant-numeric: tabular-nums;
   color: #14202a;
 }
+/* El oro "brilla": halo cálido pulsante (el líder destaca de verdad). */
 .medalGold {
   background: linear-gradient(135deg, #ffe08a, #ffb24d);
+  animation: lg-medal-shine 2.8s var(--ease-smooth) infinite;
 }
 .medalSilver {
   background: linear-gradient(135deg, #e7eef0, #aab9bd);
+  box-shadow: 0 0 10px -3px rgba(231, 238, 240, 0.5);
 }
 .medalBronze {
   background: linear-gradient(135deg, #f0a878, #c9743f);
@@ -119,6 +125,26 @@
 .medalOther {
   background: rgba(150, 220, 225, 0.14);
   color: var(--color-text-faint);
+}
+
+@keyframes lg-medal-shine {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 224, 138, 0.4),
+      0 0 14px -2px rgba(255, 178, 77, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 224, 138, 0.6),
+      0 0 22px 0 rgba(255, 178, 77, 0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medalGold {
+    animation: none;
+  }
 }
 
 /* Centro de la fila: nombre + barra de progreso relativa al líder. */
@@ -153,10 +179,12 @@
   flex-shrink: 0;
 }
 
-/* Barra de ranking: pista fría que se rellena en teal; cálida en la fila propia. */
+/* Barra de ranking: pista fría que se rellena en teal; cálida en la fila propia.
+ * Se "dibuja" de izquierda a derecha al pintar la tabla (scaleX), en sincronía
+ * con la entrada escalonada de su fila. */
 .rankBar {
   display: block;
-  height: 8px;
+  height: 10px;
   border-radius: var(--radius-full);
   background: rgba(150, 220, 225, 0.12);
   overflow: hidden;
@@ -166,14 +194,28 @@
   height: 100%;
   border-radius: var(--radius-full);
   background: linear-gradient(90deg, var(--land-400), var(--teal-bright));
+  box-shadow: 0 0 12px -2px rgba(69, 201, 176, 0.55);
+  transform-origin: left center;
   transition: width var(--duration-slower) var(--ease-emphasized);
+  animation: lg-bar-grow 700ms var(--ease-emphasized) both;
+  animation-delay: calc(var(--i, 0) * var(--stagger-step) + 120ms);
 }
 .rankMe .rankBar i {
   background: var(--gradient-accent);
+  box-shadow: 0 0 14px -2px rgba(255, 138, 89, 0.6);
+}
+
+@keyframes lg-bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
 }
 
 .rankPoints {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-black);
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
@@ -186,6 +228,7 @@
 @media (prefers-reduced-motion: reduce) {
   .rankBar i {
     transition: none;
+    animation: none;
   }
 }
 
@@ -232,15 +275,35 @@
   color: var(--color-text-muted);
 }
 
+/* "Jugar este reto": pastilla de acento que invita a tocar (no un link tímido). */
 .playLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-bold);
   color: var(--color-accent);
   text-decoration: none;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-base),
+    background-color var(--transition-fast);
 }
 
 .playLink:hover {
-  text-decoration: underline;
+  transform: translateY(-1px);
+  box-shadow: var(--glow-accent);
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playLink:hover {
+    transform: none;
+  }
 }
 
 .played {

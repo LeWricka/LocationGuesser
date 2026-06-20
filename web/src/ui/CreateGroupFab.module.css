@@ -31,16 +31,35 @@
     transform var(--transition-fast),
     box-shadow var(--transition-base),
     background-image var(--transition-base);
+  /* Latido cálido en reposo: la acción primaria respira para captar la mirada
+   * sin moverse de sitio (solo el halo cambia). */
+  animation: lg-fab-breathe 3.2s var(--ease-smooth) infinite;
+}
+
+@keyframes lg-fab-breathe {
+  0%,
+  100% {
+    box-shadow: var(--shadow-accent);
+  }
+  50% {
+    box-shadow:
+      var(--shadow-accent-hover),
+      0 0 26px -4px rgba(255, 138, 89, 0.55);
+  }
 }
 
 .fab:hover {
   background-image: var(--gradient-accent-hover);
-  box-shadow: var(--shadow-accent-hover);
-  transform: translateY(-1px);
+  box-shadow:
+    var(--shadow-accent-hover),
+    0 0 30px -4px rgba(255, 138, 89, 0.65);
+  transform: translateY(-3px) scale(1.04);
+  animation: none;
 }
 
 .fab:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
+  animation: none;
 }
 
 .icon {
@@ -71,6 +90,7 @@
 @media (prefers-reduced-motion: reduce) {
   .fab {
     transition: none;
+    animation: none;
   }
   .fab:hover,
   .fab:active {

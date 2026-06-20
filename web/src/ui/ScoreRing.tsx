@@ -41,16 +41,20 @@ export function ScoreRing({ value, max, size = 96, children, className }: Props)
   }, [reduced])
 
   const offset = filled ? c * (1 - pct) : c
+  // Puntuación alta (≥75%): el anillo "canta" con un halo cálido pulsante. Da
+  // sensación de logro sin tocar el scoring (solo lo visualiza).
+  const high = pct >= 0.75
 
   return (
     <div
-      className={[styles.wrap, className].filter(Boolean).join(' ')}
+      className={[styles.wrap, high ? styles.high : null, className].filter(Boolean).join(' ')}
       style={{ width: size, height: size }}
     >
       <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
         <defs>
           <linearGradient id="lg-score-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#ffc36b" />
+            <stop offset="0" stopColor="#ffce82" />
+            <stop offset="0.5" stopColor="#ffb24d" />
             <stop offset="1" stopColor="#ff7a59" />
           </linearGradient>
         </defs>
@@ -59,7 +63,7 @@ export function ScoreRing({ value, max, size = 96, children, className }: Props)
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="rgba(150, 220, 225, 0.18)"
+          stroke="rgba(150, 220, 225, 0.16)"
           strokeWidth={stroke}
         />
         <circle

@@ -20,8 +20,8 @@ body {
   min-height: 100svh;
   background: var(--color-bg);
   /* Atlas vivo de fondo: halos cálidos/fríos + viñeta, fijos (no hacen scroll).
-   * Sobre esto flota la rejilla de coordenadas (body::before) y los paneles de
-   * vidrio. Da color y profundidad de escena sin pesar. */
+   * Sobre esto flotan la AURORA animada (body::after), la rejilla de coordenadas
+   * (body::before) y los paneles de vidrio. Da color y profundidad sin pesar. */
   background-image: var(--gradient-app-bg);
   background-attachment: fixed;
   background-repeat: no-repeat;
@@ -34,11 +34,13 @@ body {
 }
 
 /* Rejilla de coordenadas (carta náutica) tenue sobre el océano del fondo. Fija
- * y no interactiva: vive bajo todo el contenido y refuerza el "mapa de alma". */
+ * y no interactiva: vive bajo todo el contenido y refuerza el "mapa de alma".
+ * Deriva muy lentamente para dar parallax/profundidad (el atlas se mueve bajo
+ * los pies). El recuadro se sobredimensiona para que el borde nunca asome. */
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  inset: -10%;
   z-index: -1;
   pointer-events: none;
   background-image:
@@ -48,6 +50,53 @@ body::before {
   /* Se desvanece hacia el centro para no competir con el contenido. */
   -webkit-mask-image: radial-gradient(120% 100% at 50% 30%, transparent 18%, black 95%);
   mask-image: radial-gradient(120% 100% at 50% 30%, transparent 18%, black 95%);
+  animation: lg-grid-drift var(--grid-drift-duration) linear infinite;
+  will-change: transform;
+}
+
+/* Aurora del fondo: halos de color (cálido ámbar/coral, teal frío, azul nocturno)
+ * que respiran y se desplazan en bucle muy lento. Es lo que hace que la pantalla
+ * deje de sentirse "plana": el fondo está VIVO sin distraer. Fijo, tras todo el
+ * contenido, no interactivo. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: -20%;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(38% 42% at 22% 16%, rgba(255, 138, 89, 0.22), transparent 60%),
+    radial-gradient(42% 46% at 82% 28%, rgba(69, 201, 176, 0.18), transparent 62%),
+    radial-gradient(50% 50% at 60% 94%, rgba(91, 124, 255, 0.12), transparent 65%);
+  filter: blur(6px);
+  animation: lg-aurora var(--aurora-duration) var(--ease-smooth) infinite alternate;
+  will-change: transform, opacity;
+}
+
+/* La aurora se desplaza/escala suavemente y palpita de intensidad. */
+@keyframes lg-aurora {
+  0% {
+    transform: translate3d(-3%, -2%, 0) scale(1.05) rotate(0deg);
+    opacity: 0.82;
+  }
+  50% {
+    transform: translate3d(3%, 2%, 0) scale(1.18) rotate(4deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(-2%, 3%, 0) scale(1.08) rotate(-3deg);
+    opacity: 0.8;
+  }
+}
+
+/* Deriva diagonal lenta de la rejilla (parallax de fondo). */
+@keyframes lg-grid-drift {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(88px, 88px, 0);
+  }
 }
 
 h1,
@@ -240,6 +289,60 @@ img {
   }
 }
 
+/* Entrada con muelle más enérgica: aparece desde abajo CON escala y overshoot.
+ * Para héroes y bloques que deben "saltar" a escena (saludo, CTA "te toca"). */
+@keyframes lg-rise-pop {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Palpito de glow cálido (estados "en vivo"/datos calientes/CTA que reclama). */
+@keyframes lg-pulse-glow {
+  0%,
+  100% {
+    box-shadow: var(--glow-accent);
+  }
+  50% {
+    box-shadow: var(--glow-accent-strong);
+  }
+}
+
+/* Barrido de brillo diagonal en bucle suave (héroes, badges destacados). */
+@keyframes lg-shimmer {
+  0% {
+    background-position: -150% 0;
+  }
+  100% {
+    background-position: 150% 0;
+  }
+}
+
+/* Celebración: muelle de escala + halo que crece y se desvanece. Para
+ * puntuaciones altas en el resultado (sin pasarse: una sola pasada). */
+@keyframes lg-celebrate {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 /* Aplica la entrada base a un elemento. */
 .lg-rise {
   animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
@@ -249,14 +352,18 @@ img {
   animation: lg-pop var(--duration-slow) var(--ease-spring) both;
 }
 
+.lg-rise-pop {
+  animation: lg-rise-pop var(--duration-slower) var(--ease-spring) both;
+}
+
 /*
- * Stagger: cada hijo directo entra con un retardo incremental. Pensado para
- * listas, rankings y secuencias de bloques. Limitado a ~8 hijos para no
- * arrastrar la última entrada demasiado tarde; el resto entra con el último
- * retardo. El padre marca el ritmo; los hijos heredan la entrada base.
+ * Stagger: cada hijo directo entra con un retardo incremental y un muelle suave
+ * (lg-rise-pop). Pensado para listas, rankings y secuencias de bloques. Limitado
+ * a ~10 hijos para no arrastrar la última entrada demasiado tarde; el resto entra
+ * con el último retardo. El padre marca el ritmo; los hijos heredan la entrada.
  */
 .lg-stagger > * {
-  animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
+  animation: lg-rise-pop var(--duration-slower) var(--ease-spring) both;
 }
 .lg-stagger > *:nth-child(1) {
   animation-delay: calc(var(--stagger-step) * 0);
@@ -279,8 +386,17 @@ img {
 .lg-stagger > *:nth-child(7) {
   animation-delay: calc(var(--stagger-step) * 6);
 }
-.lg-stagger > *:nth-child(n + 8) {
+.lg-stagger > *:nth-child(8) {
   animation-delay: calc(var(--stagger-step) * 7);
+}
+.lg-stagger > *:nth-child(9) {
+  animation-delay: calc(var(--stagger-step) * 8);
+}
+.lg-stagger > *:nth-child(10) {
+  animation-delay: calc(var(--stagger-step) * 9);
+}
+.lg-stagger > *:nth-child(n + 11) {
+  animation-delay: calc(var(--stagger-step) * 10);
 }
 
 /*
@@ -303,7 +419,15 @@ img {
 @media (prefers-reduced-motion: reduce) {
   .lg-rise,
   .lg-pop,
+  .lg-rise-pop,
   .lg-stagger > * {
+    animation: none;
+  }
+
+  /* El fondo vivo (aurora + deriva de rejilla) se congela: nada de movimiento
+   * ambiental para quien pide menos. La aurora queda fija (sigue dando color). */
+  body::before,
+  body::after {
     animation: none;
   }
 

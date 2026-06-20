@@ -315,22 +315,28 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
                 </Stack>
               ) : result ? (
-                <Stack gap={3}>
-                  <Row gap={4} align="center" className={styles.scoreReveal}>
-                    {/* Anillo de acierto: % de la puntuación máxima, con los puntos
-                        (count-up) en el centro. El dato manda; el anillo lo apoya. */}
-                    <ScoreRing value={result.points} max={MAX_POINTS} size={104}>
-                      <CountUp className={styles.ringPoints} value={result.points} />
-                      <span className={styles.ringUnit}>pts</span>
-                    </ScoreRing>
-                    <Stack gap={2} className={styles.scoreText}>
-                      <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
-                      <span className={styles.resultDist}>
-                        a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del
-                        objetivo
-                      </span>
-                    </Stack>
-                  </Row>
+                <Stack gap={4} align="center" className={styles.scoreReveal}>
+                  {/* Titular de celebración: cálido y enérgico si fue gran tiro. */}
+                  <span
+                    className={`${styles.scoreEyebrow} ${
+                      result.points >= MAX_POINTS * 0.75 ? styles.scoreEyebrowWin : ''
+                    }`}
+                  >
+                    {result.points >= MAX_POINTS * 0.75 ? '🎉 ¡Gran tiro!' : 'Resultado'}
+                  </span>
+                  {/* Anillo de acierto protagonista: % de la puntuación máxima, con
+                      los puntos (count-up) gigantes en el centro. */}
+                  <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
+                    <CountUp className={styles.ringPoints} value={result.points} duration={1200} />
+                    <span className={styles.ringUnit}>puntos</span>
+                  </ScoreRing>
+                  <div className={styles.scoreText}>
+                    <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
+                    <span className={styles.resultDist}>
+                      a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del
+                      objetivo
+                    </span>
+                  </div>
                   {saving && (
                     <Row gap={2} justify="center">
                       <Spinner size={16} />

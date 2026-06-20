@@ -22,8 +22,9 @@
   box-shadow: var(--shadow-md);
 }
 .raised:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+  border-color: color-mix(in srgb, var(--color-accent) 28%, var(--color-border-strong));
+  transform: translateY(-3px);
 }
 
 @media (prefers-reduced-motion: reduce) {
