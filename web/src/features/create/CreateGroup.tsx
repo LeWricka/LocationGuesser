@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { newGroupCode } from '../../lib/group'
 import { supabase } from '../../lib/supabase'
+import { joinGroupAsOwner } from '../../lib/membership'
 import { useSession } from '../../lib/session-context'
 import { Button, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
 import styles from './CreateGroup.module.css'
@@ -35,13 +36,8 @@ export function CreateGroup({ onBack }: Props) {
         .insert({ id: groupId, name: trimmed || null, created_by: user.id })
       if (error) throw new Error(error.message)
       // Membresía 'owner' para que el grupo aparezca en "Tus grupos" (la home se
-      // nutre de group_members). joinGroup solo inserta 'member', así que el rol
-      // owner lo escribimos aquí, inline (lib/membership.ts no expone helper de
-      // owner — ver nota del PR). La fila propia la permite el RLS de inserción.
-      const { error: memberError } = await supabase
-        .from('group_members')
-        .insert({ group_id: groupId, user_id: user.id, role: 'owner' })
-      if (memberError) throw new Error(memberError.message)
+      // nutre de group_members). La fila propia la permite el RLS de inserción.
+      await joinGroupAsOwner(groupId, user.id)
       // Navegar a la página del grupo. El listener de hashchange de App.tsx
       // recoge el cambio y renderiza GroupPage.
       location.hash = `#g=${groupId}`

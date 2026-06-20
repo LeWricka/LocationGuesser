@@ -44,6 +44,21 @@ export async function joinGroup(groupId: string, userId: string): Promise<void> 
   if (error) throw error
 }
 
+/**
+ * Alta del creador como dueño del grupo (role='owner'), al crearlo. Igual que
+ * joinGroup pero con rol owner; idempotente. Se separa de joinGroup (que es el
+ * auto-join de invitados, siempre 'member') para no mezclar responsabilidades.
+ */
+export async function joinGroupAsOwner(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('group_members')
+    .upsert(
+      { group_id: groupId, user_id: userId, role: 'owner' },
+      { onConflict: 'group_id,user_id', ignoreDuplicates: true },
+    )
+  if (error) throw error
+}
+
 /** ¿Soy miembro de este grupo? (para decidir auto-join silencioso, §2 flujo C). */
 export async function isMember(groupId: string, userId: string): Promise<boolean> {
   const { data, error } = await supabase
