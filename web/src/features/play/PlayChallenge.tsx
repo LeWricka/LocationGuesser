@@ -59,7 +59,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       const r = computeResult(playedGuess, answer)
       setResult(r)
 
-      const name = await ensureIdentity(current.group_id)
+      // El nombre ya se pidió al entrar; aquí solo lo usamos (fallback por si acaso).
+      const name = getIdentity()?.name ?? (await ensureIdentity(current.group_id))
       if (!name) {
         toast.show('No se guardó tu voto (sin nombre)', { tone: 'neutral' })
         return
@@ -97,7 +98,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         if (cancelled) return
         setChallenge(c)
 
-        const name = getIdentity()?.name ?? null
+        // Pedimos el nombre lo PRIMERO (antes de jugar) si el navegador aún no
+        // tiene identidad. Así "¿quién juega?" va antes de responder.
+        let name = getIdentity()?.name ?? null
+        if (!name) {
+          name = await ensureIdentity(c.group_id)
+          if (cancelled) return
+        }
+        // ¿Ya votó este jugador? → directo a su resultado (no se re-vota, ni
+        // aunque el reto siga en vivo).
         const existing = name ? await getExistingVote(challengeId, name) : null
         if (cancelled) return
         if (existing) {
@@ -120,7 +129,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [challengeId])
+  }, [challengeId, ensureIdentity])
 
   // Cuenta atrás. Arranca al entrar en `playing` reconstruyendo desde `start_at`
   // (persistido), así una recarga no reinicia el reloj. Al llegar a 0 → revelar.
