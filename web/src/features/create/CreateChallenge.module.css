@@ -94,3 +94,42 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
+
+/* Duración elegida, destacada sobre el slider. */
+.durationValue {
+  align-items: baseline;
+}
+
+.durationLabel {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-black);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pastilla "⚡ Express" para duraciones cortas. */
+.expressPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Slider de duración: usa el acento del tema; no hardcodear color. */
+.durationSlider {
+  width: 100%;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+/* Extremos de referencia bajo el slider (5 min … 48 h). */
+.durationScale {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

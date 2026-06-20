@@ -3,7 +3,7 @@ import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import type { LatLng } from '../../lib/geo'
 import { createChallenge } from '../../lib/challenges'
-import { deadlineFromNow } from '../../lib/time'
+import { deadlineFromMinutes } from '../../lib/time'
 import type { Challenge } from '../../lib/database.types'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { resolveMapsUrl } from '../../lib/mapsUrl'
@@ -39,16 +39,28 @@ interface NominatimHit {
   display_name: string
 }
 
-// Plazo del reto: DURACIÓN relativa al momento de crear (en horas). Sustituye al
-// ambiguo "fin del día" por una cuenta atrás clara. El valor es el nº de horas;
-// createChallenge lo congela como instante absoluto (deadlineFromNow).
-const DEADLINE_OPTIONS: { value: number; label: string }[] = [
-  { value: 1, label: '1 h' },
-  { value: 4, label: '4 h' },
-  { value: 8, label: '8 h' },
-  { value: 24, label: '24 h' },
-  { value: 48, label: '48 h' },
+// Plazo del reto: DURACIÓN relativa al momento de crear, en minutos. El creador
+// la elige con un slider sobre estas "paradas" (de express a largas);
+// createChallenge la congela como instante absoluto (deadlineFromMinutes).
+const DURATION_STOPS: { minutes: number; label: string }[] = [
+  { minutes: 5, label: '5 min' },
+  { minutes: 10, label: '10 min' },
+  { minutes: 15, label: '15 min' },
+  { minutes: 30, label: '30 min' },
+  { minutes: 60, label: '1 h' },
+  { minutes: 120, label: '2 h' },
+  { minutes: 240, label: '4 h' },
+  { minutes: 480, label: '8 h' },
+  { minutes: 720, label: '12 h' },
+  { minutes: 1440, label: '24 h' },
+  { minutes: 2880, label: '48 h' },
 ]
+
+// Parada por defecto: 24 h.
+const DEFAULT_DURATION_INDEX = DURATION_STOPS.findIndex((s) => s.minutes === 1440)
+
+// Hasta este umbral (incluido) la duración cuenta como "express".
+const EXPRESS_MAX_MINUTES = 15
 
 // Tiempo por jugada en segundos; null = sin límite.
 const GUESS_OPTIONS: { value: number | null; label: string }[] = [
@@ -76,8 +88,8 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   const [checkingPano, setCheckingPano] = useState(false)
   // POV con el que arrancarán los jugadores; el creador puede girar la previa.
   const [pov, setPov] = useState({ heading: 0, pitch: 0 })
-  // Duración del reto en horas (ver DEADLINE_OPTIONS); 24 h por defecto.
-  const [durationHours, setDurationHours] = useState(24)
+  // Duración del reto como índice en DURATION_STOPS; 24 h por defecto.
+  const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
   const [guessSeconds, setGuessSeconds] = useState<number | null>(120)
   // Foto opcional del reto (se sube sin EXIF). `photoIsHint` decide si se ve al
   // jugar (pista) o se reserva para el revelado (sorpresa). `photoPreview` es un
@@ -230,7 +242,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
       }
 
       setStatus('Guardando el reto…')
-      // El plazo es relativo: congelamos "ahora + durationHours" como instante
+      // El plazo es relativo: congelamos "ahora + duración elegida" como instante
       // absoluto. Guardamos la lat/lng encajada al panorama (la respuesta real
       // para el scoring) y el panorama exacto + POV inicial. El creador es el
       // user_id de la sesión.
@@ -243,7 +255,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         svPanoId: pano.panoId,
         svHeading: pov.heading,
         svPitch: pov.pitch,
-        deadlineAt: deadlineFromNow(durationHours),
+        deadlineAt: deadlineFromMinutes(DURATION_STOPS[durationIndex].minutes),
         guessSeconds,
         imagePath,
         photoIsHint,
@@ -457,21 +469,34 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         </Field>
 
         <Field label="Duración del reto" hint="Cuánto tiempo queda abierto para contestar.">
-          {() => (
-            <Row gap={2} wrap>
-              {DEADLINE_OPTIONS.map((opt) => (
-                <Button
-                  key={opt.value}
-                  variant={durationHours === opt.value ? 'primary' : 'secondary'}
-                  size="sm"
-                  aria-pressed={durationHours === opt.value}
-                  onClick={() => setDurationHours(opt.value)}
-                >
-                  {opt.label}
-                </Button>
-              ))}
-            </Row>
-          )}
+          {(fieldProps) => {
+            const stop = DURATION_STOPS[durationIndex]
+            const isExpress = stop.minutes <= EXPRESS_MAX_MINUTES
+            return (
+              <Stack gap={2}>
+                <Row gap={2} className={styles.durationValue}>
+                  <span className={styles.durationLabel}>{stop.label}</span>
+                  {isExpress && <span className={styles.expressPill}>⚡ Express</span>}
+                </Row>
+                <input
+                  {...fieldProps}
+                  type="range"
+                  className={styles.durationSlider}
+                  min={0}
+                  max={DURATION_STOPS.length - 1}
+                  step={1}
+                  value={durationIndex}
+                  onChange={(e) => setDurationIndex(Number(e.target.value))}
+                  aria-label="Duración del reto"
+                  aria-valuetext={stop.label}
+                />
+                <Row gap={2} justify="between" className={styles.durationScale}>
+                  <span>{DURATION_STOPS[0].label}</span>
+                  <span>{DURATION_STOPS[DURATION_STOPS.length - 1].label}</span>
+                </Row>
+              </Stack>
+            )
+          }}
         </Field>
 
         <Field label="Tiempo por jugada">
