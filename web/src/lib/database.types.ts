@@ -8,9 +8,22 @@ export interface Database {
   public: {
     Tables: {
       groups: {
-        Row: { id: string; name: string | null; created_at: string }
-        Insert: { id: string; name?: string | null; created_at?: string }
-        Update: { id?: string; name?: string | null; created_at?: string }
+        // created_by: uuid del dueño (auth.users). null en grupos legacy
+        // creados antes de auth. En el cliente suele rellenarlo el default
+        // `auth.uid()` de la BD, así que en Insert es opcional.
+        Row: { id: string; name: string | null; created_by: string | null; created_at: string }
+        Insert: {
+          id: string
+          name?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
         Relationships: []
       }
       players: {

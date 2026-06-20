@@ -12,4 +12,13 @@ if (!url || !publishableKey) {
   )
 }
 
-export const supabase = createClient<Database>(url, publishableKey)
+export const supabase = createClient<Database>(url, publishableKey, {
+  auth: {
+    // Persistir la sesión en localStorage y refrescar el token en background,
+    // para que el login del creador sobreviva a recargas. detectSessionInUrl
+    // procesa el token del callback de magic link / OAuth al volver al origin.
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+})
