@@ -1,13 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Badge, Button, Card, Input, Row, Skeleton, Spinner, Stack, useToast } from '../../ui'
-import { aggregateLeaderboard, getGroupVotes } from '../../lib/leaderboard'
+import {
+  Badge,
+  BackHomeButton,
+  Button,
+  Card,
+  Input,
+  PhotoStrip,
+  type PhotoStripItem,
+  Row,
+  Skeleton,
+  Stack,
+  useToast,
+} from '../../ui'
+import { aggregateLeaderboard, getGroupVotes, type VoteWithName } from '../../lib/leaderboard'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
-import { getVotes } from '../../lib/votes'
 import { fmtDist } from '../../lib/geo'
 import { formatDeadline } from '../../lib/time'
-import { getIdentity } from '../../lib/identity'
-import type { Challenge, Vote } from '../../lib/database.types'
+import { useSession } from '../../lib/session-context'
+import { deleteChallenge } from '../../lib/challenges'
+import { isMember, myGroups } from '../../lib/membership'
+import type { Challenge } from '../../lib/database.types'
 import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
 import { challengeImageUrl, getGroup, getGroupChallenges, splitByStatus } from '../../lib/groupData'
@@ -17,6 +30,8 @@ import styles from './GroupPage.module.css'
 
 interface Props {
   groupId: string
+  /** Vuelve a la home (§3.4). Lo cablea #4; por defecto limpia el hash. */
+  onBack?: () => void
 }
 
 /** Enlace del grupo (#g=) para compartir en el chat. */
@@ -29,12 +44,16 @@ function challengeLink(groupId: string, challengeId: string): string {
   return `${groupLink(groupId)}&c=${encodeURIComponent(challengeId)}`
 }
 
-// Página del grupo ("el viaje"): clasificación general, retos en vivo y
-// anteriores. Se refresca en tiempo real al entrar cualquier voto del grupo.
-export function GroupPage({ groupId }: Props) {
+// Página del grupo: clasificación general, retos en vivo y anteriores, histórico
+// de fotos. Distingue dueño (gestiona retos) de miembro (solo juega) y se
+// refresca en tiempo real al entrar cualquier voto del grupo.
+export function GroupPage({ groupId, onBack }: Props) {
+  const { user } = useSession()
   const [group, setGroup] = useState<GroupInfo | null>(null)
   const [challenges, setChallenges] = useState<Challenge[] | null>(null)
-  const [votes, setVotes] = useState<Vote[] | null>(null)
+  const [votes, setVotes] = useState<VoteWithName[] | null>(null)
+  // Soy dueño del grupo (veo gestión de retos) vs miembro (solo juego).
+  const [isOwner, setIsOwner] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // "Añadir reto" es un estado interno de la página (no una ruta nueva):
   // `adding` muestra el formulario; `created` muestra el reto recién creado con
@@ -62,6 +81,28 @@ export function GroupPage({ groupId }: Props) {
     }
   }, [groupId])
 
+  // Resolución de permisos: ¿soy dueño de este grupo? myGroups deriva isOwner
+  // (created_by === user.id o role 'owner'). Si no soy miembro aún, el auto-join
+  // lo gestiona el onboarding (#4); aquí solo leemos el rol.
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const member = await isMember(groupId, user.id)
+        if (cancelled || !member) return
+        const mine = await myGroups(user.id)
+        if (cancelled) return
+        setIsOwner(mine.find((g) => g.id === groupId)?.isOwner ?? false)
+      } catch {
+        // Permisos no resueltos: tratamos como miembro (sin gestión). No bloquea jugar.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [groupId, user])
+
   // Carga inicial + Realtime en un solo efecto: el setState siempre ocurre tras
   // un await/callback (nunca síncrono en el cuerpo del efecto), así que las
   // cargas en cascada que advierte la regla no aplican aquí.
@@ -70,20 +111,18 @@ export function GroupPage({ groupId }: Props) {
     void refresh()
     const channel = supabase
       .channel(`group-${groupId}`)
-      .on<Vote>(
+      .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'votes', filter: `group_id=eq.${groupId}` },
         (payload) => {
           // Solo los INSERT en vivo disparan aviso; la carga inicial no pasa por
-          // aquí, así que no hay riesgo de avisar de votos antiguos.
+          // aquí, así que no hay riesgo de avisar de votos antiguos. El votante
+          // es un user_id ahora; el nombre llega en el refresh (join a profiles).
           if (payload.eventType === 'INSERT') {
-            const vote = payload.new
-            if (vote.id && !announcedVotes.current.has(vote.id)) {
-              announcedVotes.current.add(vote.id)
-              const name = vote.player_name?.trim()
-              toast.show(name ? `${name} acaba de votar` : 'Alguien acaba de votar', {
-                tone: 'success',
-              })
+            const id = (payload.new as { id?: string }).id
+            if (id && !announcedVotes.current.has(id)) {
+              announcedVotes.current.add(id)
+              toast.show('Alguien acaba de votar', { tone: 'success' })
             }
           }
           void refresh()
@@ -97,9 +136,10 @@ export function GroupPage({ groupId }: Props) {
 
   const leaderboard = useMemo(() => (votes ? aggregateLeaderboard(votes) : []), [votes])
 
-  // Votos agrupados por reto, para alimentar marcadores en vivo sin más fetches.
+  // Votos agrupados por reto, para alimentar marcadores en vivo y revelados sin
+  // más fetches (ya traen el display_name del join a profiles).
   const votesByChallenge = useMemo(() => {
-    const map = new Map<string, Vote[]>()
+    const map = new Map<string, VoteWithName[]>()
     for (const v of votes ?? []) {
       const list = map.get(v.challenge_id)
       if (list) list.push(v)
@@ -110,8 +150,29 @@ export function GroupPage({ groupId }: Props) {
 
   const { live, past } = useMemo(() => splitByStatus(challenges ?? []), [challenges])
 
-  // Añadir reto al grupo existente. Al terminar, refrescamos para que aparezca
-  // en "en vivo" y mostramos el enlace del reto para compartir.
+  // Histórico de fotos del grupo: las fotos de los retos que tienen imagen, de
+  // la más reciente a la más antigua (mismo orden que getGroupChallenges).
+  const photos = useMemo<PhotoStripItem[]>(
+    () =>
+      (challenges ?? [])
+        .filter((c) => c.image_path)
+        .map((c) => ({
+          id: c.id,
+          src: challengeImageUrl(c.image_path),
+          alt: c.title,
+          caption: c.title,
+        })),
+    [challenges],
+  )
+
+  const goBack =
+    onBack ??
+    (() => {
+      location.hash = ''
+    })
+
+  // Añadir reto al grupo existente. Solo el dueño llega aquí (la UI esconde el
+  // botón a los miembros; el RLS lo respalda). Al terminar, refrescamos.
   if (adding) {
     return (
       <CreateChallenge
@@ -145,6 +206,7 @@ export function GroupPage({ groupId }: Props) {
   return (
     <main className="lg-page">
       <Stack gap={6} className="lg-stagger">
+        <BackHomeButton onClick={goBack} />
         <header className={styles.header}>
           <div>
             <h1 className={styles.title}>{group?.name?.trim() || groupId}</h1>
@@ -155,9 +217,11 @@ export function GroupPage({ groupId }: Props) {
             <Button variant="secondary" size="sm" onClick={() => void shareGroup(groupId, toast)}>
               Compartir grupo
             </Button>
-            <Button size="sm" onClick={() => setAdding(true)}>
-              ➕ Añadir reto
-            </Button>
+            {isOwner && (
+              <Button size="sm" onClick={() => setAdding(true)}>
+                ➕ Añadir reto
+              </Button>
+            )}
           </Row>
         </header>
 
@@ -171,18 +235,38 @@ export function GroupPage({ groupId }: Props) {
 
         <Leaderboard entries={leaderboard} />
 
+        <PhotoSection photos={photos} />
+
         {hasChallenges ? (
           <>
-            <LiveSection challenges={live} votesByChallenge={votesByChallenge} groupId={groupId} />
-            <PastSection challenges={past} />
+            <LiveSection
+              challenges={live}
+              votesByChallenge={votesByChallenge}
+              groupId={groupId}
+              userId={user?.id}
+              isOwner={isOwner}
+              onDeleted={() => void refresh()}
+            />
+            <PastSection
+              challenges={past}
+              votesByChallenge={votesByChallenge}
+              isOwner={isOwner}
+              onDeleted={() => void refresh()}
+            />
           </>
         ) : (
           <Card>
             <Stack gap={3} align="start">
-              <p className={styles.empty}>Aún no hay retos — añade el primero.</p>
-              <Button size="sm" onClick={() => setAdding(true)}>
-                ➕ Añadir reto
-              </Button>
+              <p className={styles.empty}>
+                {isOwner
+                  ? 'Aún no hay retos — añade el primero.'
+                  : 'Aún no hay retos en este grupo.'}
+              </p>
+              {isOwner && (
+                <Button size="sm" onClick={() => setAdding(true)}>
+                  ➕ Añadir reto
+                </Button>
+              )}
             </Stack>
           </Card>
         )}
@@ -197,7 +281,7 @@ export function GroupPage({ groupId }: Props) {
 // carga al lector de pantalla; los bloques shimmer van aria-hidden.
 function GroupSkeleton() {
   return (
-    <main className="lg-page" role="status" aria-label="Cargando el viaje">
+    <main className="lg-page" role="status" aria-label="Cargando el grupo">
       <Stack gap={6}>
         <Row justify="between" align="center" gap={3}>
           <Stack gap={2}>
@@ -270,7 +354,7 @@ function ChallengeCreated({
   const toast = useToast()
   const link = challengeLink(groupId, challenge.id)
   const shareText = `🌍 ${challenge.title} — adivina dónde es${
-    challenge.deadline_at ? ` (responde ${formatDeadline(challenge.deadline_at)})` : ''
+    challenge.deadline_at ? ` (${formatDeadline(challenge.deadline_at)})` : ''
   }: ${link}`
 
   function copy() {
@@ -317,6 +401,18 @@ function ChallengeCreated({
   )
 }
 
+// --- Histórico de fotos ----------------------------------------------------
+
+function PhotoSection({ photos }: { photos: PhotoStripItem[] }) {
+  if (photos.length === 0) return null
+  return (
+    <section>
+      <h2 className={styles.sectionTitle}>📸 Fotos del grupo</h2>
+      <PhotoStrip photos={photos} />
+    </section>
+  )
+}
+
 // --- Clasificación general -------------------------------------------------
 
 function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
@@ -332,7 +428,7 @@ function Leaderboard({ entries }: { entries: LeaderboardEntry[] }) {
           <ol className={styles.ranking}>
             {entries.map((entry, i) => (
               <li
-                key={entry.name}
+                key={entry.userId}
                 className={styles.rankRow}
                 // --i alimenta el retardo de la entrada escalonada (ver CSS).
                 style={{ '--i': i } as CSSProperties}
@@ -367,10 +463,16 @@ function LiveSection({
   challenges,
   votesByChallenge,
   groupId,
+  userId,
+  isOwner,
+  onDeleted,
 }: {
   challenges: Challenge[]
-  votesByChallenge: Map<string, Vote[]>
+  votesByChallenge: Map<string, VoteWithName[]>
   groupId: string
+  userId?: string
+  isOwner: boolean
+  onDeleted: () => void
 }) {
   if (challenges.length === 0) return null
   return (
@@ -383,6 +485,9 @@ function LiveSection({
             challenge={c}
             votes={votesByChallenge.get(c.id) ?? []}
             groupId={groupId}
+            userId={userId}
+            isOwner={isOwner}
+            onDeleted={onDeleted}
           />
         ))}
       </Stack>
@@ -396,17 +501,22 @@ function LiveCard({
   challenge,
   votes,
   groupId,
+  userId,
+  isOwner,
+  onDeleted,
 }: {
   challenge: Challenge
-  votes: Vote[]
+  votes: VoteWithName[]
   groupId: string
+  userId?: string
+  isOwner: boolean
+  onDeleted: () => void
 }) {
   const ranked = [...votes].sort((a, b) => b.points - a.points)
   const playHref = `#g=${encodeURIComponent(groupId)}&c=${encodeURIComponent(challenge.id)}`
-  // El voto del jugador actual (por nombre): si ya jugó, no puede re-jugar aunque
-  // el reto siga en vivo. Comparamos por nombre, la identidad estable del juego.
-  const myName = getIdentity()?.name?.trim()
-  const myVote = myName ? votes.find((v) => v.player_name === myName) : undefined
+  // El voto del usuario actual (por user_id): si ya jugó, no puede re-jugar
+  // aunque el reto siga en vivo. La identidad es la sesión.
+  const myVote = userId ? votes.find((v) => v.user_id === userId) : undefined
   return (
     <Card>
       <Stack gap={3}>
@@ -423,27 +533,75 @@ function LiveCard({
           <ul className={styles.scoreboard}>
             {ranked.map((v) => (
               <li key={v.id} className={styles.scoreRow}>
-                <span className={styles.scoreName}>{v.player_name}</span>
+                <span className={styles.scoreName}>{v.display_name}</span>
                 <span className={styles.scorePoints}>{v.points.toLocaleString('es-ES')} pts</span>
               </li>
             ))}
           </ul>
         )}
-        {myVote ? (
-          <p className={styles.played}>Ya jugaste · {myVote.points.toLocaleString('es-ES')} pts</p>
-        ) : (
-          <a className={styles.playLink} href={playHref}>
-            Jugar este reto →
-          </a>
-        )}
+        <Row gap={3} justify="between" align="center">
+          {myVote ? (
+            <p className={styles.played}>
+              Ya jugaste · {myVote.points.toLocaleString('es-ES')} pts
+            </p>
+          ) : (
+            <a className={styles.playLink} href={playHref}>
+              Jugar este reto →
+            </a>
+          )}
+          {isOwner && <DeleteChallengeButton challengeId={challenge.id} onDeleted={onDeleted} />}
+        </Row>
       </Stack>
     </Card>
   )
 }
 
+// Botón de borrar reto (solo dueño; RLS lo respalda). Confirma antes de borrar.
+function DeleteChallengeButton({
+  challengeId,
+  onDeleted,
+}: {
+  challengeId: string
+  onDeleted: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+
+  async function remove() {
+    if (!confirm('¿Borrar este reto? No se puede deshacer.')) return
+    setBusy(true)
+    try {
+      await deleteChallenge(challengeId)
+      toast.show('Reto borrado', { tone: 'neutral' })
+      onDeleted()
+    } catch (err) {
+      toast.show(`No se pudo borrar: ${err instanceof Error ? err.message : String(err)}`, {
+        tone: 'danger',
+      })
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Button variant="ghost" size="sm" loading={busy} onClick={() => void remove()}>
+      Borrar
+    </Button>
+  )
+}
+
 // --- Anteriores ------------------------------------------------------------
 
-function PastSection({ challenges }: { challenges: Challenge[] }) {
+function PastSection({
+  challenges,
+  votesByChallenge,
+  isOwner,
+  onDeleted,
+}: {
+  challenges: Challenge[]
+  votesByChallenge: Map<string, VoteWithName[]>
+  isOwner: boolean
+  onDeleted: () => void
+}) {
   return (
     <section>
       <h2 className={styles.sectionTitle}>Anteriores</h2>
@@ -454,7 +612,13 @@ function PastSection({ challenges }: { challenges: Challenge[] }) {
       ) : (
         <Stack gap={3}>
           {challenges.map((c) => (
-            <PastCard key={c.id} challenge={c} />
+            <PastCard
+              key={c.id}
+              challenge={c}
+              votes={votesByChallenge.get(c.id) ?? []}
+              isOwner={isOwner}
+              onDeleted={onDeleted}
+            />
           ))}
         </Stack>
       )}
@@ -462,30 +626,26 @@ function PastSection({ challenges }: { challenges: Challenge[] }) {
   )
 }
 
-// Reto cerrado: al desplegar se reconstruye (foto + ubicación real + votos).
-// Cargamos los votos perezosamente al abrir para no traerlos todos de golpe.
-function PastCard({ challenge }: { challenge: Challenge }) {
+// Reto cerrado: al desplegar se reconstruye (foto + ubicación real + votos). Los
+// votos ya vienen cargados a nivel de grupo (con display_name), sin más fetches.
+function PastCard({
+  challenge,
+  votes,
+  isOwner,
+  onDeleted,
+}: {
+  challenge: Challenge
+  votes: VoteWithName[]
+  isOwner: boolean
+  onDeleted: () => void
+}) {
   const [open, setOpen] = useState(false)
-  const [votes, setVotes] = useState<Vote[] | null>(null)
-  const [loading, setLoading] = useState(false)
   const imageUrl = challengeImageUrl(challenge.image_path)
-
-  function toggle() {
-    const next = !open
-    setOpen(next)
-    if (next && votes === null && !loading) {
-      setLoading(true)
-      getVotes(challenge.id)
-        .then(setVotes)
-        .finally(() => setLoading(false))
-    }
-  }
-
-  const ranked = votes ? [...votes].sort((a, b) => b.points - a.points) : []
+  const ranked = [...votes].sort((a, b) => b.points - a.points)
 
   return (
     <Card padding="none">
-      <button className={styles.disclosure} onClick={toggle} aria-expanded={open}>
+      <button className={styles.disclosure} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
         <span className={styles.challengeTitle}>{challenge.title}</span>
         <Row gap={2}>
           <Badge tone="neutral">cerrado</Badge>
@@ -504,23 +664,18 @@ function PastCard({ challenge }: { challenge: Challenge }) {
             <RevealMap
               answer={{ lat: challenge.lat, lng: challenge.lng }}
               votes={ranked.map((v) => ({
-                name: v.player_name,
+                name: v.display_name,
                 lat: v.guess_lat,
                 lng: v.guess_lng,
               }))}
             />
-            {loading ? (
-              <Row gap={2} justify="center">
-                <Spinner />
-                <span>Cargando votos…</span>
-              </Row>
-            ) : ranked.length === 0 ? (
+            {ranked.length === 0 ? (
               <p className={styles.empty}>Este reto se cerró sin votos.</p>
             ) : (
               <ul className={styles.scoreboard}>
                 {ranked.map((v) => (
                   <li key={v.id} className={styles.scoreRow}>
-                    <span className={styles.scoreName}>{v.player_name}</span>
+                    <span className={styles.scoreName}>{v.display_name}</span>
                     <span className={styles.scoreDist}>{fmtDist(v.distance_km)}</span>
                     <span className={styles.scorePoints}>
                       {v.points.toLocaleString('es-ES')} pts
@@ -528,6 +683,11 @@ function PastCard({ challenge }: { challenge: Challenge }) {
                   </li>
                 ))}
               </ul>
+            )}
+            {isOwner && (
+              <Row justify="end">
+                <DeleteChallengeButton challengeId={challenge.id} onDeleted={onDeleted} />
+              </Row>
             )}
           </Stack>
         </div>

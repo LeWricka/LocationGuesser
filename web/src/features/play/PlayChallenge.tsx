@@ -6,14 +6,14 @@ import { getChallenge } from '../../lib/challenges'
 import { getExistingVote, saveVote } from '../../lib/votes'
 import { computeResult, type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
-import { getIdentity } from '../../lib/identity'
-import { useIdentity } from '../identity'
-import { supabase } from '../../lib/supabase'
+import { useSession } from '../../lib/session-context'
+import { publicImageUrl } from '../../lib/storage'
 import type { Challenge } from '../../lib/database.types'
 import {
   Badge,
   Button,
   Card,
+  ChallengePhoto,
   CountUp,
   Modal,
   Row,
@@ -47,10 +47,6 @@ function distanceLabel(km: number): string {
   return 'Muy lejos'
 }
 
-function publicImageUrl(imagePath: string): string {
-  return supabase.storage.from('images').getPublicUrl(imagePath).data.publicUrl
-}
-
 export function PlayChallenge({ challengeId, groupId }: Props) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [challenge, setChallenge] = useState<Challenge | null>(null)
@@ -66,7 +62,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // Tras revelar el Street View es secundario: oculto hasta que se pide verlo.
   const [showStreetView, setShowStreetView] = useState(false)
   const toast = useToast()
-  const { ensureIdentity, modal: identityModal } = useIdentity()
+  // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
+  const { user } = useSession()
 
   // Revelar: calcula resultado contra la respuesta real, fija el pin y, si hay
   // pin, persiste el voto. Sin pin (timeout) -> "no diste a tiempo".
@@ -82,10 +79,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       const r = computeResult(playedGuess, answer)
       setResult(r)
 
-      // El nombre ya se pidió al entrar; aquí solo lo usamos (fallback por si acaso).
-      const name = getIdentity()?.name ?? (await ensureIdentity(current.group_id))
-      if (!name) {
-        toast.show('No se guardó tu voto (sin nombre)', { tone: 'neutral' })
+      if (!user) {
+        toast.show('No se guardó tu voto (sin sesión)', { tone: 'neutral' })
         return
       }
       setSaving(true)
@@ -93,7 +88,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         await saveVote({
           groupId: current.group_id,
           challengeId: current.id,
-          playerName: name,
+          userId: user.id,
           guessLat: playedGuess.lat,
           guessLng: playedGuess.lng,
           distanceKm: r.km,
@@ -108,11 +103,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         setSaving(false)
       }
     },
-    [toast, ensureIdentity],
+    [toast, user],
   )
 
-  // Carga del reto. Si el jugador ya votó, salta directo a revelado mostrando
-  // su jugada (no se re-vota: regla anti-trampas + upsert por nombre).
+  // Carga del reto. Si el usuario ya votó, salta directo a revelado mostrando
+  // su jugada (no se re-vota: regla anti-trampas + upsert por user_id).
   useEffect(() => {
     let cancelled = false
     async function load() {
@@ -121,16 +116,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         if (cancelled) return
         setChallenge(c)
 
-        // Pedimos el nombre lo PRIMERO (antes de jugar) si el navegador aún no
-        // tiene identidad. Así "¿quién juega?" va antes de responder.
-        let name = getIdentity()?.name ?? null
-        if (!name) {
-          name = await ensureIdentity(c.group_id)
-          if (cancelled) return
-        }
-        // ¿Ya votó este jugador? → directo a su resultado (no se re-vota, ni
-        // aunque el reto siga en vivo).
-        const existing = name ? await getExistingVote(challengeId, name) : null
+        // ¿Ya votó este usuario? → directo a su resultado (no se re-vota, ni
+        // aunque el reto siga en vivo). La identidad es la sesión.
+        const existing = user ? await getExistingVote(challengeId, user.id) : null
         if (cancelled) return
         if (existing) {
           setGuess({ lat: existing.guess_lat, lng: existing.guess_lng })
@@ -152,7 +140,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [challengeId, ensureIdentity])
+  }, [challengeId, user])
 
   // Cuenta atrás. Arranca al entrar en `playing` reconstruyendo desde `start_at`
   // (persistido), así una recarga no reinicia el reloj. Al llegar a 0 → revelar.
@@ -208,9 +196,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           <Skeleton width="100%" height="46svh" radius="lg" />
           <Skeleton width="100%" height={52} radius="sm" />
         </Stack>
-        {/* Imprescindible: en incógnito se pide el nombre durante la carga; si
-            no montamos el modal aquí, se quedaría cargando para siempre. */}
-        {identityModal}
       </main>
     )
   }
@@ -220,9 +205,16 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // retos antiguos no se rompen).
   const medium = sceneMedium(challenge)
   const hasStreetView = medium === 'streetview'
-  const imageUrl =
-    medium === 'photo' && challenge.image_path ? publicImageUrl(challenge.image_path) : null
+  // Foto del reto (puede acompañar a un reto de Street View como pista/sorpresa,
+  // o ser la escena en sí en los retos legacy sin panorama).
+  const photoUrl = challenge.image_path ? publicImageUrl(challenge.image_path) : null
+  // Escena legacy: el reto es solo foto (sin SV). Entonces la foto ES la escena.
+  const imageUrl = !hasStreetView ? photoUrl : null
   const revealed = phase === 'revealed'
+  // La foto opcional de un reto de SV: si es pista, se ve al jugar junto al
+  // panorama; si es sorpresa, se reserva para el revelado.
+  const hintPhotoUrl = hasStreetView && photoUrl && challenge.photo_is_hint ? photoUrl : null
+  const surprisePhotoUrl = hasStreetView && photoUrl && !challenge.photo_is_hint ? photoUrl : null
   const answer: LatLng | null = revealed ? { lat: challenge.lat, lng: challenge.lng } : null
   const urgent = remaining != null && remaining <= 10
 
@@ -286,6 +278,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           </div>
         )}
 
+        {!revealed && hintPhotoUrl && (
+          <ChallengePhoto src={hintPhotoUrl} alt="Pista: foto del reto" caption="Pista" />
+        )}
+
         {!revealed && (
           <>
             {guess ? (
@@ -336,6 +332,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 </Stack>
               ) : (
                 <span className={styles.status}>Revelado.</span>
+              )}
+
+              {/* Foto sorpresa: estaba oculta al jugar; se revela aquí, al votar. */}
+              {surprisePhotoUrl && (
+                <ChallengePhoto
+                  src={surprisePhotoUrl}
+                  alt="Foto del reto"
+                  caption="La foto del reto"
+                />
               )}
 
               {/* Street View secundario: oculto tras un botón. Solo si el reto lo
@@ -417,8 +422,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           </Stack>
         </div>
       </Modal>
-
-      {identityModal}
     </main>
   )
 }

@@ -82,3 +82,15 @@
   font-size: var(--font-size-sm);
   color: var(--color-accent-2);
 }
+
+/* Selector de archivo de la foto opcional del reto. */
+.fileInput {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Pie de la foto: explica qué hace el toggle pista/sorpresa. */
+.hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}

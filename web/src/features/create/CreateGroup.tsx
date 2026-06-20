@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { newGroupCode } from '../../lib/group'
 import { supabase } from '../../lib/supabase'
+import { useSession } from '../../lib/session-context'
 import { Button, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
 import styles from './CreateGroup.module.css'
 
@@ -10,20 +11,37 @@ interface Props {
 
 // Crear un grupo (flujo grupo-primero). El grupo es el contenedor social del
 // plan: un viaje, una despedida, un finde, una partida… No se crea ningún reto
-// aquí; eso se hace luego dentro de la página del grupo. Al crear, generamos el
-// código y navegamos a #g=<código>.
+// aquí; eso se hace luego dentro de la página del grupo. Quien crea queda como
+// dueño (`created_by` + fila 'owner' en group_members) y navegamos a #g=<código>.
 export function CreateGroup({ onBack }: Props) {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const toast = useToast()
+  const { user } = useSession()
 
   async function create() {
+    if (!user) {
+      toast.show('Inicia sesión para crear un grupo.', { tone: 'danger' })
+      return
+    }
     setBusy(true)
     try {
       const groupId = newGroupCode()
       const trimmed = name.trim()
-      const { error } = await supabase.from('groups').insert({ id: groupId, name: trimmed || null })
+      // El creador es el dueño: `created_by` lo marca y el RLS de groups deja
+      // editar/borrar solo a `created_by = auth.uid()`.
+      const { error } = await supabase
+        .from('groups')
+        .insert({ id: groupId, name: trimmed || null, created_by: user.id })
       if (error) throw new Error(error.message)
+      // Membresía 'owner' para que el grupo aparezca en "Tus grupos" (la home se
+      // nutre de group_members). joinGroup solo inserta 'member', así que el rol
+      // owner lo escribimos aquí, inline (lib/membership.ts no expone helper de
+      // owner — ver nota del PR). La fila propia la permite el RLS de inserción.
+      const { error: memberError } = await supabase
+        .from('group_members')
+        .insert({ group_id: groupId, user_id: user.id, role: 'owner' })
+      if (memberError) throw new Error(memberError.message)
       // Navegar a la página del grupo. El listener de hashchange de App.tsx
       // recoge el cambio y renderiza GroupPage.
       location.hash = `#g=${groupId}`
