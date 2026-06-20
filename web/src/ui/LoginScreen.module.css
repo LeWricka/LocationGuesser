@@ -1,0 +1,4 @@
+.group {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}

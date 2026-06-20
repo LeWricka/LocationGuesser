@@ -1,0 +1,26 @@
+/* Tira horizontal scrolleable. El overflow lo contiene la propia tira para que
+ * la página nunca scrollee en horizontal (regla mobile-first del proyecto). */
+.strip {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  /* Respiro lateral para que la primera/última no queden pegadas al borde. */
+  padding-bottom: var(--space-2);
+}
+
+.item {
+  flex: 0 0 auto;
+  width: 120px;
+  scroll-snap-align: start;
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
