@@ -31,6 +31,7 @@
 - El hilo principal de Claude actúa como **orquestador**: descompone, crea issues, **lanza agentes en paralelo** (en worktrees, por áreas que no se pisan) y mergea.
 - **Playbook obligatorio para todo agente:** [.claude/rules/always.md](.claude/rules/always.md) — seguridad, flujo issue→rama→PR, Conventional Commits, estilo, verificación, acceso a Supabase, Project #14 y áreas de trabajo.
 - Trabajo en GitHub **Project #14**; un issue → una rama → un PR → merge (squash).
+- **Operativa** (seguridad de la key de Maps, alerta de presupuesto, env vars y deploy de Edge Functions): [docs/operativa.md](docs/operativa.md).
 
 ## Arquitectura (v0.2)
 
