@@ -66,7 +66,7 @@ function AppRoutes() {
   }
 
   // ── Sesión, pero falta elegir nombre (primer login) ──────────────────────────
-  if (needsProfileStep(profile, user.email)) {
+  if (needsProfileStep(profile)) {
     return (
       <ProfileGate
         userId={user.id}

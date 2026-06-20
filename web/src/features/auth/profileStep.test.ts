@@ -13,22 +13,16 @@ function profile(displayName: string): Profile {
 
 describe('needsProfileStep', () => {
   test('sin perfil → pide paso', () => {
-    expect(needsProfileStep(null, 'lewis@ej.com')).toBe(true)
+    expect(needsProfileStep(null)).toBe(true)
   })
 
   test('display_name vacío → pide paso', () => {
-    expect(needsProfileStep(profile('   '), 'lewis@ej.com')).toBe(true)
+    expect(needsProfileStep(profile('   '))).toBe(true)
   })
 
-  test('display_name = provisional del email → pide paso', () => {
-    expect(needsProfileStep(profile('lewis'), 'lewis@ej.com')).toBe(true)
-  })
-
-  test('display_name elegido (distinto del provisional) → no pide', () => {
-    expect(needsProfileStep(profile('Lewis Real'), 'lewis@ej.com')).toBe(false)
-  })
-
-  test('sin email: nombre no vacío basta', () => {
-    expect(needsProfileStep(profile('Lewis'), undefined)).toBe(false)
+  test('cualquier nombre elegido → no pide (aunque coincida con el email)', () => {
+    // Regresión: "iker" en iker@… quedaba atrapado en bucle con la heurística vieja.
+    expect(needsProfileStep(profile('iker'))).toBe(false)
+    expect(needsProfileStep(profile('Lewis Real'))).toBe(false)
   })
 })
