@@ -21,6 +21,9 @@ interface Props {
 export function StreetViewPano({ panoId, position, heading, pitch }: Props) {
   const streetViewLib = useMapsLibrary('streetView')
   const ref = useRef<HTMLDivElement>(null)
+  // Dependemos de primitivos, no del objeto `position` (que el padre recrea en
+  // cada render del timer): así el panorama se monta una vez y no parpadea.
+  const { lat, lng } = position
 
   useEffect(() => {
     if (!streetViewLib || !ref.current) return
@@ -45,7 +48,7 @@ export function StreetViewPano({ panoId, position, heading, pitch }: Props) {
     if (panoId) {
       options.pano = panoId
     } else {
-      options.position = position
+      options.position = { lat, lng }
     }
 
     const pano = new streetViewLib.StreetViewPanorama(ref.current, options)
@@ -53,7 +56,7 @@ export function StreetViewPano({ panoId, position, heading, pitch }: Props) {
       // Suelta la cámara/listeners; el div lo desmonta React.
       pano.setVisible(false)
     }
-  }, [streetViewLib, panoId, position, heading, pitch])
+  }, [streetViewLib, panoId, lat, lng, heading, pitch])
 
   return (
     <div className={styles.pano}>
