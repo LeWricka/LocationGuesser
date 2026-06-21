@@ -1,22 +1,38 @@
 import { supabase } from './supabase'
 import type { Challenge } from './database.types'
 
-/** Id + nombre del grupo. El nombre del viaje titula la página; si falta, la
- * vista cae al código (id). */
+/** Id + nombre + premios del grupo. El nombre titula la página (si falta, cae al
+ * código); `prizes` es el texto libre de "qué se juega" en la clasificación. */
 export interface GroupInfo {
   id: string
   name: string | null
+  prizes: string | null
 }
 
-/** Lee el grupo (id + nombre) para titular la página, o null si no existe. */
+/** Lee el grupo (id + nombre + premios) para la página, o null si no existe. */
 export async function getGroup(groupId: string): Promise<GroupInfo | null> {
   const { data, error } = await supabase
     .from('groups')
-    .select('id, name')
+    .select('id, name, prizes')
     .eq('id', groupId)
     .maybeSingle()
   if (error) throw error
   return data
+}
+
+/**
+ * Guarda el texto de "qué se juega" del grupo (premios de la clasificación
+ * general). Texto vacío → null (borra el premio). Solo el dueño puede: el RLS de
+ * groups (groups_update_owner) restringe el UPDATE a created_by = auth.uid(), así
+ * que un miembro recibe error/0 filas; aquí no comprobamos rol en cliente.
+ */
+export async function updateGroupPrizes(groupId: string, prizes: string): Promise<void> {
+  const trimmed = prizes.trim()
+  const { error } = await supabase
+    .from('groups')
+    .update({ prizes: trimmed === '' ? null : trimmed })
+    .eq('id', groupId)
+  if (error) throw error
 }
 
 /**
