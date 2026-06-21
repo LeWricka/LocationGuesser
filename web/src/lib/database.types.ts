@@ -4,6 +4,19 @@
 
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
+/**
+ * Premios del grupo por POSICIÓN en la clasificación general. Cada puesto es
+ * opcional: solo aparece la clave si el dueño definió ese premio (un grupo puede
+ * premiar solo el 1º y el último, por ejemplo). Se persiste como jsonb en
+ * `groups.prizes`. `last` = el último puesto de la clasificación.
+ */
+export interface GroupPrizes {
+  first?: string
+  second?: string
+  third?: string
+  last?: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -53,21 +66,21 @@ export interface Database {
         Row: {
           id: string
           name: string | null
-          prizes: string | null
+          prizes: GroupPrizes | null
           created_by: string | null
           created_at: string
         }
         Insert: {
           id: string
           name?: string | null
-          prizes?: string | null
+          prizes?: GroupPrizes | null
           created_by?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string | null
-          prizes?: string | null
+          prizes?: GroupPrizes | null
           created_by?: string | null
           created_at?: string
         }
