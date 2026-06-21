@@ -192,8 +192,11 @@
 /* --- Tus números — rejilla de tarjetas-dato con barra de color y datos gigantes. --- */
 .statGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: var(--space-3);
+  /* minmax(0,1fr) deja que las columnas ENCOJAN por debajo del contenido (sin
+     esto, un número largo desborda la tarjeta). Las 3 reparten el ancho a
+     partes iguales y se adaptan a cualquier pantalla. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
 }
 
 .statCard {
@@ -201,6 +204,9 @@
   flex-direction: column;
   gap: var(--space-1);
   overflow: hidden;
+  /* min-width:0 es lo que permite a la tarjeta encoger dentro del grid y que el
+     truncado/elipsis del subtítulo funcione. */
+  min-width: 0;
 }
 
 /* La tarjeta de puntos es la "caliente": velo ámbar + halo cálido. */
@@ -213,11 +219,17 @@
 }
 
 .statValue {
-  font-size: var(--font-size-2xl);
+  /* Tamaño FLUIDO: escala con el ancho y nunca desborda la columna estrecha de
+     móvil (antes el número se salía de la tarjeta). */
+  font-size: clamp(1.5rem, 8vw, var(--font-size-2xl));
   font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-tighter);
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* El número de puntos totales es el dato más cálido del panel. */
