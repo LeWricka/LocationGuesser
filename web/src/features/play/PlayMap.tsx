@@ -39,6 +39,30 @@ interface Props {
   onPick: (p: LatLng) => void
 }
 
+// Leaflet lee el tamaño del contenedor al inicializarse. Cuando el panel del
+// mapa pasa de mini (130px) a grande (CSS), Leaflet NO se entera y solo pinta
+// los tiles del área original → la mitad inferior se queda GRIS (no es lentitud
+// de red: nunca pide esos tiles). Un ResizeObserver re-mide y llama
+// invalidateSize en cada cambio de tamaño (expandir, rotar móvil…), así el mapa
+// siempre llena su caja y carga todos los tiles. rAF coalesce las ráfagas de la
+// animación de expansión.
+function AutoInvalidateSize() {
+  const map = useMap()
+  useEffect(() => {
+    let raf = 0
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => map.invalidateSize({ animate: false }))
+    })
+    ro.observe(map.getContainer())
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
+  }, [map])
+  return null
+}
+
 // El clic solo coloca/mueve el pin mientras no esté bloqueado (pre-revelado).
 function ClickHandler({ locked, onPick }: { locked: boolean; onPick: (p: LatLng) => void }) {
   useMapEvents({
@@ -136,6 +160,7 @@ export function PlayMap({ guess, answer, locked, onPick }: Props) {
         keepBuffer={6}
         updateWhenZooming={false}
       />
+      <AutoInvalidateSize />
       <ClickHandler locked={locked} onPick={onPick} />
       <FitToReveal guess={guess} answer={answer} />
       {guess && <Marker position={[guess.lat, guess.lng]} icon={guessIcon} />}
