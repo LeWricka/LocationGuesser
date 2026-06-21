@@ -1,3 +1,235 @@
+/* ==========================================================================
+ * Fase de JUGAR — experiencia inmersiva a pantalla completa (estilo GeoGuessr).
+ * Contenedor fijo que cubre el viewport: la escena es edge-to-edge y los
+ * controles flotan por encima. Sale del wrapper `lg-page` a propósito.
+ * ======================================================================== */
+.immersive {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+/* Escena (panorama o foto): llena toda la pantalla. */
+.sceneFull {
+  position: absolute;
+  inset: 0;
+}
+
+.photoFull {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.noScene {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  text-align: center;
+}
+
+/* Clúster arriba-izquierda: salida + brújula + temporizador. Respeta el notch. */
+.topCluster {
+  position: absolute;
+  top: calc(var(--space-3) + env(safe-area-inset-top));
+  left: calc(var(--space-3) + env(safe-area-inset-left));
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  max-width: calc(100% - var(--space-6));
+}
+
+/* Foto-pista flotante arriba-derecha: pequeña, no tapa la escena. */
+.hintFloat {
+  position: absolute;
+  top: calc(var(--space-3) + env(safe-area-inset-top));
+  right: calc(var(--space-3) + env(safe-area-inset-right));
+  z-index: 3;
+  width: clamp(96px, 28vw, 168px);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Controles del panorama, abajo-izquierda: pequeños, de vidrio. */
+.panoControls {
+  position: absolute;
+  left: calc(var(--space-3) + env(safe-area-inset-left));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  z-index: 3;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.glassBtn {
+  width: var(--tap-target);
+  height: var(--tap-target);
+  display: grid;
+  place-items: center;
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+.glassBtn:hover {
+  border-color: var(--color-border-strong);
+}
+.glassBtn:active {
+  transform: scale(0.94);
+}
+
+/* FAB del mapa, abajo-derecha: prominente, con el gradiente de marca. */
+.mapFab {
+  position: absolute;
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  z-index: 3;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  font-size: 1.75rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--gradient-accent);
+  box-shadow: var(--shadow-accent);
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+.mapFab:hover {
+  box-shadow: var(--shadow-accent-hover);
+}
+.mapFab:active {
+  transform: scale(0.94);
+}
+
+/* Punto que avisa de que ya hay un pin colocado (sin abrir el mapa). */
+.fabDot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  border: 2px solid var(--color-bg);
+}
+
+/* Velo tras la hoja (oscurece la escena, capta el toque para cerrar). */
+.sheetScrim {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: rgba(2, 10, 16, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--transition-base),
+    visibility var(--transition-base);
+}
+.sheetScrimOpen {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Hoja inferior con el mapa de adivinar: sube desde abajo casi a pantalla. */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  height: min(92svh, 760px);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding-bottom: env(safe-area-inset-bottom);
+  transform: translateY(100%);
+  transition: transform var(--duration-slow) var(--ease-emphasized);
+}
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.sheetHandle {
+  width: 44px;
+  height: 5px;
+  margin: var(--space-2) auto 0;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  flex-shrink: 0;
+}
+
+.sheetClose {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-3);
+  z-index: 1;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  display: grid;
+  place-items: center;
+  font-size: var(--font-size-lg);
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.sheetClose:hover {
+  color: var(--color-text);
+}
+
+/* El mapa llena la hoja; se monta ya a este tamaño → carga sin gris. */
+.sheetMap {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) var(--space-3) 0;
+}
+.sheetMap :global(.lg-map) {
+  height: 100%;
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+
+.sheetFooter {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    transition: none;
+  }
+  .sheetScrim {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+ * Fase REVELADA — vuelve al layout de página (lg-page).
+ * ======================================================================== */
 .header {
   margin-bottom: var(--space-2);
   animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
@@ -13,74 +245,13 @@
   }
 }
 
-/* Escena del reto: ancla relativa para superponer el mapa de adivinar. */
-.scene {
-  position: relative;
-}
-
-/* Foto del reto (legacy): encuadre consistente y recorte limpio. */
+/* Foto del reto (legacy) en el bloque secundario del revelado. */
 .photo {
   width: 100%;
   max-height: 320px;
   object-fit: cover;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-}
-
-/*
- * Mapa de adivinar estilo GeoGuessr: panel flotante abajo-derecha. Colapsado
- * muestra solo el botón; abierto crece para afinar el pin. En desktop se abre
- * al pasar el ratón; en móvil con el botón.
- */
-.mapPanel {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
-  z-index: 2;
-  width: 180px;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  box-shadow: var(--shadow-lg);
-  transition:
-    width 0.18s ease,
-    height 0.18s ease;
-}
-
-/* Abierto = casi toda la pantalla, para apuntar con la máxima precisión. */
-.mapPanelOpen {
-  width: min(820px, calc(100% - var(--space-4)));
-}
-
-.mapToggle {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  z-index: 3;
-  border: 1px solid var(--glass-border);
-  /* Pastilla de vidrio sobre el mapa para que el control flote y se lea. */
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  color: var(--color-text);
-  border-radius: var(--radius-full);
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  cursor: pointer;
-}
-.mapToggle:hover {
-  border-color: var(--color-border-strong);
-}
-
-/* El mapa colapsado es un teaser pequeño; abierto, alto cómodo para apuntar. */
-.mapInner :global(.lg-map) {
-  height: 130px;
-  border: none;
-  border-radius: var(--radius-md);
-  transition: height 0.18s ease;
-}
-.mapPanelOpen .mapInner :global(.lg-map) {
-  height: min(64svh, 560px);
 }
 
 .coords {
@@ -185,6 +356,21 @@
 .secondary {
   border-top: 1px solid var(--color-border);
   padding-top: var(--space-4);
+}
+
+/* La escena secundaria del revelado necesita altura explícita (el panorama
+ * llena su contenedor). */
+.secondaryScene {
+  height: 56svh;
+  min-height: 320px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+@media (min-width: 768px) {
+  .secondaryScene {
+    height: 480px;
+  }
 }
 
 /* Overlay "Empezar": tapa todo, centra el contenido. */
