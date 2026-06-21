@@ -93,10 +93,13 @@
   transform: scale(0.94);
 }
 
-/* FAB del mapa, abajo-derecha: prominente, con el gradiente de marca. */
+/* FAB del mapa, CENTRO inferior: prominente, con el gradiente de marca. Va
+ * centrado (no a la derecha) para no pisar el control +/- del Street View, que
+ * Google pinta abajo-derecha. */
 .mapFab {
   position: absolute;
-  right: calc(var(--space-4) + env(safe-area-inset-right));
+  left: 50%;
+  transform: translateX(-50%);
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   z-index: 3;
   width: 64px;
@@ -109,13 +112,15 @@
   background: var(--gradient-accent);
   box-shadow: var(--shadow-accent);
   cursor: pointer;
-  transition: transform var(--transition-fast);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 .mapFab:hover {
   box-shadow: var(--shadow-accent-hover);
 }
 .mapFab:active {
-  transform: scale(0.94);
+  transform: translateX(-50%) scale(0.94);
 }
 
 /* Punto que avisa de que ya hay un pin colocado (sin abrir el mapa). */

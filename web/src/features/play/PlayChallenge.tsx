@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
-import { Compass } from './Compass'
 import { sceneMedium } from './sceneMedium'
 import { getChallenge } from '../../lib/challenges'
 import { getExistingVote, saveVote } from '../../lib/votes'
@@ -69,7 +68,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [mapOpen, setMapOpen] = useState(false)
   // Orientación actual del panorama (0=N). La provee el panorama vía callback y
   // alimenta la brújula. Sin esto la aguja no seguiría el giro.
-  const [heading, setHeading] = useState(0)
   // Tras revelar el Street View es secundario: oculto hasta que se pide verlo.
   const [showStreetView, setShowStreetView] = useState(false)
   const toast = useToast()
@@ -289,7 +287,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               position={{ lat: challenge.lat, lng: challenge.lng }}
               heading={challenge.sv_heading}
               pitch={challenge.sv_pitch}
-              onPovChanged={setHeading}
             />
           ) : imageUrl ? (
             <img className={styles.photoFull} src={imageUrl} alt={challenge.title} />
@@ -304,7 +301,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             sobre la escena (respeta el notch con safe-area). */}
         <div className={styles.topCluster}>
           <BackHomeButton onClick={goBack} label={backLabel} />
-          {hasStreetView && <Compass heading={heading} />}
           {phase === 'playing' && remaining != null && challenge.guess_seconds != null && (
             <CountdownRing remaining={remaining} total={challenge.guess_seconds} urgent={urgent} />
           )}
@@ -350,9 +346,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           {guess && <span className={styles.fabDot} aria-hidden="true" />}
         </button>
 
-        {/* Hoja inferior con el mapa de adivinar. Montada solo al abrir, ya a su
-            tamaño grande → invalidateSize (ResizeObserver de PlayMap) la pinta
-            sin gris. */}
+        {/* Hoja inferior con el mapa de adivinar. El mapa se mantiene SIEMPRE
+            montado (solo se traslada fuera de pantalla al cerrar) para conservar
+            el zoom y la posición entre aperturas: si no, al volver a abrir
+            perdías el encuadre y empezabas de cero. Su contenedor tiene tamaño
+            completo aunque esté trasladado, así que carga sin gris (ResizeObserver
+            de PlayMap). */}
         <div
           className={`${styles.sheetScrim} ${mapOpen ? styles.sheetScrimOpen : ''}`}
           onClick={() => setMapOpen(false)}
@@ -374,7 +373,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             ✕
           </button>
           <div className={styles.sheetMap}>
-            {mapOpen && <PlayMap guess={guess} answer={null} locked={false} onPick={setGuess} />}
+            <PlayMap guess={guess} answer={null} locked={false} onPick={setGuess} />
           </div>
           <div className={styles.sheetFooter}>
             {guess ? (
@@ -389,6 +388,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             )}
             <Button size="lg" fullWidth disabled={!guess} onClick={confirm}>
               ✓ Confirmar y revelar
+            </Button>
+            <Button variant="secondary" fullWidth onClick={() => setMapOpen(false)}>
+              ← Volver a {hasStreetView ? 'Street View' : 'la imagen'}
             </Button>
           </div>
         </section>

@@ -240,6 +240,18 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* Subtítulo del dato (p.ej. el grupo del mejor reto): pequeño y TRUNCADO a una
+ * línea para no desbordar la tarjeta (antes metía nombre+emojis en el número
+ * grande y rompía el layout). */
+.statSub {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Barrita de color bajo cada dato: refuerza la categoría (cálida vs fría). */
 .statBar {
   height: 5px;

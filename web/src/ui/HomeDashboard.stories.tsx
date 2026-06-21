@@ -20,7 +20,7 @@ const meta = {
     displayName: 'Lewis',
     groups,
     turns,
-    stats: { totalPoints: 12480, groupsPlayed: 3, best: '4 932 (Lisboa)' },
+    stats: { totalPoints: 12480, groupsPlayed: 3, best: { points: 4932, groupName: 'Lisboa' } },
   },
 } satisfies Meta<typeof HomeDashboard>
 

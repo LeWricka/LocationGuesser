@@ -34,8 +34,8 @@ export interface HomeStats {
   totalPoints: number
   /** Nº de grupos jugados. */
   groupsPlayed: number
-  /** Mejor reto: puntos + grupo (p.ej. "4 932 (Lisboa)"). Opcional. */
-  best?: string
+  /** Mejor reto: puntos (número grande) + grupo (subtítulo). Opcional. */
+  best?: { points: number; groupName: string } | null
 }
 
 interface Props {
@@ -167,8 +167,11 @@ export function HomeDashboard({
                 </Card>
                 {stats.best && (
                   <Card padding="md" className={styles.statCard}>
-                    <span className={styles.statValueSm}>{stats.best}</span>
+                    <CountUp value={stats.best.points} className={styles.statValue} />
                     <span className={styles.statLabel}>mejor reto</span>
+                    <span className={styles.statSub} title={stats.best.groupName}>
+                      {stats.best.groupName}
+                    </span>
                     <span
                       className={`${styles.statBar} ${styles.statBarTeal}`}
                       aria-hidden="true"

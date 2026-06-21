@@ -100,7 +100,7 @@ async function computeStats(userId: string, groups: MyGroup[]): Promise<HomeStat
   return {
     totalPoints,
     groupsPlayed: groupsPlayed.size,
-    best: best ? `${best.points.toLocaleString('es-ES')} (${best.groupName})` : undefined,
+    best: best ? { points: best.points, groupName: best.groupName } : null,
   }
 }
 
