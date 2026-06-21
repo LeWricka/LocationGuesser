@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { PlayMap } from './PlayMap'
-import { StreetViewPano } from './StreetViewPano'
+import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
+import { Compass } from './Compass'
 import { sceneMedium } from './sceneMedium'
 import { getChallenge } from '../../lib/challenges'
 import { getExistingVote, saveVote } from '../../lib/votes'
@@ -63,12 +64,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [remaining, setRemaining] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
   const [saving, setSaving] = useState(false)
-  // Mapa de adivinar como panel expandible estilo GeoGuessr: mini en la esquina,
-  // se abre a grande para colocar el pin con precisión.
+  // Mapa de adivinar como hoja inferior (bottom sheet) estilo GeoGuessr: el FAB
+  // 🗺️ la sube; dentro se coloca el pin y se confirma; cerrar vuelve al panorama.
   const [mapOpen, setMapOpen] = useState(false)
+  // Orientación actual del panorama (0=N). La provee el panorama vía callback y
+  // alimenta la brújula. Sin esto la aguja no seguiría el giro.
+  const [heading, setHeading] = useState(0)
   // Tras revelar el Street View es secundario: oculto hasta que se pide verlo.
   const [showStreetView, setShowStreetView] = useState(false)
   const toast = useToast()
+  // Handle imperativo del panorama para los controles "volver al inicio" / "norte".
+  const panoRef = useRef<StreetViewPanoHandle>(null)
   // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
   const { user } = useSession()
   // URL firmada de la foto del reto (bucket privado). Hook al tope del componente
@@ -80,6 +86,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const reveal = useCallback(
     async (current: Challenge, playedGuess: LatLng | null) => {
       setPhase('revealed')
+      setMapOpen(false)
       localStorage.removeItem(startKey(current.id))
       if (!playedGuess) {
         setTimedOut(true)
@@ -235,225 +242,281 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const surprisePhotoUrl = hasStreetView && photoUrl && !challenge.photo_is_hint ? photoUrl : null
   const answer: LatLng | null = revealed ? { lat: challenge.lat, lng: challenge.lng } : null
   const urgent = remaining != null && remaining <= 10
+  const backLabel = groupId ? 'Volver al grupo' : 'Inicio'
 
-  return (
-    <main className="lg-page">
-      <Stack gap={4}>
-        {/* Salida siempre visible: volver al grupo (o a la home) sin quedar
-            atrapado en el reto. */}
-        <BackHomeButton onClick={goBack} label={groupId ? 'Volver al grupo' : 'Inicio'} />
-        <Stack gap={2} className={styles.header}>
-          <Row gap={3} justify="between">
-            <h1 className={styles.title}>{challenge.title}</h1>
-            {phase === 'playing' && remaining != null && challenge.guess_seconds != null && (
-              <CountdownRing
-                remaining={remaining}
-                total={challenge.guess_seconds}
-                urgent={urgent}
-              />
-            )}
-          </Row>
-        </Stack>
-
-        {!revealed ? (
-          /* Fase de jugar: escena protagonista (panorama o foto) con el mapa de
-             adivinar superpuesto estilo GeoGuessr. */
-          <div className={styles.scene}>
-            {hasStreetView ? (
-              <StreetViewPano
-                panoId={challenge.sv_pano_id}
-                position={{ lat: challenge.lat, lng: challenge.lng }}
-                heading={challenge.sv_heading}
-                pitch={challenge.sv_pitch}
-              />
-            ) : imageUrl ? (
-              <img className={styles.photo} src={imageUrl} alt={challenge.title} />
-            ) : (
+  // --------------------------------------------------------------------------
+  // Fase de JUGAR: experiencia inmersiva a pantalla completa estilo GeoGuessr.
+  // Sale del wrapper `lg-page`: contenedor fijo cubriendo el viewport, escena
+  // edge-to-edge y controles flotando por encima (brújula+timer, FAB del mapa,
+  // controles del panorama, hoja inferior con el mapa de adivinar). Se monta en
+  // `playing` e `idle` (el overlay "Empezar" tapa la escena ya cargada detrás).
+  // --------------------------------------------------------------------------
+  if (!revealed) {
+    return (
+      <div className={styles.immersive}>
+        {/* Escena protagonista: panorama interactivo o foto (legacy). */}
+        <div className={styles.sceneFull}>
+          {hasStreetView ? (
+            <StreetViewPano
+              ref={panoRef}
+              panoId={challenge.sv_pano_id}
+              position={{ lat: challenge.lat, lng: challenge.lng }}
+              heading={challenge.sv_heading}
+              pitch={challenge.sv_pitch}
+              onPovChanged={setHeading}
+            />
+          ) : imageUrl ? (
+            <img className={styles.photoFull} src={imageUrl} alt={challenge.title} />
+          ) : (
+            <div className={styles.noScene}>
               <p className={styles.status}>Este reto no tiene imagen ni Street View.</p>
-            )}
-
-            {/* Mini-mapa en la esquina que se expande para afinar el pin. En
-                desktop se abre al pasar el ratón; en móvil con el botón. */}
-            <div
-              className={`${styles.mapPanel} ${mapOpen ? styles.mapPanelOpen : ''}`}
-              onMouseEnter={() => setMapOpen(true)}
-            >
-              <button
-                type="button"
-                className={styles.mapToggle}
-                aria-expanded={mapOpen}
-                onClick={() => setMapOpen((v) => !v)}
-              >
-                {mapOpen ? '✕' : '🗺️ Adivinar'}
-              </button>
-              <div className={styles.mapInner}>
-                <PlayMap guess={guess} answer={null} locked={false} onPick={setGuess} />
-              </div>
             </div>
-          </div>
-        ) : (
-          /* Fase revelada: el mapa pasa a protagonista, a tamaño grande, con tu
-             pin + 🎯 real + línea, encuadrado a los dos puntos. */
-          <div className={`${styles.resultMap} lg-rise`}>
-            <PlayMap guess={guess} answer={answer} locked onPick={setGuess} />
+          )}
+        </div>
+
+        {/* Clúster arriba-izquierda: salida + brújula + temporizador, flotando
+            sobre la escena (respeta el notch con safe-area). */}
+        <div className={styles.topCluster}>
+          <BackHomeButton onClick={goBack} label={backLabel} />
+          {hasStreetView && <Compass heading={heading} />}
+          {phase === 'playing' && remaining != null && challenge.guess_seconds != null && (
+            <CountdownRing remaining={remaining} total={challenge.guess_seconds} urgent={urgent} />
+          )}
+        </div>
+
+        {/* Foto-pista flotante (si el reto la marcó como pista). */}
+        {hintPhotoUrl && (
+          <img className={styles.hintFloat} src={hintPhotoUrl} alt="Pista: foto del reto" />
+        )}
+
+        {/* Abajo-izquierda: controles del panorama (solo con Street View). */}
+        {hasStreetView && (
+          <div className={styles.panoControls}>
+            <button
+              type="button"
+              className={styles.glassBtn}
+              onClick={() => panoRef.current?.resetToStart()}
+              aria-label="Volver a la posición inicial"
+              title="Volver a la posición inicial"
+            >
+              ⌂
+            </button>
+            <button
+              type="button"
+              className={styles.glassBtn}
+              onClick={() => panoRef.current?.resetPov()}
+              aria-label="Enderezar la vista al norte"
+              title="Enderezar (norte)"
+            >
+              🧭
+            </button>
           </div>
         )}
 
-        {!revealed && hintPhotoUrl && (
-          <ChallengePhoto src={hintPhotoUrl} alt="Pista: foto del reto" caption="Pista" />
-        )}
+        {/* Abajo-derecha: FAB del mapa. Abre la hoja inferior para adivinar. */}
+        <button
+          type="button"
+          className={styles.mapFab}
+          onClick={() => setMapOpen(true)}
+          aria-label="Abrir el mapa para adivinar"
+        >
+          <span aria-hidden="true">🗺️</span>
+          {guess && <span className={styles.fabDot} aria-hidden="true" />}
+        </button>
 
-        {!revealed && (
-          <>
+        {/* Hoja inferior con el mapa de adivinar. Montada solo al abrir, ya a su
+            tamaño grande → invalidateSize (ResizeObserver de PlayMap) la pinta
+            sin gris. */}
+        <div
+          className={`${styles.sheetScrim} ${mapOpen ? styles.sheetScrimOpen : ''}`}
+          onClick={() => setMapOpen(false)}
+          aria-hidden={!mapOpen}
+        />
+        <section
+          className={`${styles.sheet} ${mapOpen ? styles.sheetOpen : ''}`}
+          role="dialog"
+          aria-label="Mapa para adivinar"
+          aria-hidden={!mapOpen}
+        >
+          <div className={styles.sheetHandle} aria-hidden="true" />
+          <button
+            type="button"
+            className={styles.sheetClose}
+            onClick={() => setMapOpen(false)}
+            aria-label="Cerrar el mapa"
+          >
+            ✕
+          </button>
+          <div className={styles.sheetMap}>
+            {mapOpen && <PlayMap guess={guess} answer={null} locked={false} onPick={setGuess} />}
+          </div>
+          <div className={styles.sheetFooter}>
             {guess ? (
-              <Row gap={2}>
+              <Row gap={2} align="center">
                 <Badge tone="accent">📍 Tu pin</Badge>
                 <span className={styles.coords}>
-                  {guess.lat.toFixed(5)}, {guess.lng.toFixed(5)}
+                  {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
                 </span>
               </Row>
             ) : (
-              <p className={styles.status}>Abre el mapa y toca para colocar tu pin.</p>
+              <span className={styles.status}>Toca el mapa para colocar tu pin.</span>
             )}
             <Button size="lg" fullWidth disabled={!guess} onClick={confirm}>
-              Confirmar y revelar
+              ✓ Confirmar y revelar
             </Button>
-          </>
-        )}
+          </div>
+        </section>
 
-        {revealed && (
-          <Card padding="md" raised>
-            <Stack gap={4}>
-              {timedOut ? (
-                <Stack gap={2}>
-                  <strong>⏰ No diste a tiempo</strong>
-                  <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
-                </Stack>
-              ) : result ? (
-                <Stack gap={4} align="center" className={styles.scoreReveal}>
-                  {/* Titular de celebración: cálido y enérgico si fue gran tiro. */}
-                  <span
-                    className={`${styles.scoreEyebrow} ${
-                      result.points >= MAX_POINTS * 0.75 ? styles.scoreEyebrowWin : ''
-                    }`}
-                  >
-                    {result.points >= MAX_POINTS * 0.75 ? '🎉 ¡Gran tiro!' : 'Resultado'}
-                  </span>
-                  {/* Anillo de acierto protagonista: % de la puntuación máxima, con
-                      los puntos (count-up) gigantes en el centro. */}
-                  <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
-                    <CountUp className={styles.ringPoints} value={result.points} duration={1200} />
-                    <span className={styles.ringUnit}>puntos</span>
-                  </ScoreRing>
-                  <div className={styles.scoreText}>
-                    <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
-                    <span className={styles.resultDist}>
-                      a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del
-                      objetivo
-                    </span>
-                  </div>
-                  {saving && (
-                    <Row gap={2} justify="center">
-                      <Spinner size={16} />
-                      <span className={styles.status}>Guardando tu voto…</span>
-                    </Row>
-                  )}
-                </Stack>
+        {/* Overlay "Empezar": tapa la escena ya cargada detrás. Descartable
+            (✕/Escape/fuera) para no quedar atrapado. */}
+        <Modal
+          open={phase === 'idle'}
+          onClose={goBack}
+          title="¿Listo para jugar?"
+          footer={
+            <Button size="lg" fullWidth onClick={start}>
+              Empezar
+            </Button>
+          }
+        >
+          <div className={styles.startBody}>
+            <Stack gap={3} align="center">
+              <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
+                🌍
+              </span>
+              <p>
+                Cuando pulses <strong>Empezar</strong>, podrás{' '}
+                {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y abrir el mapa para
+                adivinar.
+              </p>
+              {challenge.guess_seconds != null ? (
+                <p className={styles.status}>
+                  Tendrás {challenge.guess_seconds} segundos para colocar tu pin.
+                </p>
               ) : (
-                <span className={styles.status}>Revelado.</span>
-              )}
-
-              {/* Foto sorpresa: estaba oculta al jugar; se revela aquí, al votar. */}
-              {surprisePhotoUrl && (
-                <ChallengePhoto
-                  src={surprisePhotoUrl}
-                  alt="Foto del reto"
-                  caption="La foto del reto"
-                />
-              )}
-
-              {/* Street View secundario: oculto tras un botón. Solo si el reto lo
-                tiene; los legacy con foto la muestran directa, también plegada. */}
-              {(hasStreetView || imageUrl) && (
-                <Stack gap={2} className={styles.secondary}>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowStreetView((v) => !v)}
-                    aria-expanded={showStreetView}
-                  >
-                    {showStreetView
-                      ? '✕ Ocultar'
-                      : hasStreetView
-                        ? '👀 Ver Street View'
-                        : '👀 Ver la foto'}
-                  </Button>
-                  {showStreetView && (
-                    <div className={styles.scene}>
-                      {hasStreetView ? (
-                        <StreetViewPano
-                          panoId={challenge.sv_pano_id}
-                          position={{ lat: challenge.lat, lng: challenge.lng }}
-                          heading={challenge.sv_heading}
-                          pitch={challenge.sv_pitch}
-                        />
-                      ) : imageUrl ? (
-                        <img className={styles.photo} src={imageUrl} alt={challenge.title} />
-                      ) : null}
-                    </div>
-                  )}
-                </Stack>
-              )}
-
-              {groupId && (
-                <Row gap={2} justify="end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      location.hash = `#g=${groupId}`
-                    }}
-                  >
-                    Ver clasificación →
-                  </Button>
-                </Row>
+                <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
               )}
             </Stack>
-          </Card>
-        )}
-      </Stack>
+          </div>
+        </Modal>
+      </div>
+    )
+  }
 
-      <Modal
-        open={phase === 'idle'}
-        // Descartable: la ✕, Escape o tocar fuera salen del reto (al grupo o a
-        // la home). Sin esto el overlay "Empezar" sería un callejón sin salida.
-        onClose={goBack}
-        title="¿Listo para jugar?"
-        footer={
-          <Button size="lg" fullWidth onClick={start}>
-            Empezar
-          </Button>
-        }
-      >
-        <div className={styles.startBody}>
-          <Stack gap={3} align="center">
-            <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
-              🌍
-            </span>
-            <p>
-              Cuando pulses <strong>Empezar</strong>, podrás{' '}
-              {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y adivinar en el mapa.
-            </p>
-            {challenge.guess_seconds != null ? (
-              <p className={styles.status}>
-                Tendrás {challenge.guess_seconds} segundos para colocar tu pin.
-              </p>
+  // --------------------------------------------------------------------------
+  // Fase REVELADA: el mapa pasa a protagonista (tu pin + 🎯 + línea, encuadrado),
+  // con el anillo de puntuación y la foto sorpresa. Vuelve al layout de página.
+  // --------------------------------------------------------------------------
+  return (
+    <main className="lg-page">
+      <Stack gap={4}>
+        <BackHomeButton onClick={goBack} label={backLabel} />
+        <Stack gap={2} className={styles.header}>
+          <h1 className={styles.title}>{challenge.title}</h1>
+        </Stack>
+
+        <div className={`${styles.resultMap} lg-rise`}>
+          <PlayMap guess={guess} answer={answer} locked onPick={setGuess} />
+        </div>
+
+        <Card padding="md" raised>
+          <Stack gap={4}>
+            {timedOut ? (
+              <Stack gap={2}>
+                <strong>⏰ No diste a tiempo</strong>
+                <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
+              </Stack>
+            ) : result ? (
+              <Stack gap={4} align="center" className={styles.scoreReveal}>
+                {/* Titular de celebración: cálido y enérgico si fue gran tiro. */}
+                <span
+                  className={`${styles.scoreEyebrow} ${
+                    result.points >= MAX_POINTS * 0.75 ? styles.scoreEyebrowWin : ''
+                  }`}
+                >
+                  {result.points >= MAX_POINTS * 0.75 ? '🎉 ¡Gran tiro!' : 'Resultado'}
+                </span>
+                {/* Anillo de acierto protagonista: % de la puntuación máxima, con
+                    los puntos (count-up) gigantes en el centro. */}
+                <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
+                  <CountUp className={styles.ringPoints} value={result.points} duration={1200} />
+                  <span className={styles.ringUnit}>puntos</span>
+                </ScoreRing>
+                <div className={styles.scoreText}>
+                  <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
+                  <span className={styles.resultDist}>
+                    a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del objetivo
+                  </span>
+                </div>
+                {saving && (
+                  <Row gap={2} justify="center">
+                    <Spinner size={16} />
+                    <span className={styles.status}>Guardando tu voto…</span>
+                  </Row>
+                )}
+              </Stack>
             ) : (
-              <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
+              <span className={styles.status}>Revelado.</span>
+            )}
+
+            {/* Foto sorpresa: estaba oculta al jugar; se revela aquí, al votar. */}
+            {surprisePhotoUrl && (
+              <ChallengePhoto
+                src={surprisePhotoUrl}
+                alt="Foto del reto"
+                caption="La foto del reto"
+              />
+            )}
+
+            {/* Street View secundario: oculto tras un botón. Solo si el reto lo
+              tiene; los legacy con foto la muestran directa, también plegada. */}
+            {(hasStreetView || imageUrl) && (
+              <Stack gap={2} className={styles.secondary}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowStreetView((v) => !v)}
+                  aria-expanded={showStreetView}
+                >
+                  {showStreetView
+                    ? '✕ Ocultar'
+                    : hasStreetView
+                      ? '👀 Ver Street View'
+                      : '👀 Ver la foto'}
+                </Button>
+                {showStreetView && (
+                  <div className={styles.secondaryScene}>
+                    {hasStreetView ? (
+                      <StreetViewPano
+                        panoId={challenge.sv_pano_id}
+                        position={{ lat: challenge.lat, lng: challenge.lng }}
+                        heading={challenge.sv_heading}
+                        pitch={challenge.sv_pitch}
+                      />
+                    ) : imageUrl ? (
+                      <img className={styles.photo} src={imageUrl} alt={challenge.title} />
+                    ) : null}
+                  </div>
+                )}
+              </Stack>
+            )}
+
+            {groupId && (
+              <Row gap={2} justify="end">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    location.hash = `#g=${groupId}`
+                  }}
+                >
+                  Ver clasificación →
+                </Button>
+              </Row>
             )}
           </Stack>
-        </div>
-      </Modal>
+        </Card>
+      </Stack>
     </main>
   )
 }
