@@ -23,7 +23,7 @@ import { isMember, myGroups } from '../../lib/membership'
 import type { Challenge } from '../../lib/database.types'
 import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
-import { getGroup, getGroupChallenges, splitByStatus } from '../../lib/groupData'
+import { getGroup, getGroupChallenges, splitByStatus, updateGroupPrizes } from '../../lib/groupData'
 import { signedImageUrl } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { CreateChallenge } from '../create/CreateChallenge'
@@ -247,6 +247,13 @@ export function GroupPage({ groupId, onBack }: Props) {
           />
         )}
 
+        <PrizesSection
+          groupId={groupId}
+          prizes={group?.prizes ?? null}
+          isOwner={isOwner}
+          onSaved={() => void refresh()}
+        />
+
         <Leaderboard entries={leaderboard} meId={user?.id} />
 
         <PhotoSection photos={photos} />
@@ -423,6 +430,111 @@ function PhotoSection({ photos }: { photos: PhotoStripItem[] }) {
     <section>
       <h2 className={styles.sectionTitle}>📸 Fotos del grupo</h2>
       <PhotoStrip photos={photos} />
+    </section>
+  )
+}
+
+// --- Qué se juega (premios de la clasificación) ----------------------------
+
+// Bloque de "qué se juega": texto libre que define el dueño a nivel de la
+// clasificación general (no por reto). Solo descripción; el reparto lo hace el
+// grupo en la vida real. Si está vacío: el dueño ve un CTA para añadirlo; el
+// miembro no ve nada (no hay ruido). El RLS respalda la edición (solo dueño).
+function PrizesSection({
+  groupId,
+  prizes,
+  isOwner,
+  onSaved,
+}: {
+  groupId: string
+  prizes: string | null
+  isOwner: boolean
+  onSaved: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+
+  const text = prizes?.trim() ?? ''
+  const hasText = text.length > 0
+
+  // Miembro sin premio definido: no mostramos nada (sin ruido).
+  if (!hasText && !isOwner) return null
+
+  function startEdit() {
+    setDraft(text)
+    setEditing(true)
+  }
+
+  async function save() {
+    setBusy(true)
+    try {
+      await updateGroupPrizes(groupId, draft)
+      setEditing(false)
+      toast.show('Premio guardado', { tone: 'success' })
+      onSaved()
+    } catch (err) {
+      toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
+        tone: 'danger',
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <section>
+        <h2 className={styles.sectionTitle}>🎁 Qué se juega</h2>
+        <Card className={styles.prizesCard}>
+          <Stack gap={3}>
+            <textarea
+              className={styles.prizesInput}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              rows={3}
+              maxLength={500}
+              autoFocus
+              placeholder="Ej: 🥇 elige restaurante · 🥈 nada · 🥉 paga las cañas"
+              aria-label="Qué se juega en la clasificación general"
+            />
+            <Row gap={2}>
+              <Button size="sm" loading={busy} onClick={() => void save()}>
+                Guardar
+              </Button>
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(false)}>
+                Cancelar
+              </Button>
+            </Row>
+          </Stack>
+        </Card>
+      </section>
+    )
+  }
+
+  return (
+    <section>
+      <h2 className={styles.sectionTitle}>🎁 Qué se juega</h2>
+      {hasText ? (
+        <Card className={styles.prizesCard}>
+          <Stack gap={3} align="start">
+            <p className={styles.prizesText}>{text}</p>
+            {isOwner && (
+              <Button variant="ghost" size="sm" onClick={startEdit}>
+                ✏️ Editar
+              </Button>
+            )}
+          </Stack>
+        </Card>
+      ) : (
+        // Solo el dueño llega aquí (el miembro sin texto sale arriba con null).
+        <Card className={styles.prizesCard}>
+          <Button variant="ghost" size="sm" onClick={startEdit}>
+            ➕ Añadir premio / qué se juega
+          </Button>
+        </Card>
+      )}
     </section>
   )
 }

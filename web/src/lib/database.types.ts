@@ -50,16 +50,24 @@ export interface Database {
         Relationships: []
       }
       groups: {
-        Row: { id: string; name: string | null; created_by: string | null; created_at: string }
+        Row: {
+          id: string
+          name: string | null
+          prizes: string | null
+          created_by: string | null
+          created_at: string
+        }
         Insert: {
           id: string
           name?: string | null
+          prizes?: string | null
           created_by?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           name?: string | null
+          prizes?: string | null
           created_by?: string | null
           created_at?: string
         }
