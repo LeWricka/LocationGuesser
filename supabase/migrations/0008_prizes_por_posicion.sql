@@ -1,0 +1,12 @@
+-- 0008_prizes_por_posicion — premios por POSICIÓN en la clasificación general.
+-- Antes (0006) `prizes` era un texto libre único; ahora es un objeto jsonb con un
+-- premio opcional por puesto: { "first": "...", "second": "...", "third": "...", "last": "..." }.
+-- Solo se guardan las claves con premio definido (ninguna es obligatoria).
+--
+-- `using null`: descartamos los datos actuales (eran de prueba; solo un grupo tenía
+-- premio y no merece migración de forma del texto libre al objeto). Los grupos
+-- vuelven a "sin premios" hasta que el dueño los redefina por posición.
+--
+-- La seguridad sigue dándola la policy "groups_update_owner" (0004): UPDATE solo si
+-- created_by = auth.uid(), así que un miembro no puede cambiar los premios.
+alter table public.groups alter column prizes type jsonb using null;

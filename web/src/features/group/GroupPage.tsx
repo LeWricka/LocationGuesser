@@ -20,10 +20,11 @@ import { formatDeadline } from '../../lib/time'
 import { useSession } from '../../lib/session-context'
 import { deleteChallenge } from '../../lib/challenges'
 import { isMember, myGroups } from '../../lib/membership'
-import type { Challenge } from '../../lib/database.types'
+import type { Challenge, GroupPrizes } from '../../lib/database.types'
 import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, splitByStatus, updateGroupPrizes } from '../../lib/groupData'
+import { PRIZE_SLOTS, prizeForRow } from './prizes'
 import { signedImageUrl } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { CreateChallenge } from '../create/CreateChallenge'
@@ -254,7 +255,7 @@ export function GroupPage({ groupId, onBack }: Props) {
           onSaved={() => void refresh()}
         />
 
-        <Leaderboard entries={leaderboard} meId={user?.id} />
+        <Leaderboard entries={leaderboard} meId={user?.id} prizes={group?.prizes ?? null} />
 
         <PhotoSection photos={photos} />
 
@@ -434,12 +435,12 @@ function PhotoSection({ photos }: { photos: PhotoStripItem[] }) {
   )
 }
 
-// --- Qué se juega (premios de la clasificación) ----------------------------
+// --- Qué se juega (premios por posición) -----------------------------------
 
-// Bloque de "qué se juega": texto libre que define el dueño a nivel de la
-// clasificación general (no por reto). Solo descripción; el reparto lo hace el
-// grupo en la vida real. Si está vacío: el dueño ve un CTA para añadirlo; el
-// miembro no ve nada (no hay ruido). El RLS respalda la edición (solo dueño).
+// Bloque de "qué se juega": el dueño define un premio opcional por posición
+// (1º/2º/3º/último); ninguno es obligatorio. Esos premios se marcan luego en la
+// fila correspondiente de la clasificación. Si no hay ninguno: el dueño ve un CTA
+// para añadirlos; el miembro no ve nada (sin ruido). El RLS respalda la edición.
 function PrizesSection({
   groupId,
   prizes,
@@ -447,23 +448,23 @@ function PrizesSection({
   onSaved,
 }: {
   groupId: string
-  prizes: string | null
+  prizes: GroupPrizes | null
   isOwner: boolean
   onSaved: () => void
 }) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [draft, setDraft] = useState<GroupPrizes>({})
   const [busy, setBusy] = useState(false)
   const toast = useToast()
 
-  const text = prizes?.trim() ?? ''
-  const hasText = text.length > 0
+  const defined = PRIZE_SLOTS.filter(({ key }) => (prizes?.[key]?.trim() ?? '') !== '')
+  const hasPrizes = defined.length > 0
 
-  // Miembro sin premio definido: no mostramos nada (sin ruido).
-  if (!hasText && !isOwner) return null
+  // Miembro sin premios definidos: no mostramos nada (sin ruido).
+  if (!hasPrizes && !isOwner) return null
 
   function startEdit() {
-    setDraft(text)
+    setDraft({ ...(prizes ?? {}) })
     setEditing(true)
   }
 
@@ -472,7 +473,7 @@ function PrizesSection({
     try {
       await updateGroupPrizes(groupId, draft)
       setEditing(false)
-      toast.show('Premio guardado', { tone: 'success' })
+      toast.show('Premios guardados', { tone: 'success' })
       onSaved()
     } catch (err) {
       toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
@@ -489,16 +490,18 @@ function PrizesSection({
         <h2 className={styles.sectionTitle}>🎁 Qué se juega</h2>
         <Card className={styles.prizesCard}>
           <Stack gap={3}>
-            <textarea
-              className={styles.prizesInput}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              rows={3}
-              maxLength={500}
-              autoFocus
-              placeholder="Ej: 🥇 elige restaurante · 🥈 nada · 🥉 paga las cañas"
-              aria-label="Qué se juega en la clasificación general"
-            />
+            {PRIZE_SLOTS.map(({ key, label }, i) => (
+              <label key={key} className={styles.prizeField}>
+                <span className={styles.prizeFieldLabel}>{label}</span>
+                <Input
+                  value={draft[key] ?? ''}
+                  onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+                  maxLength={120}
+                  autoFocus={i === 0}
+                  placeholder="Opcional — ej: elige restaurante"
+                />
+              </label>
+            ))}
             <Row gap={2}>
               <Button size="sm" loading={busy} onClick={() => void save()}>
                 Guardar
@@ -516,10 +519,17 @@ function PrizesSection({
   return (
     <section>
       <h2 className={styles.sectionTitle}>🎁 Qué se juega</h2>
-      {hasText ? (
+      {hasPrizes ? (
         <Card className={styles.prizesCard}>
           <Stack gap={3} align="start">
-            <p className={styles.prizesText}>{text}</p>
+            <ul className={styles.prizeList}>
+              {defined.map(({ key, label }) => (
+                <li key={key} className={styles.prizeListItem}>
+                  <span className={styles.prizeListPos}>{label}</span>
+                  <span className={styles.prizeListText}>{prizes?.[key]?.trim()}</span>
+                </li>
+              ))}
+            </ul>
             {isOwner && (
               <Button variant="ghost" size="sm" onClick={startEdit}>
                 ✏️ Editar
@@ -528,10 +538,10 @@ function PrizesSection({
           </Stack>
         </Card>
       ) : (
-        // Solo el dueño llega aquí (el miembro sin texto sale arriba con null).
+        // Solo el dueño llega aquí (el miembro sin premios sale arriba con null).
         <Card className={styles.prizesCard}>
           <Button variant="ghost" size="sm" onClick={startEdit}>
-            ➕ Añadir premio / qué se juega
+            ➕ Añadir premios
           </Button>
         </Card>
       )}
@@ -541,7 +551,15 @@ function PrizesSection({
 
 // --- Clasificación general -------------------------------------------------
 
-function Leaderboard({ entries, meId }: { entries: LeaderboardEntry[]; meId?: string }) {
+function Leaderboard({
+  entries,
+  meId,
+  prizes,
+}: {
+  entries: LeaderboardEntry[]
+  meId?: string
+  prizes: GroupPrizes | null
+}) {
   // Barra relativa al líder: el primero llena al 100% y el resto en proporción a
   // sus puntos. Visualiza la distancia en la tabla sin números extra.
   const top = entries[0]?.points ?? 0
@@ -558,6 +576,7 @@ function Leaderboard({ entries, meId }: { entries: LeaderboardEntry[]; meId?: st
             {entries.map((entry, i) => {
               const isMe = meId != null && entry.userId === meId
               const width = top > 0 ? Math.max(6, Math.round((entry.points / top) * 100)) : 0
+              const prize = prizeForRow(prizes, i, entries.length)
               return (
                 <li
                   key={entry.userId}
@@ -573,6 +592,11 @@ function Leaderboard({ entries, meId }: { entries: LeaderboardEntry[]; meId?: st
                       {entry.name}
                       {isMe && <span className={styles.youTag}>Tú</span>}
                     </span>
+                    {prize && (
+                      <span className={styles.prizeChip}>
+                        <span aria-hidden="true">🎁</span> {prize}
+                      </span>
+                    )}
                     <span className={styles.rankBar} aria-hidden="true">
                       <i style={{ width: `${width}%` } as CSSProperties} />
                     </span>

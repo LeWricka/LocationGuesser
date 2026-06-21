@@ -65,40 +65,62 @@
   box-shadow: inset 4px 0 0 0 var(--color-accent);
 }
 
-.prizesText {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: var(--font-size-md);
-  line-height: var(--line-height-normal);
+/* Campo del editor: etiqueta del puesto (🥇 1º…) sobre el Input opcional. */
+.prizeField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.prizeFieldLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text);
 }
 
-/* Textarea de edición: mismo lenguaje visual que el Input del UI kit. */
-.prizesInput {
+/* Lista de premios en la tarjeta "qué se juega": puesto + texto, uno por línea. */
+.prizeList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   width: 100%;
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
+}
+
+.prizeListItem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.prizeListPos {
+  font-weight: var(--font-weight-semibold);
   color: var(--color-text);
-  font-family: inherit;
-  font-size: var(--font-size-md);
-  line-height: var(--line-height-normal);
-  resize: vertical;
-  transition:
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
+  white-space: nowrap;
 }
 
-.prizesInput::placeholder {
-  color: var(--color-text-faint);
+.prizeListText {
+  overflow-wrap: anywhere;
+  color: var(--color-text);
 }
 
-.prizesInput:focus {
-  outline: none;
-  background: var(--color-surface-hover);
-  border-color: var(--color-focus-ring);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus-ring) 32%, transparent);
+/* Chip del premio en la fila de la clasificación: etiqueta ámbar discreta junto
+ * al nombre. Marca qué se lleva ese puesto sin robar protagonismo a los puntos. */
+.prizeChip {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* --- Clasificación general --- */

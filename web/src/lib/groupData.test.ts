@@ -7,7 +7,7 @@ vi.mock('./supabase', () => ({
   supabase: { from: vi.fn(() => ({ update: updateSpy })) },
 }))
 
-import { isLive, splitByStatus, updateGroupPrizes } from './groupData'
+import { isLive, normalizePrizes, splitByStatus, updateGroupPrizes } from './groupData'
 
 const now = new Date('2026-06-19T12:00:00.000Z')
 const future = '2026-06-19T18:00:00.000Z'
@@ -40,16 +40,36 @@ describe('splitByStatus', () => {
   })
 })
 
-describe('updateGroupPrizes', () => {
-  test('recorta el texto antes de guardar', async () => {
-    updateSpy.mockClear()
-    await updateGroupPrizes('ABC', '  el último invita  ')
-    expect(updateSpy).toHaveBeenCalledWith({ prizes: 'el último invita' })
+describe('normalizePrizes', () => {
+  test('recorta cada premio y mantiene el orden de los puestos', () => {
+    expect(normalizePrizes({ first: '  elige restaurante  ', last: ' paga las cañas ' })).toEqual({
+      first: 'elige restaurante',
+      last: 'paga las cañas',
+    })
   })
 
-  test('texto vacío (o solo espacios) borra el premio: null', async () => {
+  test('descarta claves vacías o de solo espacios', () => {
+    expect(normalizePrizes({ first: 'manda', second: '   ', third: '' })).toEqual({
+      first: 'manda',
+    })
+  })
+
+  test('todas vacías → null (borra los premios)', () => {
+    expect(normalizePrizes({ first: '  ', last: '' })).toBeNull()
+    expect(normalizePrizes({})).toBeNull()
+  })
+})
+
+describe('updateGroupPrizes', () => {
+  test('guarda el jsonb normalizado (recortado, sin claves vacías)', async () => {
     updateSpy.mockClear()
-    await updateGroupPrizes('ABC', '   ')
+    await updateGroupPrizes('ABC', { first: '  manda  ', second: '   ', last: 'invita' })
+    expect(updateSpy).toHaveBeenCalledWith({ prizes: { first: 'manda', last: 'invita' } })
+  })
+
+  test('todos los premios vacíos → null', async () => {
+    updateSpy.mockClear()
+    await updateGroupPrizes('ABC', { first: '   ', last: '' })
     expect(updateSpy).toHaveBeenCalledWith({ prizes: null })
   })
 })

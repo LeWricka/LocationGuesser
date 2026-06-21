@@ -1,12 +1,13 @@
 import { supabase } from './supabase'
-import type { Challenge } from './database.types'
+import type { Challenge, GroupPrizes } from './database.types'
 
 /** Id + nombre + premios del grupo. El nombre titula la página (si falta, cae al
- * código); `prizes` es el texto libre de "qué se juega" en la clasificación. */
+ * código); `prizes` son los premios por posición (1º/2º/3º/último) que se marcan
+ * en la clasificación general (null si el dueño no ha definido ninguno). */
 export interface GroupInfo {
   id: string
   name: string | null
-  prizes: string | null
+  prizes: GroupPrizes | null
 }
 
 /** Lee el grupo (id + nombre + premios) para la página, o null si no existe. */
@@ -21,16 +22,31 @@ export async function getGroup(groupId: string): Promise<GroupInfo | null> {
 }
 
 /**
- * Guarda el texto de "qué se juega" del grupo (premios de la clasificación
- * general). Texto vacío → null (borra el premio). Solo el dueño puede: el RLS de
- * groups (groups_update_owner) restringe el UPDATE a created_by = auth.uid(), así
- * que un miembro recibe error/0 filas; aquí no comprobamos rol en cliente.
+ * Normaliza los premios por posición antes de guardar: recorta cada texto y
+ * descarta las claves vacías. Si no queda ninguna, devuelve null (borra todos los
+ * premios). Función pura: fácil de testear sin tocar Supabase.
  */
-export async function updateGroupPrizes(groupId: string, prizes: string): Promise<void> {
-  const trimmed = prizes.trim()
+export function normalizePrizes(prizes: GroupPrizes): GroupPrizes | null {
+  const order: (keyof GroupPrizes)[] = ['first', 'second', 'third', 'last']
+  const clean: GroupPrizes = {}
+  for (const key of order) {
+    const value = prizes[key]?.trim()
+    if (value) clean[key] = value
+  }
+  return Object.keys(clean).length > 0 ? clean : null
+}
+
+/**
+ * Guarda los premios por posición del grupo (jsonb). Recorta y descarta claves
+ * vacías; si todas están vacías, guarda null (borra los premios). Solo el dueño
+ * puede: el RLS de groups (groups_update_owner) restringe el UPDATE a
+ * created_by = auth.uid(), así que un miembro recibe error/0 filas; aquí no
+ * comprobamos rol en cliente.
+ */
+export async function updateGroupPrizes(groupId: string, prizes: GroupPrizes): Promise<void> {
   const { error } = await supabase
     .from('groups')
-    .update({ prizes: trimmed === '' ? null : trimmed })
+    .update({ prizes: normalizePrizes(prizes) })
     .eq('id', groupId)
   if (error) throw error
 }
