@@ -5,9 +5,10 @@ export interface SaveVoteInput {
   groupId: string
   challengeId: string
   userId: string
-  guessLat: number
-  guessLng: number
-  distanceKm: number
+  // null en un voto de timeout: jugó pero no marcó → 0 puntos, sin pin.
+  guessLat: number | null
+  guessLng: number | null
+  distanceKm: number | null
   points: number
 }
 

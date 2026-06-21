@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import styles from './Lightbox.module.css'
 
 interface Props {
@@ -79,7 +80,12 @@ export function Lightbox({ open, src, alt = 'Foto del reto', onClose }: Props) {
 
   if (!open) return null
 
-  return (
+  // Portal a document.body: el overlay es position:fixed, pero dentro de un
+  // ancestro con transform/backdrop-filter/animación (el rediseño usa muchos) el
+  // fixed se ancla a ESE ancestro, no al viewport → la foto salía "a lo ancho"
+  // incrustada en la página en vez de a pantalla completa. Sacándolo al body se
+  // ancla al viewport y cubre toda la pantalla como popup.
+  return createPortal(
     <div className={styles.overlay} onClick={close}>
       <div
         className={styles.panel}
@@ -105,6 +111,7 @@ export function Lightbox({ open, src, alt = 'Foto del reto', onClose }: Props) {
           <img className={`${styles.img} ${zoomed ? styles.zoomed : ''}`} src={src} alt={alt} />
         </button>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

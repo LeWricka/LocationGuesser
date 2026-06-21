@@ -89,7 +89,27 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       setMapOpen(false)
       localStorage.removeItem(startKey(current.id))
       if (!playedGuess) {
+        // Se acabó el tiempo sin marcar → 0 puntos y queda MARCADO COMO JUGADO
+        // (un voto de timeout: sin pin). Así no puede reintentar para puntuar.
         setTimedOut(true)
+        if (user) {
+          setSaving(true)
+          try {
+            await saveVote({
+              groupId: current.group_id,
+              challengeId: current.id,
+              userId: user.id,
+              guessLat: null,
+              guessLng: null,
+              distanceKm: null,
+              points: 0,
+            })
+          } catch {
+            // El aviso de "no diste a tiempo" ya se muestra; no bloqueamos por esto.
+          } finally {
+            setSaving(false)
+          }
+        }
         return
       }
       const answer = { lat: current.lat, lng: current.lng }
@@ -138,8 +158,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         const existing = user ? await getExistingVote(challengeId, user.id) : null
         if (cancelled) return
         if (existing) {
-          setGuess({ lat: existing.guess_lat, lng: existing.guess_lng })
-          setResult({ km: existing.distance_km, points: existing.points })
+          if (existing.guess_lat == null || existing.guess_lng == null) {
+            // Voto de timeout: jugó pero no marcó → 0 pts, sin pin. Marcado como
+            // jugado (no puede reintentar), se muestra "no diste a tiempo".
+            setTimedOut(true)
+          } else {
+            setGuess({ lat: existing.guess_lat, lng: existing.guess_lng })
+            setResult({ km: existing.distance_km ?? 0, points: existing.points })
+          }
           setPhase('revealed')
           return
         }

@@ -122,9 +122,10 @@ export interface Database {
           group_id: string
           challenge_id: string
           user_id: string
-          guess_lat: number
-          guess_lng: number
-          distance_km: number
+          // null en un voto de timeout (jugó pero no marcó → 0 puntos, sin pin).
+          guess_lat: number | null
+          guess_lng: number | null
+          distance_km: number | null
           points: number
           created_at: string
         }
@@ -133,9 +134,9 @@ export interface Database {
           group_id: string
           challenge_id: string
           user_id: string
-          guess_lat: number
-          guess_lng: number
-          distance_km: number
+          guess_lat?: number | null
+          guess_lng?: number | null
+          distance_km?: number | null
           points: number
           created_at?: string
         }
@@ -144,9 +145,9 @@ export interface Database {
           group_id?: string
           challenge_id?: string
           user_id?: string
-          guess_lat?: number
-          guess_lng?: number
-          distance_km?: number
+          guess_lat?: number | null
+          guess_lng?: number | null
+          distance_km?: number | null
           points?: number
           created_at?: string
         }

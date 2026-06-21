@@ -696,11 +696,14 @@ function PastCard({
             )}
             <RevealMap
               answer={{ lat: challenge.lat, lng: challenge.lng }}
-              votes={ranked.map((v) => ({
-                name: v.display_name,
-                lat: v.guess_lat,
-                lng: v.guess_lng,
-              }))}
+              // Los votos de timeout no tienen pin (guess null): no se plotean.
+              votes={ranked
+                .filter((v) => v.guess_lat != null && v.guess_lng != null)
+                .map((v) => ({
+                  name: v.display_name,
+                  lat: v.guess_lat as number,
+                  lng: v.guess_lng as number,
+                }))}
             />
             {ranked.length === 0 ? (
               <p className={styles.empty}>Este reto se cerró sin votos.</p>
@@ -709,7 +712,9 @@ function PastCard({
                 {ranked.map((v) => (
                   <li key={v.id} className={styles.scoreRow}>
                     <span className={styles.scoreName}>{v.display_name}</span>
-                    <span className={styles.scoreDist}>{fmtDist(v.distance_km)}</span>
+                    <span className={styles.scoreDist}>
+                      {v.distance_km == null ? '— sin marcar' : fmtDist(v.distance_km)}
+                    </span>
                     <span className={styles.scorePoints}>
                       {v.points.toLocaleString('es-ES')} pts
                     </span>
