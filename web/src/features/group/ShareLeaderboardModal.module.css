@@ -1,0 +1,46 @@
+/* Vista previa de la tarjeta dentro del modal: encaja la imagen 4:5 en el ancho
+   disponible, con un marco sutil de la app. */
+.preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 320px;
+}
+
+.previewImg {
+  display: block;
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.error {
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+/* Lienzo de captura: la tarjeta vive a tamaño real (1080px) fuera del viewport.
+   No usamos display:none (mediría 0 y html-to-image fallaría) ni visibility:hidden;
+   la sacamos del flujo con posición absoluta y un desplazamiento grande. */
+.offscreen {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 1080px;
+  pointer-events: none;
+  z-index: -1;
+}

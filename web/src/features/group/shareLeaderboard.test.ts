@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { buildShareText } from './shareLeaderboard'
+import { buildShareText, shareDomain } from './shareLeaderboard'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 
 // Resumen de texto de la clasificación para compartir en el chat. Función pura:
@@ -57,5 +57,23 @@ describe('buildShareText', () => {
     const text = buildShareText('G', [], null, link)
     expect(text).toContain('Aún no hay clasificación')
     expect(text).toContain(`👉 Únete y juega: ${link}`)
+  })
+})
+
+// El pie de la tarjeta-imagen muestra solo el dominio (la imagen no lleva enlace
+// clicable). Comprobamos que extrae el host y limpia "www.".
+describe('shareDomain', () => {
+  test('extrae el host del enlace, con su hash', () => {
+    expect(shareDomain('https://locationguesser-sage.vercel.app/#g=ABC')).toBe(
+      'locationguesser-sage.vercel.app',
+    )
+  })
+
+  test('quita el prefijo www.', () => {
+    expect(shareDomain('https://www.ejemplo.com/ruta')).toBe('ejemplo.com')
+  })
+
+  test('no rompe con un enlace sin protocolo', () => {
+    expect(shareDomain('app.local/#g=ABC')).toBe('app.local')
   })
 })
