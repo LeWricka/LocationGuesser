@@ -26,7 +26,7 @@ import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, splitByStatus, updateGroupPrizes } from '../../lib/groupData'
 import { PRIZE_SLOTS, prizeForRow } from './prizes'
-import { buildShareText } from './shareLeaderboard'
+import { ShareLeaderboardModal } from './ShareLeaderboardModal'
 import { signedImageUrl } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { CreateChallenge } from '../create/CreateChallenge'
@@ -65,6 +65,8 @@ export function GroupPage({ groupId, onBack }: Props) {
   // su enlace para compartir, sin salir del grupo.
   const [adding, setAdding] = useState(false)
   const [created, setCreated] = useState<Challenge | null>(null)
+  // Modal de "Compartir clasificación como imagen" (genera y previsualiza el PNG).
+  const [sharingLeaderboard, setSharingLeaderboard] = useState(false)
   const toast = useToast()
   // Evita re-avisar de un mismo voto si Realtime reenvía el evento (un toast por id).
   const announcedVotes = useRef<Set<string>>(new Set())
@@ -296,18 +298,17 @@ export function GroupPage({ groupId, onBack }: Props) {
         )}
       </Stack>
 
-      {/* FAB: comparte el resumen de la clasificación en el chat del grupo
-          (motor del bucle social). Siempre accesible, sin tapar otros controles. */}
-      <ShareLeaderboardFab
-        onShare={() =>
-          void shareLeaderboard(
-            group?.name?.trim() || groupId,
-            leaderboard,
-            group?.prizes ?? null,
-            groupLink(groupId),
-            toast,
-          )
-        }
+      {/* FAB: abre la previa de la tarjeta de clasificación para compartirla como
+          IMAGEN en el chat (motor del bucle social). Siempre accesible. */}
+      <ShareLeaderboardFab onShare={() => setSharingLeaderboard(true)} />
+
+      <ShareLeaderboardModal
+        open={sharingLeaderboard}
+        onClose={() => setSharingLeaderboard(false)}
+        groupName={group?.name?.trim() || groupId}
+        entries={leaderboard}
+        prizes={group?.prizes ?? null}
+        link={groupLink(groupId)}
       />
     </main>
   )
@@ -328,29 +329,6 @@ function ShareLeaderboardFab({ onShare }: { onShare: () => void }) {
       <span className={styles.shareFabLabel}>Compartir</span>
     </button>
   )
-}
-
-// Construye el resumen de la clasificación y lo comparte: Web Share en móvil,
-// copiar al portapapeles como respaldo (con toast). Reusa el patrón de
-// shareGroup pero con el texto rico de buildShareText.
-async function shareLeaderboard(
-  groupName: string,
-  entries: LeaderboardEntry[],
-  prizes: GroupPrizes | null,
-  link: string,
-  toast: ReturnType<typeof useToast>,
-) {
-  const text = buildShareText(groupName, entries, prizes, link)
-  if (typeof navigator !== 'undefined' && 'share' in navigator) {
-    try {
-      await navigator.share({ title: `Clasificación · ${groupName}`, text })
-      return
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-    }
-  }
-  await navigator.clipboard.writeText(text)
-  toast.show('Clasificación copiada, pégala en el chat', { tone: 'success' })
 }
 
 // Esqueleto de carga de la página del grupo: reproduce el layout real (cabecera
