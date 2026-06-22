@@ -52,20 +52,38 @@
   border-bottom: none;
 }
 
-/* --- Qué se juega (premios) --- */
+/* --- Premios (editor en modal + chip en la clasificación) --- */
 
-/* Tarjeta del premio: acento ámbar sobre el vidrio para que destaque encima de
- * la clasificación sin gritar (filo izquierdo + fondo tenue de acento). */
-.prizesCard {
-  background: linear-gradient(
-    180deg,
-    var(--color-accent-soft),
-    color-mix(in srgb, var(--color-accent) 4%, transparent)
-  );
-  box-shadow: inset 4px 0 0 0 var(--color-accent);
+/* Botón discreto junto al título de la clasificación para abrir el editor de
+ * premios (solo dueño). Texto pequeño en acento, sin peso de botón sólido: no
+ * compite con la tabla pero se encuentra. */
+.editPrizesBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  /* Compensa el margin-bottom del sectionTitle para alinearlos. */
+  margin-bottom: var(--space-3);
+  padding: 2px var(--space-2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
 }
 
-/* Campo del editor: etiqueta del puesto (🥇 1º…) sobre el Input opcional. */
+.editPrizesBtn:hover {
+  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* Campo del editor (en el modal): etiqueta del puesto (🥇 1º…) sobre el Input. */
 .prizeField {
   display: flex;
   flex-direction: column;
@@ -78,49 +96,31 @@
   color: var(--color-text);
 }
 
-/* Lista de premios en la tarjeta "qué se juega": puesto + texto, uno por línea. */
-.prizeList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  width: 100%;
-}
-
-.prizeListItem {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-
-.prizeListPos {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  white-space: nowrap;
-}
-
-.prizeListText {
-  overflow-wrap: anywhere;
-  color: var(--color-text);
-}
-
-/* Chip del premio en la fila de la clasificación: etiqueta ámbar discreta junto
- * al nombre. Marca qué se lleva ese puesto sin robar protagonismo a los puntos. */
+/* Píldora del premio en la fila de la clasificación: etiqueta ámbar discreta
+ * junto al nombre. Marca qué se lleva ese puesto sin robar protagonismo a los
+ * puntos. Trunca con elipsis si el texto es largo (no rompe el grid en móvil). */
 .prizeChip {
   align-self: flex-start;
+  max-width: 100%;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  max-width: 100%;
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
   color: var(--color-accent);
   background: var(--color-accent-soft);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* El 🎁 no debe encogerse cuando el texto se trunca. */
+.prizeChip > span {
+  flex-shrink: 0;
 }
 
 /* --- Clasificación general --- */
@@ -414,4 +414,68 @@
   width: 100%;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
+}
+
+/* --- FAB "Compartir clasificación" --- */
+
+/* FAB fijo abajo-IZQUIERDA (la derecha la ocupa el FAB de crear grupo en otras
+ * vistas; aquí lo separamos para no chocar). Pastilla de marca que invita a
+ * repartir la tabla en el chat. Respeta el safe-area de iOS. */
+.shareFab {
+  position: fixed;
+  left: calc(var(--space-4) + env(safe-area-inset-left));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  z-index: var(--z-sticky);
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  height: 56px;
+  min-width: 56px;
+  padding: 0 var(--space-5);
+  justify-content: center;
+
+  border: none;
+  border-radius: var(--radius-full);
+  background-image: var(--gradient-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-accent);
+  cursor: pointer;
+
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-base),
+    background-image var(--transition-base);
+}
+
+.shareFab:hover {
+  background-image: var(--gradient-accent-hover);
+  box-shadow:
+    var(--shadow-accent-hover),
+    0 0 30px -4px rgba(255, 138, 89, 0.65);
+  transform: translateY(-3px) scale(1.04);
+}
+
+.shareFab:active {
+  transform: scale(0.95);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shareFab {
+    transition: none;
+  }
+  .shareFab:hover,
+  .shareFab:active {
+    transform: none;
+  }
+}
+
+.shareFabLabel {
+  white-space: nowrap;
 }

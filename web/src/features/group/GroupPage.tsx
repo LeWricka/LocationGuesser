@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   Input,
+  Modal,
   PhotoStrip,
   type PhotoStripItem,
   Row,
@@ -25,6 +26,7 @@ import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, splitByStatus, updateGroupPrizes } from '../../lib/groupData'
 import { PRIZE_SLOTS, prizeForRow } from './prizes'
+import { buildShareText } from './shareLeaderboard'
 import { signedImageUrl } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { CreateChallenge } from '../create/CreateChallenge'
@@ -248,14 +250,14 @@ export function GroupPage({ groupId, onBack }: Props) {
           />
         )}
 
-        <PrizesSection
-          groupId={groupId}
+        <Leaderboard
+          entries={leaderboard}
+          meId={user?.id}
           prizes={group?.prizes ?? null}
+          groupId={groupId}
           isOwner={isOwner}
-          onSaved={() => void refresh()}
+          onPrizesSaved={() => void refresh()}
         />
-
-        <Leaderboard entries={leaderboard} meId={user?.id} prizes={group?.prizes ?? null} />
 
         <PhotoSection photos={photos} />
 
@@ -293,8 +295,62 @@ export function GroupPage({ groupId, onBack }: Props) {
           </Card>
         )}
       </Stack>
+
+      {/* FAB: comparte el resumen de la clasificación en el chat del grupo
+          (motor del bucle social). Siempre accesible, sin tapar otros controles. */}
+      <ShareLeaderboardFab
+        onShare={() =>
+          void shareLeaderboard(
+            group?.name?.trim() || groupId,
+            leaderboard,
+            group?.prizes ?? null,
+            groupLink(groupId),
+            toast,
+          )
+        }
+      />
     </main>
   )
+}
+
+// FAB de "Compartir clasificación": pastilla flotante abajo-izquierda (la
+// derecha la usa el FAB de crear grupo en otras vistas; aquí evitamos chocar y
+// respetamos el safe-area). Comparte el resumen de la tabla en un toque.
+function ShareLeaderboardFab({ onShare }: { onShare: () => void }) {
+  return (
+    <button
+      type="button"
+      className={styles.shareFab}
+      onClick={onShare}
+      aria-label="Compartir clasificación"
+    >
+      <span aria-hidden="true">📤</span>
+      <span className={styles.shareFabLabel}>Compartir</span>
+    </button>
+  )
+}
+
+// Construye el resumen de la clasificación y lo comparte: Web Share en móvil,
+// copiar al portapapeles como respaldo (con toast). Reusa el patrón de
+// shareGroup pero con el texto rico de buildShareText.
+async function shareLeaderboard(
+  groupName: string,
+  entries: LeaderboardEntry[],
+  prizes: GroupPrizes | null,
+  link: string,
+  toast: ReturnType<typeof useToast>,
+) {
+  const text = buildShareText(groupName, entries, prizes, link)
+  if (typeof navigator !== 'undefined' && 'share' in navigator) {
+    try {
+      await navigator.share({ title: `Clasificación · ${groupName}`, text })
+      return
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+    }
+  }
+  await navigator.clipboard.writeText(text)
+  toast.show('Clasificación copiada, pégala en el chat', { tone: 'success' })
 }
 
 // Esqueleto de carga de la página del grupo: reproduce el layout real (cabecera
@@ -435,137 +491,58 @@ function PhotoSection({ photos }: { photos: PhotoStripItem[] }) {
   )
 }
 
-// --- Qué se juega (premios por posición) -----------------------------------
-
-// Bloque de "qué se juega": el dueño define un premio opcional por posición
-// (1º/2º/3º/último); ninguno es obligatorio. Esos premios se marcan luego en la
-// fila correspondiente de la clasificación. Si no hay ninguno: el dueño ve un CTA
-// para añadirlos; el miembro no ve nada (sin ruido). El RLS respalda la edición.
-function PrizesSection({
-  groupId,
-  prizes,
-  isOwner,
-  onSaved,
-}: {
-  groupId: string
-  prizes: GroupPrizes | null
-  isOwner: boolean
-  onSaved: () => void
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState<GroupPrizes>({})
-  const [busy, setBusy] = useState(false)
-  const toast = useToast()
-
-  const defined = PRIZE_SLOTS.filter(({ key }) => (prizes?.[key]?.trim() ?? '') !== '')
-  const hasPrizes = defined.length > 0
-
-  // Miembro sin premios definidos: no mostramos nada (sin ruido).
-  if (!hasPrizes && !isOwner) return null
-
-  function startEdit() {
-    setDraft({ ...(prizes ?? {}) })
-    setEditing(true)
-  }
-
-  async function save() {
-    setBusy(true)
-    try {
-      await updateGroupPrizes(groupId, draft)
-      setEditing(false)
-      toast.show('Premios guardados', { tone: 'success' })
-      onSaved()
-    } catch (err) {
-      toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
-        tone: 'danger',
-      })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  if (editing) {
-    return (
-      <section>
-        <h2 className={styles.sectionTitle}>🎁 Qué se juega</h2>
-        <Card className={styles.prizesCard}>
-          <Stack gap={3}>
-            {PRIZE_SLOTS.map(({ key, label }, i) => (
-              <label key={key} className={styles.prizeField}>
-                <span className={styles.prizeFieldLabel}>{label}</span>
-                <Input
-                  value={draft[key] ?? ''}
-                  onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-                  maxLength={120}
-                  autoFocus={i === 0}
-                  placeholder="Opcional — ej: elige restaurante"
-                />
-              </label>
-            ))}
-            <Row gap={2}>
-              <Button size="sm" loading={busy} onClick={() => void save()}>
-                Guardar
-              </Button>
-              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setEditing(false)}>
-                Cancelar
-              </Button>
-            </Row>
-          </Stack>
-        </Card>
-      </section>
-    )
-  }
-
-  return (
-    <section>
-      <h2 className={styles.sectionTitle}>🎁 Qué se juega</h2>
-      {hasPrizes ? (
-        <Card className={styles.prizesCard}>
-          <Stack gap={3} align="start">
-            <ul className={styles.prizeList}>
-              {defined.map(({ key, label }) => (
-                <li key={key} className={styles.prizeListItem}>
-                  <span className={styles.prizeListPos}>{label}</span>
-                  <span className={styles.prizeListText}>{prizes?.[key]?.trim()}</span>
-                </li>
-              ))}
-            </ul>
-            {isOwner && (
-              <Button variant="ghost" size="sm" onClick={startEdit}>
-                ✏️ Editar
-              </Button>
-            )}
-          </Stack>
-        </Card>
-      ) : (
-        // Solo el dueño llega aquí (el miembro sin premios sale arriba con null).
-        <Card className={styles.prizesCard}>
-          <Button variant="ghost" size="sm" onClick={startEdit}>
-            ➕ Añadir premios
-          </Button>
-        </Card>
-      )}
-    </section>
-  )
-}
-
 // --- Clasificación general -------------------------------------------------
 
+// Clasificación general. Los premios viven AQUÍ: se marcan inline en la fila de
+// su puesto (chip ámbar) y el dueño los edita con un botón discreto junto al
+// título que abre un modal. No hay sección "qué se juega" aparte (sería ruido).
 function Leaderboard({
   entries,
   meId,
   prizes,
+  groupId,
+  isOwner,
+  onPrizesSaved,
 }: {
   entries: LeaderboardEntry[]
   meId?: string
   prizes: GroupPrizes | null
+  groupId: string
+  isOwner: boolean
+  onPrizesSaved: () => void
 }) {
+  const [editingPrizes, setEditingPrizes] = useState(false)
+  const hasPrizes = PRIZE_SLOTS.some(({ key }) => (prizes?.[key]?.trim() ?? '') !== '')
   // Barra relativa al líder: el primero llena al 100% y el resto en proporción a
   // sus puntos. Visualiza la distancia en la tabla sin números extra.
   const top = entries[0]?.points ?? 0
   return (
     <section>
-      <h2 className={styles.sectionTitle}>🏆 Clasificación general</h2>
+      <Row justify="between" align="center" gap={2}>
+        <h2 className={styles.sectionTitle}>🏆 Clasificación general</h2>
+        {/* Edición de premios discreta: solo el dueño, junto al título. Invita a
+            añadir si aún no hay; si los hay, edita. El miembro no ve nada. */}
+        {isOwner && (
+          <button
+            type="button"
+            className={styles.editPrizesBtn}
+            onClick={() => setEditingPrizes(true)}
+          >
+            🎁 {hasPrizes ? 'Editar premios' : 'Añadir premios'}
+          </button>
+        )}
+      </Row>
+      {isOwner && editingPrizes && (
+        <PrizesEditorModal
+          groupId={groupId}
+          prizes={prizes}
+          onClose={() => setEditingPrizes(false)}
+          onSaved={() => {
+            setEditingPrizes(false)
+            onPrizesSaved()
+          }}
+        />
+      )}
       {entries.length === 0 ? (
         <Card>
           <p className={styles.empty}>Aún no hay puntos. Jugad un reto para abrir la tabla.</p>
@@ -624,6 +601,74 @@ function medalClass(index: number): string {
 // oro / plata / bronce / neutro). Más limpio que un emoji dentro del disco.
 function medal(index: number): string {
   return `${index + 1}`
+}
+
+// Editor de premios (solo dueño): modal con un campo opcional por puesto
+// (1º/2º/3º/último). Ninguno es obligatorio. Los premios guardados se marcan
+// luego inline en la clasificación. El RLS respalda la edición en servidor.
+function PrizesEditorModal({
+  groupId,
+  prizes,
+  onClose,
+  onSaved,
+}: {
+  groupId: string
+  prizes: GroupPrizes | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  // Arranca del valor actual para que el dueño edite sin reescribir todo.
+  const [draft, setDraft] = useState<GroupPrizes>(() => ({ ...(prizes ?? {}) }))
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+
+  async function save() {
+    setBusy(true)
+    try {
+      await updateGroupPrizes(groupId, draft)
+      toast.show('Premios guardados', { tone: 'success' })
+      onSaved()
+    } catch (err) {
+      toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
+        tone: 'danger',
+      })
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={busy ? undefined : onClose}
+      title="🎁 Premios del grupo"
+      footer={
+        <Row gap={2} justify="end">
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button size="sm" loading={busy} onClick={() => void save()}>
+            Guardar
+          </Button>
+        </Row>
+      }
+    >
+      <Stack gap={3}>
+        <p className={styles.empty}>Opcionales. Se marcan en la fila de cada puesto.</p>
+        {PRIZE_SLOTS.map(({ key, label }, i) => (
+          <label key={key} className={styles.prizeField}>
+            <span className={styles.prizeFieldLabel}>{label}</span>
+            <Input
+              value={draft[key] ?? ''}
+              onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
+              maxLength={120}
+              autoFocus={i === 0}
+              placeholder="Ej: elige restaurante"
+            />
+          </label>
+        ))}
+      </Stack>
+    </Modal>
+  )
 }
 
 // --- En vivo ---------------------------------------------------------------
