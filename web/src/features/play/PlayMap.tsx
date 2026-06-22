@@ -81,12 +81,24 @@ function FitToReveal({ guess, answer }: { guess: LatLng | null; answer: LatLng |
   const map = useMap()
   useEffect(() => {
     if (!guess || !answer) return
-    map.invalidateSize()
-    const bounds = L.latLngBounds([
-      [guess.lat, guess.lng],
-      [answer.lat, answer.lng],
-    ]).pad(0.3)
-    map.fitBounds(bounds, { maxZoom: 12 })
+    const fit = () => {
+      map.invalidateSize({ animate: false })
+      const bounds = L.latLngBounds([
+        [guess.lat, guess.lng],
+        [answer.lat, answer.lng],
+      ]).pad(0.3)
+      map.fitBounds(bounds, { maxZoom: 12, animate: false })
+    }
+    // El bloque de resultado entra con animación (transform): si encuadramos
+    // mientras anima, Leaflet mide mal el contenedor y el pin queda fuera de
+    // pantalla. Encuadramos tras un frame y otra vez cuando la animación/el
+    // layout se han asentado, para que SIEMPRE entren ambos puntos.
+    const raf = requestAnimationFrame(fit)
+    const settle = setTimeout(fit, 520)
+    return () => {
+      cancelAnimationFrame(raf)
+      clearTimeout(settle)
+    }
   }, [map, guess, answer])
   return null
 }
