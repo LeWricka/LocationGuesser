@@ -1,6 +1,83 @@
-/* La home solo aporta el estilo de su mensaje de error; el resto del layout lo
-   resuelve el componente presentacional HomeDashboard (UI kit). */
+/* El dashboard del usuario recurrente lo resuelve HomeDashboard (UI kit). Aquí
+   van solo: el aviso de error, el recordatorio compacto y la cabecera del hero
+   de bienvenida (recién llegado, sin grupos). */
 .error {
   color: var(--color-danger);
   font-size: var(--font-size-sm);
+}
+
+/* Recordatorio "cómo funciona" al final del dashboard: lo separamos del
+   contenido y lo atenuamos un poco (es secundario para el usuario recurrente). */
+.recap {
+  margin-top: var(--space-6);
+  opacity: 0.85;
+}
+
+/* --- Hero de bienvenida (sin grupos) --- */
+.welcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  /* Holgura inferior para que el FAB no tape el final del contenido. */
+  padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.greeting {
+  min-width: 0;
+}
+
+/* Saludo editorial: eyebrow cálido pequeño sobre el nombre. */
+.hello {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  line-height: 1.2;
+}
+
+.name {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Botón que envuelve el avatar (acceso a perfil): reset + foco redondo + halo
+   cálido que se aviva al pasar el ratón. Mismo gesto que en el dashboard. */
+.profileButton {
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  line-height: 0;
+  box-shadow: var(--glow-accent);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-base);
+}
+.profileButton:hover {
+  transform: translateY(-1px) scale(1.04);
+  box-shadow: var(--glow-accent-strong);
+}
+.profileButton:active {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profileButton:hover {
+    transform: none;
+  }
 }

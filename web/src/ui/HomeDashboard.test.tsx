@@ -17,7 +17,7 @@ describe('HomeDashboard', () => {
 
   test('sin grupos muestra el estado vacío (bienvenida)', () => {
     render(<HomeDashboard displayName="Lewis" groups={[]} />)
-    expect(screen.getByText('¡Bienvenido, Lewis!')).toBeInTheDocument()
+    expect(screen.getByText('Hola, Lewis')).toBeInTheDocument()
     expect(screen.queryByText('Tus grupos')).not.toBeInTheDocument()
   })
 

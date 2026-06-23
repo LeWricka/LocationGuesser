@@ -4,8 +4,8 @@ import { HomeEmptyState } from './HomeEmptyState'
 const meta = {
   title: 'Cuentas/HomeEmptyState',
   component: HomeEmptyState,
-  parameters: { layout: 'centered' },
-  args: { name: 'Lewis', onCreateGroup: () => {} },
+  parameters: { layout: 'padded' },
+  args: { name: 'Lewis', onCreateGroup: () => {}, onJoinGroup: () => {} },
 } satisfies Meta<typeof HomeEmptyState>
 
 export default meta
