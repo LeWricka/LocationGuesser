@@ -71,6 +71,140 @@ export async function isMember(groupId: string, userId: string): Promise<boolean
   return data !== null
 }
 
+/** Miembro del grupo, con nombre para mostrar y rol, para la lista de gente (#146). */
+export interface GroupMemberInfo {
+  userId: string
+  name: string
+  role: string // 'owner' | 'member'
+  isOwner: boolean
+}
+
+/**
+ * Gente del grupo con su rol, para la sección "Miembros". El RLS
+ * `group_members_select` ya deja a cualquier miembro leer las filas del grupo.
+ * Dos consultas (membresías + perfiles) en vez de un embed: `group_members.user_id`
+ * referencia `auth.users`, no `public.profiles`, así que el embed `profiles(...)`
+ * no tiene relación que resolver (mismo motivo que `getGroupVotes`). El dueño se
+ * deriva de `groups.created_by`; lo leemos una vez para no fiarnos solo de `role`.
+ */
+export async function getGroupMembers(groupId: string): Promise<GroupMemberInfo[]> {
+  const [{ data: members, error }, { data: group, error: groupError }] = await Promise.all([
+    supabase.from('group_members').select('user_id, role').eq('group_id', groupId),
+    supabase.from('groups').select('created_by').eq('id', groupId).maybeSingle(),
+  ])
+  if (error) throw error
+  if (groupError) throw groupError
+
+  const rows = members ?? []
+  if (rows.length === 0) return []
+  const ownerId = group?.created_by ?? null
+
+  const ids = [...new Set(rows.map((r) => r.user_id))]
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .in('id', ids)
+  if (profilesError) throw profilesError
+  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name]))
+
+  return rows
+    .map((row) => {
+      const isOwner = row.user_id === ownerId || row.role === 'owner'
+      return {
+        userId: row.user_id,
+        name: nameById.get(row.user_id) ?? '—',
+        role: row.role,
+        isOwner,
+      }
+    })
+    .sort((a, b) => Number(b.isOwner) - Number(a.isOwner) || a.name.localeCompare(b.name))
+}
+
+/**
+ * Salir de un grupo: borra la fila propia de `group_members`. El RLS
+ * `group_members_delete` permite borrar la fila propia (`user_id = auth.uid()`).
+ *
+ * El DUEÑO no puede salir sin más: dejaría el grupo huérfano (sin `created_by`
+ * editable). La UI le obliga a transferir la propiedad antes; aquí lo respaldamos
+ * lanzando si el que sale es el dueño actual del grupo.
+ */
+export async function leaveGroup(groupId: string, userId: string): Promise<void> {
+  const { data: group, error: groupError } = await supabase
+    .from('groups')
+    .select('created_by')
+    .eq('id', groupId)
+    .maybeSingle()
+  if (groupError) throw groupError
+  if (group?.created_by === userId) {
+    throw new Error('El dueño no puede salir del grupo: transfiere antes la propiedad.')
+  }
+
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+/**
+ * Expulsar a un miembro (solo el dueño). El RLS `group_members_delete` permite al
+ * dueño del grupo borrar filas ajenas. No comprobamos rol en cliente; un miembro
+ * recibiría 0 filas. La UI esconde la acción a los no-dueños.
+ */
+export async function kickMember(groupId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+/**
+ * Transferir la propiedad del grupo al miembro `newOwnerId`. Cambia
+ * `groups.created_by` y ajusta los roles en `group_members` (el nuevo dueño pasa
+ * a 'owner', el anterior a 'member') para que `role` y `created_by` no se
+ * contradigan.
+ *
+ * Sin transacción desde el cliente: hacemos primero los UPDATE de roles (los
+ * permite `group_members_update_owner` mientras sigamos siendo el dueño) y, en
+ * último lugar, el cambio de `created_by` (que es el que nos quita el poder). Si
+ * algún paso falla, lo propagamos; la UI avisa y el dueño puede reintentar.
+ *
+ * NOTA RLS: el `groups_update_owner` original NO permite poner `created_by`
+ * distinto de `auth.uid()` (su WITH CHECK lo exige), así que esto requiere la
+ * política nueva de la migración 0009 (ver supabase/migrations/0009_...).
+ */
+export async function transferOwnership(
+  groupId: string,
+  newOwnerId: string,
+  currentOwnerId: string,
+): Promise<void> {
+  // 1) Promover al nuevo dueño a 'owner'.
+  const promote = await supabase
+    .from('group_members')
+    .update({ role: 'owner' })
+    .eq('group_id', groupId)
+    .eq('user_id', newOwnerId)
+  if (promote.error) throw promote.error
+
+  // 2) Degradar al dueño actual a 'member'.
+  const demote = await supabase
+    .from('group_members')
+    .update({ role: 'member' })
+    .eq('group_id', groupId)
+    .eq('user_id', currentOwnerId)
+  if (demote.error) throw demote.error
+
+  // 3) Mover la propiedad. Último paso: a partir de aquí ya no somos el dueño.
+  const { error } = await supabase
+    .from('groups')
+    .update({ created_by: newOwnerId })
+    .eq('id', groupId)
+  if (error) throw error
+}
+
 // Forma de la fila del join group_members → groups que pedimos a PostgREST.
 interface MembershipRow {
   group_id: string

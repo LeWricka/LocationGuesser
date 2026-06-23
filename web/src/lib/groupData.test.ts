@@ -1,13 +1,22 @@
 import { describe, test, expect, vi } from 'vitest'
 
 // El módulo importa `./supabase`, que lanza sin env vars. Mockeamos un cliente
-// encadenable: aísla las funciones puras y deja inspeccionar el update de premios.
+// encadenable: aísla las funciones puras y deja inspeccionar el update de premios,
+// el rename y el delete del grupo.
 const updateSpy = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) }))
+const deleteSpy = vi.fn(() => ({ eq: vi.fn(() => Promise.resolve({ error: null })) }))
 vi.mock('./supabase', () => ({
-  supabase: { from: vi.fn(() => ({ update: updateSpy })) },
+  supabase: { from: vi.fn(() => ({ update: updateSpy, delete: deleteSpy })) },
 }))
 
-import { isLive, normalizePrizes, splitByStatus, updateGroupPrizes } from './groupData'
+import {
+  deleteGroup,
+  isLive,
+  normalizePrizes,
+  splitByStatus,
+  updateGroupName,
+  updateGroupPrizes,
+} from './groupData'
 
 const now = new Date('2026-06-19T12:00:00.000Z')
 const future = '2026-06-19T18:00:00.000Z'
@@ -71,5 +80,27 @@ describe('updateGroupPrizes', () => {
     updateSpy.mockClear()
     await updateGroupPrizes('ABC', { first: '   ', last: '' })
     expect(updateSpy).toHaveBeenCalledWith({ prizes: null })
+  })
+})
+
+describe('updateGroupName', () => {
+  test('recorta el nombre y lo guarda', async () => {
+    updateSpy.mockClear()
+    await updateGroupName('ABC', '  Finde en Madrid  ')
+    expect(updateSpy).toHaveBeenCalledWith({ name: 'Finde en Madrid' })
+  })
+
+  test('nombre vacío → null (cae al código del grupo)', async () => {
+    updateSpy.mockClear()
+    await updateGroupName('ABC', '   ')
+    expect(updateSpy).toHaveBeenCalledWith({ name: null })
+  })
+})
+
+describe('deleteGroup', () => {
+  test('borra el grupo por su id', async () => {
+    deleteSpy.mockClear()
+    await deleteGroup('ABC')
+    expect(deleteSpy).toHaveBeenCalled()
   })
 })

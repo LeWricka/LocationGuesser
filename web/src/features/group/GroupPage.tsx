@@ -20,6 +20,7 @@ import { fmtDist } from '../../lib/geo'
 import { formatDeadline } from '../../lib/time'
 import { useSession } from '../../lib/session-context'
 import { deleteChallenge } from '../../lib/challenges'
+import { track } from '../../lib/analytics'
 import { isMember, myGroups } from '../../lib/membership'
 import type { Challenge, GroupPrizes } from '../../lib/database.types'
 import { supabase } from '../../lib/supabase'
@@ -30,6 +31,9 @@ import { ShareLeaderboardModal } from './ShareLeaderboardModal'
 import { signedImageUrl } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { CreateChallenge } from '../create/CreateChallenge'
+import { EditChallenge } from './EditChallenge'
+import { GroupMembersSection } from './GroupMembersSection'
+import { GroupSettingsModal } from './GroupSettingsModal'
 import { RevealMap } from './RevealMap'
 import styles from './GroupPage.module.css'
 
@@ -65,8 +69,13 @@ export function GroupPage({ groupId, onBack }: Props) {
   // su enlace para compartir, sin salir del grupo.
   const [adding, setAdding] = useState(false)
   const [created, setCreated] = useState<Challenge | null>(null)
+  // Reto en edición (estado interno como `adding`): muestra la pantalla de
+  // edición y al terminar refresca la lista.
+  const [editing, setEditing] = useState<Challenge | null>(null)
   // Modal de "Compartir clasificación como imagen" (genera y previsualiza el PNG).
   const [sharingLeaderboard, setSharingLeaderboard] = useState(false)
+  // Modal de ajustes del grupo (renombrar / borrar), solo dueño.
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const toast = useToast()
   // Evita re-avisar de un mismo voto si Realtime reenvía el evento (un toast por id).
   const announcedVotes = useRef<Set<string>>(new Set())
@@ -206,6 +215,20 @@ export function GroupPage({ groupId, onBack }: Props) {
     )
   }
 
+  // Editar un reto del grupo (solo dueño; la UI esconde el botón a los miembros).
+  if (editing) {
+    return (
+      <EditChallenge
+        challenge={editing}
+        onBack={() => setEditing(null)}
+        onSaved={() => {
+          setEditing(null)
+          void refresh()
+        }}
+      />
+    )
+  }
+
   if (error) {
     return (
       <main className="lg-page">
@@ -236,6 +259,16 @@ export function GroupPage({ groupId, onBack }: Props) {
             <Button variant="secondary" size="sm" onClick={() => void shareGroup(groupId, toast)}>
               Compartir grupo
             </Button>
+            {isOwner && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setSettingsOpen(true)}
+                aria-label="Ajustes del grupo"
+              >
+                ⚙️ Ajustes
+              </Button>
+            )}
             {isOwner && (
               <Button size="sm" onClick={() => setAdding(true)}>
                 ➕ Añadir reto
@@ -272,12 +305,14 @@ export function GroupPage({ groupId, onBack }: Props) {
               userId={user?.id}
               isOwner={isOwner}
               onDeleted={() => void refresh()}
+              onEdit={setEditing}
             />
             <PastSection
               challenges={past}
               votesByChallenge={votesByChallenge}
               isOwner={isOwner}
               onDeleted={() => void refresh()}
+              onEdit={setEditing}
             />
           </>
         ) : (
@@ -296,7 +331,32 @@ export function GroupPage({ groupId, onBack }: Props) {
             </Stack>
           </Card>
         )}
+
+        <GroupMembersSection
+          groupId={groupId}
+          meId={user?.id}
+          isOwner={isOwner}
+          onLeft={goBack}
+          onTransferred={() => {
+            // Tras transferir dejo de ser dueño: refresco datos y permisos.
+            setIsOwner(false)
+            void refresh()
+          }}
+        />
       </Stack>
+
+      {isOwner && settingsOpen && (
+        <GroupSettingsModal
+          groupId={groupId}
+          currentName={group?.name ?? null}
+          onClose={() => setSettingsOpen(false)}
+          onRenamed={() => {
+            setSettingsOpen(false)
+            void refresh()
+          }}
+          onDeleted={goBack}
+        />
+      )}
 
       {/* FAB: abre la previa de la tarjeta de clasificación para compartirla como
           IMAGEN en el chat (motor del bucle social). Siempre accesible. */}
@@ -658,6 +718,7 @@ function LiveSection({
   userId,
   isOwner,
   onDeleted,
+  onEdit,
 }: {
   challenges: Challenge[]
   votesByChallenge: Map<string, VoteWithName[]>
@@ -665,6 +726,7 @@ function LiveSection({
   userId?: string
   isOwner: boolean
   onDeleted: () => void
+  onEdit: (challenge: Challenge) => void
 }) {
   if (challenges.length === 0) return null
   return (
@@ -680,6 +742,7 @@ function LiveSection({
             userId={userId}
             isOwner={isOwner}
             onDeleted={onDeleted}
+            onEdit={onEdit}
           />
         ))}
       </Stack>
@@ -696,6 +759,7 @@ function LiveCard({
   userId,
   isOwner,
   onDeleted,
+  onEdit,
 }: {
   challenge: Challenge
   votes: VoteWithName[]
@@ -703,6 +767,7 @@ function LiveCard({
   userId?: string
   isOwner: boolean
   onDeleted: () => void
+  onEdit: (challenge: Challenge) => void
 }) {
   const ranked = [...votes].sort((a, b) => b.points - a.points)
   const playHref = `#g=${encodeURIComponent(groupId)}&c=${encodeURIComponent(challenge.id)}`
@@ -741,29 +806,51 @@ function LiveCard({
               Jugar este reto →
             </a>
           )}
-          {isOwner && <DeleteChallengeButton challengeId={challenge.id} onDeleted={onDeleted} />}
+          {isOwner && (
+            <Row gap={2}>
+              <Button variant="ghost" size="sm" onClick={() => onEdit(challenge)}>
+                Editar
+              </Button>
+              <DeleteChallengeButton
+                challengeId={challenge.id}
+                groupId={groupId}
+                voteCount={votes.length}
+                onDeleted={onDeleted}
+              />
+            </Row>
+          )}
         </Row>
       </Stack>
     </Card>
   )
 }
 
-// Botón de borrar reto (solo dueño; RLS lo respalda). Confirma antes de borrar.
+// Botón de borrar reto (solo dueño; RLS lo respalda). Confirma antes de borrar y
+// avisa cuántas jugadas se perderán (FK on delete cascade borra los votos).
 function DeleteChallengeButton({
   challengeId,
+  groupId,
+  voteCount,
   onDeleted,
 }: {
   challengeId: string
+  groupId: string
+  voteCount: number
   onDeleted: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const toast = useToast()
 
   async function remove() {
-    if (!confirm('¿Borrar este reto? No se puede deshacer.')) return
+    const plays =
+      voteCount === 0
+        ? 'Aún no tiene jugadas.'
+        : `Se borrarán ${voteCount} ${voteCount === 1 ? 'jugada' : 'jugadas'}.`
+    if (!confirm(`¿Borrar este reto? ${plays} No se puede deshacer.`)) return
     setBusy(true)
     try {
       await deleteChallenge(challengeId)
+      track('challenge_deleted', { group_id: groupId, challenge_id: challengeId })
       toast.show('Reto borrado', { tone: 'neutral' })
       onDeleted()
     } catch (err) {
@@ -788,11 +875,13 @@ function PastSection({
   votesByChallenge,
   isOwner,
   onDeleted,
+  onEdit,
 }: {
   challenges: Challenge[]
   votesByChallenge: Map<string, VoteWithName[]>
   isOwner: boolean
   onDeleted: () => void
+  onEdit: (challenge: Challenge) => void
 }) {
   return (
     <section>
@@ -810,6 +899,7 @@ function PastSection({
               votes={votesByChallenge.get(c.id) ?? []}
               isOwner={isOwner}
               onDeleted={onDeleted}
+              onEdit={onEdit}
             />
           ))}
         </Stack>
@@ -825,11 +915,13 @@ function PastCard({
   votes,
   isOwner,
   onDeleted,
+  onEdit,
 }: {
   challenge: Challenge
   votes: VoteWithName[]
   isOwner: boolean
   onDeleted: () => void
+  onEdit: (challenge: Challenge) => void
 }) {
   const [open, setOpen] = useState(false)
   const imageUrl = useSignedImage(challenge.image_path)
@@ -882,8 +974,16 @@ function PastCard({
               </ul>
             )}
             {isOwner && (
-              <Row justify="end">
-                <DeleteChallengeButton challengeId={challenge.id} onDeleted={onDeleted} />
+              <Row justify="end" gap={2}>
+                <Button variant="ghost" size="sm" onClick={() => onEdit(challenge)}>
+                  Editar
+                </Button>
+                <DeleteChallengeButton
+                  challengeId={challenge.id}
+                  groupId={challenge.group_id}
+                  voteCount={votes.length}
+                  onDeleted={onDeleted}
+                />
               </Row>
             )}
           </Stack>
