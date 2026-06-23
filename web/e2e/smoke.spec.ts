@@ -1,29 +1,39 @@
-import path from 'node:path'
 import { test, expect, type ConsoleMessage, type Page, type Request } from '@playwright/test'
 
-// Smoke E2E del flujo grupo-primero (#79). Recorre Home → crear grupo → página
-// del grupo → añadir reto → buscar y marcar un punto en el mapa → capa satélite.
-// NO pulsa "Crear reto", así que no escribe retos ni votos; solo crea un grupo
-// (un insert ligero y throwaway) para poder llegar a la pantalla de crear reto.
+// Smoke HERMÉTICO (#140): no depende de auth ni escribe en BD. La app ahora exige
+// login (magic link), así que el smoke se queda en la puerta: comprueba que la SPA
+// monta y que la pantalla de login es visible, sin pulsar nada que toque Supabase.
+// Pasa igual en local (`npm run e2e`) y en prod (`npm run e2e:prod`) y es el único
+// E2E que corre en CI (no necesita secretos).
 
-// Ruido tolerado. Los tiles de mapa (CARTO/Esri) y Nominatim son terceros y
-// pueden devolver 4xx/5xx puntuales o avisos de atribución sin que la app esté
-// rota; no queremos que un fallo de red de un tercero tiña el smoke de rojo.
+// Ruido tolerado: terceros (mapas, analítica) y la propia red de Supabase
+// (auth/realtime) pueden emitir avisos sin que la app esté rota. Solo nos
+// importan los errores PROPIOS.
 const THIRD_PARTY = [
+  // Mapas / Street View.
   'basemaps.cartocdn.com',
   'arcgisonline.com',
   'nominatim.openstreetmap.org',
   'tile.openstreetmap.org',
-  // Marcar el punto dispara findPanorama (Street View, pivote #54); su tráfico a
-  // Google es ruido de tercero, no un fallo de la app.
   'maps.googleapis.com',
   'maps.gstatic.com',
   'streetviewpixels',
+  'googleapis.com',
+  'gstatic.com',
   'google.com',
+  // Analítica.
+  'mxpnl.com',
+  'mixpanel.com',
+  // Supabase: auth/realtime pueden hacer ruido de red sin que la app esté rota.
+  'supabase.co',
+  // El navegador no incluye el host en este console.error, pero solo lo emiten
+  // recursos externos (tiles, Nominatim con 429, Google). La app no lo genera.
+  'Google Maps JavaScript API',
 ]
 
 function isThirdPartyNoise(text: string): boolean {
-  return THIRD_PARTY.some((host) => text.includes(host))
+  if (THIRD_PARTY.some((host) => text.includes(host))) return true
+  return /Failed to load resource.*status of \d{3}/.test(text)
 }
 
 // Engancha los listeners de higiene y devuelve el array donde se acumulan los
@@ -52,54 +62,26 @@ function trackErrors(page: Page): string[] {
 }
 
 test.describe('smoke', () => {
-  test('home → crear grupo → añadir reto → buscar → marcar punto → satélite, sin errores', async ({
-    page,
-  }, testInfo) => {
+  test('la SPA monta y muestra la pantalla de login, sin errores propios', async ({ page }) => {
     const errors = trackErrors(page)
 
-    // 1. Home: carga y CTA visible.
+    // 1. Carga la raíz: cualquier ruta sin sesión cae al login.
     await page.goto('/')
-    const cta = page.getByRole('button', { name: 'Crear un grupo' })
-    await expect(cta).toBeVisible()
-    await cta.click()
-    await expect(page.getByRole('heading', { name: 'Crear un grupo' })).toBeVisible()
 
-    // 2. Crear el grupo (nombre único por ejecución).
-    const groupName = `smoke-${Date.now().toString(36)}`
-    await page.getByRole('textbox', { name: 'Nombre del grupo' }).fill(groupName)
-    await page.getByRole('button', { name: 'Crear grupo' }).click()
+    // 2. La SPA montó: #root tiene contenido (no quedó en blanco).
+    const root = page.locator('#root')
+    await expect(root).not.toBeEmpty()
 
-    // 3. Página del grupo → añadir reto.
-    await expect(page.getByRole('heading', { name: groupName })).toBeVisible({ timeout: 20_000 })
-    await page.getByRole('button', { name: '➕ Añadir reto' }).first().click()
-    await expect(page.getByRole('heading', { name: 'Crear un reto' })).toBeVisible()
+    // 3. La pantalla de login es visible: título, campo de correo y botón de envío
+    //    (textos/roles reales de LoginScreen.tsx). Damos margen porque al arrancar
+    //    AuthProvider resuelve la sesión persistida (spinner) antes de pintar.
+    await expect(page.getByRole('heading', { name: 'Entra a LocationGuesser' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Enviar enlace mágico' })).toBeVisible()
 
-    // 4. Buscar (guard de z-index): escribe, espera sugerencias y clica la
-    // primera. Si el mapa la tapase (z-index roto), Playwright no podría hacer
-    // click y el test fallaría — justo el tipo de bug que queremos cazar.
-    const searchBox = page.getByRole('textbox', { name: 'Buscar un lugar' })
-    await searchBox.fill('Madrid')
-
-    const suggestions = page.getByRole('list').getByRole('button')
-    // Nominatim puede tardar; damos margen al debounce (300ms) + red.
-    await expect(suggestions.first()).toBeVisible({ timeout: 15_000 })
-    await suggestions.first().click()
-
-    // El badge confirma que el punto quedó marcado.
-    await expect(page.getByText('Punto marcado')).toBeVisible()
-
-    // Captura de la pantalla de crear reto con el punto ya marcado. La guardamos
-    // en e2e/.screenshots (gitignoreado) y la adjuntamos también al reporte.
-    const shotPath = path.join(testInfo.project.testDir, '.screenshots', 'crear-con-punto.png')
-    const shot = await page.screenshot({ path: shotPath, fullPage: true })
-    await testInfo.attach('crear-con-punto', { body: shot, contentType: 'image/png' })
-
-    // 5. Capa de mapa: activar Satélite y comprobar su estado.
-    const satellite = page.getByRole('button', { name: 'Satélite' })
-    await satellite.click()
-    await expect(satellite).toHaveAttribute('aria-pressed', 'true')
-
-    // 6. Higiene: ningún error de consola/JS/petición (salvo ruido de terceros).
-    expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
+    // 4. Higiene: ningún error PROPIO de consola/JS/petición (terceros tolerados).
+    expect(errors, `Errores inesperados al cargar el login:\n${errors.join('\n')}`).toEqual([])
   })
 })

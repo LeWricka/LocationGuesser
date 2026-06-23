@@ -1,0 +1,6 @@
+# Estado de sesión autenticada que genera global-setup (contiene tokens): NUNCA
+# se versiona. La suite autenticada lo regenera con E2E_USER_EMAIL/PASSWORD.
+.auth/
+
+# Capturas de pantalla de los smoke (artefactos de depuración).
+.screenshots/
