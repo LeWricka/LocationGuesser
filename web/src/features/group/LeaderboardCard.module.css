@@ -170,16 +170,16 @@
 /* Disco de puesto: medallas con su color; resto en teal/neutro. El número de
    puesto (>3) hereda el color del texto del disco. */
 .gold {
-  background-color: #ffcf5c;
-  color: #2a1500;
+  background-color: var(--medal-gold);
+  color: var(--medal-on-gold);
 }
 .silver {
-  background-color: #cfe0e6;
-  color: #11242b;
+  background-color: var(--medal-silver);
+  color: var(--medal-on-silver);
 }
 .bronze {
-  background-color: #d98a4e;
-  color: #2a1500;
+  background-color: var(--medal-bronze);
+  color: var(--medal-on-bronze);
 }
 .other {
   background-color: rgba(69, 201, 176, 0.18);
@@ -241,13 +241,13 @@
 /* El relleno de oro/plata/bronce/otros: forzamos color de relleno legible sobre
    la pista. Las clases de disco también se aplican a <i>, así reusamos color. */
 .bar > i.gold {
-  background-color: #ffcf5c;
+  background-color: var(--medal-gold);
 }
 .bar > i.silver {
-  background-color: #cfe0e6;
+  background-color: var(--medal-silver);
 }
 .bar > i.bronze {
-  background-color: #d98a4e;
+  background-color: var(--medal-bronze);
 }
 .bar > i.other {
   background-color: var(--teal-bright);
