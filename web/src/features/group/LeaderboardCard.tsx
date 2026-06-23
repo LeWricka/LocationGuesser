@@ -5,16 +5,15 @@ import type { GroupPrizes } from '../../lib/database.types'
 import { prizeForRow } from './prizes'
 import styles from './LeaderboardCard.module.css'
 
-// Cuántas filas entran en la tarjeta antes de resumir el resto con "+N más".
-// 8 mantiene el poster legible y con barras anchas en el formato vertical.
-const MAX_ROWS = 8
-
 interface Props {
   groupName: string
   entries: LeaderboardEntry[]
   prizes: GroupPrizes | null
   /** Dominio/llamada para el pie (sin protocolo, p.ej. locationguesser-sage.vercel.app). */
   domain: string
+  /** Foto del último reto como data URL (incrustada, same-origin para el snapshot).
+   * Null si el grupo no tiene retos con foto: la tarjeta se dibuja sin miniatura. */
+  photoDataUrl: string | null
 }
 
 // Medalla por puesto: oro/plata/bronce y luego el número del puesto.
@@ -37,18 +36,17 @@ function prizesLine(prizes: GroupPrizes | null): string | null {
 }
 
 /**
- * Tarjeta de clasificación para compartir como imagen (poster vertical 1080×1350).
+ * Tarjeta de clasificación para compartir como imagen (poster vertical, ancho
+ * 1080, alto que CRECE con el nº de jugadores: todos salen, nadie se trunca).
  * Pensada para snapshot con html-to-image: usa SOLO colores/gradientes/bordes
  * sólidos (sin backdrop-filter/filter/sombras de glow) para que la captura salga
  * fiel y nítida. Se monta fuera del viewport a tamaño real; el ref apunta al nodo
  * raíz que se rasteriza. Función presentacional pura.
  */
 export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function LeaderboardCard(
-  { groupName, entries, prizes, domain },
+  { groupName, entries, prizes, domain, photoDataUrl },
   ref,
 ) {
-  const shown = entries.slice(0, MAX_ROWS)
-  const extra = entries.length - shown.length
   // Barra relativa al líder: el primero llena al 100% y el resto en proporción.
   const top = entries[0]?.points ?? 0
   const prizesText = prizesLine(prizes)
@@ -62,12 +60,22 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
         <span className={styles.brandName}>LocationGuesser</span>
       </div>
 
-      <div className={styles.header}>
-        <span className={styles.eyebrow}>Clasificación</span>
-        <h1 className={styles.groupName}>{groupName}</h1>
+      <div className={styles.headerRow}>
+        <div className={styles.header}>
+          <span className={styles.eyebrow}>Clasificación</span>
+          <h1 className={styles.groupName}>{groupName}</h1>
+        </div>
+        {/* Miniatura del último reto: contexto visual de la foto que se juega.
+            Va como data URL (incrustada) para que el snapshot no la deje en blanco. */}
+        {photoDataUrl && (
+          <div className={styles.thumb}>
+            <img className={styles.thumbImg} src={photoDataUrl} alt="" aria-hidden="true" />
+            <span className={styles.thumbTag}>Último reto</span>
+          </div>
+        )}
       </div>
 
-      {shown.length === 0 ? (
+      {entries.length === 0 ? (
         <div className={styles.empty}>
           Aún no hay clasificación.
           <br />
@@ -75,7 +83,7 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
         </div>
       ) : (
         <ol className={styles.list}>
-          {shown.map((entry, i) => {
+          {entries.map((entry, i) => {
             const width = top > 0 ? Math.max(8, Math.round((entry.points / top) * 100)) : 0
             const prize = prizeForRow(prizes, i, entries.length)
             const rankClass =
@@ -102,7 +110,6 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
               </li>
             )
           })}
-          {extra > 0 && <li className={styles.more}>+{extra} más</li>}
         </ol>
       )}
 
