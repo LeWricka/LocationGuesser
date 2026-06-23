@@ -18,5 +18,20 @@ export default defineConfig({
     },
     // Los smoke E2E (e2e/*.spec.ts) corren con Playwright, no con Vitest.
     exclude: ['e2e/**', 'node_modules/**', 'dist/**'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      // Umbrales como SUELO (ratchet), no como meta: puestos un par de puntos por
+      // debajo de la cobertura ACTUAL (~30% líneas, ~86% ramas, ~72% funciones)
+      // para que CI NO falle hoy pero SÍ atrape una regresión que baje la barra.
+      // Súbelos con el tiempo a medida que aumente la cobertura real; no los pongas
+      // aspiracionales (romperían el build sin aportar). Reportes: --coverage.
+      thresholds: {
+        lines: 28,
+        statements: 28,
+        functions: 68,
+        branches: 82,
+      },
+    },
   },
 })

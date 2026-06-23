@@ -1,5 +1,3 @@
-import { toPng } from 'html-to-image'
-
 // Caption del mensaje al compartir: MÍNIMO. La clasificación, el podio y los
 // premios viajan ya dibujados en la IMAGEN, así que el texto solo aporta el
 // enlace clicable (la imagen no lo es) y una línea de gancho. Repetir la tabla
@@ -27,6 +25,9 @@ export function shareDomain(link: string): string {
 // pantallas retina y al ampliar en el chat. cacheBust evita imágenes cacheadas
 // de un render anterior. Devuelve un Blob listo para compartir/descargar.
 export async function nodeToPngBlob(node: HTMLElement): Promise<Blob> {
+  // import dinámico: html-to-image (~30 KB) solo se carga cuando el usuario va a
+  // compartir, no en el bundle inicial. Sale a su propio chunk en el build.
+  const { toPng } = await import('html-to-image')
   const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true })
   const res = await fetch(dataUrl)
   return res.blob()

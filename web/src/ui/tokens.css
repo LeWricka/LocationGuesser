@@ -90,6 +90,17 @@
   --color-accent-2: var(--teal-bright);
   --color-accent-2-soft: rgba(69, 201, 176, 0.16);
 
+  /* Medallas del podio (oro/plata/bronce) — disco de puesto y barra del ranking
+   * en la tarjeta para compartir. Colores sólidos a propósito: la tarjeta se
+   * rasteriza con html-to-image y los filtros/transparencias raras no se captan.
+   * El token `-on-*` es el texto legible sobre cada medalla. */
+  --medal-gold: #ffcf5c;
+  --medal-on-gold: #2a1500;
+  --medal-silver: #cfe0e6;
+  --medal-on-silver: #11242b;
+  --medal-bronze: #d98a4e;
+  --medal-on-bronze: #2a1500;
+
   /* Semánticos. "warning"/"toplay" se alinea con el ámbar de marca. */
   --color-success: #45c9b0;
   --color-success-soft: rgba(69, 201, 176, 0.16);
