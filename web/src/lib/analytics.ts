@@ -35,6 +35,16 @@ export type AnalyticsEvent =
   | 'challenge_created'
   | 'challenge_played'
   | 'result_revealed'
+  // Eventos pre-declarados para las features en curso (tarjeta, onboarding,
+  // home). Se declaran aquí de antemano para que esas features solo llamen a
+  // track() sin editar este catálogo en paralelo (evita choques de merge).
+  | 'leaderboard_shared'
+  | 'onboarding_started'
+  | 'onboarding_completed'
+  | 'onboarding_skipped'
+  | 'home_viewed'
+  | 'create_group_cta'
+  | 'join_group_cta'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {
