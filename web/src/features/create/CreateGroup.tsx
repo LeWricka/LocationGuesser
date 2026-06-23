@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { newGroupCode } from '../../lib/group'
 import { supabase } from '../../lib/supabase'
 import { joinGroupAsOwner } from '../../lib/membership'
+import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
 import { Button, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
 import styles from './CreateGroup.module.css'
@@ -38,6 +39,7 @@ export function CreateGroup({ onBack }: Props) {
       // Membresía 'owner' para que el grupo aparezca en "Tus grupos" (la home se
       // nutre de group_members). La fila propia la permite el RLS de inserción.
       await joinGroupAsOwner(groupId, user.id)
+      track('group_created', { group_id: groupId })
       // Navegar a la página del grupo. El listener de hashchange de App.tsx
       // recoge el cambio y renderiza GroupPage.
       location.hash = `#g=${groupId}`

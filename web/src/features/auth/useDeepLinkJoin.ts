@@ -5,8 +5,9 @@
 // idempotente: reentrar no duplica ni falla.
 
 import { useCallback, useRef } from 'react'
-import { joinGroup } from '../../lib/membership'
+import { isMember, joinGroup } from '../../lib/membership'
 import { parseHash } from '../../lib/route'
+import { track } from '../../lib/analytics'
 
 /**
  * Devuelve `joinIfGroup(hash)`: si el hash apunta a un grupo, hace `joinGroup` y
@@ -32,8 +33,16 @@ export function useDeepLinkJoin(userId: string | undefined) {
       if (inFlight.current === hash) return
       inFlight.current = hash
       try {
+        // ¿Ya soy miembro? Lo comprobamos ANTES del upsert para distinguir un
+        // alta real (interesa para analítica) de una reentrada idempotente.
+        const alreadyMember = await isMember(route.group, userId)
         // Auto-join idempotente: alta en group_members (o no-op si ya soy miembro).
         await joinGroup(route.group, userId)
+        // Solo contamos `group_joined` cuando el usuario REALMENTE se une (no en
+        // reentradas: abrir el mismo link otra vez no es un join nuevo).
+        if (!alreadyMember) {
+          track('group_joined', { group_id: route.group })
+        }
         // Restaurar el destino: el router por hash repinta a JUGAR (si hay #c) o
         // a la página del grupo. Normalizamos a `#g=…(&c=…)`.
         const normalized = normalizeGroupHash(route.group, route.challenge)

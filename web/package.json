@@ -25,6 +25,7 @@
     "@vis.gl/react-google-maps": "^1.8.3",
     "html-to-image": "^1.11.13",
     "leaflet": "^1.9.4",
+    "mixpanel-browser": "^2.80.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-leaflet": "^5.0.0"
@@ -36,6 +37,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
+    "@types/mixpanel-browser": "^2.60.0",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

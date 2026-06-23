@@ -1,0 +1,92 @@
+// Analítica (Mixpanel) — punto ÚNICO de acceso. Otras features importan `track`
+// y los nombres de evento desde aquí; nada de strings sueltos ni del SDK directo
+// fuera de esta lib. El token es público (como la publishable key de Supabase),
+// con fallback embebido para que funcione sin configurar env en local.
+//
+// Idempotente y a prueba de "no inicializado": todo lo público pasa por el guard
+// `enabled`, así llamar a track/identify antes de init (o en tests) es un no-op
+// seguro en vez de petar.
+
+import mixpanel from 'mixpanel-browser'
+
+// Token público de Mixpanel (proyecto EU). Va en el bundle del cliente por
+// diseño; el env permite sobreescribirlo por entorno sin tocar código.
+const FALLBACK_TOKEN = '804a0a0fe0da2496051217c66bd0ff83'
+
+const token = import.meta.env.VITE_MIXPANEL_TOKEN ?? FALLBACK_TOKEN
+
+// Apagamos la analítica cuando: no hay token, estamos en tests (unit/E2E no deben
+// mandar eventos) o el entorno lo desactiva explícitamente (VITE_ANALYTICS_DISABLED).
+const disabledByEnv = import.meta.env.VITE_ANALYTICS_DISABLED === 'true'
+const isTest = import.meta.env.MODE === 'test'
+
+// Estado de inicialización: solo arrancamos una vez y solo entonces `track` etc.
+// hacen algo real.
+let enabled = false
+
+// ── Catálogo de eventos ──────────────────────────────────────────────────────
+// Nombres en snake_case. Tipar la unión obliga a usar nombres válidos en todo el
+// código; añadir un evento nuevo = añadirlo aquí.
+export type AnalyticsEvent =
+  | 'signup_completed'
+  | 'login'
+  | 'group_created'
+  | 'group_joined'
+  | 'challenge_created'
+  | 'challenge_played'
+  | 'result_revealed'
+
+// Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
+export interface AnalyticsIdentity {
+  id: string
+  email?: string | null
+  name?: string | null
+  avatar?: string | null
+}
+
+/**
+ * Inicializa Mixpanel una sola vez (idempotente). No-op si no hay token, en
+ * tests (MODE === 'test') o si VITE_ANALYTICS_DISABLED === 'true'. Llamar desde
+ * main.tsx antes de montar la app.
+ */
+export function initAnalytics(): void {
+  if (enabled) return
+  if (!token || isTest || disabledByEnv) return
+
+  mixpanel.init(token, {
+    api_host: 'https://api-eu.mixpanel.com',
+    autocapture: true,
+    record_sessions_percent: 100,
+  })
+  enabled = true
+}
+
+/**
+ * Registra un evento del producto. Tipado: solo nombres del catálogo. No-op si
+ * la analítica no está activa (no inicializada, tests o desactivada).
+ */
+export function track(event: AnalyticsEvent, props?: Record<string, unknown>): void {
+  if (!enabled) return
+  mixpanel.track(event, props)
+}
+
+/**
+ * Asocia los eventos al usuario autenticado y rellena su perfil en Mixpanel.
+ * Idempotente: reidentificar con el mismo id no duplica. No-op si la analítica
+ * no está activa.
+ */
+export function identifyUser({ id, email, name, avatar }: AnalyticsIdentity): void {
+  if (!enabled) return
+  mixpanel.identify(id)
+  mixpanel.people.set({
+    $email: email ?? undefined,
+    $name: name ?? undefined,
+    avatar: avatar ?? undefined,
+  })
+}
+
+/** Desvincula la identidad (logout). No-op si la analítica no está activa. */
+export function resetAnalytics(): void {
+  if (!enabled) return
+  mixpanel.reset()
+}

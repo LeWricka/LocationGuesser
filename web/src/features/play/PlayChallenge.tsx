@@ -6,6 +6,7 @@ import { getChallenge } from '../../lib/challenges'
 import { getExistingVote, saveVote } from '../../lib/votes'
 import { computeResult, type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
+import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
 import type { Challenge } from '../../lib/database.types'
@@ -90,6 +91,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         // Se acabó el tiempo sin marcar → 0 puntos y queda MARCADO COMO JUGADO
         // (un voto de timeout: sin pin). Así no puede reintentar para puntuar.
         setTimedOut(true)
+        track('result_revealed', {
+          group_id: current.group_id,
+          challenge_id: current.id,
+          timed_out: true,
+          points: 0,
+        })
         if (user) {
           setSaving(true)
           try {
@@ -113,6 +120,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       const answer = { lat: current.lat, lng: current.lng }
       const r = computeResult(playedGuess, answer)
       setResult(r)
+      track('result_revealed', {
+        group_id: current.group_id,
+        challenge_id: current.id,
+        timed_out: false,
+        points: r.points,
+        distance_km: r.km,
+      })
 
       if (!user) {
         toast.show('No se guardó tu voto (sin sesión)', { tone: 'neutral' })
@@ -211,7 +225,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   }
 
   function confirm() {
-    if (challenge && guess) void reveal(challenge, guess)
+    if (challenge && guess) {
+      // Adivinanza enviada (con pin). El timeout sin marcar NO es "jugar": no
+      // hubo adivinanza, se contabiliza solo como result_revealed (timed_out).
+      track('challenge_played', { group_id: challenge.group_id, challenge_id: challenge.id })
+      void reveal(challenge, guess)
+    }
   }
 
   // Salida siempre disponible: nunca dejar al jugador atrapado en el reto. Si
