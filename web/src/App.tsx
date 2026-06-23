@@ -26,6 +26,7 @@ import {
   useDeepLinkJoin,
   needsProfileStep,
 } from './features/auth'
+import { OnboardingGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
@@ -144,10 +145,18 @@ function LoggedIn({ route }: { route: ReturnType<typeof parseHash> }) {
   // Reto concreto → jugar. Solo grupo → página del grupo. (El auto-join corre en
   // paralelo; la lectura ya exige ser miembro por RLS, por eso unimos primero.)
   if (route.challenge && route.group) {
-    return <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+    return (
+      <OnboardingGate context="challenge" userId={user?.id}>
+        <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+      </OnboardingGate>
+    )
   }
   if (route.group) {
-    return <GroupPage groupId={route.group} />
+    return (
+      <OnboardingGate context="group" userId={user?.id}>
+        <GroupPage groupId={route.group} />
+      </OnboardingGate>
+    )
   }
   if (route.view === 'new') {
     return <CreateGroup onBack={() => goHome()} />
