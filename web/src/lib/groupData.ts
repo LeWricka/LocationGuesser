@@ -52,6 +52,31 @@ export async function updateGroupPrizes(groupId: string, prizes: GroupPrizes): P
 }
 
 /**
+ * Renombra el grupo. Solo el dueño lo consigue: el RLS `groups_update_owner`
+ * restringe el UPDATE a `created_by = auth.uid()`, así que un miembro recibe 0
+ * filas; no comprobamos rol en cliente. Recortamos el nombre; vacío → null (cae
+ * al código del grupo en la cabecera, como hace `getGroup`).
+ */
+export async function updateGroupName(groupId: string, name: string): Promise<void> {
+  const trimmed = name.trim()
+  const { error } = await supabase
+    .from('groups')
+    .update({ name: trimmed || null })
+    .eq('id', groupId)
+  if (error) throw error
+}
+
+/**
+ * Borra el grupo entero. Solo el dueño (RLS `groups_delete_owner`). El borrado
+ * arrastra en cascada retos, votos y membresías (FK on delete cascade de la
+ * migración 0004), por eso la UI exige una confirmación fuerte antes de llamar.
+ */
+export async function deleteGroup(groupId: string): Promise<void> {
+  const { error } = await supabase.from('groups').delete().eq('id', groupId)
+  if (error) throw error
+}
+
+/**
  * Retos de un grupo, del más reciente al más antiguo. Alimenta la página del
  * grupo: separamos "en vivo" (deadline futura) de "anteriores" en la vista.
  */

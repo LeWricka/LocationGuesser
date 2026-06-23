@@ -45,6 +45,15 @@ export type AnalyticsEvent =
   | 'home_viewed'
   | 'create_group_cta'
   | 'join_group_cta'
+  // CRUD de gestión (#146): editar/borrar reto, renombrar/borrar grupo y gestión
+  // de miembros. Props: group_id siempre; challenge_id cuando aplique.
+  | 'challenge_edited'
+  | 'challenge_deleted'
+  | 'group_renamed'
+  | 'group_deleted'
+  | 'member_kicked'
+  | 'member_left'
+  | 'ownership_transferred'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

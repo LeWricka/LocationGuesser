@@ -5,14 +5,29 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 // devuelve un builder encadenable cuyo `then` resuelve `{ data, error }`.
 const results: Record<string, { data: unknown; error: unknown }> = {}
 const upsertCalls = vi.fn()
+const updateCalls = vi.fn()
+const deleteCalls = vi.fn()
+const eqCalls = vi.fn()
 
 function builderFor(table: string) {
   const builder: Record<string, unknown> = {}
-  for (const m of ['select', 'eq', 'in']) {
+  for (const m of ['select', 'in']) {
     builder[m] = () => builder
+  }
+  builder.eq = (...args: unknown[]) => {
+    eqCalls(table, ...args)
+    return builder
   }
   builder.upsert = (...args: unknown[]) => {
     upsertCalls(table, ...args)
+    return builder
+  }
+  builder.update = (...args: unknown[]) => {
+    updateCalls(table, ...args)
+    return builder
+  }
+  builder.delete = (...args: unknown[]) => {
+    deleteCalls(table, ...args)
     return builder
   }
   builder.maybeSingle = () => Promise.resolve(results[table] ?? { data: null, error: null })
@@ -25,7 +40,16 @@ vi.mock('./supabase', () => ({
   supabase: { from: (table: string) => builderFor(table) },
 }))
 
-import { joinGroup, isMember, myGroups, pendingChallenges } from './membership'
+import {
+  joinGroup,
+  isMember,
+  myGroups,
+  pendingChallenges,
+  getGroupMembers,
+  leaveGroup,
+  kickMember,
+  transferOwnership,
+} from './membership'
 
 const FAR_FUTURE = '2999-01-01T00:00:00.000Z'
 const PAST = '2000-01-01T00:00:00.000Z'
@@ -120,5 +144,80 @@ describe('pendingChallenges', () => {
     const pending = await pendingChallenges('u1')
     expect(pending.map((p) => p.challenge.id)).toEqual(['c-soon', 'c-later'])
     expect(pending[0].groupName).toBe('A')
+  })
+})
+
+describe('getGroupMembers', () => {
+  test('combina rol + nombre y pone al dueño primero', async () => {
+    results['group_members'] = {
+      data: [
+        { user_id: 'u-member', role: 'member' },
+        { user_id: 'u-owner', role: 'owner' },
+      ],
+      error: null,
+    }
+    results['groups'] = { data: { created_by: 'u-owner' }, error: null }
+    results['profiles'] = {
+      data: [
+        { id: 'u-owner', display_name: 'Ana' },
+        { id: 'u-member', display_name: 'Bea' },
+      ],
+      error: null,
+    }
+    const members = await getGroupMembers('g1')
+    expect(members[0].userId).toBe('u-owner')
+    expect(members[0].isOwner).toBe(true)
+    expect(members[0].name).toBe('Ana')
+    expect(members[1].isOwner).toBe(false)
+    expect(members[1].name).toBe('Bea')
+  })
+
+  test('sin miembros devuelve []', async () => {
+    results['group_members'] = { data: [], error: null }
+    results['groups'] = { data: { created_by: 'x' }, error: null }
+    expect(await getGroupMembers('g1')).toEqual([])
+  })
+})
+
+describe('leaveGroup', () => {
+  test('borra la fila propia si NO soy el dueño', async () => {
+    results['groups'] = { data: { created_by: 'otro' }, error: null }
+    await leaveGroup('g1', 'u1')
+    expect(deleteCalls).toHaveBeenCalledWith('group_members')
+    expect(eqCalls).toHaveBeenCalledWith('group_members', 'group_id', 'g1')
+    expect(eqCalls).toHaveBeenCalledWith('group_members', 'user_id', 'u1')
+  })
+
+  test('el DUEÑO no puede salir (debe transferir antes)', async () => {
+    results['groups'] = { data: { created_by: 'u1' }, error: null }
+    await expect(leaveGroup('g1', 'u1')).rejects.toThrow(/dueño/)
+    expect(deleteCalls).not.toHaveBeenCalled()
+  })
+})
+
+describe('kickMember', () => {
+  test('borra la fila del miembro expulsado', async () => {
+    results['group_members'] = { data: null, error: null }
+    await kickMember('g1', 'u-victim')
+    expect(deleteCalls).toHaveBeenCalledWith('group_members')
+    expect(eqCalls).toHaveBeenCalledWith('group_members', 'user_id', 'u-victim')
+  })
+})
+
+describe('transferOwnership', () => {
+  test('promueve al nuevo dueño, degrada al actual y mueve created_by', async () => {
+    results['group_members'] = { data: null, error: null }
+    results['groups'] = { data: null, error: null }
+    await transferOwnership('g1', 'u-new', 'u-old')
+    // Dos updates de roles en group_members + uno de created_by en groups.
+    expect(updateCalls).toHaveBeenCalledWith('group_members', { role: 'owner' })
+    expect(updateCalls).toHaveBeenCalledWith('group_members', { role: 'member' })
+    expect(updateCalls).toHaveBeenCalledWith('groups', { created_by: 'u-new' })
+  })
+
+  test('propaga si falla el primer paso (sin tocar created_by)', async () => {
+    results['group_members'] = { data: null, error: new Error('denied') }
+    await expect(transferOwnership('g1', 'u-new', 'u-old')).rejects.toThrow('denied')
+    expect(updateCalls).not.toHaveBeenCalledWith('groups', { created_by: 'u-new' })
   })
 })
