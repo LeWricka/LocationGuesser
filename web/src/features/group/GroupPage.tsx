@@ -19,10 +19,11 @@ import type { LeaderboardEntry } from '../../lib/leaderboard'
 import { fmtDist } from '../../lib/geo'
 import { formatDeadline } from '../../lib/time'
 import { useSession } from '../../lib/session-context'
-import { deleteChallenge } from '../../lib/challenges'
+import { deleteChallenge, getAnswers, type ChallengeForPlay } from '../../lib/challenges'
 import { track } from '../../lib/analytics'
 import { isMember, myGroups } from '../../lib/membership'
-import type { Challenge, GroupPrizes } from '../../lib/database.types'
+import type { GroupPrizes } from '../../lib/database.types'
+import type { LatLng } from '../../lib/geo'
 import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, splitByStatus, updateGroupPrizes } from '../../lib/groupData'
@@ -59,7 +60,7 @@ function challengeLink(groupId: string, challengeId: string): string {
 export function GroupPage({ groupId, onBack }: Props) {
   const { user } = useSession()
   const [group, setGroup] = useState<GroupInfo | null>(null)
-  const [challenges, setChallenges] = useState<Challenge[] | null>(null)
+  const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(null)
   const [votes, setVotes] = useState<VoteWithName[] | null>(null)
   // Soy dueño del grupo (veo gestión de retos) vs miembro (solo juego).
   const [isOwner, setIsOwner] = useState(false)
@@ -68,10 +69,10 @@ export function GroupPage({ groupId, onBack }: Props) {
   // `adding` muestra el formulario; `created` muestra el reto recién creado con
   // su enlace para compartir, sin salir del grupo.
   const [adding, setAdding] = useState(false)
-  const [created, setCreated] = useState<Challenge | null>(null)
+  const [created, setCreated] = useState<ChallengeForPlay | null>(null)
   // Reto en edición (estado interno como `adding`): muestra la pantalla de
   // edición y al terminar refresca la lista.
-  const [editing, setEditing] = useState<Challenge | null>(null)
+  const [editing, setEditing] = useState<ChallengeForPlay | null>(null)
   // Modal de "Compartir clasificación como imagen" (genera y previsualiza el PNG).
   const [sharingLeaderboard, setSharingLeaderboard] = useState(false)
   // Modal de ajustes del grupo (renombrar / borrar), solo dueño.
@@ -165,6 +166,25 @@ export function GroupPage({ groupId, onBack }: Props) {
   }, [votes])
 
   const { live, past } = useMemo(() => splitByStatus(challenges ?? []), [challenges])
+
+  // Respuestas (lat/lng) de los retos CERRADOS, para pintar el pin real en el
+  // revelado de "anteriores". Ya no vienen en el reto (columna revocada en 0010):
+  // se piden a `challenge_answers`, cuya RLS solo sirve las de retos cerrados o ya
+  // votados. setState va dentro del .then (async), nunca síncrono en el efecto.
+  const [answersById, setAnswersById] = useState<Map<string, LatLng>>(new Map())
+  useEffect(() => {
+    let cancelled = false
+    void getAnswers(past.map((c) => c.id))
+      .then((m) => {
+        if (!cancelled) setAnswersById(m)
+      })
+      .catch(() => {
+        // Sin respuestas (RLS/red): el revelado cae a "sin mapa", no rompe la página.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [past])
 
   // Histórico de fotos del grupo. Las imágenes viven en un bucket privado y se
   // sirven con URL firmada (async), así que resolvemos las de los retos con
@@ -310,6 +330,7 @@ export function GroupPage({ groupId, onBack }: Props) {
             <PastSection
               challenges={past}
               votesByChallenge={votesByChallenge}
+              answersById={answersById}
               isOwner={isOwner}
               onDeleted={() => void refresh()}
               onEdit={setEditing}
@@ -464,7 +485,7 @@ function ChallengeCreated({
   onDismiss,
 }: {
   groupId: string
-  challenge: Challenge
+  challenge: ChallengeForPlay
   onDismiss: () => void
 }) {
   const toast = useToast()
@@ -720,13 +741,13 @@ function LiveSection({
   onDeleted,
   onEdit,
 }: {
-  challenges: Challenge[]
+  challenges: ChallengeForPlay[]
   votesByChallenge: Map<string, VoteWithName[]>
   groupId: string
   userId?: string
   isOwner: boolean
   onDeleted: () => void
-  onEdit: (challenge: Challenge) => void
+  onEdit: (challenge: ChallengeForPlay) => void
 }) {
   if (challenges.length === 0) return null
   return (
@@ -761,13 +782,13 @@ function LiveCard({
   onDeleted,
   onEdit,
 }: {
-  challenge: Challenge
+  challenge: ChallengeForPlay
   votes: VoteWithName[]
   groupId: string
   userId?: string
   isOwner: boolean
   onDeleted: () => void
-  onEdit: (challenge: Challenge) => void
+  onEdit: (challenge: ChallengeForPlay) => void
 }) {
   const ranked = [...votes].sort((a, b) => b.points - a.points)
   const playHref = `#g=${encodeURIComponent(groupId)}&c=${encodeURIComponent(challenge.id)}`
@@ -873,15 +894,17 @@ function DeleteChallengeButton({
 function PastSection({
   challenges,
   votesByChallenge,
+  answersById,
   isOwner,
   onDeleted,
   onEdit,
 }: {
-  challenges: Challenge[]
+  challenges: ChallengeForPlay[]
   votesByChallenge: Map<string, VoteWithName[]>
+  answersById: Map<string, LatLng>
   isOwner: boolean
   onDeleted: () => void
-  onEdit: (challenge: Challenge) => void
+  onEdit: (challenge: ChallengeForPlay) => void
 }) {
   return (
     <section>
@@ -897,6 +920,7 @@ function PastSection({
               key={c.id}
               challenge={c}
               votes={votesByChallenge.get(c.id) ?? []}
+              answer={answersById.get(c.id) ?? null}
               isOwner={isOwner}
               onDeleted={onDeleted}
               onEdit={onEdit}
@@ -913,15 +937,18 @@ function PastSection({
 function PastCard({
   challenge,
   votes,
+  answer,
   isOwner,
   onDeleted,
   onEdit,
 }: {
-  challenge: Challenge
+  challenge: ChallengeForPlay
   votes: VoteWithName[]
+  /** Respuesta real (de challenge_answers, RLS). null si aún no llegó o no hay derecho. */
+  answer: LatLng | null
   isOwner: boolean
   onDeleted: () => void
-  onEdit: (challenge: Challenge) => void
+  onEdit: (challenge: ChallengeForPlay) => void
 }) {
   const [open, setOpen] = useState(false)
   const imageUrl = useSignedImage(challenge.image_path)
@@ -945,17 +972,19 @@ function PastCard({
             {imageUrl && (
               <img className={styles.photo} src={imageUrl} alt={challenge.title} loading="lazy" />
             )}
-            <RevealMap
-              answer={{ lat: challenge.lat, lng: challenge.lng }}
-              // Los votos de timeout no tienen pin (guess null): no se plotean.
-              votes={ranked
-                .filter((v) => v.guess_lat != null && v.guess_lng != null)
-                .map((v) => ({
-                  name: v.display_name,
-                  lat: v.guess_lat as number,
-                  lng: v.guess_lng as number,
-                }))}
-            />
+            {answer ? (
+              <RevealMap
+                answer={answer}
+                // Los votos de timeout no tienen pin (guess null): no se plotean.
+                votes={ranked
+                  .filter((v) => v.guess_lat != null && v.guess_lng != null)
+                  .map((v) => ({
+                    name: v.display_name,
+                    lat: v.guess_lat as number,
+                    lng: v.guess_lng as number,
+                  }))}
+              />
+            ) : null}
             {ranked.length === 0 ? (
               <p className={styles.empty}>Este reto se cerró sin votos.</p>
             ) : (

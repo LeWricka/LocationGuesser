@@ -13,8 +13,12 @@ type ChallengeUpdate = Database['public']['Tables']['challenges']['Update']
  */
 export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 
-// Columnas del reto SIN lat/lng: lo que el flujo de jugar puede leer sin spoiler.
-const PLAY_COLUMNS =
+// Columnas del reto SIN lat/lng: lo que CUALQUIER lectura de `challenges` por el
+// cliente puede pedir tras revocar el privilegio de columna lat/lng (migración 0010).
+// La respuesta (lat/lng) ya no es legible desde `challenges`; vive en
+// `challenge_answers` (RLS). Reutilizado por todos los lectores: jugar, lista del
+// grupo, home y el RETURNING de crear/editar.
+export const CHALLENGE_COLUMNS_NO_ANSWER =
   'id, group_id, title, image_path, sv_pano_id, sv_heading, sv_pitch, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
 
 export interface NewChallengeInput {
@@ -50,7 +54,7 @@ const DEFAULT_DURATION_HOURS = 24
 
 export async function createChallenge(
   input: NewChallengeInput,
-): Promise<{ challenge: Challenge; groupId: string }> {
+): Promise<{ challenge: ChallengeForPlay; groupId: string }> {
   const groupId = input.groupId
   const { data, error } = await supabase
     .from('challenges')
@@ -68,8 +72,10 @@ export async function createChallenge(
       deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
       created_by: input.createdBy,
     })
-    .select()
-    .single()
+    // RETURNING sin lat/lng: tras revocar la columna (0010), pedirlas aquí daría
+    // error de permiso. La respuesta ya queda espejada en challenge_answers abajo.
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .single<ChallengeForPlay>()
   if (error) throw error
 
   // Espejamos la respuesta en `challenge_answers` (fuente que la RPC consulta y que
@@ -92,11 +98,27 @@ export async function createChallenge(
 export async function getChallenge(id: string): Promise<ChallengeForPlay> {
   const { data, error } = await supabase
     .from('challenges')
-    .select(PLAY_COLUMNS)
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
     .eq('id', id)
     .single<ChallengeForPlay>()
   if (error) throw error
   return data
+}
+
+/**
+ * Respuestas (lat/lng) de varios retos a la vez, indexadas por challenge_id. La RLS
+ * de `challenge_answers` solo devuelve las que el solicitante puede ver (reto cerrado
+ * o ya votado; el dueño, las suyas). La usa la página del grupo para pintar el pin de
+ * la respuesta en los retos CERRADOS (sección "anteriores") sin un fetch por tarjeta.
+ */
+export async function getAnswers(challengeIds: string[]): Promise<Map<string, LatLng>> {
+  if (challengeIds.length === 0) return new Map()
+  const { data, error } = await supabase
+    .from('challenge_answers')
+    .select('challenge_id, lat, lng')
+    .in('challenge_id', challengeIds)
+  if (error) throw error
+  return new Map((data ?? []).map((a) => [a.challenge_id, { lat: a.lat, lng: a.lng }]))
 }
 
 /**
@@ -171,7 +193,10 @@ export interface UpdateChallengeInput {
  * a posteriori). Por eso comprobamos `countVotes` aquí, en la capa de datos, aunque
  * la UI ya bloquee el campo: la regla no debe depender solo del cliente.
  */
-export async function updateChallenge(id: string, input: UpdateChallengeInput): Promise<Challenge> {
+export async function updateChallenge(
+  id: string,
+  input: UpdateChallengeInput,
+): Promise<ChallengeForPlay> {
   const patch: ChallengeUpdate = {}
   if (input.title !== undefined) patch.title = input.title
   if (input.deadlineAt !== undefined) patch.deadline_at = input.deadlineAt
@@ -195,8 +220,10 @@ export async function updateChallenge(id: string, input: UpdateChallengeInput): 
     .from('challenges')
     .update(patch)
     .eq('id', id)
-    .select()
-    .single()
+    // RETURNING sin lat/lng (columna revocada en 0010); la respuesta nueva se espeja
+    // en challenge_answers abajo cuando cambia la ubicación.
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .single<ChallengeForPlay>()
   if (error) throw error
 
   // Si cambió la ubicación (solo posible sin votos), espejamos la respuesta en

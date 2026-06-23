@@ -12,6 +12,7 @@ const calls = {
   delete: vi.fn(),
   select: vi.fn(),
   eq: vi.fn(),
+  in: vi.fn(),
 }
 
 function builderFor(table: string) {
@@ -22,6 +23,10 @@ function builderFor(table: string) {
   }
   builder.eq = (...args: unknown[]) => {
     calls.eq(table, ...args)
+    return builder
+  }
+  builder.in = (...args: unknown[]) => {
+    calls.in(table, ...args)
     return builder
   }
   builder.insert = (...args: unknown[]) => {
@@ -52,7 +57,14 @@ vi.mock('./supabase', () => ({
   },
 }))
 
-import { createChallenge, getChallenge, getAnswer, countVotes, updateChallenge } from './challenges'
+import {
+  createChallenge,
+  getChallenge,
+  getAnswer,
+  getAnswers,
+  countVotes,
+  updateChallenge,
+} from './challenges'
 
 const sampleChallenge: Challenge = {
   id: 'c1',
@@ -156,6 +168,28 @@ describe('getAnswer', () => {
   test('propaga el error', async () => {
     results['challenge_answers'] = { data: null, error: new Error('boom') }
     await expect(getAnswer('c1')).rejects.toThrow('boom')
+  })
+})
+
+describe('getAnswers', () => {
+  test('indexa por challenge_id las respuestas que la RLS sirve', async () => {
+    results['challenge_answers'] = {
+      data: [
+        { challenge_id: 'c1', lat: 40.4, lng: -3.7 },
+        { challenge_id: 'c2', lat: 41.3, lng: 2.1 },
+      ],
+      error: null,
+    }
+    const out = await getAnswers(['c1', 'c2'])
+    expect(calls.in).toHaveBeenCalledWith('challenge_answers', 'challenge_id', ['c1', 'c2'])
+    expect(out.get('c1')).toEqual({ lat: 40.4, lng: -3.7 })
+    expect(out.get('c2')).toEqual({ lat: 41.3, lng: 2.1 })
+  })
+
+  test('lista vacía no consulta y devuelve un mapa vacío', async () => {
+    const out = await getAnswers([])
+    expect(out.size).toBe(0)
+    expect(calls.in).not.toHaveBeenCalled()
   })
 })
 

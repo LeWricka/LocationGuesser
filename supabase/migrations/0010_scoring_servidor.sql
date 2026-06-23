@@ -32,20 +32,19 @@
 -- (no hay staging). Ver always.md §6.
 --
 -- ────────────────────────────────────────────────────────────────────────────
--- NOTA sobre la ocultación de la respuesta (enfoque elegido — opción (a) parcial):
---   · La pieza de SERVIDOR que oculta la respuesta es `challenge_answers` + su RLS:
---     la RPC `submit_vote` la devuelve al votar (revelado instantáneo) y un miembro
---     que recargue un reto YA votado (o ya cerrado) puede leerla por RLS.
---   · El CLIENTE (lib/challenges.getChallenge) deja de pedir `lat/lng` para el flujo de
---     jugar: el payload del mapa de adivinar ya NO contiene la respuesta.
---   · Cerrar el leak DIRECTO de `challenges.lat/lng` por REST (curl select=lat,lng en un
---     reto abierto) exige revocar el privilegio de COLUMNA de `challenges.lat/lng` (o
---     moverlas a esta tabla). Eso rompería a los lectores que hacen `select()` = `*`
---     sobre `challenges` y leen lat/lng de retos CERRADOS: `groupData.getGroupChallenges`,
---     `membership` y `GroupPage`/`EditChallenge` — TODOS fuera del alcance de #150.
---     Por eso ese paso (revocar columna + apuntar esos lectores a `challenge_answers`)
---     se deja como FOLLOW-UP coordinado, no en esta migración. Al final del fichero hay
---     el bloque exacto, COMENTADO, listo para ese paso. Ver el PR para el detalle.
+-- NOTA sobre la ocultación de la respuesta (cierre COMPLETO — opción (a)):
+--   · La respuesta vive en `challenge_answers` + su RLS: la RPC `submit_vote` la
+--     devuelve al votar (revelado instantáneo) y un miembro que recargue un reto YA
+--     votado (o ya cerrado) puede leerla por RLS. El dueño puede leer la suya siempre.
+--   · El CLIENTE ya no pide `lat/lng` de `challenges`: `getChallenge` (jugar),
+--     `getGroupChallenges`, `challengesForGroups` y el RETURNING de
+--     `createChallenge`/`updateChallenge` seleccionan columnas explícitas SIN lat/lng;
+--     los lectores que necesitan la respuesta de retos cerrados (GroupPage reveal,
+--     EditChallenge) la leen de `challenge_answers`.
+--   · Además REVOCAMOS el privilegio de columna `challenges.lat/lng` (sección 4): el
+--     leak directo por REST (`curl select=lat,lng` en un reto abierto) queda cerrado.
+--   · Resultado: los DOS críticos cerrados — puntos con autoridad de servidor y la
+--     respuesta NO legible antes de votar (ni por la app ni por REST directo).
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 1. challenge_answers — la respuesta del reto, gobernada por RLS
@@ -242,17 +241,20 @@ revoke all on function public.submit_vote(uuid, double precision, double precisi
 grant execute on function public.submit_vote(uuid, double precision, double precision) to authenticated;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- FOLLOW-UP COORDINADO (NO en esta migración) — cerrar el leak DIRECTO por REST
+-- 4. Cerrar el leak DIRECTO de la respuesta por REST (revocar columna)
 -- ════════════════════════════════════════════════════════════════════════════
--- Para que `select=lat,lng` por REST sobre un reto ABIERTO deje de devolver la
--- respuesta, hay que revocar el privilegio de COLUMNA y apuntar los lectores de retos
--- CERRADOS a challenge_answers. Esos lectores (groupData.getGroupChallenges, membership,
--- GroupPage, EditChallenge) están FUERA del alcance de #150, así que esto se hace en una
--- issue/PR aparte, en el MISMO despliegue coordinado. Bloque listo (déjalo comentado):
+-- Aunque la app ya no pide lat/lng para jugar, un miembro podía leer la respuesta
+-- de un reto ABIERTO con un `curl challenges?select=lat,lng` (RLS es por FILA, no por
+-- columna). Como el scoring ya es server-side, esto no permite inflar puntos, pero SÍ
+-- permitiría a un tramposo "adivinar" exacto y sacar el máximo: hay que cerrarlo.
 --
---   revoke select (lat, lng) on public.challenges from authenticated;
---   -- (y cambiar esos lectores a leer la respuesta de challenge_answers)
---
--- Hasta entonces, la respuesta de un reto abierto sigue siendo legible por REST directo
--- (no por el flujo de la app, que ya no la pide). El scoring, en cambio, queda blindado
--- desde ESTA migración: aunque conozcas la respuesta, los puntos los pone el servidor.
+-- Revocamos el privilegio de COLUMNA de `challenges.lat/lng`: a partir de aquí NINGÚN
+-- cliente (authenticated/anon) puede seleccionarlas por REST. La respuesta vive SOLO en
+-- `challenge_answers`, gobernada por su RLS (cerrado o ya votó). Los lectores del cliente
+-- ya están repuntados a columnas explícitas SIN lat/lng (getChallenge, getGroupChallenges,
+-- challengesForGroups, createChallenge/updateChallenge RETURNING) y los que necesitan la
+-- respuesta de retos cerrados leen de `challenge_answers` (GroupPage reveal, EditChallenge).
+-- La RPC `submit_vote` es SECURITY DEFINER: lee la respuesta de challenge_answers sin verse
+-- afectada por este revoke.
+revoke select (lat, lng) on public.challenges from authenticated;
+revoke select (lat, lng) on public.challenges from anon;

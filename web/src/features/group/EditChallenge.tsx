@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { MapPicker } from '../create/MapPicker'
 import { StreetViewPreview } from '../create/StreetViewPreview'
 import type { LatLng } from '../../lib/geo'
-import { countVotes, updateChallenge } from '../../lib/challenges'
+import { countVotes, getAnswer, updateChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes } from '../../lib/time'
-import type { Challenge } from '../../lib/database.types'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { uploadImage } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
@@ -23,12 +22,12 @@ import {
 import styles from '../create/CreateChallenge.module.css'
 
 interface Props {
-  /** Reto a editar. Trae los valores actuales para precargar el formulario. */
-  challenge: Challenge
+  /** Reto a editar (SIN lat/lng: la respuesta se carga aparte de challenge_answers). */
+  challenge: ChallengeForPlay
   /** Vuelve atrás sin guardar (cancelar). */
   onBack: () => void
   /** Reto actualizado: el grupo lo usa para refrescar la lista. */
-  onSaved: (challenge: Challenge) => void
+  onSaved: (challenge: ChallengeForPlay) => void
 }
 
 // Mismas "paradas" de duración que al crear: editar la duración recoloca el
@@ -76,15 +75,14 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
   const [votes, setVotes] = useState<number | null>(null)
   const locationLocked = votes === null || votes > 0
 
-  // Punto/panorama: arrancan de los valores del reto. Solo se mandan si el dueño
-  // los cambia y la ubicación no está bloqueada.
-  const [point, setPoint] = useState<LatLng>({ lat: challenge.lat, lng: challenge.lng })
+  // Punto/panorama: la ubicación real (la respuesta) ya NO viaja en el reto
+  // (columna revocada en 0010). La cargamos aparte de `challenge_answers` (el dueño
+  // tiene derecho por RLS) y prefijamos el formulario cuando llega. Hasta entonces,
+  // arrancamos en un punto neutro y marcamos `locationReady=false`.
+  const [point, setPoint] = useState<LatLng>(SPAIN)
   const [flyTo, setFlyTo] = useState<LatLng | null>(null)
-  const [pano, setPano] = useState<PanoramaMatch | null>(
-    challenge.sv_pano_id
-      ? { panoId: challenge.sv_pano_id, lat: challenge.lat, lng: challenge.lng }
-      : null,
-  )
+  const [pano, setPano] = useState<PanoramaMatch | null>(null)
+  const [locationReady, setLocationReady] = useState(false)
   const [pov, setPov] = useState({
     heading: challenge.sv_heading ?? 0,
     pitch: challenge.sv_pitch ?? 0,
@@ -121,6 +119,31 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
       cancelled = true
     }
   }, [challenge.id])
+
+  // Carga la ubicación real (la respuesta) de challenge_answers para prefijar el
+  // formulario. El dueño tiene derecho a leerla por RLS aunque el reto siga abierto
+  // y sin votos. Prefija punto, mapa (flyTo) y el panorama existente (si lo había).
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const answer = await getAnswer(challenge.id)
+        if (cancelled || !answer) return
+        setPoint(answer)
+        setFlyTo(answer)
+        if (challenge.sv_pano_id) {
+          setPano({ panoId: challenge.sv_pano_id, lat: answer.lat, lng: answer.lng })
+        }
+        setLocationReady(true)
+      } catch {
+        // Sin respuesta (RLS/red): dejamos el formulario sin prefijar (locationReady
+        // sigue false); el dueño puede recolocar si la ubicación no está bloqueada.
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [challenge.id, challenge.sv_pano_id])
 
   function pickPhoto(file: File | null) {
     setPhotoPreview((prev) => {
@@ -249,7 +272,7 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
               <Row gap={2} className={styles.coords}>
                 <Badge tone="neutral">🔒 Ubicación fija</Badge>
                 <span>
-                  {challenge.lat.toFixed(5)}, {challenge.lng.toFixed(5)}
+                  {locationReady ? `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}` : 'Cargando…'}
                 </span>
               </Row>
             ) : (

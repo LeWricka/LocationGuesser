@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import type { Challenge, GroupPrizes } from './database.types'
+import { CHALLENGE_COLUMNS_NO_ANSWER, type ChallengeForPlay } from './challenges'
 
 /** Id + nombre + premios del grupo. El nombre titula la página (si falta, cae al
  * código); `prizes` son los premios por posición (1º/2º/3º/último) que se marcan
@@ -80,14 +81,16 @@ export async function deleteGroup(groupId: string): Promise<void> {
  * Retos de un grupo, del más reciente al más antiguo. Alimenta la página del
  * grupo: separamos "en vivo" (deadline futura) de "anteriores" en la vista.
  */
-export async function getGroupChallenges(groupId: string): Promise<Challenge[]> {
+export async function getGroupChallenges(groupId: string): Promise<ChallengeForPlay[]> {
   const { data, error } = await supabase
     .from('challenges')
-    .select()
+    // Sin lat/lng (columna revocada en 0010): la respuesta de los retos cerrados se
+    // pide aparte con `getAnswers` (RLS la sirve solo para cerrados/ya votados).
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
     .eq('group_id', groupId)
     .order('created_at', { ascending: false })
   if (error) throw error
-  return data ?? []
+  return (data ?? []) as ChallengeForPlay[]
 }
 
 /** Un reto está abierto si su plazo aún no ha vencido (comparado con `now`). */

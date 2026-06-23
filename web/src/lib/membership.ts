@@ -4,7 +4,7 @@
 
 import { supabase } from './supabase'
 import { isLive } from './groupData'
-import type { Challenge } from './database.types'
+import { CHALLENGE_COLUMNS_NO_ANSWER, type ChallengeForPlay } from './challenges'
 
 /** Estado de un grupo en la home (cuentas-y-home.md §3.1, tarjetas "Tus grupos"). */
 export type GroupStatus =
@@ -23,7 +23,7 @@ export interface MyGroup {
 
 /** Reto abierto que aún no he votado, para la sección "🔔 Te toca jugar". */
 export interface PendingChallenge {
-  challenge: Challenge
+  challenge: ChallengeForPlay
   groupId: string
   groupName: string | null
 }
@@ -236,7 +236,7 @@ export async function myGroups(userId: string): Promise<MyGroup[]> {
   ])
 
   const now = new Date()
-  const byGroup = new Map<string, Challenge[]>()
+  const byGroup = new Map<string, ChallengeForPlay[]>()
   for (const c of challenges) {
     const list = byGroup.get(c.group_id) ?? []
     list.push(c)
@@ -286,7 +286,7 @@ export async function pendingChallenges(userId: string): Promise<PendingChalleng
 // ── Helpers internos ─────────────────────────────────────────────────────────
 
 function deriveStatus(
-  challenges: Challenge[],
+  challenges: ChallengeForPlay[],
   votedChallengeIds: Set<string>,
   now: Date,
 ): GroupStatus {
@@ -296,11 +296,15 @@ function deriveStatus(
   return hasUnvoted ? 'your-turn' : 'live'
 }
 
-async function challengesForGroups(groupIds: string[]): Promise<Challenge[]> {
+async function challengesForGroups(groupIds: string[]): Promise<ChallengeForPlay[]> {
   if (groupIds.length === 0) return []
-  const { data, error } = await supabase.from('challenges').select().in('group_id', groupIds)
+  const { data, error } = await supabase
+    .from('challenges')
+    // Sin lat/lng (columna revocada en 0010): la home solo necesita id/deadline.
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .in('group_id', groupIds)
   if (error) throw error
-  return data ?? []
+  return (data ?? []) as ChallengeForPlay[]
 }
 
 async function myVotedChallengeIds(userId: string, groupIds: string[]): Promise<Set<string>> {
