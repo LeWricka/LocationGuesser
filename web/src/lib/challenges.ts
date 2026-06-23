@@ -1,8 +1,21 @@
 import { supabase } from './supabase'
 import type { Challenge, Database } from './database.types'
+import type { LatLng } from './geo'
 import { deadlineFromNow } from './time'
 
 type ChallengeUpdate = Database['public']['Tables']['challenges']['Update']
+
+/**
+ * Reto SIN la respuesta (lat/lng). Es lo que se sirve al jugar: el payload del
+ * mapa de adivinar NO debe contener la ubicación real. La respuesta vive en
+ * `challenge_answers` y se obtiene solo al votar (vía RPC) o al recargar un reto
+ * ya votado/cerrado (vía `getAnswer`, gobernado por RLS). Migración 0010.
+ */
+export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
+
+// Columnas del reto SIN lat/lng: lo que el flujo de jugar puede leer sin spoiler.
+const PLAY_COLUMNS =
+  'id, group_id, title, image_path, sv_pano_id, sv_heading, sv_pitch, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -58,14 +71,49 @@ export async function createChallenge(
     .select()
     .single()
   if (error) throw error
+
+  // Espejamos la respuesta en `challenge_answers` (fuente que la RPC consulta y que
+  // el cliente solo puede leer tras votar o al cerrarse el reto). `challenges.lat/lng`
+  // se mantienen por compatibilidad con los lectores de retos cerrados. Migración 0010.
+  const { error: answerError } = await supabase
+    .from('challenge_answers')
+    .insert({ challenge_id: data.id, lat: input.lat, lng: input.lng })
+  if (answerError) throw answerError
+
   return { challenge: data, groupId }
 }
 
-/** Lee un reto por su id. Lanza si no existe o hay error de red. */
-export async function getChallenge(id: string): Promise<Challenge> {
-  const { data, error } = await supabase.from('challenges').select().eq('id', id).single()
+/**
+ * Lee un reto por su id PARA JUGAR, SIN la respuesta (lat/lng). El payload que
+ * alimenta el mapa de adivinar no debe contener la ubicación real: se revela solo
+ * al votar (RPC `submit_vote`) o al recargar un reto ya votado/cerrado (`getAnswer`).
+ * Lanza si no existe o hay error de red.
+ */
+export async function getChallenge(id: string): Promise<ChallengeForPlay> {
+  const { data, error } = await supabase
+    .from('challenges')
+    .select(PLAY_COLUMNS)
+    .eq('id', id)
+    .single<ChallengeForPlay>()
   if (error) throw error
   return data
+}
+
+/**
+ * Respuesta (lat/lng) de un reto, o null si el usuario aún no tiene derecho a verla.
+ * La RLS de `challenge_answers` (migración 0010) solo la sirve si el reto ya está
+ * cerrado o si el usuario ya votó. Se usa al RECARGAR un reto ya jugado para volver
+ * a pintar el pin de la respuesta (el revelado inmediato tras votar usa la RPC).
+ * `maybeSingle`: "sin derecho / sin fila" no es un error, es null.
+ */
+export async function getAnswer(challengeId: string): Promise<LatLng | null> {
+  const { data, error } = await supabase
+    .from('challenge_answers')
+    .select('lat, lng')
+    .eq('challenge_id', challengeId)
+    .maybeSingle()
+  if (error) throw error
+  return data ? { lat: data.lat, lng: data.lng } : null
 }
 
 /**
@@ -150,6 +198,17 @@ export async function updateChallenge(id: string, input: UpdateChallengeInput): 
     .select()
     .single()
   if (error) throw error
+
+  // Si cambió la ubicación (solo posible sin votos), espejamos la respuesta en
+  // `challenge_answers` para que la RPC y el revelado usen la nueva. Migración 0010.
+  if (input.location !== undefined) {
+    const { error: answerError } = await supabase
+      .from('challenge_answers')
+      .update({ lat: input.location.lat, lng: input.location.lng })
+      .eq('challenge_id', id)
+    if (answerError) throw answerError
+  }
+
   return data
 }
 

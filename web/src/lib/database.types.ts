@@ -137,6 +137,26 @@ export interface Database {
         }
         Relationships: []
       }
+      challenge_answers: {
+        // La respuesta del reto (lat/lng), gobernada por RLS aparte de `challenges`:
+        // legible solo si el reto está cerrado o el usuario ya votó (migración 0010).
+        Row: {
+          challenge_id: string
+          lat: number
+          lng: number
+        }
+        Insert: {
+          challenge_id: string
+          lat: number
+          lng: number
+        }
+        Update: {
+          challenge_id?: string
+          lat?: number
+          lng?: number
+        }
+        Relationships: []
+      }
       votes: {
         Row: {
           id: string
@@ -176,7 +196,24 @@ export interface Database {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      // RPC con autoridad de servidor: recibe la adivinanza (lat/lng null = voto de
+      // timeout), calcula distancia y puntos server-side contra la respuesta real y
+      // devuelve el revelado. Migración 0010. Devuelve un array de una fila.
+      submit_vote: {
+        Args: {
+          p_challenge_id: string
+          p_lat: number | null
+          p_lng: number | null
+        }
+        Returns: {
+          distance_km: number | null
+          points: number
+          answer_lat: number | null
+          answer_lng: number | null
+        }[]
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }
@@ -188,3 +225,6 @@ export type GroupMember = Database['public']['Tables']['group_members']['Row']
 export type Group = Database['public']['Tables']['groups']['Row']
 export type Challenge = Database['public']['Tables']['challenges']['Row']
 export type Vote = Database['public']['Tables']['votes']['Row']
+export type ChallengeAnswer = Database['public']['Tables']['challenge_answers']['Row']
+/** Una fila del retorno de la RPC `submit_vote` (revelado al votar). */
+export type SubmitVoteResult = Database['public']['Functions']['submit_vote']['Returns'][number]
