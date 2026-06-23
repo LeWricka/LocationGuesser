@@ -26,3 +26,28 @@ export function gotoCreateGroup(): void {
 export function gotoProfile(): void {
   window.location.hash = 'perfil'
 }
+
+// Extrae el código de grupo de lo que el usuario pegue en "Unirme con un código":
+// acepta un enlace completo (…#g=<code>&c=…) o el código a secas. Devuelve null
+// si no hay nada usable. El auto-join al entrar por #g=<code> (App.tsx) hace el
+// resto: añade al usuario al grupo de forma idempotente.
+export function parseGroupCode(input: string): string | null {
+  const raw = input.trim()
+  if (!raw) return null
+
+  // Si trae el parámetro g= (enlace pegado), nos quedamos con ese valor.
+  const match = raw.match(/[#?&]?g=([^&\s]+)/)
+  if (match) return decodeURIComponent(match[1])
+
+  // Si no, asumimos que es el código a secas; descartamos cualquier espacio.
+  return raw.split(/\s/)[0] || null
+}
+
+// Navega al grupo a partir de un código/enlace pegado. Devuelve true si pudo
+// extraer un código (y navegó), false si la entrada no servía.
+export function joinByCode(input: string): boolean {
+  const code = parseGroupCode(input)
+  if (!code) return false
+  gotoGroup(code)
+  return true
+}

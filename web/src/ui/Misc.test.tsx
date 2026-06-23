@@ -24,11 +24,20 @@ describe('CreateGroupFab', () => {
 })
 
 describe('HomeEmptyState', () => {
-  test('saluda y ofrece crear el primer grupo', async () => {
+  test('saluda, explica el producto y ofrece crear grupo', async () => {
     const onCreateGroup = vi.fn()
     render(<HomeEmptyState name="Lewis" onCreateGroup={onCreateGroup} />)
-    expect(screen.getByText('¡Bienvenido, Lewis!')).toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /Crear mi primer grupo/ }))
+    expect(screen.getByText('Hola, Lewis')).toBeInTheDocument()
+    // El hero explica el bucle en 3 pasos.
+    expect(screen.getByText('Cómo funciona')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Crear grupo' }))
     expect(onCreateGroup).toHaveBeenCalledOnce()
+  })
+
+  test('dispara onJoinGroup al pulsar "Unirme con un código"', async () => {
+    const onJoinGroup = vi.fn()
+    render(<HomeEmptyState name="Lewis" onJoinGroup={onJoinGroup} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Unirme con un código' }))
+    expect(onJoinGroup).toHaveBeenCalledOnce()
   })
 })

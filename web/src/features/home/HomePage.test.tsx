@@ -86,9 +86,12 @@ describe('HomePage', () => {
     expect(screen.getByRole('status', { name: 'Cargando tu inicio' })).toBeInTheDocument()
   })
 
-  test('usuario sin grupos → estado de bienvenida', async () => {
+  test('usuario sin grupos → hero explicativo con "cómo funciona"', async () => {
     render(<HomePage />)
-    await waitFor(() => expect(screen.getByText('¡Bienvenido, Lewis!')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Cómo funciona')).toBeInTheDocument())
+    // CTAs de empezar: crear o unirse con código.
+    expect(screen.getByRole('button', { name: 'Crear grupo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unirme con un código' })).toBeInTheDocument()
   })
 
   test('mapea grupos y turnos, resolviendo el autor por su perfil', async () => {

@@ -1,0 +1,109 @@
+.wrap {
+  width: 100%;
+}
+
+/* Título como eyebrow editorial, igual que los títulos de sección de la home. */
+.title {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.item {
+  min-width: 0;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* Icono del paso sobre un círculo cálido tenue: ancla visual de la marca. */
+.icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+}
+
+.stepText {
+  min-width: 0;
+}
+
+.stepTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+/* Número del paso: pastilla cálida pequeña que marca el orden 1→2→3. */
+.stepNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--gradient-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-black);
+  line-height: 1;
+}
+
+.stepBody {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-normal);
+}
+
+/* --- Variante compacta (usuario recurrente): una fila de 3, sin cuerpo. --- */
+.compact .steps {
+  flex-direction: row;
+  gap: var(--space-2);
+}
+.compact .item {
+  flex: 1 1 0;
+}
+.compact .step {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  height: 100%;
+}
+.compact .icon {
+  width: 36px;
+  height: 36px;
+  font-size: var(--font-size-md);
+}
+.compact .stepTitle {
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+}
