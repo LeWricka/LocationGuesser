@@ -28,6 +28,7 @@ import {
 } from './features/auth'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
+import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
 import { setNextDestination, takeNextDestination } from './lib/auth'
 import { getGroup } from './lib/groupData'
 import { parseHash } from './lib/route'
@@ -45,6 +46,10 @@ function App() {
 function AppRoutes() {
   const { user, profile, loading, refreshProfile } = useSession()
   const [route, setRoute] = useState(parseHash())
+
+  // Analítica: identifica al usuario y emite login/signup_completed por sesión,
+  // y resetea al cerrar sesión. Enganchado UNA vez, dentro del árbol con sesión.
+  useAnalyticsIdentity()
 
   useEffect(() => {
     // Cross-fade nativo (View Transitions API) al cambiar de ruta; respeta

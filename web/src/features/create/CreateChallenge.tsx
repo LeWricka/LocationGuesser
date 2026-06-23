@@ -8,6 +8,7 @@ import type { Challenge } from '../../lib/database.types'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { resolveMapsUrl } from '../../lib/mapsUrl'
 import { uploadImage } from '../../lib/storage'
+import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
 import {
   Badge,
@@ -261,6 +262,12 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         photoIsHint,
       })
       setStatus(null)
+      track('challenge_created', {
+        group_id: groupId,
+        challenge_id: challenge.id,
+        has_photo: Boolean(imagePath),
+        guess_seconds: guessSeconds,
+      })
       // El grupo recoge el reto, vuelve a la lista y ofrece su enlace.
       onCreated(challenge)
     } catch (err) {
