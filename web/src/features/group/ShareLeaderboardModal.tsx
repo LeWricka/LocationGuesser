@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { Button, Modal, Spinner, useToast } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
+import { track } from '../../lib/analytics'
+import { lastChallengeImageDataUrl } from '../../lib/lastChallengeImage'
 import { LeaderboardCard } from './LeaderboardCard'
 import {
   buildShareText,
@@ -22,28 +24,69 @@ interface Props {
   link: string
 }
 
+/** Id del grupo a partir del enlace (#g=CODE[&c=…]). Lo extraemos aquí para no
+ * pedir un prop nuevo a GroupPage: el enlace ya lleva el código. Vacío si no
+ * se puede leer (entonces no buscamos foto del reto). */
+function groupIdFromLink(link: string): string {
+  const match = link.match(/#g=([^&]+)/)
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
 // Modal de "Compartir clasificación como imagen". Monta la tarjeta a tamaño real
 // FUERA del viewport (no display:none, que mediría 0) y la rasteriza a PNG al
-// abrir. Muestra una previa de la imagen y deja Compartir / Descargar. Conserva
-// el texto (buildShareText) como caption y fallback. Compartir directo a ciegas
-// sería confuso: aquí el usuario ve la tarjeta antes de mandarla.
+// abrir. Muestra una previa de la imagen y deja Compartir / Descargar. El caption
+// (buildShareText) es mínimo: solo enlace + gancho (la tabla va en la imagen).
+// Compartir directo a ciegas sería confuso: aquí el usuario ve la tarjeta antes.
 export function ShareLeaderboardModal({ open, onClose, groupName, entries, prizes, link }: Props) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [pngUrl, setPngUrl] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
   const [error, setError] = useState(false)
   const [sharing, setSharing] = useState(false)
+  // Foto del último reto resuelta, emparejada con el groupId que la pidió: así
+  // sabemos si la foto en estado corresponde al grupo actual sin resetear estado
+  // de forma síncrona en el efecto (mismo patrón que useSignedImage). url=null
+  // significa "el grupo no tiene foto"; el campo presente = "ya resuelto".
+  const [resolvedPhoto, setResolvedPhoto] = useState<{
+    groupId: string
+    url: string | null
+  } | null>(null)
   const toast = useToast()
 
-  const text = buildShareText(groupName, entries, prizes, link)
+  const text = buildShareText(groupName, link)
   const domain = shareDomain(link)
+  const groupId = groupIdFromLink(link)
 
-  // Generar el PNG cada vez que se abre (los datos pueden haber cambiado). El
-  // reset de estado y la captura van dentro del rAF (asíncronos, no en el cuerpo
-  // del efecto) para no disparar renders en cascada. Limpia el object URL al
-  // cerrar para no fugar memoria.
+  // La foto está lista cuando ya resolvimos la del groupId actual (o no hay
+  // groupId del que sacarla). Hasta entonces no capturamos, para que la miniatura
+  // entre en el PNG. photoDataUrl es la foto a dibujar (null = sin miniatura).
+  const photoReady = !groupId || resolvedPhoto?.groupId === groupId
+  const photoDataUrl = resolvedPhoto?.groupId === groupId ? resolvedPhoto.url : null
+
+  // Carga la foto del último reto al abrir. Solo hace setState dentro del callback
+  // async (nunca síncrono en el cuerpo del efecto). Resolvemos también a null
+  // cuando el grupo no tiene retos con imagen, para no bloquear la captura.
   useEffect(() => {
-    if (!open) return
+    if (!open || !groupId) return
+    let cancelled = false
+    void lastChallengeImageDataUrl(groupId)
+      .then((url) => {
+        if (!cancelled) setResolvedPhoto({ groupId, url })
+      })
+      .catch(() => {
+        if (!cancelled) setResolvedPhoto({ groupId, url: null })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [open, groupId])
+
+  // Generar el PNG cuando la tarjeta (incl. la miniatura ya resuelta) está
+  // pintada. Esperamos a photoReady para que la foto entre en el snapshot. El
+  // reset de estado y la captura van dentro del rAF (asíncronos, no en el cuerpo
+  // del efecto) para no disparar renders en cascada. Limpia el object URL al cerrar.
+  useEffect(() => {
+    if (!open || !photoReady) return
     let cancelled = false
     let createdUrl: string | null = null
 
@@ -74,7 +117,7 @@ export function ShareLeaderboardModal({ open, onClose, groupName, entries, prize
       cancelAnimationFrame(raf)
       if (createdUrl) URL.revokeObjectURL(createdUrl)
     }
-  }, [open, groupName, entries, prizes, link])
+  }, [open, photoReady, groupName, entries, prizes, link, photoDataUrl])
 
   async function onShare() {
     if (!blob) return
@@ -82,9 +125,19 @@ export function ShareLeaderboardModal({ open, onClose, groupName, entries, prize
     try {
       const result = await shareLeaderboardImage(blob, text, `Clasificación · ${groupName}`)
       if (result === 'downloaded') {
+        track('leaderboard_shared', {
+          method: 'downloaded',
+          group_id: groupId,
+          players: entries.length,
+        })
         toast.show('Imagen descargada y enlace copiado, pégalos en el chat', { tone: 'success' })
         onClose()
       } else if (result === 'shared') {
+        track('leaderboard_shared', {
+          method: 'shared',
+          group_id: groupId,
+          players: entries.length,
+        })
         onClose()
       }
       // 'cancelled': el usuario cerró la hoja de compartir; dejamos el modal abierto.
@@ -147,6 +200,7 @@ export function ShareLeaderboardModal({ open, onClose, groupName, entries, prize
             entries={entries}
             prizes={prizes}
             domain={domain}
+            photoDataUrl={photoDataUrl}
           />
         </div>
       )}
