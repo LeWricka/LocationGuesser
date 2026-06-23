@@ -1,19 +1,24 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, hasAuthCreds } from './helpers/authed'
 
-// E2E del campo "Pega un enlace de Google Maps" (issue #14).
-//
-// Cubrimos SOLO el camino que NO necesita red: una URL LARGA de Maps se resuelve
-// con el parser local (parseLatLngFromText) → debe aparecer el badge "Punto marcado".
+// E2E AUTENTICADO del campo "Pega un enlace de Google Maps" (issue #14, adaptado a
+// login en #140). Cubrimos SOLO el camino que NO necesita red: una URL LARGA de
+// Maps se resuelve con el parser local (parseLatLngFromText) → badge "Punto marcado".
 // El enlace CORTO (maps.app.goo.gl) pasa por la Edge Function y requiere red real;
-// queda fuera de este test determinista (se valida en el flujo manual / prod).
+// queda fuera de este test determinista.
+//
+// Necesita sesión para llegar al formulario de crear reto (grupo-primero), así que
+// se SALTA sin credenciales (E2E_USER_EMAIL/PASSWORD). Crear el grupo es un insert
+// ligero throwaway.
 
-test.describe('pegar enlace de Maps', () => {
+test.skip(!hasAuthCreds, 'Define E2E_USER_EMAIL/E2E_USER_PASSWORD para los E2E autenticados')
+
+test.describe('pegar enlace de Maps (autenticado)', () => {
   test('URL larga → punto marcado (sin red)', async ({ page }) => {
-    // Flujo grupo-primero (#79): hay que crear un grupo y entrar a "añadir reto"
-    // para llegar al formulario. Crear el grupo es un insert ligero throwaway.
     await page.goto('/')
-    await page.getByRole('button', { name: 'Crear un grupo' }).click()
-    await expect(page.getByRole('heading', { name: 'Crear un grupo' })).toBeVisible()
+    await page.getByRole('button', { name: 'Crear grupo' }).click()
+    await expect(page.getByRole('heading', { name: 'Crear un grupo' })).toBeVisible({
+      timeout: 20_000,
+    })
 
     const groupName = `mapsurl-${Date.now().toString(36)}`
     await page.getByRole('textbox', { name: 'Nombre del grupo' }).fill(groupName)
