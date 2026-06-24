@@ -58,6 +58,11 @@ export type AnalyticsEvent =
   | 'member_kicked'
   | 'member_left'
   | 'ownership_transferred'
+  // Invitación al grupo con preview (#155, OP2/I4). Props: surface
+  // ('shared'|'copied'|'downloaded'), group_id. `invite_shared` = se abrió la
+  // hoja de compartir del SO; `group_link_copied` = fallback de copiar enlace.
+  | 'invite_shared'
+  | 'group_link_copied'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {
