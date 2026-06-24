@@ -200,8 +200,11 @@ img {
   overflow: hidden;
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-lg);
-  /* Contiene los z-index internos de Leaflet (panes/controles llegan a ~1000)
-   * para que no tapen overlays externos como el buscador o el selector de capa. */
+  /* Fondo oscuro mientras carga el mapa (Google Maps en el de adivinar/resultado;
+   * Leaflet en crear/grupo): evita el flash claro en el tema oscuro. */
+  background: var(--ocean-900);
+  /* Contiene los z-index internos del mapa (Leaflet llega a ~1000; Google tiene
+   * su propia pila) para que no tapen overlays externos como el buscador. */
   isolation: isolate;
 }
 
