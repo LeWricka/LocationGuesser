@@ -49,6 +49,53 @@
   outline-offset: 2px;
 }
 
+/* Flechas prev/next: pastillas translúcidas centradas verticalmente a los
+   lados, sobre la foto. Solo se montan con varias imágenes. */
+.nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--color-on-photo);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  cursor: pointer;
+}
+.nav:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.nav:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.prev {
+  left: 0;
+}
+.next {
+  right: 0;
+}
+
+/* Contador 1/3: discreto, abajo centrado, sobre la foto. */
+.counter {
+  position: absolute;
+  bottom: var(--space-2);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--color-on-photo);
+  font-size: var(--font-size-sm);
+}
+
 /* El contenedor de la imagen es el botón de zoom: ocupa el visor y centra. */
 .imageButton {
   display: flex;
