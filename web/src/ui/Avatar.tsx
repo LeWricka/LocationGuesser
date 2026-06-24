@@ -1,35 +1,39 @@
 import type { CSSProperties } from 'react'
+import { parseAvatar } from '../lib/avatar'
 import styles from './Avatar.module.css'
 
 type Size = 'sm' | 'md' | 'lg'
 
 interface Props {
-  /** Nombre del usuario: se usa para la inicial de respaldo y el alt. */
-  name: string
-  /** Foto opcional; si falta se muestra la inicial sobre un fondo de marca. */
-  src?: string | null
+  /** Id del usuario: deriva el avatar por defecto (emoji + fondo) de forma estable. */
+  userId: string
+  /** `avatar_url` del perfil: `emoji:<char>`, URL http (retrocompat) o null/vacío. */
+  avatarUrl?: string | null
+  /** Nombre del usuario para el `alt`/`aria-label` (accesibilidad). */
+  name?: string
   size?: Size
   className?: string
 }
 
-// Deriva la inicial visible (primera letra del nombre, en mayúscula).
-function initialOf(name: string): string {
-  const trimmed = name.trim()
-  return trimmed ? trimmed[0].toUpperCase() : '?'
-}
-
-// Avatar circular del usuario. Si hay `src`, muestra la imagen; si no, la
-// inicial sobre el acento de marca. Presentacional (sin subida de imagen).
-export function Avatar({ name, src, size = 'md', className }: Props) {
+// Avatar circular del usuario: un emoji de animal GRANDE sobre un fondo de
+// color (derivado del id), o la imagen si `avatar_url` es una URL antigua. El
+// emoji se refuerza con sombra suave + anillo interior claro para que se lea
+// bien sobre cualquier fondo del set. Presentacional (sin subida de imagen).
+export function Avatar({ userId, avatarUrl, name, size = 'md', className }: Props) {
   const classes = [styles.avatar, styles[size], className].filter(Boolean).join(' ')
-  const style = { '--avatar-initial-bg': 'var(--color-accent-2-soft)' } as CSSProperties
+  const label = name?.trim() || 'Avatar'
+  const resolved = parseAvatar(avatarUrl, userId)
 
-  if (src) {
-    return <img className={classes} src={src} alt={name} style={style} />
+  if (resolved.kind === 'image') {
+    return <img className={classes} src={resolved.src} alt={label} />
   }
+
+  const style = { '--avatar-bg': resolved.bg.background } as CSSProperties
   return (
-    <span className={classes} style={style} role="img" aria-label={name}>
-      {initialOf(name)}
+    <span className={classes} style={style} role="img" aria-label={label}>
+      <span className={styles.emoji} aria-hidden="true">
+        {resolved.emoji}
+      </span>
     </span>
   )
 }

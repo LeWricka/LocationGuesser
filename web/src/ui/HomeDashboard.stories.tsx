@@ -17,6 +17,7 @@ const meta = {
   component: HomeDashboard,
   parameters: { layout: 'fullscreen' },
   args: {
+    userId: 'lewis-123',
     displayName: 'Lewis',
     groups,
     turns,

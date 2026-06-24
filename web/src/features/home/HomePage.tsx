@@ -101,6 +101,9 @@ export function HomePage() {
   // genérico para no mostrar "undefined". El paso de perfil (#4) garantiza el
   // display_name en el primer login.
   const displayName = profile?.display_name?.trim() || 'jugador'
+  // Id estable para el avatar (animal + fondo). En esta pantalla la sesión ya
+  // está iniciada; el fallback evita un id vacío en el render transitorio.
+  const userId = user?.id ?? ''
   const hasGroups = data.groups.length > 0
 
   return (
@@ -108,6 +111,7 @@ export function HomePage() {
       {hasGroups ? (
         <>
           <HomeDashboard
+            userId={userId}
             displayName={displayName}
             avatarUrl={profile?.avatar_url}
             turns={data.turns}
@@ -143,7 +147,12 @@ export function HomePage() {
               onClick={gotoProfile}
               aria-label="Abrir tu perfil"
             >
-              <Avatar name={displayName} src={profile?.avatar_url} size="md" />
+              <Avatar
+                userId={userId}
+                name={displayName}
+                avatarUrl={profile?.avatar_url}
+                size="md"
+              />
             </button>
           </header>
           <HomeEmptyState

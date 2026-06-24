@@ -11,18 +11,18 @@ const groups: HomeGroup[] = [
 
 describe('HomeDashboard', () => {
   test('saluda con el display_name', () => {
-    render(<HomeDashboard displayName="Lewis" groups={groups} />)
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
     expect(screen.getByRole('heading', { name: 'Lewis' })).toBeInTheDocument()
   })
 
   test('sin grupos muestra el estado vacío (bienvenida)', () => {
-    render(<HomeDashboard displayName="Lewis" groups={[]} />)
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={[]} />)
     expect(screen.getByText('Hola, Lewis')).toBeInTheDocument()
     expect(screen.queryByText('Tus grupos')).not.toBeInTheDocument()
   })
 
   test('la sección "Te toca jugar" se oculta si no hay turnos', () => {
-    render(<HomeDashboard displayName="Lewis" groups={groups} turns={[]} />)
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} turns={[]} />)
     expect(screen.queryByText('Te toca jugar')).not.toBeInTheDocument()
   })
 
@@ -30,6 +30,7 @@ describe('HomeDashboard', () => {
     const onPlayTurn = vi.fn()
     render(
       <HomeDashboard
+        userId="u1"
         displayName="Lewis"
         groups={groups}
         turns={[{ id: 't1', groupName: "Interrail '26", author: 'Ana', countdown: '3 h 12 m' }]}
@@ -43,13 +44,15 @@ describe('HomeDashboard', () => {
 
   test('abre el grupo al pulsar su tarjeta', async () => {
     const onOpenGroup = vi.fn()
-    render(<HomeDashboard displayName="Lewis" groups={groups} onOpenGroup={onOpenGroup} />)
+    render(
+      <HomeDashboard userId="u1" displayName="Lewis" groups={groups} onOpenGroup={onOpenGroup} />,
+    )
     await userEvent.click(screen.getByRole('button', { name: "Abrir grupo Interrail '26" }))
     expect(onOpenGroup).toHaveBeenCalledWith('a')
   })
 
   test('sin stats muestra el mensaje guía de históricos', () => {
-    render(<HomeDashboard displayName="Lewis" groups={groups} stats={null} />)
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} stats={null} />)
     expect(screen.getByText(/aquí verás tus puntos/)).toBeInTheDocument()
   })
 })
