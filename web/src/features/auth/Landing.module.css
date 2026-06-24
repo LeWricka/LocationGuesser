@@ -14,7 +14,13 @@
   max-width: var(--container-max);
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-6);
+}
+
+/* Más aire antes de "Cómo funciona": queda debajo de la entrada, separado para
+ * leerse como una sección aparte (issue #183). */
+.content > section:last-child {
+  margin-top: var(--space-4);
 }
 
 /* ── Hero ─────────────────────────────────────────────────────────────────── */
@@ -27,18 +33,20 @@
 
 /* Ancla de marca (el pin) en disco cálido con glow: rompe el frío del fondo,
  * igual que la cabecera de las pantallas de auth. */
+/* Hero compacto (issue #183): el pin más pequeño y menos margen para que el
+ * formulario de email entre en pantalla sin scroll en móvil. */
 .brand {
   display: grid;
   place-items: center;
-  width: 72px;
-  height: 72px;
+  width: 60px;
+  height: 60px;
   border-radius: var(--radius-full);
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   line-height: 1;
   background: var(--color-accent-soft);
   border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
   box-shadow: var(--shadow-accent);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
 .eyebrow {
@@ -100,6 +108,36 @@
 /* El formulario se alinea a la izquierda dentro de la tarjeta centrada: la
  * etiqueta y el error leen mejor pegados al borde del campo. */
 .form {
+  text-align: left;
+}
+
+/* ── Atajo "tengo un código de grupo" (issue #183) ────────────────────────────
+ * Discreto: un disclosure que despliega un campo para pegar código/enlace. Solo
+ * en la landing genérica; en el deep-link el grupo ya viene dado. */
+.codeDisclosure {
+  margin-top: var(--space-5);
+  border-top: 1px solid var(--card-border);
+  padding-top: var(--space-4);
+}
+
+.codeSummary {
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  list-style: none;
+}
+
+.codeSummary::-webkit-details-marker {
+  display: none;
+}
+
+.codeSummary:hover {
+  color: var(--color-text);
+}
+
+.codeForm {
+  margin-top: var(--space-4);
   text-align: left;
 }
 

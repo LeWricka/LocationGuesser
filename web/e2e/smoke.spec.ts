@@ -75,7 +75,7 @@ test.describe('smoke', () => {
     // 3. La landing pública es visible: hero del producto, campo de correo y botón
     //    de magic link (textos/roles reales de Landing.tsx). Damos margen porque al
     //    arrancar AuthProvider resuelve la sesión persistida (spinner) antes de pintar.
-    await expect(page.getByRole('heading', { name: /GeoGuessr con/ })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Comparte tus sitios/ })).toBeVisible({
       timeout: 20_000,
     })
     await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
