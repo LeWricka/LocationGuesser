@@ -121,6 +121,11 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   )
   // POV con el que arrancarán los jugadores; el creador puede girar la previa.
   const [pov, setPov] = useState({ heading: 0, pitch: 0 })
+  // Candados de exploración del Street View (dificultad). AMBOS permitidos por
+  // defecto (toggles ON); el creador "quita" libertad. Guardamos como permiso
+  // (allowMove/allowRotate) y lo traducimos a candado (lock = !allow) al crear. #187.
+  const [allowMove, setAllowMove] = useState(true)
+  const [allowRotate, setAllowRotate] = useState(true)
   // Duración del reto como índice en DURATION_STOPS; 24 h por defecto.
   const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
   const [guessSeconds, setGuessSeconds] = useState<number | null>(120)
@@ -147,6 +152,8 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     setPano(null)
     setSvPrompt(null)
     setPov({ heading: 0, pitch: 0 })
+    setAllowMove(true)
+    setAllowRotate(true)
     pickPhoto(null)
     setStep('build')
   }
@@ -429,6 +436,10 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         svPanoId: pano?.panoId,
         svHeading: pano ? pov.heading : undefined,
         svPitch: pano ? pov.pitch : undefined,
+        // Candados solo aplican si hay panorama. El toggle es "permitir"; el
+        // candado es lo contrario (lock = !allow). Sin SV, ambos quedan false.
+        svLockMove: pano ? !allowMove : undefined,
+        svLockRotate: pano ? !allowRotate : undefined,
         deadlineAt: deadlineFromMinutes(DURATION_STOPS[durationIndex].minutes),
         guessSeconds,
         imagePath,
@@ -674,6 +685,50 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
                         Quitar Street View (→ 🔴 Difícil)
                       </Button>
                     )}
+                  </Stack>
+                )}
+              </Field>
+            )}
+
+            {/* CANDADOS DE EXPLORACIÓN (#187): solo con panorama. Ambos permitidos
+                por defecto; desactívalos para hacer el reto más difícil. */}
+            {pano && (
+              <Field
+                label="Cómo se explora"
+                hint="Desactiva una opción para que el reto sea más difícil. Por defecto se puede todo."
+              >
+                {() => (
+                  <Stack gap={3}>
+                    <Row gap={2} align="center" wrap>
+                      <Button
+                        variant={allowMove ? 'primary' : 'secondary'}
+                        size="sm"
+                        aria-pressed={allowMove}
+                        onClick={() => setAllowMove((v) => !v)}
+                      >
+                        {allowMove ? '✓ ' : ''}Permitir moverse
+                      </Button>
+                      <span className={styles.hint}>
+                        {allowMove
+                          ? 'Pueden avanzar a calles contiguas.'
+                          : 'Quietos en el sitio: no pueden avanzar.'}
+                      </span>
+                    </Row>
+                    <Row gap={2} align="center" wrap>
+                      <Button
+                        variant={allowRotate ? 'primary' : 'secondary'}
+                        size="sm"
+                        aria-pressed={allowRotate}
+                        onClick={() => setAllowRotate((v) => !v)}
+                      >
+                        {allowRotate ? '✓ ' : ''}Permitir mirar alrededor
+                      </Button>
+                      <span className={styles.hint}>
+                        {allowRotate
+                          ? 'Pueden girar la cámara libremente.'
+                          : 'Vista fija: no pueden girar la cámara.'}
+                      </span>
+                    </Row>
                   </Stack>
                 )}
               </Field>

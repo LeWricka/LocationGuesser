@@ -493,6 +493,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               position={panoFallback}
               heading={challenge.sv_heading}
               pitch={challenge.sv_pitch}
+              lockMove={challenge.sv_lock_move}
+              lockRotate={challenge.sv_lock_rotate}
             />
           ) : imageUrl ? (
             // Foto-escena (reto legacy): con esqueleto mientras carga del Storage

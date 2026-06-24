@@ -19,7 +19,7 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // `challenge_answers` (RLS). Reutilizado por todos los lectores: jugar, lista del
 // grupo, home y el RETURNING de crear/editar.
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, image_path, sv_pano_id, sv_heading, sv_pitch, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
+  'id, group_id, title, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -46,6 +46,10 @@ export interface NewChallengeInput {
   svHeading?: number
   /** POV inicial del panorama: inclinación en grados. (#54.) */
   svPitch?: number
+  /** Candado de MOVIMIENTO del Street View (true = no se puede ir a panoramas contiguos). (#187.) */
+  svLockMove?: boolean
+  /** Candado de GIRO del Street View (true = no se puede mirar alrededor). (#187.) */
+  svLockRotate?: boolean
 }
 
 // Plazo por defecto si el creador no eligió uno: 24 h desde ahora. La duración
@@ -86,6 +90,9 @@ export async function createChallenge(
       sv_pano_id: input.svPanoId ?? null,
       sv_heading: input.svHeading ?? null,
       sv_pitch: input.svPitch ?? null,
+      // Candados de exploración del SV (false = permitido por defecto). #187.
+      sv_lock_move: input.svLockMove ?? false,
+      sv_lock_rotate: input.svLockRotate ?? false,
       guess_seconds: input.guessSeconds ?? null,
       deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
       created_by: input.createdBy,
@@ -207,6 +214,10 @@ export interface UpdateChallengeInput {
     svPanoId?: string
     svHeading?: number
     svPitch?: number
+    /** Candado de MOVIMIENTO del SV (true = bloqueado). Default false (permitido). #187. */
+    svLockMove?: boolean
+    /** Candado de GIRO del SV (true = bloqueado). Default false (permitido). #187. */
+    svLockRotate?: boolean
   }
 }
 
@@ -241,6 +252,8 @@ export async function updateChallenge(
     patch.sv_pano_id = input.location.svPanoId ?? null
     patch.sv_heading = input.location.svHeading ?? null
     patch.sv_pitch = input.location.svPitch ?? null
+    patch.sv_lock_move = input.location.svLockMove ?? false
+    patch.sv_lock_rotate = input.location.svLockRotate ?? false
   }
 
   const { data, error } = await supabase
