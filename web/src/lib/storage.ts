@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { reportError } from './observability'
 
 const BUCKET = 'images'
 
@@ -14,6 +15,33 @@ interface DecodedImage {
   height: number
   source: CanvasImageSource
   release: () => void
+}
+
+/**
+ * ¿Es la foto un HEIC/HEIF de iPhone? Los navegadores que no lo decodifican
+ * nativamente (Chrome, Firefox de escritorio) no pueden con `createImageBitmap`
+ * ni `<img>.decode()`, así que hay que convertirla antes. Detectamos por MIME
+ * (`image/heic`/`image/heif`) y, como respaldo, por extensión: en algunos
+ * navegadores el `file.type` de un HEIC viene vacío.
+ */
+function isHeic(file: File): boolean {
+  const type = file.type.toLowerCase()
+  if (type === 'image/heic' || type === 'image/heif') return true
+  return /\.(heic|heif)$/i.test(file.name)
+}
+
+/**
+ * Convierte un HEIC/HEIF a un File JPEG con `heic2any` (wasm de libheif). Import
+ * DINÁMICO: la librería es pesada (wasm) y solo entra al bundle cuando de verdad
+ * llega un HEIC; además es navegador-only, así que el import diferido evita
+ * romper SSR/tests. El resto del pipeline (canvas → JPEG) sigue igual.
+ */
+async function heicToJpeg(file: File): Promise<File> {
+  const heic2any = (await import('heic2any')).default
+  const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: JPEG_QUALITY })
+  // heic2any devuelve Blob o Blob[] (multi-imagen); nos quedamos con el primero.
+  const blob = Array.isArray(converted) ? converted[0] : converted
+  return new File([blob], file.name.replace(/\.(heic|heif)$/i, '.jpg'), { type: 'image/jpeg' })
 }
 
 /**
@@ -60,7 +88,44 @@ async function decodeImage(file: File): Promise<DecodedImage> {
  * foto sube sin GPS ni orientación original.
  */
 async function compressAndStripExif(file: File): Promise<Blob> {
-  const img = await decodeImage(file)
+  // HEIC/HEIF (iPhone): muchos navegadores no lo decodifican; lo convertimos a
+  // JPEG antes de entrar en el pipeline de canvas. Las fotos JPEG/PNG/WebP NO
+  // pasan por aquí (no engordan ni se ralentizan con la conversión).
+  let decodable = file
+  if (isHeic(file)) {
+    try {
+      decodable = await heicToJpeg(file)
+    } catch (err) {
+      // La conversión falló: reportamos metadatos NO sensibles (sin subir la
+      // imagen) y lanzamos el error legible para el toast.
+      reportError(err, {
+        area: 'image_decode',
+        stage: 'heic_convert',
+        fileType: file.type || '(vacío)',
+        fileSizeKb: Math.round(file.size / 1024),
+        fileName: file.name,
+      })
+      throw new Error('No se pudo leer la imagen. Prueba con otra foto (JPEG o PNG).', {
+        cause: err,
+      })
+    }
+  }
+
+  let img: DecodedImage
+  try {
+    img = await decodeImage(decodable)
+  } catch (err) {
+    // Ni `createImageBitmap` ni `<img>.decode()` pudieron con el archivo.
+    // Reportamos para tener visibilidad del formato problemático en Sentry.
+    reportError(err, {
+      area: 'image_decode',
+      stage: 'decode',
+      fileType: file.type || '(vacío)',
+      fileSizeKb: Math.round(file.size / 1024),
+      fileName: file.name,
+    })
+    throw err
+  }
   try {
     const { width, height } = scaledSize(img.width, img.height)
     const canvas = document.createElement('canvas')
