@@ -127,7 +127,7 @@
   width: 140px;
   height: 140px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 178, 77, 0.32), transparent 66%);
+  background: radial-gradient(circle, var(--color-accent-glow-soft), transparent 66%);
   pointer-events: none;
 }
 

@@ -20,11 +20,8 @@
 
   /* Atlas océano sólido + halo cálido ámbar arriba (sin transparencias raras
      que el snapshot no capte). Color de respaldo opaco bajo el gradiente. */
-  background-color: #04141d;
-  background-image:
-    radial-gradient(1100px 760px at 50% -8%, rgba(255, 178, 77, 0.22), transparent 55%),
-    radial-gradient(1000px 900px at 12% 6%, rgba(69, 201, 176, 0.16), transparent 58%),
-    linear-gradient(180deg, #07212e 0%, #04141d 60%, #030f16 100%);
+  background-color: var(--ocean-900);
+  background-image: var(--card-gradient);
 
   color: var(--color-text);
   font-family: var(--font-sans);
@@ -102,7 +99,7 @@
   border-radius: 28px;
   overflow: hidden;
   border: 3px solid rgba(255, 178, 77, 0.5);
-  background-color: rgba(13, 44, 59, 0.85);
+  background-color: var(--card-surface);
 }
 
 .thumbImg {
@@ -316,8 +313,8 @@
   gap: 24px;
   padding: 18px 26px;
   border-radius: 22px;
-  background-color: rgba(13, 44, 59, 0.85);
-  border: 1px solid rgba(170, 230, 235, 0.16);
+  background-color: var(--card-surface);
+  border: 1px solid var(--card-border);
 }
 
 /* Las tres primeras filas (solo cuando NO hay podio) pesan algo más. */
@@ -400,7 +397,7 @@
   height: 16px;
   width: 100%;
   border-radius: 999px;
-  background-color: rgba(150, 220, 225, 0.12);
+  background-color: var(--track-cool);
   overflow: hidden;
 }
 
@@ -454,8 +451,8 @@
   gap: 10px;
   padding: 24px 28px;
   border-radius: 22px;
-  background-color: rgba(255, 178, 77, 0.12);
-  border: 1px solid rgba(255, 178, 77, 0.32);
+  background-color: var(--card-tint-accent);
+  border: 1px solid var(--card-border-accent);
 }
 
 .prizesLabel {
@@ -480,7 +477,7 @@
   justify-content: space-between;
   gap: 20px;
   padding-top: 28px;
-  border-top: 1px solid rgba(170, 230, 235, 0.2);
+  border-top: 1px solid var(--card-border-footer);
 }
 
 .footerCta {

@@ -257,7 +257,7 @@
   display: block;
   height: 10px;
   border-radius: var(--radius-full);
-  background: rgba(150, 220, 225, 0.12);
+  background: var(--track-cool);
   overflow: hidden;
 }
 .rankBar i {
@@ -456,9 +456,7 @@
 
 .shareFab:hover {
   background-image: var(--gradient-accent-hover);
-  box-shadow:
-    var(--shadow-accent-hover),
-    0 0 30px -4px rgba(255, 138, 89, 0.65);
+  box-shadow: var(--shadow-accent-hover), var(--glow-fab-hover);
   transform: translateY(-3px) scale(1.04);
 }
 

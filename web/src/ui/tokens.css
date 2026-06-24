@@ -58,6 +58,8 @@
 
   /* Rejilla de coordenadas tenue (sensación de carta náutica) para fondos de mapa. */
   --line-grid: rgba(150, 220, 225, 0.1);
+  /* Pista fría tenue: fondo de barras de progreso/ranking sobre superficie oscura. */
+  --track-cool: rgba(150, 220, 225, 0.12);
 
   /* Vidrio — paneles que flotan sobre el atlas. */
   --glass-bg: rgba(10, 36, 49, 0.62);
@@ -80,6 +82,9 @@
   --color-accent-hover: #ffc36b;
   --color-accent-active: #f0603c;
   --color-accent-soft: rgba(255, 178, 77, 0.14); /* fondos tenues, badges */
+  /* Relleno de halo cálido para destellos decorativos (radial-gradient de logro
+   * en RevealBurst y el halo del dashboard). Mismo ámbar, algo más presente. */
+  --color-accent-glow-soft: rgba(255, 178, 77, 0.32);
   --color-on-accent: #2a1500; /* texto sobre acento (oscuro: cálido es claro) */
 
   /* Gradiente de marca: ámbar → coral. Para CTA primario, FAB, pines, anillos. */
@@ -111,6 +116,36 @@
 
   /* Anillo de foco accesible (visible sobre cualquier superficie fría). */
   --color-focus-ring: #8fd6d0;
+
+  /* Velo modal/overlay: negro semiopaco tras diálogos y slideshow a pantalla
+   * completa. Mismo valor en Modal y en el slideshow de onboarding. */
+  --color-scrim: rgba(0, 0, 0, 0.62);
+
+  /* Blanco puro para texto/iconos SOBRE imágenes (lightbox, pie de foto): la
+   * foto ya da el contraste, no se usa el texto frío de marca. */
+  --color-on-photo: #fff;
+
+  /* Tinte/borde negro para leer texto sobre fotos arbitrarias (degradado al pie
+   * de la imagen, sombra de texto). Compartido por lightbox y ChallengePhoto. */
+  --photo-overlay-strong: rgba(0, 0, 0, 0.7);
+  --photo-text-shadow: rgba(0, 0, 0, 0.6);
+
+  /* ----------------------------------------------------------------------
+   * Tarjetas rasterizadas (LeaderboardCard / ResultCard)
+   * Superficie "atlas" compartida por las dos tarjetas que se exportan a PNG
+   * con html-to-image. SOLO color/gradiente/borde SÓLIDOS (sin blur ni glow:
+   * el rasterizador no los capta). Estos tokens consolidan los literales
+   * idénticos repetidos entre ambas tarjetas SIN cambiar ningún valor.
+   * -------------------------------------------------------------------- */
+  --card-gradient:
+    radial-gradient(1100px 760px at 50% -8%, rgba(255, 178, 77, 0.22), transparent 55%),
+    radial-gradient(1000px 900px at 12% 6%, rgba(69, 201, 176, 0.16), transparent 58%),
+    linear-gradient(180deg, #07212e 0%, var(--ocean-900) 60%, #030f16 100%);
+  --card-surface: rgba(13, 44, 59, 0.85); /* fila / CTA / miniatura */
+  --card-tint-accent: rgba(255, 178, 77, 0.12); /* bloque de puntos / premios */
+  --card-border-accent: rgba(255, 178, 77, 0.32);
+  --card-border: rgba(170, 230, 235, 0.16); /* borde de fila */
+  --card-border-footer: rgba(170, 230, 235, 0.2); /* separador del pie */
 
   /* ----------------------------------------------------------------------
    * Tipografía
@@ -187,6 +222,10 @@
     0 0 0 1px rgba(255, 178, 77, 0.3), 0 0 22px -2px rgba(255, 178, 77, 0.7),
     0 0 60px -6px rgba(255, 122, 89, 0.5);
   --glow-teal: 0 0 0 1px rgba(69, 201, 176, 0.22), 0 0 30px -6px rgba(69, 201, 176, 0.5);
+
+  /* Halo cálido extra que se suma a --shadow-accent-hover bajo un FAB al pasar el
+   * ratón. Mismo valor en el FAB de crear grupo y en el FAB de compartir ranking. */
+  --glow-fab-hover: 0 0 30px -4px rgba(255, 138, 89, 0.65);
 
   /* Sombra de tarjeta elevada al hacer hover (lift con más presencia). */
   --shadow-hover:

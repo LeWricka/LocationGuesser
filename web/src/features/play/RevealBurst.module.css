@@ -18,7 +18,7 @@
   position: absolute;
   inset: 0;
   border-radius: var(--radius-lg);
-  background: radial-gradient(60% 60% at 50% 42%, rgba(255, 178, 77, 0.32), transparent 70%);
+  background: radial-gradient(60% 60% at 50% 42%, var(--color-accent-glow-soft), transparent 70%);
   opacity: 0;
   animation: burst-flash var(--duration-slower) var(--ease-emphasized) both;
 }

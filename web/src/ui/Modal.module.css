@@ -3,7 +3,7 @@
   inset: 0;
   z-index: var(--z-overlay);
   display: flex;
-  background: rgba(0, 0, 0, 0.62);
+  background: var(--color-scrim);
   /* Desenfoque del fondo: el diálogo se separa del resto de la app. */
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
