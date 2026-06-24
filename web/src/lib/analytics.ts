@@ -63,6 +63,9 @@ export type AnalyticsEvent =
   // hoja de compartir del SO; `group_link_copied` = fallback de copiar enlace.
   | 'invite_shared'
   | 'group_link_copied'
+  // Cambio de avatar desde el perfil (#168). Props: has_emoji (eligió un animal
+  // del set) — sin más datos personales.
+  | 'avatar_changed'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

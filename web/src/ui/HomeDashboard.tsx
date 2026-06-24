@@ -39,6 +39,8 @@ export interface HomeStats {
 }
 
 interface Props {
+  /** Id del usuario: deriva el avatar por defecto (animal + fondo). */
+  userId: string
   /** Nombre a mostrar del usuario (display_name). */
   displayName: string
   avatarUrl?: string | null
@@ -58,6 +60,7 @@ interface Props {
 // Layout presentacional de la home/dashboard (§3.2). Sin auth ni datos reales:
 // todo entra por props. Las secciones siguen la jerarquía de atención del doc.
 export function HomeDashboard({
+  userId,
   displayName,
   avatarUrl,
   turns = [],
@@ -86,7 +89,7 @@ export function HomeDashboard({
             onClick={onOpenProfile}
             aria-label="Abrir tu perfil"
           >
-            <Avatar name={displayName} src={avatarUrl} size="md" />
+            <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="md" />
           </button>
         </header>
 

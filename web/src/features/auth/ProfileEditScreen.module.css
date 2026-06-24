@@ -1,0 +1,58 @@
+.picker {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.pickerLegend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+/* Rejilla de animales: discos auto-ajustados, con scroll vertical si no caben
+ * todos (el set es grande). Altura acotada para no empujar el botón Guardar. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+  gap: var(--space-2);
+  max-height: 240px;
+  overflow-y: auto;
+  padding: var(--space-1);
+}
+
+.option {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+}
+
+.option:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+
+.option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.option:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* Animal elegido: anillo de acento alrededor del disco. */
+.selected {
+  box-shadow: 0 0 0 3px var(--color-accent);
+}

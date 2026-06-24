@@ -5,31 +5,47 @@
   flex-shrink: 0;
   border-radius: var(--radius-full);
   object-fit: cover;
+  overflow: hidden;
 
-  /* Inicial de respaldo: sobre fondo de marca secundaria (violeta "ruta"). */
-  background: var(--avatar-initial-bg, var(--color-accent-2-soft));
-  color: var(--color-accent-2);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0;
-  text-transform: uppercase;
+  /* Fondo del set de avatares (gradiente sólido) inyectado por el componente. */
+  background: var(--avatar-bg, var(--color-accent-2-soft));
+  /* Anillo interior claro: separa el emoji del fondo y da contraste estable
+   * sobre cualquier color del set, más un borde fino para recortar el disco. */
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.28);
   border: 1px solid var(--color-border);
   user-select: none;
+}
+
+/* Emoji del animal: grande (~60% del disco) y con sombra suave para que se lea
+ * siempre, también sobre los fondos más claros del set. */
+.emoji {
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
 }
 
 .sm {
   width: 28px;
   height: 28px;
-  font-size: var(--font-size-sm);
+}
+
+.sm .emoji {
+  font-size: 17px;
 }
 
 .md {
   width: 40px;
   height: 40px;
-  font-size: var(--font-size-md);
+}
+
+.md .emoji {
+  font-size: 24px;
 }
 
 .lg {
   width: 64px;
   height: 64px;
-  font-size: var(--font-size-xl);
+}
+
+.lg .emoji {
+  font-size: 38px;
 }
