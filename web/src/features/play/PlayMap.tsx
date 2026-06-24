@@ -1,30 +1,19 @@
-import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
+/// <reference types="google.maps" />
+import { useEffect, useState } from 'react'
+import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
 
-// Vista inicial: el MUNDO entero (estilo GeoGuessr). Antes arrancaba en España
-// (zoom 5), lo que obligaba a alejar para buscar sitios fuera y volver a acercar.
-// Empezando alejado, el jugador va de lejos a cerca directo.
-const WORLD: LatLng = { lat: 25, lng: 0 }
+// Vista inicial: el MUNDO entero (estilo GeoGuessr). Empezando alejado, el
+// jugador va de lejos a cerca directo sin tener que alejar primero.
+const WORLD: google.maps.LatLngLiteral = { lat: 25, lng: 0 }
 const WORLD_ZOOM = 2
 
-const guessIcon = L.divIcon({
-  className: 'lg-pin',
-  html: '📍',
-  iconSize: [30, 30],
-  iconAnchor: [15, 28],
-})
-
-// El 🎯 (respuesta real) cae con muelle al revelar: clase extra que dispara la
-// animación CSS `lg-pin-drop` (definida en index.css, respeta reduced-motion).
-const answerIcon = L.divIcon({
-  className: 'lg-pin lg-pin-drop',
-  html: '🎯',
-  iconSize: [30, 30],
-  iconAnchor: [15, 28],
-})
+// Los pines son emoji renderizados como `label` del Marker clásico. Usamos el
+// Marker clásico (no AdvancedMarker) a propósito: NO requiere `mapId`, así no
+// hace falta crear nada en Google Cloud. El icono es un PNG transparente de 1px
+// (data URI) para que el glifo por defecto no se vea; el emoji va en el label.
+const TRANSPARENT_PX =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 
 const respectsMotion = () =>
   typeof window !== 'undefined' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -39,60 +28,42 @@ interface Props {
   onPick: (p: LatLng) => void
 }
 
-// Leaflet lee el tamaño del contenedor al inicializarse. Cuando el panel del
-// mapa pasa de mini (130px) a grande (CSS), Leaflet NO se entera y solo pinta
-// los tiles del área original → la mitad inferior se queda GRIS (no es lentitud
-// de red: nunca pide esos tiles). Un ResizeObserver re-mide y llama
-// invalidateSize en cada cambio de tamaño (expandir, rotar móvil…), así el mapa
-// siempre llena su caja y carga todos los tiles. rAF coalesce las ráfagas de la
-// animación de expansión.
-function AutoInvalidateSize() {
-  const map = useMap()
-  useEffect(() => {
-    let raf = 0
-    const ro = new ResizeObserver(() => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(() => map.invalidateSize({ animate: false }))
-    })
-    ro.observe(map.getContainer())
-    return () => {
-      cancelAnimationFrame(raf)
-      ro.disconnect()
-    }
-  }, [map])
-  return null
+// Icono emoji para el Marker clásico: el emoji va como `label` centrado sobre un
+// icono transparente. `labelOrigin` lo coloca en la "punta" del pin (abajo).
+function emojiIcon(): google.maps.Icon {
+  return {
+    url: TRANSPARENT_PX,
+    size: new google.maps.Size(30, 30),
+    scaledSize: new google.maps.Size(30, 30),
+    anchor: new google.maps.Point(15, 28),
+    labelOrigin: new google.maps.Point(15, 14),
+  }
 }
 
-// El clic solo coloca/mueve el pin mientras no esté bloqueado (pre-revelado).
-function ClickHandler({ locked, onPick }: { locked: boolean; onPick: (p: LatLng) => void }) {
-  useMapEvents({
-    click(e) {
-      if (locked) return
-      onPick({ lat: e.latlng.lat, lng: e.latlng.lng })
-    },
-  })
-  return null
+function emojiLabel(emoji: string): google.maps.MarkerLabel {
+  return { text: emoji, fontSize: '26px', className: 'lg-pin' }
 }
 
 // Al revelar, encuadra ambos puntos (tu pin + 🎯) con margen para que se vean
-// los dos con el zoom adecuado. El mapa debe estar dimensionado a su tamaño
-// final antes de calcular, por eso `invalidateSize` previo al `fitBounds`.
-function FitToReveal({ guess, answer }: { guess: LatLng | null; answer: LatLng | null }) {
+// los dos con el zoom adecuado. fitBounds es el equivalente directo del
+// FitToReveal/fitBounds de Leaflet. El bloque de resultado entra con animación
+// (transform): si encuadramos mientras anima, Google mide mal el contenedor y un
+// pin queda fuera. Encuadramos tras un frame y otra vez al asentarse el layout,
+// para que SIEMPRE entren ambos puntos sin cortarse.
+function FitToReveal({ guess, answer }: { guess: LatLng; answer: LatLng }) {
   const map = useMap()
   useEffect(() => {
-    if (!guess || !answer) return
+    if (!map) return
     const fit = () => {
-      map.invalidateSize({ animate: false })
-      const bounds = L.latLngBounds([
-        [guess.lat, guess.lng],
-        [answer.lat, answer.lng],
-      ]).pad(0.3)
-      map.fitBounds(bounds, { maxZoom: 12, animate: false })
+      const bounds = new google.maps.LatLngBounds()
+      bounds.extend(guess)
+      bounds.extend(answer)
+      // Padding generoso (px por lado) para que el glifo del pin nunca quede
+      // pegado al borde y se corte. maxZoom evita acercar de más si los dos
+      // puntos están casi encima (quedaría un zoom absurdo de calle).
+      map.fitBounds(bounds, { top: 56, right: 56, bottom: 56, left: 56 })
+      if ((map.getZoom() ?? 0) > 12) map.setZoom(12)
     }
-    // El bloque de resultado entra con animación (transform): si encuadramos
-    // mientras anima, Leaflet mide mal el contenedor y el pin queda fuera de
-    // pantalla. Encuadramos tras un frame y otra vez cuando la animación/el
-    // layout se han asentado, para que SIEMPRE entren ambos puntos.
     const raf = requestAnimationFrame(fit)
     const settle = setTimeout(fit, 520)
     return () => {
@@ -103,81 +74,102 @@ function FitToReveal({ guess, answer }: { guess: LatLng | null; answer: LatLng |
   return null
 }
 
-// Línea pin → 🎯 que se "dibuja" al revelar. Truco SVG: igualamos dasharray a
-// la longitud del trazo y animamos dashoffset de longitud→0 con la Web
-// Animations API. Sobre el path real que pinta Leaflet (Polyline). Bajo
-// reduced-motion la línea aparece ya dibujada (sin animar). No altera geometría
-// ni el fit-to-bounds: solo anima el trazo de un path ya posicionado.
+// Línea pin → 🎯 que se "dibuja" al revelar. Google Polyline no expone el path
+// SVG como Leaflet, así que recreamos la animación interpolando el extremo final
+// del trazo de `guess` hacia `answer` con la Web Animations timing (rAF): el path
+// crece de un punto a la recta completa. Bajo reduced-motion aparece ya completa.
 function DrawnLine({ guess, answer }: { guess: LatLng; answer: LatLng }) {
-  const lineRef = useRef<L.Polyline | null>(null)
+  const animate = respectsMotion()
+  // Reduced-motion: la recta completa de entrada (sin animar). Animando: arranca
+  // como un punto en `guess` y el efecto la hace crecer hacia `answer`.
+  const [path, setPath] = useState<google.maps.LatLngLiteral[]>(() =>
+    animate ? [guess] : [guess, answer],
+  )
 
   useEffect(() => {
-    const path = lineRef.current?.getElement() as SVGPathElement | null
-    if (!path || !respectsMotion() || typeof path.getTotalLength !== 'function') return
-    const len = path.getTotalLength()
-    if (!len) return
-    const anim = path.animate([{ strokeDashoffset: len }, { strokeDashoffset: 0 }], {
-      duration: 600,
-      easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)',
-      fill: 'forwards',
-      delay: 120,
-    })
-    // Igualamos el patrón de guiones a la longitud para que el offset "tape" toda
-    // la línea al empezar. Lo dejamos sólido al acabar.
-    path.style.strokeDasharray = `${len}`
-    path.style.strokeDashoffset = `${len}`
-    return () => anim.cancel()
-  }, [guess, answer])
+    if (!animate) return
+    const duration = 600
+    const delay = 120
+    const start = performance.now() + delay
+    let raf = 0
+    const tick = (now: number) => {
+      const t = Math.min(1, Math.max(0, (now - start) / duration))
+      // Mismo easing que la animación Leaflet anterior (cubic-bezier suave-out).
+      const eased = 1 - Math.pow(1 - t, 3)
+      const end: google.maps.LatLngLiteral = {
+        lat: guess.lat + (answer.lat - guess.lat) * eased,
+        lng: guess.lng + (answer.lng - guess.lng) * eased,
+      }
+      setPath([guess, end])
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [animate, guess, answer])
 
   return (
     <Polyline
-      ref={lineRef}
-      positions={[
-        [guess.lat, guess.lng],
-        [answer.lat, answer.lng],
-      ]}
-      pathOptions={{ color: '#ff453a', weight: 3 }}
+      path={path}
+      strokeColor="#ff453a"
+      strokeWeight={3}
+      strokeOpacity={1}
+      clickable={false}
+    />
+  )
+}
+
+// Pin de la respuesta (🎯) que "cae" con muelle al revelar, equivalente al
+// lg-pin-drop de antes. Usamos la animación DROP nativa del Marker clásico, que
+// no requiere mapId. Se aplica solo en el primer montaje (y si el sistema no
+// pide reduce-motion); después se quita para que recolocar no rebote de nuevo.
+function AnswerMarker({ answer }: { answer: LatLng }) {
+  const [animation, setAnimation] = useState<google.maps.Animation | null>(
+    respectsMotion() ? google.maps.Animation.DROP : null,
+  )
+  useEffect(() => {
+    if (!animation) return
+    const t = setTimeout(() => setAnimation(null), 800)
+    return () => clearTimeout(t)
+  }, [animation])
+  return (
+    <Marker
+      position={answer}
+      icon={emojiIcon()}
+      label={emojiLabel('🎯')}
+      clickable={false}
+      animation={animation}
     />
   )
 }
 
 export function PlayMap({ guess, answer, locked, onPick }: Props) {
   return (
-    <MapContainer
-      center={[WORLD.lat, WORLD.lng]}
-      zoom={WORLD_ZOOM}
-      minZoom={2}
-      worldCopyJump
-      // Zoom rápido para llegar a un punto pequeño sin mil scrolls (nivel 1):
-      // doble-clic/doble-tap acercan HACIA el punto (zoomDelta=2 → +2 niveles);
-      // la rueda es más sensible (wheelPxPerZoomLevel 60→40) y zoomSnap 0.5 da
-      // pasos finos para afinar al final. doubleClickZoom va de serie.
-      zoomDelta={2}
-      zoomSnap={0.5}
-      wheelPxPerZoomLevel={40}
+    <Map
       className="lg-map"
+      defaultCenter={WORLD}
+      defaultZoom={WORLD_ZOOM}
+      minZoom={2}
+      // Un dedo mueve el mapa en móvil (sin el banner "usa dos dedos"), igual que
+      // el worldCopyJump/arrastre fluido de antes.
+      gestureHandling="greedy"
+      // Mapa estándar de Google → POIs/bares visibles por defecto (lo que pide el
+      // juego). Sin mapId: usamos Marker clásico, no AdvancedMarker.
+      disableDefaultUI
+      zoomControl
+      clickableIcons={false}
+      // Colocar/mover el pin tocando el mapa, solo mientras no esté bloqueado.
+      onClick={(e) => {
+        if (locked) return
+        const latLng = e.detail.latLng
+        if (latLng) onPick({ lat: latLng.lat, lng: latLng.lng })
+      }}
     >
-      {/* CDN de CARTO. Anti-gris al hacer zoom:
-          - SIN retina {r}: tiles 256px (4× más ligeros) → cargan antes.
-          - maxNativeZoom=19: más allá de 19 CARTO no tiene tiles; en vez de
-            pedir uno inexistente (gris), Leaflet REESCALA el de 19 al instante.
-          - keepBuffer precarga alrededor; updateWhenZooming=false mantiene los
-            tiles viejos escalados durante la animación (no parpadea gris). */}
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
-        subdomains="abcd"
-        maxNativeZoom={19}
-        maxZoom={20}
-        keepBuffer={6}
-        updateWhenZooming={false}
-      />
-      <AutoInvalidateSize />
-      <ClickHandler locked={locked} onPick={onPick} />
-      <FitToReveal guess={guess} answer={answer} />
-      {guess && <Marker position={[guess.lat, guess.lng]} icon={guessIcon} />}
-      {answer && <Marker position={[answer.lat, answer.lng]} icon={answerIcon} />}
+      {guess && (
+        <Marker position={guess} icon={emojiIcon()} label={emojiLabel('📍')} clickable={false} />
+      )}
+      {answer && <AnswerMarker answer={answer} />}
       {guess && answer && <DrawnLine guess={guess} answer={answer} />}
-    </MapContainer>
+      {guess && answer && <FitToReveal guess={guess} answer={answer} />}
+    </Map>
   )
 }
