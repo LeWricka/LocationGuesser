@@ -4,7 +4,7 @@
   z-index: var(--z-overlay);
   display: flex;
   align-items: flex-end;
-  background: rgba(0, 0, 0, 0.62);
+  background: var(--color-scrim);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   animation: overlay-in var(--transition-base) ease;

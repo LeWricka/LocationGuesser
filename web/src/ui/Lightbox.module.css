@@ -37,7 +37,7 @@
   border-radius: var(--radius-sm);
   /* Pastilla translúcida: el ✕ se lee sobre fotos claras u oscuras. */
   background: rgba(0, 0, 0, 0.5);
-  color: #fff;
+  color: var(--color-on-photo);
   font-size: var(--font-size-lg);
   cursor: pointer;
 }

@@ -16,11 +16,8 @@
   gap: 48px;
 
   /* Mismo atlas que la tarjeta de clasificación: océano sólido + halo ámbar. */
-  background-color: #04141d;
-  background-image:
-    radial-gradient(1100px 760px at 50% -8%, rgba(255, 178, 77, 0.22), transparent 55%),
-    radial-gradient(1000px 900px at 12% 6%, rgba(69, 201, 176, 0.16), transparent 58%),
-    linear-gradient(180deg, #07212e 0%, #04141d 60%, #030f16 100%);
+  background-color: var(--ocean-900);
+  background-image: var(--card-gradient);
 
   color: var(--color-text);
   font-family: var(--font-sans);
@@ -90,8 +87,8 @@
   gap: 8px;
   padding: 56px 32px;
   border-radius: 32px;
-  background-color: rgba(255, 178, 77, 0.12);
-  border: 1px solid rgba(255, 178, 77, 0.32);
+  background-color: var(--card-tint-accent);
+  border: 1px solid var(--card-border-accent);
 }
 
 .points {
@@ -143,8 +140,8 @@
   text-align: center;
   padding: 28px 32px;
   border-radius: 24px;
-  background-color: rgba(13, 44, 59, 0.85);
-  border: 1px solid rgba(170, 230, 235, 0.16);
+  background-color: var(--card-surface);
+  border: 1px solid var(--card-border);
   font-size: 54px;
   font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-tight);
@@ -158,7 +155,7 @@
   justify-content: space-between;
   gap: 20px;
   padding-top: 28px;
-  border-top: 1px solid rgba(170, 230, 235, 0.2);
+  border-top: 1px solid var(--card-border-footer);
 }
 
 .footerCta {
