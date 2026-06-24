@@ -72,16 +72,16 @@ test.describe('smoke', () => {
     const root = page.locator('#root')
     await expect(root).not.toBeEmpty()
 
-    // 3. La pantalla de login es visible: título, campo de correo y botón de envío
-    //    (textos/roles reales de LoginScreen.tsx). Damos margen porque al arrancar
-    //    AuthProvider resuelve la sesión persistida (spinner) antes de pintar.
-    await expect(page.getByRole('heading', { name: 'Entra a LocationGuesser' })).toBeVisible({
+    // 3. La landing pública es visible: hero del producto, campo de correo y botón
+    //    de magic link (textos/roles reales de Landing.tsx). Damos margen porque al
+    //    arrancar AuthProvider resuelve la sesión persistida (spinner) antes de pintar.
+    await expect(page.getByRole('heading', { name: /GeoGuessr con/ })).toBeVisible({
       timeout: 20_000,
     })
     await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Enviar enlace mágico' })).toBeVisible()
 
     // 4. Higiene: ningún error PROPIO de consola/JS/petición (terceros tolerados).
-    expect(errors, `Errores inesperados al cargar el login:\n${errors.join('\n')}`).toEqual([])
+    expect(errors, `Errores inesperados al cargar la landing:\n${errors.join('\n')}`).toEqual([])
   })
 })
