@@ -1,12 +1,12 @@
 /*
  * Tarjeta de clasificación para compartir como IMAGEN (poster vertical).
  * Ancho fijo 1080 px y alto MÍNIMO 1350 px (4:5 ideal para WhatsApp/stories):
- * si el contenido (TODAS las filas + premios + pie) no cabe, el lienzo crece en
- * alto en vez de solaparse — así todos los jugadores salen, nadie se trunca. A
- * diferencia del resto del UI kit, aquí NO usamos backdrop-filter/filter/sombras
- * de glow: las herramientas de snapshot (html-to-image) no las rasterizan bien y
- * dejarían bordes sucios o paneles transparentes. Solo gradientes, colores y
- * bordes sólidos.
+ * si el contenido (podio + TODAS las filas + premios + pie) no cabe, el lienzo
+ * crece en alto en vez de solaparse — así todos los jugadores salen, nadie se
+ * trunca. A diferencia del resto del UI kit, aquí NO usamos backdrop-filter/
+ * filter/sombras de glow: las herramientas de snapshot (html-to-image) no las
+ * rasterizan bien y dejarían bordes sucios o paneles transparentes. Solo
+ * gradientes, colores y bordes sólidos.
  */
 .card {
   position: relative;
@@ -16,7 +16,7 @@
   padding: 80px 72px 64px;
   display: flex;
   flex-direction: column;
-  gap: 44px;
+  gap: 40px;
 
   /* Atlas océano sólido + halo cálido ámbar arriba (sin transparencias raras
      que el snapshot no capte). Color de respaldo opaco bajo el gradiente. */
@@ -32,23 +32,46 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* ---- Marca ------------------------------------------------------------- */
+/* ---- Marca -------------------------------------------------------------
+   Lockup de marca: pin sobre disco cálido + wordmark + tagline. Identidad
+   reconocible (como Strava/Wrapped) sin filtros: solo color sólido y borde. */
 .brand {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
 }
 
 .logoMark {
-  font-size: 44px;
+  flex: 0 0 auto;
+  width: 76px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 22px;
+  font-size: 42px;
   line-height: 1;
+  background-color: var(--color-accent);
+  border: 2px solid rgba(255, 206, 130, 0.7);
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .brandName {
-  font-size: 34px;
-  font-weight: var(--font-weight-bold);
+  font-size: 36px;
+  font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
+}
+
+.brandTag {
+  font-size: 22px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
 }
 
 /* ---- Cabecera ---------------------------------------------------------- */
@@ -124,7 +147,160 @@
   overflow-wrap: anywhere;
 }
 
-/* ---- Lista ------------------------------------------------------------- */
+/* ---- Tablero (podio + lista) ------------------------------------------- */
+/* Crece para empujar premios/pie abajo cuando sobra espacio; el lienzo crece en
+   alto si el contenido no cabe (nunca se encoge por debajo de su contenido). */
+.board {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ---- Podio (top-3) -----------------------------------------------------
+   Tres columnas alineadas abajo; la 1ª al centro y más alta (orden visual
+   2-1-3 dado por el `order`). Cada plaza tiene su disco con inicial, nombre,
+   puntos y un pedestal de altura distinta. Solo color/borde sólidos. */
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 22px;
+  padding: 8px 0 0;
+}
+
+.podiumCol {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+}
+
+/* Orden visual 2-1-3 (el DOM ya viene 2-1-3, pero fijamos el order por claridad
+   y por si cambia el orden de render). */
+.placeSecond {
+  order: 1;
+}
+.placeFirst {
+  order: 2;
+}
+.placeThird {
+  order: 3;
+}
+
+.crown {
+  font-size: 44px;
+  line-height: 1;
+  margin-bottom: -4px;
+}
+
+/* Disco con la inicial: reusa el color de la medalla (oro/plata/bronce). La 1ª
+   plaza es mayor para marcar jerarquía. */
+.podiumDisc {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  width: 132px;
+  height: 132px;
+  font-size: 60px;
+  font-weight: var(--font-weight-black);
+  line-height: 1;
+}
+
+.placeFirst .podiumDisc {
+  width: 164px;
+  height: 164px;
+  font-size: 76px;
+}
+
+.podiumName {
+  max-width: 100%;
+  font-size: 32px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.placeFirst .podiumName {
+  font-size: 38px;
+}
+
+.podiumPoints {
+  font-size: 40px;
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.placeFirst .podiumPoints {
+  font-size: 50px;
+}
+
+.podiumPrize {
+  max-width: 100%;
+  font-size: 22px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pedestal: barra de color del puesto con su medalla; altura por plaza (1ª la
+   más alta) para leer el podio de un vistazo. */
+.pedestal {
+  position: relative;
+  width: 100%;
+  margin-top: 6px;
+  border-radius: 18px 18px 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 16px;
+}
+
+.placeFirst .pedestal {
+  height: 180px;
+}
+.placeSecond .pedestal {
+  height: 130px;
+}
+.placeThird .pedestal {
+  height: 96px;
+}
+
+.pedestalMedal {
+  font-size: 44px;
+  line-height: 1;
+}
+
+/* Tinte del pedestal: versión tenue del color de la medalla con borde sólido. */
+.pedestal.gold {
+  background-color: rgba(255, 207, 92, 0.22);
+  border: 2px solid var(--medal-gold);
+  border-bottom: none;
+}
+.pedestal.silver {
+  background-color: rgba(207, 224, 230, 0.2);
+  border: 2px solid var(--medal-silver);
+  border-bottom: none;
+}
+.pedestal.bronze {
+  background-color: rgba(217, 138, 78, 0.22);
+  border: 2px solid var(--medal-bronze);
+  border-bottom: none;
+}
+
+/* ---- Lista (4º en adelante, o todos si hay <3) ------------------------- */
 .list {
   list-style: none;
   margin: 0;
@@ -132,10 +308,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  /* Crece para empujar el pie abajo cuando sobra espacio, pero SIN min-height:0:
-     así la caja nunca se encoge por debajo de su contenido y las filas no se
-     derraman sobre los premios/el pie (el lienzo crece en alto si hace falta). */
-  flex: 1;
 }
 
 .row {
@@ -148,8 +320,8 @@
   border: 1px solid rgba(170, 230, 235, 0.16);
 }
 
-/* Las tres primeras filas pesan más: fondo algo más vivo y borde cálido. */
-.podium {
+/* Las tres primeras filas (solo cuando NO hay podio) pesan algo más. */
+.topRow {
   background-color: rgba(18, 58, 76, 0.92);
   border-color: rgba(255, 178, 77, 0.28);
 }

@@ -1,0 +1,65 @@
+/* Preview de marca del grupo dentro del modal de invitar: una tarjeta con el
+   acento cálido que da contexto (nombre + personas/retos) en vez de un enlace
+   pelado. Reusa los tokens; sin hardcodear colores. */
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-accent-soft);
+  background:
+    radial-gradient(140% 120% at 0% 0%, var(--color-accent-soft), transparent 60%),
+    var(--glass-bg-strong);
+}
+
+.eyebrow {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-eyebrow);
+  color: var(--color-accent);
+}
+
+.groupName {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.metaItem {
+  white-space: nowrap;
+}
+
+.dot {
+  color: var(--color-text-faint);
+}
+
+.tagline {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-muted);
+}
+
+.hint {
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-faint);
+}

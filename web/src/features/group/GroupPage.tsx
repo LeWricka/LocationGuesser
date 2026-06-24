@@ -29,6 +29,7 @@ import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, splitByStatus, updateGroupPrizes } from '../../lib/groupData'
 import { PRIZE_SLOTS, prizeForRow } from './prizes'
 import { ShareLeaderboardModal } from './ShareLeaderboardModal'
+import { InviteModal } from './InviteModal'
 import { signedImageUrl } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { CreateChallenge } from '../create/CreateChallenge'
@@ -75,6 +76,8 @@ export function GroupPage({ groupId, onBack }: Props) {
   const [editing, setEditing] = useState<ChallengeForPlay | null>(null)
   // Modal de "Compartir clasificación como imagen" (genera y previsualiza el PNG).
   const [sharingLeaderboard, setSharingLeaderboard] = useState(false)
+  // Modal de "Invitar al grupo" (preview del grupo + Web Share / copiar enlace).
+  const [inviting, setInviting] = useState(false)
   // Modal de ajustes del grupo (renombrar / borrar), solo dueño.
   const [settingsOpen, setSettingsOpen] = useState(false)
   const toast = useToast()
@@ -276,8 +279,8 @@ export function GroupPage({ groupId, onBack }: Props) {
             <p className={styles.code}>Código {groupId}</p>
           </div>
           <Row gap={2} wrap>
-            <Button variant="secondary" size="sm" onClick={() => void shareGroup(groupId, toast)}>
-              Compartir grupo
+            <Button variant="secondary" size="sm" onClick={() => setInviting(true)}>
+              Invitar
             </Button>
             {isOwner && (
               <Button
@@ -391,6 +394,15 @@ export function GroupPage({ groupId, onBack }: Props) {
         prizes={group?.prizes ?? null}
         link={groupLink(groupId)}
       />
+
+      <InviteModal
+        open={inviting}
+        onClose={() => setInviting(false)}
+        groupId={groupId}
+        groupName={group?.name?.trim() || groupId}
+        link={groupLink(groupId)}
+        challengeCount={challenges.length}
+      />
     </main>
   )
 }
@@ -458,22 +470,6 @@ function GroupSkeleton() {
       </Stack>
     </main>
   )
-}
-
-// Comparte el enlace del grupo (#g=…): Web Share en móvil, copiar como respaldo.
-async function shareGroup(groupId: string, toast: ReturnType<typeof useToast>) {
-  const link = groupLink(groupId)
-  const text = `Únete a nuestro grupo en LocationGuesser y adivina dónde son las fotos: ${link}`
-  if (typeof navigator !== 'undefined' && 'share' in navigator) {
-    try {
-      await navigator.share({ title: 'LocationGuesser', text })
-      return
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-    }
-  }
-  await navigator.clipboard.writeText(text)
-  toast.show('Enlace del grupo copiado, pégalo en el chat', { tone: 'success' })
 }
 
 // Panel que aparece tras crear un reto: ofrece su enlace para compartir en el
