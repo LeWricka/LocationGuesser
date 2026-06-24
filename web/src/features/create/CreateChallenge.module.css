@@ -89,10 +89,19 @@
   color: var(--color-text-muted);
 }
 
-/* Pie de la foto: explica qué hace el toggle pista/sorpresa. */
+/* Pie de la foto y avisos del flujo. */
 .hint {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+}
+
+/* Aviso de Street View cercano (flujo Fácil): el SV cayó a N metros de la foto. */
+.svPrompt {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  font-size: var(--font-size-sm);
 }
 
 /* Duración elegida, destacada sobre el slider. */

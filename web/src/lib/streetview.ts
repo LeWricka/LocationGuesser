@@ -4,10 +4,18 @@
 // crear el reto encajamos el lat/lng elegido al panorama real más próximo y nos
 // quedamos con su pano_id, robusto frente a reorganizaciones de cobertura.
 
+import { haversine } from './geo'
+
 export interface PanoramaMatch {
   panoId: string
   lat: number
   lng: number
+}
+
+/** Panorama encajado + a qué distancia (en metros) cayó del punto buscado. */
+export interface PanoramaNearby extends PanoramaMatch {
+  /** Distancia del panorama al punto original, en metros (redondeada). */
+  distanceMeters: number
 }
 
 // Carga la librería 'streetView' del SDK ya inicializado por <APIProvider>.
@@ -53,4 +61,27 @@ export async function findPanorama(
     // moderna. Cualquier fallo de búsqueda lo tratamos como "no hay panorama".
     return null
   }
+}
+
+/**
+ * Busca el panorama de Street View cercano a un punto y reporta a qué distancia
+ * cayó. Pensado para el flujo Fácil: la FOTO es la respuesta (su lat/lng), y el
+ * Street View es contexto explorable que puede estar a unos metros. Si el
+ * panorama queda lejos avisamos al creador antes de usarlo.
+ *
+ * @param lat latitud del punto (la respuesta: GPS de la foto o pin manual)
+ * @param lng longitud del punto
+ * @param radius radio de búsqueda en metros (default 50; criterio del flujo Fácil)
+ * @returns el panorama encajado + su distancia en metros, o `null` si no hay
+ *   cobertura de Street View en ese radio.
+ */
+export async function findPanoramaNear(
+  lat: number,
+  lng: number,
+  radius = 50,
+): Promise<PanoramaNearby | null> {
+  const match = await findPanorama(lat, lng, radius)
+  if (!match) return null
+  const km = haversine({ lat, lng }, { lat: match.lat, lng: match.lng })
+  return { ...match, distanceMeters: Math.round(km * 1000) }
 }

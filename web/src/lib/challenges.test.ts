@@ -8,6 +8,7 @@ const results: Record<string, { data?: unknown; error?: unknown; count?: number 
 const calls = {
   from: vi.fn(),
   insert: vi.fn(),
+  upsert: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
   select: vi.fn(),
@@ -31,6 +32,10 @@ function builderFor(table: string) {
   }
   builder.insert = (...args: unknown[]) => {
     calls.insert(table, ...args)
+    return builder
+  }
+  builder.upsert = (...args: unknown[]) => {
+    calls.upsert(table, ...args)
     return builder
   }
   builder.update = (...args: unknown[]) => {
@@ -99,12 +104,13 @@ describe('createChallenge', () => {
       createdBy: '00000000-0000-0000-0000-000000000001',
       groupId: 'g1',
     })
-    // La respuesta va a su tabla aparte (gobernada por RLS).
-    expect(calls.insert).toHaveBeenCalledWith('challenge_answers', {
-      challenge_id: 'c1',
-      lat: 40.4155,
-      lng: -3.7074,
-    })
+    // La respuesta va a su tabla aparte (gobernada por RLS), con UPSERT idempotente
+    // (onConflict: challenge_id) para no chocar con el trigger de la 0012.
+    expect(calls.upsert).toHaveBeenCalledWith(
+      'challenge_answers',
+      { challenge_id: 'c1', lat: 40.4155, lng: -3.7074 },
+      { onConflict: 'challenge_id' },
+    )
     expect(out.challenge).toEqual(sampleChallenge)
     expect(out.groupId).toBe('g1')
   })
@@ -230,7 +236,12 @@ describe('updateChallenge', () => {
       sv_heading: 10,
       sv_pitch: 5,
     })
-    expect(calls.update).toHaveBeenCalledWith('challenge_answers', { lat: 1, lng: 2 })
+    // La respuesta se reescribe con UPSERT idempotente (deploy-safe frente al trigger).
+    expect(calls.upsert).toHaveBeenCalledWith(
+      'challenge_answers',
+      { challenge_id: 'c1', lat: 1, lng: 2 },
+      { onConflict: 'challenge_id' },
+    )
   })
 
   test('RECHAZA cambiar la ubicación si el reto ya tiene votos', async () => {
