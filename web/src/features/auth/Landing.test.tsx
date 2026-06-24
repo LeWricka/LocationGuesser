@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -17,11 +17,17 @@ beforeEach(() => {
   signIn.mockClear()
 })
 
+afterEach(() => {
+  window.location.hash = ''
+})
+
 describe('Landing', () => {
   test('muestra el hero y el formulario de entrada', () => {
     render(<Landing />)
     expect(
-      screen.getByRole('heading', { name: /GeoGuessr con las fotos de tus amigos/i }),
+      screen.getByRole('heading', {
+        name: /Comparte tus sitios y reta a tus amigos a adivinar dónde/i,
+      }),
     ).toBeInTheDocument()
     // Los 3 pasos reutilizados de HowItWorks.
     expect(screen.getByRole('heading', { name: 'Cómo funciona' })).toBeInTheDocument()
@@ -57,5 +63,15 @@ describe('Landing', () => {
     expect(
       screen.getByRole('heading', { name: /Únete a Finde Lisboa y juega/i }),
     ).toBeInTheDocument()
+    // En el deep-link el grupo ya viene dado: no se ofrece el atajo de código.
+    expect(screen.queryByText('¿Te han pasado un código de grupo?')).not.toBeInTheDocument()
+  })
+
+  test('el atajo de código de grupo navega a #g=<código>', async () => {
+    render(<Landing />)
+    await userEvent.click(screen.getByText('¿Te han pasado un código de grupo?'))
+    await userEvent.type(screen.getByLabelText('Código o enlace del grupo'), 'lisboa123')
+    await userEvent.click(screen.getByRole('button', { name: 'Unirme al grupo' }))
+    expect(window.location.hash).toBe('#g=lisboa123')
   })
 })
