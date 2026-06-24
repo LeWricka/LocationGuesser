@@ -8,8 +8,11 @@
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   animation: overlay-in var(--transition-base) ease;
-  /* Móvil: el panel ocupa toda la pantalla. */
+  /* Móvil: hoja inferior (bottom sheet) anclada abajo. El panel se ajusta al
+     contenido (no full-screen), así los botones del footer quedan JUSTO bajo el
+     texto y al alcance del pulgar, en vez de pegados al fondo con un hueco. */
   padding: 0;
+  align-items: flex-end;
 }
 
 .panel {
@@ -18,8 +21,10 @@
   width: 100%;
   background-color: var(--color-surface);
   background-image: linear-gradient(var(--color-surface-sheen), transparent 160px);
-  /* Móvil: full-screen, sin radios. */
-  border-radius: 0;
+  /* Móvil: hoja ajustada al contenido (hasta 92vh; el body hace scroll si no
+     cabe), con las esquinas superiores redondeadas. */
+  max-height: 92vh;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   outline: none;
   animation: slide-up var(--transition-base) var(--ease-emphasized);
 }

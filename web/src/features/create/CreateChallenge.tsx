@@ -478,7 +478,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
             {wantsPhoto && (
               <Field
                 label="Foto del reto"
-                hint="Se sube sin datos de ubicación (sin EXIF). Si la foto sabe dónde es, colocamos el pin por ti."
+                hint="Quitamos la ubicación que la foto pueda llevar dentro, para que no chive el sitio. Si la foto sabe dónde es, colocamos el pin por ti."
               >
                 {(fieldProps) => (
                   <Stack gap={3} align="start">
