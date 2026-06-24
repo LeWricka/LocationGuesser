@@ -20,7 +20,7 @@ import { PlayChallenge } from './features/play/PlayChallenge'
 import { GroupPage } from './features/group/GroupPage'
 import { HomePage } from './features/home/HomePage'
 import {
-  LoginFlow,
+  Landing,
   ProfileGate,
   ProfileEditScreen,
   useDeepLinkJoin,
@@ -64,9 +64,9 @@ function AppRoutes() {
   if (loading) return <BootScreen />
 
   // ── Sin sesión ──────────────────────────────────────────────────────────────
-  // Cualquier ruta cae al login. Si la URL trae un deep link de grupo, guardamos
-  // el destino para restaurarlo tras el email y mostramos el copy "Únete para
-  // jugar este reto" con el nombre del grupo.
+  // Cualquier ruta cae a la landing pública. Si la URL trae un deep link de
+  // grupo, guardamos el destino para restaurarlo tras el email y adaptamos el
+  // copy ("Únete a <grupo> y juega") con el nombre del grupo.
   if (!user) {
     return <LoggedOut route={route} />
   }
@@ -97,7 +97,7 @@ function BootScreen() {
   )
 }
 
-// Pantalla de login (sin sesión). Resuelve el nombre del grupo (barato: un select
+// Landing pública (sin sesión). Resuelve el nombre del grupo (barato: un select
 // por id) cuando se entra por link de reto, y guarda el destino antes de salir al
 // email para volver DIRECTO al reto (deep-link join al volver con sesión).
 function LoggedOut({ route }: { route: ReturnType<typeof parseHash> }) {
@@ -119,7 +119,7 @@ function LoggedOut({ route }: { route: ReturnType<typeof parseHash> }) {
     }
   }, [route.group])
 
-  return <LoginFlow groupName={groupName} />
+  return <Landing groupName={groupName} />
 }
 
 // Router por hash con sesión válida. Auto-join idempotente al entrar por link de

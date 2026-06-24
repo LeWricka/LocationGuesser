@@ -1,0 +1,110 @@
+/* Landing pública (issue #175): móvil-first, una columna centrada que respira
+ * en pantallas anchas. Todo con tokens del kit; sin colores/espaciados crudos. */
+.page {
+  min-height: 100svh;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-6) var(--space-4);
+  padding-top: calc(var(--space-7) + env(safe-area-inset-top));
+  padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+}
+
+.content {
+  width: 100%;
+  max-width: var(--container-max);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+.hero {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Ancla de marca (el pin) en disco cálido con glow: rompe el frío del fondo,
+ * igual que la cabecera de las pantallas de auth. */
+.brand {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  background: var(--color-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  box-shadow: var(--shadow-accent);
+  margin-bottom: var(--space-5);
+}
+
+.eyebrow {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.headline {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tighter);
+  line-height: var(--line-height-tight);
+  text-wrap: balance;
+}
+
+/* La parte que "canta": acento cálido sobre el frío. */
+.accent {
+  color: var(--color-accent);
+}
+
+.lead {
+  margin: var(--space-3) auto 0;
+  max-width: 46ch;
+  color: var(--color-text-muted);
+  line-height: var(--line-height-normal);
+}
+
+/* ── Entrada por magic link ───────────────────────────────────────────────── */
+.entry {
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+  text-align: center;
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--card-surface);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-md);
+}
+
+.entryTitle {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.entryLead {
+  margin: var(--space-2) auto var(--space-5);
+  max-width: 36ch;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+/* El formulario se alinea a la izquierda dentro de la tarjeta centrada: la
+ * etiqueta y el error leen mejor pegados al borde del campo. */
+.form {
+  text-align: left;
+}
+
+@media (min-width: 600px) {
+  .headline {
+    font-size: var(--font-size-2xl);
+  }
+}
