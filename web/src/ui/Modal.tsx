@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import styles from './Modal.module.css'
 
@@ -42,7 +43,12 @@ export function Modal({ open, onClose, title, footer, children }: Props) {
 
   const labelledBy = title ? 'lg-modal-title' : undefined
 
-  return (
+  // Portal a <body>: el overlay usa position:fixed, que un ancestro con
+  // transform/filter (p.ej. animaciones de entrada como lg-stagger) convertiría
+  // en "fixed relativo a ese ancestro" → el modal se renderizaría descolocado
+  // (inline) en vez de a pantalla completa. Sacándolo a body siempre cubre el
+  // viewport, montes el <Modal> donde lo montes.
+  return createPortal(
     <div className={styles.overlay} onClick={() => onClose?.()}>
       <div
         // stopPropagation: un clic dentro del panel no debe cerrar el modal.
@@ -71,6 +77,7 @@ export function Modal({ open, onClose, title, footer, children }: Props) {
         <div className={styles.body}>{children}</div>
         {footer && <footer className={styles.footer}>{footer}</footer>}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
