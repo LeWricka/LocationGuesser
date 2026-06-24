@@ -2,13 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { sceneMedium } from './sceneMedium'
+import { ResultCard } from './ResultCard'
+import { buildChallengeLink, buildResultShareText } from './shareResult'
 import { getAnswer, getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { getExistingVote, submitVote } from '../../lib/votes'
+import { getGroup } from '../../lib/groupData'
 import { type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
+// Rasterización + compartir reutilizadas de la tarjeta de clasificación (import
+// READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
+import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
 import {
   Badge,
   BackHomeButton,
@@ -67,6 +73,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [remaining, setRemaining] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Nombre del grupo para la tarjeta de "compartir mi resultado". El componente
+  // solo recibe el código del grupo (groupId); el nombre lo leemos aparte. Null
+  // hasta resolver (o si no hay grupo / falla): la tarjeta cae a "tu grupo".
+  const [groupName, setGroupName] = useState<string | null>(null)
+  // Compartir mi resultado: estado del PNG. `sharingResult` deshabilita el botón
+  // mientras se rasteriza/comparte; el ref apunta a la tarjeta montada fuera del
+  // viewport para el snapshot (mismo patrón que ShareLeaderboardModal).
+  const [sharingResult, setSharingResult] = useState(false)
+  const resultCardRef = useRef<HTMLDivElement>(null)
   // Mapa de adivinar como hoja inferior (bottom sheet) estilo GeoGuessr: el FAB
   // 🗺️ la sube; dentro se coloca el pin y se confirma; cerrar vuelve al panorama.
   const [mapOpen, setMapOpen] = useState(false)
@@ -197,6 +212,23 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     }
   }, [challengeId, user])
 
+  // Nombre del grupo para la tarjeta de compartir. Solo si venimos de un grupo
+  // (deep link con groupId). Falla en silencio: la tarjeta cae a "tu grupo".
+  useEffect(() => {
+    if (!groupId) return
+    let cancelled = false
+    void getGroup(groupId)
+      .then((g) => {
+        if (!cancelled && g?.name) setGroupName(g.name)
+      })
+      .catch(() => {
+        // Sin nombre: la tarjeta usa el fallback. No bloquea el juego.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [groupId])
+
   // Cuenta atrás. Arranca al entrar en `playing` reconstruyendo desde `start_at`
   // (persistido), así una recarga no reinicia el reloj. Al llegar a 0 → revelar.
   useEffect(() => {
@@ -239,6 +271,43 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // si se vuelve a entrar a media jugada.
   function goBack() {
     location.hash = groupId ? `#g=${groupId}` : ''
+  }
+
+  // Compartir MI resultado (apuesta viral): rasteriza la tarjeta (montada fuera
+  // del viewport) y la comparte por Web Share API, con fallback a descarga +
+  // caption al portapapeles. El caption y la tarjeta NO revelan la ubicación: solo
+  // mi rendimiento. Requiere haber jugado (hay resultado, no timeout) y venir de un
+  // grupo (para el enlace al reto). Dispara `result_shared` según cómo acabe.
+  async function onShareResult() {
+    if (!challenge || !result || !groupId) return
+    const node = resultCardRef.current
+    if (!node) return
+    setSharingResult(true)
+    try {
+      const link = buildChallengeLink(groupId, challenge.id)
+      const name = groupName ?? 'tu grupo'
+      const text = buildResultShareText(name, link)
+      const blob = await nodeToPngBlob(node)
+      const outcome = await shareLeaderboardImage(blob, text, `Mi resultado · ${challenge.title}`)
+      if (outcome === 'cancelled') return
+      track('result_shared', {
+        surface: outcome,
+        group_id: groupId,
+        challenge_id: challenge.id,
+        points: result.points,
+        distance_km: result.km,
+      })
+      toast.show(
+        outcome === 'downloaded'
+          ? 'Imagen descargada y enlace copiado, pégalos en el chat'
+          : '¡Compartido!',
+        { tone: 'success' },
+      )
+    } catch {
+      toast.show('No se pudo generar la imagen', { tone: 'danger' })
+    } finally {
+      setSharingResult(false)
+    }
   }
 
   if (loadError) {
@@ -510,6 +579,21 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               <span className={styles.status}>Revelado.</span>
             )}
 
+            {/* Compartir MI resultado (apuesta viral): pica al resto a jugar con la
+                tarjeta de mi rendimiento, SIN revelar la ubicación. Solo si jugué
+                (hay resultado, no timeout) y vengo de un grupo (para el enlace al
+                reto). No se muestra en timeout: no hay puntos que presumir. */}
+            {result && groupId && (
+              <Button
+                fullWidth
+                size="lg"
+                onClick={() => void onShareResult()}
+                loading={sharingResult}
+              >
+                📤 Compartir mi resultado
+              </Button>
+            )}
+
             {/* Foto sorpresa: estaba oculta al jugar; se revela aquí, al votar. */}
             {surprisePhotoUrl && (
               <ChallengePhoto
@@ -568,6 +652,25 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           </Stack>
         </Card>
       </Stack>
+
+      {/* Lienzo de captura: la tarjeta de MI resultado vive a tamaño real (1080px)
+          fuera del viewport para que html-to-image la mida y rasterice bien
+          (display:none mediría 0×0). Solo cuando hay un resultado real que
+          compartir. NO-SPOILER: ResultCard solo recibe rendimiento (puntos,
+          distancia) + título y grupo; nunca la ubicación, mapa ni foto del reto.
+          aria-hidden: es un lienzo, no contenido. */}
+      {result && groupId && (
+        <div className={styles.shareCanvas} aria-hidden="true">
+          <ResultCard
+            ref={resultCardRef}
+            groupName={groupName ?? 'tu grupo'}
+            challengeTitle={challenge.title}
+            points={result.points}
+            distanceKm={result.km}
+            domain={shareDomain(buildChallengeLink(groupId, challenge.id))}
+          />
+        </div>
+      )}
     </main>
   )
 }

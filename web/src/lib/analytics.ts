@@ -35,6 +35,10 @@ export type AnalyticsEvent =
   | 'challenge_created'
   | 'challenge_played'
   | 'result_revealed'
+  // Compartir MI resultado tras revelar (apuesta viral nº1). Props: surface
+  // ('shared'|'downloaded'), group_id, challenge_id, points, distance_km. SIN
+  // ubicación: el evento nunca lleva lat/lng ni nombre del lugar.
+  | 'result_shared'
   // Eventos pre-declarados para las features en curso (tarjeta, onboarding,
   // home). Se declaran aquí de antemano para que esas features solo llamen a
   // track() sin editar este catálogo en paralelo (evita choques de merge).

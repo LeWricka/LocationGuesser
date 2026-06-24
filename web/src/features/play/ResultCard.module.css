@@ -1,0 +1,175 @@
+/*
+ * Tarjeta de MI resultado para compartir como IMAGEN (poster vertical 4:5).
+ * Ancho fijo 1080 px, alto mínimo 1350 px (ideal WhatsApp/stories). Igual que la
+ * tarjeta de clasificación: NADA de backdrop-filter/filter/glow (html-to-image no
+ * los rasteriza fiel); solo gradientes, colores y bordes sólidos. Centrada en el
+ * rendimiento — sin mapa ni ubicación (NO-SPOILER por construcción).
+ */
+.card {
+  position: relative;
+  box-sizing: border-box;
+  width: 1080px;
+  min-height: 1350px;
+  padding: 80px 72px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+
+  /* Mismo atlas que la tarjeta de clasificación: océano sólido + halo ámbar. */
+  background-color: #04141d;
+  background-image:
+    radial-gradient(1100px 760px at 50% -8%, rgba(255, 178, 77, 0.22), transparent 55%),
+    radial-gradient(1000px 900px at 12% 6%, rgba(69, 201, 176, 0.16), transparent 58%),
+    linear-gradient(180deg, #07212e 0%, #04141d 60%, #030f16 100%);
+
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---- Marca ------------------------------------------------------------- */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logoMark {
+  font-size: 44px;
+  line-height: 1;
+}
+
+.brandName {
+  font-size: 34px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}
+
+/* ---- Cabecera ---------------------------------------------------------- */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.eyebrow {
+  font-size: 26px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-eyebrow);
+  color: var(--color-accent);
+}
+
+.challengeTitle {
+  margin: 0;
+  font-size: 72px;
+  line-height: 1.04;
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tighter);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.groupName {
+  font-size: 36px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/* ---- Puntos (protagonista) --------------------------------------------- */
+/* Crece para empujar el pie abajo, centrando el dato grande verticalmente. */
+.scoreBlock {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 56px 32px;
+  border-radius: 32px;
+  background-color: rgba(255, 178, 77, 0.12);
+  border: 1px solid rgba(255, 178, 77, 0.32);
+}
+
+.points {
+  font-size: 280px;
+  line-height: 0.9;
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tighter);
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.pointsUnit {
+  font-size: 44px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-text-muted);
+}
+
+/* ---- Distancia --------------------------------------------------------- */
+.distBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.distLabel {
+  font-size: 52px;
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}
+
+.distValue {
+  font-size: 36px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.distValue strong {
+  color: var(--teal-bright);
+  font-weight: var(--font-weight-black);
+}
+
+/* ---- CTA --------------------------------------------------------------- */
+.cta {
+  text-align: center;
+  padding: 28px 32px;
+  border-radius: 24px;
+  background-color: rgba(13, 44, 59, 0.85);
+  border: 1px solid rgba(170, 230, 235, 0.16);
+  font-size: 54px;
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}
+
+/* ---- Pie --------------------------------------------------------------- */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 28px;
+  border-top: 1px solid rgba(170, 230, 235, 0.2);
+}
+
+.footerCta {
+  font-size: 34px;
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}
+
+.footerDomain {
+  font-size: 28px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+}
