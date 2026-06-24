@@ -2,14 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { sceneMedium } from './sceneMedium'
-import { getChallenge } from '../../lib/challenges'
-import { getExistingVote, saveVote } from '../../lib/votes'
-import { computeResult, type Result } from '../../lib/result'
+import { getAnswer, getChallenge, type ChallengeForPlay } from '../../lib/challenges'
+import { getExistingVote, submitVote } from '../../lib/votes'
+import { type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
-import type { Challenge } from '../../lib/database.types'
 import {
   Badge,
   BackHomeButton,
@@ -46,7 +45,7 @@ type Phase = 'loading' | 'idle' | 'playing' | 'revealed'
 const startKey = (challengeId: string) => `lg.play.startAt.${challengeId}`
 
 // Etiqueta cualitativa según la distancia del acierto. Da feedback emocional
-// inmediato sin tocar el scoring (que sigue siendo `computeResult`).
+// inmediato sin tocar el scoring (que ahora calcula el servidor en la RPC submit_vote).
 function distanceLabel(km: number): string {
   if (km < 1) return '¡Clavado!'
   if (km < 25) return 'Muy cerca'
@@ -57,10 +56,14 @@ function distanceLabel(km: number): string {
 
 export function PlayChallenge({ challengeId, groupId }: Props) {
   const [phase, setPhase] = useState<Phase>('loading')
-  const [challenge, setChallenge] = useState<Challenge | null>(null)
+  const [challenge, setChallenge] = useState<ChallengeForPlay | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [guess, setGuess] = useState<LatLng | null>(null)
   const [result, setResult] = useState<Result | null>(null)
+  // La respuesta (ubicación real) NO viaja en el payload del reto: llega del
+  // servidor al votar (RPC) o se pide aparte al recargar un reto ya jugado/cerrado
+  // (getAnswer, gobernado por RLS). Solo se conoce una vez revelado.
+  const [answer, setAnswer] = useState<LatLng | null>(null)
   const [remaining, setRemaining] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -80,71 +83,63 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // —no tras los early-return de carga— para no romper el orden de hooks.
   const photoUrl = useSignedImage(challenge?.image_path ?? null)
 
-  // Revelar: calcula resultado contra la respuesta real, fija el pin y, si hay
-  // pin, persiste el voto. Sin pin (timeout) -> "no diste a tiempo".
+  // Revelar: emite el voto vía la RPC `submit_vote` (autoridad de servidor) y usa
+  // SU resultado (distancia, puntos y la respuesta real) para revelar. El cliente ya
+  // no calcula puntos ni conoce la respuesta de antemano. Sin pin (timeout) -> la RPC
+  // guarda 0 puntos sin pin y NO devuelve respuesta -> "no diste a tiempo".
   const reveal = useCallback(
-    async (current: Challenge, playedGuess: LatLng | null) => {
+    async (current: ChallengeForPlay, playedGuess: LatLng | null) => {
       setPhase('revealed')
       setMapOpen(false)
       localStorage.removeItem(startKey(current.id))
-      if (!playedGuess) {
-        // Se acabó el tiempo sin marcar → 0 puntos y queda MARCADO COMO JUGADO
-        // (un voto de timeout: sin pin). Así no puede reintentar para puntuar.
-        setTimedOut(true)
-        track('result_revealed', {
-          group_id: current.group_id,
-          challenge_id: current.id,
-          timed_out: true,
-          points: 0,
-        })
-        if (user) {
-          setSaving(true)
-          try {
-            await saveVote({
-              groupId: current.group_id,
-              challengeId: current.id,
-              userId: user.id,
-              guessLat: null,
-              guessLng: null,
-              distanceKm: null,
-              points: 0,
-            })
-          } catch {
-            // El aviso de "no diste a tiempo" ya se muestra; no bloqueamos por esto.
-          } finally {
-            setSaving(false)
-          }
-        }
-        return
-      }
-      const answer = { lat: current.lat, lng: current.lng }
-      const r = computeResult(playedGuess, answer)
-      setResult(r)
-      track('result_revealed', {
-        group_id: current.group_id,
-        challenge_id: current.id,
-        timed_out: false,
-        points: r.points,
-        distance_km: r.km,
-      })
 
       if (!user) {
+        // La app está gateada por sesión; sin ella no se puede puntuar (la RPC exige
+        // auth) ni conocer la respuesta. Caso límite: solo informamos.
+        if (!playedGuess) setTimedOut(true)
         toast.show('No se guardó tu voto (sin sesión)', { tone: 'neutral' })
         return
       }
+
       setSaving(true)
       try {
-        await saveVote({
-          groupId: current.group_id,
+        const res = await submitVote({
           challengeId: current.id,
-          userId: user.id,
-          guessLat: playedGuess.lat,
-          guessLng: playedGuess.lng,
-          distanceKm: r.km,
-          points: r.points,
+          guessLat: playedGuess?.lat ?? null,
+          guessLng: playedGuess?.lng ?? null,
+        })
+        if (!playedGuess) {
+          // Voto de timeout: 0 puntos, sin pin. Queda MARCADO COMO JUGADO (no puede
+          // reintentar para puntuar). La RPC no devuelve respuesta en este caso.
+          setTimedOut(true)
+          track('result_revealed', {
+            group_id: current.group_id,
+            challenge_id: current.id,
+            timed_out: true,
+            points: 0,
+          })
+          return
+        }
+        // El servidor devuelve distancia + puntos + la respuesta real para el pin.
+        const km = res.distanceKm ?? 0
+        setResult({ km, points: res.points })
+        if (res.answerLat != null && res.answerLng != null) {
+          setAnswer({ lat: res.answerLat, lng: res.answerLng })
+        }
+        track('result_revealed', {
+          group_id: current.group_id,
+          challenge_id: current.id,
+          timed_out: false,
+          points: res.points,
+          distance_km: km,
         })
         toast.show('¡Voto guardado!', { tone: 'success' })
       } catch (err) {
+        if (!playedGuess) {
+          // El aviso de "no diste a tiempo" ya se muestra; no bloqueamos por esto.
+          setTimedOut(true)
+          return
+        }
         toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
           tone: 'danger',
         })
@@ -177,6 +172,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           } else {
             setGuess({ lat: existing.guess_lat, lng: existing.guess_lng })
             setResult({ km: existing.distance_km ?? 0, points: existing.points })
+            // Ya votó: tiene derecho a ver la respuesta. La pedimos aparte (no viaja
+            // en el payload del reto); la RLS de challenge_answers la sirve por voto.
+            const ans = await getAnswer(challengeId)
+            if (cancelled) return
+            if (ans) setAnswer(ans)
           }
           setPhase('revealed')
           return
@@ -283,7 +283,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // panorama; si es sorpresa, se reserva para el revelado.
   const hintPhotoUrl = hasStreetView && photoUrl && challenge.photo_is_hint ? photoUrl : null
   const surprisePhotoUrl = hasStreetView && photoUrl && !challenge.photo_is_hint ? photoUrl : null
-  const answer: LatLng | null = revealed ? { lat: challenge.lat, lng: challenge.lng } : null
+  // Posición de fallback para el panorama: solo se usaría si NO hubiera panoId, pero
+  // `hasStreetView` implica sv_pano_id != null, así que el panorama siempre usa el
+  // panoId y nunca esta posición. La respuesta real (`answer`) solo se conoce tras
+  // revelar; al jugar es null y NO debe alimentar la escena.
+  const panoFallback: LatLng = answer ?? { lat: 0, lng: 0 }
   const urgent = remaining != null && remaining <= 10
   const backLabel = groupId ? 'Volver al grupo' : 'Inicio'
 
@@ -303,7 +307,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             <StreetViewPano
               ref={panoRef}
               panoId={challenge.sv_pano_id}
-              position={{ lat: challenge.lat, lng: challenge.lng }}
+              position={panoFallback}
               heading={challenge.sv_heading}
               pitch={challenge.sv_pitch}
             />
@@ -536,7 +540,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     {hasStreetView ? (
                       <StreetViewPano
                         panoId={challenge.sv_pano_id}
-                        position={{ lat: challenge.lat, lng: challenge.lng }}
+                        position={panoFallback}
                         heading={challenge.sv_heading}
                         pitch={challenge.sv_pitch}
                       />

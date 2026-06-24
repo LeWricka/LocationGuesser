@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import type { LatLng } from '../../lib/geo'
-import { createChallenge } from '../../lib/challenges'
+import { createChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes } from '../../lib/time'
-import type { Challenge } from '../../lib/database.types'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { resolveMapsUrl } from '../../lib/mapsUrl'
 import { uploadImage } from '../../lib/storage'
@@ -29,7 +28,7 @@ interface Props {
   /** Vuelve atrás sin crear (cancelar). */
   onBack: () => void
   /** Reto creado: el grupo lo usa para volver a la lista y ofrecer su enlace. */
-  onCreated: (challenge: Challenge) => void
+  onCreated: (challenge: ChallengeForPlay) => void
 }
 
 const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
