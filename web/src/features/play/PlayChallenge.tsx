@@ -4,6 +4,7 @@ import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { sceneMedium } from './sceneMedium'
 import { ResultCard } from './ResultCard'
 import { RevealBurst } from './RevealBurst'
+import { remainingSeconds } from './resumeState'
 import { SceneImage } from './SceneImage'
 import { buildChallengeLink, buildResultShareText } from './shareResult'
 import {
@@ -248,9 +249,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           setPhase('revealed')
           return
         }
-        // Si se recargó a media jugada (hay `start_at`), retomamos el juego sin
-        // volver a mostrar el overlay "Empezar" (el reloj no se reinicia).
-        const resuming = c.guess_seconds != null && localStorage.getItem(startKey(c.id)) != null
+        // Si ya se empezó (hay `start_at`), retomamos el juego sin volver a
+        // mostrar el overlay "Empezar": una vez empezado NO se puede reiniciar
+        // limpio saliendo y reentrando. Con tiempo, el reloj se reconstruye desde
+        // el instante original (no se regala ni recorta); sin tiempo, sigue en
+        // `playing`. Aplica también a retos sin límite (antes solo a los timed).
+        const resuming = localStorage.getItem(startKey(c.id)) != null
         setPhase(resuming ? 'playing' : 'idle')
       } catch (err) {
         if (cancelled) return
@@ -290,7 +294,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     const startAt = Number(localStorage.getItem(startKey(challenge.id)) ?? Date.now())
 
     const tick = () => {
-      const left = Math.max(0, total - Math.floor((Date.now() - startAt) / 1000))
+      const left = remainingSeconds(total, startAt, Date.now())
       setRemaining(left)
       if (left <= 0) {
         void reveal(challenge, guess)
@@ -303,9 +307,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
 
   function start() {
     if (!challenge) return
-    if (challenge.guess_seconds != null) {
-      localStorage.setItem(startKey(challenge.id), String(Date.now()))
-    }
+    // Marcamos el inicio SIEMPRE (con o sin límite de tiempo): así, al salir y
+    // reentrar, el reto se REANUDA en `playing` y nunca vuelve a "¿Listo para
+    // jugar?" (no hay reinicio limpio). Con límite, además fija el origen del
+    // reloj para reconstruir el tiempo restante.
+    localStorage.setItem(startKey(challenge.id), String(Date.now()))
     setPhase('playing')
   }
 
@@ -324,6 +330,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // si se vuelve a entrar a media jugada.
   function goBack() {
     location.hash = groupId ? `#g=${groupId}` : ''
+  }
+
+  // Salir DURANTE la jugada: el reloj NO se pausa (el reto sigue corriendo y al
+  // reentrar se reanuda, nunca reinicia). Lo confirmamos para que el jugador
+  // sepa que salir no le da un reinicio limpio ni congela el tiempo.
+  function goBackWhilePlaying() {
+    const timed = challenge?.guess_seconds != null
+    const msg = timed
+      ? 'El tiempo sigue corriendo aunque salgas. Al volver seguirás donde lo dejaste, no se reinicia. ¿Salir?'
+      : 'Al volver seguirás en este reto, no se reinicia. ¿Salir?'
+    if (window.confirm(msg)) goBack()
   }
 
   // Compartir MI resultado (apuesta viral): rasteriza la tarjeta (montada fuera
@@ -457,11 +474,19 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // `playing` e `idle` (el overlay "Empezar" tapa la escena ya cargada detrás).
   // --------------------------------------------------------------------------
   if (!revealed) {
+    // NO-SPOILER: la escena (panorama o foto) NO se monta hasta `playing`. En
+    // `idle` (overlay "Empezar") montarla dejaba ver el Street View / la foto por
+    // detrás del modal y daba pistas. Hasta pulsar Empezar mostramos un
+    // placeholder neutro; la escena real solo aparece tras `start()`.
+    const playing = phase === 'playing'
     return (
       <div className={styles.immersive}>
-        {/* Escena protagonista: panorama interactivo o foto (legacy). */}
+        {/* Escena protagonista: panorama interactivo o foto (legacy). Solo en
+            `playing`; antes, placeholder neutro (nada que delate el lugar). */}
         <div className={styles.sceneFull}>
-          {hasStreetView ? (
+          {!playing ? (
+            <div className={styles.scenePlaceholder} aria-hidden="true" />
+          ) : hasStreetView ? (
             <StreetViewPano
               ref={panoRef}
               panoId={challenge.sv_pano_id}
@@ -489,15 +514,23 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         {/* Clúster arriba-izquierda: salida + brújula + temporizador, flotando
             sobre la escena (respeta el notch con safe-area). */}
         <div className={styles.topCluster}>
-          <BackHomeButton onClick={goBack} label={backLabel} />
+          {/* En `playing` salir NO pausa el reloj: confirmamos y lo hacemos
+              evidente en el propio rótulo. En `idle` (aún sin empezar) la salida
+              es directa. */}
+          {playing ? (
+            <BackHomeButton onClick={goBackWhilePlaying} label="Salir (sigue el tiempo)" />
+          ) : (
+            <BackHomeButton onClick={goBack} label={backLabel} />
+          )}
           {phase === 'playing' && remaining != null && challenge.guess_seconds != null && (
             <CountdownRing remaining={remaining} total={challenge.guess_seconds} urgent={urgent} />
           )}
         </div>
 
-        {/* Foto-pista flotante (si el reto la marcó como pista). Con esqueleto
+        {/* Foto-pista flotante (si el reto la marcó como pista). Solo al jugar:
+            en `idle` sería un spoiler por detrás del modal. Con esqueleto
             mientras carga para que el recuadro no aparezca vacío/roto. */}
-        {hintPhotoUrl && (
+        {playing && hintPhotoUrl && (
           <div className={styles.hintFloat}>
             <SceneImage
               key={hintPhotoUrl}
@@ -509,8 +542,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           </div>
         )}
 
-        {/* Abajo-izquierda: controles del panorama (solo con Street View). */}
-        {hasStreetView && (
+        {/* Abajo-izquierda: controles del panorama (solo con Street View y ya
+            jugando: el panorama no está montado hasta `playing`). */}
+        {playing && hasStreetView && (
           <div className={styles.panoControls}>
             <button
               type="button"
