@@ -26,7 +26,7 @@ describe('Landing', () => {
     render(<Landing />)
     expect(
       screen.getByRole('heading', {
-        name: /Comparte tus sitios y reta a tus amigos a adivinar dónde/i,
+        name: /Comparte tus momentos y reta a tus amigos a encontrarte/i,
       }),
     ).toBeInTheDocument()
     // Los 3 pasos reutilizados de HowItWorks.
