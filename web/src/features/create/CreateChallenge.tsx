@@ -266,6 +266,13 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         challenge_id: challenge.id,
         has_photo: Boolean(imagePath),
         guess_seconds: guessSeconds,
+        // Cobertura SV: hoy todo reto creado aquí tiene panorama (la creación se
+        // bloquea sin él), pero lo registramos por si el flujo evoluciona.
+        has_streetview: Boolean(pano),
+        // photo_is_hint solo tiene sentido si hay foto; si no, null (no aplica).
+        photo_is_hint: imagePath ? photoIsHint : null,
+        // Duración elegida en horas (la parada del slider, en minutos → horas).
+        duration_hours: DURATION_STOPS[durationIndex].minutes / 60,
       })
       // El grupo recoge el reto, vuelve a la lista y ofrece su enlace.
       onCreated(challenge)

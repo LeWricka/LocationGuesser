@@ -1,0 +1,84 @@
+/* ==========================================================================
+ * Celebración de acierto cercano (RevealBurst): destello cálido + confeti que
+ * cae. Cubre el bloque de puntuación sin capturar toques (pointer-events:none) y
+ * se autodestruye visualmente al terminar las animaciones (el componente deja de
+ * montarse desde el padre tras un tiempo). Solo se monta si NO hay reduced-motion.
+ * ======================================================================== */
+.burst {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Destello: halo cálido que aparece y se desvanece tras el anillo, dando la
+ * sensación de "fogonazo" de logro. Usa el glow de marca de los tokens. */
+.flash {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: radial-gradient(60% 60% at 50% 42%, rgba(255, 178, 77, 0.32), transparent 70%);
+  opacity: 0;
+  animation: burst-flash var(--duration-slower) var(--ease-emphasized) both;
+}
+
+/* Cada pieza de confeti: rectángulo pequeño que cae desde arriba con deriva y
+ * giro, y se desvanece. Colores cálidos de marca (ámbar→coral→oro) según --hue. */
+.piece {
+  position: absolute;
+  top: -8%;
+  left: var(--x);
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  opacity: 0;
+  animation: burst-fall 1100ms var(--ease-emphasized) both;
+  animation-delay: var(--delay);
+}
+.piece[style*='--hue: 1'],
+.piece[style*='--hue:1'] {
+  background: var(--color-accent-active);
+}
+.piece[style*='--hue: 2'],
+.piece[style*='--hue:2'] {
+  background: var(--medal-gold);
+}
+
+@keyframes burst-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes burst-fall {
+  0% {
+    opacity: 0;
+    transform: translate(0, -10%) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--drift), 320%) rotate(540deg);
+  }
+}
+
+/* Refuerzo: aunque el componente no se monta bajo reduced-motion, si la media
+ * query cambia en caliente, anulamos toda animación (queda invisible/estático). */
+@media (prefers-reduced-motion: reduce) {
+  .burst {
+    display: none;
+  }
+}

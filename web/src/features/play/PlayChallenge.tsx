@@ -3,9 +3,11 @@ import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { sceneMedium } from './sceneMedium'
 import { ResultCard } from './ResultCard'
+import { RevealBurst } from './RevealBurst'
+import { SceneImage } from './SceneImage'
 import { buildChallengeLink, buildResultShareText } from './shareResult'
 import { getAnswer, getChallenge, type ChallengeForPlay } from '../../lib/challenges'
-import { getExistingVote, submitVote } from '../../lib/votes'
+import { getExistingVote, getVotes, submitVote } from '../../lib/votes'
 import { getGroup } from '../../lib/groupData'
 import { type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
@@ -35,6 +37,9 @@ import {
 // Puntuación máxima del scoring `5000·e^(−km/2000)`: base del % del anillo de
 // resultado. No cambia el scoring (vive en lib/result); solo lo visualiza.
 const MAX_POINTS = 5000
+// Umbral de "gran tiro": a partir del 75% de la puntuación máxima se dispara la
+// celebración (titular cálido + confeti + háptico). Mismo corte que el anillo.
+const GREAT_SHOT = MAX_POINTS * 0.75
 import styles from './PlayChallenge.module.css'
 
 interface Props {
@@ -73,6 +78,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [remaining, setRemaining] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Posición del jugador en este reto (1 = mejor). Solo informativa: alimenta la
+  // propiedad de analítica `rank_in_challenge` y el texto "Nº de N" del resultado.
+  // Se calcula con los votos del reto tras revelar (no se conoce antes de votar).
+  const [rank, setRank] = useState<{ position: number; total: number } | null>(null)
   // Nombre del grupo para la tarjeta de "compartir mi resultado". El componente
   // solo recibe el código del grupo (groupId); el nombre lo leemos aparte. Null
   // hasta resolver (o si no hay grupo / falla): la tarjeta cae a "tu grupo".
@@ -141,12 +150,30 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         if (res.answerLat != null && res.answerLng != null) {
           setAnswer({ lat: res.answerLat, lng: res.answerLng })
         }
+        // Posición en el reto: ranking estándar por puntos (1 + nº de votos con
+        // MÁS puntos que el mío). Mi voto ya está persistido por submitVote, así
+        // que getVotes lo incluye. Falla en silencio: el revelado no se bloquea
+        // por esto y, sin rango, simplemente no añadimos la propiedad.
+        let rankPosition: number | null = null
+        let rankTotal: number | null = null
+        try {
+          const votes = await getVotes(current.id)
+          if (votes.length > 0) {
+            rankTotal = votes.length
+            rankPosition = 1 + votes.filter((v) => v.points > res.points).length
+            setRank({ position: rankPosition, total: rankTotal })
+          }
+        } catch {
+          // Sin rango: el resultado se muestra igual; omitimos rank_in_challenge.
+        }
         track('result_revealed', {
           group_id: current.group_id,
           challenge_id: current.id,
           timed_out: false,
           points: res.points,
           distance_km: km,
+          // Solo si se pudo calcular (no rompemos el evento si falla la consulta).
+          ...(rankPosition != null && { rank_in_challenge: rankPosition }),
         })
         toast.show('¡Voto guardado!', { tone: 'success' })
       } catch (err) {
@@ -192,6 +219,19 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             const ans = await getAnswer(challengeId)
             if (cancelled) return
             if (ans) setAnswer(ans)
+            // Posición en el reto para el texto "Nº de N" (recarga de un voto ya
+            // emitido). Mismo ranking por puntos; falla en silencio.
+            try {
+              const votes = await getVotes(challengeId)
+              if (!cancelled && votes.length > 0) {
+                setRank({
+                  position: 1 + votes.filter((v) => v.points > existing.points).length,
+                  total: votes.length,
+                })
+              }
+            } catch {
+              // Sin rango: el resultado se muestra igual.
+            }
           }
           setPhase('revealed')
           return
@@ -381,7 +421,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               pitch={challenge.sv_pitch}
             />
           ) : imageUrl ? (
-            <img className={styles.photoFull} src={imageUrl} alt={challenge.title} />
+            // Foto-escena (reto legacy): con esqueleto mientras carga del Storage
+            // firmado, para que el hueco no parezca roto.
+            <SceneImage
+              key={imageUrl}
+              src={imageUrl}
+              alt={challenge.title}
+              className={styles.photoFull}
+              skeletonRadius="sm"
+            />
           ) : (
             <div className={styles.noScene}>
               <p className={styles.status}>Este reto no tiene imagen ni Street View.</p>
@@ -398,9 +446,18 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           )}
         </div>
 
-        {/* Foto-pista flotante (si el reto la marcó como pista). */}
+        {/* Foto-pista flotante (si el reto la marcó como pista). Con esqueleto
+            mientras carga para que el recuadro no aparezca vacío/roto. */}
         {hintPhotoUrl && (
-          <img className={styles.hintFloat} src={hintPhotoUrl} alt="Pista: foto del reto" />
+          <div className={styles.hintFloat}>
+            <SceneImage
+              key={hintPhotoUrl}
+              src={hintPhotoUrl}
+              alt="Pista: foto del reto"
+              className={styles.hintImg}
+              skeletonRadius="md"
+            />
+          </div>
         )}
 
         {/* Abajo-izquierda: controles del panorama (solo con Street View). */}
@@ -548,13 +605,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               </Stack>
             ) : result ? (
               <Stack gap={4} align="center" className={styles.scoreReveal}>
+                {/* Celebración de gran tiro: destello + confeti sobrio + háptico.
+                    Solo se monta si fue gran tiro; respeta reduced-motion (no pinta
+                    ni vibra). Va absoluto sobre el bloque, sin capturar toques. */}
+                <RevealBurst active={result.points >= GREAT_SHOT} />
                 {/* Titular de celebración: cálido y enérgico si fue gran tiro. */}
                 <span
                   className={`${styles.scoreEyebrow} ${
-                    result.points >= MAX_POINTS * 0.75 ? styles.scoreEyebrowWin : ''
+                    result.points >= GREAT_SHOT ? styles.scoreEyebrowWin : ''
                   }`}
                 >
-                  {result.points >= MAX_POINTS * 0.75 ? '🎉 ¡Gran tiro!' : 'Resultado'}
+                  {result.points >= GREAT_SHOT ? '🎉 ¡Gran tiro!' : 'Resultado'}
                 </span>
                 {/* Anillo de acierto protagonista: % de la puntuación máxima, con
                     los puntos (count-up) gigantes en el centro. */}
@@ -567,6 +628,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   <span className={styles.resultDist}>
                     a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del objetivo
                   </span>
+                  {/* Tu puesto en el reto: pica a mejorar ("3º de 6"). Solo si se
+                      pudo calcular con los votos del reto. */}
+                  {rank && (
+                    <span className={styles.rank}>
+                      {rank.position}º de {rank.total}
+                    </span>
+                  )}
                 </div>
                 {saving && (
                   <Row gap={2} justify="center">
@@ -629,7 +697,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                         pitch={challenge.sv_pitch}
                       />
                     ) : imageUrl ? (
-                      <img className={styles.photo} src={imageUrl} alt={challenge.title} />
+                      <SceneImage
+                        key={imageUrl}
+                        src={imageUrl}
+                        alt={challenge.title}
+                        className={styles.photo}
+                        skeletonRadius="lg"
+                      />
                     ) : null}
                   </div>
                 )}
