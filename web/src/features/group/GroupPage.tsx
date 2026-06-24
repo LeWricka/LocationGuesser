@@ -19,7 +19,15 @@ import type { LeaderboardEntry } from '../../lib/leaderboard'
 import { fmtDist } from '../../lib/geo'
 import { formatDeadline } from '../../lib/time'
 import { useSession } from '../../lib/session-context'
-import { deleteChallenge, getAnswers, type ChallengeForPlay } from '../../lib/challenges'
+import {
+  deleteChallenge,
+  getAnswers,
+  isPracticeChallenge,
+  type ChallengeForPlay,
+} from '../../lib/challenges'
+import { deleteMyVote } from '../../lib/votes'
+import { describeError } from '../../lib/errors'
+import { reportError } from '../../lib/observability'
 import { track } from '../../lib/analytics'
 import { isMember, myGroups } from '../../lib/membership'
 import type { GroupPrizes } from '../../lib/database.types'
@@ -328,6 +336,7 @@ export function GroupPage({ groupId, onBack }: Props) {
               userId={user?.id}
               isOwner={isOwner}
               onDeleted={() => void refresh()}
+              onReplayed={() => void refresh()}
               onEdit={setEditing}
             />
             <PastSection
@@ -735,6 +744,7 @@ function LiveSection({
   userId,
   isOwner,
   onDeleted,
+  onReplayed,
   onEdit,
 }: {
   challenges: ChallengeForPlay[]
@@ -743,6 +753,7 @@ function LiveSection({
   userId?: string
   isOwner: boolean
   onDeleted: () => void
+  onReplayed: () => void
   onEdit: (challenge: ChallengeForPlay) => void
 }) {
   if (challenges.length === 0) return null
@@ -759,6 +770,7 @@ function LiveSection({
             userId={userId}
             isOwner={isOwner}
             onDeleted={onDeleted}
+            onReplayed={onReplayed}
             onEdit={onEdit}
           />
         ))}
@@ -776,6 +788,7 @@ function LiveCard({
   userId,
   isOwner,
   onDeleted,
+  onReplayed,
   onEdit,
 }: {
   challenge: ChallengeForPlay
@@ -784,6 +797,7 @@ function LiveCard({
   userId?: string
   isOwner: boolean
   onDeleted: () => void
+  onReplayed: () => void
   onEdit: (challenge: ChallengeForPlay) => void
 }) {
   const ranked = [...votes].sort((a, b) => b.points - a.points)
@@ -791,6 +805,9 @@ function LiveCard({
   // El voto del usuario actual (por user_id): si ya jugó, no puede re-jugar
   // aunque el reto siga en vivo. La identidad es la sesión.
   const myVote = userId ? votes.find((v) => v.user_id === userId) : undefined
+  // "Volver a jugar" SOLO en retos de práctica: rejugar uno real tras ver la
+  // respuesta sería trampa. El gating de práctica respalda el anti-trampa.
+  const canReplay = myVote != null && isPracticeChallenge(challenge.deadline_at)
   return (
     <Card>
       <Stack gap={3}>
@@ -815,9 +832,21 @@ function LiveCard({
         )}
         <Row gap={3} justify="between" align="center">
           {myVote ? (
-            <p className={styles.played}>
-              Ya jugaste · {myVote.points.toLocaleString('es-ES')} pts
-            </p>
+            // Ya jugó: muestra los puntos y deja reentrar al revelado (el enlace
+            // reabre el resultado, PlayChallenge detecta el voto existente). En
+            // práctica, además, "volver a jugar" borra el voto y reabre el reto.
+            <Row gap={2} align="center" wrap>
+              <a className={styles.played} href={playHref}>
+                Ya jugaste · {myVote.points.toLocaleString('es-ES')} pts
+              </a>
+              {canReplay && (
+                <ReplayChallengeButton
+                  challengeId={challenge.id}
+                  groupId={groupId}
+                  onReplayed={onReplayed}
+                />
+              )}
+            </Row>
           ) : (
             <a className={styles.playLink} href={playHref}>
               Jugar este reto →
@@ -881,6 +910,43 @@ function DeleteChallengeButton({
   return (
     <Button variant="ghost" size="sm" loading={busy} onClick={() => void remove()}>
       Borrar
+    </Button>
+  )
+}
+
+// "Volver a jugar" en la tarjeta del reto, SOLO en retos de práctica (el gating
+// lo decide LiveCard). Borra el voto propio (RLS limita el borrado a las filas
+// del usuario) y refresca el grupo: la tarjeta vuelve a "sin jugar" y se puede
+// rejugar. No hay confirmación: en práctica rejugar es el flujo esperado.
+function ReplayChallengeButton({
+  challengeId,
+  groupId,
+  onReplayed,
+}: {
+  challengeId: string
+  groupId: string
+  onReplayed: () => void
+}) {
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+
+  async function replay() {
+    setBusy(true)
+    try {
+      await deleteMyVote(challengeId)
+      track('challenge_replayed', { group_id: groupId, challenge_id: challengeId })
+      toast.show('Voto borrado, puedes volver a jugar', { tone: 'success' })
+      onReplayed()
+    } catch (err) {
+      reportError(err, { area: 'replay_challenge', challengeId })
+      toast.show(describeError(err), { tone: 'danger' })
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Button variant="secondary" size="sm" loading={busy} onClick={() => void replay()}>
+      🔄 Volver a jugar
     </Button>
   )
 }
