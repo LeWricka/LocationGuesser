@@ -6,8 +6,13 @@ import { ResultCard } from './ResultCard'
 import { RevealBurst } from './RevealBurst'
 import { SceneImage } from './SceneImage'
 import { buildChallengeLink, buildResultShareText } from './shareResult'
-import { getAnswer, getChallenge, type ChallengeForPlay } from '../../lib/challenges'
-import { getExistingVote, getVotes, submitVote } from '../../lib/votes'
+import {
+  getAnswer,
+  getChallenge,
+  isPracticeChallenge,
+  type ChallengeForPlay,
+} from '../../lib/challenges'
+import { deleteMyVote, getExistingVote, getVotes, submitVote } from '../../lib/votes'
 import { getGroup } from '../../lib/groupData'
 import { type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
@@ -358,6 +363,39 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     }
   }
 
+  // Volver a jugar (SOLO en retos de práctica): borra el voto propio y reinicia
+  // el estado local para empezar de cero. Sin esto no se podría retrastear un reto
+  // sin SQL. El gating de práctica vive en el render (no se monta el botón en retos
+  // reales), pero el borrado en sí lo respalda la RLS `votes_delete_self`.
+  async function replay() {
+    if (!challenge) return
+    try {
+      await deleteMyVote(challenge.id)
+      // Reinicio limpio: replicamos el estado inicial de "aún no ha votado". El
+      // start_at persistido se borra para que el reloj se reconstruya desde cero
+      // al volver a Empezar (no regalar ni recortar tiempo de la jugada anterior).
+      localStorage.removeItem(startKey(challenge.id))
+      setGuess(null)
+      setResult(null)
+      setAnswer(null)
+      setRemaining(null)
+      setTimedOut(false)
+      setRank(null)
+      setMapOpen(false)
+      setShowStreetView(false)
+      setSaving(false)
+      setSharingResult(false)
+      setPhase('idle')
+      track('challenge_replayed', {
+        group_id: challenge.group_id,
+        challenge_id: challenge.id,
+      })
+    } catch (err) {
+      reportError(err, { area: 'replay_challenge', challengeId: challenge.id })
+      toast.show(`No se pudo reiniciar: ${describeError(err)}`, { tone: 'danger' })
+    }
+  }
+
   if (loadError) {
     return (
       <main className="lg-page">
@@ -407,6 +445,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const panoFallback: LatLng = answer ?? { lat: 0, lng: 0 }
   const urgent = remaining != null && remaining <= 10
   const backLabel = groupId ? 'Volver al grupo' : 'Inicio'
+  // Reto de práctica: plazo lejano (>1 año). Solo en estos mostramos "volver a
+  // jugar" tras revelar; en un reto real rejugar tras ver la respuesta sería trampa.
+  const isPractice = isPracticeChallenge(challenge.deadline_at)
 
   // --------------------------------------------------------------------------
   // Fase de JUGAR: experiencia inmersiva a pantalla completa estilo GeoGuessr.
@@ -716,6 +757,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   </div>
                 )}
               </Stack>
+            )}
+
+            {/* Volver a jugar: SOLO en retos de práctica (plazo lejano). Reinicia
+                el juego para retrastear sin SQL; en retos reales NO se monta (rejugar
+                tras ver la respuesta sería trampa). */}
+            {isPractice && (
+              <Button variant="secondary" fullWidth onClick={() => void replay()}>
+                🔄 Volver a jugar
+              </Button>
             )}
 
             {groupId && (
