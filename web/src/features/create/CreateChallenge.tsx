@@ -17,6 +17,7 @@ import {
   isValidMedia,
 } from '../../lib/difficulty'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import {
   Badge,
@@ -449,6 +450,9 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
       })
       onCreated(challenge)
     } catch (err) {
+      // Visibilidad del fallo completo de crear reto (subida/decodificación de
+      // foto, RPC…) en Sentry, aunque la UI lo gestione con un toast.
+      reportError(err, { area: 'create_challenge' })
       const msg = err instanceof Error ? err.message : String(err)
       setStatus(null)
       const networkish = /failed to fetch|networkerror|load failed/i.test(msg)
