@@ -12,6 +12,8 @@ import { getGroup } from '../../lib/groupData'
 import { type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
+import { describeError } from '../../lib/errors'
+import { reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
 // Rasterización + compartir reutilizadas de la tarjeta de clasificación (import
@@ -177,12 +179,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         })
         toast.show('¡Voto guardado!', { tone: 'success' })
       } catch (err) {
+        // Registramos el fallo en Sentry con contexto (el toast lo maneja para el
+        // usuario, pero queremos verlo en el dashboard pase lo que pase).
+        reportError(err, { area: 'submit_vote', challengeId: current.id })
         if (!playedGuess) {
           // El aviso de "no diste a tiempo" ya se muestra; no bloqueamos por esto.
           setTimedOut(true)
           return
         }
-        toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
+        // `describeError` evita el '[object Object]' de String(err) con errores
+        // de Supabase/PostgREST (objeto, no Error nativo).
+        toast.show(`No se pudo guardar: ${describeError(err)}`, {
           tone: 'danger',
         })
       } finally {
@@ -242,7 +249,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         setPhase(resuming ? 'playing' : 'idle')
       } catch (err) {
         if (cancelled) return
-        setLoadError(err instanceof Error ? err.message : String(err))
+        reportError(err, { area: 'load_challenge', challengeId })
+        setLoadError(describeError(err))
         setPhase('loading')
       }
     }

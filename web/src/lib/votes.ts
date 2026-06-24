@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { describeError } from './errors'
 import type { Vote } from './database.types'
 
 export interface SubmitVoteInput {
@@ -42,7 +43,10 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
     p_lat: input.guessLat,
     p_lng: input.guessLng,
   })
-  if (error) throw error
+  // El error de la RPC es un objeto de PostgREST (no Error nativo): lo
+  // re-lanzamos como Error con mensaje legible (describeError combina
+  // message/details/hint/code) para que el toast no muestre '[object Object]'.
+  if (error) throw new Error(describeError(error))
   // La RPC `returns table` llega como array de una fila.
   const row = Array.isArray(data) ? data[0] : data
   if (!row) throw new Error('La RPC submit_vote no devolvió resultado')

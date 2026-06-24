@@ -85,6 +85,13 @@ export function initAnalytics(): void {
     api_host: 'https://api-eu.mixpanel.com',
     autocapture: true,
     record_sessions_percent: 100,
+    // Replay VISIBLE: por defecto Mixpanel enmascara todo el texto (`*`) y
+    // bloquea `img,video`, así que el replay sale en negro (no se ve el mapa
+    // —Leaflet usa <img>— ni la UI ni los botones). Lo invertimos: solo
+    // enmascaramos datos sensibles (email/contraseña y lo marcado a mano con
+    // [data-sensitive]) y no bloqueamos ningún elemento. Así el replay es útil.
+    record_mask_text_selector: 'input[type=email], input[type=password], [data-sensitive]',
+    record_block_selector: '',
   })
   enabled = true
 }
