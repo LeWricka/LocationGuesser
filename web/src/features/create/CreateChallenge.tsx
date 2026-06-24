@@ -23,6 +23,7 @@ import {
   Button,
   ChallengePhoto,
   Field,
+  FileButton,
   Input,
   Row,
   Spinner,
@@ -210,7 +211,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
           const match = await findPanorama(point.lat, point.lng)
           if (token !== panoSearchToken.current) return
           if (!match) {
-            toast.show('No hay Street View aquí; elige otro punto con cobertura.', {
+            toast.show('Aquí no hay Street View; mueve el pin a un punto con cobertura.', {
               tone: 'danger',
             })
             return
@@ -327,25 +328,42 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     }
   }
 
+  // "Mi ubicación": pide el GPS y, al obtenerlo, fija el punto y vuela el mapa
+  // ahí. En Medio (el reto ES el panorama) comprobamos cobertura de Street View
+  // en el punto: si no hay, lo decimos claro PERO conservamos la ubicación (el
+  // creador la afina moviendo el pin). El spinner se apaga SIEMPRE, también en
+  // error, y diferenciamos permiso denegado / timeout / no disponible.
   function useGps() {
     if (!navigator.geolocation) {
-      toast.show('Tu navegador no permite geolocalización.', { tone: 'danger' })
+      toast.show('Tu navegador no permite geolocalización. Toca el mapa.', { tone: 'danger' })
       return
     }
     setLocating(true)
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        // Fijamos la ubicación SIEMPRE: el efecto de `point` buscará el SV cuando
+        // toque (Medio/Fácil). La cobertura no debe tragarse la posición.
         setPoint(p)
         setFlyTo(p)
         setLocationSource('gps')
         setLocating(false)
       },
-      () => {
+      (err) => {
         setLocating(false)
-        toast.show('No se pudo obtener tu ubicación. Toca el mapa.', { tone: 'danger' })
+        // GeolocationPositionError: 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE,
+        // 3 = TIMEOUT. Mensaje claro por caso; nunca dejamos al usuario colgado.
+        const message =
+          err.code === err.PERMISSION_DENIED
+            ? 'Diste «no» al permiso de ubicación. Actívalo en el navegador o toca el mapa.'
+            : err.code === err.TIMEOUT
+              ? 'Tardó demasiado en localizarte. Reinténtalo o toca el mapa.'
+              : 'No se pudo obtener tu ubicación. Toca el mapa.'
+        toast.show(message, { tone: 'danger' })
       },
-      { enableHighAccuracy: true, timeout: 8000 },
+      // maximumAge: aceptamos una posición cacheada de hasta 30 s para responder
+      // rápido (evita el "no pasa nada" cuando el fix de alta precisión tarda).
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
     )
   }
 
@@ -482,19 +500,19 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
               >
                 {(fieldProps) => (
                   <Stack gap={3} align="start">
-                    <input
+                    <FileButton
                       {...fieldProps}
-                      type="file"
                       accept="image/*"
-                      className={styles.fileInput}
-                      onChange={(e) => void onPhotoChange(e.target.files?.[0] ?? null)}
-                    />
-                    {readingExif && (
-                      <Row gap={2} className={styles.status}>
-                        <Spinner size={16} />
-                        <span>Leyendo la foto…</span>
-                      </Row>
-                    )}
+                      loading={readingExif}
+                      ariaLabel="Foto del reto"
+                      onPick={(file) => void onPhotoChange(file)}
+                    >
+                      {readingExif
+                        ? 'Leyendo la foto…'
+                        : photoPreview
+                          ? '📷 Cambiar foto'
+                          : '📷 Añadir foto'}
+                    </FileButton>
                     {photoPreview && (
                       <>
                         <ChallengePhoto src={photoPreview} alt="Vista previa de la foto del reto" />

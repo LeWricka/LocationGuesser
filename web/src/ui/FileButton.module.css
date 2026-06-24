@@ -1,0 +1,26 @@
+/* El <label> ya viste de Button (clases del módulo Button); aquí solo
+   ajustamos el cursor y ocultamos el <input> nativo. */
+.label {
+  cursor: pointer;
+}
+
+/* Input de archivo oculto pero accesible (patrón visually-hidden): el clic en
+   el label lo activa; el lector de pantalla lo anuncia con su aria-label. */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Estado bloqueado: el <label> no recibe :disabled, lo emulamos. */
+.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}

@@ -1,6 +1,7 @@
 // Barril del UI kit. Importa desde aquí: `import { Button, Card } from '../ui'`.
 
 export { Button } from './Button'
+export { FileButton } from './FileButton'
 export { Input } from './Input'
 export { Field } from './Field'
 export { Card } from './Card'
