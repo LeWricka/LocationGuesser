@@ -382,3 +382,16 @@
 .startBody {
   text-align: center;
 }
+
+/* Lienzo de captura de la tarjeta de "compartir mi resultado": vive a tamaño real
+   (1080px) FUERA del viewport. No usamos display:none (mediría 0×0 y html-to-image
+   fallaría) ni visibility:hidden; lo sacamos del flujo con posición fija y un
+   desplazamiento grande (mismo patrón que el modal de la clasificación). */
+.shareCanvas {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 1080px;
+  pointer-events: none;
+  z-index: -1;
+}
