@@ -52,6 +52,24 @@ export interface NewChallengeInput {
 // relativa sustituye al ambiguo "fin del día" (que dependía del huso del lector).
 const DEFAULT_DURATION_HOURS = 24
 
+// Umbral de "reto de práctica": un plazo a más de 365 días vista. Los retos
+// reales duran como mucho ~48 h; solo los de práctica (p.ej. el infinito de
+// Iruña, con cierre en el año 2999) caen tan lejos. Se usa para permitir "volver
+// a jugar" SOLO en práctica: en un reto real, rejugar tras ver la respuesta sería
+// trampa.
+const PRACTICE_DEADLINE_DAYS = 365
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * ¿Es un reto de PRÁCTICA? True si el plazo está a más de un año vista (los retos
+ * reales son ≤48 h; el infinito de práctica cierra en 2999). Función pura para
+ * gatear "volver a jugar" en la UI sin depender del servidor.
+ */
+export function isPracticeChallenge(deadlineAt: string): boolean {
+  const ms = new Date(deadlineAt).getTime() - Date.now()
+  return ms > PRACTICE_DEADLINE_DAYS * DAY_MS
+}
+
 export async function createChallenge(
   input: NewChallengeInput,
 ): Promise<{ challenge: ChallengeForPlay; groupId: string }> {

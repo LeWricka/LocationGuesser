@@ -69,6 +69,7 @@ import {
   getAnswers,
   countVotes,
   updateChallenge,
+  isPracticeChallenge,
 } from './challenges'
 
 const sampleChallenge: Challenge = {
@@ -262,5 +263,20 @@ describe('updateChallenge', () => {
     results['challenges'] = { data: sampleChallenge, error: null }
     await updateChallenge('c1', { imagePath: null })
     expect(calls.update).toHaveBeenCalledWith('challenges', { image_path: null })
+  })
+})
+
+describe('isPracticeChallenge', () => {
+  test('un reto real (plazo a 48 h) NO es de práctica', () => {
+    const in48h = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString()
+    expect(isPracticeChallenge(in48h)).toBe(false)
+  })
+
+  test('el infinito de práctica (año 2999) SÍ es de práctica', () => {
+    expect(isPracticeChallenge('2999-12-31T23:59:59.999Z')).toBe(true)
+  })
+
+  test('un reto cerrado (plazo en el pasado) NO es de práctica', () => {
+    expect(isPracticeChallenge('2020-01-01T00:00:00.000Z')).toBe(false)
   })
 })

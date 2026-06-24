@@ -79,3 +79,15 @@ export async function getVotes(challengeId: string): Promise<Vote[]> {
   if (error) throw error
   return data ?? []
 }
+
+/**
+ * Borra el voto PROPIO en un reto. Lo usa "volver a jugar" (solo en retos de
+ * práctica): al borrar el voto, el flujo de juego vuelve a permitir votar.
+ * La RLS `votes_delete_self` (migración 0004) limita el borrado a las filas del
+ * propio usuario (`user_id = auth.uid()`), así que filtrar solo por `challenge_id`
+ * no puede tocar votos ajenos. Lanza si Supabase devuelve error.
+ */
+export async function deleteMyVote(challengeId: string): Promise<void> {
+  const { error } = await supabase.from('votes').delete().eq('challenge_id', challengeId)
+  if (error) throw error
+}

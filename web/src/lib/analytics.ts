@@ -66,6 +66,10 @@ export type AnalyticsEvent =
   // Cambio de avatar desde el perfil (#168). Props: has_emoji (eligió un animal
   // del set) — sin más datos personales.
   | 'avatar_changed'
+  // "Volver a jugar" en un reto de práctica (#181): borra el voto propio y
+  // reinicia el juego. Solo en retos de práctica (plazo lejano). Props: group_id,
+  // challenge_id.
+  | 'challenge_replayed'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

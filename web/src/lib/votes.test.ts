@@ -8,6 +8,7 @@ const calls = {
   from: vi.fn(),
   select: vi.fn(),
   eq: vi.fn(),
+  delete: vi.fn(),
   rpc: vi.fn(),
 }
 let result: { data: unknown; error: unknown } = { data: null, error: null }
@@ -20,6 +21,10 @@ const builder = {
   },
   eq: (...args: unknown[]) => {
     calls.eq(...args)
+    return builder
+  },
+  delete: (...args: unknown[]) => {
+    calls.delete(...args)
     return builder
   },
   single: () => Promise.resolve(result),
@@ -40,7 +45,7 @@ vi.mock('./supabase', () => ({
   },
 }))
 
-import { submitVote, getExistingVote, getVotes } from './votes'
+import { submitVote, getExistingVote, getVotes, deleteMyVote } from './votes'
 
 const sampleVote: Vote = {
   id: 'v1',
@@ -143,5 +148,20 @@ describe('getVotes', () => {
   test('propaga el error', async () => {
     result = { data: null, error: new Error('boom') }
     await expect(getVotes('c1')).rejects.toThrow('boom')
+  })
+})
+
+describe('deleteMyVote', () => {
+  test('borra filtrando por challenge_id (la RLS limita al propio usuario)', async () => {
+    result = { data: null, error: null }
+    await deleteMyVote('c1')
+    expect(calls.from).toHaveBeenCalledWith('votes')
+    expect(calls.delete).toHaveBeenCalled()
+    expect(calls.eq).toHaveBeenCalledWith('challenge_id', 'c1')
+  })
+
+  test('propaga el error de Supabase', async () => {
+    result = { data: null, error: new Error('boom') }
+    await expect(deleteMyVote('c1')).rejects.toThrow('boom')
   })
 })
