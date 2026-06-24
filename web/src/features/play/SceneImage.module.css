@@ -1,0 +1,37 @@
+/* Contenedor de la foto con estado de carga. Ocupa el tamaño que le da el padre
+ * (la escena a pantalla completa, la caja del revelado…). El esqueleto se apila
+ * encima mientras la imagen no ha cargado. */
+.wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Esqueleto a tamaño completo sobre el hueco de la imagen. */
+.skeleton {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.skeleton > * {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* La imagen arranca transparente y entra con un fundido suave al cargar, para
+ * que no aparezca de golpe sobre el esqueleto. */
+.img {
+  opacity: 0;
+  transition: opacity var(--duration-base) var(--ease-smooth);
+}
+.imgLoaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .img {
+    transition: none;
+  }
+}

@@ -45,7 +45,8 @@
   max-width: calc(100% - var(--space-6));
 }
 
-/* Foto-pista flotante arriba-derecha: pequeña, no tapa la escena. */
+/* Foto-pista flotante arriba-derecha: pequeña, no tapa la escena. El recuadro
+ * fija tamaño/forma; la imagen (o su esqueleto) lo llena por dentro. */
 .hintFloat {
   position: absolute;
   top: calc(var(--space-3) + env(safe-area-inset-top));
@@ -53,10 +54,15 @@
   z-index: 3;
   width: clamp(96px, 28vw, 168px);
   aspect-ratio: 4 / 3;
-  object-fit: cover;
   border-radius: var(--radius-md);
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.hintImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 /* Controles del panorama, abajo-izquierda: pequeños, de vidrio. */
@@ -287,8 +293,10 @@
 }
 
 /* Entrada del bloque de puntuación: aparece con muelle al revelar, en sincronía
- * con el count-up. Se desactiva bajo reduced-motion. */
+ * con el count-up. Se desactiva bajo reduced-motion. `relative` para contener el
+ * destello/confeti de la celebración (RevealBurst, posicionado absoluto). */
 .scoreReveal {
+  position: relative;
   text-align: center;
   animation: lg-celebrate var(--duration-slower) var(--ease-spring) both;
 }
@@ -354,6 +362,16 @@
 .resultKm {
   color: var(--color-accent);
   font-weight: var(--font-weight-black);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tu puesto en el reto ("3º de 6"): pista discreta que pica a mejorar. */
+.rank {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
 
