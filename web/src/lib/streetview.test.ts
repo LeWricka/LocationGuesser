@@ -17,7 +17,7 @@ beforeEach(() => {
   globalThis.google = { maps: { importLibrary } }
 })
 
-import { findPanorama } from './streetview'
+import { findPanorama, findPanoramaNear } from './streetview'
 
 describe('findPanorama', () => {
   test('devuelve panoId y la posición encajada al panorama', async () => {
@@ -58,5 +58,39 @@ describe('findPanorama', () => {
     getPanorama.mockResolvedValue({ data: { location: null } })
     const out = await findPanorama(0, 0)
     expect(out).toBeNull()
+  })
+})
+
+describe('findPanoramaNear', () => {
+  test('usa radio 50 m por defecto (criterio del flujo Fácil)', async () => {
+    getPanorama.mockResolvedValue({
+      data: { location: { pano: 'P', latLng: { lat: () => 40.4, lng: () => -3.7 } } },
+    })
+    await findPanoramaNear(40.4, -3.7)
+    expect(getPanorama.mock.calls[0][0].radius).toBe(50)
+  })
+
+  test('reporta la distancia en metros entre el punto y el panorama encajado', async () => {
+    // Panorama en el MISMO punto: distancia 0 m.
+    getPanorama.mockResolvedValue({
+      data: { location: { pano: 'P', latLng: { lat: () => 40.4, lng: () => -3.7 } } },
+    })
+    const out = await findPanoramaNear(40.4, -3.7)
+    expect(out).toEqual({ panoId: 'P', lat: 40.4, lng: -3.7, distanceMeters: 0 })
+  })
+
+  test('calcula una distancia > 0 cuando el panorama cae a unos metros', async () => {
+    // ~111 m al norte (0.001° de latitud ≈ 111 m).
+    getPanorama.mockResolvedValue({
+      data: { location: { pano: 'P', latLng: { lat: () => 40.401, lng: () => -3.7 } } },
+    })
+    const out = await findPanoramaNear(40.4, -3.7)
+    expect(out?.distanceMeters).toBeGreaterThan(100)
+    expect(out?.distanceMeters).toBeLessThan(120)
+  })
+
+  test('null si no hay cobertura en el radio', async () => {
+    getPanorama.mockRejectedValue(new Error('ZERO_RESULTS'))
+    expect(await findPanoramaNear(0, 0)).toBeNull()
   })
 })

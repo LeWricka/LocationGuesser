@@ -81,9 +81,18 @@ export async function createChallenge(
   // Espejamos la respuesta en `challenge_answers` (fuente que la RPC consulta y que
   // el cliente solo puede leer tras votar o al cerrarse el reto). `challenges.lat/lng`
   // se mantienen por compatibilidad con los lectores de retos cerrados. Migración 0010.
+  //
+  // UPSERT idempotente (onConflict: challenge_id): la migración 0012 añade un
+  // trigger que escribe esta misma respuesta en la misma transacción del INSERT
+  // del reto. Con upsert no chocamos con el trigger en ningún orden de despliegue
+  // (deploy-safe): si la fila ya existe (la creó el trigger), la igualamos en vez
+  // de fallar por clave duplicada.
   const { error: answerError } = await supabase
     .from('challenge_answers')
-    .insert({ challenge_id: data.id, lat: input.lat, lng: input.lng })
+    .upsert(
+      { challenge_id: data.id, lat: input.lat, lng: input.lng },
+      { onConflict: 'challenge_id' },
+    )
   if (answerError) throw answerError
 
   return { challenge: data, groupId }
@@ -228,11 +237,15 @@ export async function updateChallenge(
 
   // Si cambió la ubicación (solo posible sin votos), espejamos la respuesta en
   // `challenge_answers` para que la RPC y el revelado usen la nueva. Migración 0010.
+  // UPSERT idempotente (onConflict: challenge_id): deploy-safe frente al trigger de
+  // la 0012 — si por cualquier motivo no existiera la fila, la crea en vez de fallar.
   if (input.location !== undefined) {
     const { error: answerError } = await supabase
       .from('challenge_answers')
-      .update({ lat: input.location.lat, lng: input.location.lng })
-      .eq('challenge_id', id)
+      .upsert(
+        { challenge_id: id, lat: input.location.lat, lng: input.location.lng },
+        { onConflict: 'challenge_id' },
+      )
     if (answerError) throw answerError
   }
 
