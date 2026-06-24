@@ -1,12 +1,12 @@
 // Flujo de login con magic link, sin sesión (cuentas-y-home.md §2.2, flujos A y B).
 // Máquina de estados de dos pantallas presentacionales del kit: LoginScreen
-// (pide email) → CheckEmail (revisa tu correo). Aquí va la lógica/wiring sobre
-// `lib/auth`; la UI viene del kit. Al pulsar el enlace del email el usuario
-// vuelve con sesión y AuthProvider repinta: este componente ya no se monta.
+// (pide email) → CheckEmail (revisa tu correo). La lógica/wiring vive en el hook
+// `useMagicLink` (compartido con la landing pública); aquí solo conectamos esa
+// lógica a la UI del kit. Al pulsar el enlace del email el usuario vuelve con
+// sesión y AuthProvider repinta: este componente ya no se monta.
 
-import { useState } from 'react'
 import { CheckEmail, LoginScreen } from '../../ui'
-import { signInWithMagicLink } from '../../lib/auth'
+import { useMagicLink } from './useMagicLink'
 
 interface Props {
   /**
@@ -22,61 +22,14 @@ interface Props {
   redirectTo?: string
 }
 
-type Step = 'email' | 'sent'
-
-// Validación mínima en cliente: un email vacío o sin "@" no merece ir a Supabase.
-function isValidEmail(value: string): boolean {
-  return /.+@.+\..+/.test(value.trim())
-}
-
 export function LoginFlow({ groupName, redirectTo }: Props) {
-  const [step, setStep] = useState<Step>('email')
-  const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [resending, setResending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function send(): Promise<boolean> {
-    setError(null)
-    if (!isValidEmail(email)) {
-      setError('Escribe un correo válido.')
-      return false
-    }
-    try {
-      // No mandamos display_name aquí: el nombre se elige en el paso de perfil al
-      // volver (ProfileStep). El trigger crea un perfil provisional.
-      await signInWithMagicLink(email.trim(), undefined, redirectTo)
-      return true
-    } catch {
-      setError('No pudimos enviar el enlace. Inténtalo de nuevo.')
-      return false
-    }
-  }
-
-  async function handleSubmit() {
-    setLoading(true)
-    const ok = await send()
-    setLoading(false)
-    if (ok) setStep('sent')
-  }
-
-  async function handleResend() {
-    setResending(true)
-    await send()
-    setResending(false)
-  }
+  const { step, email, setEmail, loading, resending, error, submit, resend, reset } = useMagicLink({
+    redirectTo,
+  })
 
   if (step === 'sent') {
     return (
-      <CheckEmail
-        email={email}
-        resending={resending}
-        onResend={handleResend}
-        onChangeEmail={() => {
-          setStep('email')
-          setError(null)
-        }}
-      />
+      <CheckEmail email={email} resending={resending} onResend={resend} onChangeEmail={reset} />
     )
   }
 
@@ -84,7 +37,7 @@ export function LoginFlow({ groupName, redirectTo }: Props) {
     <LoginScreen
       email={email}
       onEmailChange={setEmail}
-      onSubmit={handleSubmit}
+      onSubmit={submit}
       loading={loading}
       error={error}
       groupName={groupName}
