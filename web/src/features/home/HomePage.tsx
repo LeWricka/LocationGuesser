@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import {
   Avatar,
   Card,
+  EmptyState,
   HomeDashboard,
   HomeEmptyState,
   HowItWorks,
   Skeleton,
+  SkeletonCard,
   Stack,
   Row,
 } from '../../ui'
@@ -80,7 +82,16 @@ export function HomePage() {
     return (
       <main className="lg-page">
         <Card>
-          <p className={styles.error}>No hemos podido cargar tu inicio. Reintenta en un momento.</p>
+          {/* Estado de error con UNA salida clara: reintentar la carga (no deja
+              al usuario en un callejón sin acción). */}
+          <EmptyState
+            icon="⚠️"
+            tone="danger"
+            title="No hemos podido cargar tu inicio"
+            description="Puede ser un fallo de conexión. Inténtalo de nuevo."
+            actionLabel="Reintentar"
+            onAction={() => void reload()}
+          />
         </Card>
       </main>
     )
@@ -164,30 +175,19 @@ function HomeSkeleton() {
           <Skeleton width={44} height={44} radius="full" />
         </Row>
 
+        {/* "Te toca jugar": tarjetas con texto + botón fantasma. */}
         <Stack gap={3}>
           <Skeleton width={160} height={22} radius="md" />
           {[0, 1].map((i) => (
-            <Card key={i} padding="md">
-              <Row justify="between" align="center" gap={3}>
-                <Stack gap={2}>
-                  <Skeleton width={140} height={16} />
-                  <Skeleton width={100} height={13} />
-                </Stack>
-                <Skeleton width={72} height={32} radius="sm" />
-              </Row>
-            </Card>
+            <SkeletonCard key={i} lines={2} action />
           ))}
         </Stack>
 
+        {/* "Tus grupos": tarjetas con una línea + pill de estado fantasma. */}
         <Stack gap={3}>
           <Skeleton width={130} height={22} radius="md" />
           {[0, 1, 2].map((i) => (
-            <Card key={i} padding="md">
-              <Row justify="between" align="center" gap={3}>
-                <Skeleton width="45%" height={18} />
-                <Skeleton width={80} height={20} radius="full" />
-              </Row>
-            </Card>
+            <SkeletonCard key={i} lines={1} action />
           ))}
         </Stack>
       </Stack>

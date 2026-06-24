@@ -1,10 +1,6 @@
-/* El dashboard del usuario recurrente lo resuelve HomeDashboard (UI kit). Aquí
-   van solo: el aviso de error, el recordatorio compacto y la cabecera del hero
-   de bienvenida (recién llegado, sin grupos). */
-.error {
-  color: var(--color-danger);
-  font-size: var(--font-size-sm);
-}
+/* El dashboard del usuario recurrente lo resuelve HomeDashboard (UI kit) y el
+   estado de error usa el EmptyState del kit. Aquí van solo: el recordatorio
+   compacto y la cabecera del hero de bienvenida (recién llegado, sin grupos). */
 
 /* Recordatorio "cómo funciona" al final del dashboard: lo separamos del
    contenido y lo atenuamos un poco (es secundario para el usuario recurrente). */

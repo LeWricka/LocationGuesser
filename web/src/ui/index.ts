@@ -36,3 +36,7 @@ export { AuthScreen } from './AuthScreen'
 export { LoginScreen } from './LoginScreen'
 export { CheckEmail } from './CheckEmail'
 export { ProfileStep } from './ProfileStep'
+
+// Estados vacíos y de carga reutilizables (issue #156).
+export { EmptyState } from './EmptyState'
+export { SkeletonCard } from './SkeletonCard'
