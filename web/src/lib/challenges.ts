@@ -103,22 +103,12 @@ export async function createChallenge(
     .single<ChallengeForPlay>()
   if (error) throw error
 
-  // Espejamos la respuesta en `challenge_answers` (fuente que la RPC consulta y que
-  // el cliente solo puede leer tras votar o al cerrarse el reto). `challenges.lat/lng`
-  // se mantienen por compatibilidad con los lectores de retos cerrados. Migración 0010.
-  //
-  // UPSERT idempotente (onConflict: challenge_id): la migración 0012 añade un
-  // trigger que escribe esta misma respuesta en la misma transacción del INSERT
-  // del reto. Con upsert no chocamos con el trigger en ningún orden de despliegue
-  // (deploy-safe): si la fila ya existe (la creó el trigger), la igualamos en vez
-  // de fallar por clave duplicada.
-  const { error: answerError } = await supabase
-    .from('challenge_answers')
-    .upsert(
-      { challenge_id: data.id, lat: input.lat, lng: input.lng },
-      { onConflict: 'challenge_id' },
-    )
-  if (answerError) throw answerError
+  // La respuesta (`challenge_answers`) la escribe el TRIGGER `sync_challenge_answer`
+  // (migración 0012, SECURITY DEFINER) en la misma transacción del INSERT del reto.
+  // NO la escribimos desde el cliente: hacerlo provocaba `42501` (RLS de
+  // challenge_answers) cuando un MIEMBRO no-dueño creaba el reto —el upsert chocaba
+  // con la fila que ya había creado el trigger y caía en el camino UPDATE
+  // (solo-dueño)—. El trigger es la única fuente de la respuesta.
 
   return { challenge: data, groupId }
 }
@@ -260,25 +250,13 @@ export async function updateChallenge(
     .from('challenges')
     .update(patch)
     .eq('id', id)
-    // RETURNING sin lat/lng (columna revocada en 0010); la respuesta nueva se espeja
-    // en challenge_answers abajo cuando cambia la ubicación.
+    // RETURNING sin lat/lng (columna revocada en 0010). Si cambió la ubicación, la
+    // respuesta en `challenge_answers` la actualiza el TRIGGER `sync_challenge_answer`
+    // (0012) al detectar el UPDATE de lat/lng — no la escribimos desde el cliente
+    // (evita el 42501 de RLS y deja el trigger como única fuente).
     .select(CHALLENGE_COLUMNS_NO_ANSWER)
     .single<ChallengeForPlay>()
   if (error) throw error
-
-  // Si cambió la ubicación (solo posible sin votos), espejamos la respuesta en
-  // `challenge_answers` para que la RPC y el revelado usen la nueva. Migración 0010.
-  // UPSERT idempotente (onConflict: challenge_id): deploy-safe frente al trigger de
-  // la 0012 — si por cualquier motivo no existiera la fila, la crea en vez de fallar.
-  if (input.location !== undefined) {
-    const { error: answerError } = await supabase
-      .from('challenge_answers')
-      .upsert(
-        { challenge_id: id, lat: input.location.lat, lng: input.location.lng },
-        { onConflict: 'challenge_id' },
-      )
-    if (answerError) throw answerError
-  }
 
   return data
 }
