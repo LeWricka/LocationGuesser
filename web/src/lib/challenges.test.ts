@@ -85,6 +85,8 @@ const sampleChallenge: Challenge = {
   guess_seconds: 120,
   deadline_at: '2026-06-19T23:59:59.999Z',
   photo_is_hint: true,
+  sv_lock_move: false,
+  sv_lock_rotate: false,
   created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
 }
@@ -114,6 +116,44 @@ describe('createChallenge', () => {
     )
     expect(out.challenge).toEqual(sampleChallenge)
     expect(out.groupId).toBe('g1')
+  })
+
+  test('los candados de SV son false (explorable) por defecto', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    results['challenge_answers'] = { data: null, error: null }
+    await createChallenge({
+      title: 'x',
+      lat: 1,
+      lng: 2,
+      createdBy: 'u',
+      groupId: 'g1',
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.sv_lock_move).toBe(false)
+    expect(insertArg.sv_lock_rotate).toBe(false)
+  })
+
+  test('escribe los candados de SV cuando el creador los activa', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    results['challenge_answers'] = { data: null, error: null }
+    await createChallenge({
+      title: 'x',
+      lat: 1,
+      lng: 2,
+      createdBy: 'u',
+      groupId: 'g1',
+      svLockMove: true,
+      svLockRotate: true,
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.sv_lock_move).toBe(true)
+    expect(insertArg.sv_lock_rotate).toBe(true)
   })
 
   test('propaga el error de la respuesta', async () => {
@@ -228,7 +268,7 @@ describe('updateChallenge', () => {
     results['challenges'] = { data: sampleChallenge, error: null }
     results['challenge_answers'] = { data: null, error: null }
     await updateChallenge('c1', {
-      location: { lat: 1, lng: 2, svPanoId: 'P', svHeading: 10, svPitch: 5 },
+      location: { lat: 1, lng: 2, svPanoId: 'P', svHeading: 10, svPitch: 5, svLockMove: true },
     })
     expect(calls.update).toHaveBeenCalledWith('challenges', {
       lat: 1,
@@ -236,6 +276,9 @@ describe('updateChallenge', () => {
       sv_pano_id: 'P',
       sv_heading: 10,
       sv_pitch: 5,
+      // El candado activado se escribe; el otro cae al default permitido (false).
+      sv_lock_move: true,
+      sv_lock_rotate: false,
     })
     // La respuesta se reescribe con UPSERT idempotente (deploy-safe frente al trigger).
     expect(calls.upsert).toHaveBeenCalledWith(

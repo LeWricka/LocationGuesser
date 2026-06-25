@@ -100,6 +100,9 @@ export interface Database {
           guess_seconds: number | null
           deadline_at: string
           photo_is_hint: boolean
+          // Candados de exploración del Street View (false = permitido). Migración 0013.
+          sv_lock_move: boolean
+          sv_lock_rotate: boolean
           created_by: string
           created_at: string
         }
@@ -116,6 +119,8 @@ export interface Database {
           guess_seconds?: number | null
           deadline_at: string
           photo_is_hint?: boolean
+          sv_lock_move?: boolean
+          sv_lock_rotate?: boolean
           created_by: string
           created_at?: string
         }
@@ -132,6 +137,8 @@ export interface Database {
           guess_seconds?: number | null
           deadline_at?: string
           photo_is_hint?: boolean
+          sv_lock_move?: boolean
+          sv_lock_rotate?: boolean
           created_by?: string
           created_at?: string
         }

@@ -13,6 +13,16 @@ interface Props {
   /** POV inicial: todos arrancan mirando lo mismo. */
   heading: number | null
   pitch: number | null
+  /**
+   * Candado de MOVIMIENTO (#187): si true, no se puede ir a panoramas contiguos
+   * (sin flechas de enlaces ni clic-para-avanzar). Default false (explorable).
+   */
+  lockMove?: boolean
+  /**
+   * Candado de GIRO (#187): si true, no se puede mirar alrededor; la vista queda
+   * clavada en el POV inicial del reto. Default false (explorable).
+   */
+  lockRotate?: boolean
   /** Emite el heading actual (0=N) cada vez que el jugador gira el panorama. */
   onPovChanged?: (heading: number) => void
 }
@@ -33,7 +43,7 @@ export interface StreetViewPanoHandle {
 // imperativa (`resetToStart`/`resetPov`) para los controles "volver al inicio" y
 // "enderezar/norte" sin recrear el panorama (recrearlo parpadea y recarga teselas).
 export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function StreetViewPano(
-  { panoId, position, heading, pitch, onPovChanged },
+  { panoId, position, heading, pitch, lockMove = false, lockRotate = false, onPovChanged },
   ref,
 ) {
   const streetViewLib = useMapsLibrary('streetView')
@@ -74,15 +84,21 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
     // Spoiler-free + explorable como GeoGuessr: ocultamos lo que delata el sitio
     // (dirección, nombres de calle, fullscreen, cerrar) y dejamos navegar
     // (clic para avanzar, flechas de enlaces, pan y zoom con scroll).
+    //
+    // Candados de dificultad (#187):
+    //  · MOVIMIENTO bloqueado → clickToGo:false + linksControl:false: ni clic para
+    //    avanzar ni flechas de enlaces; el jugador no puede irse a panoramas vecinos.
+    //  · GIRO bloqueado → escondemos panControl (el giro se fuerza vía el listener
+    //    pov_changed más abajo, que es lo único que el SDK respeta de verdad).
     const options: google.maps.StreetViewPanoramaOptions = {
       pov: { heading: startHeading, pitch: startPitch },
       addressControl: false,
       showRoadLabels: false,
       fullscreenControl: false,
       enableCloseButton: false,
-      clickToGo: true,
-      linksControl: true,
-      panControl: true,
+      clickToGo: !lockMove,
+      linksControl: !lockMove,
+      panControl: !lockRotate,
       zoomControl: true,
       scrollwheel: true,
       motionTracking: false,
@@ -100,6 +116,19 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
     // La brújula sigue el giro: emitimos el heading en cada cambio de POV.
     onPovChangedRef.current?.(startHeading)
     const listener = pano.addListener('pov_changed', () => {
+      // GIRO bloqueado (#187): el SDK de Google no tiene flag nativo para impedir
+      // el pan, así que reenganchamos el POV al inicial en cada cambio. Comparamos
+      // antes de fijar para NO entrar en bucle (setPov dispara pov_changed otra vez):
+      // si ya está en el POV inicial, no hacemos nada y el evento muere ahí.
+      if (lockRotate) {
+        const pov = pano.getPov()
+        if (pov.heading !== startHeading || pov.pitch !== startPitch) {
+          pano.setPov({ heading: startHeading, pitch: startPitch })
+        }
+        // Con el giro clavado, la brújula siempre apunta al heading inicial.
+        onPovChangedRef.current?.(startHeading)
+        return
+      }
       onPovChangedRef.current?.(pano.getPov().heading)
     })
 
@@ -109,7 +138,7 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
       pano.setVisible(false)
       panoRef.current = null
     }
-  }, [streetViewLib, panoId, lat, lng, startHeading, startPitch])
+  }, [streetViewLib, panoId, lat, lng, startHeading, startPitch, lockMove, lockRotate])
 
   return (
     <div className={styles.pano}>
