@@ -28,6 +28,12 @@ alter table public.votes add column if not exists left_app boolean not null defa
 -- `returns table`. Añade `p_left_app boolean default false` al final de la firma
 -- y guarda ese valor en la columna `left_app` del voto (insert + upsert). El
 -- default permite que un cliente que aún no pase el parámetro siga funcionando.
+--
+-- IMPORTANTE: añadir un parámetro crea una FUNCIÓN NUEVA (4 args), no reemplaza la
+-- de la 0010 (3 args). Hay que BORRAR la antigua o PostgREST no puede resolver la
+-- sobrecarga (PGRST203: "Could not choose the best candidate function").
+drop function if exists public.submit_vote(uuid, double precision, double precision);
+
 create or replace function public.submit_vote(
   p_challenge_id uuid,
   p_lat double precision,
