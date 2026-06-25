@@ -76,11 +76,10 @@ export function Landing({ groupName, redirectTo }: Props) {
           ) : (
             <>
               <h1 className={styles.headline}>
-                Comparte tus momentos y reta a tus amigos a{' '}
-                <span className={styles.accent}>encontrarte</span>
+                Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
               </h1>
               <p className={styles.lead}>
-                Un juego para tu grupo: vuestros viajes, bares y rincones, convertidos en reto.
+                Tus amigos adivinan en el mapa dónde estás. Gana quien más se acerca.
               </p>
             </>
           )}

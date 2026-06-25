@@ -28,11 +28,10 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
         <div className={styles.hero}>
           <p className={styles.eyebrow}>Hola, {name}</p>
           <h1 className={styles.headline}>
-            Comparte <span className={styles.accent}>dónde estás</span>
+            Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
           </h1>
           <p className={styles.lead}>
-            Tus amigos lo adivinan en el mapa; gana quien más se acerca. Una forma distinta de
-            compartir tus sitios con el grupo.
+            Tus amigos adivinan en el mapa dónde estás; gana quien más se acerca.
           </p>
         </div>
 

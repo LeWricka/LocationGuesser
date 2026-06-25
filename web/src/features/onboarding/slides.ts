@@ -14,8 +14,8 @@ export interface OnboardingSlide {
 const GROUP_SLIDES: OnboardingSlide[] = [
   {
     icon: '📍',
-    title: 'Comparte dónde estás',
-    body: 'Una forma distinta de compartir tus sitios con el grupo: compartes dónde estás y tus amigos lo adivinan en el mapa. Cuanto más cerca, más puntos.',
+    title: 'Comparte tus momentos de una forma diferente',
+    body: 'Compartes dónde estás y tus amigos lo adivinan en el mapa. Cuanto más cerca, más puntos.',
   },
   {
     icon: '📷',
