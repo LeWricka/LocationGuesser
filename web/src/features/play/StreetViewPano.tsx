@@ -81,7 +81,7 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
   useEffect(() => {
     if (!streetViewLib || !containerRef.current) return
 
-    // Spoiler-free + explorable como GeoGuessr: ocultamos lo que delata el sitio
+    // Spoiler-free + explorable: ocultamos lo que delata el sitio
     // (dirección, nombres de calle, fullscreen, cerrar) y dejamos navegar
     // (clic para avanzar, flechas de enlaces, pan y zoom con scroll).
     //

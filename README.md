@@ -1,6 +1,6 @@
 # 📍 LocationGuesser
 
-**GeoGuessr, pero con las fotos de tus amigos.** Un colega de viaje guarda su ubicación exacta y manda una foto al grupo; los demás colocan un pin en el mapa y **gana quien más se acerca**. Con cuenta atrás.
+**Comparte dónde estás; tus amigos lo adivinan en el mapa.** Compartes un sitio (una foto y/o un Street View) con tu ubicación real; los demás colocan un pin y **gana quien más se acerca**. Con cuenta atrás, clasificación y premios. Una forma distinta de compartir tus sitios con el grupo.
 
 > v0.1 — web estática, sin backend, sin instalar nada. El reto viaja codificado en un enlace.
 

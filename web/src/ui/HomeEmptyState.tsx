@@ -28,15 +28,15 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
         <div className={styles.hero}>
           <p className={styles.eyebrow}>Hola, {name}</p>
           <h1 className={styles.headline}>
-            GeoGuessr con <span className={styles.accent}>las fotos de tus amigos</span>
+            Comparte <span className={styles.accent}>dónde estás</span>
           </h1>
           <p className={styles.lead}>
-            Alguien sube una foto de dónde está; los demás adivinan en el mapa. Gana quien más se
-            acerca.
+            Tus amigos lo adivinan en el mapa; gana quien más se acerca. Una forma distinta de
+            compartir tus sitios con el grupo.
           </p>
         </div>
 
-        <HowItWorks />
+        <HowItWorks compact />
 
         <Stack gap={2}>
           <Button size="lg" fullWidth onClick={onCreateGroup}>

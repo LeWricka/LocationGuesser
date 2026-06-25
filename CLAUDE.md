@@ -1,6 +1,6 @@
 # LocationGuesser — Contexto de proyecto
 
-**Qué es:** GeoGuessr con las fotos de tus amigos. Un colega de viaje guarda su ubicación exacta + manda foto al grupo; los demás adivinan en el mapa; gana quien más se acerca. Con cuenta atrás.
+**Qué es:** una forma distinta de compartir con tu grupo. Compartes dónde estás (una foto y/o un Street View con tu ubicación real) y los demás adivinan en el mapa dónde es; gana quien más se acerca. Con cuenta atrás. La mecánica de adivinar una ubicación es el *cómo* (el gancho), no el *qué somos*: la identidad es el compartir social, no el juego. (Frase ancla de producto: **"Comparte dónde estás. Tus amigos lo adivinan en el mapa."**)
 
 **Origen:** caso real de un grupo de viaje en WhatsApp que ya juega a esto "a ojo". Objetivo: que el grupo juegue ≥1 reto durante el viaje y repita.
 

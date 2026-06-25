@@ -1,5 +1,5 @@
 /* ==========================================================================
- * Fase de JUGAR — experiencia inmersiva a pantalla completa (estilo GeoGuessr).
+ * Fase de JUGAR — experiencia inmersiva a pantalla completa.
  * Contenedor fijo que cubre el viewport: la escena es edge-to-edge y los
  * controles flotan por encima. Sale del wrapper `lg-page` a propósito.
  * ======================================================================== */

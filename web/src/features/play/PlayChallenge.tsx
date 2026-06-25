@@ -103,7 +103,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // viewport para el snapshot (mismo patrón que ShareLeaderboardModal).
   const [sharingResult, setSharingResult] = useState(false)
   const resultCardRef = useRef<HTMLDivElement>(null)
-  // Mapa de adivinar como hoja inferior (bottom sheet) estilo GeoGuessr: el FAB
+  // Mapa de adivinar como hoja inferior (bottom sheet): el FAB
   // 🗺️ la sube; dentro se coloca el pin y se confirma; cerrar vuelve al panorama.
   const [mapOpen, setMapOpen] = useState(false)
   // Orientación actual del panorama (0=N). La provee el panorama vía callback y
@@ -503,7 +503,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const isPractice = isPracticeChallenge(challenge.deadline_at)
 
   // --------------------------------------------------------------------------
-  // Fase de JUGAR: experiencia inmersiva a pantalla completa estilo GeoGuessr.
+  // Fase de JUGAR: experiencia inmersiva a pantalla completa.
   // Sale del wrapper `lg-page`: contenedor fijo cubriendo el viewport, escena
   // edge-to-edge y controles flotando por encima (brújula+timer, FAB del mapa,
   // controles del panorama, hoja inferior con el mapa de adivinar). Se monta en
