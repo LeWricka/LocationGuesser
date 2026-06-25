@@ -475,3 +475,15 @@
   pointer-events: none;
   z-index: -1;
 }
+
+/* Aviso anti-trampa en el resultado: "saliste de la app durante la jugada".
+   Informativo (no penaliza), con el ámbar de "warning" de la marca. */
+.leftAppNotice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}

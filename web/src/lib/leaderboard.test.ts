@@ -18,6 +18,7 @@ function vote(
     guess_lat: 0,
     guess_lng: 0,
     distance_km: 0,
+    left_app: false,
     created_at: '2026-06-19T00:00:00.000Z',
     ...partial,
   }

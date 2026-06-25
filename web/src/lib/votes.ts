@@ -7,6 +7,10 @@ export interface SubmitVoteInput {
   // null en un voto de timeout: jugó pero no marcó → 0 puntos, sin pin.
   guessLat: number | null
   guessLng: number | null
+  // El jugador cambió de pestaña/app durante la jugada (anti-trampa, issue #200).
+  // Se persiste en el voto (`votes.left_app`) y se muestra como ⚠️ en el marcador.
+  // Opcional: si no se pasa, la RPC usa su default (false).
+  leftApp?: boolean
 }
 
 /**
@@ -42,6 +46,7 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
     p_challenge_id: input.challengeId,
     p_lat: input.guessLat,
     p_lng: input.guessLng,
+    p_left_app: input.leftApp ?? false,
   })
   // El error de la RPC es un objeto de PostgREST (no Error nativo): lo
   // re-lanzamos como Error con mensaje legible (describeError combina

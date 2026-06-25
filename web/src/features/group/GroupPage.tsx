@@ -824,7 +824,19 @@ function LiveCard({
           <ul className={styles.scoreboard}>
             {ranked.map((v) => (
               <li key={v.id} className={styles.scoreRow}>
-                <span className={styles.scoreName}>{v.display_name}</span>
+                <span className={styles.scoreName}>
+                  {v.display_name}
+                  {/* Anti-trampa (issue #200): salió de la app durante la jugada. */}
+                  {v.left_app && (
+                    <span
+                      className={styles.leftAppFlag}
+                      title="Salió de la app durante la jugada"
+                      aria-label="Salió de la app durante la jugada"
+                    >
+                      ⚠️
+                    </span>
+                  )}
+                </span>
                 <span className={styles.scorePoints}>{v.points.toLocaleString('es-ES')} pts</span>
               </li>
             ))}
@@ -1053,7 +1065,19 @@ function PastCard({
               <ul className={styles.scoreboard}>
                 {ranked.map((v) => (
                   <li key={v.id} className={styles.scoreRow}>
-                    <span className={styles.scoreName}>{v.display_name}</span>
+                    <span className={styles.scoreName}>
+                      {v.display_name}
+                      {/* Anti-trampa (issue #200): salió de la app durante la jugada. */}
+                      {v.left_app && (
+                        <span
+                          className={styles.leftAppFlag}
+                          title="Salió de la app durante la jugada"
+                          aria-label="Salió de la app durante la jugada"
+                        >
+                          ⚠️
+                        </span>
+                      )}
+                    </span>
                     <span className={styles.scoreDist}>
                       {v.distance_km == null ? '— sin marcar' : fmtDist(v.distance_km)}
                     </span>

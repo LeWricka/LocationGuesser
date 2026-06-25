@@ -86,6 +86,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [answer, setAnswer] = useState<LatLng | null>(null)
   const [remaining, setRemaining] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
+  // Si MI propio voto salió de la app durante la jugada: alimenta el aviso del
+  // resultado. Se fija al votar (desde leftAppRef) y al recargar un voto previo.
+  const [iLeftApp, setILeftApp] = useState(false)
   const [saving, setSaving] = useState(false)
   // Posición del jugador en este reto (1 = mejor). Solo informativa: alimenta la
   // propiedad de analítica `rank_in_challenge` y el texto "Nº de N" del resultado.
@@ -112,6 +115,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // completa (zoom + pan). Sin esto la foto se ve cortada y no se puede inspeccionar.
   const [photoExpanded, setPhotoExpanded] = useState(false)
   const toast = useToast()
+  // Anti-trampa (issue #200): si el jugador cambia de pestaña/app MIENTRAS el reloj
+  // corre (fase `playing`, antes de votar), lo marcamos. Ref (no estado) porque el
+  // valor solo se lee al votar; no necesita re-render y debe persistir hasta el voto.
+  const leftAppRef = useRef(false)
   // Handle imperativo del panorama para los controles "volver al inicio" / "norte".
   const panoRef = useRef<StreetViewPanoHandle>(null)
   // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
@@ -139,11 +146,16 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       }
 
       setSaving(true)
+      // Marca anti-trampa: si salió de la app durante la jugada, la propagamos al
+      // voto y la reflejamos en el aviso del resultado.
+      const leftApp = leftAppRef.current
+      if (leftApp) setILeftApp(true)
       try {
         const res = await submitVote({
           challengeId: current.id,
           guessLat: playedGuess?.lat ?? null,
           guessLng: playedGuess?.lng ?? null,
+          leftApp,
         })
         if (!playedGuess) {
           // Voto de timeout: 0 puntos, sin pin. Queda MARCADO COMO JUGADO (no puede
@@ -225,6 +237,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         const existing = user ? await getExistingVote(challengeId, user.id) : null
         if (cancelled) return
         if (existing) {
+          // Recarga de un voto ya emitido: refleja la marca anti-trampa en el aviso.
+          if (existing.left_app) setILeftApp(true)
           if (existing.guess_lat == null || existing.guess_lng == null) {
             // Voto de timeout: jugó pero no marcó → 0 pts, sin pin. Marcado como
             // jugado (no puede reintentar), se muestra "no diste a tiempo".
@@ -309,6 +323,20 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     const id = window.setInterval(tick, 250)
     return () => window.clearInterval(id)
   }, [phase, challenge, guess, reveal])
+
+  // Anti-trampa (issue #200): SOLO durante `playing` (reloj corriendo, antes de
+  // votar) escuchamos `visibilitychange`. Si la pestaña/app se oculta (el jugador
+  // se va a buscar la respuesta), marcamos el ref; persiste hasta el voto. El
+  // listener se limpia al salir de `playing` o al desmontar. NO marca nada tras
+  // revelar/votar (ahí salir es legítimo: el resultado ya está fijado).
+  useEffect(() => {
+    if (phase !== 'playing') return
+    const onVisibility = () => {
+      if (document.hidden) leftAppRef.current = true
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [phase])
 
   function start() {
     if (!challenge) return
@@ -402,6 +430,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       setAnswer(null)
       setRemaining(null)
       setTimedOut(false)
+      // Reinicio limpio de la marca anti-trampa: rejugar arranca sin "salió".
+      leftAppRef.current = false
+      setILeftApp(false)
       setRank(null)
       setMapOpen(false)
       setShowStreetView(false)
@@ -767,6 +798,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               </Stack>
             ) : (
               <span className={styles.status}>Revelado.</span>
+            )}
+
+            {/* Anti-trampa (issue #200): si mi voto salió de la app durante la
+                jugada, aviso informativo (no penaliza puntos, solo deja constancia;
+                en el marcador se ve junto a mi nombre). */}
+            {iLeftApp && (
+              <p className={styles.leftAppNotice} role="note">
+                ⚠️ Saliste de la app durante la jugada
+              </p>
             )}
 
             {/* Compartir MI resultado (apuesta viral): pica al resto a jugar con la
