@@ -14,13 +14,13 @@ export interface OnboardingSlide {
 const GROUP_SLIDES: OnboardingSlide[] = [
   {
     icon: '📍',
-    title: 'GeoGuessr con las fotos de tus amigos',
-    body: 'LocationGuesser es un juego para tu grupo: adivináis en el mapa dónde se hizo cada foto. Cuanto más cerca, más puntos.',
+    title: 'Comparte dónde estás',
+    body: 'Una forma distinta de compartir tus sitios con el grupo: compartes dónde estás y tus amigos lo adivinan en el mapa. Cuanto más cerca, más puntos.',
   },
   {
     icon: '📷',
     title: 'Así funciona un grupo',
-    body: 'Alguien sube una foto desde el sitio donde está y guarda su ubicación. Los demás colocáis un pin en el mapa donde creéis que es. Gana quien más se acerca.',
+    body: 'Alguien comparte su sitio (una foto y/o Street View) y guarda su ubicación. Los demás colocáis un pin en el mapa donde creéis que es. Gana quien más se acerca.',
   },
   {
     icon: '🏆',
@@ -37,8 +37,8 @@ const GROUP_SLIDES: OnboardingSlide[] = [
 const CHALLENGE_SLIDES: OnboardingSlide[] = [
   {
     icon: '🔎',
-    title: 'Observa la foto',
-    body: 'Mira bien la imagen del reto: detalles, carteles, paisaje… todo da pistas de dónde se hizo.',
+    title: 'Observa el reto',
+    body: 'Mira bien la foto o el Street View del reto: detalles, carteles, paisaje… todo da pistas de dónde es.',
   },
   {
     icon: '📌',

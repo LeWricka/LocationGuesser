@@ -33,7 +33,7 @@ export function StreetViewPreview({ panoId, heading, pitch, onPovChange }: Props
     const panorama = new streetViewLib.StreetViewPanorama(ref.current, {
       pano: panoId,
       pov: { heading, pitch },
-      // Ocultar todo lo que delata la ubicación (= spoiler), igual que GeoGuessr.
+      // Ocultar todo lo que delata la ubicación (= spoiler).
       addressControl: false,
       showRoadLabels: false,
       fullscreenControl: false,

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
 
-// Vista inicial: el MUNDO entero (estilo GeoGuessr). Empezando alejado, el
+// Vista inicial: el MUNDO entero. Empezando alejado, el
 // jugador va de lejos a cerca directo sin tener que alejar primero.
 const WORLD: google.maps.LatLngLiteral = { lat: 25, lng: 0 }
 const WORLD_ZOOM = 2
