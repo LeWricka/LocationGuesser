@@ -18,6 +18,7 @@ import {
 } from '../../lib/difficulty'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
+import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
 import {
   Badge,
@@ -464,7 +465,9 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
       // Visibilidad del fallo completo de crear reto (subida/decodificación de
       // foto, RPC…) en Sentry, aunque la UI lo gestione con un toast.
       reportError(err, { area: 'create_challenge' })
-      const msg = err instanceof Error ? err.message : String(err)
+      // describeError saca el mensaje REAL de errores de Supabase/PostgREST (que no
+      // son `Error`): sin esto, el toast mostraba "[object Object]".
+      const msg = describeError(err)
       setStatus(null)
       const networkish = /failed to fetch|networkerror|load failed/i.test(msg)
       toast.show(
