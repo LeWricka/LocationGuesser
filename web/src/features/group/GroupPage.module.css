@@ -329,6 +329,14 @@
   white-space: nowrap;
 }
 
+/* Marca anti-trampa (issue #200): ⚠️ junto al nombre del jugador cuyo voto salió
+   de la app durante la jugada. Pequeño, sin romper el truncado del nombre. */
+.leftAppFlag {
+  margin-left: var(--space-1);
+  font-size: var(--font-size-sm);
+  cursor: help;
+}
+
 .scoreDist {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);

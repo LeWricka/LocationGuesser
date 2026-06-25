@@ -175,6 +175,8 @@ export interface Database {
           guess_lng: number | null
           distance_km: number | null
           points: number
+          // El jugador cambió de pestaña/app durante la jugada (anti-trampa). Migración 0015.
+          left_app: boolean
           created_at: string
         }
         Insert: {
@@ -186,6 +188,7 @@ export interface Database {
           guess_lng?: number | null
           distance_km?: number | null
           points: number
+          left_app?: boolean
           created_at?: string
         }
         Update: {
@@ -197,6 +200,7 @@ export interface Database {
           guess_lng?: number | null
           distance_km?: number | null
           points?: number
+          left_app?: boolean
           created_at?: string
         }
         Relationships: []
@@ -212,6 +216,9 @@ export interface Database {
           p_challenge_id: string
           p_lat: number | null
           p_lng: number | null
+          // El jugador salió de la app durante la jugada (anti-trampa). Migración 0015.
+          // Opcional con default false: clientes antiguos siguen funcionando.
+          p_left_app?: boolean
         }
         Returns: {
           distance_km: number | null
