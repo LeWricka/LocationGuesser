@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Salida del service worker en dev de vite-plugin-pwa (devOptions)
+dev-dist
+
 # Salida del build de Storybook
 storybook-static
 
