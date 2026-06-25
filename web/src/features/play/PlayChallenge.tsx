@@ -33,6 +33,7 @@ import {
   ChallengePhoto,
   CountdownRing,
   CountUp,
+  Lightbox,
   Modal,
   Row,
   ScoreRing,
@@ -106,6 +107,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // alimenta la brújula. Sin esto la aguja no seguiría el giro.
   // Tras revelar el Street View es secundario: oculto hasta que se pide verlo.
   const [showStreetView, setShowStreetView] = useState(false)
+  // Reto de FOTO (sin Street View): la escena se recorta para llenar la pantalla,
+  // así que ofrecemos verla COMPLETA y poder ampliarla en un visor a pantalla
+  // completa (zoom + pan). Sin esto la foto se ve cortada y no se puede inspeccionar.
+  const [photoExpanded, setPhotoExpanded] = useState(false)
   const toast = useToast()
   // Handle imperativo del panorama para los controles "volver al inicio" / "norte".
   const panoRef = useRef<StreetViewPanoHandle>(null)
@@ -496,14 +501,26 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             />
           ) : imageUrl ? (
             // Foto-escena (reto legacy): con esqueleto mientras carga del Storage
-            // firmado, para que el hueco no parezca roto.
-            <SceneImage
-              key={imageUrl}
-              src={imageUrl}
-              alt={challenge.title}
-              className={styles.photoFull}
-              skeletonRadius="sm"
-            />
+            // firmado, para que el hueco no parezca roto. La escena se recorta para
+            // llenar la pantalla, así que es PULSABLE: abre el visor a pantalla
+            // completa (foto entera + zoom) para poder inspeccionar los detalles.
+            <button
+              type="button"
+              className={styles.photoSceneButton}
+              onClick={() => setPhotoExpanded(true)}
+              aria-label="Ampliar la foto del reto"
+            >
+              <SceneImage
+                key={imageUrl}
+                src={imageUrl}
+                alt={challenge.title}
+                className={styles.photoFull}
+                skeletonRadius="sm"
+              />
+              <span className={styles.photoExpandHint} aria-hidden="true">
+                ⤢ Ampliar
+              </span>
+            </button>
           ) : (
             <div className={styles.noScene}>
               <p className={styles.status}>Este reto no tiene imagen ni Street View.</p>
@@ -626,6 +643,18 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             </Button>
           </div>
         </section>
+
+        {/* Visor a pantalla completa de la foto del reto: la escena se recorta
+            (object-fit: cover), así que el visor permite ver la foto ENTERA y
+            ampliarla (zoom). Solo en retos de foto y mientras se juega. */}
+        {imageUrl && (
+          <Lightbox
+            open={photoExpanded}
+            src={imageUrl}
+            alt={challenge.title}
+            onClose={() => setPhotoExpanded(false)}
+          />
+        )}
 
         {/* Overlay "Empezar": tapa la escena ya cargada detrás. Descartable
             (✕/Escape/fuera) para no quedar atrapado. */}

@@ -23,6 +23,39 @@
   object-fit: cover;
 }
 
+/* La foto-escena es un botón a pantalla completa: abre el visor para ampliarla.
+   Resetea el estilo nativo de botón y deja a la imagen llenar el contenedor. */
+.photoSceneButton {
+  position: absolute;
+  inset: 0;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  appearance: none;
+}
+
+/* Pista visible de que la foto se puede ampliar (la escena recortada no lo
+   sugiere por sí sola). Flota abajo-centro, sobre el notch inferior. */
+.photoExpandHint {
+  position: absolute;
+  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgb(0 0 0 / 0.55);
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
 /* NO-SPOILER: relleno neutro mientras la escena NO debe verse (antes de pulsar
    Empezar). Sin pistas del lugar; un degradado sobrio del tema bajo el modal. */
 .scenePlaceholder {
