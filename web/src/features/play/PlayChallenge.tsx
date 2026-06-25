@@ -550,7 +550,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             en `idle` sería un spoiler por detrás del modal. Con esqueleto
             mientras carga para que el recuadro no aparezca vacío/roto. */}
         {playing && hintPhotoUrl && (
-          <div className={styles.hintFloat}>
+          <button
+            type="button"
+            className={styles.hintFloat}
+            onClick={() => setPhotoExpanded(true)}
+            aria-label="Ampliar la foto del reto"
+          >
             <SceneImage
               key={hintPhotoUrl}
               src={hintPhotoUrl}
@@ -558,7 +563,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               className={styles.hintImg}
               skeletonRadius="md"
             />
-          </div>
+            <span className={styles.hintExpand} aria-hidden="true">
+              ⤢
+            </span>
+          </button>
         )}
 
         {/* Abajo-izquierda: controles del panorama (solo con Street View y ya
@@ -649,10 +657,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         {/* Visor a pantalla completa de la foto del reto: la escena se recorta
             (object-fit: cover), así que el visor permite ver la foto ENTERA y
             ampliarla (zoom). Solo en retos de foto y mientras se juega. */}
-        {imageUrl && (
+        {(imageUrl || hintPhotoUrl) && (
           <Lightbox
             open={photoExpanded}
-            src={imageUrl}
+            src={imageUrl ?? hintPhotoUrl ?? ''}
             alt={challenge.title}
             onClose={() => setPhotoExpanded(false)}
           />
