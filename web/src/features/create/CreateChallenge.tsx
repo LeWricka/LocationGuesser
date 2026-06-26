@@ -74,8 +74,8 @@ const DURATION_STOPS: { minutes: number; label: string }[] = [
   { minutes: 2880, label: '48 h' },
 ]
 
-// Parada por defecto: 24 h.
-const DEFAULT_DURATION_INDEX = DURATION_STOPS.findIndex((s) => s.minutes === 1440)
+// Parada por defecto: 4 h para responder.
+const DEFAULT_DURATION_INDEX = DURATION_STOPS.findIndex((s) => s.minutes === 240)
 
 // Hasta este umbral (incluido) la duración cuenta como "express".
 const EXPRESS_MAX_MINUTES = 15
@@ -129,7 +129,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   const [allowRotate, setAllowRotate] = useState(true)
   // Duración del reto como índice en DURATION_STOPS; 24 h por defecto.
   const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
-  const [guessSeconds, setGuessSeconds] = useState<number | null>(120)
+  const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
   // Foto del reto (se sube SIN EXIF). En Fácil va siempre como pista (visible al
   // jugar, junto al Street View); en Difícil ES la escena. `photoPreview` es un
   // object URL que revocamos al cambiar para no fugar memoria.
