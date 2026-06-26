@@ -122,7 +122,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // Handle imperativo del panorama para los controles "volver al inicio" / "norte".
   const panoRef = useRef<StreetViewPanoHandle>(null)
   // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
-  const { user } = useSession()
+  // El perfil aporta el avatar para pintar la burbuja del pin del propio jugador.
+  const { user, profile } = useSession()
   // URL firmada de la foto del reto (bucket privado). Hook al tope del componente
   // —no tras los early-return de carga— para no romper el orden de hooks.
   const photoUrl = useSignedImage(challenge?.image_path ?? null)
@@ -663,7 +664,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             ✕
           </button>
           <div className={styles.sheetMap}>
-            <PlayMap guess={guess} answer={null} locked={false} onPick={setGuess} />
+            <PlayMap
+              guess={guess}
+              answer={null}
+              locked={false}
+              onPick={setGuess}
+              meAvatar={profile?.avatar_url}
+              meUserId={user?.id ?? ''}
+            />
           </div>
           <div className={styles.sheetFooter}>
             {guess ? (
@@ -746,7 +754,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         </Stack>
 
         <div className={`${styles.resultMap} lg-rise`}>
-          <PlayMap guess={guess} answer={answer} locked onPick={setGuess} />
+          <PlayMap
+            guess={guess}
+            answer={answer}
+            locked
+            onPick={setGuess}
+            meAvatar={profile?.avatar_url}
+            meUserId={user?.id ?? ''}
+          />
         </div>
 
         <Card padding="md" raised>
