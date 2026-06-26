@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
-import { ScenePreview } from './ScenePreview'
+import { GameScenePreview } from './GameScenePreview'
 import { PhotoDropzone } from './PhotoDropzone'
 import { StepHeader } from './StepHeader'
 import { MediaCard } from './MediaCard'
@@ -43,12 +43,6 @@ const SV_NEAR_RADIUS = 50
 // De dónde salió la ubicación de la respuesta (para analítica).
 type LocationSource = 'exif' | 'manual' | 'gps'
 
-interface NominatimHit {
-  lat: string
-  lon: string
-  display_name: string
-}
-
 // Plazo del reto: DURACIÓN relativa al momento de crear, en minutos. El creador
 // la elige con un slider sobre estas "paradas" (de express a largas);
 // createChallenge la congela como instante absoluto (deadlineFromMinutes).
@@ -80,14 +74,14 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: 'Sin límite' },
 ]
 
-// Asistente en 3 pasos. El mapa, la foto y el Street View viven JUNTOS en «El
-// sitio» (el SV se busca a partir del punto del mapa: van acoplados). La
+// Asistente en 3 pasos. El mapa, la foto y el Street View viven JUNTOS en «Tu
+// posición» (el SV se busca a partir del punto del mapa: van acoplados). La
 // dificultad NO se elige; se DERIVA de los medios y se muestra en vivo.
 type Step = 'site' | 'details' | 'preview'
 
 const STEP_ORDER: Step[] = ['site', 'details', 'preview']
 const STEP_TITLES: Record<Step, string> = {
-  site: '1 · El sitio',
+  site: '1 · Tu posición',
   details: '2 · Detalles',
   preview: '3 · Previa',
 }
@@ -101,9 +95,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   const [point, setPoint] = useState<LatLng | null>(null)
   const [locationSource, setLocationSource] = useState<LocationSource | null>(null)
   const [flyTo, setFlyTo] = useState<LatLng | null>(null)
-  const [search, setSearch] = useState('')
-  const [suggestions, setSuggestions] = useState<NominatimHit[]>([])
-  const [searching, setSearching] = useState(false)
   const [locating, setLocating] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -266,48 +257,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     })
   }
 
-  // Autocompletado Nominatim con debounce; respeta su uso (300ms, solo > 2 car).
-  useEffect(() => {
-    const q = search.trim()
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => {
-      if (q.length < 3) {
-        setSuggestions([])
-        setSearching(false)
-        return
-      }
-      setSearching(true)
-      void (async () => {
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(q)}`,
-            { signal: ctrl.signal },
-          )
-          const data = (await res.json()) as NominatimHit[]
-          setSuggestions(data)
-        } catch {
-          // Búsqueda fallida o abortada: silenciamos; el mapa sigue disponible.
-        } finally {
-          setSearching(false)
-        }
-      })()
-    }, 300)
-    return () => {
-      clearTimeout(timer)
-      ctrl.abort()
-    }
-  }, [search])
-
-  function pickSuggestion(hit: NominatimHit) {
-    const p = { lat: Number(hit.lat), lng: Number(hit.lon) }
-    setPoint(p)
-    setFlyTo(p)
-    setLocationSource('manual')
-    setSearch(hit.display_name)
-    setSuggestions([])
-    setStatus(null)
-  }
-
   // "Mi ubicación": pide el GPS y, al obtenerlo, fija el punto y vuela el mapa
   // ahí. El spinner se apaga SIEMPRE, también en error, y diferenciamos permiso
   // denegado / timeout / no disponible.
@@ -448,55 +397,63 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     }
   }
 
+  // PASO 3 — PREVIA = PANTALLA DE JUEGO REAL (#234). Montamos la MISMA escena
+  // inmersiva que verán los jugadores (a pantalla completa, fuera del layout de
+  // página), con los datos del BORRADOR. Es una previa: NO vota ni guarda; las
+  // acciones del paso (Anterior / Crear reto) flotan sobre la escena.
+  if (step === 'preview' && realDifficulty && point) {
+    return (
+      <>
+        <GameScenePreview
+          title={title}
+          panoId={pano?.panoId ?? null}
+          pov={pov}
+          lockMove={!allowMove}
+          lockRotate={!allowRotate}
+          point={point}
+          photoUrl={photoPreview}
+          guessSeconds={guessSeconds}
+          onBack={goBack}
+        />
+        {/* Acciones del paso, flotando sobre la escena (por encima del overlay). */}
+        <div className={styles.previewActions}>
+          {status && (
+            <Row gap={2} className={styles.previewStatus}>
+              <Spinner size={16} />
+              <span>{status}</span>
+            </Row>
+          )}
+          <Row gap={3} className={styles.nav}>
+            <Button variant="secondary" onClick={goBack}>
+              ← Anterior
+            </Button>
+            <Button
+              size="lg"
+              className={styles.navNext}
+              loading={busy}
+              disabled={!readyToCreate}
+              onClick={() => void save()}
+            >
+              Crear reto
+            </Button>
+          </Row>
+        </div>
+      </>
+    )
+  }
+
   return (
     <main className="lg-page">
       <Stack gap={4}>
         <StepHeader title={STEP_TITLES[step]} onBack={goBack} />
 
-        {/* PASO 1 — EL SITIO: mapa + foto + Street View JUNTOS. Marca el punto
-            (foto-EXIF / buscar / GPS / tocar el mapa) y elige medios. Foto y SV
-            son opcionales, al menos uno obligatorio. */}
+        {/* PASO 1 — TU POSICIÓN: el MAPA arriba (GPS + tocar el mapa / foto-EXIF)
+            y, DEBAJO, los medios (foto y Street View). Foto y SV son opcionales,
+            al menos uno obligatorio. */}
         {step === 'site' && (
           <Stack gap={5}>
-            {/* MAPA y cómo marcar el punto. */}
+            {/* MAPA arriba: GPS + tocar el mapa marcan el punto (la respuesta). */}
             <Stack gap={3}>
-              <Field label="Buscar un lugar" hideLabel>
-                {(fieldProps) => (
-                  <div className={styles.searchWrap}>
-                    <div className={styles.searchField}>
-                      <Input
-                        {...fieldProps}
-                        className={styles.searchInput}
-                        placeholder="Buscar un lugar…"
-                        autoComplete="off"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                      {searching && (
-                        <span className={styles.searchSpinner}>
-                          <Spinner size={16} label="Buscando" />
-                        </span>
-                      )}
-                    </div>
-                    {suggestions.length > 0 && (
-                      <ul className={styles.suggestions}>
-                        {suggestions.map((hit, i) => (
-                          <li key={`${hit.lat},${hit.lon},${i}`}>
-                            <button
-                              type="button"
-                              className={styles.suggestion}
-                              onClick={() => pickSuggestion(hit)}
-                            >
-                              {hit.display_name}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </Field>
-
               <Button variant="secondary" fullWidth loading={locating} onClick={useGps}>
                 📡 Mi ubicación
               </Button>
@@ -513,16 +470,25 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
               )}
             </Stack>
 
-            {/* MEDIOS: foto y Street View. Ambos OPCIONALES; al menos uno. Cada
-                uno en su tarjeta con badge «Opcional» y check al estar listo. */}
+            {/* MEDIOS (DEBAJO del mapa): foto y Street View. Ambos OPCIONALES; al
+                menos uno. Pista primero, luego las dos tarjetas. */}
             <Stack gap={3}>
+              <p className={styles.hint}>Añade foto o Street View (al menos uno).</p>
+
               <MediaCard title="📷 Foto" done={hasPhoto} doneLabel="Añadida">
-                <PhotoDropzone
-                  preview={photoPreview}
-                  loading={readingExif}
-                  onPick={(file) => void onPhotoChange(file)}
-                  onClear={() => pickPhoto(null)}
-                />
+                <Stack gap={3}>
+                  {/* El usuario pidió EXPLÍCITAMENTE explicar la foto (excepción al
+                      "mínimo texto"): es la pista que verán y tendrán que situar. */}
+                  <span className={styles.hint}>
+                    Es la imagen que verán los jugadores y tendrán que situar en el mapa.
+                  </span>
+                  <PhotoDropzone
+                    preview={photoPreview}
+                    loading={readingExif}
+                    onPick={(file) => void onPhotoChange(file)}
+                    onClear={() => pickPhoto(null)}
+                  />
+                </Stack>
               </MediaCard>
 
               <MediaCard title="🗺️ Street View" done={hasStreetView} doneLabel="Añadido">
@@ -609,23 +575,20 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
                 </Stack>
               </MediaCard>
 
-              {/* Dificultad en vivo según la combinación de medios. Si aún no hay
-                  ninguno válido, recordamos «al menos uno». */}
-              {realDifficulty ? (
+              {/* Dificultad en vivo según la combinación de medios (badge bajo las
+                  tarjetas). La pista «al menos uno» vive arriba, sobre las tarjetas. */}
+              {realDifficulty && (
                 <Row gap={2} align="center" wrap className={styles.difficultyBadge}>
                   <span className={styles.difficultyLead}>Será</span>
                   <Badge tone="accent">{DIFFICULTY_LABEL[realDifficulty]}</Badge>
                   <span className={styles.hint}>{DIFFICULTY_BLURB[realDifficulty]}</span>
                 </Row>
-              ) : (
-                <p className={styles.hint}>Añade foto o Street View (al menos uno).</p>
               )}
             </Stack>
 
+            {/* Paso 1: solo «Siguiente» (cancelar se hace con el «← Volver» de la
+                cabecera; no hay «Anterior» en la primera pantalla). */}
             <Row gap={3} className={styles.nav}>
-              <Button variant="ghost" onClick={goBack}>
-                ← Anterior
-              </Button>
               <Button
                 size="lg"
                 className={styles.navNext}
@@ -712,38 +675,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
                 onClick={goNext}
               >
                 Siguiente →
-              </Button>
-            </Row>
-          </Stack>
-        )}
-
-        {/* PASO 3 — PREVIA: lo que verán los participantes + crear. */}
-        {step === 'preview' && realDifficulty && (
-          <Stack gap={4}>
-            <ScenePreview
-              difficulty={realDifficulty}
-              panoId={pano?.panoId ?? null}
-              pov={pov}
-              photoUrl={photoPreview}
-            />
-            {status && (
-              <Row gap={2} className={styles.status}>
-                <Spinner size={16} />
-                <span>{status}</span>
-              </Row>
-            )}
-            <Row gap={3} className={styles.nav}>
-              <Button variant="ghost" onClick={goBack}>
-                ← Anterior
-              </Button>
-              <Button
-                size="lg"
-                className={styles.navNext}
-                loading={busy}
-                disabled={!readyToCreate}
-                onClick={() => void save()}
-              >
-                Crear reto
               </Button>
             </Row>
           </Stack>
