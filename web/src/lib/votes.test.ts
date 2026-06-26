@@ -57,6 +57,7 @@ const sampleVote: Vote = {
   distance_km: 12.3,
   points: 4900,
   left_app: false,
+  elapsed_seconds: null,
   created_at: '2026-06-19T00:00:00.000Z',
 }
 
