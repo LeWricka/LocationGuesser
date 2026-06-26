@@ -396,7 +396,9 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     }) &&
     // Medio exige panorama (es la escena); Fácil/Difícil exigen foto.
     (wantsStreetView ? chosen === 'facil' || pano != null : true) &&
-    (!wantsPhoto || photoFile != null)
+    (!wantsPhoto || photoFile != null) &&
+    // El nombre del reto es obligatorio (ya no hay título por defecto).
+    title.trim().length > 0
 
   async function save() {
     if (!user) {
@@ -429,7 +431,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
       // panorama (cuando lo hay) es contexto explorable, aunque caiga a unos
       // metros de la respuesta: es correcto.
       const { challenge } = await createChallenge({
-        title: title.trim() || '¿Dónde estoy? 🌍',
+        title: title.trim(),
         lat: point.lat,
         lng: point.lng,
         createdBy: user.id,
