@@ -177,6 +177,8 @@ export interface Database {
           points: number
           // El jugador cambió de pestaña/app durante la jugada (anti-trampa). Migración 0015.
           left_app: boolean
+          // Segundos que tardó el jugador en votar (null en histórico previo). Migración 0016.
+          elapsed_seconds: number | null
           created_at: string
         }
         Insert: {
@@ -189,6 +191,7 @@ export interface Database {
           distance_km?: number | null
           points: number
           left_app?: boolean
+          elapsed_seconds?: number | null
           created_at?: string
         }
         Update: {
@@ -201,6 +204,7 @@ export interface Database {
           distance_km?: number | null
           points?: number
           left_app?: boolean
+          elapsed_seconds?: number | null
           created_at?: string
         }
         Relationships: []
@@ -219,12 +223,75 @@ export interface Database {
           // El jugador salió de la app durante la jugada (anti-trampa). Migración 0015.
           // Opcional con default false: clientes antiguos siguen funcionando.
           p_left_app?: boolean
+          // Segundos que tardó el jugador en votar. Opcional (default null). Migración 0016.
+          p_elapsed_seconds?: number | null
         }
         Returns: {
           distance_km: number | null
           points: number
           answer_lat: number | null
           answer_lng: number | null
+        }[]
+      }
+      // ¿La sesión actual es admin? (allowlist por email del JWT). Migración 0016.
+      is_admin: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
+      // Resumen por grupo para la vista de admin (excluye grupos de cuentas de
+      // prueba). SECURITY DEFINER + comprobación is_admin(). Migración 0016.
+      admin_groups: {
+        Args: Record<string, never>
+        Returns: {
+          group_id: string
+          name: string | null
+          owner_email: string | null
+          created_at: string
+          member_count: number
+          challenge_count: number
+          vote_count: number
+          participant_count: number
+        }[]
+      }
+      // Resumen por reto de un grupo para la vista de admin (incluye la respuesta
+      // lat/lng, que el admin puede ver). Migración 0016.
+      admin_group_challenges: {
+        Args: {
+          p_group_id: string
+        }
+        Returns: {
+          challenge_id: string
+          title: string
+          created_at: string
+          deadline_at: string
+          guess_seconds: number | null
+          has_image: boolean
+          lat: number
+          lng: number
+          vote_count: number
+          // % votantes / miembros del grupo (null si el grupo no tiene miembros).
+          participation_pct: number | null
+          avg_distance_km: number | null
+          avg_points: number | null
+          avg_elapsed_seconds: number | null
+          avg_time_consumed_pct: number | null
+        }[]
+      }
+      // Agregados globales para la vista de admin (solo grupos reales). Devuelve
+      // una única fila. Migración 0016.
+      admin_analytics: {
+        Args: Record<string, never>
+        Returns: {
+          groups_count: number
+          challenges_count: number
+          participants_count: number
+          votes_count: number
+          avg_challenges_per_group: number | null
+          avg_days_between_challenges: number | null
+          avg_votes_per_challenge: number | null
+          avg_participation_pct: number | null
+          avg_response_seconds: number | null
+          avg_time_consumed_pct: number | null
         }[]
       }
     }
