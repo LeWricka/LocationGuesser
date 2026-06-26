@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
-import { DifficultyPicker } from './DifficultyPicker'
 import { ScenePreview } from './ScenePreview'
+import { WizardProgress } from './WizardProgress'
 import type { LatLng } from '../../lib/geo'
 import { createChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes } from '../../lib/time'
@@ -12,6 +12,7 @@ import { uploadImage } from '../../lib/storage'
 import { readGpsFromExif } from '../../lib/exif'
 import {
   type Difficulty,
+  DIFFICULTY_BLURB,
   DIFFICULTY_LABEL,
   difficultyFromMedia,
   isValidMedia,
@@ -45,7 +46,8 @@ interface Props {
 
 const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
 
-// Radio (m) en el que buscamos Street View alrededor de la respuesta en Fácil.
+// Radio (m) en el que buscamos Street View cerca de la foto cuando hay foto. El
+// SV acompaña a la foto como contexto, no necesita caer en el punto exacto.
 const SV_NEAR_RADIUS = 50
 
 // De dónde salió la ubicación de la respuesta (para analítica).
@@ -88,18 +90,19 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: 'Sin límite' },
 ]
 
-// Pasos del asistente: elegir dificultad → montar el reto → previa y confirmar.
-type Step = 'difficulty' | 'build' | 'preview'
+// Asistente paso a paso: una decisión por pantalla. La dificultad ya NO se elige;
+// se DERIVA de los medios (foto y/o Street View) y se muestra en vivo.
+type Step = 'location' | 'scene' | 'details' | 'preview'
+
+const STEP_ORDER: Step[] = ['location', 'scene', 'details', 'preview']
+const STEP_LABELS = ['Ubicación', 'Escena', 'Detalles', 'Previa']
 
 export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
-  const [step, setStep] = useState<Step>('difficulty')
-  // Dificultad ELEGIDA por el creador. La REAL puede degradar (p.ej. Fácil sin
-  // SV → Difícil): la derivamos de los medios al guardar/previsualizar.
-  const [chosen, setChosen] = useState<Difficulty | null>(null)
+  const [step, setStep] = useState<Step>('location')
 
   const [title, setTitle] = useState('')
-  // Respuesta del reto (lat/lng oculto). En Fácil/Difícil sale de la foto (EXIF)
-  // o del mapa; en Medio, del punto con cobertura de Street View.
+  // Respuesta del reto (lat/lng oculto). Sale de la foto (EXIF), del mapa, de un
+  // enlace de Maps o del GPS.
   const [point, setPoint] = useState<LatLng | null>(null)
   const [locationSource, setLocationSource] = useState<LocationSource | null>(null)
   const [flyTo, setFlyTo] = useState<LatLng | null>(null)
@@ -111,11 +114,14 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   const [locating, setLocating] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  // Panorama de Street View encajado (Fácil/Medio). En Fácil es OPCIONAL (la foto
-  // es la respuesta y el SV es contexto); el creador puede quitarlo → pasa a Difícil.
+  // ¿El creador quiere incluir Street View? Toggle explícito del paso Escena. Al
+  // activarlo buscamos panorama cerca del punto; al desactivarlo lo quitamos.
+  const [wantsStreetView, setWantsStreetView] = useState(false)
+  // Panorama de Street View encajado. Cuando hay foto, es contexto cercano; sin
+  // foto, ES la escena. `wantsStreetView` sin `pano` = activo pero aún sin encaje.
   const [pano, setPano] = useState<PanoramaMatch | null>(null)
   const [checkingPano, setCheckingPano] = useState(false)
-  // En Fácil avisamos a qué distancia cayó el SV de la foto para que el creador
+  // Cuando hay foto avisamos a qué distancia cayó el SV para que el creador
   // confirme usarlo. Mientras está pendiente de confirmar, no fijamos `pano`.
   const [svPrompt, setSvPrompt] = useState<{ pano: PanoramaMatch; distanceMeters: number } | null>(
     null,
@@ -127,12 +133,12 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   // (allowMove/allowRotate) y lo traducimos a candado (lock = !allow) al crear. #187.
   const [allowMove, setAllowMove] = useState(true)
   const [allowRotate, setAllowRotate] = useState(true)
-  // Duración del reto como índice en DURATION_STOPS; 24 h por defecto.
+  // Duración del reto como índice en DURATION_STOPS; 4 h por defecto.
   const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
   const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
-  // Foto del reto (se sube SIN EXIF). En Fácil va siempre como pista (visible al
-  // jugar, junto al Street View); en Difícil ES la escena. `photoPreview` es un
-  // object URL que revocamos al cambiar para no fugar memoria.
+  // Foto del reto (se sube SIN EXIF). Con SV va como pista (visible al jugar,
+  // junto al panorama); sin SV ES la escena. `photoPreview` es un object URL que
+  // revocamos al cambiar para no fugar memoria.
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [readingExif, setReadingExif] = useState(false)
@@ -143,21 +149,10 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   // creador mueve el pin mientras una búsqueda está en curso, ignoramos la vieja.
   const panoSearchToken = useRef(0)
 
-  const wantsStreetView = chosen === 'facil' || chosen === 'medio'
-  const wantsPhoto = chosen === 'facil' || chosen === 'dificil'
-
-  function resetForDifficulty(difficulty: Difficulty) {
-    setChosen(difficulty)
-    setPoint(null)
-    setLocationSource(null)
-    setPano(null)
-    setSvPrompt(null)
-    setPov({ heading: 0, pitch: 0 })
-    setAllowMove(true)
-    setAllowRotate(true)
-    pickPhoto(null)
-    setStep('build')
-  }
+  // Medios reales del reto y dificultad derivada de ellos (fuente de verdad).
+  const hasPhoto = Boolean(photoFile)
+  const hasStreetView = Boolean(pano)
+  const realDifficulty: Difficulty | null = difficultyFromMedia({ hasPhoto, hasStreetView })
 
   function pickPhoto(file: File | null) {
     setPhotoPreview((prev) => {
@@ -167,9 +162,9 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     setPhotoFile(file)
   }
 
-  // Adjuntar foto en Fácil/Difícil: leemos el GPS del File ORIGINAL (antes de que
-  // uploadImage lo estripe). Con GPS → es la respuesta (pin ajustable); sin GPS →
-  // pedimos colocarla en el mapa a mano.
+  // Adjuntar foto: leemos el GPS del File ORIGINAL (antes de que uploadImage lo
+  // estripe). Con GPS → es la respuesta (pin ajustable); sin GPS → pedimos
+  // colocarla en el mapa a mano.
   async function onPhotoChange(file: File | null) {
     pickPhoto(file)
     if (!file) return
@@ -183,7 +178,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         toast.show('Leímos dónde es por la foto. Ajusta el pin si hace falta.', { tone: 'success' })
       } else {
         // Sin GPS: NO bloqueamos. El creador coloca el punto en el mapa.
-        setLocationSource(null)
         toast.show('Esta foto no dice dónde es. Colócala en el mapa.', { tone: 'neutral' })
       }
     } finally {
@@ -191,21 +185,19 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     }
   }
 
-  // Colocar/ajustar el punto en el mapa (manual). En Fácil/Difícil esto fija (o
-  // ajusta) la respuesta; en Medio elige el punto que debe tener cobertura SV.
+  // Colocar/ajustar el punto en el mapa (manual). Fija (o ajusta) la respuesta.
   function pickPoint(p: LatLng) {
     setPoint(p)
     // El origen es "manual" salvo que ya viniera de EXIF y solo lo estén ajustando:
     // mantenemos 'exif' como origen primario (ajustar el pin no cambia que la pista
-    // de ubicación vino de la foto). En Medio el origen es siempre el punto elegido.
-    if (locationSource == null || chosen === 'medio') setLocationSource('manual')
+    // de ubicación vino de la foto).
+    if (locationSource == null) setLocationSource('manual')
   }
 
-  // Al fijar el punto buscamos Street View, con criterio por dificultad:
-  //  · Medio: el reto ES el panorama → exigimos cobertura (sin SV, otro punto).
-  //  · Fácil: el SV es contexto a ≤50 m de la foto → si está lejos/ausente avisamos
-  //    y dejamos seguir (la foto manda); el reto puede degradar a Difícil.
-  //  · Difícil: no buscamos SV (aunque exista, no se muestra).
+  // Buscar Street View al activarlo o al mover el punto con SV activo:
+  //  · Con foto: el SV es contexto a ≤50 m → si cae cerca pedimos confirmar; si no
+  //    hay, avisamos (el reto seguirá como solo foto = Difícil).
+  //  · Sin foto: el SV ES la escena → exigimos cobertura en el punto exacto.
   useEffect(() => {
     if (!point || !wantsStreetView) return
     const token = ++panoSearchToken.current
@@ -216,7 +208,21 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
       setPano(null)
       setCheckingPano(true)
       try {
-        if (chosen === 'medio') {
+        if (hasPhoto) {
+          const near = await findPanoramaNear(point.lat, point.lng, SV_NEAR_RADIUS)
+          if (token !== panoSearchToken.current) return
+          if (!near) {
+            // Sin SV cerca: el reto será Difícil (solo foto). No bloqueamos.
+            toast.show(
+              'No hay Street View cerca de la foto. Sin él, el reto será 🔴 Difícil (solo foto).',
+              { tone: 'neutral' },
+            )
+            return
+          }
+          // Pedimos confirmación del SV cercano antes de adoptarlo (puede estar a
+          // unos metros de la foto: es correcto, pero el creador decide).
+          setSvPrompt({ pano: near, distanceMeters: near.distanceMeters })
+        } else {
           const match = await findPanorama(point.lat, point.lng)
           if (token !== panoSearchToken.current) return
           if (!match) {
@@ -227,30 +233,17 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
           }
           setPano(match)
           setPov({ heading: 0, pitch: 0 })
-        } else if (chosen === 'facil') {
-          const near = await findPanoramaNear(point.lat, point.lng, SV_NEAR_RADIUS)
-          if (token !== panoSearchToken.current) return
-          if (!near) {
-            // Sin SV cerca: el reto será Difícil (solo foto). No bloqueamos.
-            toast.show(
-              'No hay Street View cerca de la foto. Se creará como 🔴 Difícil (solo foto), o elige otra ubicación.',
-              { tone: 'neutral' },
-            )
-            return
-          }
-          // Pedimos confirmación del SV cercano antes de adoptarlo (puede estar a
-          // unos metros de la foto: es correcto, pero el creador decide).
-          setSvPrompt({ pano: near, distanceMeters: near.distanceMeters })
         }
       } finally {
         if (token === panoSearchToken.current) setCheckingPano(false)
       }
     })()
-    // toast es estable (contexto); reaccionamos al punto y a la dificultad elegida.
+    // toast es estable (contexto); reaccionamos al punto, al toggle de SV y a si
+    // hay foto (cambia el criterio de búsqueda: cercano vs. exacto).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [point, chosen, wantsStreetView])
+  }, [point, wantsStreetView, hasPhoto])
 
-  // Confirmar el Street View cercano propuesto (Fácil): lo adoptamos como contexto.
+  // Confirmar el Street View cercano propuesto (con foto): lo adoptamos.
   function acceptSv() {
     if (!svPrompt) return
     setPano(svPrompt.pano)
@@ -259,18 +252,25 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   }
 
   // Rechazar el SV propuesto: lo descartamos. El creador puede recolocar el punto
-  // (otra búsqueda) o quitar el SV → el reto pasa a Difícil.
+  // (otra búsqueda) o desactivar el SV → el reto será solo foto (Difícil).
   function rejectSv() {
     setSvPrompt(null)
     setPano(null)
   }
 
-  // Quitar el Street View en Fácil → el reto pasa a 🔴 Difícil (solo foto).
-  function removeStreetView() {
-    setPano(null)
-    setSvPrompt(null)
-    setChosen('dificil')
-    toast.show('Street View quitado: el reto será 🔴 Difícil (solo foto).', { tone: 'neutral' })
+  // Desactivar el Street View: lo quitamos como medio. La dificultad se recalcula
+  // sola (con foto → Difícil; sin foto el creador tendrá que añadir algún medio).
+  function toggleStreetView() {
+    setWantsStreetView((on) => {
+      const next = !on
+      if (!next) {
+        setPano(null)
+        setSvPrompt(null)
+        setAllowMove(true)
+        setAllowRotate(true)
+      }
+      return next
+    })
   }
 
   // Autocompletado Nominatim con debounce; respeta su uso (300ms, solo > 2 car).
@@ -338,10 +338,8 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   }
 
   // "Mi ubicación": pide el GPS y, al obtenerlo, fija el punto y vuela el mapa
-  // ahí. En Medio (el reto ES el panorama) comprobamos cobertura de Street View
-  // en el punto: si no hay, lo decimos claro PERO conservamos la ubicación (el
-  // creador la afina moviendo el pin). El spinner se apaga SIEMPRE, también en
-  // error, y diferenciamos permiso denegado / timeout / no disponible.
+  // ahí. El spinner se apaga SIEMPRE, también en error, y diferenciamos permiso
+  // denegado / timeout / no disponible.
   function useGps() {
     if (!navigator.geolocation) {
       toast.show('Tu navegador no permite geolocalización. Toca el mapa.', { tone: 'danger' })
@@ -351,8 +349,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const p = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        // Fijamos la ubicación SIEMPRE: el efecto de `point` buscará el SV cuando
-        // toque (Medio/Fácil). La cobertura no debe tragarse la posición.
         setPoint(p)
         setFlyTo(p)
         setLocationSource('gps')
@@ -376,29 +372,31 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     )
   }
 
-  // ¿Está el reto listo para previsualizar/guardar según su dificultad real?
-  const realDifficulty: Difficulty | null = point
-    ? difficultyFromMedia({
-        hasPhoto: wantsPhoto && Boolean(photoFile),
-        hasStreetView: Boolean(pano),
-      })
-    : null
+  // Gating por paso: cada pantalla decide si se puede avanzar.
+  const canLeaveLocation = point != null && !resolving && !locating
+  const mediaValid = isValidMedia({ hasPhoto, hasStreetView })
+  // El SV activo sin panorama (aún buscando o sin cobertura) y sin foto no es un
+  // medio válido; con svPrompt pendiente forzamos decidir antes de seguir.
+  const canLeaveScene = mediaValid && !svPrompt && !checkingPano
+  const canLeaveDetails = title.trim().length > 0
 
-  // Listo para avanzar a la previa: hay punto (respuesta) y los medios son válidos
-  // (al menos foto o SV). En Medio hace falta panorama; en Fácil/Difícil, foto.
-  const readyToPreview =
-    point != null &&
-    !svPrompt &&
-    realDifficulty != null &&
-    isValidMedia({
-      hasPhoto: wantsPhoto && Boolean(photoFile),
-      hasStreetView: Boolean(pano),
-    }) &&
-    // Medio exige panorama (es la escena); Fácil/Difícil exigen foto.
-    (wantsStreetView ? chosen === 'facil' || pano != null : true) &&
-    (!wantsPhoto || photoFile != null) &&
-    // El nombre del reto es obligatorio (ya no hay título por defecto).
-    title.trim().length > 0
+  // Listo para crear: hay punto, medios válidos, sin confirmaciones pendientes y
+  // título. Equivale a haber pasado los tres primeros gates.
+  const readyToCreate =
+    canLeaveLocation && canLeaveScene && canLeaveDetails && realDifficulty != null
+
+  function goNext() {
+    const i = STEP_ORDER.indexOf(step)
+    if (i < STEP_ORDER.length - 1) setStep(STEP_ORDER[i + 1])
+  }
+
+  // El botón "Volver": en el primer paso cancela (sale del flujo); entre pasos
+  // retrocede uno.
+  function goBack() {
+    const i = STEP_ORDER.indexOf(step)
+    if (i === 0) onBack()
+    else setStep(STEP_ORDER[i - 1])
+  }
 
   async function save() {
     if (!user) {
@@ -409,9 +407,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
       toast.show('Falta la ubicación del reto.', { tone: 'danger' })
       return
     }
-    if (
-      !isValidMedia({ hasPhoto: wantsPhoto && Boolean(photoFile), hasStreetView: Boolean(pano) })
-    ) {
+    if (!isValidMedia({ hasPhoto, hasStreetView })) {
       toast.show('Un reto debe tener al menos foto o Street View.', { tone: 'danger' })
       return
     }
@@ -421,7 +417,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
       // Foto opcional: la subimos comprimida y SIN EXIF. El GPS ya lo leímos del
       // File original al adjuntarla; aquí solo sube la versión estripada.
       let imagePath: string | undefined
-      if (wantsPhoto && photoFile) {
+      if (photoFile) {
         setStatus('Subiendo la foto…')
         imagePath = await uploadImage(photoFile)
       }
@@ -446,7 +442,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         deadlineAt: deadlineFromMinutes(DURATION_STOPS[durationIndex].minutes),
         guessSeconds,
         imagePath,
-        // En Fácil la foto es siempre pista (acompaña al panorama).
+        // Con Street View la foto es pista (acompaña al panorama).
         photoIsHint: true,
       })
       setStatus(null)
@@ -458,7 +454,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         guess_seconds: guessSeconds,
         photo_is_hint: imagePath ? true : null,
         duration_hours: DURATION_STOPS[durationIndex].minutes / 60,
-        // Nuevas props del flujo guiado por dificultad (no son eventos nuevos).
+        // La dificultad ya no se elige: es la derivada de los medios.
         difficulty: realDifficulty,
         location_source: locationSource ?? 'manual',
       })
@@ -482,72 +478,59 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     }
   }
 
-  // El botón "Volver" del header: en build vuelve a elegir dificultad; en preview
-  // vuelve a montar; en difficulty cancela (sale del flujo de crear).
-  function headerBack() {
-    if (step === 'preview') setStep('build')
-    else if (step === 'build') setStep('difficulty')
-    else onBack()
-  }
-
-  // El mapa: en Medio se busca el punto del panorama; en Fácil/Difícil se coloca
-  // o ajusta el pin (la respuesta).
-  const showMap = step === 'build' && chosen != null
+  const currentStepIndex = STEP_ORDER.indexOf(step)
 
   return (
     <main className="lg-page">
       <Stack gap={4}>
         <Row gap={3} className={styles.header}>
-          <Button variant="ghost" size="sm" onClick={headerBack}>
+          <Button variant="ghost" size="sm" onClick={goBack}>
             ← Volver
           </Button>
           <h1 className={styles.title}>Crear un reto</h1>
         </Row>
 
-        {step === 'difficulty' && <DifficultyPicker onPick={resetForDifficulty} />}
+        <WizardProgress steps={STEP_LABELS} current={currentStepIndex} />
 
-        {step === 'build' && chosen != null && (
+        {/* PASO 1 — UBICACIÓN: dónde es. Foto (EXIF), búsqueda, enlace, GPS, mapa. */}
+        {step === 'location' && (
           <Stack gap={4}>
-            <Row gap={2}>
-              <Badge tone="accent">{DIFFICULTY_LABEL[realDifficulty ?? chosen]}</Badge>
-            </Row>
+            <p className={styles.intro}>
+              ¿Dónde es? Sube una foto (leemos dónde se hizo), busca el sitio, pega un enlace de
+              Maps, usa tu ubicación o toca el mapa.
+            </p>
 
-            {/* FOTO — Fácil y Difícil: la subida lee el GPS del EXIF. */}
-            {wantsPhoto && (
-              <Field
-                label="Foto del reto"
-                hint="Quitamos la ubicación que la foto pueda llevar dentro, para que no chive el sitio. Si la foto sabe dónde es, colocamos el pin por ti."
-              >
-                {(fieldProps) => (
-                  <Stack gap={3} align="start">
-                    <FileButton
-                      {...fieldProps}
-                      accept="image/*"
-                      loading={readingExif}
-                      ariaLabel="Foto del reto"
-                      onPick={(file) => void onPhotoChange(file)}
-                    >
-                      {readingExif
-                        ? 'Leyendo la foto…'
-                        : photoPreview
-                          ? '📷 Cambiar foto'
-                          : '📷 Añadir foto'}
-                    </FileButton>
-                    {photoPreview && (
-                      <>
-                        <ChallengePhoto src={photoPreview} alt="Vista previa de la foto del reto" />
-                        <Button variant="ghost" size="sm" onClick={() => pickPhoto(null)}>
-                          Quitar foto
-                        </Button>
-                      </>
-                    )}
-                  </Stack>
-                )}
-              </Field>
-            )}
+            <Field
+              label="Foto del reto (opcional aquí)"
+              hint="Quitamos la ubicación que la foto pueda llevar dentro, para que no chive el sitio. Si la foto sabe dónde es, colocamos el pin por ti."
+            >
+              {(fieldProps) => (
+                <Stack gap={3} align="start">
+                  <FileButton
+                    {...fieldProps}
+                    accept="image/*"
+                    loading={readingExif}
+                    ariaLabel="Foto del reto"
+                    onPick={(file) => void onPhotoChange(file)}
+                  >
+                    {readingExif
+                      ? 'Leyendo la foto…'
+                      : photoPreview
+                        ? '📷 Cambiar foto'
+                        : '📷 Añadir foto'}
+                  </FileButton>
+                  {photoPreview && (
+                    <>
+                      <ChallengePhoto src={photoPreview} alt="Vista previa de la foto del reto" />
+                      <Button variant="ghost" size="sm" onClick={() => pickPhoto(null)}>
+                        Quitar foto
+                      </Button>
+                    </>
+                  )}
+                </Stack>
+              )}
+            </Field>
 
-            {/* UBICACIÓN — buscador, GPS y enlace de Maps. En Medio elige el punto
-                con cobertura SV; en Fácil/Difícil coloca/ajusta la respuesta. */}
             <div className={styles.searchWrap}>
               <Row gap={2}>
                 <Button variant="secondary" loading={locating} onClick={useGps}>
@@ -629,120 +612,192 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
               )}
             </Field>
 
-            {showMap && (
-              <MapPicker value={point} flyTo={flyTo} center={SPAIN} zoom={5} onPick={pickPoint} />
-            )}
+            <MapPicker value={point} flyTo={flyTo} center={SPAIN} zoom={5} onPick={pickPoint} />
 
             {point && (
               <Row gap={2}>
-                <Badge tone="accent">📍 {wantsPhoto ? 'Dónde es' : 'Punto del reto'}</Badge>
+                <Badge tone="accent">📍 Dónde es</Badge>
                 <span className={styles.coords}>
                   {point.lat.toFixed(5)}, {point.lng.toFixed(5)}
                 </span>
               </Row>
             )}
 
-            {checkingPano && (
-              <Row gap={2} className={styles.status}>
-                <Spinner size={16} />
-                <span>Buscando Street View…</span>
-              </Row>
-            )}
+            <Button size="lg" fullWidth disabled={!canLeaveLocation} onClick={goNext}>
+              Siguiente →
+            </Button>
+          </Stack>
+        )}
 
-            {/* Aviso de SV cercano (Fácil): confirmar usarlo o no. */}
-            {svPrompt && (
-              <Stack gap={2} className={styles.svPrompt}>
-                <span>
-                  El Street View más cercano está a {svPrompt.distanceMeters} m de tu foto. ¿Lo
-                  usamos?
-                </span>
-                <Row gap={2} wrap>
-                  <Button size="sm" onClick={acceptSv}>
-                    Sí, usarlo
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={rejectSv}>
-                    No
-                  </Button>
+        {/* PASO 2 — ESCENA: qué incluye el reto. Foto y/o Street View. La
+            dificultad se deriva y se muestra en vivo. */}
+        {step === 'scene' && (
+          <Stack gap={4}>
+            <p className={styles.intro}>
+              Elige qué verán los demás. Cuanta menos información, más difícil; la dificultad se
+              calcula sola.
+            </p>
+
+            {/* Badge de dificultad en vivo. */}
+            {realDifficulty ? (
+              <Stack gap={1} className={styles.difficultyBadge}>
+                <Row gap={2} align="center">
+                  <span className={styles.difficultyLead}>Este reto será</span>
+                  <Badge tone="accent">{DIFFICULTY_LABEL[realDifficulty]}</Badge>
                 </Row>
-                <p className={styles.hint}>
-                  Si dices que no, recoloca el punto para buscar otro panorama, o quita el Street
-                  View y el reto será 🔴 Difícil (solo foto).
-                </p>
+                <span className={styles.hint}>{DIFFICULTY_BLURB[realDifficulty]}</span>
               </Stack>
+            ) : (
+              <p className={styles.hint}>
+                Añade una foto o activa Street View para tener un reto que mostrar.
+              </p>
             )}
 
-            {/* Previa del panorama (Fácil/Medio, ya confirmado). */}
-            {pano && (
-              <Field
-                label="Vista previa de Street View"
-                hint="Gira la cámara para fijar cómo arrancarán los demás."
-              >
-                {() => (
-                  <Stack gap={2}>
-                    <StreetViewPreview
-                      panoId={pano.panoId}
-                      heading={pov.heading}
-                      pitch={pov.pitch}
-                      onPovChange={setPov}
-                    />
-                    {chosen === 'facil' && (
-                      <Button variant="ghost" size="sm" onClick={removeStreetView}>
-                        Quitar Street View (→ 🔴 Difícil)
-                      </Button>
-                    )}
-                  </Stack>
-                )}
-              </Field>
-            )}
-
-            {/* CANDADOS DE EXPLORACIÓN (#187): solo con panorama. Ambos permitidos
-                por defecto; desactívalos para hacer el reto más difícil. */}
-            {pano && (
-              <Field
-                label="Cómo se explora"
-                hint="Desactiva una opción para que el reto sea más difícil. Por defecto se puede todo."
-              >
-                {() => (
-                  <Stack gap={3}>
-                    <Row gap={2} align="center" wrap>
-                      <Button
-                        variant={allowMove ? 'primary' : 'secondary'}
-                        size="sm"
-                        aria-pressed={allowMove}
-                        onClick={() => setAllowMove((v) => !v)}
-                      >
-                        {allowMove ? '✓ ' : ''}Permitir moverse
-                      </Button>
-                      <span className={styles.hint}>
-                        {allowMove
-                          ? 'Pueden avanzar a calles contiguas.'
-                          : 'Quietos en el sitio: no pueden avanzar.'}
-                      </span>
-                    </Row>
-                    <Row gap={2} align="center" wrap>
-                      <Button
-                        variant={allowRotate ? 'primary' : 'secondary'}
-                        size="sm"
-                        aria-pressed={allowRotate}
-                        onClick={() => setAllowRotate((v) => !v)}
-                      >
-                        {allowRotate ? '✓ ' : ''}Permitir mirar alrededor
-                      </Button>
-                      <span className={styles.hint}>
-                        {allowRotate
-                          ? 'Pueden girar la cámara libremente.'
-                          : 'Vista fija: no pueden girar la cámara.'}
-                      </span>
-                    </Row>
-                  </Stack>
-                )}
-              </Field>
-            )}
-
+            {/* FOTO: si ya la subió en el paso anterior, la mostramos con opción de
+                cambiar/quitar; si no, puede subirla aquí. */}
             <Field
-              label="Título del reto"
-              hint="Opcional. Si lo dejas vacío usamos «¿Dónde estoy? 🌍»."
+              label="Foto"
+              hint="Quitamos la ubicación que la foto pueda llevar dentro, para que no chive el sitio."
             >
+              {(fieldProps) => (
+                <Stack gap={3} align="start">
+                  <FileButton
+                    {...fieldProps}
+                    accept="image/*"
+                    loading={readingExif}
+                    ariaLabel="Foto del reto"
+                    onPick={(file) => void onPhotoChange(file)}
+                  >
+                    {readingExif
+                      ? 'Leyendo la foto…'
+                      : photoPreview
+                        ? '📷 Cambiar foto'
+                        : '📷 Añadir foto'}
+                  </FileButton>
+                  {photoPreview && (
+                    <>
+                      <ChallengePhoto src={photoPreview} alt="Vista previa de la foto del reto" />
+                      <Button variant="ghost" size="sm" onClick={() => pickPhoto(null)}>
+                        Quitar foto
+                      </Button>
+                    </>
+                  )}
+                </Stack>
+              )}
+            </Field>
+
+            {/* STREET VIEW: toggle que busca panorama cerca del punto. */}
+            <Field
+              label="Street View"
+              hint="Inclúyelo para que puedan explorar el panorama de la ubicación."
+            >
+              {() => (
+                <Stack gap={3}>
+                  <Row gap={2} align="center" wrap>
+                    <Button
+                      variant={wantsStreetView ? 'primary' : 'secondary'}
+                      size="sm"
+                      aria-pressed={wantsStreetView}
+                      onClick={toggleStreetView}
+                    >
+                      {wantsStreetView ? '✓ ' : ''}Incluir Street View
+                    </Button>
+                    {checkingPano && (
+                      <Row gap={2} className={styles.status}>
+                        <Spinner size={16} />
+                        <span>Buscando Street View…</span>
+                      </Row>
+                    )}
+                  </Row>
+
+                  {/* Aviso de SV cercano (con foto): confirmar usarlo o no. */}
+                  {svPrompt && (
+                    <Stack gap={2} className={styles.svPrompt}>
+                      <span>
+                        El Street View más cercano está a {svPrompt.distanceMeters} m de tu foto.
+                        ¿Lo usamos?
+                      </span>
+                      <Row gap={2} wrap>
+                        <Button size="sm" onClick={acceptSv}>
+                          Sí, usarlo
+                        </Button>
+                        <Button variant="secondary" size="sm" onClick={rejectSv}>
+                          No
+                        </Button>
+                      </Row>
+                      <p className={styles.hint}>
+                        Si dices que no, recoloca el punto para buscar otro panorama, o desactiva el
+                        Street View y el reto será 🔴 Difícil (solo foto).
+                      </p>
+                    </Stack>
+                  )}
+
+                  {/* Previa del panorama (ya confirmado). */}
+                  {pano && (
+                    <Stack gap={2}>
+                      <StreetViewPreview
+                        panoId={pano.panoId}
+                        heading={pov.heading}
+                        pitch={pov.pitch}
+                        onPovChange={setPov}
+                      />
+                    </Stack>
+                  )}
+
+                  {/* CANDADOS DE EXPLORACIÓN (#187): opciones avanzadas, solo con
+                      panorama. Ambos permitidos por defecto; desactívalos para
+                      hacer el reto más difícil. */}
+                  {pano && (
+                    <details className={styles.advanced}>
+                      <summary className={styles.advancedSummary}>Opciones avanzadas</summary>
+                      <Stack gap={3} className={styles.advancedBody}>
+                        <Row gap={2} align="center" wrap>
+                          <Button
+                            variant={allowMove ? 'primary' : 'secondary'}
+                            size="sm"
+                            aria-pressed={allowMove}
+                            onClick={() => setAllowMove((v) => !v)}
+                          >
+                            {allowMove ? '✓ ' : ''}Permitir moverse
+                          </Button>
+                          <span className={styles.hint}>
+                            {allowMove
+                              ? 'Pueden avanzar a calles contiguas.'
+                              : 'Quietos en el sitio: no pueden avanzar.'}
+                          </span>
+                        </Row>
+                        <Row gap={2} align="center" wrap>
+                          <Button
+                            variant={allowRotate ? 'primary' : 'secondary'}
+                            size="sm"
+                            aria-pressed={allowRotate}
+                            onClick={() => setAllowRotate((v) => !v)}
+                          >
+                            {allowRotate ? '✓ ' : ''}Permitir mirar alrededor
+                          </Button>
+                          <span className={styles.hint}>
+                            {allowRotate
+                              ? 'Pueden girar la cámara libremente.'
+                              : 'Vista fija: no pueden girar la cámara.'}
+                          </span>
+                        </Row>
+                      </Stack>
+                    </details>
+                  )}
+                </Stack>
+              )}
+            </Field>
+
+            <Button size="lg" fullWidth disabled={!canLeaveScene} onClick={goNext}>
+              Siguiente →
+            </Button>
+          </Stack>
+        )}
+
+        {/* PASO 3 — DETALLES: título (obligatorio), duración y tiempo por jugada. */}
+        {step === 'details' && (
+          <Stack gap={4}>
+            <Field label="Título del reto" hint="Ponle un nombre para que el grupo lo reconozca.">
               {(fieldProps) => (
                 <Input
                   {...fieldProps}
@@ -802,29 +857,31 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
               )}
             </Field>
 
-            <Button
-              size="lg"
-              fullWidth
-              disabled={!readyToPreview || checkingPano}
-              onClick={() => setStep('preview')}
-            >
+            <Button size="lg" fullWidth disabled={!canLeaveDetails} onClick={goNext}>
               Ver cómo quedará →
             </Button>
           </Stack>
         )}
 
-        {step === 'preview' && chosen != null && (
+        {/* PASO 4 — PREVIA: lo que verán los participantes + crear. */}
+        {step === 'preview' && realDifficulty && (
           <Stack gap={4}>
             <ScenePreview
-              difficulty={realDifficulty ?? chosen}
+              difficulty={realDifficulty}
               panoId={pano?.panoId ?? null}
               pov={pov}
-              photoUrl={wantsPhoto ? photoPreview : null}
+              photoUrl={photoPreview}
             />
-            <Button size="lg" fullWidth loading={busy} onClick={() => void save()}>
+            <Button
+              size="lg"
+              fullWidth
+              loading={busy}
+              disabled={!readyToCreate}
+              onClick={() => void save()}
+            >
               Confirmar y crear reto
             </Button>
-            <Button variant="secondary" fullWidth onClick={() => setStep('build')}>
+            <Button variant="secondary" fullWidth onClick={() => setStep('details')}>
               ← Volver a editar
             </Button>
             {status && (

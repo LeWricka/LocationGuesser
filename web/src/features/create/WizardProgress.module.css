@@ -1,0 +1,77 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* La línea entre pastillas: crece para repartir el ancho. */
+.step:not(:last-child)::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: var(--color-border);
+}
+
+.step[data-state='done']:not(:last-child)::after {
+  background: var(--color-accent);
+}
+
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.step[data-state='current'] .dot {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.step[data-state='done'] .dot {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.step[data-state='current'] .label {
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+}
+
+/* En pantallas estrechas solo mostramos la etiqueta del paso actual. */
+@media (max-width: 30rem) {
+  .step[data-state='done'] .label,
+  .step[data-state='upcoming'] .label {
+    display: none;
+  }
+}
