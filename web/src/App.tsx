@@ -200,6 +200,13 @@ function LoggedIn({
         profile={profile}
         onSaved={refreshProfile}
         onBack={() => goHome()}
+        onOpenAdmin={
+          isAdminEmail(user?.email)
+            ? () => {
+                location.hash = '#admin'
+              }
+            : undefined
+        }
       />
     )
   }

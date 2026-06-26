@@ -18,9 +18,12 @@ interface Props {
   onSaved: () => Promise<void> | void
   /** Volver a la home. */
   onBack: () => void
+  /** Abrir la vista de administración. Solo lo pasa App.tsx si eres admin; si
+   * no llega, el botón no se muestra (la seguridad real está en las RPCs). */
+  onOpenAdmin?: () => void
 }
 
-export function ProfileEditScreen({ userId, profile, onSaved, onBack }: Props) {
+export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmin }: Props) {
   const toast = useToast()
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '')
   // Avatar elegido (token `emoji:<char>` o el del perfil). Estado local para
@@ -75,6 +78,11 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack }: Props) {
       subtitle="Cambia tu nombre, elige tu animal o cierra sesión."
       footer={
         <Stack gap={3} align="center">
+          {onOpenAdmin && (
+            <Button variant="secondary" size="sm" onClick={onOpenAdmin}>
+              🛠️ Vista de administración
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
             Cerrar sesión
           </Button>
