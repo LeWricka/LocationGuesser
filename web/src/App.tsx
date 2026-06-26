@@ -12,6 +12,7 @@
 //       #g=     → GroupPage     (auto-join)
 //       #nuevo  → CreateGroup
 //       #perfil → ProfileEditScreen
+//       #admin  → AdminPage (SOLO admin; un no-admin cae a la home)
 //       raíz    → HomePage
 
 import { useEffect, useState } from 'react'
@@ -19,6 +20,8 @@ import { CreateGroup } from './features/create/CreateGroup'
 import { PlayChallenge } from './features/play/PlayChallenge'
 import { GroupPage } from './features/group/GroupPage'
 import { HomePage } from './features/home/HomePage'
+import { AdminPage } from './features/admin'
+import { isAdminEmail } from './lib/admin'
 import {
   Landing,
   ProfileGate,
@@ -44,9 +47,19 @@ function App() {
   )
 }
 
+// ¿El hash es exactamente `#admin`? Es una vista atómica de la app, igual que
+// `#nuevo`/`#perfil`, pero NO vive en route.ts (parseHash, área de lib): la
+// gestiona App con la sesión a mano para gatear por email de admin.
+function isAdminHash(hash: string = window.location.hash): boolean {
+  return (hash.startsWith('#') ? hash.slice(1) : hash).trim() === 'admin'
+}
+
 function AppRoutes() {
   const { user, profile, loading, refreshProfile } = useSession()
   const [route, setRoute] = useState(parseHash())
+  // El hash de admin se sigue aparte porque parseHash lo colapsa a la home; sin
+  // este estado, navegar a `#admin` no repintaría (mismo valor de route).
+  const [adminRoute, setAdminRoute] = useState(isAdminHash())
 
   // Analítica: identifica al usuario y emite login/signup_completed por sesión,
   // y resetea al cerrar sesión. Enganchado UNA vez, dentro del árbol con sesión.
@@ -55,7 +68,11 @@ function AppRoutes() {
   useEffect(() => {
     // Cross-fade nativo (View Transitions API) al cambiar de ruta; respeta
     // prefers-reduced-motion (withViewTransition cae a un setState directo).
-    const onHash = () => withViewTransition(() => setRoute(parseHash()))
+    const onHash = () =>
+      withViewTransition(() => {
+        setRoute(parseHash())
+        setAdminRoute(isAdminHash())
+      })
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -83,7 +100,7 @@ function AppRoutes() {
   }
 
   // ── Sesión + perfil OK ───────────────────────────────────────────────────────
-  return <LoggedIn route={route} />
+  return <LoggedIn route={route} adminRoute={adminRoute} />
 }
 
 // Spinner de arranque, mientras AuthProvider resuelve la sesión persistida.
@@ -124,7 +141,13 @@ function LoggedOut({ route }: { route: ReturnType<typeof parseHash> }) {
 
 // Router por hash con sesión válida. Auto-join idempotente al entrar por link de
 // grupo y restauración del destino guardado al volver del email.
-function LoggedIn({ route }: { route: ReturnType<typeof parseHash> }) {
+function LoggedIn({
+  route,
+  adminRoute,
+}: {
+  route: ReturnType<typeof parseHash>
+  adminRoute: boolean
+}) {
   const { user, profile, refreshProfile } = useSession()
   const joinIfGroup = useDeepLinkJoin(user?.id)
 
@@ -141,6 +164,15 @@ function LoggedIn({ route }: { route: ReturnType<typeof parseHash> }) {
   useEffect(() => {
     if (route.group && user?.id) void joinIfGroup(window.location.hash)
   }, [route.group, route.challenge, user?.id, joinIfGroup])
+
+  // `#admin`: pantalla de administración SOLO para el admin. Un no-admin que
+  // fuerce el hash cae a la home (no ve nada de admin); aun así, las RPCs `admin_*`
+  // deniegan en servidor. Tras los hooks (no condicionarlos) y antes del resto del
+  // router: un deep link de grupo viaja por #g, nunca por #admin, así que no chocan.
+  if (adminRoute) {
+    if (isAdminEmail(user?.email)) return <AdminPage onBack={() => goHome()} />
+    return <RedirectHome />
+  }
 
   // Reto concreto → jugar. Solo grupo → página del grupo. (El auto-join corre en
   // paralelo; la lectura ya exige ser miembro por RLS, por eso unimos primero.)
@@ -172,7 +204,34 @@ function LoggedIn({ route }: { route: ReturnType<typeof parseHash> }) {
     )
   }
 
-  // Raíz sin hash → home/dashboard (centro de gravedad con sesión, §3).
+  // Raíz sin hash → home/dashboard (centro de gravedad con sesión, §3). Para el
+  // admin añadimos un acceso DISCRETO a `#admin` (un enlace flotante), invisible
+  // para el resto. Solo en la home para no estorbar en grupo/jugar/perfil.
+  return (
+    <>
+      <HomePage />
+      {isAdminEmail(user?.email) && <AdminLink />}
+    </>
+  )
+}
+
+// Acceso discreto a la pantalla de administración, solo visible para el admin.
+// Pastilla flotante abajo-izquierda (la derecha la ocupa el FAB de crear grupo).
+function AdminLink() {
+  return (
+    <a className={styles.adminLink} href="#admin" aria-label="Abrir administración">
+      ⚙︎ Admin
+    </a>
+  )
+}
+
+// Redirige a la home limpiando el hash (p.ej. un no-admin en `#admin`). El
+// borrado va en un efecto para no mutar location durante el render; mientras,
+// pintamos la home para no dejar la pantalla en blanco.
+function RedirectHome() {
+  useEffect(() => {
+    goHome()
+  }, [])
   return <HomePage />
 }
 
