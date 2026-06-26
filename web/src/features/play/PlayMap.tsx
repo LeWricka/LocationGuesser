@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
+import { avatarPinFromProfile, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
 
 // Vista inicial: el MUNDO entero. Empezando alejado, el
 // jugador va de lejos a cerca directo sin tener que alejar primero.
@@ -26,6 +27,10 @@ interface Props {
   /** Bloquea el clic tras revelar: el voto ya no se puede mover. */
   locked: boolean
   onPick: (p: LatLng) => void
+  /** Avatar del jugador (`profiles.avatar_url`) para la burbuja de su pin. */
+  meAvatar?: string | null
+  /** Id del jugador: ancla el avatar por defecto cuando no hay avatar elegido. */
+  meUserId: string
 }
 
 // Icono emoji para el Marker clásico: el emoji va como `label` centrado sobre un
@@ -42,6 +47,17 @@ function emojiIcon(): google.maps.Icon {
 
 function emojiLabel(emoji: string): google.maps.MarkerLabel {
   return { text: emoji, fontSize: '26px', className: 'lg-pin' }
+}
+
+// Icono del pin del PROPIO jugador: la burbuja de su avatar (teardrop con su
+// emoji sobre su fondo) servida como data-URI SVG en `icon.url`. Anclado por la
+// punta a la coordenada exacta, igual que el resto de marcadores clásicos.
+function guessIcon(avatar: string | null | undefined, userId: string): google.maps.Icon {
+  return {
+    url: avatarPinFromProfile(avatar ?? null, userId),
+    scaledSize: new google.maps.Size(PIN_SIZE.width, PIN_SIZE.height),
+    anchor: new google.maps.Point(PIN_ANCHOR.x, PIN_ANCHOR.y),
+  }
 }
 
 // Al revelar, encuadra ambos puntos (tu pin + 🎯) con margen para que se vean
@@ -142,7 +158,7 @@ function AnswerMarker({ answer }: { answer: LatLng }) {
   )
 }
 
-export function PlayMap({ guess, answer, locked, onPick }: Props) {
+export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: Props) {
   return (
     <Map
       className="lg-map"
@@ -164,9 +180,7 @@ export function PlayMap({ guess, answer, locked, onPick }: Props) {
         if (latLng) onPick({ lat: latLng.lat, lng: latLng.lng })
       }}
     >
-      {guess && (
-        <Marker position={guess} icon={emojiIcon()} label={emojiLabel('📍')} clickable={false} />
-      )}
+      {guess && <Marker position={guess} icon={guessIcon(meAvatar, meUserId)} clickable={false} />}
       {answer && <AnswerMarker answer={answer} />}
       {guess && answer && <DrawnLine guess={guess} answer={answer} />}
       {guess && answer && <FitToReveal guess={guess} answer={answer} />}
