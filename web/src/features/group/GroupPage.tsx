@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   Input,
+  Lightbox,
   Modal,
   PhotoStrip,
   type PhotoStripItem,
@@ -564,11 +565,29 @@ function ChallengeCreated({
 // --- Histórico de fotos ----------------------------------------------------
 
 function PhotoSection({ photos }: { photos: PhotoStripItem[] }) {
+  // Slideshow: al tocar una miniatura abrimos el visor en modo galería con TODAS
+  // las fotos del grupo, empezando en la tocada. Así se pasan con flechas/swipe
+  // sin cerrar una y abrir otra. El Lightbox ya soporta `images` + `startIndex`.
+  const [openAt, setOpenAt] = useState<number | null>(null)
+  const slides = useMemo(() => photos.map((p) => ({ src: p.src ?? '', alt: p.alt })), [photos])
+
   if (photos.length === 0) return null
   return (
     <section>
       <h2 className={styles.sectionTitle}>📸 Fotos del grupo</h2>
-      <PhotoStrip photos={photos} />
+      <PhotoStrip
+        photos={photos}
+        onSelect={(id) => {
+          const i = photos.findIndex((p) => p.id === id)
+          if (i >= 0) setOpenAt(i)
+        }}
+      />
+      <Lightbox
+        open={openAt !== null}
+        images={slides}
+        startIndex={openAt ?? 0}
+        onClose={() => setOpenAt(null)}
+      />
     </section>
   )
 }
