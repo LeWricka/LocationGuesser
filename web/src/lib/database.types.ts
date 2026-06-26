@@ -239,7 +239,8 @@ export interface Database {
         Returns: boolean
       }
       // Resumen por grupo para la vista de admin (excluye grupos de cuentas de
-      // prueba). SECURITY DEFINER + comprobación is_admin(). Migración 0016.
+      // prueba). SECURITY DEFINER + comprobación is_admin(). Migración 0016,
+      // ampliada en 0018 (engagement, distancia, tiempos, salir-de-app, etc.).
       admin_groups: {
         Args: Record<string, never>
         Returns: {
@@ -251,10 +252,32 @@ export interface Database {
           challenge_count: number
           vote_count: number
           participant_count: number
+          // % de miembros que han votado al menos una vez (null si sin miembros).
+          active_member_pct: number | null
+          // Miembros del grupo que nunca han votado en él.
+          lurker_count: number
+          // Votos emitidos / votos posibles (miembros × retos), en % (null si denom 0).
+          coverage_pct: number | null
+          avg_distance_km: number | null
+          // display_name del jugador con más puntos totales (null si no hay votos).
+          top_player: string | null
+          // Última actividad (último reto o voto). Null si no hay ninguno.
+          last_activity_at: string | null
+          // Actividad en los últimos 14 días.
+          is_active: boolean
+          // Cadencia propia del grupo: días entre retos (null si <2 retos).
+          avg_days_between_challenges: number | null
+          left_app_count: number
+          left_app_pct: number | null
+          // Votos sin pin (jugó sin marcar).
+          timeout_count: number
+          median_response_seconds: number | null
+          median_time_consumed_pct: number | null
         }[]
       }
       // Resumen por reto de un grupo para la vista de admin (incluye la respuesta
-      // lat/lng, que el admin puede ver). Migración 0016.
+      // lat/lng, que el admin puede ver). Migración 0016, ampliada en 0018
+      // (no votantes, dispersión, mejor/peor jugador, tipo, autor, estado, etc.).
       admin_group_challenges: {
         Args: {
           p_group_id: string
@@ -275,10 +298,32 @@ export interface Database {
           avg_points: number | null
           avg_elapsed_seconds: number | null
           avg_time_consumed_pct: number | null
+          // Miembros que NO votaron este reto.
+          non_voter_count: number
+          // Votos sin pin (jugó sin marcar).
+          timeout_count: number
+          // Dispersión de distancias (solo votos con pin).
+          min_distance_km: number | null
+          median_distance_km: number | null
+          max_distance_km: number | null
+          max_points: number | null
+          // display_name del voto más cercano / más lejano (null si no hay votos con pin).
+          best_player: string | null
+          worst_player: string | null
+          median_elapsed_seconds: number | null
+          median_time_consumed_pct: number | null
+          // 'foto_sv' | 'foto' | 'sv' | 'ninguno' según los medios del reto.
+          kind: string
+          // display_name del creador (null si no hay perfil).
+          author: string | null
+          // 'practica' | 'cerrado' | 'abierto'.
+          status: string
+          left_app_count: number
         }[]
       }
       // Agregados globales para la vista de admin (solo grupos reales). Devuelve
-      // una única fila. Migración 0016.
+      // una única fila. Migración 0016, ampliada en 0018 (salir-de-app, timeouts,
+      // mediana de respuesta).
       admin_analytics: {
         Args: Record<string, never>
         Returns: {
@@ -292,6 +337,12 @@ export interface Database {
           avg_participation_pct: number | null
           avg_response_seconds: number | null
           avg_time_consumed_pct: number | null
+          // % global de votos con salida de la app (null si no hay votos).
+          avg_left_app_pct: number | null
+          // % global de timeouts (votos sin pin) (null si no hay votos).
+          timeout_pct: number | null
+          // Mediana global del tiempo de respuesta (segundos).
+          median_response_seconds: number | null
         }[]
       }
     }
