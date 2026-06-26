@@ -40,6 +40,7 @@ export function PhotoDropzone({ preview, loading = false, onPick, onClear, label
         )}
         <div className={styles.actions}>
           <label className={styles.change}>
+            <span aria-hidden>🔁</span>
             <span>Cambiar</span>
             <input
               type="file"
@@ -57,26 +58,27 @@ export function PhotoDropzone({ preview, loading = false, onPick, onClear, label
             disabled={loading}
             aria-label="Quitar foto"
           >
-            Quitar
+            <span aria-hidden>🗑️</span>
           </button>
         </div>
       </div>
     )
   }
 
+  // Tile autoexplicativo por su forma: icono de cámara con un "+" superpuesto y
+  // una etiqueta de 2 palabras. Sin párrafos de ayuda; el aria-label cubre al
+  // lector de pantalla.
   return (
     <label className={styles.empty} aria-busy={loading || undefined}>
       <span className={styles.icon} aria-hidden>
         {loading ? <Spinner size={28} /> : '📷'}
+        {!loading && <span className={styles.plus}>+</span>}
       </span>
-      <span className={styles.emptyLabel}>
-        {loading ? 'Leyendo la foto…' : (label ?? 'Sube una foto del sitio')}
-      </span>
-      <span className={styles.emptyHint}>Quitamos el GPS de la foto antes de subirla</span>
+      <span className={styles.emptyLabel}>{loading ? 'Leyendo…' : (label ?? 'Añadir foto')}</span>
       <input
         type="file"
         accept="image/*"
-        aria-label="Sube una foto del sitio"
+        aria-label="Añadir foto del sitio"
         disabled={loading}
         className={styles.input}
         onChange={handleChange}

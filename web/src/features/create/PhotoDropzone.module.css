@@ -30,21 +30,40 @@
   cursor: progress;
 }
 
+/* Disco de icono: cámara grande con un "+" superpuesto. La forma comunica
+   "añadir foto" sin depender del texto. */
 .icon {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
   font-size: var(--font-size-xl);
+}
+
+.plus {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-black);
+  line-height: 1;
 }
 
 .emptyLabel {
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
-}
-
-.emptyHint {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
 }
 
 /* Con foto: contenedor de la miniatura con los controles superpuestos abajo. */
@@ -92,7 +111,10 @@
 .remove {
   display: inline-flex;
   align-items: center;
-  min-height: 36px;
+  justify-content: center;
+  gap: var(--space-1);
+  /* Objetivo táctil cómodo en móvil. */
+  min-height: var(--tap-target);
   padding: 0 var(--space-3);
   border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: var(--radius-full);
@@ -101,6 +123,12 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
+}
+
+/* "Quitar" solo lleva icono: cuadrado para que sea claramente un botón aparte. */
+.remove {
+  min-width: var(--tap-target);
+  padding: 0;
 }
 
 .change:hover,

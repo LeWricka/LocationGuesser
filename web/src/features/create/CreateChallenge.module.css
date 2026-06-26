@@ -66,12 +66,6 @@
   background: var(--color-surface-hover);
 }
 
-/* Texto introductorio de cada paso del asistente. */
-.intro {
-  font-size: var(--font-size-md);
-  color: var(--color-text-muted);
-}
-
 /* Separador "o marca el sitio" entre la foto (camino estrella) y los otros
    métodos de ubicación. Línea a ambos lados de la etiqueta. */
 .divider {

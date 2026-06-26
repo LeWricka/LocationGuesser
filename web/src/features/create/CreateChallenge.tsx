@@ -461,8 +461,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
             ajustar en el mapa. */}
         {step === 'location' && (
           <Stack gap={5}>
-            <p className={styles.intro}>¿Dónde es? Sube una foto del sitio o márcalo en el mapa.</p>
-
             {/* Camino estrella: la foto. Si lleva GPS, colocamos el pin solos. */}
             <PhotoDropzone
               preview={photoPreview}
@@ -537,8 +535,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
             dificultad se deriva y se muestra en vivo. */}
         {step === 'scene' && (
           <Stack gap={5}>
-            <p className={styles.intro}>¿Qué verán los demás? Cuanto menos enseñes, más difícil.</p>
-
             {/* Badge de dificultad en vivo. */}
             {realDifficulty ? (
               <Stack gap={1} className={styles.difficultyBadge}>
@@ -549,9 +545,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
                 <span className={styles.hint}>{DIFFICULTY_BLURB[realDifficulty]}</span>
               </Stack>
             ) : (
-              <p className={styles.hint}>
-                Añade una foto o Street View para tener algo que mostrar.
-              </p>
+              <p className={styles.hint}>Añade foto o Street View.</p>
             )}
 
             {/* FOTO: misma zona visual que en Ubicación. */}
@@ -567,24 +561,23 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
             </Field>
 
             {/* STREET VIEW: toggle que busca panorama cerca del punto. */}
-            <Field label="Street View" hint="Deja explorar el panorama del sitio.">
+            <Field label="Street View" hideLabel>
               {() => (
                 <Stack gap={3}>
-                  <Row gap={2} align="center" wrap>
-                    <Button
-                      variant={wantsStreetView ? 'primary' : 'secondary'}
-                      aria-pressed={wantsStreetView}
-                      onClick={toggleStreetView}
-                    >
-                      {wantsStreetView ? '✓ Street View incluido' : 'Incluir Street View'}
-                    </Button>
-                    {checkingPano && (
-                      <Row gap={2} className={styles.status}>
-                        <Spinner size={16} />
-                        <span>Buscando…</span>
-                      </Row>
-                    )}
-                  </Row>
+                  <Button
+                    variant={wantsStreetView ? 'primary' : 'secondary'}
+                    fullWidth
+                    aria-pressed={wantsStreetView}
+                    onClick={toggleStreetView}
+                  >
+                    {wantsStreetView ? '✓ Street View' : '🗺️ Añadir Street View'}
+                  </Button>
+                  {checkingPano && (
+                    <Row gap={2} className={styles.status}>
+                      <Spinner size={16} />
+                      <span>Buscando…</span>
+                    </Row>
+                  )}
 
                   {/* Aviso de SV cercano (con foto): confirmar usarlo o no. */}
                   {svPrompt && (
@@ -729,7 +722,6 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
         {/* PASO 4 — PREVIA: lo que verán los participantes + crear. */}
         {step === 'preview' && realDifficulty && (
           <Stack gap={4}>
-            <p className={styles.intro}>Así lo verán los demás.</p>
             <ScenePreview
               difficulty={realDifficulty}
               panoId={pano?.panoId ?? null}
