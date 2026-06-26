@@ -11,6 +11,10 @@ export interface SubmitVoteInput {
   // Se persiste en el voto (`votes.left_app`) y se muestra como ⚠️ en el marcador.
   // Opcional: si no se pasa, la RPC usa su default (false).
   leftApp?: boolean
+  // Segundos que tardó el jugador en votar, medidos en cliente (wall-clock desde
+  // que empezó a jugar hasta que confirmó). Se persiste en `votes.elapsed_seconds`
+  // (issue #214). Opcional/null: si no hay un inicio válido, la RPC usa su default.
+  elapsedSeconds?: number | null
 }
 
 /**
@@ -47,6 +51,7 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
     p_lat: input.guessLat,
     p_lng: input.guessLng,
     p_left_app: input.leftApp ?? false,
+    p_elapsed_seconds: input.elapsedSeconds ?? null,
   })
   // El error de la RPC es un objeto de PostgREST (no Error nativo): lo
   // re-lanzamos como Error con mensaje legible (describeError combina

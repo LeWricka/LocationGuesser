@@ -119,6 +119,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // corre (fase `playing`, antes de votar), lo marcamos. Ref (no estado) porque el
   // valor solo se lee al votar; no necesita re-render y debe persistir hasta el voto.
   const leftAppRef = useRef(false)
+  // Tiempo de respuesta (issue #214): instante (ms epoch) en que el jugador empezó
+  // a jugar (entrada en `playing`). Al votar medimos los segundos transcurridos en
+  // wall-clock. Es coherente con que "el tiempo sigue corriendo aunque salgas": no
+  // descontamos pausas; si reanuda, el inicio NO se reinicia (se reconstruye desde
+  // el `start_at` persistido, igual que el reloj de la cuenta atrás). Null si no hay
+  // inicio válido → mandamos `null` y no rompemos el voto.
+  const playStartAtRef = useRef<number | null>(null)
   // Handle imperativo del panorama para los controles "volver al inicio" / "norte".
   const panoRef = useRef<StreetViewPanoHandle>(null)
   // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
@@ -151,12 +158,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       // voto y la reflejamos en el aviso del resultado.
       const leftApp = leftAppRef.current
       if (leftApp) setILeftApp(true)
+      // Tiempo de respuesta (issue #214): segundos en wall-clock desde que empezó a
+      // jugar hasta este voto. Sin inicio válido → null (no rompe el voto).
+      const startedAt = playStartAtRef.current
+      const elapsedSeconds = startedAt != null ? Math.round((Date.now() - startedAt) / 1000) : null
       try {
         const res = await submitVote({
           challengeId: current.id,
           guessLat: playedGuess?.lat ?? null,
           guessLng: playedGuess?.lng ?? null,
           leftApp,
+          elapsedSeconds,
         })
         if (!playedGuess) {
           // Voto de timeout: 0 puntos, sin pin. Queda MARCADO COMO JUGADO (no puede
@@ -306,6 +318,16 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     }
   }, [groupId])
 
+  // Inicio del cronómetro de respuesta (issue #214). Al entrar en `playing`
+  // fijamos el origen desde el `start_at` persistido (el mismo que reconstruye la
+  // cuenta atrás): así una recarga o un salir-y-reentrar NO reinicia el contador,
+  // y el tiempo medido es wall-clock real desde que se pulsó Empezar.
+  useEffect(() => {
+    if (phase !== 'playing' || !challenge) return
+    const startAt = Number(localStorage.getItem(startKey(challenge.id)) ?? Date.now())
+    playStartAtRef.current = startAt
+  }, [phase, challenge])
+
   // Cuenta atrás. Arranca al entrar en `playing` reconstruyendo desde `start_at`
   // (persistido), así una recarga no reinicia el reloj. Al llegar a 0 → revelar.
   useEffect(() => {
@@ -433,6 +455,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       setTimedOut(false)
       // Reinicio limpio de la marca anti-trampa: rejugar arranca sin "salió".
       leftAppRef.current = false
+      // Reinicio del cronómetro de respuesta: rejugar mide desde el nuevo Empezar.
+      playStartAtRef.current = null
       setILeftApp(false)
       setRank(null)
       setMapOpen(false)
