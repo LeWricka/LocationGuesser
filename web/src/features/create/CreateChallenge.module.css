@@ -1,9 +1,11 @@
-.header {
-  margin-bottom: var(--space-2);
+/* Pie de cada paso: «Anterior» a la izquierda, «Siguiente»/«Crear» dominante a
+   la derecha (crece para ser el objetivo táctil principal en móvil). */
+.nav {
+  align-items: center;
 }
 
-.title {
-  font-size: var(--font-size-xl);
+.navNext {
+  flex: 1;
 }
 
 /* Barra de búsqueda + GPS: el campo crece, el botón mantiene su tamaño. */
@@ -66,27 +68,8 @@
   background: var(--color-surface-hover);
 }
 
-/* Separador "o marca el sitio" entre la foto (camino estrella) y los otros
-   métodos de ubicación. Línea a ambos lados de la etiqueta. */
-.divider {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-wide);
-  color: var(--color-text-faint);
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--color-border);
-}
-
-/* Badge de dificultad en vivo (paso Escena): se actualiza con los medios. */
+/* Dificultad en vivo (paso «El sitio»): se actualiza con la combinación de
+   medios elegida. Resumen de una línea bajo las tarjetas de foto y SV. */
 .difficultyBadge {
   padding: var(--space-3);
   border: 1px solid var(--color-border);
