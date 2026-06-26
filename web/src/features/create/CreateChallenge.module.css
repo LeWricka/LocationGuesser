@@ -68,8 +68,28 @@
 
 /* Texto introductorio de cada paso del asistente. */
 .intro {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-md);
   color: var(--color-text-muted);
+}
+
+/* Separador "o marca el sitio" entre la foto (camino estrella) y los otros
+   métodos de ubicación. Línea a ambos lados de la etiqueta. */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-text-faint);
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
 }
 
 /* Badge de dificultad en vivo (paso Escena): se actualiza con los medios. */
