@@ -1,0 +1,153 @@
+/* Zona vacía: tile grande tipo tarjeta, borde discontinuo, centrada. Todo el
+   bloque es el área de toque (es un <label>). */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 160px;
+  padding: var(--space-5) var(--space-4);
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.empty:hover,
+.empty:focus-within {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
+}
+
+.empty[aria-busy='true'] {
+  cursor: progress;
+}
+
+/* Disco de icono: cámara grande con un "+" superpuesto. La forma comunica
+   "añadir foto" sin depender del texto. */
+.icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  font-size: var(--font-size-xl);
+}
+
+.plus {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-black);
+  line-height: 1;
+}
+
+.emptyLabel {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Con foto: contenedor de la miniatura con los controles superpuestos abajo. */
+.filled {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  object-fit: cover;
+}
+
+/* Velo + spinner sobre la miniatura mientras lee EXIF de la foto nueva. */
+.thumbBusy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-scrim);
+  color: var(--color-on-photo);
+}
+
+/* Controles discretos sobre el degradado al pie de la miniatura. */
+.actions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: linear-gradient(to top, var(--photo-overlay-strong), transparent);
+}
+
+.change,
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  /* Objetivo táctil cómodo en móvil. */
+  min-height: var(--tap-target);
+  padding: 0 var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--color-on-photo);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+/* "Quitar" solo lleva icono: cuadrado para que sea claramente un botón aparte. */
+.remove {
+  min-width: var(--tap-target);
+  padding: 0;
+}
+
+.change:hover,
+.remove:hover,
+.change:focus-within,
+.remove:focus-visible {
+  background: rgba(0, 0, 0, 0.55);
+  border-color: var(--color-on-photo);
+}
+
+/* Input de archivo oculto pero accesible (visually-hidden). */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
