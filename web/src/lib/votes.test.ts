@@ -80,6 +80,8 @@ describe('submitVote', () => {
       p_lng: -3,
       // Sin pasar leftApp → la RPC recibe false (su default).
       p_left_app: false,
+      // Sin pasar elapsedSeconds → null (la RPC usa su default).
+      p_elapsed_seconds: null,
     })
     // El cliente NO manda points: el servidor los devuelve y el cliente los usa tal cual.
     expect(out).toEqual({ distanceKm: 12.3, points: 4900, answerLat: 40.1, answerLng: -3.1 })
@@ -96,6 +98,7 @@ describe('submitVote', () => {
       p_lat: null,
       p_lng: null,
       p_left_app: false,
+      p_elapsed_seconds: null,
     })
     expect(out).toEqual({ distanceKm: null, points: 0, answerLat: null, answerLng: null })
   })
@@ -111,6 +114,22 @@ describe('submitVote', () => {
       p_lat: 40,
       p_lng: -3,
       p_left_app: true,
+      p_elapsed_seconds: null,
+    })
+  })
+
+  test('pasa elapsedSeconds como p_elapsed_seconds (tiempo de respuesta, #214)', async () => {
+    rpcResult = {
+      data: [{ distance_km: 12.3, points: 4900, answer_lat: 40.1, answer_lng: -3.1 }],
+      error: null,
+    }
+    await submitVote({ challengeId: 'c1', guessLat: 40, guessLng: -3, elapsedSeconds: 37 })
+    expect(calls.rpc).toHaveBeenCalledWith('submit_vote', {
+      p_challenge_id: 'c1',
+      p_lat: 40,
+      p_lng: -3,
+      p_left_app: false,
+      p_elapsed_seconds: 37,
     })
   })
 
