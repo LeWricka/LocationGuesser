@@ -20,6 +20,7 @@ function vote(
     distance_km: 0,
     left_app: false,
     created_at: '2026-06-19T00:00:00.000Z',
+    avatar: null,
     ...partial,
   }
 }
@@ -36,9 +37,23 @@ describe('aggregateLeaderboard', () => {
       vote({ user_id: 'u-bea', display_name: 'Bea', points: 120, challenge_id: 'c1' }),
     ])
     expect(result).toEqual([
-      { userId: 'u-ana', name: 'Ana', points: 150, plays: 2 },
-      { userId: 'u-bea', name: 'Bea', points: 120, plays: 1 },
+      { userId: 'u-ana', name: 'Ana', avatar: null, points: 150, plays: 2 },
+      { userId: 'u-bea', name: 'Bea', avatar: null, points: 120, plays: 1 },
     ])
+  })
+
+  test('toma el avatar del jugador (del primer voto visto)', () => {
+    const result = aggregateLeaderboard([
+      vote({ user_id: 'u-ana', display_name: 'Ana', points: 10, avatar: 'emoji:🦊' }),
+      vote({
+        user_id: 'u-ana',
+        display_name: 'Ana',
+        points: 10,
+        avatar: 'emoji:🐼',
+        challenge_id: 'c2',
+      }),
+    ])
+    expect(result[0].avatar).toBe('emoji:🦊')
   })
 
   test('ordena por puntos descendente (premia participar: suma, no media)', () => {
