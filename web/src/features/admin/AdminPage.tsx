@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { BackHomeButton, Badge, Card, EmptyState, Row, Skeleton, Stack } from '../../ui'
 import {
   getAdminAnalytics,
@@ -8,7 +8,18 @@ import {
   type AdminGroup,
   type AdminGroupChallenge,
 } from '../../lib/admin'
-import { fmtCadence, fmtDate, fmtInt, fmtKm, fmtNumber, fmtPercent, fmtSeconds } from './format'
+import {
+  fmtCadence,
+  fmtDate,
+  fmtInt,
+  fmtKind,
+  fmtKm,
+  fmtNumber,
+  fmtPercent,
+  fmtSeconds,
+  fmtSince,
+  fmtStatus,
+} from './format'
 import styles from './AdminPage.module.css'
 
 interface Props {
@@ -118,6 +129,17 @@ function AnalyticsSection({ analytics }: { analytics: AdminAnalytics | null }) {
             value={fmtPercent(analytics.avg_time_consumed_pct)}
             hint="del plazo, medio"
           />
+          <Metric
+            label="Respuesta (mediana)"
+            value={fmtSeconds(analytics.median_response_seconds)}
+            hint="mediana global"
+          />
+          <Metric
+            label="Salidas de la app"
+            value={fmtPercent(analytics.avg_left_app_pct)}
+            hint="de los votos"
+          />
+          <Metric label="Timeouts" value={fmtPercent(analytics.timeout_pct)} hint="votos sin pin" />
         </div>
       )}
     </section>
@@ -140,7 +162,7 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
 function MetricsSkeleton() {
   return (
     <div className={styles.metrics} role="status" aria-label="Cargando métricas">
-      {Array.from({ length: 10 }, (_, i) => (
+      {Array.from({ length: 13 }, (_, i) => (
         <Card key={i} padding="md">
           <Stack gap={2}>
             <Skeleton width={80} height={36} radius="md" />
@@ -228,7 +250,12 @@ function GroupRow({ group }: { group: AdminGroup }) {
         aria-expanded={open}
       >
         <div className={styles.groupHead}>
-          <span className={styles.groupName}>{name}</span>
+          <span className={styles.groupNameRow}>
+            <span className={styles.groupName}>{name}</span>
+            <Badge tone={group.is_active ? 'success' : 'neutral'} dot={group.is_active}>
+              {group.is_active ? 'Activo' : 'Inactivo'}
+            </Badge>
+          </span>
           <span className={styles.groupMeta}>
             {group.owner_email ?? 'sin dueño'} · {fmtDate(group.created_at)}
           </span>
@@ -257,14 +284,20 @@ function GroupRow({ group }: { group: AdminGroup }) {
                 <Skeleton width="80%" height={14} />
               </Stack>
             </div>
-          ) : challenges && challenges.length > 0 ? (
-            <Stack gap={3}>
-              {challenges.map((c) => (
-                <ChallengeRow key={c.challenge_id} challenge={c} />
-              ))}
-            </Stack>
           ) : (
-            <p className={styles.empty}>Este grupo aún no tiene retos.</p>
+            <Stack gap={4}>
+              <GroupStats group={group} />
+              {challenges && challenges.length > 0 ? (
+                <Stack gap={3}>
+                  <h3 className={styles.blockTitle}>Retos</h3>
+                  {challenges.map((c) => (
+                    <ChallengeRow key={c.challenge_id} challenge={c} />
+                  ))}
+                </Stack>
+              ) : (
+                <p className={styles.empty}>Este grupo aún no tiene retos.</p>
+              )}
+            </Stack>
           )}
         </div>
       )}
@@ -272,33 +305,126 @@ function GroupRow({ group }: { group: AdminGroup }) {
   )
 }
 
-// Detalle de un reto: cabecera (título, fecha, foto) + métricas en una rejilla.
+// Bloque de stats del grupo (columnas ampliadas de admin_groups), agrupado por
+// tema para que no sea un muro de números: participación, rendimiento, tiempo e
+// integridad/contexto.
+function GroupStats({ group }: { group: AdminGroup }) {
+  return (
+    <Stack gap={3}>
+      <StatGroup title="Participación y cobertura">
+        <Stat label="Miembros activos" value={fmtPercent(group.active_member_pct)} />
+        <Stat label="Lurkers" value={fmtInt(group.lurker_count)} />
+        <Stat label="Cobertura de votos" value={fmtPercent(group.coverage_pct)} />
+      </StatGroup>
+      <StatGroup title="Rendimiento">
+        <Stat label="Distancia media" value={fmtKm(group.avg_distance_km)} />
+        <Stat label="Mejor jugador" value={group.top_player ?? '—'} />
+      </StatGroup>
+      <StatGroup title="Tiempo">
+        <Stat label="Respuesta (mediana)" value={fmtSeconds(group.median_response_seconds)} />
+        <Stat
+          label="Tiempo consumido (mediana)"
+          value={fmtPercent(group.median_time_consumed_pct)}
+        />
+        <Stat label="Timeouts" value={fmtInt(group.timeout_count)} />
+      </StatGroup>
+      <StatGroup title="Integridad y contexto">
+        <Stat label="Última actividad" value={fmtSince(group.last_activity_at)} />
+        <Stat label="Cadencia de retos" value={fmtCadence(group.avg_days_between_challenges)} />
+        <Stat
+          label="Salidas de la app"
+          value={`${fmtInt(group.left_app_count)} (${fmtPercent(group.left_app_pct)})`}
+        />
+      </StatGroup>
+    </Stack>
+  )
+}
+
+// Subbloque temático: subtítulo + rejilla de stats (dl). Reutiliza la rejilla de
+// métricas por reto.
+function StatGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <h4 className={styles.statGroupTitle}>{title}</h4>
+      <dl className={styles.challengeMetrics}>{children}</dl>
+    </div>
+  )
+}
+
+// Detalle de un reto, expandible: cabecera (título, fecha, badges de tipo/estado/
+// foto) + resumen siempre visible; al abrir, métricas ampliadas (dispersión,
+// mejor/peor jugador, medianas, no votantes, timeouts, salidas de la app).
 function ChallengeRow({ challenge }: { challenge: AdminGroupChallenge }) {
+  const [open, setOpen] = useState(false)
+
   return (
     <div className={styles.challenge}>
-      <Row justify="between" align="start" gap={2}>
-        <div>
+      <button
+        type="button"
+        className={styles.challengeHead}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <div className={styles.challengeHeadMain}>
           <span className={styles.challengeTitle}>{challenge.title}</span>
-          <span className={styles.challengeMeta}>{fmtDate(challenge.created_at)}</span>
+          <span className={styles.challengeMeta}>
+            {fmtDate(challenge.created_at)}
+            {challenge.author ? ` · ${challenge.author}` : ''}
+          </span>
+          <span className={styles.challengeBadges}>
+            <Badge tone={challenge.status === 'abierto' ? 'live' : 'neutral'}>
+              {fmtStatus(challenge.status)}
+            </Badge>
+            <Badge tone="accent">{fmtKind(challenge.kind)}</Badge>
+          </span>
         </div>
-        <Badge tone={challenge.has_image ? 'accent' : 'neutral'}>
-          {challenge.has_image ? '📷 con foto' : 'sin foto'}
-        </Badge>
-      </Row>
+        <span className={styles.chevron} aria-hidden="true">
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+
       <dl className={styles.challengeMetrics}>
         <Stat label="Votos" value={fmtInt(challenge.vote_count)} />
         <Stat label="Participación" value={fmtPercent(challenge.participation_pct)} />
         <Stat label="Distancia media" value={fmtKm(challenge.avg_distance_km)} />
         <Stat label="Puntos medios" value={fmtNumber(challenge.avg_points, 0)} />
-        <Stat label="Tiempo de respuesta" value={fmtSeconds(challenge.avg_elapsed_seconds)} />
-        <Stat label="Tiempo consumido" value={fmtPercent(challenge.avg_time_consumed_pct)} />
       </dl>
+
+      {open && (
+        <Stack gap={3}>
+          <StatGroup title="Dispersión de distancias">
+            <Stat label="Mínima" value={fmtKm(challenge.min_distance_km)} />
+            <Stat label="Mediana" value={fmtKm(challenge.median_distance_km)} />
+            <Stat label="Máxima" value={fmtKm(challenge.max_distance_km)} />
+          </StatGroup>
+          <StatGroup title="Jugadores">
+            <Stat label="Puntos máx." value={fmtInt(challenge.max_points)} />
+            <Stat label="Mejor jugador" value={challenge.best_player ?? '—'} />
+            <Stat label="Peor jugador" value={challenge.worst_player ?? '—'} />
+          </StatGroup>
+          <StatGroup title="Tiempo">
+            <Stat
+              label="Respuesta (mediana)"
+              value={fmtSeconds(challenge.median_elapsed_seconds)}
+            />
+            <Stat
+              label="Tiempo consumido (mediana)"
+              value={fmtPercent(challenge.median_time_consumed_pct)}
+            />
+          </StatGroup>
+          <StatGroup title="Integridad">
+            <Stat label="No votantes" value={fmtInt(challenge.non_voter_count)} />
+            <Stat label="Timeouts" value={fmtInt(challenge.timeout_count)} />
+            <Stat label="Salidas de la app" value={fmtInt(challenge.left_app_count)} />
+          </StatGroup>
+        </Stack>
+      )}
     </div>
   )
 }
 
-// Una métrica por reto: etiqueta pequeña + valor. dt/dd para semántica de lista
-// de definiciones.
+// Una métrica: etiqueta pequeña + valor. dt/dd para semántica de lista de
+// definiciones.
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className={styles.stat}>

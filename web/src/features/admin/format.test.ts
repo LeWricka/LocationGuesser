@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { fmtCadence, fmtDate, fmtInt, fmtKm, fmtNumber, fmtPercent, fmtSeconds } from './format'
+import {
+  fmtCadence,
+  fmtDate,
+  fmtInt,
+  fmtKind,
+  fmtKm,
+  fmtNumber,
+  fmtPercent,
+  fmtSeconds,
+  fmtSince,
+  fmtStatus,
+} from './format'
 
 describe('formateadores de admin', () => {
   it('fmtInt redondea y separa miles; null → guion', () => {
@@ -43,5 +54,29 @@ describe('formateadores de admin', () => {
     expect(fmtDate('2026-06-12T10:00:00Z')).toMatch(/2026/)
     expect(fmtDate(null)).toBe('—')
     expect(fmtDate('no-es-fecha')).toBe('—')
+  })
+
+  it('fmtSince elige la unidad mayor relativa a "ahora"', () => {
+    const now = new Date('2026-06-20T12:00:00Z')
+    expect(fmtSince('2026-06-17T12:00:00Z', now)).toBe('hace 3 días')
+    expect(fmtSince('2026-06-20T09:00:00Z', now)).toBe('hace 3 horas')
+    expect(fmtSince('2026-06-20T11:30:00Z', now)).toBe('hace 30 minutos')
+    expect(fmtSince(null, now)).toBe('—')
+    expect(fmtSince('no-es-fecha', now)).toBe('—')
+  })
+
+  it('fmtKind traduce el tipo de reto; desconocido/null → guion', () => {
+    expect(fmtKind('foto_sv')).toBe('Foto + Street View')
+    expect(fmtKind('foto')).toBe('Foto')
+    expect(fmtKind('sv')).toBe('Street View')
+    expect(fmtKind('ninguno')).toBe('Sin medios')
+    expect(fmtKind(null)).toBe('—')
+  })
+
+  it('fmtStatus traduce el estado del reto; null → guion', () => {
+    expect(fmtStatus('abierto')).toBe('Abierto')
+    expect(fmtStatus('cerrado')).toBe('Cerrado')
+    expect(fmtStatus('practica')).toBe('Práctica')
+    expect(fmtStatus(null)).toBe('—')
   })
 })
