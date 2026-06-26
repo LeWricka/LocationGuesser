@@ -44,7 +44,9 @@ import { CreateChallenge } from '../create/CreateChallenge'
 import { EditChallenge } from './EditChallenge'
 import { GroupMembersSection } from './GroupMembersSection'
 import { GroupSettingsModal } from './GroupSettingsModal'
-import { RevealMap } from './RevealMap'
+import { AllGuessesMap } from './AllGuessesMap'
+import { Podium, type PodiumClasses } from './Podium'
+import { parseAvatar } from '../../lib/avatar'
 import styles from './GroupPage.module.css'
 
 interface Props {
@@ -61,6 +63,22 @@ function groupLink(groupId: string): string {
 /** Enlace de un reto concreto (#g=…&c=…) para compartir tras crearlo. */
 function challengeLink(groupId: string, challengeId: string): string {
   return `${groupLink(groupId)}&c=${encodeURIComponent(challengeId)}`
+}
+
+// Fecha legible en español para la cabecera de un reto cerrado (p.ej. "12 jun
+// 2026"). Devuelve null si la fecha no es válida (no rompe la cabecera).
+const challengeDateFmt = new Intl.DateTimeFormat('es-ES', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+})
+function formatChallengeDate(value: string | null | undefined): string | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  // Intl añade un punto al mes abreviado ("12 jun. 2026"); lo quitamos para el
+  // formato compacto pedido ("12 jun 2026").
+  return challengeDateFmt.format(date).replace('.', '')
 }
 
 // Página del grupo: clasificación general, retos en vivo y anteriores, histórico
@@ -580,6 +598,11 @@ function Leaderboard({
   // Barra relativa al líder: el primero llena al 100% y el resto en proporción a
   // sus puntos. Visualiza la distancia en la tabla sin números extra.
   const top = entries[0]?.points ?? 0
+  // Con 3+ jugadores el top-3 va en PODIO (mismo visual que la tarjeta para
+  // compartir); el 4º en adelante sigue en lista. Con menos, todos en lista.
+  const hasPodium = entries.length >= 3
+  const listEntries = hasPodium ? entries.slice(3) : entries
+  const listStartIndex = hasPodium ? 3 : 0
   return (
     <section>
       <Row justify="between" align="center" gap={2}>
@@ -612,45 +635,97 @@ function Leaderboard({
           <p className={styles.empty}>Aún no hay puntos. Jugad un reto para abrir la tabla.</p>
         </Card>
       ) : (
-        <Card padding="none">
-          <ol className={styles.ranking}>
-            {entries.map((entry, i) => {
-              const isMe = meId != null && entry.userId === meId
-              const width = top > 0 ? Math.max(6, Math.round((entry.points / top) * 100)) : 0
-              const prize = prizeForRow(prizes, i, entries.length)
-              return (
-                <li
-                  key={entry.userId}
-                  className={`${styles.rankRow} ${isMe ? styles.rankMe : ''}`}
-                  // --i alimenta el retardo de la entrada escalonada (ver CSS).
-                  style={{ '--i': i } as CSSProperties}
-                >
-                  <span className={`${styles.medal} ${medalClass(i)}`} aria-hidden="true">
-                    {medal(i)}
-                  </span>
-                  <div className={styles.rankMid}>
-                    <span className={styles.rankName}>
-                      {entry.name}
-                      {isMe && <span className={styles.youTag}>Tú</span>}
-                    </span>
-                    {prize && (
-                      <span className={styles.prizeChip}>
-                        <span aria-hidden="true">🎁</span> {prize}
+        <Stack gap={4}>
+          {hasPodium && (
+            <Podium
+              top3={entries.slice(0, 3)}
+              prizes={prizes}
+              totalEntries={entries.length}
+              classes={groupPodiumClasses}
+            />
+          )}
+          {listEntries.length > 0 && (
+            <Card padding="none">
+              <ol className={styles.ranking} start={listStartIndex + 1}>
+                {listEntries.map((entry, j) => {
+                  const i = listStartIndex + j
+                  const isMe = meId != null && entry.userId === meId
+                  const width = top > 0 ? Math.max(6, Math.round((entry.points / top) * 100)) : 0
+                  const prize = prizeForRow(prizes, i, entries.length)
+                  const avatar = parseAvatar(entry.avatar, entry.userId)
+                  return (
+                    <li
+                      key={entry.userId}
+                      className={`${styles.rankRow} ${isMe ? styles.rankMe : ''}`}
+                      // --i alimenta el retardo de la entrada escalonada (ver CSS).
+                      style={{ '--i': j } as CSSProperties}
+                    >
+                      <span className={`${styles.medal} ${medalClass(i)}`} aria-hidden="true">
+                        {medal(i)}
                       </span>
-                    )}
-                    <span className={styles.rankBar} aria-hidden="true">
-                      <i style={{ width: `${width}%` } as CSSProperties} />
-                    </span>
-                  </div>
-                  <span className={styles.rankPoints}>{entry.points.toLocaleString('es-ES')}</span>
-                </li>
-              )
-            })}
-          </ol>
-        </Card>
+                      <span
+                        className={styles.rankAvatar}
+                        style={
+                          avatar.kind === 'emoji'
+                            ? ({ background: avatar.bg.background } as CSSProperties)
+                            : undefined
+                        }
+                        aria-hidden="true"
+                      >
+                        {avatar.kind === 'emoji' ? (
+                          avatar.emoji
+                        ) : (
+                          <img className={styles.rankAvatarImg} src={avatar.src} alt="" />
+                        )}
+                      </span>
+                      <div className={styles.rankMid}>
+                        <span className={styles.rankName}>
+                          {entry.name}
+                          {isMe && <span className={styles.youTag}>Tú</span>}
+                        </span>
+                        {prize && (
+                          <span className={styles.prizeChip}>
+                            <span aria-hidden="true">🎁</span> {prize}
+                          </span>
+                        )}
+                        <span className={styles.rankBar} aria-hidden="true">
+                          <i style={{ width: `${width}%` } as CSSProperties} />
+                        </span>
+                      </div>
+                      <span className={styles.rankPoints}>
+                        {entry.points.toLocaleString('es-ES')}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ol>
+            </Card>
+          )}
+        </Stack>
       )}
     </section>
   )
+}
+
+// Clases del podio en la página del grupo (escala de pantalla, no la del poster
+// 1080px). Se pasan al componente compartido `Podium`.
+const groupPodiumClasses: PodiumClasses = {
+  podium: styles.podium,
+  podiumCol: styles.podiumCol,
+  placeFirst: styles.placeFirst,
+  placeSecond: styles.placeSecond,
+  placeThird: styles.placeThird,
+  crown: styles.crown,
+  podiumDisc: styles.podiumDisc,
+  podiumAvatar: styles.podiumAvatar,
+  podiumName: styles.podiumName,
+  podiumPoints: styles.podiumPoints,
+  podiumPrize: styles.podiumPrize,
+  pedestal: styles.pedestal,
+  pedestalMedal: styles.pedestalMedal,
+  gold: styles.podiumGold,
+  silver: styles.podiumSilver,
+  bronze: styles.podiumBronze,
 }
 
 // Clase de medalla por puesto (oro/plata/bronce/resto): da el color del disco.
@@ -1027,12 +1102,27 @@ function PastCard({
   const [open, setOpen] = useState(false)
   const imageUrl = useSignedImage(challenge.image_path)
   const ranked = [...votes].sort((a, b) => b.points - a.points)
+  // Fecha del reto: el cierre (deadline) es lo más informativo de un reto cerrado;
+  // si no hubiera, caemos a la creación.
+  const dateLabel = formatChallengeDate(challenge.deadline_at ?? challenge.created_at)
 
   return (
     <Card padding="none">
       <button className={styles.disclosure} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-        <span className={styles.challengeTitle}>{challenge.title}</span>
-        <Row gap={2}>
+        {/* Miniatura de la foto a la izquierda (si la hay); título en el centro;
+            fecha a la derecha. Mantiene el desplegable. */}
+        {imageUrl && (
+          <img
+            className={styles.pastThumb}
+            src={imageUrl}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+          />
+        )}
+        <span className={styles.pastTitle}>{challenge.title}</span>
+        <Row gap={2} align="center">
+          {dateLabel && <span className={styles.pastDate}>{dateLabel}</span>}
           <Badge tone="neutral">cerrado</Badge>
           <span className={styles.chevron} aria-hidden="true">
             {open ? '▲' : '▼'}
@@ -1047,13 +1137,15 @@ function PastCard({
               <img className={styles.photo} src={imageUrl} alt={challenge.title} loading="lazy" />
             )}
             {answer ? (
-              <RevealMap
+              <AllGuessesMap
                 answer={answer}
                 // Los votos de timeout no tienen pin (guess null): no se plotean.
-                votes={ranked
+                guesses={ranked
                   .filter((v) => v.guess_lat != null && v.guess_lng != null)
                   .map((v) => ({
+                    userId: v.user_id,
                     name: v.display_name,
+                    avatar: v.avatar,
                     lat: v.guess_lat as number,
                     lng: v.guess_lng as number,
                   }))}

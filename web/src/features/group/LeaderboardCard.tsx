@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import { prizeForRow } from './prizes'
+import { Podium, type PodiumClasses } from './Podium'
 import styles from './LeaderboardCard.module.css'
 
 interface Props {
@@ -22,12 +23,6 @@ function medalFor(index: number): string {
   if (index === 1) return '🥈'
   if (index === 2) return '🥉'
   return `${index + 1}`
-}
-
-// Inicial del nombre para los discos del podio (respaldo cuando no hay avatar).
-function initialOf(name: string): string {
-  const trimmed = name.trim()
-  return trimmed ? trimmed[0].toUpperCase() : '?'
 }
 
 // Línea de premios "en juego" para el pie de la tarjeta (mismo orden que el chat).
@@ -50,39 +45,26 @@ function rankClassOf(styleMap: typeof styles, index: number): string {
   return styleMap.other
 }
 
-// Una columna del podio (avatar-disco + nombre + puntos + premio). El orden
-// visual (2-1-3) lo da el CSS; aquí solo describimos cada plaza.
-function PodiumColumn({
-  entry,
-  index,
-  prize,
-  place,
-}: {
-  entry: LeaderboardEntry
-  index: number
-  prize: string | null
-  // Clase de la plaza para la altura del pedestal (1ª más alta).
-  place: string
-}) {
-  const rankClass = rankClassOf(styles, index)
-  return (
-    <div className={`${styles.podiumCol} ${place}`}>
-      {index === 0 && (
-        <span className={styles.crown} aria-hidden="true">
-          👑
-        </span>
-      )}
-      <span className={`${styles.podiumDisc} ${rankClass}`}>{initialOf(entry.name)}</span>
-      <span className={styles.podiumName}>{entry.name}</span>
-      <span className={styles.podiumPoints}>{entry.points.toLocaleString('es-ES')}</span>
-      {prize && <span className={styles.podiumPrize}>🎁 {prize}</span>}
-      <span className={`${styles.pedestal} ${rankClass}`}>
-        <span className={styles.pedestalMedal} aria-hidden="true">
-          {medalFor(index)}
-        </span>
-      </span>
-    </div>
-  )
+// Clases del podio de la tarjeta (escala 1080px del poster). Se pasan al
+// componente compartido `Podium`, que aporta el markup; la escala la fija ESTE
+// módulo CSS para no romper el render rasterizado a tamaño fijo.
+const podiumClasses: PodiumClasses = {
+  podium: styles.podium,
+  podiumCol: styles.podiumCol,
+  placeFirst: styles.placeFirst,
+  placeSecond: styles.placeSecond,
+  placeThird: styles.placeThird,
+  crown: styles.crown,
+  podiumDisc: styles.podiumDisc,
+  podiumAvatar: styles.podiumAvatar,
+  podiumName: styles.podiumName,
+  podiumPoints: styles.podiumPoints,
+  podiumPrize: styles.podiumPrize,
+  pedestal: styles.pedestal,
+  pedestalMedal: styles.pedestalMedal,
+  gold: styles.gold,
+  silver: styles.silver,
+  bronze: styles.bronze,
 }
 
 /**
@@ -148,28 +130,12 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
       ) : (
         <div className={styles.board}>
           {hasPodium && (
-            <div className={styles.podium}>
-              {/* Orden DOM 2-1-3: el CSS lo coloca con la 1ª plaza al centro y
-                  más alta. Cada columna lleva su clase de plaza para la altura. */}
-              <PodiumColumn
-                entry={podium[1]}
-                index={1}
-                place={styles.placeSecond}
-                prize={prizeForRow(prizes, 1, entries.length)}
-              />
-              <PodiumColumn
-                entry={podium[0]}
-                index={0}
-                place={styles.placeFirst}
-                prize={prizeForRow(prizes, 0, entries.length)}
-              />
-              <PodiumColumn
-                entry={podium[2]}
-                index={2}
-                place={styles.placeThird}
-                prize={prizeForRow(prizes, 2, entries.length)}
-              />
-            </div>
+            <Podium
+              top3={podium}
+              prizes={prizes}
+              totalEntries={entries.length}
+              classes={podiumClasses}
+            />
           )}
 
           {rest.length > 0 && (
