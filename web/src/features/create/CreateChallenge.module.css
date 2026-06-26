@@ -66,10 +66,42 @@
   background: var(--color-surface-hover);
 }
 
-/* Texto introductorio del flujo: explica que el reto es Street View. */
+/* Texto introductorio de cada paso del asistente. */
 .intro {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+}
+
+/* Badge de dificultad en vivo (paso Escena): se actualiza con los medios. */
+.difficultyBadge {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.difficultyLead {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+/* Opciones avanzadas de Street View (candados): plegadas por defecto. */
+.advanced {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.advancedSummary {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.advancedBody {
+  padding: 0 var(--space-3) var(--space-3);
 }
 
 .coords {
