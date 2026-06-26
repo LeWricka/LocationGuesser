@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
+import { GameScene, type GameSceneData } from './GameScene'
 import { sceneMedium } from './sceneMedium'
 import { ResultCard } from './ResultCard'
 import { RevealBurst } from './RevealBurst'
@@ -26,15 +27,11 @@ import { useSignedImage } from '../../lib/useSignedImage'
 // READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
 import {
-  Badge,
   BackHomeButton,
   Button,
   Card,
   ChallengePhoto,
-  CountdownRing,
   CountUp,
-  Lightbox,
-  Modal,
   Row,
   ScoreRing,
   Skeleton,
@@ -521,7 +518,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // panoId y nunca esta posición. La respuesta real (`answer`) solo se conoce tras
   // revelar; al jugar es null y NO debe alimentar la escena.
   const panoFallback: LatLng = answer ?? { lat: 0, lng: 0 }
-  const urgent = remaining != null && remaining <= 10
   const backLabel = groupId ? 'Volver al grupo' : 'Inicio'
   // Reto de práctica: plazo lejano (>1 año). Solo en estos mostramos "volver a
   // jugar" tras revelar; en un reto real rejugar tras ver la respuesta sería trampa.
@@ -540,209 +536,50 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     // detrás del modal y daba pistas. Hasta pulsar Empezar mostramos un
     // placeholder neutro; la escena real solo aparece tras `start()`.
     const playing = phase === 'playing'
+    // Escena reutilizable (la misma que la PREVIA de crear). Toda la lógica (votar,
+    // reloj, anti-trampa, salir) sigue aquí: GameScene es solo presentacional.
+    const sceneData: GameSceneData = hasStreetView
+      ? {
+          kind: 'streetview',
+          panoId: challenge.sv_pano_id,
+          position: panoFallback,
+          heading: challenge.sv_heading,
+          pitch: challenge.sv_pitch,
+          lockMove: challenge.sv_lock_move,
+          lockRotate: challenge.sv_lock_rotate,
+          hintPhotoUrl,
+        }
+      : { kind: 'photo', photoUrl: imageUrl }
     return (
-      <div className={styles.immersive}>
-        {/* Escena protagonista: panorama interactivo o foto (legacy). Solo en
-            `playing`; antes, placeholder neutro (nada que delate el lugar). */}
-        <div className={styles.sceneFull}>
-          {!playing ? (
-            <div className={styles.scenePlaceholder} aria-hidden="true" />
-          ) : hasStreetView ? (
-            <StreetViewPano
-              ref={panoRef}
-              panoId={challenge.sv_pano_id}
-              position={panoFallback}
-              heading={challenge.sv_heading}
-              pitch={challenge.sv_pitch}
-              lockMove={challenge.sv_lock_move}
-              lockRotate={challenge.sv_lock_rotate}
-            />
-          ) : imageUrl ? (
-            // Foto-escena (reto legacy): con esqueleto mientras carga del Storage
-            // firmado, para que el hueco no parezca roto. La escena se recorta para
-            // llenar la pantalla, así que es PULSABLE: abre el visor a pantalla
-            // completa (foto entera + zoom) para poder inspeccionar los detalles.
-            <button
-              type="button"
-              className={styles.photoSceneButton}
-              onClick={() => setPhotoExpanded(true)}
-              aria-label="Ampliar la foto del reto"
-            >
-              <SceneImage
-                key={imageUrl}
-                src={imageUrl}
-                alt={challenge.title}
-                className={styles.photoFull}
-                skeletonRadius="sm"
-              />
-              <span className={styles.photoExpandHint} aria-hidden="true">
-                ⤢ Ampliar
-              </span>
-            </button>
-          ) : (
-            <div className={styles.noScene}>
-              <p className={styles.status}>Este reto no tiene imagen ni Street View.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Clúster arriba-izquierda: salida + brújula + temporizador, flotando
-            sobre la escena (respeta el notch con safe-area). */}
-        <div className={styles.topCluster}>
-          {/* En `playing` salir NO pausa el reloj: confirmamos y lo hacemos
-              evidente en el propio rótulo. En `idle` (aún sin empezar) la salida
-              es directa. */}
-          {playing ? (
-            <BackHomeButton onClick={goBackWhilePlaying} label="Salir (sigue el tiempo)" />
-          ) : (
-            <BackHomeButton onClick={goBack} label={backLabel} />
-          )}
-          {phase === 'playing' && remaining != null && challenge.guess_seconds != null && (
-            <CountdownRing remaining={remaining} total={challenge.guess_seconds} urgent={urgent} />
-          )}
-        </div>
-
-        {/* Foto-pista flotante (si el reto la marcó como pista). Solo al jugar:
-            en `idle` sería un spoiler por detrás del modal. Con esqueleto
-            mientras carga para que el recuadro no aparezca vacío/roto. */}
-        {playing && hintPhotoUrl && (
-          <button
-            type="button"
-            className={styles.hintFloat}
-            onClick={() => setPhotoExpanded(true)}
-            aria-label="Ampliar la foto del reto"
-          >
-            <SceneImage
-              key={hintPhotoUrl}
-              src={hintPhotoUrl}
-              alt="Pista: foto del reto"
-              className={styles.hintImg}
-              skeletonRadius="md"
-            />
-            <span className={styles.hintExpand} aria-hidden="true">
-              ⤢
-            </span>
-          </button>
-        )}
-
-        {/* Abajo-izquierda: controles del panorama (solo con Street View y ya
-            jugando: el panorama no está montado hasta `playing`). */}
-        {playing && hasStreetView && (
-          <div className={styles.panoControls}>
-            <button
-              type="button"
-              className={styles.glassBtn}
-              onClick={() => panoRef.current?.resetToStart()}
-              aria-label="Volver a la posición inicial"
-              title="Volver a la posición inicial"
-            >
-              ⌂
-            </button>
-            <button
-              type="button"
-              className={styles.glassBtn}
-              onClick={() => panoRef.current?.resetPov()}
-              aria-label="Enderezar la vista al norte"
-              title="Enderezar (norte)"
-            >
-              🧭
-            </button>
-          </div>
-        )}
-
-        {/* Abajo-derecha: FAB del mapa. Abre la hoja inferior para adivinar. */}
-        <button
-          type="button"
-          className={styles.mapFab}
-          onClick={() => setMapOpen(true)}
-          aria-label="Abrir el mapa para adivinar"
-        >
-          <span aria-hidden="true">🗺️</span>
-          {guess && <span className={styles.fabDot} aria-hidden="true" />}
-        </button>
-
-        {/* Hoja inferior con el mapa de adivinar. El mapa se mantiene SIEMPRE
-            montado (solo se traslada fuera de pantalla al cerrar) para conservar
-            el zoom y la posición entre aperturas: si no, al volver a abrir
-            perdías el encuadre y empezabas de cero. Su contenedor tiene tamaño
-            completo aunque esté trasladado, así que carga sin gris (ResizeObserver
-            de PlayMap). */}
-        <div
-          className={`${styles.sheetScrim} ${mapOpen ? styles.sheetScrimOpen : ''}`}
-          onClick={() => setMapOpen(false)}
-          aria-hidden={!mapOpen}
-        />
-        <section
-          className={`${styles.sheet} ${mapOpen ? styles.sheetOpen : ''}`}
-          role="dialog"
-          aria-label="Mapa para adivinar"
-          aria-hidden={!mapOpen}
-        >
-          <div className={styles.sheetHandle} aria-hidden="true" />
-          <button
-            type="button"
-            className={styles.sheetClose}
-            onClick={() => setMapOpen(false)}
-            aria-label="Cerrar el mapa"
-          >
-            ✕
-          </button>
-          <div className={styles.sheetMap}>
-            <PlayMap
-              guess={guess}
-              answer={null}
-              locked={false}
-              onPick={setGuess}
-              meAvatar={profile?.avatar_url}
-              meUserId={user?.id ?? ''}
-            />
-          </div>
-          <div className={styles.sheetFooter}>
-            {guess ? (
-              <Row gap={2} align="center">
-                <Badge tone="accent">📍 Tu pin</Badge>
-                <span className={styles.coords}>
-                  {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
-                </span>
-              </Row>
-            ) : (
-              <span className={styles.status}>Toca el mapa para colocar tu pin.</span>
-            )}
-            <Button size="lg" fullWidth disabled={!guess} onClick={confirm}>
-              ✓ Confirmar y revelar
-            </Button>
-            <Button variant="secondary" fullWidth onClick={() => setMapOpen(false)}>
-              ← Volver a {hasStreetView ? 'Street View' : 'la imagen'}
-            </Button>
-          </div>
-        </section>
-
-        {/* Visor a pantalla completa de la foto del reto: la escena se recorta
-            (object-fit: cover), así que el visor permite ver la foto ENTERA y
-            ampliarla (zoom). Solo en retos de foto y mientras se juega. */}
-        {(imageUrl || hintPhotoUrl) && (
-          <Lightbox
-            open={photoExpanded}
-            src={imageUrl ?? hintPhotoUrl ?? ''}
-            alt={challenge.title}
-            onClose={() => setPhotoExpanded(false)}
-          />
-        )}
-
-        {/* Overlay "Empezar": tapa la escena ya cargada detrás. Descartable
-            (✕/Escape/fuera) para no quedar atrapado. */}
-        <Modal
-          open={phase === 'idle'}
-          onClose={goBack}
-          title="¿Listo para jugar?"
-          footer={
-            <Button size="lg" fullWidth onClick={start}>
-              Empezar
-            </Button>
-          }
-        >
-          <div className={styles.startBody}>
-            <Stack gap={3} align="center">
+      <GameScene
+        title={challenge.title}
+        scene={sceneData}
+        sceneReady={playing}
+        // En `playing` con límite mostramos el anillo; sin empezar/sin límite, null.
+        remaining={playing && challenge.guess_seconds != null ? remaining : null}
+        guessSeconds={challenge.guess_seconds}
+        // En `playing` salir NO pausa el reloj: lo confirmamos y lo decimos en el
+        // rótulo. En `idle` (aún sin empezar) la salida es directa.
+        backLabel={playing ? 'Salir (sigue el tiempo)' : backLabel}
+        onBack={playing ? goBackWhilePlaying : goBack}
+        guess={guess}
+        onGuess={setGuess}
+        mapOpen={mapOpen}
+        onOpenMap={() => setMapOpen(true)}
+        onCloseMap={() => setMapOpen(false)}
+        meAvatar={profile?.avatar_url}
+        meUserId={user?.id ?? ''}
+        onConfirm={confirm}
+        photoExpanded={photoExpanded}
+        onExpandPhoto={() => setPhotoExpanded(true)}
+        onClosePhoto={() => setPhotoExpanded(false)}
+        panoRef={panoRef}
+        startOverlay={{
+          open: phase === 'idle',
+          onStart: start,
+          onClose: goBack,
+          body: (
+            <>
               <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
                 🌍
               </span>
@@ -758,10 +595,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               ) : (
                 <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
               )}
-            </Stack>
-          </div>
-        </Modal>
-      </div>
+            </>
+          ),
+        }}
+      />
     )
   }
 
