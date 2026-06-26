@@ -63,3 +63,45 @@ export function fmtKm(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return DASH
   return `${value.toLocaleString('es-ES', { maximumFractionDigits: 0 })} km`
 }
+
+const relFmt = new Intl.RelativeTimeFormat('es-ES', { numeric: 'auto' })
+
+/** Antigüedad legible de una fecha hasta ahora: "hace 3 días", "hoy". Elige la
+ * unidad mayor que aplique (días → horas → minutos). Ausente/inválida → guion. */
+export function fmtSince(value: string | null | undefined, now: Date = new Date()): string {
+  if (!value) return DASH
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return DASH
+  const minutes = Math.round((date.getTime() - now.getTime()) / 60000)
+  const absMin = Math.abs(minutes)
+  if (absMin >= 1440) return relFmt.format(Math.round(minutes / 1440), 'day')
+  if (absMin >= 60) return relFmt.format(Math.round(minutes / 60), 'hour')
+  return relFmt.format(minutes, 'minute')
+}
+
+// Etiqueta legible del tipo de reto según los medios disponibles.
+const KIND_LABELS: Record<string, string> = {
+  foto_sv: 'Foto + Street View',
+  foto: 'Foto',
+  sv: 'Street View',
+  ninguno: 'Sin medios',
+}
+
+/** Etiqueta del tipo de reto ('foto_sv'|'foto'|'sv'|'ninguno'). Desconocido → guion. */
+export function fmtKind(kind: string | null | undefined): string {
+  if (!kind) return DASH
+  return KIND_LABELS[kind] ?? kind
+}
+
+// Etiqueta legible del estado del reto.
+const STATUS_LABELS: Record<string, string> = {
+  abierto: 'Abierto',
+  cerrado: 'Cerrado',
+  practica: 'Práctica',
+}
+
+/** Etiqueta del estado del reto ('abierto'|'cerrado'|'practica'). Desconocido → guion. */
+export function fmtStatus(status: string | null | undefined): string {
+  if (!status) return DASH
+  return STATUS_LABELS[status] ?? status
+}
