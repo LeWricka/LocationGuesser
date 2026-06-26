@@ -7,7 +7,7 @@ import {
   type GroupMemberInfo,
 } from '../../lib/membership'
 import { track } from '../../lib/analytics'
-import { Badge, Button, Card, Modal, Row, Skeleton, Stack, useToast } from '../../ui'
+import { Avatar, Badge, Button, Card, Modal, Row, Skeleton, Stack, useToast } from '../../ui'
 import styles from './GroupPage.module.css'
 
 interface Props {
@@ -81,55 +81,81 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
 
   return (
     <section>
-      <Row justify="between" align="center" gap={2}>
-        <h2 className={styles.sectionTitle}>👥 Miembros</h2>
-        {meId && (
-          <button type="button" className={styles.editPrizesBtn} onClick={() => void leave()}>
-            Salir del grupo
-          </button>
-        )}
-      </Row>
-
       {members === null ? (
-        <Card padding="none">
-          <div>
-            {[0, 1, 2].map((i) => (
-              <Row key={i} justify="between" align="center" gap={3} className={styles.skelRow}>
-                <Skeleton width="40%" height={16} />
-                <Skeleton width={64} height={16} />
-              </Row>
-            ))}
-          </div>
-        </Card>
+        <>
+          <Row justify="between" align="center" gap={2}>
+            <h2 className={styles.sectionTitle}>👥 Miembros</h2>
+            {meId && (
+              <button type="button" className={styles.editPrizesBtn} onClick={() => void leave()}>
+                Salir del grupo
+              </button>
+            )}
+          </Row>
+          <Card padding="none">
+            <div>
+              {[0, 1, 2].map((i) => (
+                <Row key={i} justify="between" align="center" gap={3} className={styles.skelRow}>
+                  <Skeleton width="40%" height={16} />
+                  <Skeleton width={64} height={16} />
+                </Row>
+              ))}
+            </div>
+          </Card>
+        </>
       ) : (
-        <Card padding="none">
-          <ul className={styles.memberList}>
-            {members.map((m) => {
-              const isMe = meId != null && m.userId === meId
-              return (
-                <li key={m.userId} className={styles.memberRow}>
-                  <span className={styles.memberName}>
-                    {m.name}
-                    {isMe && <span className={styles.youTag}>Tú</span>}
-                  </span>
-                  <Row gap={2} align="center">
-                    {m.isOwner ? (
-                      <Badge tone="accent">👑 Dueño</Badge>
-                    ) : (
-                      <Badge tone="neutral">Miembro</Badge>
-                    )}
-                    {/* El dueño puede expulsar a cualquier otro miembro. */}
-                    {isOwner && !m.isOwner && (
-                      <Button variant="ghost" size="sm" onClick={() => void kick(m)}>
-                        Expulsar
-                      </Button>
-                    )}
-                  </Row>
-                </li>
-              )
-            })}
-          </ul>
-        </Card>
+        <>
+          {/* Lista colapsable: la membresía es secundaria (la página es larga), así
+              que arranca cerrada. <details> da el toggle accesible nativo; el
+              chevron lo rota el CSS según [open]. "Salir del grupo" queda fuera del
+              <summary> para no entrar/salir del colapso al pulsarlo. */}
+          <details className={styles.membersDetails}>
+            <summary className={styles.membersSummary}>
+              <span className={styles.sectionTitle}>👥 Miembros ({members.length})</span>
+              <span className={styles.membersChevron} aria-hidden="true">
+                ▼
+              </span>
+            </summary>
+            <Card padding="none">
+              <ul className={styles.memberList}>
+                {members.map((m) => {
+                  const isMe = meId != null && m.userId === meId
+                  return (
+                    <li key={m.userId} className={styles.memberRow}>
+                      <span className={styles.memberName}>
+                        {/* getGroupMembers (lib, fuera de esta área) no trae el avatar;
+                            usamos el avatar por defecto estable del userId, que es lo
+                            que el propio Avatar resuelve sin avatarUrl. */}
+                        <Avatar userId={m.userId} name={m.name} size="sm" />
+                        {m.name}
+                        {isMe && <span className={styles.youTag}>Tú</span>}
+                      </span>
+                      <Row gap={2} align="center">
+                        {m.isOwner ? (
+                          <Badge tone="accent">👑 Dueño</Badge>
+                        ) : (
+                          <Badge tone="neutral">Miembro</Badge>
+                        )}
+                        {/* El dueño puede expulsar a cualquier otro miembro. */}
+                        {isOwner && !m.isOwner && (
+                          <Button variant="ghost" size="sm" onClick={() => void kick(m)}>
+                            Expulsar
+                          </Button>
+                        )}
+                      </Row>
+                    </li>
+                  )
+                })}
+              </ul>
+            </Card>
+          </details>
+          {meId && (
+            <Row justify="end" className={styles.transferRow}>
+              <button type="button" className={styles.editPrizesBtn} onClick={() => void leave()}>
+                Salir del grupo
+              </button>
+            </Row>
+          )}
+        </>
       )}
 
       {isOwner && members && members.length > 1 && (

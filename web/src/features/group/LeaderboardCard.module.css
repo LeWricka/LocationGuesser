@@ -194,8 +194,9 @@
   margin-bottom: -4px;
 }
 
-/* Disco con la inicial: reusa el color de la medalla (oro/plata/bronce). La 1ª
-   plaza es mayor para marcar jerarquía. */
+/* Disco con el avatar del jugador: el fondo lo inyecta el componente (gradiente
+   del avatar). Anillo claro de la medalla (oro/plata/bronce) alrededor para no
+   perder la jerarquía de puesto. La 1ª plaza es mayor para marcarla. */
 .podiumDisc {
   flex: 0 0 auto;
   display: flex;
@@ -204,15 +205,39 @@
   border-radius: 999px;
   width: 132px;
   height: 132px;
-  font-size: 60px;
-  font-weight: var(--font-weight-black);
+  overflow: hidden;
   line-height: 1;
+}
+
+/* Anillo de puesto sobre el disco del avatar (en vez de tintar todo el disco). */
+.podiumDisc.gold {
+  box-shadow: inset 0 0 0 6px var(--medal-gold);
+}
+.podiumDisc.silver {
+  box-shadow: inset 0 0 0 6px var(--medal-silver);
+}
+.podiumDisc.bronze {
+  box-shadow: inset 0 0 0 6px var(--medal-bronze);
+}
+
+/* Emoji del avatar dentro del disco (o imagen de avatares antiguos). */
+.podiumAvatar {
+  font-size: 76px;
+  line-height: 1;
+}
+img.podiumAvatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .placeFirst .podiumDisc {
   width: 164px;
   height: 164px;
-  font-size: 76px;
+}
+
+.placeFirst .podiumAvatar {
+  font-size: 96px;
 }
 
 .podiumName {
