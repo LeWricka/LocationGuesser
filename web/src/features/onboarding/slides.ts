@@ -15,40 +15,40 @@ const GROUP_SLIDES: OnboardingSlide[] = [
   {
     icon: '📍',
     title: 'Comparte tus momentos de una forma diferente',
-    body: 'Compartes dónde estás y tus amigos lo adivinan en el mapa. Cuanto más cerca, más puntos.',
+    body: 'Compartes dónde estás y tus amigos lo adivinan.',
   },
   {
     icon: '📷',
-    title: 'Así funciona un grupo',
-    body: 'Alguien comparte su sitio (una foto y/o Street View) y guarda su ubicación. Los demás colocáis un pin en el mapa donde creéis que es. Gana quien más se acerca.',
+    title: 'Comparte tu sitio',
+    body: 'Una foto y/o Street View, con tu ubicación.',
+  },
+  {
+    icon: '🗺️',
+    title: 'Adivinan en el mapa',
+    body: 'Tus amigos marcan dónde creen que es.',
   },
   {
     icon: '🏆',
-    title: 'Clasificación y premios',
-    body: 'Cada reto suma puntos a la clasificación del grupo. Las primeras posiciones se llevan los premios: pelead por el podio.',
-  },
-  {
-    icon: '🔗',
-    title: 'Invita a tu gente',
-    body: 'Comparte el enlace del grupo para que se unan. Cuantos más juguéis, más divertido. ¡A por el primer reto!',
+    title: 'Gana quien más se acerca',
+    body: 'Puntos por distancia. Clasificación y premios.',
   },
 ]
 
 const CHALLENGE_SLIDES: OnboardingSlide[] = [
   {
     icon: '🔎',
-    title: 'Observa el reto',
-    body: 'Mira bien la foto o el Street View del reto: detalles, carteles, paisaje… todo da pistas de dónde es.',
+    title: 'Mira las pistas',
+    body: 'Carteles, paisaje, detalles… todo cuenta.',
   },
   {
     icon: '📌',
     title: 'Coloca tu pin',
-    body: 'Toca el mapa en el punto donde crees que es. Puedes ajustarlo todas las veces que quieras antes de confirmar.',
+    body: 'Toca el mapa donde crees que es.',
   },
   {
     icon: '⏱️',
-    title: 'Confirma antes de que acabe',
-    body: 'Hay cuenta atrás: confirma tu respuesta a tiempo. Cuanto más cerca quedes, más puntos sumas.',
+    title: 'Confirma a tiempo',
+    body: 'Hay cuenta atrás. Cuanto más cerca, más puntos.',
   },
 ]
 

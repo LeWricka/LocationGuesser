@@ -12,18 +12,18 @@ interface Props {
 const STEPS = [
   {
     icon: '📷',
-    title: 'Sube una foto',
-    body: 'Estás en un sitio chulo: hazle una foto y guarda tu ubicación real.',
+    title: 'Comparte tu sitio',
+    body: 'Una foto y/o Street View, con tu ubicación.',
   },
   {
     icon: '🗺️',
-    title: 'Adivinad en el mapa',
-    body: 'Tus amigos marcan dónde creen que es, contrarreloj.',
+    title: 'Adivinan en el mapa',
+    body: 'Tus amigos marcan dónde creen que es.',
   },
   {
     icon: '🏆',
     title: 'Gana quien más se acerca',
-    body: 'Sumáis puntos por distancia. Hay clasificación y premios.',
+    body: 'Puntos por distancia. Clasificación y premios.',
   },
 ] as const
 
