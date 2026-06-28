@@ -1,8 +1,35 @@
+/* Sección de foto de perfil: etiqueta, control de subida y nota de ayuda. */
+.photoSection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.sectionLabel {
+  align-self: flex-start;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+}
+
+.photoHint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
 .picker {
   border: none;
   margin: 0;
   padding: 0;
   min-width: 0;
+}
+
+/* Mientras sube la foto, atenuamos el selector de animal (fieldset disabled). */
+.picker:disabled {
+  opacity: 0.6;
 }
 
 .pickerLegend {
