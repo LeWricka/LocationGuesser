@@ -214,6 +214,35 @@ export interface Database {
         }
         Relationships: []
       }
+      push_subscriptions: {
+        // Suscripciones Web Push (una por dispositivo/navegador). RLS: cada
+        // usuario gestiona solo las suyas (user_id = auth.uid()). Migración 0014.
+        Row: {
+          id: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          endpoint: string
+          p256dh: string
+          auth: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          endpoint?: string
+          p256dh?: string
+          auth?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -375,5 +404,6 @@ export type Group = Database['public']['Tables']['groups']['Row']
 export type Challenge = Database['public']['Tables']['challenges']['Row']
 export type Vote = Database['public']['Tables']['votes']['Row']
 export type ChallengeAnswer = Database['public']['Tables']['challenge_answers']['Row']
+export type PushSubscriptionRow = Database['public']['Tables']['push_subscriptions']['Row']
 /** Una fila del retorno de la RPC `submit_vote` (revelado al votar). */
 export type SubmitVoteResult = Database['public']['Functions']['submit_vote']['Returns'][number]

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { AuthScreen, Avatar, BackHomeButton, Button, Field, Input, Stack, useToast } from '../../ui'
 import { upsertProfile } from '../../lib/profile'
 import { signOut } from '../../lib/auth'
+import { PushNotificationsControl } from './PushNotificationsControl'
 import { uploadAvatar } from '../../lib/storage'
 import { ANIMAL_EMOJIS, avatarToken, parseAvatar } from '../../lib/avatar'
 import { track } from '../../lib/analytics'
@@ -191,6 +192,10 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
           <Button type="submit" size="lg" fullWidth loading={loading} disabled={uploading}>
             {saved ? 'Guardado ✓' : 'Guardar'}
           </Button>
+
+          {/* Avisos del grupo (PWA): control aparte del guardado del perfil. Solo
+              se renderiza si el navegador soporta push y hay VAPID configurada. */}
+          <PushNotificationsControl userId={userId} />
         </Stack>
       </form>
     </AuthScreen>
