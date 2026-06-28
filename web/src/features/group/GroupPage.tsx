@@ -183,6 +183,15 @@ export function GroupPage({ groupId, onBack }: Props) {
 
   const leaderboard = useMemo(() => (votes ? aggregateLeaderboard(votes) : []), [votes])
 
+  // Fin de temporada: con closed_at el grupo está archivado → solo-lectura. Se
+  // ocultan/inhabilitan las acciones de escritura (añadir reto, jugar, votar,
+  // gestionar) y se muestra el podio final con el ganador destacado.
+  const isClosed = group?.closed_at != null
+  // Gestión de retos/premios (editar, borrar, añadir): solo el dueño Y con la
+  // temporada abierta. El acceso a Ajustes sigue siendo del dueño aunque esté
+  // cerrado (es donde se REABRE la temporada).
+  const canManage = isOwner && !isClosed
+
   // Votos agrupados por reto, para alimentar marcadores en vivo y revelados sin
   // más fetches (ya traen el display_name del join a profiles).
   const votesByChallenge = useMemo(() => {
@@ -319,13 +328,31 @@ export function GroupPage({ groupId, onBack }: Props) {
                 ⚙️ Ajustes
               </Button>
             )}
-            {isOwner && (
+            {/* Grupo archivado (solo-lectura): no se añaden retos. */}
+            {isOwner && !isClosed && (
               <Button size="sm" onClick={() => setAdding(true)}>
                 ➕ Añadir reto
               </Button>
             )}
           </Row>
         </header>
+
+        {/* Banner de fin de temporada: el grupo está congelado y en solo-lectura.
+            La fecha del cierre la da closed_at. */}
+        {isClosed && (
+          <div className={styles.closedBanner} role="status">
+            <span className={styles.closedBannerIcon} aria-hidden="true">
+              🏁
+            </span>
+            <p className={styles.closedBannerText}>
+              <strong>Temporada cerrada</strong>
+              {(() => {
+                const when = formatChallengeDate(group?.closed_at)
+                return when ? <span className={styles.closedBannerDate}> · {when}</span> : null
+              })()}
+            </p>
+          </div>
+        )}
 
         {created && (
           <ChallengeCreated
@@ -340,7 +367,8 @@ export function GroupPage({ groupId, onBack }: Props) {
           meId={user?.id}
           prizes={group?.prizes ?? null}
           groupId={groupId}
-          isOwner={isOwner}
+          isOwner={canManage}
+          highlightWinner={isClosed}
           onPrizesSaved={() => void refresh()}
         />
 
@@ -353,7 +381,8 @@ export function GroupPage({ groupId, onBack }: Props) {
               votesByChallenge={votesByChallenge}
               groupId={groupId}
               userId={user?.id}
-              isOwner={isOwner}
+              isOwner={canManage}
+              isClosed={isClosed}
               onDeleted={() => void refresh()}
               onReplayed={() => void refresh()}
               onEdit={setEditing}
@@ -362,7 +391,7 @@ export function GroupPage({ groupId, onBack }: Props) {
               challenges={past}
               votesByChallenge={votesByChallenge}
               answersById={answersById}
-              isOwner={isOwner}
+              isOwner={canManage}
               onDeleted={() => void refresh()}
               onEdit={setEditing}
             />
@@ -371,11 +400,11 @@ export function GroupPage({ groupId, onBack }: Props) {
           <Card>
             <Stack gap={3} align="start">
               <p className={styles.empty}>
-                {isOwner
+                {canManage
                   ? 'Aún no hay retos — añade el primero.'
                   : 'Aún no hay retos en este grupo.'}
               </p>
-              {isOwner && (
+              {canManage && (
                 <Button size="sm" onClick={() => setAdding(true)}>
                   ➕ Añadir reto
                 </Button>
@@ -401,8 +430,13 @@ export function GroupPage({ groupId, onBack }: Props) {
         <GroupSettingsModal
           groupId={groupId}
           currentName={group?.name ?? null}
+          isClosed={isClosed}
           onClose={() => setSettingsOpen(false)}
           onRenamed={() => {
+            setSettingsOpen(false)
+            void refresh()
+          }}
+          onSeasonChanged={() => {
             setSettingsOpen(false)
             void refresh()
           }}
@@ -603,6 +637,7 @@ function Leaderboard({
   prizes,
   groupId,
   isOwner,
+  highlightWinner = false,
   onPrizesSaved,
 }: {
   entries: LeaderboardEntry[]
@@ -610,6 +645,8 @@ function Leaderboard({
   prizes: GroupPrizes | null
   groupId: string
   isOwner: boolean
+  /** Temporada cerrada: destaca al ganador (🏆) sobre la clasificación congelada. */
+  highlightWinner?: boolean
   onPrizesSaved: () => void
 }) {
   const [editingPrizes, setEditingPrizes] = useState(false)
@@ -655,6 +692,13 @@ function Leaderboard({
         </Card>
       ) : (
         <Stack gap={4}>
+          {/* Temporada cerrada: corona al ganador (1º) por encima del podio. */}
+          {highlightWinner && entries[0] && (
+            <p className={styles.winnerBanner}>
+              <span aria-hidden="true">🏆</span> Ganador de la temporada:{' '}
+              <strong>{entries[0].name}</strong>
+            </p>
+          )}
           {hasPodium && (
             <Podium
               top3={entries.slice(0, 3)}
@@ -837,6 +881,7 @@ function LiveSection({
   groupId,
   userId,
   isOwner,
+  isClosed,
   onDeleted,
   onReplayed,
   onEdit,
@@ -846,6 +891,8 @@ function LiveSection({
   groupId: string
   userId?: string
   isOwner: boolean
+  /** Temporada cerrada: no se puede jugar/votar; el marcador queda de solo lectura. */
+  isClosed: boolean
   onDeleted: () => void
   onReplayed: () => void
   onEdit: (challenge: ChallengeForPlay) => void
@@ -863,6 +910,7 @@ function LiveSection({
             groupId={groupId}
             userId={userId}
             isOwner={isOwner}
+            isClosed={isClosed}
             onDeleted={onDeleted}
             onReplayed={onReplayed}
             onEdit={onEdit}
@@ -881,6 +929,7 @@ function LiveCard({
   groupId,
   userId,
   isOwner,
+  isClosed,
   onDeleted,
   onReplayed,
   onEdit,
@@ -890,6 +939,7 @@ function LiveCard({
   groupId: string
   userId?: string
   isOwner: boolean
+  isClosed: boolean
   onDeleted: () => void
   onReplayed: () => void
   onEdit: (challenge: ChallengeForPlay) => void
@@ -899,9 +949,9 @@ function LiveCard({
   // El voto del usuario actual (por user_id): si ya jugó, no puede re-jugar
   // aunque el reto siga en vivo. La identidad es la sesión.
   const myVote = userId ? votes.find((v) => v.user_id === userId) : undefined
-  // "Volver a jugar" SOLO en retos de práctica: rejugar uno real tras ver la
-  // respuesta sería trampa. El gating de práctica respalda el anti-trampa.
-  const canReplay = myVote != null && isPracticeChallenge(challenge.deadline_at)
+  // "Volver a jugar" SOLO en retos de práctica y con la temporada abierta: rejugar
+  // uno real tras ver la respuesta sería trampa, y un grupo cerrado es solo-lectura.
+  const canReplay = myVote != null && !isClosed && isPracticeChallenge(challenge.deadline_at)
   return (
     <Card>
       <Stack gap={3}>
@@ -953,6 +1003,9 @@ function LiveCard({
                 />
               )}
             </Row>
+          ) : isClosed ? (
+            // Temporada cerrada: no se admite jugar (el voto fallaría en submit_vote).
+            <span className={styles.empty}>Temporada cerrada</span>
           ) : (
             <a className={styles.playLink} href={playHref}>
               Jugar este reto →

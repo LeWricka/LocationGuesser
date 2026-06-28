@@ -69,6 +69,9 @@ export interface Database {
           prizes: GroupPrizes | null
           created_by: string | null
           created_at: string
+          // Fin de temporada: null = grupo activo; con fecha = cerrado/archivado
+          // (solo-lectura). Migración 0019.
+          closed_at: string | null
         }
         Insert: {
           id: string
@@ -76,6 +79,7 @@ export interface Database {
           prizes?: GroupPrizes | null
           created_by?: string | null
           created_at?: string
+          closed_at?: string | null
         }
         Update: {
           id?: string
@@ -83,6 +87,7 @@ export interface Database {
           prizes?: GroupPrizes | null
           created_by?: string | null
           created_at?: string
+          closed_at?: string | null
         }
         Relationships: []
       }
@@ -232,6 +237,18 @@ export interface Database {
           answer_lat: number | null
           answer_lng: number | null
         }[]
+      }
+      // Cerrar la temporada del grupo (closed_at = now). Solo el dueño; SECURITY
+      // DEFINER comprueba propiedad. Idempotente. Migración 0019.
+      close_group: {
+        Args: { p_group_id: string }
+        Returns: undefined
+      }
+      // Reabrir la temporada del grupo (closed_at = null). Solo el dueño.
+      // Migración 0019.
+      reopen_group: {
+        Args: { p_group_id: string }
+        Returns: undefined
       }
       // ¿La sesión actual es admin? (allowlist por email del JWT). Migración 0016.
       is_admin: {
