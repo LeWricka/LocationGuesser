@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { GameScene, type GameSceneData } from './GameScene'
+import { CountdownOverlay } from './CountdownOverlay'
 import { sceneMedium } from './sceneMedium'
 import { ResultCard } from './ResultCard'
 import { RevealBurst } from './RevealBurst'
@@ -53,9 +54,10 @@ interface Props {
   groupId?: string
 }
 
-// Fases del juego. El overlay "Empezar" tapa todo en `idle`; el reloj solo
-// corre en `playing`; tras `revealed` el voto queda fijo.
-type Phase = 'loading' | 'idle' | 'playing' | 'revealed'
+// Fases del juego. El overlay "Empezar" tapa todo en `idle`; al pulsar Empezar se
+// pasa por `countdown` (3·2·1 sobre la foto del reto) antes de `playing`; el reloj
+// de la jugada solo corre en `playing`; tras `revealed` el voto queda fijo.
+type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed'
 
 // `start_at` por reto en localStorage: recargar durante la jugada no regala
 // tiempo (el reloj se reconstruye desde el instante en que se pulsó Empezar).
@@ -360,10 +362,19 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
 
   function start() {
     if (!challenge) return
-    // Marcamos el inicio SIEMPRE (con o sin límite de tiempo): así, al salir y
-    // reentrar, el reto se REANUDA en `playing` y nunca vuelve a "¿Listo para
-    // jugar?" (no hay reinicio limpio). Con límite, además fija el origen del
-    // reloj para reconstruir el tiempo restante.
+    // Empezar NO arranca el reloj: primero la cuenta atrás 3·2·1 (sobre la foto del
+    // reto). El `start_at` se fija al TERMINAR la cuenta (beginPlaying), para que el
+    // reloj de la jugada arranque tras el 3-2-1, no durante. Si el jugador recarga
+    // durante la cuenta (aún sin start_at), vuelve a "¿Listo?": no perdió tiempo.
+    setPhase('countdown')
+  }
+
+  // Fin de la cuenta atrás 3·2·1 → entra en juego. Aquí (no en `start`) fijamos el
+  // inicio SIEMPRE (con o sin límite): así, al salir y reentrar, el reto se REANUDA
+  // en `playing` y nunca vuelve a "¿Listo para jugar?" (no hay reinicio limpio). Con
+  // límite, además fija el origen del reloj para reconstruir el tiempo restante.
+  function beginPlaying() {
+    if (!challenge) return
     localStorage.setItem(startKey(challenge.id), String(Date.now()))
     setPhase('playing')
   }
@@ -551,54 +562,62 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         }
       : { kind: 'photo', photoUrl: imageUrl }
     return (
-      <GameScene
-        title={challenge.title}
-        scene={sceneData}
-        sceneReady={playing}
-        // En `playing` con límite mostramos el anillo; sin empezar/sin límite, null.
-        remaining={playing && challenge.guess_seconds != null ? remaining : null}
-        guessSeconds={challenge.guess_seconds}
-        // En `playing` salir NO pausa el reloj: lo confirmamos y lo decimos en el
-        // rótulo. En `idle` (aún sin empezar) la salida es directa.
-        backLabel={playing ? 'Salir (sigue el tiempo)' : backLabel}
-        onBack={playing ? goBackWhilePlaying : goBack}
-        guess={guess}
-        onGuess={setGuess}
-        mapOpen={mapOpen}
-        onOpenMap={() => setMapOpen(true)}
-        onCloseMap={() => setMapOpen(false)}
-        meAvatar={profile?.avatar_url}
-        meUserId={user?.id ?? ''}
-        onConfirm={confirm}
-        photoExpanded={photoExpanded}
-        onExpandPhoto={() => setPhotoExpanded(true)}
-        onClosePhoto={() => setPhotoExpanded(false)}
-        panoRef={panoRef}
-        startOverlay={{
-          open: phase === 'idle',
-          onStart: start,
-          onClose: goBack,
-          body: (
-            <>
-              <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
-                🌍
-              </span>
-              <p>
-                Cuando pulses <strong>Empezar</strong>, podrás{' '}
-                {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y abrir el mapa para
-                adivinar.
-              </p>
-              {challenge.guess_seconds != null ? (
-                <p className={styles.status}>
-                  Tendrás {challenge.guess_seconds} segundos para colocar tu pin.
+      <>
+        <GameScene
+          title={challenge.title}
+          scene={sceneData}
+          sceneReady={playing}
+          // En `playing` con límite mostramos el anillo; sin empezar/sin límite, null.
+          remaining={playing && challenge.guess_seconds != null ? remaining : null}
+          guessSeconds={challenge.guess_seconds}
+          // En `playing` salir NO pausa el reloj: lo confirmamos y lo decimos en el
+          // rótulo. En `idle` (aún sin empezar) la salida es directa.
+          backLabel={playing ? 'Salir (sigue el tiempo)' : backLabel}
+          onBack={playing ? goBackWhilePlaying : goBack}
+          guess={guess}
+          onGuess={setGuess}
+          mapOpen={mapOpen}
+          onOpenMap={() => setMapOpen(true)}
+          onCloseMap={() => setMapOpen(false)}
+          meAvatar={profile?.avatar_url}
+          meUserId={user?.id ?? ''}
+          onConfirm={confirm}
+          photoExpanded={photoExpanded}
+          onExpandPhoto={() => setPhotoExpanded(true)}
+          onClosePhoto={() => setPhotoExpanded(false)}
+          panoRef={panoRef}
+          startOverlay={{
+            open: phase === 'idle',
+            onStart: start,
+            onClose: goBack,
+            body: (
+              <>
+                <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
+                  🌍
+                </span>
+                <p>
+                  Cuando pulses <strong>Empezar</strong>, podrás{' '}
+                  {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y abrir el mapa para
+                  adivinar.
                 </p>
-              ) : (
-                <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
-              )}
-            </>
-          ),
-        }}
-      />
+                {challenge.guess_seconds != null ? (
+                  <p className={styles.status}>
+                    Tendrás {challenge.guess_seconds} segundos para colocar tu pin.
+                  </p>
+                ) : (
+                  <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
+                )}
+              </>
+            ),
+          }}
+        />
+
+        {/* Cuenta atrás 3·2·1 tras pulsar Empezar: tapa la escena (que aún no se
+            monta: sceneReady sigue false en `countdown`) con la FOTO del reto de
+            fondo. Al terminar arranca el juego y, con él, el reloj de la jugada.
+            Bajo reduced-motion el overlay entra directo a `playing` sin pausa. */}
+        {phase === 'countdown' && <CountdownOverlay photoUrl={photoUrl} onDone={beginPlaying} />}
+      </>
     )
   }
 

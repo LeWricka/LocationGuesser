@@ -1,0 +1,81 @@
+import { useEffect, useRef, useState } from 'react'
+import { SceneImage } from './SceneImage'
+import { useReducedMotion } from '../../ui'
+import styles from './CountdownOverlay.module.css'
+
+interface Props {
+  /** Foto del reto para el fondo a pantalla completa (URL firmada). Null = fondo neutro. */
+  photoUrl: string | null
+  /** Se llama al terminar la cuenta (también de inmediato bajo reduced-motion). */
+  onDone: () => void
+}
+
+// Números de la cuenta atrás: 3 → 2 → 1, uno por segundo. Al consumir el 1 se
+// dispara onDone (entrada en juego); el reloj de la jugada arranca entonces.
+const SEQUENCE = [3, 2, 1] as const
+const STEP_MS = 1000
+
+// Overlay de cuenta atrás entre el inicio (idle) y el juego (playing). Visual-first:
+// la FOTO del reto llena el fondo (si la hay), con un velo oscuro para legibilidad;
+// encima, números GIGANTES que entran con muelle. El reloj de la jugada NO corre
+// aquí: el padre lo arranca al recibir onDone.
+//
+// prefers-reduced-motion: ni animación ni espera; llamamos onDone al montar para
+// entrar directos al juego (no atrapamos al usuario en una pausa sin movimiento).
+export function CountdownOverlay({ photoUrl, onDone }: Props) {
+  const reduced = useReducedMotion()
+  const [index, setIndex] = useState(0)
+  // onDone puede cambiar de identidad entre renders; lo guardamos en un ref para
+  // que el efecto del temporizador no se reinicie y duplique la secuencia. La
+  // sincronización va en su propio efecto (no en render) por la regla de refs.
+  const onDoneRef = useRef(onDone)
+  useEffect(() => {
+    onDoneRef.current = onDone
+  }, [onDone])
+
+  useEffect(() => {
+    // Movimiento reducido: saltamos la cuenta y entramos directos al juego.
+    if (reduced) {
+      onDoneRef.current()
+      return
+    }
+
+    let step = 0
+    const id = window.setInterval(() => {
+      step += 1
+      if (step >= SEQUENCE.length) {
+        window.clearInterval(id)
+        onDoneRef.current()
+        return
+      }
+      setIndex(step)
+    }, STEP_MS)
+    return () => window.clearInterval(id)
+  }, [reduced])
+
+  // Bajo reduced-motion no pintamos nada (entramos al juego al instante).
+  if (reduced) return null
+
+  const value = SEQUENCE[index]
+
+  return (
+    <div className={styles.overlay} role="status" aria-label={`Empezando en ${value}`}>
+      {/* Fondo: la foto del reto a pantalla completa (si la hay) o un degradado
+          neutro de la marca. Velo oscuro encima para que los números resalten. */}
+      <div className={styles.bg} aria-hidden="true">
+        {photoUrl ? (
+          <SceneImage src={photoUrl} alt="" className={styles.bgImg} skeletonRadius="sm" />
+        ) : (
+          <div className={styles.bgNeutral} />
+        )}
+        <div className={styles.scrim} />
+      </div>
+
+      {/* Número gigante: `key` por valor reinicia la animación de entrada en cada
+          cambio (3 → 2 → 1). aria-hidden: el valor ya se anuncia en el label. */}
+      <span key={value} className={styles.number} aria-hidden="true">
+        {value}
+      </span>
+    </div>
+  )
+}
