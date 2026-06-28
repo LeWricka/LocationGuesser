@@ -70,6 +70,9 @@ export type AnalyticsEvent =
   // reinicia el juego. Solo en retos de práctica (plazo lejano). Props: group_id,
   // challenge_id.
   | 'challenge_replayed'
+  // Fin de temporada (#236): cerrar/reabrir el grupo. Props: group_id.
+  | 'group_closed'
+  | 'group_reopened'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {
