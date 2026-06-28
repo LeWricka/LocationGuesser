@@ -60,6 +60,17 @@
   color: var(--color-text);
 }
 
+/* Aviso en «Resumen» cuando no hay ningún medio (ni foto ni Street View): un
+   reto no puede crearse sin al menos uno. Tono de atención, no destructivo. */
+.mediaWarning {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
 /* Opciones avanzadas de Street View (candados): plegadas por defecto. */
 .advanced {
   border: 1px solid var(--color-border);
