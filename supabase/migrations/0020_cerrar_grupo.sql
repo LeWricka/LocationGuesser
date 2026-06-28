@@ -1,5 +1,5 @@
 -- ════════════════════════════════════════════════════════════════════════════
--- 0019 — cerrar / archivar grupo (fin de temporada) + ganadores
+-- 0020 — cerrar / archivar grupo (fin de temporada) + ganadores
 -- ════════════════════════════════════════════════════════════════════════════
 -- Issue #236 (Fase 1). El dueño puede CERRAR el grupo ("fin de temporada"):
 -- congela la clasificación y deja el grupo en modo solo-lectura, con el podio
