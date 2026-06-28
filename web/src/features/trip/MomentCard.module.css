@@ -1,0 +1,93 @@
+/*
+ * Tarjeta de momento del carrusel. La foto va a sangre (full-bleed) y el texto
+ * flota encima sobre un degradado de legibilidad (tokens de foto ya existentes).
+ * El ancho lo fija el carrusel padre (scroll-snap); aquí solo la proporción.
+ */
+.card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  background: var(--ocean-900);
+}
+
+/*
+ * El marco de ChallengePhoto cubre toda la tarjeta: anulamos su ancho máximo y su
+ * borde/radio para que la foto sea a sangre. La proporción 16:9 del marco define
+ * la altura de la tarjeta (el carrusel no impone alto fijo).
+ */
+.photo {
+  width: 100%;
+  max-width: none;
+  border: 0;
+  border-radius: var(--radius-lg);
+}
+
+/* Capa de contenido sobre la foto: ocupa toda la tarjeta y no intercepta toques
+   (la foto-botón de debajo abre el detalle); solo el CTA es interactivo. */
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--space-3);
+  pointer-events: none;
+  /* Degradado de legibilidad al pie (token de foto). */
+  background: linear-gradient(to top, var(--photo-overlay-strong) 0%, transparent 55%);
+}
+
+/* Badge "EN JUEGO" anclado arriba a la izquierda. */
+.badge {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  color: var(--color-on-photo);
+  text-shadow: 0 1px 3px var(--photo-text-shadow);
+  /* Dos líneas como mucho; el resto se trunca para no romper la tarjeta. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-on-photo);
+  text-shadow: 0 1px 2px var(--photo-text-shadow);
+}
+
+.date {
+  opacity: 0.85;
+}
+
+.social {
+  font-variant-numeric: tabular-nums;
+}
+
+/* CTA cálido del momento en juego: sobre el overlay y SÍ interactivo. */
+.cta {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  pointer-events: auto;
+}

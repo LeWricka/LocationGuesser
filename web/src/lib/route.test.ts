@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { parseHash, groupHash } from './route'
+import { parseHash, groupHash, classicGroupHash, addMomentHash } from './route'
 
 describe('parseHash', () => {
   test('grupo y reto juntos', () => {
@@ -56,6 +56,32 @@ describe('parseHash', () => {
     // Un hash con `=` no es una vista atómica; "nuevo" como valor de `g` es grupo.
     expect(parseHash('#g=nuevo')).toEqual({ view: 'home', group: 'nuevo' })
   })
+
+  test('grupo sin v → pantalla Viaje (sin groupView)', () => {
+    // Por defecto el grupo abre el "Viaje": parseHash no marca groupView.
+    expect(parseHash('#g=abc123')).toEqual({ view: 'home', group: 'abc123' })
+  })
+
+  test('v=clasico → escape a la GroupPage clásica', () => {
+    expect(parseHash('#g=abc123&v=clasico')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      groupView: 'clasico',
+    })
+  })
+
+  test('v desconocido se ignora (cae al Viaje)', () => {
+    expect(parseHash('#g=abc123&v=otra')).toEqual({ view: 'home', group: 'abc123' })
+  })
+
+  test('add=1 marca la intención de añadir momento', () => {
+    expect(parseHash('#g=abc123&v=clasico&add=1')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      groupView: 'clasico',
+      groupAdd: true,
+    })
+  })
 })
 
 describe('groupHash', () => {
@@ -65,5 +91,20 @@ describe('groupHash', () => {
 
   test('grupo y reto', () => {
     expect(groupHash('abc123', 'uuid-1')).toBe('#g=abc123&c=uuid-1')
+  })
+})
+
+describe('classicGroupHash / addMomentHash', () => {
+  test('classicGroupHash apunta a la vista clásica', () => {
+    expect(classicGroupHash('abc123')).toBe('#g=abc123&v=clasico')
+    // Y parseHash lo reconoce como tal (ida y vuelta).
+    expect(parseHash(classicGroupHash('abc123')).groupView).toBe('clasico')
+  })
+
+  test('addMomentHash abre el creador en la vista clásica', () => {
+    expect(addMomentHash('abc123')).toBe('#g=abc123&v=clasico&add=1')
+    const r = parseHash(addMomentHash('abc123'))
+    expect(r.groupView).toBe('clasico')
+    expect(r.groupAdd).toBe(true)
   })
 })
