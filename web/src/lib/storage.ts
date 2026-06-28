@@ -2,10 +2,17 @@ import { supabase } from './supabase'
 import { reportError } from './observability'
 
 const BUCKET = 'images'
+// Bucket PÚBLICO para avatares: a diferencia de `images` (privado, URLs firmadas
+// que caducan), el avatar se muestra en clasificación, mapa, etc. y necesita una
+// URL ESTABLE. La foto de perfil no es secreta, así que servirla pública vale.
+const AVATARS_BUCKET = 'avatars'
 
 // Lado largo máximo tras redimensionar. ~1600px basta para ver la foto en
 // pantalla y recorta peso de subida en móvil.
 const MAX_SIDE = 1600
+// Lado del avatar tras recortar a cuadrado: nítido en el tamaño grande (64px) y
+// en alta densidad, sin engordar el bucket público.
+const AVATAR_SIDE = 256
 // Calidad JPEG: equilibrio peso/nitidez. La recompresión, de paso, estripa el
 // EXIF (incluido el GPS, que sería la respuesta del reto).
 const JPEG_QUALITY = 0.8
@@ -140,6 +147,61 @@ async function compressAndStripExif(file: File): Promise<Blob> {
   }
 }
 
+/**
+ * Recorta la imagen a un cuadrado centrado y la re-exporta a JPEG de lado
+ * AVATAR_SIDE. Como `compressAndStripExif`, pasa por canvas, así que descarta el
+ * EXIF (orientación y GPS) y reusa la conversión de HEIC del pipeline general.
+ */
+async function squareCropToJpeg(file: File): Promise<Blob> {
+  let decodable = file
+  if (isHeic(file)) {
+    try {
+      decodable = await heicToJpeg(file)
+    } catch (err) {
+      reportError(err, {
+        area: 'image_decode',
+        stage: 'heic_convert',
+        fileType: file.type || '(vacío)',
+        fileSizeKb: Math.round(file.size / 1024),
+        fileName: file.name,
+      })
+      throw new Error('No se pudo leer la imagen. Prueba con otra foto (JPEG o PNG).', {
+        cause: err,
+      })
+    }
+  }
+
+  let img: DecodedImage
+  try {
+    img = await decodeImage(decodable)
+  } catch (err) {
+    reportError(err, {
+      area: 'image_decode',
+      stage: 'decode',
+      fileType: file.type || '(vacío)',
+      fileSizeKb: Math.round(file.size / 1024),
+      fileName: file.name,
+    })
+    throw err
+  }
+  try {
+    // Cuadrado centrado: tomamos el lado corto y descartamos los bordes del lado
+    // largo (mitad a cada lado) para que la foto quede centrada en el círculo.
+    const side = Math.min(img.width, img.height)
+    const sx = (img.width - side) / 2
+    const sy = (img.height - side) / 2
+    const canvas = document.createElement('canvas')
+    canvas.width = AVATAR_SIDE
+    canvas.height = AVATAR_SIDE
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('No se pudo procesar la imagen.')
+    ctx.drawImage(img.source, sx, sy, side, side, 0, 0, AVATAR_SIDE, AVATAR_SIDE)
+    return await canvasToJpeg(canvas)
+  } finally {
+    img.release()
+  }
+}
+
 function scaledSize(w: number, h: number): { width: number; height: number } {
   const longSide = Math.max(w, h)
   if (longSide <= MAX_SIDE) return { width: w, height: h }
@@ -183,4 +245,25 @@ export async function signedImageUrl(path: string, expiresIn = 3600): Promise<st
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresIn)
   if (error) return null
   return data?.signedUrl ?? null
+}
+
+/**
+ * Recorta a cuadrado, comprime/estripa EXIF y sube la foto de perfil al bucket
+ * PÚBLICO `avatars`. Devuelve la URL pública ESTABLE para guardar en
+ * `profiles.avatar_url` (se muestra en clasificación, mapa, etc.).
+ *
+ * Ruta `<userId>/<uuid>.jpg`: la política de escritura solo permite al propio
+ * usuario tocar su carpeta (primer segmento = auth.uid()). Un uuid nuevo en cada
+ * subida evita la caché del CDN al cambiar de foto (no hay que invalidar).
+ */
+export async function uploadAvatar(file: File, userId: string): Promise<string> {
+  const blob = await squareCropToJpeg(file)
+  const path = `${userId}/${crypto.randomUUID()}.jpg`
+  const { error } = await supabase.storage.from(AVATARS_BUCKET).upload(path, blob, {
+    contentType: 'image/jpeg',
+    cacheControl: '31536000',
+  })
+  if (error) throw error
+  const { data } = supabase.storage.from(AVATARS_BUCKET).getPublicUrl(path)
+  return data.publicUrl
 }

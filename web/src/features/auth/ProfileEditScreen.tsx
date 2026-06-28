@@ -6,9 +6,11 @@ import { useState } from 'react'
 import { AuthScreen, Avatar, BackHomeButton, Button, Field, Input, Stack, useToast } from '../../ui'
 import { upsertProfile } from '../../lib/profile'
 import { signOut } from '../../lib/auth'
+import { uploadAvatar } from '../../lib/storage'
 import { ANIMAL_EMOJIS, avatarToken, parseAvatar } from '../../lib/avatar'
 import { track } from '../../lib/analytics'
 import type { Profile } from '../../lib/database.types'
+import { AvatarPhotoPicker } from './AvatarPhotoPicker'
 import styles from './ProfileEditScreen.module.css'
 
 interface Props {
@@ -30,6 +32,7 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
   // que el selector y la previsualización respondan al instante.
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url ?? null)
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
@@ -37,9 +40,36 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
   // no tiene animal explícito, se resalta el animal por defecto del id.
   const current = parseAvatar(avatarUrl, userId)
   const selectedEmoji = current.kind === 'emoji' ? current.emoji : null
+  // ¿El avatar actual es una foto subida? Entonces se muestra como preview y no
+  // se resalta ningún animal del grid.
+  const photoUrl = current.kind === 'image' ? current.src : null
 
   function chooseEmoji(emoji: string) {
     setAvatarUrl(avatarToken(emoji))
+    setSaved(false)
+  }
+
+  // Sube la foto al bucket público `avatars` y deja su URL pública como avatar.
+  // La subida es inmediata (no espera a Guardar) para poder previsualizar la
+  // foto ya recortada/comprimida; "Guardar" persiste la URL en el perfil.
+  async function handlePickPhoto(file: File | null) {
+    if (!file) return
+    setError(null)
+    setSaved(false)
+    setUploading(true)
+    try {
+      const url = await uploadAvatar(file, userId)
+      setAvatarUrl(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No pudimos subir la foto.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  // Quitar la foto → volver al animal por defecto del id (avatar_url null).
+  function clearPhoto() {
+    setAvatarUrl(null)
     setSaved(false)
   }
 
@@ -54,7 +84,10 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
     setLoading(true)
     try {
       await upsertProfile({ id: userId, displayName: name, avatarUrl })
-      track('avatar_changed', { has_emoji: avatarUrl?.startsWith('emoji:') ?? false })
+      track('avatar_changed', {
+        has_emoji: avatarUrl?.startsWith('emoji:') ?? false,
+        has_photo: photoUrl != null,
+      })
       await onSaved()
       setSaved(true)
       toast.show('Perfil guardado', { tone: 'success' })
@@ -75,7 +108,7 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
     <AuthScreen
       icon={<Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="lg" />}
       title="Tu perfil"
-      subtitle="Cambia tu nombre, elige tu animal o cierra sesión."
+      subtitle="Cambia tu nombre, sube una foto o elige tu animal."
       footer={
         <Stack gap={3} align="center">
           {onOpenAdmin && (
@@ -117,7 +150,22 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
             )}
           </Field>
 
-          <fieldset className={styles.picker}>
+          <div className={styles.photoSection}>
+            <span className={styles.sectionLabel}>Tu foto</span>
+            <AvatarPhotoPicker
+              preview={photoUrl}
+              loading={uploading}
+              onPick={(file) => void handlePickPhoto(file)}
+              onClear={clearPhoto}
+            />
+            <p className={styles.photoHint}>
+              {photoUrl
+                ? 'Tu foto se usa como avatar. Quítala para volver al animal.'
+                : 'Sin foto usamos tu animal. Sube una para personalizarlo.'}
+            </p>
+          </div>
+
+          <fieldset className={styles.picker} disabled={uploading}>
             <legend className={styles.pickerLegend}>Tu animal</legend>
             <div className={styles.grid} role="radiogroup" aria-label="Elige tu animal">
               {ANIMAL_EMOJIS.map((emoji) => {
@@ -140,7 +188,7 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
             </div>
           </fieldset>
 
-          <Button type="submit" size="lg" fullWidth loading={loading}>
+          <Button type="submit" size="lg" fullWidth loading={loading} disabled={uploading}>
             {saved ? 'Guardado ✓' : 'Guardar'}
           </Button>
         </Stack>
