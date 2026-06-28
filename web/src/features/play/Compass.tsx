@@ -13,7 +13,7 @@ function cardinal(heading: number): string {
   return DIRS[Math.round(h / 45) % 8]
 }
 
-// Brújula flotante estilo GeoGuessr: punto cardinal + aguja roja que apunta a
+// Brújula flotante: punto cardinal + aguja roja que apunta a
 // donde mira el jugador. La aguja rota CON el panorama (heading). Presentacional:
 // el heading lo provee PlayChallenge desde el panorama.
 export function Compass({ heading }: Props) {

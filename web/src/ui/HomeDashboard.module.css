@@ -207,6 +207,10 @@
   /* min-width:0 es lo que permite a la tarjeta encoger dentro del grid y que el
      truncado/elipsis del subtítulo funcione. */
   min-width: 0;
+  /* Contenedor de consultas: el número de .statValue escala con el ANCHO DE LA
+     TARJETA (cqi), no del viewport. Antes el tamaño dependía de 8vw y un número
+     de 5-6 cifras se salía de su columna (1/3) y se cortaba con elipsis. */
+  container-type: inline-size;
 }
 
 /* La tarjeta de puntos es la "caliente": velo ámbar + halo cálido. */
@@ -219,9 +223,11 @@
 }
 
 .statValue {
-  /* Tamaño FLUIDO: escala con el ancho y nunca desborda la columna estrecha de
-     móvil (antes el número se salía de la tarjeta). */
-  font-size: clamp(1.5rem, 8vw, var(--font-size-2xl));
+  /* Tamaño FLUIDO atado al ANCHO DE LA TARJETA (cqi), no al viewport: así un
+     número de 5-6 cifras (p.ej. "17.834") cabe en su columna estrecha (1/3) sin
+     cortarse. El cap (2rem) y el cqi están calibrados para que 6 cifras quepan
+     en cualquier ancho; la elipsis queda solo de red de seguridad. */
+  font-size: clamp(1rem, 24cqi, 2rem);
   font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-tighter);
   line-height: 1;

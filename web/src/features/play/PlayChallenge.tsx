@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
+import { GameScene, type GameSceneData } from './GameScene'
+import { CountdownOverlay } from './CountdownOverlay'
 import { sceneMedium } from './sceneMedium'
 import { ResultCard } from './ResultCard'
 import { RevealBurst } from './RevealBurst'
@@ -26,15 +28,11 @@ import { useSignedImage } from '../../lib/useSignedImage'
 // READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
 import {
-  Badge,
   BackHomeButton,
   Button,
   Card,
   ChallengePhoto,
-  CountdownRing,
   CountUp,
-  Lightbox,
-  Modal,
   Row,
   ScoreRing,
   Skeleton,
@@ -56,9 +54,10 @@ interface Props {
   groupId?: string
 }
 
-// Fases del juego. El overlay "Empezar" tapa todo en `idle`; el reloj solo
-// corre en `playing`; tras `revealed` el voto queda fijo.
-type Phase = 'loading' | 'idle' | 'playing' | 'revealed'
+// Fases del juego. El overlay "Empezar" tapa todo en `idle`; al pulsar Empezar se
+// pasa por `countdown` (3·2·1 sobre la foto del reto) antes de `playing`; el reloj
+// de la jugada solo corre en `playing`; tras `revealed` el voto queda fijo.
+type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed'
 
 // `start_at` por reto en localStorage: recargar durante la jugada no regala
 // tiempo (el reloj se reconstruye desde el instante en que se pulsó Empezar).
@@ -86,6 +85,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [answer, setAnswer] = useState<LatLng | null>(null)
   const [remaining, setRemaining] = useState<number | null>(null)
   const [timedOut, setTimedOut] = useState(false)
+  // Si MI propio voto salió de la app durante la jugada: alimenta el aviso del
+  // resultado. Se fija al votar (desde leftAppRef) y al recargar un voto previo.
+  const [iLeftApp, setILeftApp] = useState(false)
   const [saving, setSaving] = useState(false)
   // Posición del jugador en este reto (1 = mejor). Solo informativa: alimenta la
   // propiedad de analítica `rank_in_challenge` y el texto "Nº de N" del resultado.
@@ -100,7 +102,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // viewport para el snapshot (mismo patrón que ShareLeaderboardModal).
   const [sharingResult, setSharingResult] = useState(false)
   const resultCardRef = useRef<HTMLDivElement>(null)
-  // Mapa de adivinar como hoja inferior (bottom sheet) estilo GeoGuessr: el FAB
+  // Mapa de adivinar como hoja inferior (bottom sheet): el FAB
   // 🗺️ la sube; dentro se coloca el pin y se confirma; cerrar vuelve al panorama.
   const [mapOpen, setMapOpen] = useState(false)
   // Orientación actual del panorama (0=N). La provee el panorama vía callback y
@@ -112,10 +114,22 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // completa (zoom + pan). Sin esto la foto se ve cortada y no se puede inspeccionar.
   const [photoExpanded, setPhotoExpanded] = useState(false)
   const toast = useToast()
+  // Anti-trampa (issue #200): si el jugador cambia de pestaña/app MIENTRAS el reloj
+  // corre (fase `playing`, antes de votar), lo marcamos. Ref (no estado) porque el
+  // valor solo se lee al votar; no necesita re-render y debe persistir hasta el voto.
+  const leftAppRef = useRef(false)
+  // Tiempo de respuesta (issue #214): instante (ms epoch) en que el jugador empezó
+  // a jugar (entrada en `playing`). Al votar medimos los segundos transcurridos en
+  // wall-clock. Es coherente con que "el tiempo sigue corriendo aunque salgas": no
+  // descontamos pausas; si reanuda, el inicio NO se reinicia (se reconstruye desde
+  // el `start_at` persistido, igual que el reloj de la cuenta atrás). Null si no hay
+  // inicio válido → mandamos `null` y no rompemos el voto.
+  const playStartAtRef = useRef<number | null>(null)
   // Handle imperativo del panorama para los controles "volver al inicio" / "norte".
   const panoRef = useRef<StreetViewPanoHandle>(null)
   // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
-  const { user } = useSession()
+  // El perfil aporta el avatar para pintar la burbuja del pin del propio jugador.
+  const { user, profile } = useSession()
   // URL firmada de la foto del reto (bucket privado). Hook al tope del componente
   // —no tras los early-return de carga— para no romper el orden de hooks.
   const photoUrl = useSignedImage(challenge?.image_path ?? null)
@@ -139,11 +153,21 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       }
 
       setSaving(true)
+      // Marca anti-trampa: si salió de la app durante la jugada, la propagamos al
+      // voto y la reflejamos en el aviso del resultado.
+      const leftApp = leftAppRef.current
+      if (leftApp) setILeftApp(true)
+      // Tiempo de respuesta (issue #214): segundos en wall-clock desde que empezó a
+      // jugar hasta este voto. Sin inicio válido → null (no rompe el voto).
+      const startedAt = playStartAtRef.current
+      const elapsedSeconds = startedAt != null ? Math.round((Date.now() - startedAt) / 1000) : null
       try {
         const res = await submitVote({
           challengeId: current.id,
           guessLat: playedGuess?.lat ?? null,
           guessLng: playedGuess?.lng ?? null,
+          leftApp,
+          elapsedSeconds,
         })
         if (!playedGuess) {
           // Voto de timeout: 0 puntos, sin pin. Queda MARCADO COMO JUGADO (no puede
@@ -225,6 +249,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         const existing = user ? await getExistingVote(challengeId, user.id) : null
         if (cancelled) return
         if (existing) {
+          // Recarga de un voto ya emitido: refleja la marca anti-trampa en el aviso.
+          if (existing.left_app) setILeftApp(true)
           if (existing.guess_lat == null || existing.guess_lng == null) {
             // Voto de timeout: jugó pero no marcó → 0 pts, sin pin. Marcado como
             // jugado (no puede reintentar), se muestra "no diste a tiempo".
@@ -291,6 +317,16 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     }
   }, [groupId])
 
+  // Inicio del cronómetro de respuesta (issue #214). Al entrar en `playing`
+  // fijamos el origen desde el `start_at` persistido (el mismo que reconstruye la
+  // cuenta atrás): así una recarga o un salir-y-reentrar NO reinicia el contador,
+  // y el tiempo medido es wall-clock real desde que se pulsó Empezar.
+  useEffect(() => {
+    if (phase !== 'playing' || !challenge) return
+    const startAt = Number(localStorage.getItem(startKey(challenge.id)) ?? Date.now())
+    playStartAtRef.current = startAt
+  }, [phase, challenge])
+
   // Cuenta atrás. Arranca al entrar en `playing` reconstruyendo desde `start_at`
   // (persistido), así una recarga no reinicia el reloj. Al llegar a 0 → revelar.
   useEffect(() => {
@@ -310,12 +346,35 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     return () => window.clearInterval(id)
   }, [phase, challenge, guess, reveal])
 
+  // Anti-trampa (issue #200): SOLO durante `playing` (reloj corriendo, antes de
+  // votar) escuchamos `visibilitychange`. Si la pestaña/app se oculta (el jugador
+  // se va a buscar la respuesta), marcamos el ref; persiste hasta el voto. El
+  // listener se limpia al salir de `playing` o al desmontar. NO marca nada tras
+  // revelar/votar (ahí salir es legítimo: el resultado ya está fijado).
+  useEffect(() => {
+    if (phase !== 'playing') return
+    const onVisibility = () => {
+      if (document.hidden) leftAppRef.current = true
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [phase])
+
   function start() {
     if (!challenge) return
-    // Marcamos el inicio SIEMPRE (con o sin límite de tiempo): así, al salir y
-    // reentrar, el reto se REANUDA en `playing` y nunca vuelve a "¿Listo para
-    // jugar?" (no hay reinicio limpio). Con límite, además fija el origen del
-    // reloj para reconstruir el tiempo restante.
+    // Empezar NO arranca el reloj: primero la cuenta atrás 3·2·1 (sobre la foto del
+    // reto). El `start_at` se fija al TERMINAR la cuenta (beginPlaying), para que el
+    // reloj de la jugada arranque tras el 3-2-1, no durante. Si el jugador recarga
+    // durante la cuenta (aún sin start_at), vuelve a "¿Listo?": no perdió tiempo.
+    setPhase('countdown')
+  }
+
+  // Fin de la cuenta atrás 3·2·1 → entra en juego. Aquí (no en `start`) fijamos el
+  // inicio SIEMPRE (con o sin límite): así, al salir y reentrar, el reto se REANUDA
+  // en `playing` y nunca vuelve a "¿Listo para jugar?" (no hay reinicio limpio). Con
+  // límite, además fija el origen del reloj para reconstruir el tiempo restante.
+  function beginPlaying() {
+    if (!challenge) return
     localStorage.setItem(startKey(challenge.id), String(Date.now()))
     setPhase('playing')
   }
@@ -402,6 +461,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       setAnswer(null)
       setRemaining(null)
       setTimedOut(false)
+      // Reinicio limpio de la marca anti-trampa: rejugar arranca sin "salió".
+      leftAppRef.current = false
+      // Reinicio del cronómetro de respuesta: rejugar mide desde el nuevo Empezar.
+      playStartAtRef.current = null
+      setILeftApp(false)
       setRank(null)
       setMapOpen(false)
       setShowStreetView(false)
@@ -465,14 +529,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // panoId y nunca esta posición. La respuesta real (`answer`) solo se conoce tras
   // revelar; al jugar es null y NO debe alimentar la escena.
   const panoFallback: LatLng = answer ?? { lat: 0, lng: 0 }
-  const urgent = remaining != null && remaining <= 10
   const backLabel = groupId ? 'Volver al grupo' : 'Inicio'
   // Reto de práctica: plazo lejano (>1 año). Solo en estos mostramos "volver a
   // jugar" tras revelar; en un reto real rejugar tras ver la respuesta sería trampa.
   const isPractice = isPracticeChallenge(challenge.deadline_at)
 
   // --------------------------------------------------------------------------
-  // Fase de JUGAR: experiencia inmersiva a pantalla completa estilo GeoGuessr.
+  // Fase de JUGAR: experiencia inmersiva a pantalla completa.
   // Sale del wrapper `lg-page`: contenedor fijo cubriendo el viewport, escena
   // edge-to-edge y controles flotando por encima (brújula+timer, FAB del mapa,
   // controles del panorama, hoja inferior con el mapa de adivinar). Se monta en
@@ -484,221 +547,77 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     // detrás del modal y daba pistas. Hasta pulsar Empezar mostramos un
     // placeholder neutro; la escena real solo aparece tras `start()`.
     const playing = phase === 'playing'
+    // Escena reutilizable (la misma que la PREVIA de crear). Toda la lógica (votar,
+    // reloj, anti-trampa, salir) sigue aquí: GameScene es solo presentacional.
+    const sceneData: GameSceneData = hasStreetView
+      ? {
+          kind: 'streetview',
+          panoId: challenge.sv_pano_id,
+          position: panoFallback,
+          heading: challenge.sv_heading,
+          pitch: challenge.sv_pitch,
+          lockMove: challenge.sv_lock_move,
+          lockRotate: challenge.sv_lock_rotate,
+          hintPhotoUrl,
+        }
+      : { kind: 'photo', photoUrl: imageUrl }
     return (
-      <div className={styles.immersive}>
-        {/* Escena protagonista: panorama interactivo o foto (legacy). Solo en
-            `playing`; antes, placeholder neutro (nada que delate el lugar). */}
-        <div className={styles.sceneFull}>
-          {!playing ? (
-            <div className={styles.scenePlaceholder} aria-hidden="true" />
-          ) : hasStreetView ? (
-            <StreetViewPano
-              ref={panoRef}
-              panoId={challenge.sv_pano_id}
-              position={panoFallback}
-              heading={challenge.sv_heading}
-              pitch={challenge.sv_pitch}
-              lockMove={challenge.sv_lock_move}
-              lockRotate={challenge.sv_lock_rotate}
-            />
-          ) : imageUrl ? (
-            // Foto-escena (reto legacy): con esqueleto mientras carga del Storage
-            // firmado, para que el hueco no parezca roto. La escena se recorta para
-            // llenar la pantalla, así que es PULSABLE: abre el visor a pantalla
-            // completa (foto entera + zoom) para poder inspeccionar los detalles.
-            <button
-              type="button"
-              className={styles.photoSceneButton}
-              onClick={() => setPhotoExpanded(true)}
-              aria-label="Ampliar la foto del reto"
-            >
-              <SceneImage
-                key={imageUrl}
-                src={imageUrl}
-                alt={challenge.title}
-                className={styles.photoFull}
-                skeletonRadius="sm"
-              />
-              <span className={styles.photoExpandHint} aria-hidden="true">
-                ⤢ Ampliar
-              </span>
-            </button>
-          ) : (
-            <div className={styles.noScene}>
-              <p className={styles.status}>Este reto no tiene imagen ni Street View.</p>
-            </div>
-          )}
-        </div>
-
-        {/* Clúster arriba-izquierda: salida + brújula + temporizador, flotando
-            sobre la escena (respeta el notch con safe-area). */}
-        <div className={styles.topCluster}>
-          {/* En `playing` salir NO pausa el reloj: confirmamos y lo hacemos
-              evidente en el propio rótulo. En `idle` (aún sin empezar) la salida
-              es directa. */}
-          {playing ? (
-            <BackHomeButton onClick={goBackWhilePlaying} label="Salir (sigue el tiempo)" />
-          ) : (
-            <BackHomeButton onClick={goBack} label={backLabel} />
-          )}
-          {phase === 'playing' && remaining != null && challenge.guess_seconds != null && (
-            <CountdownRing remaining={remaining} total={challenge.guess_seconds} urgent={urgent} />
-          )}
-        </div>
-
-        {/* Foto-pista flotante (si el reto la marcó como pista). Solo al jugar:
-            en `idle` sería un spoiler por detrás del modal. Con esqueleto
-            mientras carga para que el recuadro no aparezca vacío/roto. */}
-        {playing && hintPhotoUrl && (
-          <button
-            type="button"
-            className={styles.hintFloat}
-            onClick={() => setPhotoExpanded(true)}
-            aria-label="Ampliar la foto del reto"
-          >
-            <SceneImage
-              key={hintPhotoUrl}
-              src={hintPhotoUrl}
-              alt="Pista: foto del reto"
-              className={styles.hintImg}
-              skeletonRadius="md"
-            />
-            <span className={styles.hintExpand} aria-hidden="true">
-              ⤢
-            </span>
-          </button>
-        )}
-
-        {/* Abajo-izquierda: controles del panorama (solo con Street View y ya
-            jugando: el panorama no está montado hasta `playing`). */}
-        {playing && hasStreetView && (
-          <div className={styles.panoControls}>
-            <button
-              type="button"
-              className={styles.glassBtn}
-              onClick={() => panoRef.current?.resetToStart()}
-              aria-label="Volver a la posición inicial"
-              title="Volver a la posición inicial"
-            >
-              ⌂
-            </button>
-            <button
-              type="button"
-              className={styles.glassBtn}
-              onClick={() => panoRef.current?.resetPov()}
-              aria-label="Enderezar la vista al norte"
-              title="Enderezar (norte)"
-            >
-              🧭
-            </button>
-          </div>
-        )}
-
-        {/* Abajo-derecha: FAB del mapa. Abre la hoja inferior para adivinar. */}
-        <button
-          type="button"
-          className={styles.mapFab}
-          onClick={() => setMapOpen(true)}
-          aria-label="Abrir el mapa para adivinar"
-        >
-          <span aria-hidden="true">🗺️</span>
-          {guess && <span className={styles.fabDot} aria-hidden="true" />}
-        </button>
-
-        {/* Hoja inferior con el mapa de adivinar. El mapa se mantiene SIEMPRE
-            montado (solo se traslada fuera de pantalla al cerrar) para conservar
-            el zoom y la posición entre aperturas: si no, al volver a abrir
-            perdías el encuadre y empezabas de cero. Su contenedor tiene tamaño
-            completo aunque esté trasladado, así que carga sin gris (ResizeObserver
-            de PlayMap). */}
-        <div
-          className={`${styles.sheetScrim} ${mapOpen ? styles.sheetScrimOpen : ''}`}
-          onClick={() => setMapOpen(false)}
-          aria-hidden={!mapOpen}
-        />
-        <section
-          className={`${styles.sheet} ${mapOpen ? styles.sheetOpen : ''}`}
-          role="dialog"
-          aria-label="Mapa para adivinar"
-          aria-hidden={!mapOpen}
-        >
-          <div className={styles.sheetHandle} aria-hidden="true" />
-          <button
-            type="button"
-            className={styles.sheetClose}
-            onClick={() => setMapOpen(false)}
-            aria-label="Cerrar el mapa"
-          >
-            ✕
-          </button>
-          <div className={styles.sheetMap}>
-            <PlayMap guess={guess} answer={null} locked={false} onPick={setGuess} />
-          </div>
-          <div className={styles.sheetFooter}>
-            {guess ? (
-              <Row gap={2} align="center">
-                <Badge tone="accent">📍 Tu pin</Badge>
-                <span className={styles.coords}>
-                  {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
+      <>
+        <GameScene
+          title={challenge.title}
+          scene={sceneData}
+          sceneReady={playing}
+          // En `playing` con límite mostramos el anillo; sin empezar/sin límite, null.
+          remaining={playing && challenge.guess_seconds != null ? remaining : null}
+          guessSeconds={challenge.guess_seconds}
+          // En `playing` salir NO pausa el reloj: lo confirmamos y lo decimos en el
+          // rótulo. En `idle` (aún sin empezar) la salida es directa.
+          backLabel={playing ? 'Salir (sigue el tiempo)' : backLabel}
+          onBack={playing ? goBackWhilePlaying : goBack}
+          guess={guess}
+          onGuess={setGuess}
+          mapOpen={mapOpen}
+          onOpenMap={() => setMapOpen(true)}
+          onCloseMap={() => setMapOpen(false)}
+          meAvatar={profile?.avatar_url}
+          meUserId={user?.id ?? ''}
+          onConfirm={confirm}
+          photoExpanded={photoExpanded}
+          onExpandPhoto={() => setPhotoExpanded(true)}
+          onClosePhoto={() => setPhotoExpanded(false)}
+          panoRef={panoRef}
+          startOverlay={{
+            open: phase === 'idle',
+            onStart: start,
+            onClose: goBack,
+            body: (
+              <>
+                <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
+                  🌍
                 </span>
-              </Row>
-            ) : (
-              <span className={styles.status}>Toca el mapa para colocar tu pin.</span>
-            )}
-            <Button size="lg" fullWidth disabled={!guess} onClick={confirm}>
-              ✓ Confirmar y revelar
-            </Button>
-            <Button variant="secondary" fullWidth onClick={() => setMapOpen(false)}>
-              ← Volver a {hasStreetView ? 'Street View' : 'la imagen'}
-            </Button>
-          </div>
-        </section>
-
-        {/* Visor a pantalla completa de la foto del reto: la escena se recorta
-            (object-fit: cover), así que el visor permite ver la foto ENTERA y
-            ampliarla (zoom). Solo en retos de foto y mientras se juega. */}
-        {(imageUrl || hintPhotoUrl) && (
-          <Lightbox
-            open={photoExpanded}
-            src={imageUrl ?? hintPhotoUrl ?? ''}
-            alt={challenge.title}
-            onClose={() => setPhotoExpanded(false)}
-          />
-        )}
-
-        {/* Overlay "Empezar": tapa la escena ya cargada detrás. Descartable
-            (✕/Escape/fuera) para no quedar atrapado. */}
-        <Modal
-          open={phase === 'idle'}
-          onClose={goBack}
-          title="¿Listo para jugar?"
-          footer={
-            <Button size="lg" fullWidth onClick={start}>
-              Empezar
-            </Button>
-          }
-        >
-          <div className={styles.startBody}>
-            <Stack gap={3} align="center">
-              <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
-                🌍
-              </span>
-              <p>
-                Cuando pulses <strong>Empezar</strong>, podrás{' '}
-                {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y abrir el mapa para
-                adivinar.
-              </p>
-              {challenge.guess_seconds != null ? (
-                <p className={styles.status}>
-                  Tendrás {challenge.guess_seconds} segundos para colocar tu pin.
+                <p>
+                  Cuando pulses <strong>Empezar</strong>, podrás{' '}
+                  {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y abrir el mapa para
+                  adivinar.
                 </p>
-              ) : (
-                <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
-              )}
-            </Stack>
-          </div>
-        </Modal>
-      </div>
+                {challenge.guess_seconds != null ? (
+                  <p className={styles.status}>
+                    Tendrás {challenge.guess_seconds} segundos para colocar tu pin.
+                  </p>
+                ) : (
+                  <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
+                )}
+              </>
+            ),
+          }}
+        />
+
+        {/* Cuenta atrás 3·2·1 tras pulsar Empezar: tapa la escena (que aún no se
+            monta: sceneReady sigue false en `countdown`) con la FOTO del reto de
+            fondo. Al terminar arranca el juego y, con él, el reloj de la jugada.
+            Bajo reduced-motion el overlay entra directo a `playing` sin pausa. */}
+        {phase === 'countdown' && <CountdownOverlay photoUrl={photoUrl} onDone={beginPlaying} />}
+      </>
     )
   }
 
@@ -715,7 +634,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         </Stack>
 
         <div className={`${styles.resultMap} lg-rise`}>
-          <PlayMap guess={guess} answer={answer} locked onPick={setGuess} />
+          <PlayMap
+            guess={guess}
+            answer={answer}
+            locked
+            onPick={setGuess}
+            meAvatar={profile?.avatar_url}
+            meUserId={user?.id ?? ''}
+          />
         </div>
 
         <Card padding="md" raised>
@@ -767,6 +693,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               </Stack>
             ) : (
               <span className={styles.status}>Revelado.</span>
+            )}
+
+            {/* Anti-trampa (issue #200): si mi voto salió de la app durante la
+                jugada, aviso informativo (no penaliza puntos, solo deja constancia;
+                en el marcador se ve junto a mi nombre). */}
+            {iLeftApp && (
+              <p className={styles.leftAppNotice} role="note">
+                ⚠️ Saliste de la app durante la jugada
+              </p>
             )}
 
             {/* Compartir MI resultado (apuesta viral): pica al resto a jugar con la

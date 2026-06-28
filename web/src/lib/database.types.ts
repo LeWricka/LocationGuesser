@@ -69,6 +69,9 @@ export interface Database {
           prizes: GroupPrizes | null
           created_by: string | null
           created_at: string
+          // Fin de temporada: null = grupo activo; con fecha = cerrado/archivado
+          // (solo-lectura). Migración 0019.
+          closed_at: string | null
         }
         Insert: {
           id: string
@@ -76,6 +79,7 @@ export interface Database {
           prizes?: GroupPrizes | null
           created_by?: string | null
           created_at?: string
+          closed_at?: string | null
         }
         Update: {
           id?: string
@@ -83,6 +87,7 @@ export interface Database {
           prizes?: GroupPrizes | null
           created_by?: string | null
           created_at?: string
+          closed_at?: string | null
         }
         Relationships: []
       }
@@ -175,6 +180,10 @@ export interface Database {
           guess_lng: number | null
           distance_km: number | null
           points: number
+          // El jugador cambió de pestaña/app durante la jugada (anti-trampa). Migración 0015.
+          left_app: boolean
+          // Segundos que tardó el jugador en votar (null en histórico previo). Migración 0016.
+          elapsed_seconds: number | null
           created_at: string
         }
         Insert: {
@@ -186,6 +195,8 @@ export interface Database {
           guess_lng?: number | null
           distance_km?: number | null
           points: number
+          left_app?: boolean
+          elapsed_seconds?: number | null
           created_at?: string
         }
         Update: {
@@ -197,6 +208,8 @@ export interface Database {
           guess_lng?: number | null
           distance_km?: number | null
           points?: number
+          left_app?: boolean
+          elapsed_seconds?: number | null
           created_at?: string
         }
         Relationships: []
@@ -241,12 +254,141 @@ export interface Database {
           p_challenge_id: string
           p_lat: number | null
           p_lng: number | null
+          // El jugador salió de la app durante la jugada (anti-trampa). Migración 0015.
+          // Opcional con default false: clientes antiguos siguen funcionando.
+          p_left_app?: boolean
+          // Segundos que tardó el jugador en votar. Opcional (default null). Migración 0016.
+          p_elapsed_seconds?: number | null
         }
         Returns: {
           distance_km: number | null
           points: number
           answer_lat: number | null
           answer_lng: number | null
+        }[]
+      }
+      // Cerrar la temporada del grupo (closed_at = now). Solo el dueño; SECURITY
+      // DEFINER comprueba propiedad. Idempotente. Migración 0019.
+      close_group: {
+        Args: { p_group_id: string }
+        Returns: undefined
+      }
+      // Reabrir la temporada del grupo (closed_at = null). Solo el dueño.
+      // Migración 0019.
+      reopen_group: {
+        Args: { p_group_id: string }
+        Returns: undefined
+      }
+      // ¿La sesión actual es admin? (allowlist por email del JWT). Migración 0016.
+      is_admin: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
+      // Resumen por grupo para la vista de admin (excluye grupos de cuentas de
+      // prueba). SECURITY DEFINER + comprobación is_admin(). Migración 0016,
+      // ampliada en 0018 (engagement, distancia, tiempos, salir-de-app, etc.).
+      admin_groups: {
+        Args: Record<string, never>
+        Returns: {
+          group_id: string
+          name: string | null
+          owner_email: string | null
+          created_at: string
+          member_count: number
+          challenge_count: number
+          vote_count: number
+          participant_count: number
+          // % de miembros que han votado al menos una vez (null si sin miembros).
+          active_member_pct: number | null
+          // Miembros del grupo que nunca han votado en él.
+          lurker_count: number
+          // Votos emitidos / votos posibles (miembros × retos), en % (null si denom 0).
+          coverage_pct: number | null
+          avg_distance_km: number | null
+          // display_name del jugador con más puntos totales (null si no hay votos).
+          top_player: string | null
+          // Última actividad (último reto o voto). Null si no hay ninguno.
+          last_activity_at: string | null
+          // Actividad en los últimos 14 días.
+          is_active: boolean
+          // Cadencia propia del grupo: días entre retos (null si <2 retos).
+          avg_days_between_challenges: number | null
+          left_app_count: number
+          left_app_pct: number | null
+          // Votos sin pin (jugó sin marcar).
+          timeout_count: number
+          median_response_seconds: number | null
+          median_time_consumed_pct: number | null
+        }[]
+      }
+      // Resumen por reto de un grupo para la vista de admin (incluye la respuesta
+      // lat/lng, que el admin puede ver). Migración 0016, ampliada en 0018
+      // (no votantes, dispersión, mejor/peor jugador, tipo, autor, estado, etc.).
+      admin_group_challenges: {
+        Args: {
+          p_group_id: string
+        }
+        Returns: {
+          challenge_id: string
+          title: string
+          created_at: string
+          deadline_at: string
+          guess_seconds: number | null
+          has_image: boolean
+          lat: number
+          lng: number
+          vote_count: number
+          // % votantes / miembros del grupo (null si el grupo no tiene miembros).
+          participation_pct: number | null
+          avg_distance_km: number | null
+          avg_points: number | null
+          avg_elapsed_seconds: number | null
+          avg_time_consumed_pct: number | null
+          // Miembros que NO votaron este reto.
+          non_voter_count: number
+          // Votos sin pin (jugó sin marcar).
+          timeout_count: number
+          // Dispersión de distancias (solo votos con pin).
+          min_distance_km: number | null
+          median_distance_km: number | null
+          max_distance_km: number | null
+          max_points: number | null
+          // display_name del voto más cercano / más lejano (null si no hay votos con pin).
+          best_player: string | null
+          worst_player: string | null
+          median_elapsed_seconds: number | null
+          median_time_consumed_pct: number | null
+          // 'foto_sv' | 'foto' | 'sv' | 'ninguno' según los medios del reto.
+          kind: string
+          // display_name del creador (null si no hay perfil).
+          author: string | null
+          // 'practica' | 'cerrado' | 'abierto'.
+          status: string
+          left_app_count: number
+        }[]
+      }
+      // Agregados globales para la vista de admin (solo grupos reales). Devuelve
+      // una única fila. Migración 0016, ampliada en 0018 (salir-de-app, timeouts,
+      // mediana de respuesta).
+      admin_analytics: {
+        Args: Record<string, never>
+        Returns: {
+          groups_count: number
+          challenges_count: number
+          participants_count: number
+          votes_count: number
+          avg_challenges_per_group: number | null
+          avg_days_between_challenges: number | null
+          avg_votes_per_challenge: number | null
+          avg_participation_pct: number | null
+          avg_response_seconds: number | null
+          avg_time_consumed_pct: number | null
+          // % global de votos con salida de la app (null si no hay votos).
+          avg_left_app_pct: number | null
+          // % global de timeouts (votos sin pin) (null si no hay votos).
+          timeout_pct: number | null
+          // Mediana global del tiempo de respuesta (segundos).
+          median_response_seconds: number | null
         }[]
       }
     }

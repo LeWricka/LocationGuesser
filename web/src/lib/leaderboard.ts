@@ -1,15 +1,18 @@
 import { supabase } from './supabase'
 import type { Vote } from './database.types'
 
-/** Voto enriquecido con el display_name del votante (join a profiles). La
- * identidad real es `user_id`; el nombre es solo para mostrar (puede repetirse). */
+/** Voto enriquecido con datos de display del votante (join a profiles). La
+ * identidad real es `user_id`; el nombre es solo para mostrar (puede repetirse).
+ * `avatar` es el `avatar_url` del perfil (token `emoji:…`, URL o null). */
 export interface VoteWithName extends Vote {
   display_name: string
+  avatar: string | null
 }
 
 export interface LeaderboardEntry {
   userId: string
   name: string
+  avatar: string | null
   points: number
   plays: number
 }
@@ -34,6 +37,7 @@ export function aggregateLeaderboard(votes: VoteWithName[]): LeaderboardEntry[] 
       byUser.set(vote.user_id, {
         userId: vote.user_id,
         name: vote.display_name,
+        avatar: vote.avatar,
         points: vote.points,
         plays: 1,
       })
@@ -58,10 +62,17 @@ export async function getGroupVotes(groupId: string): Promise<VoteWithName[]> {
   const ids = [...new Set(votes.map((v) => v.user_id))]
   const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
-    .select('id, display_name')
+    .select('id, display_name, avatar_url')
     .in('id', ids)
   if (profilesError) throw profilesError
-  const nameById = new Map((profiles ?? []).map((p) => [p.id, p.display_name]))
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
 
-  return votes.map((vote) => ({ ...vote, display_name: nameById.get(vote.user_id) ?? '—' }))
+  return votes.map((vote) => {
+    const profile = profileById.get(vote.user_id)
+    return {
+      ...vote,
+      display_name: profile?.display_name ?? '—',
+      avatar: profile?.avatar_url ?? null,
+    }
+  })
 }

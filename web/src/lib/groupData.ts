@@ -4,22 +4,45 @@ import { CHALLENGE_COLUMNS_NO_ANSWER, type ChallengeForPlay } from './challenges
 
 /** Id + nombre + premios del grupo. El nombre titula la página (si falta, cae al
  * código); `prizes` son los premios por posición (1º/2º/3º/último) que se marcan
- * en la clasificación general (null si el dueño no ha definido ninguno). */
+ * en la clasificación general (null si el dueño no ha definido ninguno).
+ * `closed_at` marca el fin de temporada: null = activo; con fecha = archivado
+ * (la página pasa a solo-lectura y muestra el podio final). */
 export interface GroupInfo {
   id: string
   name: string | null
   prizes: GroupPrizes | null
+  closed_at: string | null
 }
 
-/** Lee el grupo (id + nombre + premios) para la página, o null si no existe. */
+/** Lee el grupo (id + nombre + premios + cierre) para la página, o null si no existe. */
 export async function getGroup(groupId: string): Promise<GroupInfo | null> {
   const { data, error } = await supabase
     .from('groups')
-    .select('id, name, prizes')
+    .select('id, name, prizes, closed_at')
     .eq('id', groupId)
     .maybeSingle()
   if (error) throw error
   return data
+}
+
+/**
+ * Cierra la temporada del grupo (fin de temporada): congela la clasificación y
+ * deja el grupo en solo-lectura. Va por la RPC `close_group` (SECURITY DEFINER),
+ * que comprueba en servidor que quien llama es el dueño; un miembro recibe error.
+ */
+export async function closeGroup(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('close_group', { p_group_id: groupId })
+  if (error) throw error
+}
+
+/**
+ * Reabre la temporada del grupo (vuelve a activo: se puede crear retos y votar).
+ * Va por la RPC `reopen_group` (SECURITY DEFINER), que comprueba la propiedad en
+ * servidor igual que `close_group`.
+ */
+export async function reopenGroup(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('reopen_group', { p_group_id: groupId })
+  if (error) throw error
 }
 
 /**

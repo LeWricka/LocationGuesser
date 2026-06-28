@@ -1,75 +1,93 @@
-.header {
-  margin-bottom: var(--space-2);
+/* Pie de cada paso: «Anterior» a la izquierda, «Siguiente»/«Crear» dominante a
+   la derecha (crece para ser el objetivo táctil principal en móvil). */
+.nav {
+  align-items: center;
 }
 
-.title {
-  font-size: var(--font-size-xl);
-}
-
-/* Barra de búsqueda + GPS: el campo crece, el botón mantiene su tamaño. */
-.searchField {
-  position: relative;
+.navNext {
   flex: 1;
 }
 
-.searchInput {
-  width: 100%;
-  /* Hueco para el spinner de carga a la derecha. */
-  padding-right: var(--space-6);
-}
-
-/* Spinner dentro del buscador mientras Nominatim responde. */
-.searchSpinner {
-  position: absolute;
-  top: 50%;
-  right: var(--space-2);
-  transform: translateY(-50%);
+/* Acciones del paso 3 (previa = juego real): flotan ARRIBA-CENTRO sobre la escena
+   inmersiva (que es fija, z-index overlay). El back «← Editar» de la escena queda
+   arriba-izquierda y el FAB del mapa abajo-centro: estas acciones no los pisan.
+   Una pastilla de vidrio para que «Crear reto» se lea sobre cualquier escena. */
+.previewActions {
+  position: fixed;
+  top: calc(var(--space-3) + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-overlay) + 1);
   display: flex;
-  color: var(--color-text-muted);
-  pointer-events: none;
-}
-
-/* Wrapper relativo para colgar la lista de sugerencias bajo el buscador. */
-.searchWrap {
-  position: relative;
-}
-
-.suggestions {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  z-index: var(--z-sticky);
-  margin-top: var(--space-1);
-  list-style: none;
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-md);
-  overflow: hidden;
+  max-width: calc(100% - var(--space-6));
 }
 
-.suggestion {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: transparent;
+/* La fila de botones de la previa no estira (no es el layout de pie de paso). */
+.previewActions .nav {
+  gap: var(--space-2);
+}
+.previewActions .navNext {
+  flex: 0 0 auto;
+}
+
+/* Estado de guardado en la previa: texto legible dentro de la pastilla. */
+.previewStatus {
+  font-size: var(--font-size-sm);
   color: var(--color-text);
+}
+
+/* Dificultad en vivo (paso «El sitio»): se actualiza con la combinación de
+   medios elegida. Resumen de una línea bajo las tarjetas de foto y SV. */
+.difficultyBadge {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.difficultyLead {
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+/* Aviso en «Resumen» cuando no hay ningún medio (ni foto ni Street View): un
+   reto no puede crearse sin al menos uno. Tono de atención, no destructivo. */
+.mediaWarning {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+/* Opciones avanzadas de Street View (candados): plegadas por defecto. */
+.advanced {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+}
+
+.advancedSummary {
   padding: var(--space-2) var(--space-3);
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
   cursor: pointer;
 }
 
-.suggestion:hover,
-.suggestion:focus-visible {
-  background: var(--color-surface-hover);
-}
-
-/* Texto introductorio del flujo: explica que el reto es Street View. */
-.intro {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+.advancedBody {
+  padding: 0 var(--space-3) var(--space-3);
 }
 
 .coords {

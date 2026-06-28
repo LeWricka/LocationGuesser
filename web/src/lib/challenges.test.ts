@@ -97,9 +97,8 @@ beforeEach(() => {
 })
 
 describe('createChallenge', () => {
-  test('inserta el reto Y espeja la respuesta en challenge_answers', async () => {
+  test('inserta el reto; la respuesta la escribe el trigger 0012, no el cliente', async () => {
     results['challenges'] = { data: sampleChallenge, error: null }
-    results['challenge_answers'] = { data: null, error: null }
     const out = await createChallenge({
       title: 'Plaza Mayor',
       lat: 40.4155,
@@ -107,13 +106,13 @@ describe('createChallenge', () => {
       createdBy: '00000000-0000-0000-0000-000000000001',
       groupId: 'g1',
     })
-    // La respuesta va a su tabla aparte (gobernada por RLS), con UPSERT idempotente
-    // (onConflict: challenge_id) para no chocar con el trigger de la 0012.
-    expect(calls.upsert).toHaveBeenCalledWith(
-      'challenge_answers',
-      { challenge_id: 'c1', lat: 40.4155, lng: -3.7074 },
-      { onConflict: 'challenge_id' },
-    )
+    // El cliente NO escribe `challenge_answers`: lo hace el trigger
+    // `sync_challenge_answer` (0012) en la misma transacción. Escribirlo desde el
+    // cliente provocaba 42501 (RLS) al crear un miembro no-dueño.
+    const wroteAnswer =
+      calls.upsert.mock.calls.some((c) => c[0] === 'challenge_answers') ||
+      calls.insert.mock.calls.some((c) => c[0] === 'challenge_answers')
+    expect(wroteAnswer).toBe(false)
     expect(out.challenge).toEqual(sampleChallenge)
     expect(out.groupId).toBe('g1')
   })
@@ -154,20 +153,6 @@ describe('createChallenge', () => {
     >
     expect(insertArg.sv_lock_move).toBe(true)
     expect(insertArg.sv_lock_rotate).toBe(true)
-  })
-
-  test('propaga el error de la respuesta', async () => {
-    results['challenges'] = { data: sampleChallenge, error: null }
-    results['challenge_answers'] = { data: null, error: new Error('rls') }
-    await expect(
-      createChallenge({
-        title: 'x',
-        lat: 1,
-        lng: 2,
-        createdBy: 'u',
-        groupId: 'g1',
-      }),
-    ).rejects.toThrow('rls')
   })
 })
 
@@ -263,10 +248,9 @@ describe('updateChallenge', () => {
     expect(out.title).toBe('Nuevo')
   })
 
-  test('cambiar la ubicación (sin votos) actualiza también challenge_answers', async () => {
+  test('cambiar la ubicación (sin votos) actualiza el reto; la respuesta la sincroniza el trigger', async () => {
     results['votes'] = { error: null, count: 0 }
     results['challenges'] = { data: sampleChallenge, error: null }
-    results['challenge_answers'] = { data: null, error: null }
     await updateChallenge('c1', {
       location: { lat: 1, lng: 2, svPanoId: 'P', svHeading: 10, svPitch: 5, svLockMove: true },
     })
@@ -280,12 +264,10 @@ describe('updateChallenge', () => {
       sv_lock_move: true,
       sv_lock_rotate: false,
     })
-    // La respuesta se reescribe con UPSERT idempotente (deploy-safe frente al trigger).
-    expect(calls.upsert).toHaveBeenCalledWith(
-      'challenge_answers',
-      { challenge_id: 'c1', lat: 1, lng: 2 },
-      { onConflict: 'challenge_id' },
-    )
+    // El cliente NO escribe `challenge_answers`: el trigger 0012 la sincroniza al
+    // detectar el UPDATE de lat/lng (evita el 42501 de RLS, única fuente).
+    const wroteAnswer = calls.upsert.mock.calls.some((c) => c[0] === 'challenge_answers')
+    expect(wroteAnswer).toBe(false)
   })
 
   test('RECHAZA cambiar la ubicación si el reto ya tiene votos', async () => {

@@ -28,15 +28,12 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
         <div className={styles.hero}>
           <p className={styles.eyebrow}>Hola, {name}</p>
           <h1 className={styles.headline}>
-            GeoGuessr con <span className={styles.accent}>las fotos de tus amigos</span>
+            Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
           </h1>
-          <p className={styles.lead}>
-            Alguien sube una foto de dónde está; los demás adivinan en el mapa. Gana quien más se
-            acerca.
-          </p>
+          <p className={styles.lead}>Comparte dónde estás. Gana quien más se acerca.</p>
         </div>
 
-        <HowItWorks />
+        <HowItWorks compact />
 
         <Stack gap={2}>
           <Button size="lg" fullWidth onClick={onCreateGroup}>
@@ -45,9 +42,7 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
           <Button variant="secondary" size="lg" fullWidth onClick={onJoinGroup}>
             Unirme con un código
           </Button>
-          <p className={styles.hint}>
-            ¿Te han pasado un enlace? Ábrelo y entrarás al grupo automáticamente.
-          </p>
+          <p className={styles.hint}>¿Te han pasado un enlace? Ábrelo y entras directo.</p>
         </Stack>
       </Stack>
     </section>

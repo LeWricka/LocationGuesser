@@ -132,7 +132,7 @@
 
 .rankRow {
   display: grid;
-  grid-template-columns: 32px 1fr auto;
+  grid-template-columns: 32px 36px 1fr auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
@@ -216,6 +216,186 @@
   .medalGold {
     animation: none;
   }
+}
+
+/* Avatar del jugador en la fila de la lista (4º en adelante, o todos si <3).
+   El fondo (gradiente del avatar) lo inyecta el TSX; aquí solo forma y tamaño. */
+.rankAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  line-height: 1;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--color-border);
+  user-select: none;
+}
+
+.rankAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* --- Podio (top-3 de la clasificación) ------------------------------------
+   Mismo MARKUP que la tarjeta para compartir (componente Podium), pero a escala
+   de PANTALLA: discos/fuentes pensados para el ancho del móvil, no para el
+   poster 1080px. El orden visual 2-1-3 y las alturas las dan las clases de plaza. */
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.podiumCol {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-1);
+}
+
+/* Orden visual 2-1-3 (el DOM ya viene 2-1-3; fijamos el order por claridad). */
+.placeSecond {
+  order: 1;
+}
+.placeFirst {
+  order: 2;
+}
+.placeThird {
+  order: 3;
+}
+
+.crown {
+  font-size: 24px;
+  line-height: 1;
+  margin-bottom: -4px;
+}
+
+/* Disco con el avatar; el fondo (gradiente del avatar) lo inyecta el componente.
+   Anillo de puesto (oro/plata/bronce) alrededor. La 1ª plaza, mayor. */
+.podiumDisc {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  line-height: 1;
+}
+
+.podiumGold {
+  box-shadow: inset 0 0 0 3px var(--medal-gold);
+}
+.podiumSilver {
+  box-shadow: inset 0 0 0 3px var(--medal-silver);
+}
+.podiumBronze {
+  box-shadow: inset 0 0 0 3px var(--medal-bronze);
+}
+
+.podiumAvatar {
+  font-size: 30px;
+  line-height: 1;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+}
+img.podiumAvatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: none;
+}
+
+.placeFirst .podiumDisc {
+  width: 72px;
+  height: 72px;
+}
+.placeFirst .podiumAvatar {
+  font-size: 38px;
+}
+
+.podiumName {
+  max-width: 100%;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.podiumPoints {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-black);
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.podiumPrize {
+  max-width: 100%;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Pedestal: tinte del color del puesto con su medalla; altura por plaza (1ª la
+   más alta) para leer el podio de un vistazo. */
+.pedestal {
+  position: relative;
+  width: 100%;
+  margin-top: var(--space-1);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: var(--space-2);
+}
+
+.placeFirst .pedestal {
+  height: 64px;
+}
+.placeSecond .pedestal {
+  height: 46px;
+}
+.placeThird .pedestal {
+  height: 34px;
+}
+
+.pedestalMedal {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.pedestal.podiumGold {
+  background-color: rgba(255, 207, 92, 0.18);
+  border: 1px solid var(--medal-gold);
+  border-bottom: none;
+  box-shadow: none;
+}
+.pedestal.podiumSilver {
+  background-color: rgba(207, 224, 230, 0.16);
+  border: 1px solid var(--medal-silver);
+  border-bottom: none;
+  box-shadow: none;
+}
+.pedestal.podiumBronze {
+  background-color: rgba(217, 138, 78, 0.18);
+  border: 1px solid var(--medal-bronze);
+  border-bottom: none;
+  box-shadow: none;
 }
 
 /* Centro de la fila: nombre + barra de progreso relativa al líder. */
@@ -329,6 +509,14 @@
   white-space: nowrap;
 }
 
+/* Marca anti-trampa (issue #200): ⚠️ junto al nombre del jugador cuyo voto salió
+   de la app durante la jugada. Pequeño, sin romper el truncado del nombre. */
+.leftAppFlag {
+  margin-left: var(--space-1);
+  font-size: var(--font-size-sm);
+  cursor: help;
+}
+
 .scoreDist {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
@@ -416,6 +604,38 @@
   color: var(--color-text-muted);
 }
 
+/* Miniatura de la foto en la cabecera del reto cerrado (a la izquierda). No se
+   encoge para que el título no la aplaste. */
+.pastThumb {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+}
+
+/* Título del reto en la cabecera: ocupa el centro y trunca si es largo (deja
+   sitio a la fecha y al chevron a la derecha). */
+.pastTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fecha del reto a la derecha (p.ej. "12 jun 2026"), discreta. */
+.pastDate {
+  flex: 0 0 auto;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .reveal {
   padding: 0 var(--space-4) var(--space-4);
 }
@@ -490,6 +710,53 @@
 
 /* --- Miembros del grupo (#146) ---------------------------------------------- */
 
+/* Sección colapsable de miembros: el <summary> es la cabecera (título + chevron).
+   Arranca cerrada (la membresía es secundaria en una página larga). Al abrir,
+   separamos el summary de la lista. */
+.membersDetails[open] .membersSummary {
+  margin-bottom: var(--space-3);
+}
+
+.membersSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* El sectionTitle dentro del summary no necesita su margen inferior (lo gestiona
+   el Stack/Card de abajo); lo anulamos para alinear el chevron con el texto. */
+.membersSummary .sectionTitle {
+  margin-bottom: 0;
+}
+
+/* Oculta el triángulo nativo del <summary> (usamos nuestro chevron). */
+.membersSummary::-webkit-details-marker {
+  display: none;
+}
+.membersSummary::marker {
+  content: '';
+}
+
+.membersChevron {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+}
+
+/* Chevron apunta hacia arriba cuando la sección está abierta. */
+.membersDetails[open] .membersChevron {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .membersChevron {
+    transition: none;
+  }
+}
+
 .memberList {
   list-style: none;
   margin: 0;
@@ -529,6 +796,24 @@
   cursor: pointer;
 }
 
+/* --- Ajustes del grupo: sección neutra (temporada) -------------------------- */
+
+/* Bloque separado dentro de Ajustes para una acción reversible (cerrar/reabrir
+   temporada). Mismo separador que la zona peligrosa, pero label en tono normal. */
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.settingsSectionLabel {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
 /* --- Ajustes del grupo: zona peligrosa (borrar) ----------------------------- */
 
 .dangerZone {
@@ -553,4 +838,41 @@
 
 .dangerBtn:hover:not(:disabled) {
   background: var(--color-danger-soft);
+}
+
+/* --- Fin de temporada: banner de grupo cerrado (archivado) ------------------ */
+
+/* Banner ámbar (tono "trofeo") en la cabecera de un grupo archivado: comunica de
+   un vistazo que la temporada está cerrada y la fecha del cierre. Poco texto. */
+.closedBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.closedBannerIcon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.closedBannerText {
+  margin: 0;
+}
+
+.closedBannerDate {
+  color: var(--color-text-muted);
+}
+
+/* Corona del ganador sobre el podio congelado (temporada cerrada). */
+.winnerBanner {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-lg);
+  color: var(--color-text);
 }

@@ -121,3 +121,37 @@
     font-size: 56px;
   }
 }
+
+/* Acceso discreto a la administración (solo admin): pastilla flotante abajo a la
+ * izquierda. Discreta a propósito (baja opacidad, sin acento de marca) para no
+ * competir con el FAB de crear grupo de la home. Respeta el safe-area de iOS. */
+.adminLink {
+  position: fixed;
+  left: var(--space-4);
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+.adminLink:hover {
+  opacity: 1;
+  color: var(--color-text);
+}
+
+.adminLink:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  opacity: 1;
+}
