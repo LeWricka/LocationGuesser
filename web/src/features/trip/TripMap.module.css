@@ -1,0 +1,57 @@
+/*
+ * Mapa plano de la ruta (Leaflet + satélite Esri). Ocupa todo el contenedor; el
+ * layout a pantalla completa lo decide la pantalla padre. Fondo océano mientras
+ * cargan los tiles satélite (mismo patrón que .lg-map).
+ */
+.wrap {
+  width: 100%;
+  height: 100%;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+  /* Fondo profundo bajo los tiles que aún no han cargado (evita el flash gris). */
+  background: var(--ocean-900);
+}
+
+/*
+ * Los pines son `L.divIcon`: Leaflet inyecta su HTML FUERA del árbol de React,
+ * así que las clases deben ser globales para alcanzar ese DOM. Las declaramos
+ * con :global() para que viajen con este componente sin filtrarse a otros.
+ */
+
+/* Pin-foto: miniatura redonda con anillo; el anillo (color) lo fija el estado. */
+:global(.lg-trip-pin) {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full, 999px);
+  background-size: cover;
+  background-position: center;
+  background-color: var(--ocean-900);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  /* Anillo del estado: variable que cada pin sobreescribe inline. */
+  border: var(--pin-ring-width) solid var(--pin-ring-closed);
+}
+
+/* Pin sin foto: muestra un emoji centrado sobre el disco. */
+:global(.lg-trip-pin--icon) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* Pin del momento ACTIVO: anillo cálido + halo que respira (reusa lg-pulse-glow). */
+:global(.lg-trip-pin--active) {
+  border-color: var(--pin-ring-active);
+  animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global(.lg-trip-pin--active) {
+    animation: none;
+  }
+}

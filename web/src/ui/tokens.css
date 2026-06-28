@@ -131,6 +131,30 @@
   --photo-text-shadow: rgba(0, 0, 0, 0.6);
 
   /* ----------------------------------------------------------------------
+   * Mapa "Viaje" (pivote diario visual) — deltas §4.2 del spec de diseño.
+   * El mapa va a sangre con satélite Esri; estos tokens visten el chrome, los
+   * pines-foto y la ruta SOBRE la imagen satélite (muy contrastada). NO se
+   * incluye el @font-face manuscrito (Fase 2: aún no tenemos el .woff2).
+   * -------------------------------------------------------------------- */
+
+  /* Chrome flotante sobre el mapa hero (más opaco que el glass normal porque va
+   * sobre fotos satélite muy contrastadas). */
+  --map-chrome-bg: rgba(8, 24, 33, 0.66);
+  --map-chrome-blur: blur(14px) saturate(130%);
+
+  /* Anillo del pin-foto en cada estado. */
+  --pin-ring-closed: rgba(255, 255, 255, 0.92); /* cerrado: blanco */
+  --pin-ring-active: var(--color-accent); /* en juego: cálido pulsante */
+  --pin-ring-width: 3px;
+
+  /* Trazo de la ruta sobre satélite. */
+  --route-line: rgba(255, 255, 255, 0.78);
+  --route-line-dash: rgba(255, 255, 255, 0.55); /* tramo no clavado (hacia el activo) */
+
+  /* Velo bajo el carrusel para separar tarjetas del mapa (degradado al pie). */
+  --map-bottom-scrim: linear-gradient(to top, rgba(2, 10, 16, 0.85), transparent);
+
+  /* ----------------------------------------------------------------------
    * Tarjetas rasterizadas (LeaderboardCard / ResultCard)
    * Superficie "atlas" compartida por las dos tarjetas que se exportan a PNG
    * con html-to-image. SOLO color/gradiente/borde SÓLIDOS (sin blur ni glow:
