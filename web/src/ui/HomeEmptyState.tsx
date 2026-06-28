@@ -30,9 +30,7 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
           <h1 className={styles.headline}>
             Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
           </h1>
-          <p className={styles.lead}>
-            Tus amigos adivinan en el mapa dónde estás; gana quien más se acerca.
-          </p>
+          <p className={styles.lead}>Comparte dónde estás. Gana quien más se acerca.</p>
         </div>
 
         <HowItWorks compact />
@@ -44,9 +42,7 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
           <Button variant="secondary" size="lg" fullWidth onClick={onJoinGroup}>
             Unirme con un código
           </Button>
-          <p className={styles.hint}>
-            ¿Te han pasado un enlace? Ábrelo y entrarás al grupo automáticamente.
-          </p>
+          <p className={styles.hint}>¿Te han pasado un enlace? Ábrelo y entras directo.</p>
         </Stack>
       </Stack>
     </section>
