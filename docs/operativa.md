@@ -113,12 +113,14 @@ Requiere estar logueado en el CLI (`npx supabase login`).
 
 ---
 
-## 5. Migraciones automáticas + deploy ordenado
+## 5. Migraciones automáticas
 
-El pipeline que aplica las migraciones de Supabase y luego despliega el front
-(orden "migrar primero, desplegar después", para evitar el bug tipo `closed_at`)
-tiene su propia guía de puesta en marcha — secrets, ajuste de Vercel y
-reconciliación única del historial:
+El pipeline aplica las migraciones de Supabase con `supabase db push` en cada
+push a `main`. El deploy del front lo sigue haciendo Vercel por su auto-deploy de
+git. El orden Vercel-vs-migración no importa gracias a la **regla de 2 fases**
+(migración aditiva primero, front que la usa después; el front nunca selecciona
+una columna que aún no existe). Guía de puesta en marcha — secrets de Supabase,
+regla de 2 fases y reconciliación única del historial:
 
 ➡️ **[docs/migraciones-automaticas.md](migraciones-automaticas.md)**
 

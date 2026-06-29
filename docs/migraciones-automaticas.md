@@ -1,65 +1,61 @@
-# Migraciones automáticas + deploy ordenado
+# Migraciones automáticas
 
 Guía de **puesta en marcha** del pipeline que aplica las migraciones de Supabase
-y despliega el front en el orden correcto: **migrar primero, desplegar después**.
+en cada push a `main`.
 
 El workflow está en [`.github/workflows/db-migrate.yml`](../.github/workflows/db-migrate.yml).
-En cada push a `main`: aplica las migraciones pendientes con `supabase db push` y
-**solo si eso va en verde** dispara el deploy de Vercel vía Deploy Hook.
+En cada push a `main` aplica las migraciones pendientes con `supabase db push`.
 
-> **Por qué este orden.** El front estático de Vercel auto-despliega en cada push
-> a `main`. Si el código nuevo asume una columna/tabla que aún no existe en la BD,
-> el deploy rompe producción hasta que alguien aplica la migración a mano (fue el
-> bug tipo `closed_at`). Aplicando el esquema **antes** del deploy, la BD siempre
-> va por delante (o a la par) del código.
+> **El deploy del front lo sigue haciendo Vercel** por su auto-deploy de git: no
+> lo tocamos. El orden Vercel-vs-migración se garantiza con disciplina (regla de
+> 2 fases, abajo), no con un deploy-hook.
 
-Hay **tres tareas manuales** que debe hacer el usuario una vez (Claude no puede:
-no tiene acceso a los secrets del repo, al panel de Vercel ni a credenciales de la BD).
+Hay **dos tareas manuales** que debe hacer el usuario una vez (Claude no puede:
+no tiene acceso a los secrets del repo ni a credenciales de la BD).
 
 ---
 
 ## 1. Crear los GitHub secrets
 
 Repo → **Settings → Secrets and variables → Actions → New repository secret**.
-Crear estos tres:
+Crear estos dos:
 
 | Secret | Qué es | De dónde sale |
 |--------|--------|---------------|
 | `SUPABASE_ACCESS_TOKEN` | Token personal del CLI de Supabase | [supabase.com/account/tokens](https://supabase.com/account/tokens) → *Generate new token* |
 | `SUPABASE_DB_PASSWORD` | Contraseña de la BD del proyecto | Supabase → Project → **Settings → Database → Connection** (o resetearla ahí) |
-| `VERCEL_DEPLOY_HOOK_URL` | URL secreta que dispara un deploy de production | Vercel → Project → **Settings → Git → Deploy Hooks** → crear uno para la rama `main` |
 
 > Ninguno de estos valores se escribe NUNCA en el repo. El workflow los lee de
 > `secrets.*` y los pasa por `env` al CLI. No se imprimen en los logs.
 
 ---
 
-## 2. Desactivar el auto-deploy por git en Vercel
+## 2. Regla de 2 fases: migrar antes de usar (disciplina, gratis)
 
-Para que el deploy **solo** ocurra vía el hook (tras migrar) y no también por el
-push de git (que iría en paralelo, sin esperar a la migración):
+El front estático de Vercel auto-despliega en cada push a `main`, y la migración
+corre en su propio workflow. **No controlamos cuál de los dos termina antes.** El
+problema clásico (el bug tipo `closed_at`) era: el front nuevo `select`a una
+columna que la BD aún no tiene → producción rota.
 
-- Vercel → Project → **Settings → Git → Ignored Build Step**.
-- Poner un comando que **siempre cancele** el build automático de production, p.ej.:
+La solución no necesita ningún ajuste de Vercel ni deploy-hook, solo **orden de
+merge**:
 
-  ```bash
-  exit 0   # "ignorar build": no construir nunca por push de git
-  ```
+1. **Primero** se mergea la migración que **añade** la columna/tabla.
+2. **Después** (otro PR) se mergea el front que la usa.
 
-  (Vercel interpreta exit code **0** del Ignored Build Step como "no hace falta
-  build" y **cancela** el deploy automático. El deploy real lo arranca el Deploy
-  Hook, que ignora este paso.)
+Como las migraciones son **aditivas** (añaden, no quitan ni renombran), una vez
+aplicada la fase 1 la columna existe para siempre. El front de la fase 2 nunca
+puede salir antes que su columna, así que **da igual quién gane la carrera
+Vercel-vs-migración**: el front jamás selecciona algo que todavía no existe.
 
-- Alternativa más explícita: en **Settings → Git** desconectar el despliegue
-  automático de Production (dejar solo Preview para PRs, si se quiere).
-
-> **Por qué.** Si ambos caminos están activos (push de git **y** hook), el deploy
-> por git puede salir ANTES de que termine la migración → vuelve el problema de
-> orden. Dejando un único disparador (el hook tras `db push`) el orden queda
-> garantizado.
+> **Por qué funciona sin coordinar deploys.** Entre fase 1 y fase 2 el front viejo
+> sigue corriendo y no conoce la columna nueva → no la pide. La columna añadida
+> es invisible hasta que llega el front que la usa. El orden temporal de los dos
+> pipelines deja de importar.
 >
-> **Nota:** los deploys de **Preview** (PRs) pueden seguir activos sin riesgo: no
-> tocan producción ni la BD de prod.
+> **Corolario:** evita migraciones **destructivas** (drop/rename de columnas en
+> uso) en el mismo ciclo que el front. Si hay que retirar una columna, hazlo en
+> dos fases inversas: primero deja de usarla en el front, luego la dropeas.
 
 ---
 
@@ -71,8 +67,8 @@ las tiene registradas**. Si no se reconcilia:
 
 > ⚠️ Un `supabase db push` ingenuo creería que 0001–0020 están pendientes e
 > intentaría **re-aplicarlas**. Fallarían en seco (`relation already exists`,
-> `column already exists`, etc.) y el job quedaría en rojo → no se desplegaría
-> nunca. En el peor caso, una migración a medio re-aplicar deja la BD inconsistente.
+> `column already exists`, etc.) y el job quedaría en rojo. En el peor caso, una
+> migración a medio re-aplicar deja la BD inconsistente.
 
 La solución es **marcar 0001–0020 como ya aplicadas** en el historial remoto, sin
 ejecutarlas, de modo que `db push` solo aplique de **0021 en adelante**.
@@ -124,11 +120,10 @@ npx supabase migration list
 
    Debe decir que aplicaría **solo** `0021_challenge_description.sql`. Si lista
    alguna de 0001–0020, la reconciliación no quedó bien: vuelve al §3.
-3. **Mergea a `main`.** El workflow `DB migrate + deploy` se dispara:
-   - aplica 0021 (columna `description`, aditiva y nullable → no rompe nada),
-   - y al ir en verde, llama al Deploy Hook → Vercel despliega.
+3. **Mergea a `main`.** El workflow `DB migrate` se dispara y aplica 0021
+   (columna `description`, aditiva y nullable → no rompe nada).
 4. **Revisa la pestaña Actions**: el job debe terminar en verde. Si `db push`
-   falla, el deploy **no** se dispara (producción intacta) — corrige y reintenta.
+   falla, corrige y reintenta (la migración no se registra hasta que va en verde).
 5. **Verifica la columna** sin credenciales sensibles (publishable key):
 
    ```bash
@@ -138,4 +133,5 @@ npx supabase migration list
 
 > 0021 es **aditiva** (columna nullable, sin default, sin tocar policies): el
 > riesgo de esta primera pasada es mínimo. Es la migración ideal para estrenar el
-> pipeline.
+> pipeline. Por la **regla de 2 fases (§2)**, el front que use `description` se
+> mergea en un PR posterior, nunca antes de que esta migración esté en `main`.
