@@ -1,0 +1,77 @@
+# Auto-migraciones + deploy: "migrar primero, desplegar después".
+#
+# Por qué: el front estático en Vercel auto-despliega en cada push a main. Si el
+# código nuevo asume una columna/tabla que aún no existe en la BD, el deploy
+# rompe producción hasta que alguien aplica la migración a mano (fue el bug tipo
+# closed_at). Este workflow invierte el orden: en cada push a main aplica las
+# migraciones pendientes con `supabase db push` y SOLO si eso va en verde
+# dispara el deploy de Vercel vía Deploy Hook. Así el esquema siempre va por
+# delante (o a la par) del código.
+#
+# PRE-REQUISITO OPERATIVO (una sola vez, lo hace el usuario): ver
+# docs/migraciones-automaticas.md
+#   1. Crear los secrets SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD y
+#      VERCEL_DEPLOY_HOOK_URL en el repo.
+#   2. Reconciliar el historial de migraciones (0001-0020 se aplicaron a mano):
+#      `supabase migration repair --status applied <version>` para cada una,
+#      o `supabase db pull`. Sin esto, `db push` intentaría re-aplicarlas y fallaría.
+#   3. Desactivar el auto-deploy por git en Vercel (Ignored Build Step) para que
+#      el deploy SOLO ocurra vía el hook tras migrar.
+
+name: DB migrate + deploy
+
+on:
+  push:
+    branches: [main]
+    # Acotamos a lo que de verdad cambia el esquema o el propio pipeline; un push
+    # que solo toca docs/web no necesita relanzar la migración (pero tampoco haría
+    # daño: db push es idempotente). Lo dejamos amplio a propósito para que el
+    # deploy-hook se dispare en TODO push a main (el front vive en web/).
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+      - 'web/**'
+      - '.github/workflows/db-migrate.yml'
+
+# Un solo run a la vez: dos pushes seguidos a main no deben pisarse aplicando
+# migraciones en paralelo. No cancelamos el run en curso (cancel-in-progress:
+# false) porque abortar un `db push` a medias dejaría el historial inconsistente;
+# encolamos y dejamos terminar.
+concurrency:
+  group: db-migrate-main
+  cancel-in-progress: false
+
+jobs:
+  migrate-and-deploy:
+    name: Aplicar migraciones y, si OK, desplegar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+
+      # `link` y `db push` leen el token y la password de la BD del entorno
+      # (SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD). NUNCA se hardcodean ni se
+      # imprimen; vienen de los secrets del repo. db push aplica solo las
+      # migraciones que el historial remoto aún no tiene registradas.
+      - name: Aplicar migraciones (supabase db push)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref ykquigyjvgxisgdxryxr
+          supabase db push
+
+      # Solo se llega aquí si el paso anterior fue en verde (si `db push` falla,
+      # el job aborta y NO se dispara el deploy → producción no estrena código
+      # que la BD no soporta). El hook es una URL secreta de Vercel que arranca
+      # un deploy de production. -f hace que curl devuelva error si el POST no
+      # responde 2xx, así un hook caído también marca el job en rojo.
+      - name: Disparar deploy de Vercel (solo si la migración fue OK)
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: curl -fsS -X POST "$VERCEL_DEPLOY_HOOK_URL"
