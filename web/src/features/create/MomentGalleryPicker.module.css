@@ -1,0 +1,230 @@
+/* Estado vacío: mismo tile que PhotoDropzone (cámara con "+"), pero invita a
+   varias fotos. Reusa los tokens "Atelier" (sin colores nuevos). */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 160px;
+  padding: var(--space-5) var(--space-4);
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.empty:hover,
+.empty:focus-within {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
+}
+
+.empty[aria-busy='true'] {
+  cursor: progress;
+}
+
+.icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  font-size: var(--font-size-xl);
+}
+
+.plus {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-black);
+  line-height: 1;
+}
+
+.emptyLabel {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Con fotos: galería en tira horizontal con scroll-snap (mobile-first). */
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.strip {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: var(--space-1);
+}
+
+.tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: 64%;
+  max-width: 280px;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-sm);
+  scroll-snap-align: start;
+}
+
+/* La portada resalta con un anillo de acento (sin color nuevo). */
+.tile[data-cover] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbBusy {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-scrim);
+  color: var(--color-on-photo);
+}
+
+.coverBadge {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.tileActions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: linear-gradient(to top, var(--photo-overlay-strong), transparent);
+}
+
+.makeCover,
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--color-on-photo);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+.makeCover:hover,
+.remove:hover,
+.makeCover:focus-visible,
+.remove:focus-visible {
+  background: rgba(0, 0, 0, 0.55);
+  border-color: var(--color-on-photo);
+}
+
+/* Tile final para añadir más fotos: discontinuo, mismo tamaño que las miniaturas. */
+.addTile {
+  flex: 0 0 auto;
+  width: 40%;
+  max-width: 160px;
+  aspect-ratio: 4 / 3;
+  scroll-snap-align: start;
+}
+
+.addLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.addLabel:hover,
+.addLabel:focus-within {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
+}
+
+.addIcon {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-black);
+  line-height: 1;
+}
+
+.addText {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.count {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Input de archivo oculto pero accesible (visually-hidden). */
+.input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -7,6 +7,7 @@ import { promoteToChallenge, updateChallengeDescription } from '../../lib/challe
 import { deadlineFromMinutes } from '../../lib/time'
 import { MapPicker } from '../create/MapPicker'
 import { Countdown } from './Countdown'
+import { MomentGallery } from './MomentGallery'
 import styles from './MomentSheet.module.css'
 
 interface Props {
@@ -243,28 +244,38 @@ export function MomentSheet({ moment, canEdit = false, onClose, onPlay, onPromot
         {/* lg-stagger: el bloque editorial se ensambla en cascada al subir la hoja.
             Se anula bajo reduced-motion (la utilidad global ya lo gestiona). */}
         <div className={`${styles.content} lg-stagger`}>
-          <div className={styles.photoWrap}>
-            <ChallengePhoto
-              src={moment.imageUrl}
-              alt={moment.title}
-              ratio="wide"
-              size="lg"
-              className={styles.photo}
+          {/* RECUERDO: galería multi-foto (carrusel + controles del dueño). RETO:
+              su foto única (la que se adivina), sin galería. */}
+          {isRecuerdo ? (
+            <MomentGallery
+              challengeId={moment.challengeId}
+              initialCoverUrl={moment.imageUrl}
+              canEdit={canEdit}
+              onChanged={onPromoted}
             />
-            {/* Estado sobre la foto: EN JUEGO (cálido) o "🎯 Reto" (cerrado/práctica).
-                Un recuerdo no lleva badge: es contenido, no juego. */}
-            {isActive ? (
-              <div className={styles.photoBadge}>
-                <Badge tone="live" dot>
-                  EN JUEGO
-                </Badge>
-              </div>
-            ) : isReto ? (
-              <div className={styles.photoBadge}>
-                <Badge tone="accent">🎯 Reto</Badge>
-              </div>
-            ) : null}
-          </div>
+          ) : (
+            <div className={styles.photoWrap}>
+              <ChallengePhoto
+                src={moment.imageUrl}
+                alt={moment.title}
+                ratio="wide"
+                size="lg"
+                className={styles.photo}
+              />
+              {/* Estado sobre la foto: EN JUEGO (cálido) o "🎯 Reto" (cerrado/práctica). */}
+              {isActive ? (
+                <div className={styles.photoBadge}>
+                  <Badge tone="live" dot>
+                    EN JUEGO
+                  </Badge>
+                </div>
+              ) : isReto ? (
+                <div className={styles.photoBadge}>
+                  <Badge tone="accent">🎯 Reto</Badge>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <h2 className={styles.title}>{moment.title}</h2>
           {/* Meta-línea estilo Polarsteps: "🇲🇾 MALASIA · 8 de abril de 2026". El país

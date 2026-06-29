@@ -170,6 +170,33 @@ export interface Database {
         }
         Relationships: []
       }
+      moment_images: {
+        // Galería de fotos de un MOMENTO (recuerdo): N filas por momento. La
+        // PORTADA es la de menor `sort_order` y se espeja en `challenges.image_path`.
+        // Migración 0023. RLS: SELECT miembro del grupo; INSERT/UPDATE/DELETE dueño.
+        Row: {
+          id: string
+          challenge_id: string
+          image_path: string
+          sort_order: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          challenge_id: string
+          image_path: string
+          sort_order?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          challenge_id?: string
+          image_path?: string
+          sort_order?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
       challenge_answers: {
         // La respuesta del reto (lat/lng), gobernada por RLS aparte de `challenges`:
         // legible solo si el reto está cerrado o el usuario ya votó (migración 0010).
