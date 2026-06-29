@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { EmptyState, Spinner } from '../../ui'
+import { EmptyState, Spinner, useReducedMotion } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import type { Moment } from '../../lib/trip'
@@ -46,9 +46,16 @@ function membersLine(names: string[], myName: string | null): string {
  * carrusel horizontal de momentos abajo. Al tocar una tarjeta sube la hoja de
  * detalle. El juego es una CAPA opcional: solo el momento en juego ofrece jugar.
  */
+// Intervalo entre saltos al "reproducir" el viaje. Suficiente para que el flyTo
+// del mapa asiente y se lea cada momento, sin que la espera se haga larga.
+const PLAYBACK_INTERVAL_MS = 2300
+
 export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic, onBack }: Props) {
   const { user, profile } = useSession()
   const { group, moments, route, loading, error } = useTripData(groupId)
+  // Con menos movimiento, los flyTo se vuelven saltos secos: reproducir un
+  // recorrido animado pierde sentido, así que ocultamos el control (no autoplay).
+  const reducedMotion = useReducedMotion()
 
   // Momento abierto en la hoja de detalle (null = cerrada).
   const [openMoment, setOpenMoment] = useState<Moment | null>(null)
@@ -63,9 +70,27 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
   // Evita reposicionar el scroll del carrusel cuando la selección vino DEL propio
   // carrusel (si no, pelearía con el gesto del usuario al hacer swipe).
   const selectionFromCarousel = useRef(false)
+  // Marca que el scroll que está corriendo lo PROGRAMAMOS nosotros (scrollIntoView
+  // al seleccionar desde mapa/timeline/stepper). Sirve para que el sync-on-scroll
+  // no confunda ese scroll con un swipe humano y entre en bucle (scroll → select →
+  // scroll → …). Se baja cuando el scroll se estabiliza.
+  const programmaticScroll = useRef(false)
+  // Temporizadores del scroll-sync del carrusel (debounce del swipe + ventana tras
+  // un scroll programado). Se limpian al desmontar.
+  const scrollSettleTimer = useRef<number | null>(null)
+  const programmaticScrollTimer = useRef<number | null>(null)
   // Solo auto-seleccionamos el momento en juego UNA vez (al abrir): después
   // respetamos lo que el usuario toque, no le robamos la selección en cada refresh.
   const didAutoSelect = useRef(false)
+
+  // Reproducir el viaje: recorre los momentos en orden cronológico seleccionando
+  // cada uno (cada selección centra el mapa con flyTo + desplaza el carrusel, así
+  // que el efecto es "ver el viaje en marcha"). El stepper vive aquí porque es
+  // quien tiene selectedId + onSelectMoment; la UI del botón está en MomentTimeline.
+  const [playing, setPlaying] = useState(false)
+  // Marca que la PRÓXIMA selección la dispara el stepper, para no auto-pausar por
+  // ella (cualquier selección que NO venga del stepper = interacción del usuario).
+  const stepperSelecting = useRef(false)
 
   // Permisos + miembros: leemos si soy dueño (puedo crear) y los nombres del
   // grupo. Tolerante: si falla, no bloquea ver el viaje (solo oculta el FAB).
@@ -103,23 +128,57 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
 
   const title = group?.name?.trim() || groupId
 
+  // Cualquier selección que NO venga del stepper es interacción del usuario (tocar
+  // un pin, una tarjeta, una marca de la timeline o el indicador "en juego"): pausa
+  // la reproducción para devolverle el control. El stepper limpia su propia marca.
+  const stopPlaybackOnUserSelect = () => {
+    if (stepperSelecting.current) return
+    setPlaying(false)
+  }
+
   // Selección: centra el pin en el mapa. Marcamos el origen para no auto-scrollear
   // el carrusel cuando la selección ya vino de él.
   const selectFromCarousel = (challengeId: string) => {
+    stopPlaybackOnUserSelect()
     selectionFromCarousel.current = true
     setSelectedId(challengeId)
   }
   const selectFromMap = (challengeId: string) => {
+    stopPlaybackOnUserSelect()
     selectionFromCarousel.current = false
     setSelectedId(challengeId)
+  }
+
+  // Desplaza una tarjeta al centro del carrusel marcando el scroll como PROGRAMADO
+  // (para que el sync-on-scroll no lo lea como swipe humano). Con menos movimiento,
+  // salto seco; si no, suave. La ventana de "scroll programado" cubre la animación.
+  const scrollCardIntoView = (challengeId: string) => {
+    const el = carouselRef.current?.querySelector<HTMLElement>(`[data-cid="${challengeId}"]`)
+    if (!el) return
+    programmaticScroll.current = true
+    if (programmaticScrollTimer.current != null)
+      window.clearTimeout(programmaticScrollTimer.current)
+    el.scrollIntoView({
+      behavior: reducedMotion ? 'auto' : 'smooth',
+      inline: 'center',
+      block: 'nearest',
+    })
+    // Tras la animación de scroll, deja de tratar los eventos como programados.
+    programmaticScrollTimer.current = window.setTimeout(
+      () => {
+        programmaticScroll.current = false
+      },
+      reducedMotion ? 80 : 600,
+    )
   }
 
   // Cuando el mapa selecciona un momento (tocar pin), desplazamos el carrusel a su
   // tarjeta para mantener carrusel↔mapa en sincronía.
   useEffect(() => {
     if (!selectedId || selectionFromCarousel.current) return
-    const el = carouselRef.current?.querySelector<HTMLElement>(`[data-cid="${selectedId}"]`)
-    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    scrollCardIntoView(selectedId)
+    // scrollCardIntoView es estable (cierra sobre refs); no lo listamos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
 
   // Point 5: al abrir el viaje, si hay un momento EN JUEGO lo seleccionamos solo
@@ -129,11 +188,102 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
     if (didAutoSelect.current || selectedId || !activeMoment) return
     didAutoSelect.current = true
     selectFromMap(activeMoment.challengeId)
-    const el = carouselRef.current?.querySelector<HTMLElement>(
-      `[data-cid="${activeMoment.challengeId}"]`,
-    )
-    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+    scrollCardIntoView(activeMoment.challengeId)
+    // selectFromMap es estable en la práctica; no lo listamos para no re-disparar
+    // la auto-selección (este efecto solo debe correr al abrir el viaje).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMoment, selectedId])
+
+  // Stepper de reproducción: mientras `playing`, avanza al siguiente momento cada
+  // PLAYBACK_INTERVAL_MS empezando por el primero. Seleccionar centra el mapa
+  // (flyTo) y desplaza el carrusel. Al llegar al último, para (no hace bucle: el
+  // viaje "termina" donde acaba). El intervalo se limpia al pausar y al desmontar.
+  useEffect(() => {
+    if (!playing) return
+    // Arrancar siempre desde el principio del viaje para que el recorrido se lea
+    // completo aunque hubiera un momento seleccionado.
+    let index = 0
+    const step = () => {
+      const moment = moments[index]
+      if (!moment) {
+        setPlaying(false)
+        return
+      }
+      stepperSelecting.current = true
+      // Reusa la selección "desde el mapa": centra el pin y sincroniza el carrusel.
+      selectFromMap(moment.challengeId)
+      stepperSelecting.current = false
+    }
+    step() // primer salto inmediato, sin esperar el primer tick
+    const id = window.setInterval(() => {
+      index += 1
+      if (index >= moments.length) {
+        window.clearInterval(id)
+        setPlaying(false)
+        return
+      }
+      step()
+    }, PLAYBACK_INTERVAL_MS)
+    return () => window.clearInterval(id)
+    // selectFromMap es estable en la práctica (closures sobre refs/setState); no lo
+    // listamos para no reiniciar el recorrido en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playing, moments])
+
+  // Scroll-sync: al hacer SWIPE por el carrusel, selecciona la tarjeta que queda
+  // centrada (lo que hace volar el mapa a su pin y resalta su fecha en la timeline),
+  // no solo al tocar. Debounce: esperamos a que el scroll se estabilice (~140 ms)
+  // para no disparar un flyTo por píxel. El scroll PROGRAMADO (scrollIntoView del
+  // mapa/timeline/stepper) se ignora vía programmaticScroll para no entrar en bucle.
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el || moments.length === 0) return
+
+    const syncToCenteredCard = () => {
+      // La tarjeta enfocada es la más cercana al centro del viewport del carrusel.
+      const center = el.scrollLeft + el.clientWidth / 2
+      let closestId: string | null = null
+      let closestDist = Infinity
+      for (const slide of el.querySelectorAll<HTMLElement>('[data-cid]')) {
+        const slideCenter = slide.offsetLeft + slide.offsetWidth / 2
+        const dist = Math.abs(slideCenter - center)
+        if (dist < closestDist) {
+          closestDist = dist
+          closestId = slide.dataset.cid ?? null
+        }
+      }
+      // selectFromCarousel: NO re-scrollea (el usuario ya está donde quiere) y pausa
+      // la reproducción al ser interacción humana. Si ya está seleccionada, no-op.
+      if (closestId && closestId !== selectedId) selectFromCarousel(closestId)
+    }
+
+    const onScroll = () => {
+      // Scroll que programamos nosotros (centrar una tarjeta): ni sync ni pausa.
+      if (programmaticScroll.current) return
+      if (scrollSettleTimer.current != null) window.clearTimeout(scrollSettleTimer.current)
+      scrollSettleTimer.current = window.setTimeout(syncToCenteredCard, 140)
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (scrollSettleTimer.current != null) window.clearTimeout(scrollSettleTimer.current)
+    }
+    // selectFromCarousel es estable (cierra sobre refs/setState). Dependemos de
+    // selectedId para el no-op y de moments para re-enganchar si cambian las cards.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, moments])
+
+  // Limpieza del timer de "scroll programado" al desmontar (los otros se limpian en
+  // sus propios efectos). Evita un setState tras desmontar si quedara pendiente.
+  useEffect(() => {
+    return () => {
+      if (programmaticScrollTimer.current != null)
+        window.clearTimeout(programmaticScrollTimer.current)
+    }
+  }, [])
+
+  const togglePlay = () => setPlaying((p) => !p)
 
   if (loading) {
     return (
@@ -208,7 +358,15 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
         <div className={styles.dock}>
           {/* Franja cronológica sobre el carrusel: tocar una marca selecciona ese
               momento (centra el mapa + desplaza el carrusel). */}
-          <MomentTimeline moments={moments} selectedId={selectedId} onSelect={selectFromMap} />
+          <MomentTimeline
+            moments={moments}
+            selectedId={selectedId}
+            onSelect={selectFromMap}
+            // Con prefers-reduced-motion no ofrecemos reproducción (sin control =
+            // sin autoplay animado); el usuario sigue navegando momento a momento.
+            playing={reducedMotion ? undefined : playing}
+            onTogglePlay={reducedMotion ? undefined : togglePlay}
+          />
 
           <div className={styles.carousel} ref={carouselRef}>
             {moments.map((m) => (

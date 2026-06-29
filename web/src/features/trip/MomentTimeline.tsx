@@ -8,6 +8,14 @@ interface Props {
   selectedId: string | null
   /** Tocar una marca → seleccionar ese momento (centra mapa + desplaza carrusel). */
   onSelect: (challengeId: string) => void
+  /**
+   * ¿Está reproduciéndose el viaje? El stepper vive en TripPage (es quien tiene la
+   * selección); aquí solo pintamos el botón ▶/⏸. Si es undefined, no mostramos el
+   * control (p.ej. con prefers-reduced-motion, donde la reproducción animada no aplica).
+   */
+  playing?: boolean
+  /** Alternar reproducir/pausar el recorrido del viaje. Ausente = sin control. */
+  onTogglePlay?: () => void
 }
 
 // Etiqueta corta de la marca: día y mes ("8 abr"). Si la fecha no es válida,
@@ -28,11 +36,25 @@ function shortDate(value: string): string {
  * MVP ligero: scroll horizontal con snap, cero librerías. Va sobre el mapa, así
  * que usa el chrome de vidrio y texto sobre foto (tokens), legible sobre satélite.
  */
-export function MomentTimeline({ moments, selectedId, onSelect }: Props) {
+export function MomentTimeline({ moments, selectedId, onSelect, playing, onTogglePlay }: Props) {
   if (moments.length === 0) return null
+
+  // Solo tiene sentido reproducir si hay más de un momento que recorrer.
+  const canPlay = onTogglePlay != null && moments.length > 1
 
   return (
     <nav className={styles.timeline} aria-label="Línea temporal del viaje">
+      {canPlay && (
+        <button
+          type="button"
+          className={styles.play}
+          onClick={onTogglePlay}
+          aria-pressed={playing}
+          aria-label={playing ? 'Pausar el recorrido del viaje' : 'Reproducir el viaje'}
+        >
+          <span aria-hidden="true">{playing ? '⏸' : '▶'}</span>
+        </button>
+      )}
       <ol className={styles.track}>
         {moments.map((m) => {
           const isSelected = m.challengeId === selectedId
