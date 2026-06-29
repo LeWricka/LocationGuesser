@@ -11,7 +11,7 @@ interface Props {
   route: RoutePoint[]
   activeMoment: Moment | null
   selectedId: string | null
-  /** Texto del recorrido para el pie del mapa ("Tokio → Kioto"), o null. */
+  /** Texto del recorrido para el rótulo flotante ("Tokio → Kioto"), o null. */
   routeCaption: string | null
   /** ¿Puede el usuario añadir momentos? (dueño) — gobierna el CTA del vacío. */
   canCreate: boolean
@@ -26,13 +26,14 @@ interface Props {
 }
 
 /**
- * Sección DIARIO del viaje: mapa SATÉLITE enmarcado como hero (el recorrido cosido
- * con la ruta) + línea de tiempo y carrusel de momentos. Es una de las dos páginas
- * hermanas de TripPage; vive dentro de un panel que hace scroll vertical mientras
- * la página se desliza en horizontal entre Diario y Retos.
+ * Sección DIARIO del viaje: el MAPA SATÉLITE/GLOBO A SANGRE es el protagonista (llena
+ * la pantalla, estilo Polarsteps) y los momentos FLOTAN ENCIMA en un dock inferior
+ * (timeline + carrusel) con los pines sobre el mapa. NO es un mapa "enmarcado" con la
+ * lista debajo: el mapa manda y el contenido se posa sobre él.
  *
- * El `ref` apunta al carrusel (TripPage gobierna el scroll-sync carrusel↔mapa y la
- * reproducción del recorrido; aquí solo presentamos y delegamos los toques).
+ * Es una de las dos páginas hermanas de TripPage; vive en un panel a sangre (sin
+ * scroll vertical: el mapa ocupa todo y el dock flota). El `ref` apunta al carrusel
+ * (TripPage gobierna el scroll-sync carrusel↔mapa y la reproducción del recorrido).
  */
 export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
   {
@@ -55,32 +56,31 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
   const hasMoments = moments.length > 0
 
   return (
-    <div className={`${styles.diario} lg-stagger`}>
-      {/* Hero: mapa satélite enmarcado con el recorrido cosido. */}
-      <div className={styles.heroMap}>
+    <div className={styles.diario}>
+      {/* Mapa A SANGRE: llena toda la sección (el protagonista del diario). Los pines
+          de momentos viven sobre él; el dock de abajo flota encima. */}
+      <div className={styles.map}>
         <TripMap
           route={route}
           activeMoment={activeMoment}
           selectedChallengeId={selectedId}
           onSelectMoment={onSelectFromMap}
         />
-        {routeCaption && (
-          <div className={styles.heroCap} aria-hidden="true">
-            <span className={styles.heroLabel}>El recorrido</span>
-            <span className={styles.heroBig}>{routeCaption}</span>
-          </div>
-        )}
       </div>
 
-      {hasMoments ? (
-        <>
-          <header className={styles.eyebrow}>
-            <span className={styles.eyebrowTitle}>Momentos</span>
-            <span className={styles.eyebrowMeta}>
-              {moments.length} {moments.length === 1 ? 'recuerdo' : 'recuerdos'}
-            </span>
-          </header>
+      {/* Rótulo flotante del recorrido ("El recorrido · Tokio → Kioto"), arriba a la
+          izquierda sobre el mapa (no roba protagonismo, telegrafía qué es). */}
+      {routeCaption && (
+        <div className={styles.routeCap} aria-hidden="true">
+          <span className={styles.routeLabel}>El recorrido</span>
+          <span className={styles.routeBig}>{routeCaption}</span>
+        </div>
+      )}
 
+      {hasMoments ? (
+        /* DOCK flotante inferior: timeline + carrusel de momentos posados sobre el
+           mapa. El velo funde el dock con el mapa para que el contenido respire. */
+        <div className={styles.dock}>
           <MomentTimeline
             moments={moments}
             selectedId={selectedId}
@@ -105,9 +105,10 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
               </div>
             ))}
           </div>
-        </>
+        </div>
       ) : (
-        <div className={styles.emptyWrap}>
+        /* Sin momentos: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre). */
+        <div className={styles.emptyDock}>
           <EmptyState
             icon="🗺️"
             title="Aún no hay momentos"

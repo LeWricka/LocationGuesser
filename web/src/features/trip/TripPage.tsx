@@ -61,8 +61,17 @@ const PLAYBACK_INTERVAL_MS = 2300
  */
 export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic, onBack }: Props) {
   const { user, profile } = useSession()
-  const { group, moments, route, leaderboard, recentResults, recentTitle, loading, error } =
-    useTripData(groupId)
+  const {
+    group,
+    moments,
+    route,
+    leaderboard,
+    recentResults,
+    recentTitle,
+    loading,
+    error,
+    refresh,
+  } = useTripData(groupId)
   const reducedMotion = useReducedMotion()
 
   // Página activa (diario|retos). Gobierna el desplazamiento de la pista.
@@ -368,7 +377,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
           style={{ transform: `translateX(-${activeIndex * 50}%)` }}
         >
           <section
-            className={styles.panel}
+            className={`${styles.panel} ${styles.panelBleed}`}
             role="tabpanel"
             aria-label="Diario"
             aria-hidden={section !== 'diario'}
@@ -452,7 +461,9 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
         </button>
       )}
 
-      {/* Hoja de detalle del momento (con descripción del día + edición del dueño). */}
+      {/* Hoja de detalle del momento: descripción editable + (en un recuerdo del
+          dueño) "Convertir en reto". Al promover, refrescamos el viaje para que el
+          momento aparezca ya como reto en el mapa y el carrusel. */}
       <MomentSheet
         moment={openMoment}
         canEdit={canCreate}
@@ -462,6 +473,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
             ? () => onPlayChallenge(openMoment.challengeId)
             : undefined
         }
+        onPromoted={() => void refresh()}
       />
     </div>
   )
