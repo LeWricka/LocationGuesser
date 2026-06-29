@@ -90,6 +90,14 @@ describe('parseHash', () => {
       groupAddMoment: true,
     })
   })
+
+  test('add=reto marca el flujo inmersivo de crear reto', () => {
+    expect(parseHash('#g=abc123&add=reto')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      groupAddChallenge: true,
+    })
+  })
 })
 
 describe('groupHash', () => {
@@ -116,10 +124,10 @@ describe('classicGroupHash / addMomentHash', () => {
     expect(r.groupAddMoment).toBe(true)
   })
 
-  test('addChallengeHash abre el asistente de reto en la vista clásica', () => {
-    expect(addChallengeHash('abc123')).toBe('#g=abc123&v=clasico&add=1')
+  test('addChallengeHash abre el flujo inmersivo de crear reto', () => {
+    expect(addChallengeHash('abc123')).toBe('#g=abc123&add=reto')
     const r = parseHash(addChallengeHash('abc123'))
-    expect(r.groupView).toBe('clasico')
-    expect(r.groupAdd).toBe(true)
+    expect(r.group).toBe('abc123')
+    expect(r.groupAddChallenge).toBe(true)
   })
 })

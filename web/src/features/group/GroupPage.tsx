@@ -40,8 +40,8 @@ import { PRIZE_SLOTS, prizeForRow } from './prizes'
 import { ShareLeaderboardModal } from './ShareLeaderboardModal'
 import { InviteModal } from './InviteModal'
 import { signedImageUrl } from '../../lib/storage'
+import { addChallengeHash } from '../../lib/route'
 import { useSignedImage } from '../../lib/useSignedImage'
-import { CreateChallenge } from '../create/CreateChallenge'
 import { EditChallenge } from './EditChallenge'
 import { GroupMembersSection } from './GroupMembersSection'
 import { GroupSettingsModal } from './GroupSettingsModal'
@@ -54,18 +54,11 @@ interface Props {
   groupId: string
   /** Vuelve a la home (§3.4). Lo cablea #4; por defecto limpia el hash. */
   onBack?: () => void
-  /** Abre directamente "Añadir reto" al montar (FAB de la pantalla "Viaje"). */
-  openAdd?: boolean
 }
 
 /** Enlace del grupo (#g=) para compartir en el chat. */
 function groupLink(groupId: string): string {
   return `${location.origin}${location.pathname}#g=${encodeURIComponent(groupId)}`
-}
-
-/** Enlace de un reto concreto (#g=…&c=…) para compartir tras crearlo. */
-function challengeLink(groupId: string, challengeId: string): string {
-  return `${groupLink(groupId)}&c=${encodeURIComponent(challengeId)}`
 }
 
 // Fecha legible en español para la cabecera de un reto cerrado (p.ej. "12 jun
@@ -87,7 +80,7 @@ function formatChallengeDate(value: string | null | undefined): string | null {
 // Página del grupo: clasificación general, retos en vivo y anteriores, histórico
 // de fotos. Distingue dueño (gestiona retos) de miembro (solo juega) y se
 // refresca en tiempo real al entrar cualquier voto del grupo.
-export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
+export function GroupPage({ groupId, onBack }: Props) {
   const { user } = useSession()
   const [group, setGroup] = useState<GroupInfo | null>(null)
   const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(null)
@@ -95,11 +88,9 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
   // Soy dueño del grupo (veo gestión de retos) vs miembro (solo juego).
   const [isOwner, setIsOwner] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // "Añadir reto" es un estado interno de la página (no una ruta nueva):
-  // `adding` muestra el formulario; `created` muestra el reto recién creado con
-  // su enlace para compartir, sin salir del grupo.
-  const [adding, setAdding] = useState(false)
-  const [created, setCreated] = useState<ChallengeForPlay | null>(null)
+  // Crear reto ya NO es un estado interno: el botón navega al flujo INMERSIVO
+  // (`#g=…&add=reto`), que al lanzar vuelve al reto recién creado (deep link). El
+  // panel "compartir tras crear" vive ahora en ese flujo, no aquí.
   // Reto en edición (estado interno como `adding`): muestra la pantalla de
   // edición y al terminar refresca la lista.
   const [editing, setEditing] = useState<ChallengeForPlay | null>(null)
@@ -194,13 +185,11 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
   // cerrado (es donde se REABRE la temporada).
   const canManage = isOwner && !isClosed
 
-  // El FAB "Añadir momento" de la pantalla "Viaje" entra aquí con `openAdd`: abre
-  // directamente el creador de retos (mismo flujo que el botón ➕ Añadir reto).
-  // Solo si soy dueño y la temporada no está cerrada (igual gating que ese botón).
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- intención del enrutado (FAB del viaje): abrir el creador al montar, una vez
-    if (openAdd && canManage) setAdding(true)
-  }, [openAdd, canManage])
+  // Crear un reto: navega al flujo INMERSIVO (`#g=…&add=reto`). Mantenemos el
+  // gating (solo dueño con temporada abierta) en la UI; el RLS lo respalda.
+  function goCreateChallenge() {
+    location.hash = addChallengeHash(groupId)
+  }
 
   // Votos agrupados por reto, para alimentar marcadores en vivo y revelados sin
   // más fetches (ya traen el display_name del join a profiles).
@@ -268,22 +257,6 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
       location.hash = ''
     })
 
-  // Añadir reto al grupo existente. Solo el dueño llega aquí (la UI esconde el
-  // botón a los miembros; el RLS lo respalda). Al terminar, refrescamos.
-  if (adding) {
-    return (
-      <CreateChallenge
-        groupId={groupId}
-        onBack={() => setAdding(false)}
-        onCreated={(challenge) => {
-          setAdding(false)
-          setCreated(challenge)
-          void refresh()
-        }}
-      />
-    )
-  }
-
   // Editar un reto del grupo (solo dueño; la UI esconde el botón a los miembros).
   if (editing) {
     return (
@@ -340,7 +313,7 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
             )}
             {/* Grupo archivado (solo-lectura): no se añaden retos. */}
             {isOwner && !isClosed && (
-              <Button size="sm" onClick={() => setAdding(true)}>
+              <Button size="sm" onClick={goCreateChallenge}>
                 ➕ Añadir reto
               </Button>
             )}
@@ -362,14 +335,6 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
               })()}
             </p>
           </div>
-        )}
-
-        {created && (
-          <ChallengeCreated
-            groupId={groupId}
-            challenge={created}
-            onDismiss={() => setCreated(null)}
-          />
         )}
 
         <Leaderboard
@@ -415,7 +380,7 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
                   : 'Aún no hay retos en este viaje.'}
               </p>
               {canManage && (
-                <Button size="sm" onClick={() => setAdding(true)}>
+                <Button size="sm" onClick={goCreateChallenge}>
                   ➕ Añadir reto
                 </Button>
               )}
@@ -541,68 +506,6 @@ function GroupSkeleton() {
         </Stack>
       </Stack>
     </main>
-  )
-}
-
-// Panel que aparece tras crear un reto: ofrece su enlace para compartir en el
-// chat del grupo. El reto ya está en la lista "en vivo"; esto solo facilita el
-// reparto del enlace concreto.
-function ChallengeCreated({
-  groupId,
-  challenge,
-  onDismiss,
-}: {
-  groupId: string
-  challenge: ChallengeForPlay
-  onDismiss: () => void
-}) {
-  const toast = useToast()
-  const link = challengeLink(groupId, challenge.id)
-  const shareText = `🌍 ${challenge.title} — vívelo conmigo${
-    challenge.deadline_at ? ` (${formatDeadline(challenge.deadline_at)})` : ''
-  }: ${link}`
-
-  function copy() {
-    void navigator.clipboard.writeText(shareText)
-    toast.show('Texto copiado, pégalo en el grupo', { tone: 'success' })
-  }
-
-  async function share() {
-    if (typeof navigator !== 'undefined' && 'share' in navigator) {
-      try {
-        await navigator.share({ title: challenge.title, text: shareText })
-        return
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-      }
-    }
-    copy()
-  }
-
-  return (
-    <Card padding="md" raised>
-      <Stack gap={3}>
-        <strong>¡Reto creado! Compártelo en el grupo:</strong>
-        <Input
-          className={styles.linkInput}
-          readOnly
-          value={shareText}
-          aria-label="Mensaje para compartir el reto"
-          onFocus={(e) => e.target.select()}
-        />
-        <Row gap={2}>
-          {typeof navigator !== 'undefined' && 'share' in navigator && (
-            <Button onClick={() => void share()}>Compartir</Button>
-          )}
-          <Button variant="secondary" onClick={copy}>
-            Copiar
-          </Button>
-          <Button variant="ghost" onClick={onDismiss}>
-            Hecho
-          </Button>
-        </Row>
-      </Stack>
-    </Card>
   )
 }
 

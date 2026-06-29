@@ -18,6 +18,7 @@
 import { useEffect, useState } from 'react'
 import { CreateGroup } from './features/create/CreateGroup'
 import { AddMoment } from './features/create/AddMoment'
+import { CreateChallengeImmersive } from './features/create/CreateChallengeImmersive'
 import { PlayChallenge } from './features/play/PlayChallenge'
 import { GroupPage } from './features/group/GroupPage'
 import { TripPage } from './features/trip/TripPage'
@@ -212,6 +213,24 @@ function LoggedIn({
         </OnboardingGate>
       )
     }
+    // FAB "Reto" del viaje → flujo INMERSIVO de crear reto (mapa satélite a sangre
+    // + hoja que crece por etapas). Reemplaza al asistente clásico de 3 pasos. Al
+    // crear, volvemos al reto recién lanzado (deep link) para ofrecer su enlace.
+    if (route.groupAddChallenge) {
+      return (
+        <OnboardingGate context="group" userId={user?.id}>
+          <CreateChallengeImmersive
+            groupId={groupId}
+            onBack={() => {
+              location.hash = groupHash(groupId)
+            }}
+            onCreated={(challenge) => {
+              location.hash = groupHash(groupId, challenge.id)
+            }}
+          />
+        </OnboardingGate>
+      )
+    }
     // Por defecto, un grupo abre la pantalla "Viaje" (diario visual). `v=clasico`
     // es el escape a la GroupPage de siempre (marcador, ajustes, fin de temporada),
     // accesible desde el botón "⋯" del viaje, así que NO se pierde nada de ella.
@@ -220,7 +239,6 @@ function LoggedIn({
         <OnboardingGate context="group" userId={user?.id}>
           <GroupPage
             groupId={groupId}
-            openAdd={route.groupAdd}
             onBack={() => {
               location.hash = groupHash(groupId)
             }}
