@@ -9,7 +9,7 @@ describe('buildResultShareText', () => {
 
   test('una sola línea: gancho con el grupo + enlace', () => {
     const text = buildResultShareText('Viaje a Italia', link)
-    expect(text).toBe('📍 ¿Me superas en Viaje a Italia? 👉 https://app/#g=ABC&c=42')
+    expect(text).toBe('📍 Vive este viaje conmigo en Viaje a Italia 👉 https://app/#g=ABC&c=42')
   })
 
   test('no filtra el rendimiento ni la ubicación en el texto', () => {

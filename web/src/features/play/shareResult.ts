@@ -11,8 +11,9 @@ export function buildChallengeLink(groupId: string, challengeId: string): string
 }
 
 // Caption MÍNIMO: una línea de gancho + el enlace clicable (la imagen no lo es).
-// SIN SPOILER: no menciona ubicación, lugar ni coordenadas; solo reta al grupo.
-// El rendimiento (puntos/distancia) viaja en la IMAGEN, no aquí, para no duplicar.
+// SIN SPOILER: no menciona ubicación, lugar ni coordenadas. Relato de recuerdos
+// compartidos: invita a vivir el viaje; el reto a superar viaja en la IMAGEN
+// (puntos/distancia), no en el texto, para no duplicar.
 export function buildResultShareText(groupName: string, link: string): string {
-  return `📍 ¿Me superas en ${groupName}? 👉 ${link}`
+  return `📍 Vive este viaje conmigo en ${groupName} 👉 ${link}`
 }

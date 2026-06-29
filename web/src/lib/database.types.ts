@@ -96,6 +96,8 @@ export interface Database {
           id: string
           group_id: string
           title: string
+          // Descripción del día (texto libre opcional, null = sin texto). Migración 0021.
+          description: string | null
           lat: number
           lng: number
           image_path: string | null
@@ -115,6 +117,7 @@ export interface Database {
           id?: string
           group_id: string
           title: string
+          description?: string | null
           lat: number
           lng: number
           image_path?: string | null
@@ -133,6 +136,7 @@ export interface Database {
           id?: string
           group_id?: string
           title?: string
+          description?: string | null
           lat?: number
           lng?: number
           image_path?: string | null

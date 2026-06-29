@@ -10,7 +10,7 @@ interface Props {
   /** Email controlado por el padre (la lógica de auth la cablea #4). */
   email: string
   onEmailChange: (value: string) => void
-  /** Enviar el enlace mágico. Recibe el evento ya con preventDefault hecho. */
+  /** Enviar el email (código + enlace). Recibe el submit ya con preventDefault hecho. */
   onSubmit?: () => void
   /** Bloquea el botón mientras se envía. */
   loading?: boolean
@@ -24,9 +24,9 @@ interface Props {
   className?: string
 }
 
-// Pantalla de login con magic link (§2). Presentacional y controlada: sin
-// llamadas a Supabase Auth (eso lo hace #4). Dos copys según haya o no contexto
-// de grupo (flujo A vs B del doc).
+// Pantalla de login passwordless (§2): el usuario mete su email y le mandamos un
+// código (y un enlace como fallback). Presentacional y controlada: sin llamadas a
+// Supabase Auth (eso lo hace el hook). Dos copys según haya o no contexto de grupo.
 export function LoginScreen({
   email,
   onEmailChange,
@@ -52,10 +52,10 @@ export function LoginScreen({
         joining ? (
           <>
             Te han retado en <strong className={styles.group}>{groupName}</strong>. Te mandamos un
-            enlace mágico a tu correo. Sin contraseñas.
+            código a tu correo para entrar. Sin contraseñas.
           </>
         ) : (
-          'Te mandamos un enlace mágico a tu correo. Sin contraseñas.'
+          'Te mandamos un código a tu correo para entrar. Sin contraseñas.'
         )
       }
     >
@@ -77,7 +77,7 @@ export function LoginScreen({
             )}
           </Field>
           <Button type="submit" size="lg" fullWidth loading={loading}>
-            Enviar enlace mágico
+            Empieza a compartir
           </Button>
         </Stack>
       </form>

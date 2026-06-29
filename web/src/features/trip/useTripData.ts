@@ -2,7 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, isLive, splitByStatus } from '../../lib/groupData'
 import { getAnswers, isPracticeChallenge, type ChallengeForPlay } from '../../lib/challenges'
-import { getGroupVotes, type VoteWithName } from '../../lib/leaderboard'
+import {
+  aggregateLeaderboard,
+  getGroupVotes,
+  type LeaderboardEntry,
+  type VoteWithName,
+} from '../../lib/leaderboard'
 import { signedImageUrl } from '../../lib/storage'
 import { supabase } from '../../lib/supabase'
 import { countryFromCoords, type CountryInfo } from '../../lib/countryFlag'
@@ -13,12 +18,32 @@ import type { Moment, MomentStatus, RoutePoint } from '../../lib/trip'
 // dejamos margen (1.1 s) para no rozar el límite ni en ráfaga.
 const COUNTRY_STAGGER_MS = 1100
 
+/**
+ * Resultado de un jugador en un reto concreto (para "Resultados recientes" del
+ * hub de Retos): quién jugó, a cuántos km cayó y los puntos que sacó. Derivado de
+ * los votos del último reto CERRADO, ordenado del más certero (menos km) al menos.
+ */
+export interface RecentResult {
+  userId: string
+  name: string
+  avatar: string | null
+  /** Distancia al objetivo en km; null en un voto de timeout (no marcó). */
+  distanceKm: number | null
+  points: number
+}
+
 interface TripData {
   group: GroupInfo | null
   /** Momentos en orden cronológico ASCENDENTE (del primero del viaje al último). */
   moments: Moment[]
   /** Ruta: solo momentos cerrados con lat/lng visible, en orden cronológico ASC. */
   route: RoutePoint[]
+  /** Clasificación general del grupo (suma de puntos por jugador), orden desc. */
+  leaderboard: LeaderboardEntry[]
+  /** Resultados del último reto cerrado (quién acertó, km), del más certero al menos. */
+  recentResults: RecentResult[]
+  /** Título del reto cuyos resultados se muestran en `recentResults`, o null. */
+  recentTitle: string | null
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -174,8 +199,10 @@ export function useTripData(groupId: string): TripData {
       return {
         challengeId: ch.id,
         title: ch.title,
+        description: ch.description,
         status: statusOf(ch, now),
         date: ch.created_at,
+        deadlineAt: ch.deadline_at,
         imageUrl: imageUrlById[ch.id] ?? null,
         imagePath: ch.image_path,
         // Solo los cerrados con respuesta visible llevan coordenada (anti-spoiler).
@@ -209,8 +236,51 @@ export function useTripData(groupId: string): TripData {
     [moments],
   )
 
+  // Clasificación general del grupo: misma agregación que GroupPage (suma de
+  // puntos por jugador). El hub de Retos la muestra como marcador protagonista.
+  const leaderboard = useMemo(() => (votes ? aggregateLeaderboard(votes) : []), [votes])
+
+  // Resultados del ÚLTIMO reto cerrado: los momentos vienen en orden ASC, así que
+  // el último cerrado es el reto recién resuelto. Tomamos sus votos, ordenados del
+  // más certero (menos km) al menos; los de timeout (sin km) caen al final.
+  const lastClosed = useMemo(() => {
+    const closed = moments.filter((m) => m.status === 'closed')
+    return closed.length > 0 ? closed[closed.length - 1] : null
+  }, [moments])
+
+  const recentResults = useMemo<RecentResult[]>(() => {
+    if (!lastClosed || !votes) return []
+    return votes
+      .filter((v) => v.challenge_id === lastClosed.challengeId)
+      .map((v) => ({
+        userId: v.user_id,
+        name: v.display_name,
+        avatar: v.avatar,
+        distanceKm: v.distance_km,
+        points: v.points,
+      }))
+      .sort((a, b) => {
+        // Sin distancia (timeout) al final; entre válidos, menos km = más certero.
+        if (a.distanceKm == null) return b.distanceKm == null ? 0 : 1
+        if (b.distanceKm == null) return -1
+        return a.distanceKm - b.distanceKm
+      })
+  }, [lastClosed, votes])
+
+  const recentTitle = lastClosed?.title ?? null
+
   // Cargando hasta tener la primera respuesta del grupo (challenges resuelto).
   const loading = challenges === null && error === null
 
-  return { group, moments, route, loading, error, refresh }
+  return {
+    group,
+    moments,
+    route,
+    leaderboard,
+    recentResults,
+    recentTitle,
+    loading,
+    error,
+    refresh,
+  }
 }

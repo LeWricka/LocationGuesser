@@ -1,0 +1,30 @@
+/* Cuenta atrás viva: pastilla de vidrio con icono + "Cierra en mm:ss". El número
+   es tabular (no baila) y rebota un pelín al cambiar de segundo (lg-count-tick). */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-full);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-chrome);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.label {
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.time {
+  font-variant-numeric: tabular-nums;
+  /* origen centrado: el micro-rebote no descoloca la pastilla. */
+  display: inline-block;
+  transform-origin: center;
+}

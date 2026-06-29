@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import type { MyGroup, PendingChallenge } from '../../lib/membership'
-import type { Challenge, Profile } from '../../lib/database.types'
+import type { MyGroup } from '../../lib/membership'
+import type { Profile } from '../../lib/database.types'
 
 // --- Mocks de los contratos que consume la home -----------------------------
 
@@ -17,27 +17,22 @@ vi.mock('../../lib/session-context', () => ({
 }))
 
 const myGroupsMock = vi.fn<(userId: string) => Promise<MyGroup[]>>()
-const pendingChallengesMock = vi.fn<(userId: string) => Promise<PendingChallenge[]>>()
 vi.mock('../../lib/membership', () => ({
   myGroups: (userId: string) => myGroupsMock(userId),
-  pendingChallenges: (userId: string) => pendingChallengesMock(userId),
 }))
 
-vi.mock('../../lib/leaderboard', () => ({
-  getGroupVotes: vi.fn(async () => []),
+// El mapamundi depende de la capa de mapa (MapLibre/Leaflet): lo stubbeamos para
+// aislar la home de la infra de mapa en el test unitario.
+vi.mock('./useWorldTrips', () => ({
+  useWorldTrips: () => ({ trips: [], totalKm: 0, loading: false }),
+}))
+vi.mock('./HomeWorldMap', () => ({
+  HomeWorldMap: () => <div data-testid="world-map" />,
 }))
 
-// supabase: builder mínimo para la consulta de autores (profiles .in()) y un
-// canal de realtime que no hace nada (la home solo se suscribe).
-const profilesData: { data: unknown; error: unknown } = { data: [], error: null }
+// supabase: solo un canal de realtime que no hace nada (la home se suscribe).
 vi.mock('../../lib/supabase', () => ({
   supabase: {
-    from: () => {
-      const builder: Record<string, unknown> = {}
-      builder.select = () => builder
-      builder.in = () => Promise.resolve(profilesData)
-      return builder
-    },
     channel: () => {
       const ch: Record<string, unknown> = {}
       ch.on = () => ch
@@ -50,33 +45,12 @@ vi.mock('../../lib/supabase', () => ({
 
 import { HomePage } from './HomePage'
 
-const challenge = (over: Partial<Challenge> = {}): Challenge =>
-  ({
-    id: 'c1',
-    group_id: 'g1',
-    title: 'Reto',
-    lat: 0,
-    lng: 0,
-    image_path: null,
-    sv_pano_id: null,
-    sv_heading: null,
-    sv_pitch: null,
-    guess_seconds: null,
-    deadline_at: '2999-01-01T00:00:00.000Z',
-    photo_is_hint: false,
-    created_by: 'author1',
-    created_at: '2026-01-01T00:00:00.000Z',
-    ...over,
-  }) as Challenge
-
 beforeEach(() => {
   vi.clearAllMocks()
   sessionState.loading = false
   sessionState.user = { id: 'u1' }
   sessionState.profile = { display_name: 'Lewis', avatar_url: null }
-  profilesData.data = []
   myGroupsMock.mockResolvedValue([])
-  pendingChallengesMock.mockResolvedValue([])
 })
 
 describe('HomePage', () => {
@@ -94,22 +68,20 @@ describe('HomePage', () => {
     expect(screen.getByRole('button', { name: 'Unirme con un código' })).toBeInTheDocument()
   })
 
-  test('mapea grupos y turnos, resolviendo el autor por su perfil', async () => {
+  test('con grupos → dashboard de recuerdos con el viaje y el mapamundi', async () => {
     myGroupsMock.mockResolvedValue([
       { id: 'g1', name: "Interrail '26", role: 'owner', isOwner: true, status: 'your-turn' },
     ])
-    pendingChallengesMock.mockResolvedValue([
-      { challenge: challenge(), groupId: 'g1', groupName: "Interrail '26" },
-    ])
-    profilesData.data = [{ id: 'author1', display_name: 'Ana' }]
 
     render(<HomePage />)
 
-    // Turno con autor resuelto (el nombre del grupo aparece en turno y tarjeta;
-    // anclamos en "reto de Ana", que es único del turno).
-    await waitFor(() => expect(screen.getByText(/reto de Ana/)).toBeInTheDocument())
-    // Grupo con chip de dueño.
-    expect(screen.getByText('Tuyo')).toBeInTheDocument()
+    // El viaje aparece como tarjeta (su botón abre el viaje) y el mapamundi se monta.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument(),
+    )
+    expect(screen.getByTestId('world-map')).toBeInTheDocument()
+    // SIN "cómo funciona" para el usuario recurrente (relato nuevo).
+    expect(screen.queryByText('Cómo funciona')).not.toBeInTheDocument()
   })
 
   test('error de carga → aviso, sin romper', async () => {

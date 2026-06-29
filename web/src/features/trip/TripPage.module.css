@@ -1,17 +1,20 @@
 /*
- * Pantalla "Viaje": mapa a sangre como fondo + chrome flotante arriba + carrusel
- * de momentos abajo (§2 del spec). Mobile-first, a pantalla completa. El mapa es
- * el fondo (capa 0); chrome y carrusel flotan encima con sus propios z.
+ * Pantalla "Viaje" en DOS secciones hermanas (Diario ↔ Retos) navegadas por
+ * deslizamiento. Estructura: cabecera fija (marca + pager de 2 puntos) + un
+ * viewport con una pista que traslada en X entre los dos paneles. Cada panel hace
+ * su propio scroll vertical. Lenguaje Atelier/Pizarra (papel, tinta, acento).
  */
 .screen {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   height: 100svh;
   overflow: hidden;
-  background: var(--ocean-900);
+  background: var(--color-bg);
+  background-image: var(--paper-halo-cool), var(--paper-halo-warm), var(--paper-grain);
 }
 
-/* Pantallas de carga/error: centradas sobre el fondo de la app. */
 .center {
   min-height: 100svh;
   display: flex;
@@ -20,211 +23,264 @@
   padding: var(--space-5);
 }
 
-/* (a) Mapa a sangre, detrás de todo. */
-.mapLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-/* ----------------------------------------------------------------------
- * Esqueleto de carga del viaje (carga con clase, § pase visual 2/2). En vez de
- * un spinner desnudo, prefiguramos la pantalla: el lienzo del mapa con un shimmer
- * frío, pastillas de chrome arriba y tarjetas-foto fantasma abajo. El cerebro
- * empieza a procesar el layout antes de que lleguen los datos → la espera se
- * percibe más corta (NN/g). Decorativo (aria-hidden); el estado lo anuncia el
- * contenedor con role=status.
- * -------------------------------------------------------------------- */
-.skeletonMap {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-/* Pastilla fantasma del chrome (volver / portada / más): mismo lenguaje glass que
-   las reales, con shimmer en vez de contenido. */
-.skelPill {
-  border-radius: var(--radius-full);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-chrome), var(--ring-contact);
-}
-.skelIcon {
-  flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-}
-.skelCover {
-  flex: 1 1 auto;
-  min-width: 0;
-  height: 56px;
-}
-
-/* Tarjeta-foto fantasma del carrusel: misma proporción/altura que MomentCard, con
-   el shimmer de superficie. */
-.skelCard {
-  flex: 0 0 80%;
-  max-width: 320px;
-  aspect-ratio: 16 / 9;
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-photo-card);
-}
-
-/* (b) Chrome flotante arriba: respeta el notch (safe-area). */
+/* ---- Cabecera: marca del viaje + accesos ---- */
 .chrome {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 2;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-3) var(--space-3);
+  gap: var(--space-3);
+  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-4) var(--space-2);
 }
-
-/* Pastilla de icono (volver / más opciones): vidrio sobre el mapa contrastado. */
 .iconPill {
   flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-lg);
-  /* Pastilla CLARA translúcida sobre mapa claro (Atelier): icono en tinta, no en
-     blanco-sobre-foto (que sería invisible sobre el papel). */
   color: var(--color-text);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
-  border: 1px solid var(--glass-border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
-  /* Sombra de chrome (despega la pastilla del mapa) + anillo de contacto que
-     la define contra tiles claros (token del pase de craft). */
-  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
     transform var(--transition-fast) var(--ease-emphasized);
 }
 .iconPill:hover {
-  background: var(--glass-bg-strong);
+  background: var(--color-surface-hover);
 }
 .iconPill:active {
   transform: scale(0.92);
 }
+.titleBlock {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.tripName {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tripMeta {
+  display: block;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* Pastilla "🔴 N en juego": indicador cálido de momentos jugables (point 5). El
-   punto rojo respira (reusa la animación global). Tocarla salta al momento activo. */
-.livePill {
+/* ---- Fila de navegación: título de sección (cross-fade) + pager ---- */
+.headNav {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  height: 44px;
-  padding: 0 var(--space-3);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  /* Texto en tinta sobre la pastilla clara (el punto rojo da el color "en juego"). */
-  color: var(--color-text);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-chrome), var(--ring-contact);
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background-color var(--transition-fast),
-    transform var(--transition-fast) var(--ease-emphasized);
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-3);
 }
-.livePill:hover {
-  background: var(--glass-bg-strong);
+.secTitle {
+  position: relative;
+  height: 18px;
+  flex: 1;
+  min-width: 0;
 }
-.livePill:active {
-  transform: scale(0.96);
-}
-
-.liveDot {
-  width: 9px;
-  height: 9px;
-  border-radius: var(--radius-full);
-  /* Punto rojo discreto (🔴 en juego): da el único toque de color cálido del chrome
-     sobre el papel; el texto va en tinta. */
-  background: var(--color-danger);
-  box-shadow: 0 0 0 0 var(--color-accent-glow-soft);
-  animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .liveDot {
-    animation: none;
-  }
-}
-
-/* (c) Dock inferior: línea temporal + carrusel, anclados abajo. El velo de fondo
-   separa el conjunto del mapa (token §4.2) y cubre timeline y carrusel a la vez. */
-.dock {
+.secTitle span {
   position: absolute;
   left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding-top: var(--space-6);
-  /* Velo al pie para separar el dock del mapa (timeline + carrusel). */
-  background: var(--map-bottom-scrim);
+  top: 0;
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  transition:
+    opacity var(--duration-slow) var(--ease-emphasized),
+    transform var(--duration-slow) var(--ease-emphasized);
+}
+.secOn {
+  opacity: 1;
+  transform: none;
+}
+.secOff {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
-/* Carrusel horizontal de momentos con scroll-snap nativo (dentro del dock). */
-.carousel {
+/* pager de 2 puntos: tocar para ir; el activo se alarga en pastilla. */
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+}
+.pagerDot {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  background: transparent;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+}
+.pagerDot:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+.blip {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-faint);
+  opacity: 0.55;
+  transition:
+    width var(--duration-slow) var(--ease-emphasized),
+    background-color var(--duration-base),
+    opacity var(--duration-base);
+}
+.pagerActive .blip {
+  width: 20px;
+  background: var(--color-accent);
+  opacity: 1;
+}
+
+/* ---- Viewport + pista deslizable ---- */
+.viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.track {
   display: flex;
-  gap: var(--space-3);
-  padding: 0 var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-4));
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
+  width: 200%;
+  height: 100%;
+  transition: transform var(--duration-slower) var(--ease-emphasized);
+}
+.panel {
+  width: 50%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
+  padding: var(--space-2) var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-7));
   scrollbar-width: none;
 }
-.carousel::-webkit-scrollbar {
+.panel::-webkit-scrollbar {
   display: none;
 }
 
-/* Cada slide ocupa casi todo el ancho (se intuye la siguiente). */
-.slide {
-  flex: 0 0 80%;
-  max-width: 320px;
-  scroll-snap-align: center;
-}
-
-/* Estado vacío: centrado en una tarjeta de vidrio sobre el mapa. */
-.emptyWrap {
+/* ---- Edge-peek: flecha sutil que late hacia la página vecina ---- */
+.peek {
   position: absolute;
-  left: 50%;
-  bottom: var(--space-7);
-  z-index: 1;
-  transform: translateX(-50%);
-  width: min(92%, 420px);
-  padding: var(--space-4);
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  top: 0;
+  bottom: 0;
+  width: 26px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.peekRight {
+  right: 0;
+  justify-content: flex-end;
+}
+.peekLeft {
+  left: 0;
+  justify-content: flex-start;
+}
+.peek::before {
+  content: '';
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  width: 100%;
+  background: linear-gradient(var(--color-accent-glow-soft), transparent);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.peekRight::before {
+  border-left: 1px solid var(--color-border);
+}
+.peekLeft::before {
+  border-right: 1px solid var(--color-border);
+}
+.peek:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+.nudge {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 44px;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--color-accent);
+}
+.nudgeR {
+  animation: lg-nudge-r 2.6s ease-in-out infinite;
+}
+.nudgeL {
+  animation: lg-nudge-l 2.6s ease-in-out infinite;
 }
 
-/* FAB de añadir momento: cálido (acción primaria), abajo-derecha sobre el carrusel. */
+/* ---- Esqueleto de carga ---- */
+.skelPill {
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+.skelIcon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+}
+.skelTitle {
+  flex: 1;
+  height: 30px;
+  border-radius: var(--radius-sm);
+}
+.skelHero {
+  display: block;
+  width: 100%;
+  height: 240px;
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+}
+.skelCard {
+  display: block;
+  width: 86%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+}
+
+/* FAB de añadir momento: acción primaria (acento) flotando abajo-derecha. */
 .fab {
   position: absolute;
   right: var(--space-4);
-  bottom: calc(env(safe-area-inset-bottom) + var(--space-7));
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-5));
   z-index: 3;
   width: 56px;
   height: 56px;
@@ -232,21 +288,18 @@
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-xl);
-  color: var(--ocean-900);
-  background: var(--gradient-accent);
+  color: #fff;
+  background: var(--color-accent);
   border: none;
   border-radius: var(--radius-full);
-  /* Glow cálido bajo el FAB (única acción cálida flotando sobre el mapa): tira el
-     ojo y lo despega del satélite con el lenguaje de marca, no con negro. */
-  box-shadow: var(--shadow-accent), var(--ring-contact);
+  box-shadow: var(--shadow-lg);
   cursor: pointer;
   transition:
-    box-shadow var(--transition-base),
+    background-color var(--transition-base),
     transform var(--transition-fast) var(--ease-emphasized);
 }
 .fab:hover {
-  background: var(--gradient-accent-hover);
-  box-shadow: var(--shadow-accent-hover), var(--glow-fab-hover);
+  background: var(--color-accent-hover);
   transform: translateY(-2px);
 }
 .fab:active {
@@ -254,15 +307,28 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .iconPill,
-  .livePill,
+  .track {
+    transition: none;
+  }
   .fab {
     transition: none;
   }
-  .iconPill:active,
-  .livePill:active,
   .fab:hover,
   .fab:active {
+    transform: none;
+  }
+  .blip,
+  .secTitle span {
+    transition: none;
+  }
+  .nudgeR,
+  .nudgeL {
+    animation: none;
+  }
+  .iconPill {
+    transition: none;
+  }
+  .iconPill:active {
     transform: none;
   }
 }

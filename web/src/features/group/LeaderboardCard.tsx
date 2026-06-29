@@ -102,7 +102,7 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
         </span>
         <div className={styles.brandText}>
           <span className={styles.brandName}>LocationGuesser</span>
-          <span className={styles.brandTag}>Adivina dónde son las fotos</span>
+          <span className={styles.brandTag}>Vive los viajes de los tuyos</span>
         </div>
       </div>
 
@@ -174,7 +174,7 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
       )}
 
       <div className={styles.footer}>
-        <span className={styles.footerCta}>Únete y juega</span>
+        <span className={styles.footerCta}>Únete y vívelo</span>
         <span className={styles.footerDomain}>{domain}</span>
       </div>
     </div>

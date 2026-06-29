@@ -7,23 +7,25 @@ interface Props {
   className?: string
 }
 
-// Los 3 pasos del bucle del producto, con su icono y color de marca. Texto
-// directo, sin emojis sueltos en el copy (el icono ya es el guiño visual).
+// Los 3 pasos del bucle, alineados al relato nuevo: la identidad es COMPARTIR tus
+// recuerdos y VIVIRLOS con los tuyos; adivinar en el mapa es el guiño que lo hace
+// divertido, no el qué somos. Texto directo, sin emojis sueltos en el copy (el
+// icono ya es el guiño visual).
 const STEPS = [
   {
     icon: '📷',
-    title: 'Comparte tu sitio',
-    body: 'Una foto y/o Street View, con tu ubicación.',
+    title: 'Comparte un momento',
+    body: 'Una foto y/o Street View del sitio donde estuviste.',
   },
   {
     icon: '🗺️',
-    title: 'Adivinan en el mapa',
-    body: 'Tus amigos marcan dónde creen que es.',
+    title: 'Lo viven contigo',
+    body: 'Los tuyos lo descubren y, de paso, adivinan dónde es.',
   },
   {
-    icon: '🏆',
-    title: 'Gana quien más se acerca',
-    body: 'Puntos por distancia. Clasificación y premios.',
+    icon: '💛',
+    title: 'Guardáis el recuerdo',
+    body: 'Cada momento queda en el grupo. Gana quien más se acerca.',
   },
 ] as const
 

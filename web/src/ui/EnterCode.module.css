@@ -1,0 +1,25 @@
+.email {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  /* Emails largos no deben romper el ancho de la tarjeta. */
+  word-break: break-all;
+}
+
+/* Input del código: grande, centrado y monoespaciado, con tracking generoso
+   para que los 6 dígitos se lean uno a uno. */
+.code {
+  text-align: center;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.4em;
+  /* El tracking empuja a la derecha; lo compensamos para que quede centrado. */
+  text-indent: 0.4em;
+}
+
+.note {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+  text-align: center;
+}

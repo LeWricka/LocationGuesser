@@ -76,6 +76,7 @@ const sampleChallenge: Challenge = {
   id: 'c1',
   group_id: 'g1',
   title: 'Plaza Mayor',
+  description: null,
   lat: 40.4155,
   lng: -3.7074,
   image_path: null,

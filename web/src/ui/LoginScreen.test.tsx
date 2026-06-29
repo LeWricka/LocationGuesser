@@ -25,7 +25,7 @@ describe('LoginScreen', () => {
   test('enviar el formulario dispara onSubmit', async () => {
     const onSubmit = vi.fn()
     render(<LoginScreen email="lewis@x.com" onEmailChange={() => {}} onSubmit={onSubmit} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Enviar enlace mágico' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     expect(onSubmit).toHaveBeenCalledOnce()
   })
 

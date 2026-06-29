@@ -19,7 +19,7 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // `challenge_answers` (RLS). Reutilizado por todos los lectores: jugar, lista del
 // grupo, home y el RETURNING de crear/editar.
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
+  'id, group_id, title, description, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -185,6 +185,8 @@ export async function countVotes(challengeId: string): Promise<number> {
  */
 export interface UpdateChallengeInput {
   title?: string
+  /** Descripción del día (texto libre); null o '' la deja vacía. Migración 0021. */
+  description?: string | null
   /** Plazo del reto en ISO absoluto (duración relativa ya congelada). */
   deadlineAt?: string
   /** Segundos por jugada; null = sin límite. */
@@ -227,6 +229,7 @@ export async function updateChallenge(
 ): Promise<ChallengeForPlay> {
   const patch: ChallengeUpdate = {}
   if (input.title !== undefined) patch.title = input.title
+  if (input.description !== undefined) patch.description = input.description
   if (input.deadlineAt !== undefined) patch.deadline_at = input.deadlineAt
   if (input.guessSeconds !== undefined) patch.guess_seconds = input.guessSeconds
   if (input.imagePath !== undefined) patch.image_path = input.imagePath
@@ -259,6 +262,21 @@ export async function updateChallenge(
   if (error) throw error
 
   return data
+}
+
+/**
+ * Edita SOLO la descripción del día de un reto (texto editorial; no toca la
+ * mecánica). Atajo de `updateChallenge` para la edición inline del detalle del
+ * momento. Recorta espacios y guarda `null` si queda vacía (estado "sin texto").
+ * Solo el dueño del grupo lo consigue (misma RLS `challenges_update_owner`, 0004).
+ */
+export async function updateChallengeDescription(id: string, description: string): Promise<void> {
+  const trimmed = description.trim()
+  const { error } = await supabase
+    .from('challenges')
+    .update({ description: trimmed === '' ? null : trimmed })
+    .eq('id', id)
+  if (error) throw error
 }
 
 /**

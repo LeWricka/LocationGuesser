@@ -9,19 +9,20 @@ import type { TripMapProps as Props } from './TripMap.types'
 import './tripPins.css'
 import styles from './TripMapLeaflet.module.css'
 
-// Basemap CLARO por defecto (estilo Atelier, restyle §5): Carto Positron, papel
-// gris minimalista sin API key. Deja que los pines-foto y la ruta en acento sean
-// los protagonistas de color; el fondo es "papel", coherente con el diario claro.
-const POSITRON_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-const POSITRON_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-
-// Satélite Esri sin API key — se jubila como fondo por defecto pero sigue como
-// capa OPT-IN (toggle en el chrome) para quien quiera la inmersión "mundo real".
+// Satélite Esri World Imagery sin API key — BASEMAP POR DEFECTO (fase "nuevo
+// enfoque"): el mapamundi satélite es el héroe, da la inmersión "mundo real" y
+// hace que los recuerdos manden. Los pines-foto y la ruta en acento (tokens) son
+// el color de marca encima.
 const ESRI_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const ESRI_ATTRIBUTION =
   'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+
+// Basemap CLARO Carto Positron, papel gris minimalista sin API key — ahora capa
+// OPT-IN (toggle en el chrome) para quien prefiera el plano sobrio en vez del satélite.
+const POSITRON_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+const POSITRON_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
 
 // Centro/zoom de arranque (el mundo) hasta que fitBounds encuadra los pines.
 const WORLD: L.LatLngExpression = [25, 0]
@@ -148,7 +149,7 @@ function PanToSelected({
 }
 
 /**
- * Mapa PLANO de la ruta del viaje (Leaflet + satélite Esri) — el "suelo"
+ * Mapa PLANO de la ruta del viaje (Leaflet + satélite Esri por defecto) — el "suelo"
  * garantizado del pivote (el globo 3D/MapLibre es otra tarea). Pinta:
  *  - un pin-foto circular por momento cerrado, clavado en su lat/lng;
  *  - el momento activo FLOTANDO sobre el centroide de los cerrados (anti-spoiler),
@@ -161,10 +162,10 @@ export function TripMapLeaflet({
   selectedChallengeId,
   onSelectMoment,
 }: Props) {
-  // Capa de fondo: CLARO (Positron) por defecto; satélite solo si el usuario lo
-  // pide con el toggle del chrome (opt-in, restyle §5). No persiste: cada visita
-  // arranca en claro, que es el estado de reposo del diario.
-  const [satellite, setSatellite] = useState(false)
+  // Capa de fondo: SATÉLITE (Esri) por defecto (fase "nuevo enfoque"); el plano
+  // claro (Positron) solo si el usuario lo pide con el toggle del chrome (opt-in).
+  // No persiste: cada visita arranca en satélite, el estado de reposo del atlas.
+  const [satellite, setSatellite] = useState(true)
 
   const activePos = useMemo<L.LatLngExpression | null>(
     () => (activeMoment ? floatingActivePos(route) : null),
@@ -254,7 +255,7 @@ export function TripMapLeaflet({
       </MapContainer>
 
       {/* Toggle de capa: pastilla clara del chrome (estilo Atelier). Alterna entre
-          el papel claro (Positron) por defecto y el satélite opt-in. */}
+          el satélite (Esri) por defecto y el plano claro (Positron) opt-in. */}
       <button
         type="button"
         className={`${styles.layerToggle} ${satellite ? styles.layerToggleActive : ''}`}
