@@ -1,26 +1,120 @@
-/* Landing pública (issue #175): móvil-first, una columna centrada que respira
- * en pantallas anchas. Todo con tokens del kit; sin colores/espaciados crudos. */
+/* Landing pública — enfoque "globo/mapa vivo de fondo + popup" (issue #175).
+ * Móvil-first, una columna centrada sobre un globo satélite que respira detrás.
+ * Todo con tokens del kit; sin colores/espaciados crudos salvo el degradado del
+ * globo, que es una textura decorativa (no parte del sistema de superficies). */
 .page {
+  position: relative;
   min-height: 100svh;
   display: flex;
   justify-content: center;
+  align-items: center;
   padding: var(--space-6) var(--space-4);
   padding-top: calc(var(--space-7) + env(safe-area-inset-top));
   padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+  /* El globo y el velo viven dentro: recortamos el sangrado del disco. */
+  overflow: hidden;
 }
 
+/* ── Globo satélite vivo ──────────────────────────────────────────────────────
+ * Un disco terráqueo grande, anclado abajo (asoma como un horizonte) que gira
+ * muy lento. Es CSS puro: cero JS, cero red, no penaliza el arranque. Evoca el
+ * mapa/globo de la app sin montar MapLibre. Decorativo (aria-hidden). */
+.globe {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* Velo de tinta sobre el globo para que el texto cante (legibilidad AAA). */
+  background:
+    radial-gradient(
+      120% 80% at 50% 8%,
+      transparent 0%,
+      color-mix(in srgb, var(--paper) 78%, transparent) 62%,
+      var(--paper) 100%
+    ),
+    var(--paper);
+}
+
+/* La esfera: un disco enorme con sombreado tipo planeta (océano en acento
+ * Pizarra + un destello frío arriba-izquierda, como luz cenital). Gira lento
+ * arrastrando un patrón de "continentes" tenue para dar vida sin pesar. */
+.globeSphere {
+  position: absolute;
+  left: 50%;
+  bottom: -58vmin;
+  width: 130vmin;
+  height: 130vmin;
+  transform: translateX(-50%);
+  border-radius: var(--radius-full);
+  background:
+    /* destello cenital frío (luz sobre el planeta) */
+    radial-gradient(
+      42% 42% at 34% 26%,
+      color-mix(in srgb, #ffffff 70%, transparent) 0%,
+      transparent 60%
+    ),
+    /* "continentes": manchas tenues que el giro mueve */
+    radial-gradient(
+        20% 16% at 30% 62%,
+        color-mix(in srgb, var(--accent-deep) 42%, transparent) 0%,
+        transparent 70%
+      ),
+    radial-gradient(
+      24% 18% at 72% 44%,
+      color-mix(in srgb, var(--accent-deep) 38%, transparent) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      14% 12% at 56% 78%,
+      color-mix(in srgb, var(--accent-deep) 34%, transparent) 0%,
+      transparent 70%
+    ),
+    /* océano: degradado de acento Pizarra */
+    radial-gradient(
+        120% 120% at 38% 22%,
+        color-mix(in srgb, var(--accent) 78%, #ffffff) 0%,
+        var(--accent) 46%,
+        var(--accent-deep) 100%
+      );
+  box-shadow:
+    inset -18vmin -10vmin 22vmin color-mix(in srgb, var(--accent-deep) 60%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent);
+  /* Giro lento (los "continentes" desfilan). Lo desactivamos con reduced-motion. */
+  animation: globe-spin 80s linear infinite;
+  will-change: transform;
+}
+
+/* Atmósfera: un halo frío suave en el borde del disco. */
+.globeGlow {
+  position: absolute;
+  left: 50%;
+  bottom: -58vmin;
+  width: 130vmin;
+  height: 130vmin;
+  transform: translateX(-50%);
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 18vmin 4vmin var(--color-accent-glow-soft);
+}
+
+@keyframes globe-spin {
+  /* Rotamos el disco (el sombreado/destello se mueven con él, dando "vida"). */
+  from {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  to {
+    transform: translateX(-50%) rotate(360deg);
+  }
+}
+
+/* ── Contenido (por encima del globo) ─────────────────────────────────────── */
 .content {
+  position: relative;
+  z-index: 1;
   width: 100%;
   max-width: var(--container-max);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-}
-
-/* Más aire antes de "Cómo funciona": queda debajo de la entrada, separado para
- * leerse como una sección aparte (issue #183). */
-.content > section:last-child {
-  margin-top: var(--space-4);
+  align-items: center;
 }
 
 /* ── Hero ─────────────────────────────────────────────────────────────────── */
@@ -31,20 +125,19 @@
   align-items: center;
 }
 
-/* Ancla de marca (el pin) en disco de tint de acento con hairline: quieto, sin
- * halo. Hero compacto (issue #183): el pin pequeño para que el formulario de
- * email entre en pantalla sin scroll en móvil. */
+/* Ancla de marca (el pin) en disco de tint de acento con hairline. */
 .brand {
   display: grid;
   place-items: center;
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   border-radius: var(--radius-full);
   font-size: var(--font-size-lg);
   line-height: 1;
-  background: var(--color-accent-soft);
+  background: var(--color-surface);
   border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
-  margin-bottom: var(--space-4);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--space-5);
 }
 
 .eyebrow {
@@ -56,7 +149,8 @@
   margin-bottom: var(--space-2);
 }
 
-/* Frase ancla en serif (la voz editorial), peso medio que respira. */
+/* Frase ancla en serif (la voz editorial), peso medio que respira. Generosa: es
+ * el primer pantallazo y debe leerse como una promesa, no como una etiqueta. */
 .headline {
   font-family: var(--font-serif);
   font-size: var(--font-size-2xl);
@@ -64,6 +158,7 @@
   letter-spacing: var(--letter-spacing-tight);
   line-height: var(--line-height-tight);
   text-wrap: balance;
+  max-width: 16ch;
 }
 
 /* La parte que "canta": cursiva en acento (gesto de la maqueta). */
@@ -73,61 +168,24 @@
 }
 
 .lead {
-  margin: var(--space-3) auto 0;
-  max-width: 46ch;
+  margin: var(--space-4) auto 0;
+  max-width: 42ch;
   color: var(--color-text-muted);
   line-height: var(--line-height-normal);
 }
 
-/* ── Entrada por magic link ───────────────────────────────────────────────── */
-/* La tarjeta de entrada es el foco de la landing: debe destacar sobre el papel,
- * no fundirse. Degradado sutil (blanco→tinte de acento), borde de acento algo más
- * marcado y elevación mayor para que el formulario "flote" y cante. */
-.entry {
-  width: 100%;
-  max-width: 420px;
-  margin: 0 auto;
-  text-align: center;
-  padding: var(--space-6);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(
-    180deg,
-    var(--color-surface) 0%,
-    color-mix(in srgb, var(--color-accent-soft) 60%, var(--color-surface)) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
-  box-shadow: var(--shadow-lg);
+/* CTA que abre el popup: generoso, centrado, con aire por encima. */
+.cta {
+  margin-top: var(--space-6);
 }
 
-.entryTitle {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-tight);
-  line-height: var(--line-height-tight);
-}
-
-.entryLead {
-  margin: var(--space-2) auto var(--space-5);
-  max-width: 36ch;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-normal);
-}
-
-/* El formulario se alinea a la izquierda dentro de la tarjeta centrada: la
- * etiqueta y el error leen mejor pegados al borde del campo. */
-.form {
-  text-align: left;
-}
-
-/* ── Atajo "tengo un código de grupo" (issue #183) ────────────────────────────
+/* ── Atajo "tengo un código de grupo" ─────────────────────────────────────────
  * Discreto: un disclosure que despliega un campo para pegar código/enlace. Solo
  * en la landing genérica; en el deep-link el grupo ya viene dado. */
 .codeDisclosure {
-  margin-top: var(--space-5);
-  border-top: 1px solid var(--card-border);
-  padding-top: var(--space-4);
+  margin-top: var(--space-6);
+  width: 100%;
+  max-width: 360px;
 }
 
 .codeSummary {
@@ -151,8 +209,20 @@
   text-align: left;
 }
 
-@media (min-width: 600px) {
-  .headline {
-    font-size: var(--font-size-2xl);
+/* ── Contenido del popup (paso email) ─────────────────────────────────────── */
+.modalIntro {
+  text-align: left;
+}
+
+.modalLead {
+  margin: 0 0 var(--space-5);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .globeSphere {
+    animation: none;
   }
 }

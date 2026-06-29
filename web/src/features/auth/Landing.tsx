@@ -1,24 +1,23 @@
-// Landing pública para visitantes SIN sesión (issue #175, copy afinado en #183).
-// Antes, un recién llegado solo veía la pantalla de email del magic link; ahora
-// ve una landing que explica el producto y le ofrece la entrada passwordless en
-// el mismo sitio. La política sigue siendo passwordless puro: sin contraseñas
-// (cuentas-y-home.md §1.2 y §2).
+// Landing pública para visitantes SIN sesión — enfoque "globo/mapa vivo de fondo
+// + popup" (issue #175, copy #183).
 //
-// Orden (issue #183): hero compacto → entrada (email) → "Cómo funciona". Así un
-// visitante nuevo ve cómo entrar sin hacer scroll; el "cómo funciona" queda
-// debajo para quien baje. El hero NO duplica los 3 pasos (eso es `HowItWorks`):
-// es una frase de valor.
+// La entrada evoca la identidad de la app (el globo satélite que el usuario verá
+// dentro): un globo vivo de fondo (CSS, ligero — no monta MapLibre para no
+// penalizar el arranque) con una frase emotiva en serif y un CTA cálido. El flujo
+// passwordless (OTP) no vive en la página, sino en un POPUP fino que abre el CTA:
+// "tu mundo te espera, entra". Así el primer pantallazo es puro deseo (la frase +
+// el globo) y el formulario aparece solo cuando el visitante decide entrar.
 //
-// Reutiliza:
-//  - `ui/HowItWorks` para los 3 pasos (no se duplica).
-//  - el hook `useMagicLink` para toda la lógica/wiring del login passwordless, el
-//    mismo que usa LoginFlow (código de 6 dígitos; enlace del email como fallback).
+// Reutiliza, SIN modificar su lógica:
+//  - `useMagicLink` para todo el wiring del login passwordless (código de 6
+//    dígitos; enlace del email como fallback) — el mismo que usa LoginFlow.
+//  - `ui/Modal` del kit para el popup (overlay + foco + Escape + hoja en móvil).
 //  - `ui/EnterCode` para el paso "introduce el código" tras enviar el email.
 //  - `features/home/navigation.joinByCode` para el atajo "tengo un código de
 //    grupo" en la landing genérica (lleva a `#g=<código>`).
 
 import { useState } from 'react'
-import { EnterCode, Button, Field, HowItWorks, Input, Stack } from '../../ui'
+import { EnterCode, Button, Field, Input, Modal, Stack } from '../../ui'
 import { joinByCode } from '../home/navigation'
 import { useMagicLink } from './useMagicLink'
 import styles from './Landing.module.css'
@@ -26,7 +25,7 @@ import styles from './Landing.module.css'
 interface Props {
   /**
    * Nombre del grupo cuando se llega por un link de reto (flujo A): cambia el
-   * copy del hero a "Vive los viajes de <grupo>". Sin él, landing genérica (flujo B).
+   * copy a "Vive los viajes de <grupo>". Sin él, landing genérica (flujo B).
    */
   groupName?: string
   /**
@@ -53,34 +52,33 @@ export function Landing({ groupName, redirectTo }: Props) {
     reset,
   } = useMagicLink({ redirectTo })
 
+  // El popup de entrada: cerrado hasta que el visitante pulsa el CTA. Al cerrarlo
+  // volvemos el flujo a 'email' para que no reabra en mitad del paso del código.
+  const [open, setOpen] = useState(false)
+
   // Atajo opcional (solo landing genérica): el visitante que ya tiene un código
   // de GRUPO lo pega aquí y entra directo al flujo de unirse (#g=<código>). Es
   // distinto del código OTP de login: este navega, no autentica.
   const [groupCode, setGroupCode] = useState('')
   const [codeError, setCodeError] = useState<string | undefined>(undefined)
 
-  // Tras enviar el email, el flujo es idéntico al login: "introduce el código",
-  // con reenviar y volver. Reutilizamos la pantalla del kit para no divergir.
-  if (step === 'code') {
-    return (
-      <EnterCode
-        email={email}
-        code={code}
-        onCodeChange={setCode}
-        onSubmit={verify}
-        onResend={resend}
-        onChangeEmail={reset}
-        verifying={verifying}
-        resending={resending}
-        error={error}
-      />
-    )
-  }
-
   const joining = Boolean(groupName)
+
+  function closeModal() {
+    setOpen(false)
+    reset()
+  }
 
   return (
     <main className={styles.page}>
+      {/* Globo satélite vivo de fondo (CSS puro): un disco terráqueo que gira
+          lento bajo un velo de tinta, evocando el mapa de la app sin coste de
+          arranque. Decorativo: aria-hidden y desactivado con reduced-motion. */}
+      <div className={styles.globe} aria-hidden="true">
+        <span className={styles.globeSphere} />
+        <span className={styles.globeGlow} />
+      </div>
+
       <div className={styles.content}>
         <section className={styles.hero}>
           <span className={styles.brand} aria-hidden="true">
@@ -103,49 +101,15 @@ export function Landing({ groupName, redirectTo }: Props) {
                 Que los que más quieres <span className={styles.accent}>lo vivan contigo</span>
               </h1>
               <p className={styles.lead}>
-                Comparte tus viajes y guarda esos recuerdos con los tuyos. Ellos los viven contigo
-                y, de paso, adivinan dónde es.
+                Comparte tus viajes y haz que los que más quieres los vivan contigo. Tu mundo te
+                espera.
               </p>
             </>
           )}
-        </section>
 
-        <section className={styles.entry} aria-labelledby="landing-entry-title">
-          <h2 id="landing-entry-title" className={styles.entryTitle}>
-            {joining ? 'Entra y únete al viaje' : 'Comparte tu primer viaje'}
-          </h2>
-          <p className={styles.entryLead}>
-            Sin contraseñas: te mandamos un código para <strong>entrar o crear tu cuenta</strong>.
-          </p>
-          <form
-            className={styles.form}
-            noValidate
-            onSubmit={(event) => {
-              event.preventDefault()
-              void submit()
-            }}
-          >
-            <Stack gap={4}>
-              <Field label="Tu correo" error={error}>
-                {(fieldProps) => (
-                  <Input
-                    {...fieldProps}
-                    type="email"
-                    name="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    placeholder="tucorreo@ejemplo.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    disabled={loading}
-                  />
-                )}
-              </Field>
-              <Button type="submit" size="lg" fullWidth loading={loading}>
-                Empieza a compartir
-              </Button>
-            </Stack>
-          </form>
+          <Button size="lg" className={styles.cta} onClick={() => setOpen(true)}>
+            {joining ? 'Entrar y unirme al viaje' : 'Empieza a compartir'}
+          </Button>
 
           {/* Atajo para quien llega con un código de grupo a mano: solo en la
               landing genérica (en el flujo deep-link ya viene el grupo). */}
@@ -185,11 +149,69 @@ export function Landing({ groupName, redirectTo }: Props) {
             </details>
           )}
         </section>
-
-        {/* Compacto: el bucle se entiende de un vistazo sin empujar el email +
-            CTA fuera de pantalla en móvil (mobile-first). */}
-        <HowItWorks compact />
       </div>
+
+      {/* Popup fino con el flujo OTP. Mismo paso 'code' que LoginFlow: tras enviar
+          el email mostramos EnterCode dentro del mismo popup (reenviar/volver). El
+          Modal sin onClose en el paso del código evita cerrarlo por error mientras
+          se teclea; siempre hay "Cambiar correo" (reset) para volver. */}
+      <Modal
+        open={open}
+        onClose={step === 'email' ? closeModal : undefined}
+        title={
+          step === 'email' ? (joining ? 'Entra y únete al viaje' : 'Tu mundo te espera') : null
+        }
+      >
+        {step === 'code' ? (
+          <EnterCode
+            email={email}
+            code={code}
+            onCodeChange={setCode}
+            onSubmit={verify}
+            onResend={resend}
+            onChangeEmail={reset}
+            verifying={verifying}
+            resending={resending}
+            error={error}
+          />
+        ) : (
+          <div className={styles.modalIntro}>
+            <p className={styles.modalLead}>
+              Sin contraseñas: te mandamos un código para <strong>entrar o crear tu cuenta</strong>.
+              Comparte tus viajes y haz que los que más quieres los vivan contigo.
+            </p>
+            <form
+              noValidate
+              onSubmit={(event) => {
+                event.preventDefault()
+                void submit()
+              }}
+            >
+              <Stack gap={4}>
+                <Field label="Tu correo" error={error}>
+                  {(fieldProps) => (
+                    <Input
+                      {...fieldProps}
+                      type="email"
+                      name="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      placeholder="tucorreo@ejemplo.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={loading}
+                      autoFocus
+                    />
+                  )}
+                </Field>
+                <Button type="submit" size="lg" fullWidth loading={loading}>
+                  Enviarme el código
+                </Button>
+              </Stack>
+            </form>
+          </div>
+        )}
+      </Modal>
     </main>
   )
 }

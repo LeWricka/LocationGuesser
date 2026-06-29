@@ -23,39 +23,49 @@ afterEach(() => {
 })
 
 describe('Landing', () => {
-  test('muestra el hero y el formulario de entrada', () => {
+  test('muestra el hero con la frase y el CTA de entrada', () => {
     render(<Landing />)
     expect(
       screen.getByRole('heading', {
         name: /Que los que más quieres lo vivan contigo/i,
       }),
     ).toBeInTheDocument()
-    // Los 3 pasos reutilizados de HowItWorks.
-    expect(screen.getByRole('heading', { name: 'Cómo funciona' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
+    // El CTA abre el popup; el formulario no está visible hasta pulsarlo.
     expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Tu correo')).not.toBeInTheDocument()
+  })
+
+  test('el CTA abre el popup con el formulario de email', async () => {
+    render(<Landing />)
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enviarme el código' })).toBeInTheDocument()
   })
 
   test('email inválido no llama a Supabase y muestra error', async () => {
     render(<Landing />)
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
     expect(signIn).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('correo válido')
   })
 
   test('email válido envía el código y pasa a la pantalla del código', async () => {
     render(<Landing />)
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
     expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, undefined)
     expect(await screen.findByLabelText('Código de 6 dígitos')).toBeInTheDocument()
   })
 
   test('pasa el redirectTo al enviar el código', async () => {
     render(<Landing redirectTo="https://app.example/#g=abc" />)
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
     expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, 'https://app.example/#g=abc')
   })
 
@@ -64,6 +74,7 @@ describe('Landing', () => {
     expect(
       screen.getByRole('heading', { name: /Vive los viajes de Finde Lisboa/i }),
     ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Entrar y unirme al viaje' })).toBeInTheDocument()
     // En el deep-link el grupo ya viene dado: no se ofrece el atajo de código.
     expect(screen.queryByText('¿Te han pasado un código de viaje?')).not.toBeInTheDocument()
   })
