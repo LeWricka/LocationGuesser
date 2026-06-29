@@ -1,8 +1,9 @@
 /*
- * Pantalla "Viaje" en DOS secciones hermanas (Diario ↔ Retos) navegadas por
- * deslizamiento. Estructura: cabecera fija (marca + pager de 2 puntos) + un
- * viewport con una pista que traslada en X entre los dos paneles. Cada panel hace
- * su propio scroll vertical. Lenguaje Atelier/Pizarra (papel, tinta, acento).
+ * Pantalla "Viaje" a PANTALLA COMPLETA en DOS secciones hermanas (Diario ↔ Retos).
+ * Estructura: el viewport llena toda la pantalla con una pista que traslada en X
+ * entre los dos paneles; la cabecera (marca + pager de 2 puntos) NO ocupa hueco:
+ * es un overlay absoluto que FLOTA por encima del mapa, con scrim y consciente de
+ * la sección. Cada panel hace su propio scroll vertical. Lenguaje Atelier/Pizarra.
  */
 .screen {
   position: relative;
@@ -23,14 +24,44 @@
   padding: var(--space-5);
 }
 
-/* ---- Cabecera: marca del viaje + accesos ---- */
-.chrome {
-  flex: 0 0 auto;
+/* ---- Cabecera FLOTANTE sobre el mapa a pantalla completa ----
+   Overlay absoluto en la franja superior del viewport: NO ocupa hueco en el flujo
+   (el mapa llena la pantalla por debajo). Lleva un scrim en degradado para legibilidad
+   y respeta el notch con safe-area-inset-top. Es consciente de la sección activa:
+   en DIARIO (mapa satélite) scrim oscuro + texto blanco; en RETOS (papel claro)
+   un velo de papel + tinta para que no quede ilegible. */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-4) var(--space-2);
+  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-4) var(--space-5);
+  pointer-events: none; /* el scrim no captura toques; los controles lo reactivan */
 }
+.overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  transition: background var(--duration-slow) var(--ease-emphasized);
+}
+.overlay > * {
+  pointer-events: auto;
+}
+/* DIARIO: sobre satélite → velo oscuro + texto blanco. */
+.overlayDark::before {
+  background: linear-gradient(to bottom, rgba(24, 32, 43, 0.62), rgba(24, 32, 43, 0));
+}
+/* RETOS: sobre papel claro → velo de papel + tinta. */
+.overlayLight::before {
+  background: linear-gradient(to bottom, var(--color-bg) 38%, transparent);
+}
+
 .iconPill {
   flex: 0 0 auto;
   width: 42px;
@@ -66,7 +97,6 @@
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   line-height: 1;
-  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -76,52 +106,30 @@
   font-size: var(--font-size-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-text-faint);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-/* ---- Fila de navegación: título de sección (cross-fade) + pager ---- */
-.headNav {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: 0 var(--space-4) var(--space-3);
+/* Color del texto del título según la sección (legibilidad sobre cada fondo). */
+.overlayDark .tripName {
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(24, 32, 43, 0.45);
 }
-.secTitle {
-  position: relative;
-  height: 18px;
-  flex: 1;
-  min-width: 0;
+.overlayDark .tripMeta {
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 6px rgba(24, 32, 43, 0.4);
 }
-.secTitle span {
-  position: absolute;
-  left: 0;
-  top: 0;
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-accent);
-  transition:
-    opacity var(--duration-slow) var(--ease-emphasized),
-    transform var(--duration-slow) var(--ease-emphasized);
+.overlayLight .tripName {
+  color: var(--color-text);
 }
-.secOn {
-  opacity: 1;
-  transform: none;
-}
-.secOff {
-  opacity: 0;
-  transform: translateY(-4px);
+.overlayLight .tripMeta {
+  color: var(--color-text-faint);
 }
 
 /* pager de 2 puntos: tocar para ir; el activo se alarga en pastilla. */
 .pager {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -161,6 +169,13 @@
   background: var(--color-accent);
   opacity: 1;
 }
+/* Sobre el mapa satélite (DIARIO) el acento no contrasta: el pager va en blanco. */
+.overlayDark .blip {
+  background: #fff;
+}
+.overlayDark .pagerActive .blip {
+  background: #fff;
+}
 
 /* ---- Viewport + pista deslizable ---- */
 .viewport {
@@ -193,6 +208,12 @@
 .panelBleed {
   padding: 0;
   overflow: hidden;
+}
+
+/* Panel Retos: la cabecera flota por encima, así que su contenido necesita un
+   padding-top que lo deje pasar por debajo del overlay sin quedar tapado. */
+.panelRetos {
+  padding-top: calc(env(safe-area-inset-top) + var(--space-8));
 }
 
 /* ---- Edge-peek: zona táctil ancha + sliver de la página vecina que asoma ----
@@ -300,12 +321,20 @@
   border-radius: var(--radius-lg);
 }
 
-/* FAB de añadir momento: acción primaria (acento) flotando abajo-derecha. */
-.fab {
+/* FAB "＋" con menú: contenedor flotando abajo-derecha; ancla el popover de acciones. */
+.fabWrap {
   position: absolute;
   right: var(--space-4);
   bottom: calc(env(safe-area-inset-bottom) + var(--space-5));
-  z-index: 3;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+/* FAB: acción primaria (acento). Al abrir el menú gira el "＋" a una "×". */
+.fab {
   width: 56px;
   height: 56px;
   display: flex;
@@ -329,6 +358,68 @@
 .fab:active {
   transform: scale(0.94);
 }
+.fabActive {
+  transform: rotate(45deg);
+}
+.fabActive:hover {
+  transform: rotate(45deg) translateY(-2px);
+}
+
+/* Menú de acciones: dos pastillas (Momento / Reto) que surgen sobre el FAB. */
+.fabMenu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+  animation: lg-fab-menu-in var(--duration-base) var(--ease-emphasized);
+}
+.fabItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.fabItem:hover {
+  background: var(--color-surface-hover);
+}
+.fabItem:active {
+  transform: scale(0.96);
+}
+.fabItem:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.fabItemIcon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+@keyframes lg-fab-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .track {
@@ -341,8 +432,24 @@
   .fab:active {
     transform: none;
   }
-  .blip,
-  .secTitle span {
+  /* El FAB abierto mantiene la "×" girada (es estado, no animación). */
+  .fabActive,
+  .fabActive:hover {
+    transform: rotate(45deg);
+  }
+  .fabMenu {
+    animation: none;
+  }
+  .fabItem {
+    transition: none;
+  }
+  .fabItem:active {
+    transform: none;
+  }
+  .blip {
+    transition: none;
+  }
+  .overlay::before {
     transition: none;
   }
   .nudgeR,

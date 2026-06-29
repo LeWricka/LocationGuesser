@@ -607,3 +607,29 @@
   font-size: 0.9rem;
   line-height: 1;
 }
+
+/* Pie discreto: acceso al marcador completo y ajustes clásicos. Texto tenue,
+   subrayado al hover; centrado, sin peso visual (no compite con los bloques). */
+.settingsLink {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  appearance: none;
+  border: 0;
+  background: transparent;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-full);
+  transition: color var(--transition-fast);
+}
+.settingsLink:hover {
+  color: var(--color-text);
+}
+.settingsLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

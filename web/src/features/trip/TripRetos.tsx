@@ -274,6 +274,13 @@ export function TripRetos({
           <Icon icon={ChevronRight} size={16} />
         </span>
       </button>
+
+      {/* Pie discreto: hogar del marcador completo y los ajustes clásicos (antes
+          colgaba del "⋯" de la cabecera; ahora toda la info del reto vive aquí). */}
+      <button type="button" className={styles.settingsLink} onClick={onOpenClassic}>
+        Ver marcador completo y ajustes
+        <Icon icon={ChevronRight} size={14} />
+      </button>
     </div>
   )
 }
