@@ -410,10 +410,12 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
           />
         </section>
 
-        {/* LUGAR — mapa satélite. Visible (es un recuerdo). Opcional. */}
+        {/* LUGAR — mapa satélite. En recuerdo es el sitio VISIBLE; con el toggle de
+            reto ON es la respuesta OCULTA a adivinar (cambia el lenguaje). */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            Lugar <span className={styles.optional}>opcional</span>
+            {isChallenge ? '🎯 Lugar a adivinar' : '📍 Sitio del recuerdo'}{' '}
+            <span className={styles.optional}>{isChallenge ? 'obligatorio' : 'opcional'}</span>
           </span>
           <Stack gap={3}>
             <Button variant="secondary" fullWidth loading={locating} onClick={useGps}>
@@ -429,7 +431,12 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
               </Row>
             ) : (
               <span className={styles.hint}>
-                Toca el mapa para marcar dónde es. Sin lugar también vale.
+                👆 Toca el mapa para marcar dónde es. Sin lugar también vale.
+              </span>
+            )}
+            {isChallenge && (
+              <span className={styles.hint}>
+                Este será el sitio oculto que los jugadores deberán adivinar.
               </span>
             )}
           </Stack>
@@ -484,7 +491,9 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             onClick={toggleIsChallenge}
           >
             <span className={styles.toggleText}>
-              <span className={styles.toggleTitle}>🎯 Convertirlo en reto</span>
+              <span className={styles.toggleTitle}>
+                {isChallenge ? '✓ Es un reto' : '🎯 Convertirlo en reto'}
+              </span>
               <span className={styles.toggleHint}>
                 Esconde el lugar y que adivinen dónde es, con cuenta atrás.
               </span>

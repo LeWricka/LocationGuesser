@@ -53,9 +53,14 @@
   color: var(--color-text);
 }
 
+/* Capa activa: sólida en acento + anillo blanco y sombra para destacar sobre la
+   foto satélite (sin el contorno, el acento se confunde con tonos del terreno). */
 .layerActive {
   background: var(--color-accent);
   color: var(--color-on-accent);
+  box-shadow:
+    0 0 0 2px var(--color-on-accent),
+    var(--shadow-sm);
 }
 
 /* Foco visible (AA) para el control de capa. */
