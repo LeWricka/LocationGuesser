@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { defaultAvatarFor, parseAvatar, svgForEmoji, ANIMAL_SVG_VIEWBOX } from '../lib/avatar'
+import {
+  canonicalEmoji,
+  defaultAvatarFor,
+  parseAvatar,
+  svgForEmoji,
+  ANIMAL_SVG_VIEWBOX,
+} from '../lib/avatar'
 import styles from './Avatar.module.css'
 
 type Size = 'sm' | 'md' | 'lg'
@@ -16,10 +22,12 @@ interface Props {
 }
 
 // Avatar circular del usuario: la foto de perfil (URL http) recortada en
-// círculo, o un animal cuando no hay foto. Los 8 animales del set por defecto se
-// pintan como dibujo de LÍNEA en SVG (estilo Kinfolk: trazo de acento sobre tint
-// claro); el resto del set cae al emoji sobre un fondo de color. El MODELO de
-// datos no cambia: la clave sigue siendo el emoji (`emoji:<char>`). Presentacional.
+// círculo, o un animal cuando no hay foto. El set por defecto son SOLO 8 animales
+// dibujados a LÍNEA en SVG (estilo Atelier: trazo de acento sobre tint claro), así
+// que el avatar por defecto SIEMPRE se pinta como SVG (nunca emoji suelto). El
+// MODELO de datos no cambia: la clave sigue siendo el emoji (`emoji:<char>`). Un
+// token antiguo fuera de los 8 se proyecta de forma estable a uno de los 8 en
+// `parseAvatar`. Presentacional.
 export function Avatar({ userId, avatarUrl, name, size = 'md', className }: Props) {
   const label = name?.trim() || 'Avatar'
   const resolved = parseAvatar(avatarUrl, userId)
@@ -38,38 +46,22 @@ export function Avatar({ userId, avatarUrl, name, size = 'md', className }: Prop
     )
   }
 
-  const emoji = resolved.kind === 'emoji' ? resolved.emoji : defaultAvatarFor(userId).emoji
-  const svg = svgForEmoji(emoji)
-
-  // Animal del set por defecto → dibujo de línea (acento sobre tint), sin fondo
-  // de color: el lenguaje editorial Pizarra.
-  if (svg) {
-    const classes = [styles.avatar, styles.line, styles[size], className].filter(Boolean).join(' ')
-    return (
-      <span className={classes} role="img" aria-label={label}>
-        <svg
-          className={styles.svg}
-          viewBox={ANIMAL_SVG_VIEWBOX}
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: svg }}
-        />
-      </span>
-    )
-  }
-
-  // Resto del set → emoji grande sobre fondo de color (derivado del animal).
-  const bg = resolved.kind === 'emoji' ? resolved.bg : defaultAvatarFor(userId).bg
-  const classes = [styles.avatar, styles[size], className].filter(Boolean).join(' ')
+  // Avatar por defecto → SIEMPRE dibujo de línea (acento sobre tint), sin emoji
+  // suelto. `parseAvatar` ya normaliza al set canónico de 8, así que el emoji
+  // resuelto siempre tiene SVG; `canonicalEmoji` es el cinturón de seguridad por
+  // si llegara un emoji crudo (p.ej. al caer una foto que no carga).
+  const rawEmoji = resolved.kind === 'emoji' ? resolved.emoji : defaultAvatarFor(userId).emoji
+  const emoji = canonicalEmoji(rawEmoji)
+  const svg = svgForEmoji(emoji) ?? svgForEmoji(defaultAvatarFor(userId).emoji) ?? ''
+  const classes = [styles.avatar, styles.line, styles[size], className].filter(Boolean).join(' ')
   return (
-    <span
-      className={classes}
-      style={{ ['--avatar-bg' as string]: bg.background }}
-      role="img"
-      aria-label={label}
-    >
-      <span className={styles.emoji} aria-hidden="true">
-        {emoji}
-      </span>
+    <span className={classes} role="img" aria-label={label}>
+      <svg
+        className={styles.svg}
+        viewBox={ANIMAL_SVG_VIEWBOX}
+        aria-hidden="true"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
     </span>
   )
 }

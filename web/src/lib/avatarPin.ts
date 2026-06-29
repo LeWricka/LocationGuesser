@@ -64,10 +64,13 @@ export function avatarPinSvg(emoji: string, bgCss: string): string {
 }
 
 /**
- * Resuelve un avatar de perfil a un pin SVG. Si el avatar es una imagen
- * (retrocompat con URLs antiguas) no se puede meter en el SVG sin assets
- * externos, así que se cae al emoji POR DEFECTO del `userId`: el pin sigue
- * siendo autocontenido y estable por usuario.
+ * Resuelve un avatar de perfil a un pin SVG. `parseAvatar` normaliza el animal
+ * al set canónico de 8 (un token antiguo fuera del set se proyecta de forma
+ * estable a uno de los 8), así que el emoji del teardrop siempre pertenece al
+ * set nuevo y su color sale de la paleta del set — nunca un emoji retirado. Si
+ * el avatar es una imagen (foto de perfil subida) no se puede meter en el SVG
+ * sin assets externos, así que se cae al animal POR DEFECTO del `userId`: el pin
+ * sigue siendo autocontenido y estable por usuario.
  */
 export function avatarPinFromProfile(avatarUrl: string | null, userId: string): string {
   const resolved = parseAvatar(avatarUrl, userId)
