@@ -1,5 +1,4 @@
-import { Maximize2 } from 'lucide-react'
-import { Badge, Button, ChallengePhoto, Icon } from '../../ui'
+import { Badge, Button, ChallengePhoto } from '../../ui'
 import type { Moment } from '../../lib/trip'
 import styles from './MomentCard.module.css'
 
@@ -7,9 +6,7 @@ interface Props {
   moment: Moment
   /** ¿Es la tarjeta seleccionada (centrada)? Resalta su marco. */
   selected?: boolean
-  /** Tocar la foto: selecciona el momento y el mapa hace ZOOM a su pin. */
-  onSelect: () => void
-  /** Botón "expandir": abre la hoja de detalle (foto grande + texto). */
+  /** Tocar la foto: centra su pin en el mapa Y abre la hoja de detalle (foto grande). */
   onExpand: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
@@ -43,7 +40,7 @@ function formatMomentDate(value: string): string | null {
  *    "EN JUEGO" y la única acción cálida "Adivina →" (regla del pivote: jugar es
  *    capa, no peaje — un reto ya cerrado se ve y ya).
  */
-export function MomentCard({ moment, selected, onSelect, onExpand, onPlay }: Props) {
+export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
   const isActive = moment.status === 'active'
   // Lleva capa de reto (en juego, cerrado o práctica) → chip "🎯 Reto". Un recuerdo
   // puro no lo lleva: la tarjeta lee como contenido, no como juego.
@@ -59,23 +56,17 @@ export function MomentCard({ moment, selected, onSelect, onExpand, onPlay }: Pro
         .filter(Boolean)
         .join(' ')}
     >
-      {/* Tocar la foto SELECCIONA (mapa hace zoom al pin), no abre la hoja: abrir
-          el detalle es el botón "Ver". La foto no es zoomable aquí (eso vive en
-          el detalle), su click lo cableamos a la selección. */}
+      {/* Tocar la foto CENTRA su pin en el mapa y ABRE la hoja de detalle (foto en
+          grande). Un solo gesto claro — sin botón de "ampliar" suelto, que se perdía
+          sobre fotos claras. El zoom real de la imagen vive ya en el detalle. */}
       <ChallengePhoto
         src={moment.imageUrl}
         alt={moment.title}
         ratio="wide"
         zoomable={false}
-        onClick={onSelect}
+        onClick={onExpand}
         className={styles.photo}
       />
-
-      {/* Botón explícito de expandir (abre la hoja de detalle). Sobre el overlay y
-          SÍ interactivo; el resto de la foto selecciona + hace zoom. */}
-      <button type="button" className={styles.expand} onClick={onExpand} aria-label="Ver detalle">
-        <Icon icon={Maximize2} size={18} />
-      </button>
 
       {/* Bandera del país en disco de vidrio, esquina sup-izq (estilo Polarsteps).
           Solo aparece cuando el país ya se ha resuelto (CERRADOS con coord); si aún

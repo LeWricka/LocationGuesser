@@ -1,6 +1,41 @@
 /* AÑADIR RECUERDO — estilo Atelier (Kinfolk · Pizarra): papel, hairlines, serif
    en el titular, acento pizarra sobrio y micro-interacciones contenidas. */
 
+/* Presentación tipo móvil: la pantalla de crear "sube" al entrar y, al guardar,
+   "baja" para descartarse (clase .leaving) antes de volver al viaje. */
+.screen {
+  animation: lg-create-rise 320ms var(--ease-emphasized) both;
+}
+.screen.leaving {
+  animation: lg-create-fall 240ms var(--ease-emphasized) both;
+}
+@keyframes lg-create-rise {
+  from {
+    transform: translateY(18px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes lg-create-fall {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen,
+  .screen.leaving {
+    animation: none;
+  }
+}
+
 .header {
   display: flex;
   flex-direction: column;

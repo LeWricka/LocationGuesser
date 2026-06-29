@@ -13,7 +13,17 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
-import { Badge, Button, Field, Input, Row, Spinner, Stack, useToast } from '../../ui'
+import {
+  Badge,
+  Button,
+  Field,
+  Input,
+  Row,
+  Spinner,
+  Stack,
+  useReducedMotion,
+  useToast,
+} from '../../ui'
 import styles from './AddMoment.module.css'
 
 interface Props {
@@ -113,6 +123,9 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
 
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
+  // Salida tipo móvil: al guardar, la pantalla se desliza hacia abajo antes de volver.
+  const [leaving, setLeaving] = useState(false)
+  const reducedMotion = useReducedMotion()
   const toast = useToast()
   const { user } = useSession()
 
@@ -397,7 +410,16 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
         has_place: place != null,
         promoted_to_challenge: isChallenge,
       })
-      onCreated(result)
+      // Efecto móvil al guardar: vibración corta + la pantalla se desliza hacia abajo
+      // (como descartar una hoja nativa) y luego volvemos al viaje. Sin animación con
+      // reduced-motion: navegamos directos.
+      if (reducedMotion) {
+        onCreated(result)
+      } else {
+        navigator.vibrate?.(30)
+        setLeaving(true)
+        window.setTimeout(() => onCreated(result), 260)
+      }
     } catch (err) {
       reportError(err, { area: 'add_moment' })
       const msg = describeError(err)
@@ -417,7 +439,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
   const isExpress = durationStop.minutes <= EXPRESS_MAX_MINUTES
 
   return (
-    <main className="lg-page">
+    <main className={`lg-page ${styles.screen}${leaving ? ` ${styles.leaving}` : ''}`}>
       <Stack gap={5} className="lg-stagger">
         <header className={styles.header}>
           <Button variant="ghost" size="sm" onClick={onBack}>
