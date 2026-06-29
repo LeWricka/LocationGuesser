@@ -684,17 +684,12 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
           )}
         </section>
 
-        {/* CTA — el verbo cambia con el toggle. */}
+        {/* CTA — el verbo cambia con el toggle. Mientras guarda, el PROPIO botón
+            muestra el estado (subiendo fotos n/N, guardando…) para que se vea qué
+            pasa y no parezca colgado. */}
         <Button size="lg" fullWidth loading={busy} disabled={!canSave} onClick={() => void save()}>
-          {isChallenge ? '🎯 Crear reto' : 'Guardar recuerdo'}
+          {busy ? (status ?? 'Guardando…') : isChallenge ? '🎯 Crear reto' : 'Guardar recuerdo'}
         </Button>
-
-        {status && (
-          <Row gap={2} className={styles.status} justify="center">
-            <Spinner size={16} />
-            <span>{status}</span>
-          </Row>
-        )}
       </Stack>
     </main>
   )
