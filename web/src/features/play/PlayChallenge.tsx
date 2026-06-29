@@ -1,4 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Globe,
+  RotateCcw,
+  Share2,
+  TimerOff,
+} from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { GameScene, type GameSceneData } from './GameScene'
@@ -33,6 +43,7 @@ import {
   Card,
   ChallengePhoto,
   CountUp,
+  Icon,
   Row,
   ScoreRing,
   Skeleton,
@@ -110,8 +121,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // viewport para el snapshot (mismo patrón que ShareLeaderboardModal).
   const [sharingResult, setSharingResult] = useState(false)
   const resultCardRef = useRef<HTMLDivElement>(null)
-  // Mapa de adivinar como hoja inferior (bottom sheet): el FAB
-  // 🗺️ la sube; dentro se coloca el pin y se confirma; cerrar vuelve al panorama.
+  // Mapa de adivinar como hoja inferior (bottom sheet): el asa-pastilla del mapa
+  // la sube; dentro se coloca el pin y se confirma; cerrar vuelve al panorama.
   const [mapOpen, setMapOpen] = useState(false)
   // Orientación actual del panorama (0=N). La provee el panorama vía callback y
   // alimenta la brújula. Sin esto la aguja no seguiría el giro.
@@ -619,9 +630,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             onClose: goBack,
             body: (
               <>
-                <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
-                  🌍
-                </span>
+                <Icon icon={Globe} size={44} className={styles.startGlobe} />
                 <p>
                   Cuando pulses <strong>Empezar</strong>, podrás{' '}
                   {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y abrir el mapa para
@@ -675,7 +684,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           <Stack gap={4}>
             {timedOut ? (
               <Stack gap={2}>
-                <strong>⏰ No diste a tiempo</strong>
+                <strong className={styles.inlineIcon}>
+                  <Icon icon={TimerOff} size={18} /> No diste a tiempo
+                </strong>
                 <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
               </Stack>
             ) : result ? (
@@ -727,7 +738,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 en el marcador se ve junto a mi nombre). */}
             {iLeftApp && (
               <p className={styles.leftAppNotice} role="note">
-                ⚠️ Saliste de la app durante la jugada
+                <Icon icon={AlertTriangle} size={16} /> Saliste de la app durante la jugada
               </p>
             )}
 
@@ -742,7 +753,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 onClick={() => void onShareResult()}
                 loading={sharingResult}
               >
-                📤 Compartir mi resultado
+                <span className={styles.inlineIcon}>
+                  <Icon icon={Share2} size={18} /> Compartir mi resultado
+                </span>
               </Button>
             )}
 
@@ -765,11 +778,18 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   onClick={() => setShowStreetView((v) => !v)}
                   aria-expanded={showStreetView}
                 >
-                  {showStreetView
-                    ? '✕ Ocultar'
-                    : hasStreetView
-                      ? '👀 Ver Street View'
-                      : '👀 Ver la foto'}
+                  <span className={styles.inlineIcon}>
+                    {showStreetView ? (
+                      <>
+                        <Icon icon={EyeOff} size={16} /> Ocultar
+                      </>
+                    ) : (
+                      <>
+                        <Icon icon={Eye} size={16} />{' '}
+                        {hasStreetView ? 'Ver Street View' : 'Ver la foto'}
+                      </>
+                    )}
+                  </span>
                 </Button>
                 {showStreetView && (
                   <div className={styles.secondaryScene}>
@@ -799,7 +819,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 tras ver la respuesta sería trampa). */}
             {isPractice && (
               <Button variant="secondary" fullWidth onClick={() => void replay()}>
-                🔄 Volver a jugar
+                <span className={styles.inlineIcon}>
+                  <Icon icon={RotateCcw} size={16} /> Volver a jugar
+                </span>
               </Button>
             )}
 
@@ -812,7 +834,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     location.hash = `#g=${groupId}`
                   }}
                 >
-                  Ver clasificación →
+                  <span className={styles.inlineIcon}>
+                    Ver clasificación <Icon icon={ArrowRight} size={16} />
+                  </span>
                 </Button>
               </Row>
             )}
