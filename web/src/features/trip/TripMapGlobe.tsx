@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 // Tipos SOLO (import type → cero coste en bundle). El runtime entra por import()
 // dinámico dentro del efecto para que maplibre quede en un chunk aparte.
-import type { MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
+import type {
+  MapLibreMap,
+  Marker as MapLibreMarker,
+  SkySpecification,
+  StyleSpecification,
+} from 'maplibre-gl'
 import type { RoutePoint } from '../../lib/trip'
 import type { TripMapProps as Props } from './TripMap.types'
 import './tripPins.css'
@@ -29,6 +34,12 @@ const FIT_MAX_ZOOM = 12
 const FIT_PADDING = { top: 88, bottom: 220, left: 48, right: 48 }
 // Zoom mínimo al volar a un pin seleccionado: ciudad, sin re-encuadrar todo.
 const SELECT_ZOOM = 11
+
+// Entrada cinematográfica (Fase 2): arrancamos un punto MÁS lejos que WORLD_ZOOM
+// (vista de globo entero) y "aterrizamos" en el encuadre de la ruta. Duración corta
+// para que sea un gesto, no una espera. Con reduced-motion no se usa (salto directo).
+const INTRO_START_ZOOM = 0.6
+const INTRO_DURATION = 1500
 
 // Ids de fuente/capa de la ruta (line). Constantes para añadir/quitar sin colisión.
 const ROUTE_SRC = 'lg-route'
@@ -95,6 +106,46 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
+// Atmósfera del globo (Fase 2): halo azul-noche en el borde de la esfera sobre el
+// fondo oscuro de espacio que ya da `.map` (var --ocean-900). `atmosphere-blend`
+// hace visible el halo; el degradado cielo→horizonte tiñe la esfera de azul frío,
+// coherente con la paleta "Atlas Editorial". Son colores de PAINT de MapLibre (no
+// CSS), así que no pueden ser `var(--token)`; quedan en valores concretos próximos
+// a los tokens del sistema.
+const GLOBE_SKY: SkySpecification = {
+  'sky-color': '#0a2233', // cielo: océano profundo (~ --ocean-800/900)
+  'horizon-color': '#1d5f7a', // horizonte: teal frío que ilumina el borde
+  'sky-horizon-blend': 0.8,
+  'atmosphere-blend': 0.9, // halo de atmósfera bien visible en proyección globo
+}
+
+// Aplica atmósfera/cielo SOLO si la versión de maplibre soporta la API. Feature-detect
+// estricto: si `setSky` no existe, se omite sin lanzar (degradación elegante). Lo mismo
+// con `setFog` (API de Mapbox que maplibre-gl puede no exponer): se intenta como mejora
+// extra y cualquier fallo se traga — nunca debe tumbar el globo que ya funciona.
+function applySky(map: MapLibreMap): void {
+  const withSky = map as MapLibreMap & {
+    setSky?: (sky: SkySpecification) => unknown
+    setFog?: (fog: Record<string, unknown>) => unknown
+  }
+  if (typeof withSky.setSky === 'function') {
+    try {
+      withSky.setSky(GLOBE_SKY)
+    } catch {
+      // Versión sin soporte real pese a existir el método: omitir, no romper.
+    }
+  }
+  if (typeof withSky.setFog === 'function') {
+    try {
+      // Niebla atmosférica sutil hacia el horizonte (refuerza la sensación de
+      // espacio). Opcional: si la versión la ignora o falla, da igual.
+      withSky.setFog({ color: '#0a2233', 'horizon-blend': 0.2 })
+    } catch {
+      // No disponible/aceptada: ignorar.
+    }
+  }
+}
+
 export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelectMoment }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -103,6 +154,9 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
   const markersRef = useRef<MapLibreMarker[]>([])
   // Señal de que el estilo cargó: los efectos de pintado esperan a esto.
   const readyRef = useRef(false)
+  // La entrada cinematográfica corre UNA sola vez por montaje. Tras ella, el encuadre
+  // lo gobiernan los datos/selección como siempre.
+  const introDoneRef = useRef(false)
   // Un fallo al cargar/crear el mapa ocurre en un callback async, fuera del render,
   // así que el ErrorBoundary del selector NO lo vería. Lo guardamos en estado y lo
   // RE-LANZAMOS en render para que el boundary caiga al mapa plano (red de seguridad).
@@ -186,6 +240,51 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
     map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration })
   }, [])
 
+  // Entrada cinematográfica: arranca en vista de globo (bien lejos) y "aterriza" en
+  // el encuadre de la ruta con un vuelo suave. Una sola vez por montaje. Con
+  // reduced-motion NO anima: salta directo al encuadre (respeta la preferencia).
+  // Si algo impide el vuelo, cae a `fitToPins` (que ya es seguro). Devuelve true si
+  // hizo el vuelo (para que el handler `load` no llame además a `fitToPins`).
+  const introFlight = useCallback((): boolean => {
+    const map = mapRef.current
+    const gl = glRef.current
+    if (!map || !gl) return false
+    if (prefersReducedMotion()) {
+      // Sin animación: encuadre directo (fitToPins ya respeta reduced-motion → 0 ms).
+      fitToPins()
+      return true
+    }
+    const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
+    if (activeRef.current) pts.push(floatingActivePos(routeRef.current))
+    if (pts.length === 0) {
+      // Viaje vacío: no hay destino. Igual hacemos un acercamiento sutil al globo
+      // para que la entrada no sea estática, sin reencuadrar nada.
+      map.easeTo({ zoom: WORLD_ZOOM, duration: INTRO_DURATION, essential: true })
+      return true
+    }
+    // Punto de partida: globo entero (más lejos que el encuadre final). Lo fijamos sin
+    // animación y desde ahí volamos al destino, dando la sensación de aterrizar.
+    map.jumpTo({ center: WORLD_CENTER, zoom: INTRO_START_ZOOM })
+    if (pts.length === 1) {
+      map.flyTo({
+        center: pts[0],
+        zoom: SINGLE_ZOOM,
+        duration: INTRO_DURATION,
+        essential: true, // ignora reduced-motion del navegador: ya lo gestionamos arriba
+      })
+      return true
+    }
+    const bounds = new gl.LngLatBounds(pts[0], pts[0])
+    for (const p of pts) bounds.extend(p)
+    map.fitBounds(bounds, {
+      padding: FIT_PADDING,
+      maxZoom: FIT_MAX_ZOOM,
+      duration: INTRO_DURATION,
+      essential: true,
+    })
+    return true
+  }, [fitToPins])
+
   // ── Montaje: crea el mapa una sola vez (import dinámico de maplibre + su CSS). ──
   useEffect(() => {
     const container = containerRef.current
@@ -220,6 +319,9 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
           if (disposed) return
           // Globo: la proyección llegó en v4 y se activa tras cargar el estilo.
           map.setProjection({ type: 'globe' })
+          // Atmósfera/cielo nocturno (Fase 2). Feature-detect dentro: si la versión
+          // no lo soporta, se omite sin romper el globo que ya funciona.
+          applySky(map)
           // Raster Esri como capa de fondo (sin key). En globo da el look satélite.
           map.addSource('esri', {
             type: 'raster',
@@ -231,7 +333,13 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
           map.addLayer({ id: 'esri', type: 'raster', source: 'esri' })
           readyRef.current = true
           repaint()
-          fitToPins()
+          // Entrada cinematográfica una sola vez; si no la hace, fitBounds normal.
+          if (!introDoneRef.current) {
+            introDoneRef.current = true
+            if (!introFlight()) fitToPins()
+          } else {
+            fitToPins()
+          }
         })
       } catch (err) {
         // Import o creación del mapa falló → que el boundary caiga al plano.
@@ -248,7 +356,7 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
       mapRef.current = null
       glRef.current = null
     }
-  }, [repaint, fitToPins])
+  }, [repaint, fitToPins, introFlight])
 
   // Repinta cuando cambian los datos (no recrea el mapa). No-op hasta que el
   // estilo cargó; el handler `load` hace el primer pintado.
