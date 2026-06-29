@@ -11,14 +11,14 @@
 //
 // Reutiliza:
 //  - `ui/HowItWorks` para los 3 pasos (no se duplica).
-//  - el hook `useMagicLink` para toda la lógica/wiring del enlace mágico, el
-//    mismo que usa LoginFlow.
-//  - `ui/CheckEmail` para el paso "revisa tu correo" tras enviar el email.
+//  - el hook `useMagicLink` para toda la lógica/wiring del login passwordless, el
+//    mismo que usa LoginFlow (código de 6 dígitos; enlace del email como fallback).
+//  - `ui/EnterCode` para el paso "introduce el código" tras enviar el email.
 //  - `features/home/navigation.joinByCode` para el atajo "tengo un código de
 //    grupo" en la landing genérica (lleva a `#g=<código>`).
 
 import { useState } from 'react'
-import { CheckEmail, Button, Field, HowItWorks, Input, Stack } from '../../ui'
+import { EnterCode, Button, Field, HowItWorks, Input, Stack } from '../../ui'
 import { joinByCode } from '../home/navigation'
 import { useMagicLink } from './useMagicLink'
 import styles from './Landing.module.css'
@@ -37,20 +37,43 @@ interface Props {
 }
 
 export function Landing({ groupName, redirectTo }: Props) {
-  const { step, email, setEmail, loading, resending, error, submit, resend, reset } = useMagicLink({
-    redirectTo,
-  })
+  const {
+    step,
+    email,
+    setEmail,
+    code,
+    setCode,
+    loading,
+    resending,
+    verifying,
+    error,
+    submit,
+    resend,
+    verify,
+    reset,
+  } = useMagicLink({ redirectTo })
 
   // Atajo opcional (solo landing genérica): el visitante que ya tiene un código
-  // de grupo lo pega aquí y entra directo al flujo de unirse (#g=<código>).
-  const [code, setCode] = useState('')
+  // de GRUPO lo pega aquí y entra directo al flujo de unirse (#g=<código>). Es
+  // distinto del código OTP de login: este navega, no autentica.
+  const [groupCode, setGroupCode] = useState('')
   const [codeError, setCodeError] = useState<string | undefined>(undefined)
 
-  // Tras enviar el email, el flujo es idéntico al login: "revisa tu correo",
+  // Tras enviar el email, el flujo es idéntico al login: "introduce el código",
   // con reenviar y volver. Reutilizamos la pantalla del kit para no divergir.
-  if (step === 'sent') {
+  if (step === 'code') {
     return (
-      <CheckEmail email={email} resending={resending} onResend={resend} onChangeEmail={reset} />
+      <EnterCode
+        email={email}
+        code={code}
+        onCodeChange={setCode}
+        onSubmit={verify}
+        onResend={resend}
+        onChangeEmail={reset}
+        verifying={verifying}
+        resending={resending}
+        error={error}
+      />
     )
   }
 
@@ -92,7 +115,7 @@ export function Landing({ groupName, redirectTo }: Props) {
             {joining ? 'Entra y únete al grupo' : 'Comparte tu primer viaje'}
           </h2>
           <p className={styles.entryLead}>
-            Sin contraseñas: te mandamos un enlace para <strong>entrar o crear tu cuenta</strong>.
+            Sin contraseñas: te mandamos un código para <strong>entrar o crear tu cuenta</strong>.
           </p>
           <form
             className={styles.form}
@@ -134,7 +157,7 @@ export function Landing({ groupName, redirectTo }: Props) {
                 noValidate
                 onSubmit={(event) => {
                   event.preventDefault()
-                  if (joinByCode(code)) {
+                  if (joinByCode(groupCode)) {
                     setCodeError(undefined)
                   } else {
                     setCodeError('Pega un código o enlace de grupo válido.')
@@ -149,8 +172,8 @@ export function Landing({ groupName, redirectTo }: Props) {
                         type="text"
                         name="group-code"
                         placeholder="Pega aquí el código o el enlace"
-                        value={code}
-                        onChange={(e) => setCode(e.target.value)}
+                        value={groupCode}
+                        onChange={(e) => setGroupCode(e.target.value)}
                       />
                     )}
                   </Field>

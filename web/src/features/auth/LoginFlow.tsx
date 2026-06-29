@@ -1,11 +1,14 @@
-// Flujo de login con magic link, sin sesión (cuentas-y-home.md §2.2, flujos A y B).
-// Máquina de estados de dos pantallas presentacionales del kit: LoginScreen
-// (pide email) → CheckEmail (revisa tu correo). La lógica/wiring vive en el hook
+// Flujo de login passwordless, sin sesión (cuentas-y-home.md §2.2, flujos A y B).
+// Máquina de dos pantallas presentacionales del kit: LoginScreen (pide email) →
+// EnterCode (introduce el código de 6 dígitos). La lógica/wiring vive en el hook
 // `useMagicLink` (compartido con la landing pública); aquí solo conectamos esa
-// lógica a la UI del kit. Al pulsar el enlace del email el usuario vuelve con
-// sesión y AuthProvider repinta: este componente ya no se monta.
+// lógica a la UI del kit.
+//
+// El email lleva el código Y un enlace mágico (fallback): si el usuario pulsa el
+// enlace en vez de teclear el código, vuelve con sesión y AuthProvider repinta;
+// este componente ya no se monta. La vía de código no rompe ese camino.
 
-import { CheckEmail, LoginScreen } from '../../ui'
+import { EnterCode, LoginScreen } from '../../ui'
 import { useMagicLink } from './useMagicLink'
 
 interface Props {
@@ -15,21 +18,43 @@ interface Props {
    */
   groupName?: string
   /**
-   * A dónde debe volver el usuario tras el email. El destino deep-link ya se ha
-   * guardado en `lg.next` por el router; este `redirectTo` es la URL absoluta de
-   * retorno (origin), por defecto el origin actual.
+   * A dónde debe volver el usuario tras pulsar el enlace del email. El destino
+   * deep-link ya se guardó en `lg.next` por el router; este `redirectTo` es la URL
+   * absoluta de retorno (origin), por defecto el origin actual.
    */
   redirectTo?: string
 }
 
 export function LoginFlow({ groupName, redirectTo }: Props) {
-  const { step, email, setEmail, loading, resending, error, submit, resend, reset } = useMagicLink({
-    redirectTo,
-  })
+  const {
+    step,
+    email,
+    setEmail,
+    code,
+    setCode,
+    loading,
+    resending,
+    verifying,
+    error,
+    submit,
+    resend,
+    verify,
+    reset,
+  } = useMagicLink({ redirectTo })
 
-  if (step === 'sent') {
+  if (step === 'code') {
     return (
-      <CheckEmail email={email} resending={resending} onResend={resend} onChangeEmail={reset} />
+      <EnterCode
+        email={email}
+        code={code}
+        onCodeChange={setCode}
+        onSubmit={verify}
+        onResend={resend}
+        onChangeEmail={reset}
+        verifying={verifying}
+        resending={resending}
+        error={error}
+      />
     )
   }
 

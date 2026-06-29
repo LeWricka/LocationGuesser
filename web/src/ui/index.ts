@@ -37,6 +37,7 @@ export type { HomeGroup } from './HomeDashboard'
 export { AuthScreen } from './AuthScreen'
 export { LoginScreen } from './LoginScreen'
 export { CheckEmail } from './CheckEmail'
+export { EnterCode } from './EnterCode'
 export { ProfileStep } from './ProfileStep'
 
 // Estados vacíos y de carga reutilizables (issue #156).

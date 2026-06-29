@@ -2,13 +2,14 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-// auth.ts importa ./supabase (lanza sin env). Mockeamos signInWithMagicLink.
+// auth.ts importa ./supabase (lanza sin env). Mockeamos los helpers de OTP.
 const signIn = vi.fn<(email: string, displayName?: string, redirectTo?: string) => Promise<void>>(
   async () => {},
 )
 vi.mock('../../lib/auth', () => ({
-  signInWithMagicLink: (email: string, displayName?: string, redirectTo?: string) =>
+  sendEmailOtp: (email: string, displayName?: string, redirectTo?: string) =>
     signIn(email, displayName, redirectTo),
+  verifyEmailOtp: vi.fn(async () => {}),
 }))
 
 import { Landing } from './Landing'
@@ -43,15 +44,15 @@ describe('Landing', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('correo válido')
   })
 
-  test('email válido envía el enlace y pasa a "revisa tu correo"', async () => {
+  test('email válido envía el código y pasa a la pantalla del código', async () => {
     render(<Landing />)
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, undefined)
-    expect(await screen.findByRole('heading', { name: 'Mira tu correo' })).toBeInTheDocument()
+    expect(await screen.findByLabelText('Código de 6 dígitos')).toBeInTheDocument()
   })
 
-  test('pasa el redirectTo al enviar el enlace', async () => {
+  test('pasa el redirectTo al enviar el código', async () => {
     render(<Landing redirectTo="https://app.example/#g=abc" />)
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
