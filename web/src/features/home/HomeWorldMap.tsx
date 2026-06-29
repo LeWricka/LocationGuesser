@@ -335,16 +335,6 @@ export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }:
           <div ref={containerRef} className={styles.map} />
         )}
 
-        {/* Lema integrado, fundido sobre el satélite (como la maqueta). */}
-        <div className={styles.lema} aria-hidden="true">
-          <p className={styles.lemaEyebrow}>Tu mundo, compartido</p>
-          <h2 className={styles.lemaTitle}>
-            Que los que más quieres
-            <br />
-            lo vivan contigo
-          </h2>
-        </div>
-
         {/* Caption editorial: recuento de viajes + km de las mini-rutas. */}
         <div className={styles.caption} aria-hidden={loading}>
           <p className={styles.captionName}>

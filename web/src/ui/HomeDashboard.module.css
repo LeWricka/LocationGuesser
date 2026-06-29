@@ -11,17 +11,22 @@
   padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
 }
 
-/* --- HÉROE: el mapamundi con el chrome flotando encima --- */
+/* --- HÉROE: el mapamundi A SANGRE con el chrome flotando encima --- */
+/* Rompe el padding del contenedor de página (.lg-page → var(--space-4)) para que el
+   satélite toque los bordes de la pantalla (Polarsteps), no quede dentro de una tarjeta.
+   Sube también hasta el borde superior; el chrome flotante respeta el safe-area. */
 .hero {
   position: relative;
+  margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
 }
 
-/* Topbar flotante sobre el satélite: marca + perfil en pastillas papel translúcidas. */
+/* Topbar flotante sobre el satélite: marca + perfil en pastillas papel translúcidas.
+   Respeta el safe-area superior (notch) ahora que el mapa llega hasta arriba del todo. */
 .topbar {
   position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
-  right: var(--space-3);
+  top: calc(env(safe-area-inset-top) + var(--space-3));
+  left: var(--space-4);
+  right: var(--space-4);
   z-index: 3;
   display: flex;
   align-items: center;
