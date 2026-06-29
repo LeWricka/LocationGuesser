@@ -17,7 +17,7 @@ export function JoinGroupModal({ open, onClose }: Props) {
   function submit() {
     const ok = joinByCode(value)
     if (!ok) {
-      setError('Pega el enlace del grupo o su código.')
+      setError('Pega el enlace del viaje o su código.')
       return
     }
     // Navegado: limpiamos y cerramos para no dejar el código a la vista.
@@ -49,7 +49,7 @@ export function JoinGroupModal({ open, onClose }: Props) {
         }}
       >
         <Field
-          label="Enlace o código del grupo"
+          label="Enlace o código del viaje"
           hint="Te lo pasa quien te invita. Vale el enlace entero o solo el código."
           error={error}
         >

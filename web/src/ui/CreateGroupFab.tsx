@@ -13,7 +13,7 @@ interface Props {
 // primaria SIEMPRE accesible, no un botón grande fijo arriba). En móvil es un
 // círculo con "+"; a partir de tablet expande la etiqueta. Presentacional: la
 // apertura del flujo de creación la cablea #3.
-export function CreateGroupFab({ onClick, label = 'Crear grupo', className }: Props) {
+export function CreateGroupFab({ onClick, label = 'Crear viaje', className }: Props) {
   return (
     <button
       type="button"

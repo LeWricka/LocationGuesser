@@ -65,14 +65,14 @@ describe('Landing', () => {
       screen.getByRole('heading', { name: /Vive los viajes de Finde Lisboa/i }),
     ).toBeInTheDocument()
     // En el deep-link el grupo ya viene dado: no se ofrece el atajo de código.
-    expect(screen.queryByText('¿Te han pasado un código de grupo?')).not.toBeInTheDocument()
+    expect(screen.queryByText('¿Te han pasado un código de viaje?')).not.toBeInTheDocument()
   })
 
   test('el atajo de código de grupo navega a #g=<código>', async () => {
     render(<Landing />)
-    await userEvent.click(screen.getByText('¿Te han pasado un código de grupo?'))
-    await userEvent.type(screen.getByLabelText('Código o enlace del grupo'), 'lisboa123')
-    await userEvent.click(screen.getByRole('button', { name: 'Unirme al grupo' }))
+    await userEvent.click(screen.getByText('¿Te han pasado un código de viaje?'))
+    await userEvent.type(screen.getByLabelText('Código o enlace del viaje'), 'lisboa123')
+    await userEvent.click(screen.getByRole('button', { name: 'Unirme al viaje' }))
     expect(window.location.hash).toBe('#g=lisboa123')
   })
 })

@@ -109,7 +109,7 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
     <Modal
       open={open}
       onClose={onClose}
-      title="Invitar al grupo"
+      title="Invitar al viaje"
       footer={
         <>
           <Button variant="ghost" onClick={() => void copyLink()}>
@@ -141,7 +141,7 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
       </div>
 
       <p className={styles.hint}>
-        Comparte el mensaje en el chat del grupo. Quien lo abra entra directo al grupo.
+        Comparte el mensaje en el chat del grupo. Quien lo abra entra directo al viaje.
       </p>
     </Modal>
   )

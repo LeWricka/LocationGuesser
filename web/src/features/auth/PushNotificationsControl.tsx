@@ -93,7 +93,7 @@ export function PushNotificationsControl({ userId }: Props) {
 
   return (
     <Stack gap={2} className={styles.control}>
-      <span className={styles.label}>Avisos del grupo</span>
+      <span className={styles.label}>Avisos del viaje</span>
 
       {uiState === 'loading' && <p className={styles.hint}>Comprobando el estado de los avisos…</p>}
 

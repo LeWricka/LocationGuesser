@@ -41,7 +41,7 @@ export function GroupCard({ name, status, owned = false, meta, onClick, classNam
   // Card tipa sus props como atributos genéricos de HTMLElement (sin `type`);
   // cuando renderiza un <button> le pasamos type="button" para que, dentro de
   // un form, no envíe. Spread acotado para no tocar el tipo de Card.
-  const buttonProps = isButton ? { type: 'button', 'aria-label': `Abrir grupo ${name}` } : {}
+  const buttonProps = isButton ? { type: 'button', 'aria-label': `Abrir viaje ${name}` } : {}
 
   return (
     <Card

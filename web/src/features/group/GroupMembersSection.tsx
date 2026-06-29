@@ -45,11 +45,11 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
   }, [refresh])
 
   async function kick(member: GroupMemberInfo) {
-    if (!confirm(`¿Expulsar a ${member.name} del grupo? Perderá el acceso.`)) return
+    if (!confirm(`¿Expulsar a ${member.name} del viaje? Perderá el acceso.`)) return
     try {
       await kickMember(groupId, member.userId)
       track('member_kicked', { group_id: groupId })
-      toast.show(`${member.name} ha salido del grupo`, { tone: 'neutral' })
+      toast.show(`${member.name} ha salido del viaje`, { tone: 'neutral' })
       void refresh()
     } catch (err) {
       toast.show(`No se pudo expulsar: ${err instanceof Error ? err.message : String(err)}`, {
@@ -65,7 +65,7 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
       setTransferring(true)
       return
     }
-    if (!confirm('¿Salir de este grupo? Dejarás de ver sus retos y clasificación.')) return
+    if (!confirm('¿Salir de este viaje? Dejarás de ver sus retos y clasificación.')) return
     try {
       if (meId) await leaveGroup(groupId, meId)
       track('member_left', { group_id: groupId })
@@ -87,7 +87,7 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
             <h2 className={styles.sectionTitle}>👥 Miembros</h2>
             {meId && (
               <button type="button" className={styles.editPrizesBtn} onClick={() => void leave()}>
-                Salir del grupo
+                Salir del viaje
               </button>
             )}
           </Row>
@@ -151,7 +151,7 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
           {meId && (
             <Row justify="end" className={styles.transferRow}>
               <button type="button" className={styles.editPrizesBtn} onClick={() => void leave()}>
-                Salir del grupo
+                Salir del viaje
               </button>
             </Row>
           )}
@@ -210,7 +210,7 @@ function TransferOwnershipModal({
   async function transfer() {
     if (!selected) return
     const target = candidates.find((c) => c.userId === selected)
-    if (!confirm(`¿Hacer a ${target?.name ?? 'este miembro'} dueño del grupo? Dejarás de serlo.`)) {
+    if (!confirm(`¿Hacer a ${target?.name ?? 'este miembro'} dueño del viaje? Dejarás de serlo.`)) {
       return
     }
     setBusy(true)

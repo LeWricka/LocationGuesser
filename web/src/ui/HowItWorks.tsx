@@ -25,7 +25,7 @@ const STEPS = [
   {
     icon: '💛',
     title: 'Guardáis el recuerdo',
-    body: 'Cada momento queda en el grupo. Gana quien más se acerca.',
+    body: 'Cada momento queda en el viaje. Gana quien más se acerca.',
   },
 ] as const
 

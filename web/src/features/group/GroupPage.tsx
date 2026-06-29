@@ -126,7 +126,7 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
       setChallenges(c)
       setVotes(v)
     } catch {
-      setError('No hemos podido cargar el grupo. Reintenta en un momento.')
+      setError('No hemos podido cargar el viaje. Reintenta en un momento.')
     }
   }, [groupId])
 
@@ -333,7 +333,7 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
                 variant="secondary"
                 size="sm"
                 onClick={() => setSettingsOpen(true)}
-                aria-label="Ajustes del grupo"
+                aria-label="Ajustes del viaje"
               >
                 ⚙️ Ajustes
               </Button>
@@ -412,7 +412,7 @@ export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
               <p className={styles.empty}>
                 {canManage
                   ? 'Aún no hay retos — añade el primero.'
-                  : 'Aún no hay retos en este grupo.'}
+                  : 'Aún no hay retos en este viaje.'}
               </p>
               {canManage && (
                 <Button size="sm" onClick={() => setAdding(true)}>
@@ -502,7 +502,7 @@ function ShareLeaderboardFab({ onShare }: { onShare: () => void }) {
 // carga al lector de pantalla; los bloques shimmer van aria-hidden.
 function GroupSkeleton() {
   return (
-    <main className="lg-page" role="status" aria-label="Cargando el grupo">
+    <main className="lg-page" role="status" aria-label="Cargando el viaje">
       <Stack gap={6}>
         <Row justify="between" align="center" gap={3}>
           <Stack gap={2}>
@@ -618,7 +618,7 @@ function PhotoSection({ photos }: { photos: PhotoStripItem[] }) {
   if (photos.length === 0) return null
   return (
     <section>
-      <h2 className={styles.sectionTitle}>📸 Fotos del grupo</h2>
+      <h2 className={styles.sectionTitle}>📸 Fotos del viaje</h2>
       <PhotoStrip
         photos={photos}
         onSelect={(id) => {
@@ -852,7 +852,7 @@ function PrizesEditorModal({
     <Modal
       open
       onClose={busy ? undefined : onClose}
-      title="🎁 Premios del grupo"
+      title="🎁 Premios del viaje"
       footer={
         <Row gap={2} justify="end">
           <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>

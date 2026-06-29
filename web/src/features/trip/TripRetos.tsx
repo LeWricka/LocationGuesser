@@ -96,7 +96,7 @@ export function TripRetos({
     <div className={`${styles.hub} lg-stagger`}>
       {/* (a) EN JUEGO ----------------------------------------------------- */}
       <header className={styles.eyebrow}>
-        <span className={styles.eyebrowTitle}>El juego del grupo</span>
+        <span className={styles.eyebrowTitle}>El juego del viaje</span>
         <span className={styles.eyebrowMeta}>{activeMoment ? 'Reto vivo' : 'Sin reto vivo'}</span>
       </header>
 
