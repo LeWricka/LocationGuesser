@@ -1,17 +1,45 @@
 import { describe, test, expect } from 'vitest'
 import {
   ANIMAL_EMOJIS,
+  ANIMAL_SVGS,
   AVATAR_BACKGROUNDS,
   avatarToken,
   bgForEmoji,
+  canonicalEmoji,
   defaultAvatarFor,
   parseAvatar,
+  svgForEmoji,
 } from './avatar'
 
 describe('set de animales', () => {
-  test('tiene ~90 emojis, todos únicos', () => {
-    expect(ANIMAL_EMOJIS.length).toBeGreaterThanOrEqual(85)
+  test('es exactamente el set canónico de 8 animales con SVG, todos únicos', () => {
+    expect(ANIMAL_EMOJIS.length).toBe(8)
     expect(new Set(ANIMAL_EMOJIS).size).toBe(ANIMAL_EMOJIS.length)
+  })
+
+  test('todos los animales del set tienen dibujo SVG', () => {
+    for (const emoji of ANIMAL_EMOJIS) {
+      expect(svgForEmoji(emoji)).not.toBeNull()
+    }
+    // Y no hay SVGs huérfanos fuera del set ofrecido.
+    expect(new Set(Object.keys(ANIMAL_SVGS))).toEqual(new Set(ANIMAL_EMOJIS))
+  })
+})
+
+describe('canonicalEmoji', () => {
+  test('un animal del set se devuelve tal cual', () => {
+    for (const emoji of ANIMAL_EMOJIS) {
+      expect(canonicalEmoji(emoji)).toBe(emoji)
+    }
+  })
+
+  test('un emoji antiguo (fuera del set) se proyecta a uno de los 8, estable', () => {
+    // El panda ya no está en el set de 8; debe caer en uno de los 8, siempre el
+    // mismo (determinista) → un perfil viejo nunca ve un emoji retirado.
+    const a = canonicalEmoji('🐼')
+    const b = canonicalEmoji('🐼')
+    expect(a).toBe(b)
+    expect(ANIMAL_EMOJIS).toContain(a)
   })
 })
 
@@ -23,18 +51,10 @@ describe('bgForEmoji', () => {
     expect(AVATAR_BACKGROUNDS).toContainEqual(a)
   })
 
-  test('emojis distintos tienden a fondos distintos (buena distribución)', () => {
-    // El fondo sale del propio animal: sobre todo el set debe usarse buena
-    // parte de la paleta (no todos iguales, como pasaba al derivarlo del id).
-    const fondos = new Set(ANIMAL_EMOJIS.map((emoji) => bgForEmoji(emoji).background))
-    // Con ~102 animales y 24 fondos, esperamos cubrir casi toda la paleta.
-    expect(fondos.size).toBeGreaterThanOrEqual(AVATAR_BACKGROUNDS.length - 2)
-  })
-
   test('dos animales concretos distintos dan fondos distintos', () => {
-    // No es garantía universal (puede haber colisiones), pero el panda y el
-    // zorro deben verse con colores distintos en el selector.
-    expect(bgForEmoji('🐼')).not.toEqual(bgForEmoji('🦊'))
+    // No es garantía universal (puede haber colisiones), pero el oso y el zorro
+    // —ambos del set de 8— deben verse con colores distintos.
+    expect(bgForEmoji('🐻')).not.toEqual(bgForEmoji('🦊'))
   })
 })
 
@@ -65,18 +85,28 @@ describe('defaultAvatarFor', () => {
 })
 
 describe('parseAvatar', () => {
-  test('token emoji → ese animal con fondo derivado del emoji', () => {
+  test('token del set → ese animal con fondo derivado del emoji', () => {
     const result = parseAvatar('emoji:🦊', 'user-1')
     expect(result).toEqual({ kind: 'emoji', emoji: '🦊', bg: bgForEmoji('🦊') })
   })
 
-  test('el fondo del token NO depende del id (mismo emoji → mismo fondo)', () => {
+  test('token antiguo (fuera del set) → animal canónico, estable y dentro de los 8', () => {
+    const result = parseAvatar('emoji:🐼', 'user-1')
+    expect(result.kind).toBe('emoji')
+    if (result.kind === 'emoji') {
+      expect(result.emoji).toBe(canonicalEmoji('🐼'))
+      expect(ANIMAL_EMOJIS).toContain(result.emoji)
+      expect(result.bg).toEqual(bgForEmoji(result.emoji))
+    }
+  })
+
+  test('el resultado del token NO depende del id (mismo token → mismo animal)', () => {
     const a = parseAvatar('emoji:🐼', 'user-1')
     const b = parseAvatar('emoji:🐼', 'user-2')
     expect(a).toEqual(b)
   })
 
-  test('URL http → imagen (retrocompat)', () => {
+  test('URL http → imagen (retrocompat con fotos subidas)', () => {
     const result = parseAvatar('https://cdn.example.com/a.png', 'user-1')
     expect(result).toEqual({ kind: 'image', src: 'https://cdn.example.com/a.png' })
   })

@@ -1,116 +1,15 @@
-// Avatares de animal: un emoji GRANDE sobre un fondo de color con buen
-// contraste. No se suben fotos; cada usuario tiene un avatar al instante,
-// derivado de su id de forma determinista (sin escribir en BD). El usuario
-// puede elegir otro animal desde el perfil; se guarda como `emoji:<char>` en
-// `profiles.avatar_url`. El fondo se deriva del propio ANIMAL (del carácter del
-// emoji), no del id: así cada animal tiene su color y el set se ve variado en
-// el selector. El animal por defecto sí sale del id (avatar estable por user).
+// Avatares de animal: un dibujo de LÍNEA (SVG, estilo Atelier/Pizarra) sobre un
+// tint claro. No se suben fotos por defecto; cada usuario tiene un avatar al
+// instante, derivado de su id de forma determinista (sin escribir en BD). El
+// usuario puede elegir otro animal desde el perfil; se guarda como `emoji:<char>`
+// en `profiles.avatar_url` (la CLAVE sigue siendo el emoji → el MODELO de datos
+// no cambia). El set por defecto son SOLO los 8 animales con dibujo SVG, para que
+// el look sea consistente (nunca se mezcla SVG con emoji). El animal por defecto
+// sale del id (avatar estable por usuario); el fondo se deriva del propio animal.
 
-/** ~90 emojis de animales para el set de avatares (todos únicos). */
-export const ANIMAL_EMOJIS: readonly string[] = [
-  '🦊',
-  '🐼',
-  '🐧',
-  '🦉',
-  '🐢',
-  '🐙',
-  '🦁',
-  '🐯',
-  '🐸',
-  '🐵',
-  '🐨',
-  '🐰',
-  '🦝',
-  '🦦',
-  '🦥',
-  '🦡',
-  '🐺',
-  '🐗',
-  '🦌',
-  '🦄',
-  '🐝',
-  '🦋',
-  '🐞',
-  '🐳',
-  '🐬',
-  '🦈',
-  '🐊',
-  '🦓',
-  '🦒',
-  '🦔',
-  '🐱',
-  '🐶',
-  '🦅',
-  '🦜',
-  '🐹',
-  '🐷',
-  '🐮',
-  '🐭',
-  '🐻',
-  '🐻‍❄️',
-  '🐔',
-  '🐤',
-  '🐥',
-  '🦆',
-  '🦢',
-  '🦩',
-  '🦚',
-  '🦃',
-  '🕊️',
-  '🦇',
-  '🐴',
-  '🦛',
-  '🦏',
-  '🐘',
-  '🐫',
-  '🐪',
-  '🦙',
-  '🐑',
-  '🐐',
-  '🐖',
-  '🦬',
-  '🐃',
-  '🐂',
-  '🐄',
-  '🐎',
-  '🦣',
-  '🦘',
-  '🐿️',
-  '🦫',
-  '🐀',
-  '🐁',
-  '🐇',
-  '🐈',
-  '🐈‍⬛',
-  '🐕',
-  '🦮',
-  '🐩',
-  '🐅',
-  '🐆',
-  '🦧',
-  '🦍',
-  '🐒',
-  '🦎',
-  '🐍',
-  '🐉',
-  '🐲',
-  '🦕',
-  '🦖',
-  '🐡',
-  '🐠',
-  '🐟',
-  '🦐',
-  '🦞',
-  '🦀',
-  '🦑',
-  '🐚',
-  '🐌',
-  '🐛',
-  '🐜',
-  '🦗',
-  '🕷️',
-  '🦂',
-] as const
+// El set canónico se define más abajo como las CLAVES de `ANIMAL_SVGS` (los 8
+// animales con dibujo). `ANIMAL_EMOJIS` apunta a ese mismo set para que el
+// selector, `defaultAvatarFor` y `parseAvatar` ofrezcan/rendericen solo esos 8.
 
 /** Fondo del avatar: degradado sólido (sin filtros) que contrasta con el emoji. */
 export interface AvatarBg {
@@ -150,13 +49,12 @@ export const AVATAR_BACKGROUNDS: readonly AvatarBg[] = [
   { background: 'linear-gradient(135deg, #58a85e 0%, #2f7740 100%)' },
 ] as const
 
-// Avatares-animal en SVG de línea (estilo Kinfolk/Pizarra): el set por defecto
-// son 8 animales dibujados a trazo, recuperados de la maqueta. Se mapean sobre
-// 8 emojis del set existente (la CLAVE sigue siendo el emoji, así el MODELO de
-// datos —token `emoji:<char>`, `parseAvatar`, `ANIMAL_EMOJIS` y los pines de
-// mapa en `avatarPin`— no cambia). Para esos 8 emojis el componente Avatar pinta
-// el SVG; para el resto de animales del set cae al emoji. El contenido del SVG
-// es el INTERIOR del <svg viewBox="0 0 24 24">; el componente lo envuelve.
+// Avatares-animal en SVG de línea (estilo Atelier/Pizarra): el set por defecto
+// son EXACTAMENTE estos 8 animales dibujados a trazo. La CLAVE sigue siendo el
+// emoji (token `emoji:<char>`), así el MODELO de datos no cambia; lo que cambia
+// es que solo se ofrecen/renderizan estos 8 (nunca emoji suelto). El componente
+// Avatar siempre pinta el SVG para los avatares por defecto. El contenido es el
+// INTERIOR del <svg viewBox="0 0 24 24">; el componente lo envuelve.
 export const ANIMAL_SVG_VIEWBOX = '0 0 24 24'
 
 export const ANIMAL_SVGS: Readonly<Record<string, string>> = {
@@ -200,14 +98,31 @@ export const ANIMAL_SVGS: Readonly<Record<string, string>> = {
 }
 
 /**
- * Los 8 animales del set por defecto (los que tienen dibujo SVG). En el orden de
- * la maqueta — útil para selectores que quieran destacarlos primero.
+ * Set canónico de avatares por defecto: los 8 animales con dibujo SVG, en el
+ * orden de la maqueta. Es el ÚNICO set que se ofrece en el selector y del que
+ * salen los avatares por defecto. Cualquier token antiguo fuera de aquí se mapea
+ * de forma estable a uno de estos 8 (ver `parseAvatar`).
  */
-export const DEFAULT_ANIMAL_EMOJIS: readonly string[] = Object.keys(ANIMAL_SVGS)
+export const ANIMAL_EMOJIS: readonly string[] = Object.keys(ANIMAL_SVGS)
+
+/** Alias retrocompatible: el set por defecto ES el set canónico. */
+export const DEFAULT_ANIMAL_EMOJIS = ANIMAL_EMOJIS
 
 /** ¿Este emoji tiene un avatar SVG de línea en el set por defecto? */
 export function svgForEmoji(emoji: string): string | null {
   return ANIMAL_SVGS[emoji] ?? null
+}
+
+/**
+ * Mapea cualquier emoji al set canónico de 8: si ya es uno de los 8 lo devuelve
+ * tal cual; si es un emoji antiguo (ya retirado del set) lo proyecta de forma
+ * DETERMINISTA a uno de los 8 (hash del propio token). Así un perfil viejo con
+ * un emoji que ya no existe ve siempre el mismo animal SVG, sin emoji suelto y
+ * sin tocar la BD.
+ */
+export function canonicalEmoji(emoji: string): string {
+  if (ANIMAL_SVGS[emoji]) return emoji
+  return ANIMAL_EMOJIS[hashString(`legacy:${emoji}`) % ANIMAL_EMOJIS.length]
 }
 
 /** Resultado de resolver un avatar: o un emoji sobre fondo, o una imagen. */
@@ -247,16 +162,21 @@ export function defaultAvatarFor(userId: string): { emoji: string; bg: AvatarBg 
 
 /**
  * Resuelve qué pintar para un usuario:
- * - `emoji:<char>` → ese animal, con fondo derivado del propio emoji.
- * - URL http(s) → imagen (retrocompatibilidad con avatares antiguos).
+ * - `emoji:<char>` → ese animal, normalizado al set canónico de 8 (un token
+ *   antiguo fuera del set se proyecta de forma estable a uno de los 8), con
+ *   fondo derivado del animal resultante.
+ * - URL http(s) → imagen (retrocompatibilidad con fotos de perfil subidas).
  * - null/vacío → avatar por defecto del id (animal del id, fondo del animal).
  */
 export function parseAvatar(avatarUrl: string | null | undefined, userId: string): ResolvedAvatar {
   const value = avatarUrl?.trim()
   if (value) {
     if (value.startsWith(EMOJI_PREFIX)) {
-      const emoji = value.slice(EMOJI_PREFIX.length)
-      if (emoji) return { kind: 'emoji', emoji, bg: bgForEmoji(emoji) }
+      const raw = value.slice(EMOJI_PREFIX.length)
+      if (raw) {
+        const emoji = canonicalEmoji(raw)
+        return { kind: 'emoji', emoji, bg: bgForEmoji(emoji) }
+      }
     } else if (/^https?:\/\//i.test(value)) {
       return { kind: 'image', src: value }
     }

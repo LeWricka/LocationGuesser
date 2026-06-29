@@ -6,7 +6,7 @@ import {
   avatarPinFromProfile,
   avatarPinSvg,
 } from './avatarPin'
-import { avatarToken, bgForEmoji } from './avatar'
+import { avatarToken, bgForEmoji, canonicalEmoji } from './avatar'
 
 describe('avatarPinSvg', () => {
   test('devuelve un data-URI de SVG', () => {
@@ -65,9 +65,15 @@ describe('constantes de tamaño', () => {
 })
 
 describe('avatarPinFromProfile', () => {
-  test('token emoji → pin con ese emoji y su fondo', () => {
+  test('token del set → pin con ese animal y su fondo', () => {
+    const uri = avatarPinFromProfile(avatarToken('🦊'), 'user-1')
+    expect(uri).toBe(avatarPinSvg('🦊', bgForEmoji('🦊').background))
+  })
+
+  test('token antiguo → pin con el animal canónico (nunca un emoji retirado)', () => {
+    const canon = canonicalEmoji('🐼')
     const uri = avatarPinFromProfile(avatarToken('🐼'), 'user-1')
-    expect(uri).toBe(avatarPinSvg('🐼', bgForEmoji('🐼').background))
+    expect(uri).toBe(avatarPinSvg(canon, bgForEmoji(canon).background))
   })
 
   test('null → pin del avatar por defecto del id (estable)', () => {
