@@ -54,9 +54,15 @@ export function Countdown({ deadlineAt, closedLabel = 'Cerrado' }: Props) {
   const text = formatRemaining(remaining)
   // La key por segundo remonta el número → reinicia el micro-rebote (salvo reduced).
   const seconds = Math.floor(remaining / 1000)
+  // Últimos 30s: urgencia. La pastilla vira a peligro (rojo del token) para que el
+  // cierre inminente se lea de un vistazo sin depender solo del movimiento.
+  const urgent = remaining <= 30_000
 
   return (
-    <span className={styles.pill} aria-label={`Cierra en ${text}`}>
+    <span
+      className={`${styles.pill} ${urgent ? styles.urgent : ''}`}
+      aria-label={`Cierra en ${text}`}
+    >
       <Icon icon={Clock} size={14} />
       <span className={styles.label}>Cierra en</span>
       <span

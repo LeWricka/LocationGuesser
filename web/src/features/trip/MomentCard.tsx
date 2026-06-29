@@ -48,10 +48,17 @@ export function MomentCard({ moment, selected, onSelect, onExpand, onPlay }: Pro
   // Lleva capa de reto (en juego, cerrado o práctica) → chip "🎯 Reto". Un recuerdo
   // puro no lo lleva: la tarjeta lee como contenido, no como juego.
   const isReto = moment.isChallenge && moment.status !== 'recuerdo'
+  // Recuerdo puro (contenido, no juego): ni reto ni en juego → marca de filete
+  // izquierdo para diferenciarlo de un vistazo del contenido de juego.
+  const isRecuerdo = !isReto && !isActive
   const date = formatMomentDate(moment.date)
 
   return (
-    <article className={[styles.card, selected ? styles.selected : ''].filter(Boolean).join(' ')}>
+    <article
+      className={[styles.card, selected ? styles.selected : '', isRecuerdo ? styles.recuerdo : '']
+        .filter(Boolean)
+        .join(' ')}
+    >
       {/* Tocar la foto SELECCIONA (mapa hace zoom al pin), no abre la hoja: abrir
           el detalle es el botón "Ver". La foto no es zoomable aquí (eso vive en
           el detalle), su click lo cableamos a la selección. */}
