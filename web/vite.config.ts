@@ -11,20 +11,28 @@ const ACCENT = '#34506b' // theme_color (azul pizarra de marca)
 export default defineConfig({
   plugins: [
     react(),
-    // PWA ADITIVA: hace la app instalable y genera el service worker (Workbox)
-    // que precachea el app-shell. `autoUpdate` = el SW nuevo toma el control en
+    // PWA ADITIVA: hace la app instalable y registra el service worker que
+    // precachea el app-shell. `autoUpdate` = el SW nuevo toma el control en
     // cuanto está listo, sin pedir nada al usuario (clientsClaim + skipWaiting).
     // No rompe nada en el navegador normal: si el SW no se registra, la app va
     // igual. `cleanupOutdatedCaches` borra precachés viejos para que un deploy
     // nuevo no quede servido desde caché obsoleta.
+    //
+    // injectManifest: usamos NUESTRO propio service worker (`src/sw.ts`) en vez
+    // del que autogenera Workbox, porque necesitamos manejar los eventos `push` y
+    // `notificationclick` de Web Push (Workbox no los cubre). El plugin inyecta en
+    // ese SW el precache-manifest de Workbox (`self.__WB_MANIFEST`), así que el
+    // app-shell se sigue precacheando igual; solo añadimos los handlers de push
+    // encima. El build sigue 100% estático en Vercel (emite `sw.js` + manifest a
+    // `dist/`); no introduce backend.
     VitePWA({
       registerType: 'autoUpdate',
       // El plugin inyecta el registro del SW en el bundle (injectRegister 'auto').
       injectRegister: 'auto',
-      workbox: {
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
       },
       // En desarrollo NO activamos el SW: evita cachés agresivas mientras se

@@ -7,6 +7,8 @@ vi.mock('./supabase', () => ({ supabase: {} }))
 
 import {
   isPushSupported,
+  isPushConfigured,
+  isBrowserPushCapable,
   getPermission,
   subscribeToPush,
   unsubscribeFromPush,
@@ -22,6 +24,13 @@ describe('isPushSupported', () => {
 
   test('getPermission reporta unsupported cuando no hay soporte', () => {
     expect(getPermission()).toBe('unsupported')
+  })
+
+  // En tests, tanto la config (VAPID) como la capacidad del navegador son false:
+  // así la UI no ofrece la opción ni intenta tocar APIs del navegador.
+  test('isPushConfigured y isBrowserPushCapable son false en tests', () => {
+    expect(isPushConfigured()).toBe(false)
+    expect(isBrowserPushCapable()).toBe(false)
   })
 })
 

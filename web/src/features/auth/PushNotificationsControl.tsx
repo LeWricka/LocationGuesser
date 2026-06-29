@@ -1,15 +1,21 @@
-// Control "Activar avisos del grupo" (PWA Fase 1). Vive en el perfil; gobierna la
-// suscripción Web Push del dispositivo actual. Diseño: docs/estrategia/pwa-push.md §3.
+// Control "Avisos del viaje" (PWA). Vive en el perfil; gobierna la suscripción Web
+// Push del dispositivo actual. Diseño: docs/estrategia/pwa-push.md §3.
 //
-// Si el navegador no soporta push o no hay clave VAPID configurada, este control
-// NO se renderiza (devuelve null): la app va exactamente igual sin la opción.
-// El ENVÍO real de notificaciones es la Fase 2; aquí solo nos suscribimos.
+// Estados que cubre, en orden de prioridad:
+//   · navegador SIN APIs de push (iOS Safari sin instalar, etc.) → el control NO se
+//     renderiza (null): no tiene sentido ofrecer algo que el navegador no puede.
+//   · navegador capaz pero SIN clave VAPID en el bundle → "avisos no disponibles
+//     todavía" (informativo; el operador aún no ha configurado el envío). Así el
+//     usuario sabe que la opción existe pero no está montada, en vez de no ver nada.
+//   · soportado + configurado → toggle real (denegado / activar / desactivar).
+// El ENVÍO real de notificaciones lo hace la Edge Function send-push (Fase 2).
 
 import { useEffect, useState } from 'react'
 import { Button, Stack, useToast } from '../../ui'
 import {
   getPermission,
-  isPushSupported,
+  isBrowserPushCapable,
+  isPushConfigured,
   subscribeToPush,
   unsubscribeFromPush,
   type PushStatus,
@@ -25,7 +31,9 @@ type UiState = 'loading' | 'denied' | 'on' | 'off'
 
 export function PushNotificationsControl({ userId }: Props) {
   const toast = useToast()
-  const [supported] = useState(() => isPushSupported())
+  const [capable] = useState(() => isBrowserPushCapable())
+  const [configured] = useState(() => isPushConfigured())
+  const supported = capable && configured
   const [uiState, setUiState] = useState<UiState>('loading')
   const [busy, setBusy] = useState(false)
 
@@ -51,8 +59,19 @@ export function PushNotificationsControl({ userId }: Props) {
     }
   }, [supported])
 
-  // No soportado o sin VAPID: el control no existe (la app no ofrece la opción).
-  if (!supported) return null
+  // Navegador sin APIs de push: el control no existe (la app no ofrece la opción).
+  if (!capable) return null
+
+  // Navegador capaz pero la app aún no tiene VAPID configurada: informamos en vez
+  // de ofrecer un toggle que no haría nada (cumple "no configurado" del diseño).
+  if (!configured) {
+    return (
+      <Stack gap={2} className={styles.control}>
+        <span className={styles.label}>Avisos del viaje</span>
+        <p className={styles.hint}>Los avisos aún no están disponibles. Llegarán pronto.</p>
+      </Stack>
+    )
+  }
 
   function applyStatus(status: PushStatus) {
     if (status === 'subscribed') {
