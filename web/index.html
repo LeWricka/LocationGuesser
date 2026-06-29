@@ -3,15 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- PWA: color de barra del navegador (azul pizarra de marca) e icono al instalar
-         en iOS. El <link rel="manifest"> lo inyecta vite-plugin-pwa en el build. -->
-    <meta name="theme-color" content="#34506b" />
+    <!-- PWA: color de barra del navegador (papel de marca, para que se funda con
+         el fondo claro de la app) e icono al instalar en iOS. El
+         <link rel="manifest"> lo inyecta vite-plugin-pwa en el build. -->
+    <meta name="theme-color" content="#f6f7f9" />
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
     <!-- Precarga del peso de display más usado (Cormorant 500) para que los
          titulares no parpadeen al entrar (font-display: swap cubre el resto). -->
     <link rel="preload" href="/fonts/cormorant-500.woff2" as="font" type="font/woff2" crossorigin />
-    <title>LocationGuesser</title>
+    <title>Lugares — comparte tus momentos de una forma diferente</title>
+    <meta
+      name="description"
+      content="Comparte dónde estás con tu grupo y deja que adivinen el lugar en el mapa. Los sitios que vives, unidos en una ruta."
+    />
   </head>
   <body>
     <div id="root"></div>

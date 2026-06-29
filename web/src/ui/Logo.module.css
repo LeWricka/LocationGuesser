@@ -1,0 +1,38 @@
+/* Marca "Lugares": constelación/ruta de lugares + wordmark serif.
+   El símbolo hereda el color (currentColor) salvo que `tone="accent"` lo fije
+   al azul pizarra de marca. */
+
+.logo {
+  --logo-size: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  line-height: 1;
+}
+
+/* El tono se aplica con `color` para que currentColor del SVG lo herede. */
+.current {
+  color: inherit;
+}
+.accent {
+  color: var(--color-accent);
+}
+
+.mark {
+  display: block;
+  width: var(--logo-size);
+  height: var(--logo-size);
+  flex: none;
+}
+
+/* "Lugares" en la serif de marca. La inicial mayúscula respira; el resto en
+   altura-x normal. Escala con el símbolo (em = relativo a --logo-size). */
+.word {
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-semibold);
+  /* El símbolo ocupa la mayúscula; la palabra se sienta algo mayor para
+     equilibrar el peso visual de la serif frente al trazo fino del símbolo. */
+  font-size: calc(var(--logo-size) * 0.92);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}

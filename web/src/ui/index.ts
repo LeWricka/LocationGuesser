@@ -20,6 +20,7 @@ export { useToast } from './toast-context'
 export type { ToastApi, ToastOptions, ToastTone } from './toast-context'
 export { withViewTransition, useReducedMotion } from './motion'
 export { Icon } from './Icon'
+export { Logo } from './Logo'
 
 // Pantallas y piezas de "Cuentas + Home" (presentacionales; las cablean #3/#4/#5).
 export { Avatar } from './Avatar'

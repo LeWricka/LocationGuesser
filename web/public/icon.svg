@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <!-- Fondo papel de marca con esquinas suaves (icono estándar). -->
+  <rect width="512" height="512" rx="112" fill="#f6f7f9"/>
+  <!-- Constelación / ruta de lugares centrada (lienzo 24×24 escalado ×16 y
+       reubicado: traslación 64,64 + escala 16 → ocupa 384px centrados). -->
+  <g transform="translate(64 88) scale(16)">
+    <polyline points="4,17 9.5,11.5 14,15.5 17,7.5 20,12.5" stroke="#34506b" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-opacity="0.45" fill="none"/>
+    <circle cx="4" cy="17" r="1.45" fill="#34506b"/>
+    <circle cx="9.5" cy="11.5" r="1.45" fill="#34506b"/>
+    <circle cx="14" cy="15.5" r="1.45" fill="#34506b"/>
+    <circle cx="20" cy="12.5" r="1.45" fill="#34506b"/>
+    <circle cx="17" cy="7.5" r="3.4" stroke="#34506b" stroke-width="1" stroke-opacity="0.5" fill="none"/>
+    <circle cx="17" cy="7.5" r="2" fill="#34506b"/>
+  </g>
+</svg>
