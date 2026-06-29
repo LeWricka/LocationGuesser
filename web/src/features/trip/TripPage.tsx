@@ -7,6 +7,7 @@ import { useTripData } from './useTripData'
 import { TripMap } from './TripMap'
 import { MomentCard } from './MomentCard'
 import { MomentSheet } from './MomentSheet'
+import { MomentTimeline } from './MomentTimeline'
 import styles from './TripPage.module.css'
 
 interface Props {
@@ -61,6 +62,9 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
   // Evita reposicionar el scroll del carrusel cuando la selección vino DEL propio
   // carrusel (si no, pelearía con el gesto del usuario al hacer swipe).
   const selectionFromCarousel = useRef(false)
+  // Solo auto-seleccionamos el momento en juego UNA vez (al abrir): después
+  // respetamos lo que el usuario toque, no le robamos la selección en cada refresh.
+  const didAutoSelect = useRef(false)
 
   // Permisos + miembros: leemos si soy dueño (puedo crear) y los nombres del
   // grupo. Tolerante: si falla, no bloquea ver el viaje (solo oculta el FAB).
@@ -85,6 +89,10 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
   }, [groupId, user])
 
   const activeMoment = useMemo(() => moments.find((m) => m.status === 'active') ?? null, [moments])
+  // Nº de momentos EN JUEGO (point 5): alimenta el indicador del chrome para que se
+  // vea de un vistazo dónde se puede jugar. Hoy el modelo permite 1 activo, pero
+  // contamos por si en el futuro hay varios; el indicador se oculta si es 0.
+  const liveCount = useMemo(() => moments.filter((m) => m.status === 'active').length, [moments])
 
   // Línea "Tú, X y N más": el nombre propio sale del perfil de sesión (display_name).
   const subtitle = useMemo(
@@ -112,6 +120,19 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
     const el = carouselRef.current?.querySelector<HTMLElement>(`[data-cid="${selectedId}"]`)
     el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }, [selectedId])
+
+  // Point 5: al abrir el viaje, si hay un momento EN JUEGO lo seleccionamos solo
+  // (centra su pin + lo deja a la vista en el carrusel) para que el sitio donde se
+  // juega salte a la vista. Solo una vez y solo si el usuario no ha elegido ya otro.
+  useEffect(() => {
+    if (didAutoSelect.current || selectedId || !activeMoment) return
+    didAutoSelect.current = true
+    selectFromMap(activeMoment.challengeId)
+    const el = carouselRef.current?.querySelector<HTMLElement>(
+      `[data-cid="${activeMoment.challengeId}"]`,
+    )
+    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+  }, [activeMoment, selectedId])
 
   if (loading) {
     return (
@@ -157,6 +178,20 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
           <p className={styles.tripName}>{title}</p>
           {subtitle && <p className={styles.tripSub}>{subtitle}</p>}
         </div>
+        {/* Point 5: indicador "🔴 N en juego". Tocarlo selecciona el momento en
+            juego (centra su pin + lo trae a la vista), para que el sitio donde se
+            puede jugar salte a la vista de un vistazo. */}
+        {liveCount > 0 && activeMoment && (
+          <button
+            type="button"
+            className={styles.livePill}
+            onClick={() => selectFromMap(activeMoment.challengeId)}
+            aria-label={`${liveCount} en juego — ir al momento`}
+          >
+            <span className={styles.liveDot} aria-hidden="true" />
+            {liveCount} en juego
+          </button>
+        )}
         <button
           type="button"
           className={styles.iconPill}
@@ -167,21 +202,31 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
         </button>
       </header>
 
-      {/* (c) Carrusel inferior de momentos, o estado vacío. */}
+      {/* (c) Dock inferior: línea temporal (point 2) + carrusel de momentos. */}
       {hasMoments ? (
-        <div className={styles.carousel} ref={carouselRef}>
-          {moments.map((m) => (
-            <div key={m.challengeId} className={styles.slide} data-cid={m.challengeId}>
-              <MomentCard
-                moment={m}
-                onOpen={() => {
-                  selectFromCarousel(m.challengeId)
-                  setOpenMoment(m)
-                }}
-                onPlay={m.status === 'active' ? () => onPlayChallenge(m.challengeId) : undefined}
-              />
-            </div>
-          ))}
+        <div className={styles.dock}>
+          {/* Franja cronológica sobre el carrusel: tocar una marca selecciona ese
+              momento (centra el mapa + desplaza el carrusel). */}
+          <MomentTimeline moments={moments} selectedId={selectedId} onSelect={selectFromMap} />
+
+          <div className={styles.carousel} ref={carouselRef}>
+            {moments.map((m) => (
+              <div key={m.challengeId} className={styles.slide} data-cid={m.challengeId}>
+                <MomentCard
+                  moment={m}
+                  selected={m.challengeId === selectedId}
+                  // Tocar la foto = seleccionar + el mapa hace ZOOM a su pin (point 3).
+                  onSelect={() => selectFromCarousel(m.challengeId)}
+                  // Abrir el detalle es explícito (botón "expandir"): no choca con el zoom.
+                  onExpand={() => {
+                    selectFromCarousel(m.challengeId)
+                    setOpenMoment(m)
+                  }}
+                  onPlay={m.status === 'active' ? () => onPlayChallenge(m.challengeId) : undefined}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div className={styles.emptyWrap}>

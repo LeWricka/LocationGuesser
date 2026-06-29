@@ -63,6 +63,18 @@ export function MomentSheet({ moment, onClose, onPlay }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moment])
 
+  // Bloquea el scroll del FONDO (la pantalla Viaje) mientras la hoja está abierta:
+  // así el gesto de scroll solo afecta al contenido de la hoja, nunca a la página
+  // de detrás (mismo patrón que Modal/Lightbox). Se restaura al cerrar.
+  useEffect(() => {
+    if (!moment) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [moment])
+
   if (!moment) return null
 
   const isActive = moment.status === 'active'
@@ -112,7 +124,13 @@ export function MomentSheet({ moment, onClose, onPlay }: Props) {
 
         <div className={styles.content}>
           <div className={styles.photoWrap}>
-            <ChallengePhoto src={moment.imageUrl} alt={moment.title} ratio="wide" size="lg" />
+            <ChallengePhoto
+              src={moment.imageUrl}
+              alt={moment.title}
+              ratio="wide"
+              size="lg"
+              className={styles.photo}
+            />
             {isActive && (
               <div className={styles.photoBadge}>
                 <Badge tone="live" dot>
