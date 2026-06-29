@@ -26,19 +26,19 @@ describe('Landing', () => {
     render(<Landing />)
     expect(
       screen.getByRole('heading', {
-        name: /Comparte tus momentos de una forma diferente/i,
+        name: /Que los que más quieres lo vivan contigo/i,
       }),
     ).toBeInTheDocument()
     // Los 3 pasos reutilizados de HowItWorks.
     expect(screen.getByRole('heading', { name: 'Cómo funciona' })).toBeInTheDocument()
     expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Enviar enlace mágico' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
   })
 
   test('email inválido no llama a Supabase y muestra error', async () => {
     render(<Landing />)
     await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviar enlace mágico' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     expect(signIn).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('correo válido')
   })
@@ -46,7 +46,7 @@ describe('Landing', () => {
   test('email válido envía el enlace y pasa a "revisa tu correo"', async () => {
     render(<Landing />)
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviar enlace mágico' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, undefined)
     expect(await screen.findByRole('heading', { name: 'Mira tu correo' })).toBeInTheDocument()
   })
@@ -54,14 +54,14 @@ describe('Landing', () => {
   test('pasa el redirectTo al enviar el enlace', async () => {
     render(<Landing redirectTo="https://app.example/#g=abc" />)
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviar enlace mágico' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, 'https://app.example/#g=abc')
   })
 
   test('con groupName adapta el copy del hero a unirse al grupo', () => {
     render(<Landing groupName="Finde Lisboa" />)
     expect(
-      screen.getByRole('heading', { name: /Únete a Finde Lisboa y juega/i }),
+      screen.getByRole('heading', { name: /Vive los viajes de Finde Lisboa/i }),
     ).toBeInTheDocument()
     // En el deep-link el grupo ya viene dado: no se ofrece el atajo de código.
     expect(screen.queryByText('¿Te han pasado un código de grupo?')).not.toBeInTheDocument()

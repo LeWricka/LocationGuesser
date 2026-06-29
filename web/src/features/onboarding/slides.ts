@@ -14,23 +14,23 @@ export interface OnboardingSlide {
 const GROUP_SLIDES: OnboardingSlide[] = [
   {
     icon: '📍',
-    title: 'Comparte tus momentos de una forma diferente',
-    body: 'Compartes dónde estás y tus amigos lo adivinan.',
+    title: 'Que los que más quieres lo vivan contigo',
+    body: 'Comparte tus viajes y guarda esos recuerdos con los tuyos.',
   },
   {
     icon: '📷',
-    title: 'Comparte tu sitio',
-    body: 'Una foto y/o Street View, con tu ubicación.',
+    title: 'Guarda el recuerdo',
+    body: 'Una foto y/o Street View del sitio donde estuviste.',
+  },
+  {
+    icon: '💛',
+    title: 'Compártelo con los tuyos',
+    body: 'Tu grupo lo abre y vive el momento contigo.',
   },
   {
     icon: '🗺️',
-    title: 'Adivinan en el mapa',
-    body: 'Tus amigos marcan dónde creen que es.',
-  },
-  {
-    icon: '🏆',
-    title: 'Gana quien más se acerca',
-    body: 'Puntos por distancia. Clasificación y premios.',
+    title: 'Y, de paso, lo adivinan',
+    body: 'El guiño divertido: marcan en el mapa dónde es. Gana quien más se acerca.',
   },
 ]
 

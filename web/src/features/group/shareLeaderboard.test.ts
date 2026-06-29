@@ -8,7 +8,7 @@ describe('buildShareText', () => {
 
   test('una sola línea: gancho + nombre del grupo + enlace', () => {
     const text = buildShareText('Viaje a Italia', link)
-    expect(text).toBe('📍 Clasificación de Viaje a Italia 👉 https://app/#g=ABC')
+    expect(text).toBe('📍 Revive los viajes de Viaje a Italia 👉 https://app/#g=ABC')
   })
 
   test('no repite la tabla ni los premios en texto', () => {

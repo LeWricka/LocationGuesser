@@ -74,10 +74,10 @@ export const ResultCard = forwardRef<HTMLDivElement, Props>(function ResultCard(
         </span>
       </div>
 
-      <div className={styles.cta}>¿Me superas?</div>
+      <div className={styles.cta}>¿Lo vives conmigo?</div>
 
       <div className={styles.footer}>
-        <span className={styles.footerCta}>Únete y juega</span>
+        <span className={styles.footerCta}>Únete y vívelo</span>
         <span className={styles.footerDomain}>{domain}</span>
       </div>
     </div>

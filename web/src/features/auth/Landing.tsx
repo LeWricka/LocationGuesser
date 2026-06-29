@@ -26,7 +26,7 @@ import styles from './Landing.module.css'
 interface Props {
   /**
    * Nombre del grupo cuando se llega por un link de reto (flujo A): cambia el
-   * copy del hero a "Únete a <grupo> y juega". Sin él, landing genérica (flujo B).
+   * copy del hero a "Vive los viajes de <grupo>". Sin él, landing genérica (flujo B).
    */
   groupName?: string
   /**
@@ -65,21 +65,23 @@ export function Landing({ groupName, redirectTo }: Props) {
           </span>
           {joining ? (
             <>
-              <p className={styles.eyebrow}>Te han retado</p>
+              <p className={styles.eyebrow}>Te han invitado</p>
               <h1 className={styles.headline}>
-                Únete a <span className={styles.accent}>{groupName}</span> y juega
+                Vive los viajes de <span className={styles.accent}>{groupName}</span>
               </h1>
               <p className={styles.lead}>
-                Marca en el mapa dónde crees que es. Gana quien más se acerca.
+                Te comparten dónde estuvieron y tú lo vives con ellos. Y, de paso, adivinas el sitio
+                en el mapa.
               </p>
             </>
           ) : (
             <>
               <h1 className={styles.headline}>
-                Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
+                Que los que más quieres <span className={styles.accent}>lo vivan contigo</span>
               </h1>
               <p className={styles.lead}>
-                Tus amigos adivinan en el mapa dónde estás. Gana quien más se acerca.
+                Comparte tus viajes y guarda esos recuerdos con los tuyos. Ellos los viven contigo
+                y, de paso, adivinan dónde es.
               </p>
             </>
           )}
@@ -87,7 +89,7 @@ export function Landing({ groupName, redirectTo }: Props) {
 
         <section className={styles.entry} aria-labelledby="landing-entry-title">
           <h2 id="landing-entry-title" className={styles.entryTitle}>
-            {joining ? 'Entra y únete al grupo' : 'Empieza a jugar'}
+            {joining ? 'Entra y únete al grupo' : 'Comparte tu primer viaje'}
           </h2>
           <p className={styles.entryLead}>
             Sin contraseñas: te mandamos un enlace para <strong>entrar o crear tu cuenta</strong>.
@@ -117,7 +119,7 @@ export function Landing({ groupName, redirectTo }: Props) {
                 )}
               </Field>
               <Button type="submit" size="lg" fullWidth loading={loading}>
-                Enviar enlace mágico
+                Empieza a compartir
               </Button>
             </Stack>
           </form>

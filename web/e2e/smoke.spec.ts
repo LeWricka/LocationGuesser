@@ -72,14 +72,14 @@ test.describe('smoke', () => {
     const root = page.locator('#root')
     await expect(root).not.toBeEmpty()
 
-    // 3. La landing pública es visible: hero del producto, campo de correo y botón
-    //    de magic link (textos/roles reales de Landing.tsx). Damos margen porque al
+    // 3. La landing pública es visible: hero del producto, campo de correo y CTA
+    //    de entrada (textos/roles reales de Landing.tsx). Damos margen porque al
     //    arrancar AuthProvider resuelve la sesión persistida (spinner) antes de pintar.
-    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Que los que más quieres/ })).toBeVisible({
       timeout: 20_000,
     })
     await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Enviar enlace mágico' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).toBeVisible()
 
     // 4. Higiene: ningún error PROPIO de consola/JS/petición (terceros tolerados).
     expect(errors, `Errores inesperados al cargar la landing:\n${errors.join('\n')}`).toEqual([])

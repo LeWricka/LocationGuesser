@@ -137,7 +137,7 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
           )}
           <span className={styles.metaItem}>🎯 {challengesLabel(challengeCount)}</span>
         </p>
-        <p className={styles.tagline}>Adivina dónde son las fotos de tus amigos.</p>
+        <p className={styles.tagline}>Vive los viajes de tus amigos. Y adivina dónde es.</p>
       </div>
 
       <p className={styles.hint}>

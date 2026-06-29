@@ -558,7 +558,7 @@ function ChallengeCreated({
 }) {
   const toast = useToast()
   const link = challengeLink(groupId, challenge.id)
-  const shareText = `🌍 ${challenge.title} — adivina dónde es${
+  const shareText = `🌍 ${challenge.title} — vívelo conmigo${
     challenge.deadline_at ? ` (${formatDeadline(challenge.deadline_at)})` : ''
   }: ${link}`
 
