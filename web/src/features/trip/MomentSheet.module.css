@@ -162,6 +162,70 @@
   margin-top: var(--space-2);
 }
 
+/* ---- Descripción del día (lectura + edición del dueño) ---- */
+.descBlock {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+.description {
+  margin: 0;
+  font-size: var(--font-size-md);
+  line-height: 1.6;
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+}
+.descEditBtn,
+.descAdd {
+  appearance: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+.descAdd {
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  align-self: flex-start;
+}
+.descEdit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.descArea {
+  width: 100%;
+  resize: vertical;
+  min-height: 5rem;
+  padding: var(--space-3);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  line-height: 1.55;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.descArea:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.descActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 @keyframes lg-sheet-fade {
   from {
     opacity: 0;

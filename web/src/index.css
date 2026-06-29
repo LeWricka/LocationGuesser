@@ -406,6 +406,86 @@ img {
 }
 
 /* ----------------------------------------------------------------------
+ * Dinamismo de la pantalla Viaje (secciones Diario/Retos).
+ *
+ *  - lg-bar-grow: la barra de clasificación crece de 0 a su ancho (--bar-w) al
+ *    entrar. El ancho final lo fija un inline-style; la animación solo lo revela.
+ *  - lg-nudge-r / lg-nudge-l: la flecha del edge-peek "empuja" hacia su lado para
+ *    telegrafiar el gesto de swipe (sutil, en bucle).
+ *  - lg-ken-burns: deriva/zoom lentísimo de una foto de fondo (ambiente, no acción).
+ *  - lg-count-tick: micro-rebote del número de la cuenta atrás al cambiar de seg.
+ * Todo se desactiva bajo prefers-reduced-motion (bloque al final del fichero).
+ * -------------------------------------------------------------------- */
+@keyframes lg-bar-grow {
+  from {
+    width: 0;
+  }
+  to {
+    width: var(--bar-w, 100%);
+  }
+}
+
+@keyframes lg-nudge-r {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(-3px);
+    opacity: 0.95;
+  }
+}
+
+@keyframes lg-nudge-l {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateX(3px);
+    opacity: 0.95;
+  }
+}
+
+@keyframes lg-ken-burns {
+  0% {
+    transform: scale(1.06) translate(0, 0);
+  }
+  100% {
+    transform: scale(1.14) translate(-1.5%, -1.5%);
+  }
+}
+
+@keyframes lg-count-tick {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* La barra crece al entrar; el ancho final lo da --bar-w (inline-style). */
+.lg-bar-grow {
+  animation: lg-bar-grow var(--duration-slower) var(--ease-emphasized) both;
+}
+
+/* Foto de fondo con ken-burns ambiental (lentísimo, en bucle, alterna ida/vuelta). */
+.lg-ken-burns {
+  animation: lg-ken-burns 18s ease-in-out infinite alternate;
+}
+
+/* Micro-rebote al cambiar el segundo de la cuenta atrás (la clave la cambia React). */
+.lg-count-tick {
+  animation: lg-count-tick var(--duration-base) var(--ease-spring) both;
+}
+
+/* ----------------------------------------------------------------------
  * Accesibilidad: respetar a quien pide menos movimiento.
  * Neutraliza entradas, stagger y las transiciones de vista de golpe.
  * -------------------------------------------------------------------- */
@@ -415,6 +495,17 @@ img {
   .lg-rise-pop,
   .lg-photo-in,
   .lg-stagger > * {
+    animation: none;
+  }
+
+  /* El dinamismo del viaje se reduce a estado final estático: las barras quedan a
+     su ancho (--bar-w), el ken-burns se congela, la flecha y el tick no se mueven. */
+  .lg-bar-grow {
+    animation: none;
+    width: var(--bar-w, 100%);
+  }
+  .lg-ken-burns,
+  .lg-count-tick {
     animation: none;
   }
 

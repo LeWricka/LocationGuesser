@@ -1,0 +1,97 @@
+/*
+ * Sección DIARIO: mapa satélite enmarcado (hero) + timeline + carrusel de
+ * momentos. Vive en un panel deslizable de TripPage (scroll vertical propio).
+ * Lenguaje Atelier/Pizarra con tokens; el mapa es satélite por defecto.
+ */
+.diario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Hero del recorrido: marco con el mapa a sangre dentro (el mapa rellena inset:0).
+   Altura fija para que el carrusel quede a la vista bajo el pliegue. */
+.heroMap {
+  position: relative;
+  height: 240px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+/* El mapa (TripMap) se posiciona absoluto dentro de su contenedor relativo. */
+.heroMap > :global(*) {
+  position: absolute;
+  inset: 0;
+}
+
+/* Pie del mapa: rótulo del recorrido sobre un velo inferior para legibilidad. */
+.heroCap {
+  position: absolute;
+  left: var(--space-4);
+  bottom: var(--space-3);
+  z-index: 1;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.heroLabel {
+  display: block;
+  font-size: 0.625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  margin-bottom: 2px;
+}
+.heroBig {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.05;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.eyebrowTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.eyebrowMeta {
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/* Carrusel horizontal de momentos con scroll-snap (igual patrón que antes). */
+.carousel {
+  display: flex;
+  gap: var(--space-3);
+  padding-bottom: var(--space-2);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* deja respirar el gesto vertical del panel; el swipe horizontal de página lo
+     gestiona TripPage solo en los bordes/áreas sin scroll-x. */
+  overscroll-behavior-x: contain;
+}
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+.slide {
+  flex: 0 0 86%;
+  max-width: 320px;
+  scroll-snap-align: center;
+}
+
+.emptyWrap {
+  padding: var(--space-5) var(--space-2);
+}

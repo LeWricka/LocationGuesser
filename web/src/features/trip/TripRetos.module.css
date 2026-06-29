@@ -1,0 +1,609 @@
+/*
+ * Sección RETOS: el hub de juego del viaje (protagonista del nuevo enfoque).
+ * Lenguaje Atelier/Pizarra: papel, tinta, acento pizarra con disciplina, oro SOLO
+ * en el podio. Vive dentro de un panel deslizable de TripPage (scroll vertical).
+ */
+.hub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* eyebrow del hub: título serif + meta en mayúsculas espaciadas. */
+.eyebrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.eyebrowTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.eyebrowMeta {
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+/* ---- (a) EN JUEGO ---- */
+.nowPlaying {
+  position: relative;
+}
+.npPhoto {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+.npImg {
+  display: block;
+  width: 100%;
+  /* el ken-burns escala la foto; el overflow del marco la recorta. */
+  will-change: transform;
+}
+.npGrad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(24, 32, 43, 0) 35%, rgba(24, 32, 43, 0.82) 100%);
+  pointer-events: none;
+}
+.npTag {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--color-accent);
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+}
+.live {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: #e7d3a2;
+  box-shadow: 0 0 0 0 rgba(231, 211, 162, 0.6);
+  animation: lg-pulse-glow 1.8s ease-out infinite;
+}
+.npFoot {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: var(--space-4);
+}
+.npPrompt {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.05;
+  color: #fff;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+.npBottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.ctaPlay {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+  background: #fff;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  transition: transform var(--transition-fast);
+}
+.ctaPlay:hover {
+  transform: translateY(-1px);
+}
+.ctaPlay:active {
+  transform: scale(0.95);
+}
+.npSocial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.npEmpty {
+  padding: var(--space-5);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+.npEmptyText {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* ---- cabeceras de bloque ---- */
+.blockHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.blockTitle {
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.blockMeta {
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- (b) RESULTADOS RECIENTES ---- */
+.results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.result {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.resultInfo {
+  flex: 1;
+  min-width: 0;
+}
+.resultName {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.resultSub {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+}
+.resultKm {
+  flex: 0 0 auto;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-accent);
+  line-height: 1;
+}
+.resultKmTag {
+  display: block;
+  font-family: var(--font-sans, inherit);
+  font-size: 0.625rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  font-weight: var(--font-weight-semibold);
+  margin-top: 2px;
+}
+.resultWin .resultKm {
+  color: var(--medal-gold);
+}
+
+/* ---- (c) CLASIFICACIÓN protagonista ---- */
+.standings {
+  position: relative;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-4);
+  overflow: hidden;
+}
+/* hilo de oro arriba: señala "esto es lo importante" (único toque cálido). */
+.standings::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--medal-gold), var(--medal-bronze), var(--medal-gold));
+  opacity: 0.85;
+}
+.standingsHead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.standingsKicker {
+  display: block;
+  font-size: 0.625rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--medal-gold);
+  font-weight: var(--font-weight-bold);
+  margin-bottom: 2px;
+}
+.standingsTitle {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  color: var(--color-text);
+}
+.standingsMeta {
+  text-align: right;
+}
+.leaderLine {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.leaderLine b {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+}
+.standingsMetaSub {
+  display: block;
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-top: 2px;
+}
+.standingsEmpty {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--space-3) 0;
+}
+
+/* lista del 4º en adelante: barra relativa al líder que CRECE al entrar + stagger. */
+.board {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+  /* stagger del ranking: cada fila entra con un retardo incremental (--i). */
+  animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
+  animation-delay: calc(var(--stagger-step) * var(--i, 0));
+}
+.row:last-child {
+  border-bottom: 0;
+}
+.rank {
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.playerName {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.youTag {
+  font-size: 0.5625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  background: var(--color-accent);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  margin-left: var(--space-2);
+  font-weight: var(--font-weight-bold);
+}
+.rowRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.bar {
+  display: none;
+}
+/* La barra solo aparece con sitio (pantallas algo anchas): en móvil estrecho los
+   puntos bastan; donde cabe, la barra hace visible la distancia al líder. */
+@media (min-width: 380px) {
+  .bar {
+    display: block;
+    width: 64px;
+    height: 5px;
+    border-radius: var(--radius-full);
+    background: var(--color-accent-soft);
+    overflow: hidden;
+  }
+  .bar > i {
+    display: block;
+    height: 100%;
+    border-radius: var(--radius-full);
+    background: var(--color-accent);
+  }
+}
+.rowPoints {
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  min-width: 2.5em;
+  text-align: right;
+}
+.rowMe {
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-sm);
+  border-bottom-color: transparent;
+}
+.standingsFoot {
+  margin-top: var(--space-3);
+  text-align: center;
+}
+.allLink {
+  appearance: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-full);
+  transition: background-color var(--transition-fast);
+}
+.allLink:hover {
+  background: var(--color-surface-hover);
+}
+
+/* ---- (d) TODOS LOS RETOS ---- */
+.allChallenges {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast);
+}
+.allChallenges:hover {
+  background: var(--color-surface-hover);
+}
+.allChallenges:active {
+  transform: scale(0.99);
+}
+.acText {
+  min-width: 0;
+}
+.acTitle {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.acSub {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  margin-top: 1px;
+}
+.acGo {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live {
+    animation: none;
+  }
+  .ctaPlay,
+  .allChallenges,
+  .allLink {
+    transition: none;
+  }
+  .row {
+    animation: none;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * PODIO en escala de pantalla (markup compartido `Podium`, orden 2-1-3).
+ * Disco con avatar, corona en el 1º, pedestales por altura. Oro/plata/bronce
+ * SOLO aquí (resto en tinta/acento).
+ * ════════════════════════════════════════════════════════════════════ */
+.podium {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  align-items: end;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+}
+.podiumCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  min-width: 0;
+}
+/* orden visual 2-1-3 vía CSS order (el DOM viene 2,1,3 desde Podium). */
+.placeSecond {
+  order: 1;
+}
+.placeFirst {
+  order: 2;
+}
+.placeThird {
+  order: 3;
+}
+.crown {
+  font-size: 1.1rem;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.podiumDisc {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+}
+.placeFirst .podiumDisc {
+  width: 58px;
+  height: 58px;
+}
+.podiumDisc.gold {
+  border-color: var(--medal-gold);
+}
+.podiumDisc.silver {
+  border-color: var(--medal-silver);
+}
+.podiumDisc.bronze {
+  border-color: var(--medal-bronze);
+}
+.podiumAvatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+}
+.podiumName {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.1;
+  margin-top: var(--space-2);
+  color: var(--color-text);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.podiumPoints {
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  margin-top: 1px;
+}
+.placeFirst .podiumPoints {
+  color: var(--medal-gold);
+}
+.podiumPrize {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin-top: 1px;
+}
+.pedestal {
+  margin-top: var(--space-2);
+  width: 100%;
+  height: 26px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  display: grid;
+  place-items: center;
+  background: var(--color-accent-soft);
+}
+.placeFirst .pedestal {
+  height: 40px;
+}
+.placeThird .pedestal {
+  height: 18px;
+}
+.pedestal.gold {
+  background: color-mix(in srgb, var(--medal-gold) 22%, var(--color-surface));
+}
+.pedestal.silver {
+  background: color-mix(in srgb, var(--medal-silver) 22%, var(--color-surface));
+}
+.pedestal.bronze {
+  background: color-mix(in srgb, var(--medal-bronze) 22%, var(--color-surface));
+}
+.pedestalMedal {
+  font-size: 0.9rem;
+  line-height: 1;
+}

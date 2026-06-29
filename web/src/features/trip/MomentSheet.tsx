@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
-import { Badge, Button, ChallengePhoto } from '../../ui'
+import { Pencil } from 'lucide-react'
+import { Badge, Button, ChallengePhoto, Icon, useToast } from '../../ui'
 import type { Moment } from '../../lib/trip'
+import { updateChallengeDescription } from '../../lib/challenges'
 import styles from './MomentSheet.module.css'
 
 interface Props {
   /** Momento a mostrar; `null` = hoja cerrada. */
   moment: Moment | null
+  /** El usuario es dueño del viaje: puede editar la descripción del día. */
+  canEdit?: boolean
   onClose: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
@@ -37,11 +41,20 @@ const DRAG_CLOSE_PX = 110
  * Accesibilidad: rol diálogo, cierra con Escape y al tocar el fondo; respeta
  * `prefers-reduced-motion` vía CSS (la animación de subida se anula por media query).
  */
-export function MomentSheet({ moment, onClose, onPlay }: Props) {
+export function MomentSheet({ moment, canEdit = false, onClose, onPlay }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const toast = useToast()
   // Desplazamiento vertical en curso del gesto de arrastre (0 = en su sitio).
   const [dragY, setDragY] = useState(0)
   const dragStart = useRef<number | null>(null)
+
+  // Descripción del día: estado LOCAL sembrado del momento. El panel se remonta por
+  // `key` al cambiar de momento (ver más abajo), así que el estado inicial siempre
+  // refleja el momento abierto. Tras guardar, lo dejamos optimista (el Realtime del
+  // viaje escucha votos, no `challenges`, así que no se refrescaría solo).
+  const [description, setDescription] = useState(moment?.description ?? '')
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   // Cierra reseteando el arrastre, para que la próxima apertura entre limpia
   // (el panel además se remonta por `key`, ver más abajo).
@@ -75,9 +88,28 @@ export function MomentSheet({ moment, onClose, onPlay }: Props) {
     }
   }, [moment])
 
+  // Guarda la descripción del día (solo dueño). Optimista: cierra la edición y deja
+  // el texto local; si falla, avisa y reabre la edición para no perder lo escrito.
+  const saveDescription = async () => {
+    if (!moment) return
+    setSaving(true)
+    try {
+      await updateChallengeDescription(moment.challengeId, description)
+      setEditing(false)
+      toast.show('Descripción guardada', { tone: 'success' })
+    } catch (err) {
+      toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
+        tone: 'danger',
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (!moment) return null
 
   const isActive = moment.status === 'active'
+  const trimmedDesc = description.trim()
   const date = formatMomentDate(moment.date)
   // País ya resuelto (solo CERRADOS con coord); con bandera válida para pintarlo.
   const country = moment.country?.flag ? moment.country : null
@@ -160,6 +192,56 @@ export function MomentSheet({ moment, onClose, onPlay }: Props) {
               {date}
             </p>
           )}
+
+          {/* Descripción del día (columna `challenges.description`). Se muestra a
+              todos; el DUEÑO puede editarla en línea (textarea → guardar). Si está
+              vacía, solo el dueño ve el incentivo para añadirla. */}
+          {editing ? (
+            <div className={styles.descEdit}>
+              <textarea
+                className={styles.descArea}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Cuenta el día: dónde fue, qué pasó…"
+                rows={4}
+                autoFocus
+                disabled={saving}
+              />
+              <div className={styles.descActions}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setDescription(moment.description ?? '')
+                    setEditing(false)
+                  }}
+                  disabled={saving}
+                >
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={() => void saveDescription()} loading={saving}>
+                  Guardar
+                </Button>
+              </div>
+            </div>
+          ) : trimmedDesc ? (
+            <div className={styles.descBlock}>
+              <p className={styles.description}>{trimmedDesc}</p>
+              {canEdit && (
+                <button
+                  type="button"
+                  className={styles.descEditBtn}
+                  onClick={() => setEditing(true)}
+                >
+                  <Icon icon={Pencil} size={14} /> Editar
+                </button>
+              )}
+            </div>
+          ) : canEdit ? (
+            <button type="button" className={styles.descAdd} onClick={() => setEditing(true)}>
+              <Icon icon={Pencil} size={14} /> Añadir descripción del día
+            </button>
+          ) : null}
 
           {/* Social ligero. Lo REAL es el contador de adivinadores (derivado de
               votos); ❤/💬 se omiten en v1 por no existir en BD (ver resumen). */}

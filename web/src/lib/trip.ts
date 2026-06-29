@@ -28,9 +28,13 @@ export type MomentStatus = 'active' | 'closed' | 'practice'
 export interface Moment {
   challengeId: string
   title: string
+  /** Descripción del día (texto libre del dueño), o null si no la han escrito. Migración 0021. */
+  description: string | null
   status: MomentStatus
   /** Fecha del momento en ISO (usamos `created_at`: cuándo se añadió al viaje). */
   date: string
+  /** Instante de cierre del reto en ISO (`deadline_at`): alimenta la cuenta atrás. */
+  deadlineAt: string
   /** URL firmada de la foto (bucket privado), o null si el momento no tiene foto. */
   imageUrl: string | null
   /** Path en Storage de la foto (para re-firmar/lightbox), o null si no hay foto. */
