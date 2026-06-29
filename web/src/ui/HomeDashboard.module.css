@@ -83,32 +83,6 @@
   transform: scale(0.97);
 }
 
-/* --- Lema editorial bajo el héroe --- */
-.lede {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.ledeTitle {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-tight);
-  line-height: var(--line-height-tight);
-  color: var(--color-text);
-  text-wrap: balance;
-}
-.ledeTitle em {
-  font-style: italic;
-  color: var(--color-accent);
-}
-.subcopy {
-  font-size: var(--font-size-md);
-  line-height: 1.5;
-  color: var(--color-text-muted);
-  max-width: 36ch;
-}
-
 /* Título de sección como eyebrow editorial. */
 .sectionTitle {
   font-size: var(--font-size-xs);
@@ -119,11 +93,11 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- TUS VIAJES: rejilla de portadas grandes y separadas (no carrusel apretado) --- */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--space-3);
+/* --- VIAJES: lista a TODO EL ANCHO, una portada grande por fila (Polarsteps) --- */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .tripCard {
@@ -162,7 +136,7 @@
    alto estilo Polarsteps. */
 .tripCover {
   position: relative;
-  aspect-ratio: 3 / 4;
+  aspect-ratio: 16 / 10;
   background-color: var(--color-surface-hover);
   background-size: cover;
   background-position: center;
@@ -248,43 +222,6 @@
   backdrop-filter: blur(6px);
 }
 
-/* Portada-fantasma "nuevo viaje": misma silueta que las portadas, contorno discontinuo
-   (sin card blanca opaca). Mantiene la rejilla de fotos coherente. */
-.ghostCard {
-  aspect-ratio: 3 / 4;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  border: 1.5px dashed var(--color-border-strong, var(--color-border));
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-hover);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition:
-    transform var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
-.ghostCard:hover {
-  transform: translateY(-3px);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
-.ghostCard:active {
-  transform: scale(0.99);
-}
-.ghostPlus {
-  font-family: var(--font-serif);
-  font-size: 2.25rem;
-  line-height: 1;
-}
-.ghostLabel {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-}
-
 /* --- Acciones: empezar un viaje (primaria) / unirme --- */
 .ctas {
   display: flex;
@@ -303,8 +240,7 @@
     animation: none;
   }
   .avatarButton:hover,
-  .tripButton:hover:not(:disabled),
-  .ghostCard:hover {
+  .tripButton:hover:not(:disabled) {
     transform: none;
   }
 }

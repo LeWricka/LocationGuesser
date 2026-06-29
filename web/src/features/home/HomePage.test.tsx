@@ -70,7 +70,14 @@ describe('HomePage', () => {
 
   test('con grupos → dashboard de recuerdos con el viaje y el mapamundi', async () => {
     myGroupsMock.mockResolvedValue([
-      { id: 'g1', name: "Interrail '26", role: 'owner', isOwner: true, status: 'your-turn' },
+      {
+        id: 'g1',
+        name: "Interrail '26",
+        role: 'owner',
+        isOwner: true,
+        status: 'your-turn',
+        createdAt: '2026-06-01T00:00:00Z',
+      },
     ])
 
     render(<HomePage />)

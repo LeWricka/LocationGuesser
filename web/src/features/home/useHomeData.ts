@@ -36,6 +36,7 @@ function toHomeGroup(group: MyGroup): HomeGroup {
     name: group.name ?? group.id, // sin nombre aún → mostramos el código del grupo
     status: toUiStatus(group.status),
     owned: group.isOwner,
+    createdAt: group.createdAt,
   }
 }
 

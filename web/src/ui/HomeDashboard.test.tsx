@@ -11,10 +11,14 @@ const groups: HomeGroup[] = [
 ]
 
 describe('HomeDashboard', () => {
-  test('muestra el lema de recuerdos y el subcopy', () => {
+  test('separa tus viajes del resto y no muestra el lema de marketing', () => {
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
-    expect(screen.getByRole('heading', { name: /Guarda tus recuerdos/ })).toBeInTheDocument()
-    expect(screen.getByText(/Los lugares que viviste/)).toBeInTheDocument()
+    // Dos secciones: los que posees vs donde participas.
+    expect(screen.getByRole('heading', { name: 'Tus viajes' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Donde participas' })).toBeInTheDocument()
+    // El lema de marketing baja de la home logueada.
+    expect(screen.queryByText(/Guarda tus recuerdos/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Los lugares que viviste/)).not.toBeInTheDocument()
   })
 
   test('lista los viajes como tarjetas que abren el viaje', async () => {

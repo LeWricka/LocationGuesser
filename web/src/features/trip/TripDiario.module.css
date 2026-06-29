@@ -22,39 +22,6 @@
   inset: 0;
 }
 
-/* Rótulo del recorrido INTEGRADO sobre el mapa (sin pastilla): texto blanco fundido en
-   el satélite, como las leyendas de Polarsteps. Una sombra le da legibilidad AA sin robar
-   protagonismo al mapa. Respeta el safe-area superior para no chocar con el chrome. */
-.routeCap {
-  position: absolute;
-  top: calc(env(safe-area-inset-top) + var(--space-3));
-  left: var(--space-4);
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  max-width: 78%;
-  pointer-events: none;
-}
-.routeLabel {
-  font-size: 0.625rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
-  text-shadow: 0 1px 6px rgba(8, 12, 18, 0.7);
-}
-.routeBig {
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.1;
-  color: #fff;
-  text-shadow: 0 1px 8px rgba(8, 12, 18, 0.7);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* Dock flotante inferior: timeline + carrusel posados sobre el mapa. El velo funde
    el dock con el mapa (token compartido) para que los momentos respiren sin tapar
    el mapa entero. No intercepta toques fuera de sus hijos (el mapa sigue arrastrable

@@ -19,6 +19,8 @@ export interface MyGroup {
   /** Eres el dueño del grupo (chip 👑 "Tuyo"). */
   isOwner: boolean
   status: GroupStatus
+  /** Fecha de creación del viaje (ISO), para ordenar por más reciente en la home. */
+  createdAt: string
 }
 
 /** Reto abierto que aún no he votado, para la sección "🔔 Te toca jugar". */
@@ -209,7 +211,12 @@ export async function transferOwnership(
 interface MembershipRow {
   group_id: string
   role: string
-  groups: { id: string; name: string | null; created_by: string | null } | null
+  groups: {
+    id: string
+    name: string | null
+    created_by: string | null
+    created_at: string | null
+  } | null
 }
 
 /**
@@ -223,7 +230,7 @@ interface MembershipRow {
 export async function myGroups(userId: string): Promise<MyGroup[]> {
   const { data, error } = await supabase
     .from('group_members')
-    .select('group_id, role, groups ( id, name, created_by )')
+    .select('group_id, role, groups ( id, name, created_by, created_at )')
     .eq('user_id', userId)
   if (error) throw error
   const rows = (data ?? []) as unknown as MembershipRow[]
@@ -252,6 +259,7 @@ export async function myGroups(userId: string): Promise<MyGroup[]> {
       role: row.role,
       isOwner: row.groups?.created_by === userId || row.role === 'owner',
       status,
+      createdAt: row.groups?.created_at ?? '',
     }
   })
 }

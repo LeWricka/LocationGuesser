@@ -11,8 +11,6 @@ interface Props {
   route: RoutePoint[]
   activeMoment: Moment | null
   selectedId: string | null
-  /** Texto del recorrido para el rótulo flotante ("Tokio → Kioto"), o null. */
-  routeCaption: string | null
   /** ¿Puede el usuario añadir momentos? (dueño) — gobierna el CTA del vacío. */
   canCreate: boolean
   /** Reproducción del recorrido (undefined bajo reduced-motion: sin control). */
@@ -41,7 +39,6 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
     route,
     activeMoment,
     selectedId,
-    routeCaption,
     canCreate,
     playing,
     onTogglePlay,
@@ -67,15 +64,6 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
           onSelectMoment={onSelectFromMap}
         />
       </div>
-
-      {/* Rótulo flotante del recorrido ("El recorrido · Tokio → Kioto"), arriba a la
-          izquierda sobre el mapa (no roba protagonismo, telegrafía qué es). */}
-      {routeCaption && (
-        <div className={styles.routeCap} aria-hidden="true">
-          <span className={styles.routeLabel}>El recorrido</span>
-          <span className={styles.routeBig}>{routeCaption}</span>
-        </div>
-      )}
 
       {hasMoments ? (
         /* DOCK flotante inferior: timeline + carrusel de momentos posados sobre el

@@ -14,6 +14,23 @@ export interface HomeGroup {
   meta?: ReactNode
   /** URL de la foto de portada del viaje, o null (cae a un fondo de papel). */
   coverUrl?: string | null
+  /** Fecha de creación (ISO) para ordenar por más reciente. Opcional en tests. */
+  createdAt?: string
+}
+
+// Orden de los viajes: PRIMERO los que piden acción (te toca → en juego), luego el
+// resto por más reciente. Así el usuario ve antes lo que tiene que hacer.
+function actionRank(status: GroupStatus): number {
+  if (status === 'toplay') return 0 // 🟡 te toca jugar
+  if (status === 'live') return 1 // 🔴 hay reto abierto
+  return 2 // ⚪ sin acción pendiente
+}
+function sortTrips(list: HomeGroup[]): HomeGroup[] {
+  return [...list].sort(
+    (a, b) =>
+      actionRank(a.status) - actionRank(b.status) ||
+      (b.createdAt ?? '').localeCompare(a.createdAt ?? ''),
+  )
 }
 
 interface Props {
@@ -55,6 +72,11 @@ export function HomeDashboard({
   onOpenGroup,
   className,
 }: Props) {
+  // Separamos TUS viajes (los que posees) del RESTO (donde solo participas); cada
+  // grupo ordenado con los que piden acción primero y luego por más reciente.
+  const owned = sortTrips(groups.filter((g) => g.owned))
+  const others = sortTrips(groups.filter((g) => !g.owned))
+
   return (
     <div className={[styles.home, className].filter(Boolean).join(' ')}>
       {/* HÉROE: el mapamundi a sangre con el chrome flotando encima. */}
@@ -79,38 +101,14 @@ export function HomeDashboard({
         {worldMap}
       </section>
 
-      {/* Lema editorial (cumple el contrato de copy: "Guarda tus recuerdos y compártelos"). */}
-      <header className={styles.lede}>
-        <h1 className={styles.ledeTitle}>
-          Guarda tus recuerdos <em>y compártelos</em>.
-        </h1>
-        <p className={styles.subcopy}>
-          Los lugares que viviste, en un mapa que cuentas con quien más quieres.
-        </p>
-      </header>
-
-      {/* TUS VIAJES: rejilla de portadas GRANDES y separadas (imagen-dominante). */}
-      <section aria-labelledby="home-trips">
-        <h2 id="home-trips" className={styles.sectionTitle}>
-          Tus viajes
-        </h2>
-        <div className={styles.grid}>
-          {groups.map((group) => (
-            <TripCard
-              key={group.id}
-              group={group}
-              onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
-            />
-          ))}
-          {/* Portada-fantasma "nuevo": empezar un viaje sin romper la rejilla de fotos. */}
-          <button type="button" className={styles.ghostCard} onClick={onCreateGroup}>
-            <span className={styles.ghostPlus} aria-hidden="true">
-              +
-            </span>
-            <span className={styles.ghostLabel}>Nuevo viaje</span>
-          </button>
-        </div>
-      </section>
+      {/* TUS VIAJES (los que posees) y, aparte, DONDE PARTICIPAS. Portadas a todo el
+          ancho, una por fila (imagen-dominante). Cada sección solo si tiene viajes. */}
+      {owned.length > 0 && (
+        <TripSection title="Tus viajes" trips={owned} onOpenGroup={onOpenGroup} />
+      )}
+      {others.length > 0 && (
+        <TripSection title="Donde participas" trips={others} onOpenGroup={onOpenGroup} />
+      )}
 
       {/* Acciones: empezar un viaje (primaria) / unirse con un código. */}
       <div className={styles.ctas}>
@@ -122,6 +120,32 @@ export function HomeDashboard({
         </Button>
       </div>
     </div>
+  )
+}
+
+// Sección de viajes con su título eyebrow + lista a todo el ancho (una portada por fila).
+function TripSection({
+  title,
+  trips,
+  onOpenGroup,
+}: {
+  title: string
+  trips: HomeGroup[]
+  onOpenGroup?: (id: string) => void
+}) {
+  return (
+    <section aria-label={title}>
+      <h2 className={styles.sectionTitle}>{title}</h2>
+      <div className={styles.list}>
+        {trips.map((group) => (
+          <TripCard
+            key={group.id}
+            group={group}
+            onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+          />
+        ))}
+      </div>
+    </section>
   )
 }
 

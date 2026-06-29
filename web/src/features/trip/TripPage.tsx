@@ -42,10 +42,6 @@ function membersLine(names: string[], myName: string | null): string {
   return base
 }
 
-// Umbral de swipe horizontal (px) y dominancia sobre el eje vertical para tratar
-// el gesto como cambio de página (no como scroll). Igual criterio que la maqueta.
-const SWIPE_PX = 48
-const SWIPE_DOMINANCE = 1.4
 // Saltos al "reproducir" el viaje (igual que antes): da tiempo al flyTo del mapa.
 const PLAYBACK_INTERVAL_MS = 2300
 
@@ -124,13 +120,6 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
     [memberNames, profile],
   )
   const title = group?.name?.trim() || groupId
-
-  // Pie del mapa: "primero → último" del recorrido cosido (los cerrados con coord).
-  const routeCaption = useMemo(() => {
-    if (route.length === 0) return null
-    if (route.length === 1) return route[0].title
-    return `${route[0].title} → ${route[route.length - 1].title}`
-  }, [route])
 
   // --- Selección y reproducción (transversal a Diario) -----------------------
   const stopPlaybackOnUserSelect = () => {
@@ -257,24 +246,11 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
 
   const togglePlay = () => setPlaying((p) => !p)
 
-  // --- Navegación entre secciones (swipe + teclado + pager) ------------------
+  // --- Navegación entre secciones (botón "›"/"‹" + pager + teclado) ----------
+  // SIN swipe horizontal de página: chocaba con el scroll del carrusel de fotos del
+  // Diario (ambos gestos horizontales). Se navega solo con el botón de borde, los dos
+  // puntos del pager y el teclado.
   const trackRef = useRef<HTMLDivElement>(null)
-  const touchStart = useRef<{ x: number; y: number } | null>(null)
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    touchStart.current = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }
-  }
-  const onTouchEnd = (e: React.TouchEvent) => {
-    if (!touchStart.current) return
-    const dx = e.changedTouches[0].clientX - touchStart.current.x
-    const dy = e.changedTouches[0].clientY - touchStart.current.y
-    touchStart.current = null
-    // Solo si el gesto es CLARAMENTE horizontal (no roba el scroll vertical ni el
-    // swipe del carrusel, que es horizontal pero local a su pista con scroll-snap).
-    if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * SWIPE_DOMINANCE) {
-      setSection(dx < 0 ? 'retos' : 'diario')
-    }
-  }
 
   // Teclado en el pager: flechas mueven de página. Home/End van a los extremos.
   const onPagerKeyDown = (e: React.KeyboardEvent) => {
@@ -319,7 +295,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
   const activeIndex = SECTIONS.indexOf(section)
 
   return (
-    <div className={styles.screen} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    <div className={styles.screen}>
       {/* Cabecera: marca del viaje + pager de dos puntos (sin pestaña ancha). */}
       <header className={styles.chrome}>
         <button type="button" className={styles.iconPill} onClick={onBack} aria-label="Volver">
@@ -388,7 +364,6 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
               route={route}
               activeMoment={activeMoment}
               selectedId={selectedId}
-              routeCaption={routeCaption}
               canCreate={canCreate}
               playing={reducedMotion ? undefined : playing}
               onTogglePlay={reducedMotion ? undefined : togglePlay}
