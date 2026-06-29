@@ -34,6 +34,9 @@ const WORLD_ZOOM = 1.4
 const SINGLE_ZOOM = 11
 const FIT_MAX_ZOOM = 12
 const FIT_PADDING = { top: 88, bottom: 220, left: 48, right: 48 }
+// Suelo de zoom para que el satélite llene el lienzo (sin esfera flotando en el espacio).
+// ~3.2 cubre el alto de un móvil en retrato con la proyección globo.
+const MIN_FILL_ZOOM = 3.2
 // Zoom mínimo al volar a un pin seleccionado: ciudad, sin re-encuadrar todo.
 const SELECT_ZOOM = 11
 
@@ -310,6 +313,11 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
           style: BASE_STYLE,
           center: WORLD_CENTER,
           zoom: WORLD_ZOOM,
+          // Suelo de zoom: que el satélite SIEMPRE llene el lienzo a sangre (Polarsteps),
+          // sin alejarse tanto que aparezca el globo entero flotando en cielo oscuro. Si
+          // un viaje tiene puntos muy dispersos, fitBounds clampa aquí y centra (raro en
+          // un viaje real, casi siempre regional). El intro cinematográfico también clampa.
+          minZoom: MIN_FILL_ZOOM,
           attributionControl: { compact: true },
           // Con reduced-motion no animamos el fade de tiles.
           fadeDuration: prefersReducedMotion() ? 0 : 300,

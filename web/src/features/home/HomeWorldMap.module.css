@@ -7,18 +7,16 @@
   width: 100%;
 }
 
-/* Lienzo del mapa: rectángulo alto y protagonista (más alto que ancho, como un héroe
-   editorial). overflow:hidden recorta al radio; la sombra "alza" la lámina del papel.
-   Fondo NOCHE mientras carga, para que el flash case con el cielo del satélite. */
+/* Lienzo del mapa A SANGRE (sin tarjeta): el satélite manda de borde a borde, estilo
+   Polarsteps. Sin radio/borde/sombra — el chrome flota directamente sobre el mapa. El
+   alto es protagonista (algo más que ancho). Fondo NOCHE mientras carga para que el
+   flash case con el cielo del satélite. El break-out del padding lo hace `.hero`. */
 .frame {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1.18;
   max-height: 78vh;
-  border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-lg);
   background: var(--ink-900);
 }
 
@@ -59,36 +57,6 @@
     0 0 0 1px rgba(120, 180, 220, 0.12);
 }
 
-/* --- Lema integrado sobre el satélite (arriba, centrado), estilo maqueta --- */
-.lema {
-  position: absolute;
-  top: var(--space-6);
-  left: 0;
-  right: 0;
-  z-index: 2;
-  text-align: center;
-  padding: 0 var(--space-5);
-  pointer-events: none;
-}
-.lemaEyebrow {
-  font-size: var(--font-size-xs);
-  letter-spacing: var(--letter-spacing-eyebrow);
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.7);
-  text-shadow: 0 1px 6px rgba(8, 12, 18, 0.8);
-  margin-bottom: var(--space-2);
-}
-.lemaTitle {
-  font-family: var(--font-serif);
-  font-weight: var(--font-weight-medium);
-  font-style: italic;
-  font-size: var(--font-size-xl);
-  line-height: 1.18;
-  color: #fff;
-  text-shadow: 0 2px 14px rgba(8, 12, 18, 0.6);
-  text-wrap: balance;
-}
-
 /* --- Caption editorial (esquina inferior izquierda) sobre el satélite oscuro --- */
 .caption {
   position: absolute;
@@ -112,12 +80,6 @@
   letter-spacing: var(--letter-spacing-wide);
   font-variant-numeric: tabular-nums;
   opacity: 0.92;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lemaTitle {
-    text-wrap: normal;
-  }
 }
 
 /* ============================================================
@@ -195,4 +157,23 @@
   :global(.lg-home-globe-breathe) {
     animation: none;
   }
+}
+
+/* Atribución de Esri DISCRETA sobre el satélite: obligatoria, pero no debe ser una caja
+   blanca que tape el globo. La dejamos translúcida, pequeña y pegada a la esquina; el
+   botón compacto (ⓘ) sigue ahí para expandirla. (Reglas globales de MapLibre: van en
+   :global porque su DOM se inyecta fuera de React.) */
+:global(.maplibregl-ctrl-attrib) {
+  background: rgba(8, 12, 18, 0.35) !important;
+  border-radius: var(--radius-sm);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+:global(.maplibregl-ctrl-attrib),
+:global(.maplibregl-ctrl-attrib a) {
+  color: rgba(255, 255, 255, 0.62) !important;
+  font-size: 9px;
+}
+:global(.maplibregl-ctrl-attrib-button) {
+  background-color: rgba(8, 12, 18, 0.4) !important;
 }

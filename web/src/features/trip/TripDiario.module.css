@@ -22,37 +22,34 @@
   inset: 0;
 }
 
-/* Rótulo flotante del recorrido sobre el mapa, arriba-izq. Pastilla de vidrio del
-   chrome (legible sobre satélite/globo), no roba protagonismo. */
+/* Rótulo del recorrido INTEGRADO sobre el mapa (sin pastilla): texto blanco fundido en
+   el satélite, como las leyendas de Polarsteps. Una sombra le da legibilidad AA sin robar
+   protagonismo al mapa. Respeta el safe-area superior para no chocar con el chrome. */
 .routeCap {
   position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
+  top: calc(env(safe-area-inset-top) + var(--space-3));
+  left: var(--space-4);
   z-index: 2;
   display: flex;
   flex-direction: column;
-  max-width: 70%;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  gap: 1px;
+  max-width: 78%;
   pointer-events: none;
 }
 .routeLabel {
   font-size: 0.625rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--color-text-faint);
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow: 0 1px 6px rgba(8, 12, 18, 0.7);
 }
 .routeBig {
   font-family: var(--font-display);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   line-height: 1.1;
-  color: var(--color-text);
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(8, 12, 18, 0.7);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
