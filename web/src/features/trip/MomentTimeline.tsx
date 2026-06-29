@@ -1,3 +1,5 @@
+import { Pause, Play } from 'lucide-react'
+import { Icon } from '../../ui'
 import type { Moment } from '../../lib/trip'
 import styles from './MomentTimeline.module.css'
 
@@ -10,7 +12,7 @@ interface Props {
   onSelect: (challengeId: string) => void
   /**
    * ¿Está reproduciéndose el viaje? El stepper vive en TripPage (es quien tiene la
-   * selección); aquí solo pintamos el botón ▶/⏸. Si es undefined, no mostramos el
+   * selección); aquí solo pintamos el botón play/pausa. Si es undefined, no mostramos el
    * control (p.ej. con prefers-reduced-motion, donde la reproducción animada no aplica).
    */
   playing?: boolean
@@ -52,7 +54,7 @@ export function MomentTimeline({ moments, selectedId, onSelect, playing, onToggl
           aria-pressed={playing}
           aria-label={playing ? 'Pausar el recorrido del viaje' : 'Reproducir el viaje'}
         >
-          <span aria-hidden="true">{playing ? '⏸' : '▶'}</span>
+          <Icon icon={playing ? Pause : Play} size={16} />
         </button>
       )}
       <ol className={styles.track}>

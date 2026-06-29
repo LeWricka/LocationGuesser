@@ -1,3 +1,5 @@
+import { Plus } from 'lucide-react'
+import { Icon } from './Icon'
 import styles from './CreateGroupFab.module.css'
 
 interface Props {
@@ -19,9 +21,7 @@ export function CreateGroupFab({ onClick, label = 'Crear grupo', className }: Pr
       onClick={onClick}
       aria-label={label}
     >
-      <span className={styles.icon} aria-hidden="true">
-        +
-      </span>
+      <Icon icon={Plus} size={26} className={styles.icon} />
       <span className={styles.label}>{label}</span>
     </button>
   )

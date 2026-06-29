@@ -60,11 +60,9 @@
   animation: none;
 }
 
+/* El "+" ahora es un icono Lucide (tamaño por prop, color por currentColor). */
 .icon {
-  font-size: 1.75rem;
-  line-height: 1;
-  /* Centrado óptico del glifo "+". */
-  margin-top: -2px;
+  flex: 0 0 auto;
 }
 
 /* En móvil solo el "+" (círculo). La etiqueta queda para lectores de pantalla. */
@@ -76,9 +74,6 @@
 @media (min-width: 768px) {
   .fab {
     padding: 0 var(--space-5);
-  }
-  .icon {
-    margin-top: -1px;
   }
   .label {
     display: inline;

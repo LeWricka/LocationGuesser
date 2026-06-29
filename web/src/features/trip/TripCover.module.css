@@ -17,7 +17,9 @@
   backdrop-filter: var(--map-chrome-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  /* Sombra de chrome + anillo de contacto: la portada flota sobre el satélite con
+     credibilidad (no la sombra fría de tarjeta sobre océano). */
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   text-align: center;
 }
 

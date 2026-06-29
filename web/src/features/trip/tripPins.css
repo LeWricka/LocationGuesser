@@ -16,7 +16,9 @@
   background-size: cover;
   background-position: center;
   background-color: var(--ocean-900);
-  box-shadow: var(--shadow-md);
+  /* Sombra de pin (anillo de contacto + caída difusa): clavado físico sobre el
+     satélite, no una mancha plana (token del pase de craft). */
+  box-shadow: var(--shadow-pin);
   cursor: pointer;
   /* Anillo del estado: el cerrado es blanco; el activo lo sobreescribe abajo. */
   border: var(--pin-ring-width) solid var(--pin-ring-closed);

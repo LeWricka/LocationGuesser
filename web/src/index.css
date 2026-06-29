@@ -336,6 +336,45 @@ img {
   }
 }
 
+/* Fundido de entrada de una imagen al cargar (la foto manda: en vez de aparecer
+ * de golpe sobre su skeleton, se revela con un breve fade + un pelín de escala que
+ * la "asienta"). La usa ChallengePhoto cuando el bitmap termina de cargar. */
+@keyframes lg-photo-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ----------------------------------------------------------------------
+ * Shimmer de carga reutilizable sobre superficies (foto, pin, skeletons del
+ * viaje). Banda fría que recorre el bloque sin forzar layout (solo
+ * background-position). Clase global para que la compartan CSS Modules y los
+ * markers inyectados fuera de React (pines de mapa). Se detiene bajo
+ * prefers-reduced-motion (queda un bloque estático, sigue diciendo "cargando").
+ * -------------------------------------------------------------------- */
+.lg-shimmer-surface {
+  background-color: var(--photo-loading-bg);
+  background-image: linear-gradient(
+    100deg,
+    transparent 28%,
+    var(--shimmer-band) 50%,
+    transparent 72%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: lg-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Foto que se revela al cargar: arranca con el fundido + escala suave. */
+.lg-photo-in {
+  animation: lg-photo-in var(--duration-slow) var(--ease-emphasized) both;
+}
+
 /* Celebración: muelle de escala + halo que crece y se desvanece. Para
  * puntuaciones altas en el resultado (sin pasarse: una sola pasada). */
 @keyframes lg-celebrate {
@@ -430,8 +469,16 @@ img {
   .lg-rise,
   .lg-pop,
   .lg-rise-pop,
+  .lg-photo-in,
   .lg-stagger > * {
     animation: none;
+  }
+
+  /* El shimmer de carga se congela: el bloque queda estático (sigue comunicando
+   * "cargando" por su superficie, sin movimiento ambiental). */
+  .lg-shimmer-surface {
+    animation: none;
+    background-image: none;
   }
 
   /* El fondo vivo (aurora + deriva de rejilla) se congela: nada de movimiento

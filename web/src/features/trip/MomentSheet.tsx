@@ -124,7 +124,10 @@ export function MomentSheet({ moment, onClose, onPlay }: Props) {
           <span className={styles.handle} aria-hidden="true" />
         </div>
 
-        <div className={styles.content}>
+        {/* lg-stagger: el bloque editorial (foto → título → meta → social → CTA)
+            se ensambla en cascada al subir la hoja. Se anula bajo reduced-motion
+            (la utilidad global ya lo gestiona). */}
+        <div className={`${styles.content} lg-stagger`}>
           <div className={styles.photoWrap}>
             <ChallengePhoto
               src={moment.imageUrl}

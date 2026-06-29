@@ -27,11 +27,19 @@
      scroll en vez de desbordar el panel (regla flexbox). */
   min-height: 0;
   background: var(--color-surface);
+  /* Hairline de luz cenital en el borde superior: la hoja "capta luz" al subir,
+     como un material real (no un rectángulo opaco). */
+  border-top: 1px solid var(--color-surface-sheen);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  /* Sube desde abajo con la curva enfatizada del sistema. */
-  animation: lg-sheet-rise 320ms var(--ease-emphasized, cubic-bezier(0.2, 0, 0, 1)) both;
+  /* Sombra proyectada HACIA ARRIBA: la hoja flota sobre el mapa que asoma (token
+     del pase de craft), no una caja pegada al borde inferior. */
+  box-shadow: var(--shadow-sheet);
+  /* Sube desde abajo con la curva enfatizada (decelera al final): el "asentado"
+     premium de la referencia. No usamos --ease-spring aquí porque su overshoot
+     pasaría de translateY(0) y dejaría asomar un sliver de velo bajo la hoja; el
+     muelle lo damos con un pelín de escala en el contenido (.content). */
+  animation: lg-sheet-rise var(--duration-slower) var(--ease-emphasized) both;
   /* Respeta el notch inferior. */
   padding-bottom: env(safe-area-inset-bottom);
   overflow: hidden;
@@ -50,10 +58,20 @@
 }
 
 .handle {
-  width: 44px;
+  width: 40px;
   height: 5px;
   border-radius: var(--radius-full, 999px);
   background: var(--color-border-strong, rgba(255, 255, 255, 0.3));
+  transition: background-color var(--transition-fast);
+}
+/* Agarrar el asa la ilumina: micro-feedback de que es interactiva. */
+.handleZone:active .handle {
+  background: var(--color-text-muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .handle {
+    transition: none;
+  }
 }
 
 /*
@@ -82,6 +100,9 @@
   flex: 0 0 auto;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  /* La foto manda: anillo de contacto fino que define el marco contra la hoja
+     clara y una caída difusa que la "asienta" (no flota descolgada). */
+  box-shadow: var(--shadow-photo-card);
 }
 
 /*

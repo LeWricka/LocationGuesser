@@ -1,4 +1,5 @@
-import { Badge, Button, ChallengePhoto } from '../../ui'
+import { Maximize2 } from 'lucide-react'
+import { Badge, Button, ChallengePhoto, Icon } from '../../ui'
 import type { Moment } from '../../lib/trip'
 import styles from './MomentCard.module.css'
 
@@ -32,7 +33,8 @@ function formatMomentDate(value: string): string | null {
  *  - tocar la FOTO = SELECCIONAR el momento → el mapa hace ZOOM a su pin (acción
  *    primaria, lo que la gente espera del diario visual);
  *  - abrir el detalle (foto grande + texto) es una acción EXPLÍCITA: el botón
- *    "⤢ Ver" arriba a la derecha. Así un toque no dispara a la vez zoom y hoja.
+ *    "Ver detalle" (icono expandir) arriba a la derecha. Así un toque no dispara
+ *    a la vez zoom y hoja.
  *
  * REGLA DE ORO DEL PIVOTE: jugar es capa, no peaje. Un momento CERRADO se ve y
  * ya (sin CTA); SOLO el momento en juego ofrece "Adivina →" (única acción cálida).
@@ -58,7 +60,7 @@ export function MomentCard({ moment, selected, onSelect, onExpand, onPlay }: Pro
       {/* Botón explícito de expandir (abre la hoja de detalle). Sobre el overlay y
           SÍ interactivo; el resto de la foto selecciona + hace zoom. */}
       <button type="button" className={styles.expand} onClick={onExpand} aria-label="Ver detalle">
-        <span aria-hidden="true">⤢</span>
+        <Icon icon={Maximize2} size={18} />
       </button>
 
       {/* Bandera del país en disco de vidrio, esquina sup-izq (estilo Polarsteps).

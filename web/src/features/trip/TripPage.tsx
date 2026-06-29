@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { EmptyState, Spinner, useReducedMotion } from '../../ui'
+import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react'
+import { EmptyState, Icon, useReducedMotion } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import type { Moment } from '../../lib/trip'
@@ -286,10 +287,24 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
   const togglePlay = () => setPlaying((p) => !p)
 
   if (loading) {
+    // Carga con clase: prefiguramos la pantalla (mapa + chrome + carrusel) con
+    // shimmer en vez de un spinner desnudo. role=status anuncia "cargando" a los
+    // lectores de pantalla; las piezas son aria-hidden (puro layout fantasma).
     return (
-      <main className={styles.center}>
-        <Spinner size={32} />
-      </main>
+      <div className={styles.screen} role="status" aria-label="Cargando el viaje">
+        <div className={`${styles.skeletonMap} lg-shimmer-surface`} aria-hidden="true" />
+        <header className={styles.chrome} aria-hidden="true">
+          <span className={`${styles.skelPill} ${styles.skelIcon} lg-shimmer-surface`} />
+          <span className={`${styles.skelPill} ${styles.skelCover} lg-shimmer-surface`} />
+          <span className={`${styles.skelPill} ${styles.skelIcon} lg-shimmer-surface`} />
+        </header>
+        <div className={styles.dock} aria-hidden="true">
+          <div className={styles.carousel}>
+            <span className={`${styles.slide} ${styles.skelCard} lg-shimmer-surface`} />
+            <span className={`${styles.slide} ${styles.skelCard} lg-shimmer-surface`} />
+          </div>
+        </div>
+      </div>
     )
   }
 
@@ -323,7 +338,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
       {/* (b) Chrome flotante arriba (pastillas de vidrio sobre el mapa). */}
       <header className={styles.chrome}>
         <button type="button" className={styles.iconPill} onClick={onBack} aria-label="Volver">
-          ←
+          <Icon icon={ArrowLeft} />
         </button>
         {/* Portada editorial (Fase 2, §1.8): eleva la antigua titlePill al nombre
             en cursiva manuscrita + stats del viaje (días/km/momentos). Sigue
@@ -349,7 +364,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
           onClick={onOpenClassic}
           aria-label="Ver marcador y ajustes"
         >
-          ⋯
+          <Icon icon={MoreHorizontal} />
         </button>
       </header>
 
@@ -408,7 +423,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
           onClick={onAddMoment}
           aria-label="Añadir momento"
         >
-          <span aria-hidden="true">＋</span>
+          <Icon icon={Plus} size={26} />
         </button>
       )}
 

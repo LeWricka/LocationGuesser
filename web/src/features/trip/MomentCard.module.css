@@ -9,17 +9,28 @@
   height: 100%;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-lg);
+  /* Sombra de "objeto físico" sobre el satélite: anillo de contacto + caída
+     difusa (token del pase de craft). La tarjeta flota sobre el mapa con
+     credibilidad, no es una caja plana. */
+  box-shadow: var(--shadow-photo-card);
   background: var(--ocean-900);
-  /* Anillo de selección (se enciende en .selected); transición suave del borde. */
+  /* Anillo de selección (se enciende en .selected); transición suave del borde.
+     La sombra y un leve lift hacia el usuario completan el "enfoque" con un muelle
+     suave (emphasized): la tarjeta centrada salta un punto hacia delante. */
   outline: 0 solid transparent;
   outline-offset: 2px;
-  transition: outline-color var(--transition-fast);
+  transition:
+    outline-color var(--transition-fast),
+    box-shadow var(--transition-base),
+    transform var(--duration-slow) var(--ease-spring);
 }
 
-/* Tarjeta seleccionada (centrada): anillo claro que la ata al pin resaltado. */
+/* Tarjeta seleccionada (centrada): anillo claro que la ata al pin resaltado, una
+   sombra más presente y un leve lift que la trae al frente del carrusel. */
 .card.selected {
   outline: 2px solid var(--color-on-photo);
+  box-shadow: var(--shadow-photo-card-active);
+  transform: translateY(-4px);
 }
 
 /* Botón "expandir": disco de vidrio arriba a la derecha; abre la hoja de detalle. */
@@ -40,8 +51,25 @@
   backdrop-filter: var(--map-chrome-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.expand:hover {
+  background: var(--glass-bg-strong);
+}
+.expand:active {
+  transform: scale(0.92);
+}
+@media (prefers-reduced-motion: reduce) {
+  .expand {
+    transition: none;
+  }
+  .expand:active {
+    transform: none;
+  }
 }
 
 /*
@@ -66,8 +94,10 @@
   justify-content: flex-end;
   padding: var(--space-3);
   pointer-events: none;
-  /* Degradado de legibilidad al pie (token de foto). */
-  background: linear-gradient(to top, var(--photo-overlay-strong) 0%, transparent 55%);
+  /* Degradado de legibilidad al pie CALIBRADO (la foto manda): solo oscurece el
+     pie donde va el texto y deja la foto respirar arriba (token del pase de craft,
+     tres paradas suaves en vez de un corte al 55%). */
+  background: var(--photo-scrim-card);
 }
 
 /* Bandera del país: disco de vidrio arriba a la izquierda (estilo Polarsteps).
@@ -87,7 +117,7 @@
   backdrop-filter: var(--map-chrome-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   pointer-events: none;
 }
 
@@ -153,5 +183,10 @@
 @media (prefers-reduced-motion: reduce) {
   .card {
     transition: none;
+  }
+  /* Sin movimiento: el enfoque se comunica por el anillo y la sombra, no por el
+     lift (nada de desplazamiento para quien pide menos movimiento). */
+  .card.selected {
+    transform: none;
   }
 }

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
+import { X } from 'lucide-react'
+import { Icon } from './Icon'
 import styles from './Modal.module.css'
 
 interface Props {
@@ -69,7 +71,7 @@ export function Modal({ open, onClose, title, footer, children }: Props) {
             )}
             {onClose && (
               <button type="button" className={styles.close} onClick={onClose} aria-label="Cerrar">
-                ✕
+                <Icon icon={X} />
               </button>
             )}
           </header>

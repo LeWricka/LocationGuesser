@@ -1,3 +1,5 @@
+import { ArrowLeft } from 'lucide-react'
+import { Icon } from './Icon'
 import styles from './BackHomeButton.module.css'
 
 interface Props {
@@ -16,9 +18,7 @@ export function BackHomeButton({ onClick, label = 'Inicio', className }: Props) 
       className={[styles.back, className].filter(Boolean).join(' ')}
       onClick={onClick}
     >
-      <span className={styles.arrow} aria-hidden="true">
-        ←
-      </span>
+      <Icon icon={ArrowLeft} size={18} className={styles.arrow} />
       {label}
     </button>
   )
