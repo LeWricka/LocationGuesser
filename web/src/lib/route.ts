@@ -24,10 +24,17 @@ export interface Route {
   groupView?: 'clasico'
   /**
    * Intención de abrir directamente "Añadir momento" al entrar a la GroupPage
-   * clásica (`#g=…&v=clasico&add=1`). Lo usa el FAB de la pantalla "Viaje" para
-   * reusar el flujo de creación existente sin duplicarlo.
+   * clásica (`#g=…&v=clasico&add=1`). Lo usa el asistente de reto clásico cuando
+   * se entra por la vista clásica.
    */
   groupAdd?: boolean
+  /**
+   * Intención de abrir el flujo ligero "Añadir recuerdo" del viaje (`#g=…&add=recuerdo`).
+   * Es la entrada del FAB "＋" de la pantalla "Viaje": un momento (foto/lugar/texto)
+   * sin reto por defecto, con el reto como capa opcional (toggle). Separa CONTENIDO
+   * de RETO (flujos-viaje-po.md): el camino feliz es subir un recuerdo, no montar un juego.
+   */
+  groupAddMoment?: boolean
 }
 
 // Hashes atómicos (sin pares clave=valor) que mapean a vistas de la app.
@@ -71,6 +78,11 @@ export function parseHash(hash: string = window.location.hash): Route {
   // Intención de abrir "Añadir momento" directo (solo junto a la vista clásica).
   if (params.get('add')?.trim() === '1') route.groupAdd = true
 
+  // Flujo ligero "Añadir recuerdo" del viaje (`#g=…&add=recuerdo`): la entrada del
+  // FAB "＋" de la pantalla "Viaje". Tiene prioridad sobre `add=1` (que es el legado
+  // del asistente de reto clásico) cuando ambos no coexisten.
+  if (params.get('add')?.trim() === 'recuerdo') route.groupAddMoment = true
+
   return route
 }
 
@@ -86,7 +98,16 @@ export function classicGroupHash(groupId: string): string {
   return `#g=${encodeURIComponent(groupId)}&v=clasico`
 }
 
-/** Hash de la GroupPage clásica abriendo "Añadir momento" (`…&v=clasico&add=1`). */
+/**
+ * Hash del flujo ligero "Añadir recuerdo" del viaje (`#g=…&add=recuerdo`). Es la
+ * entrada del FAB "＋" de la pantalla "Viaje": abre el asistente de recuerdo (foto,
+ * lugar y texto) con el reto como capa opcional, en vez del asistente de reto clásico.
+ */
 export function addMomentHash(groupId: string): string {
+  return `#g=${encodeURIComponent(groupId)}&add=recuerdo`
+}
+
+/** Hash de la GroupPage clásica abriendo el asistente de reto (`…&v=clasico&add=1`). */
+export function addChallengeHash(groupId: string): string {
   return `${classicGroupHash(groupId)}&add=1`
 }

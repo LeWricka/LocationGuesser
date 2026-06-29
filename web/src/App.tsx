@@ -17,6 +17,7 @@
 
 import { useEffect, useState } from 'react'
 import { CreateGroup } from './features/create/CreateGroup'
+import { AddMoment } from './features/create/AddMoment'
 import { PlayChallenge } from './features/play/PlayChallenge'
 import { GroupPage } from './features/group/GroupPage'
 import { TripPage } from './features/trip/TripPage'
@@ -186,6 +187,25 @@ function LoggedIn({
   }
   if (route.group) {
     const groupId = route.group
+    // FAB "＋" del viaje → flujo ligero "Añadir recuerdo" (separación contenido/reto):
+    // un momento (foto/lugar/texto) sin reto por defecto, con el reto como capa
+    // opcional. Al terminar (o cancelar) volvemos al viaje. Reemplaza el salto
+    // directo al asistente de reto clásico.
+    if (route.groupAddMoment) {
+      return (
+        <OnboardingGate context="group" userId={user?.id}>
+          <AddMoment
+            groupId={groupId}
+            onBack={() => {
+              location.hash = groupHash(groupId)
+            }}
+            onCreated={() => {
+              location.hash = groupHash(groupId)
+            }}
+          />
+        </OnboardingGate>
+      )
+    }
     // Por defecto, un grupo abre la pantalla "Viaje" (diario visual). `v=clasico`
     // es el escape a la GroupPage de siempre (marcador, ajustes, fin de temporada),
     // accesible desde el botón "⋯" del viaje, así que NO se pierde nada de ella.
@@ -210,7 +230,8 @@ function LoggedIn({
           onPlayChallenge={(challengeId) => {
             location.hash = groupHash(groupId, challengeId)
           }}
-          // "Añadir momento": a la GroupPage clásica abriendo el creador de retos.
+          // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
+          // un momento sin reto por defecto (el reto es una capa opcional con toggle).
           onAddMoment={() => {
             location.hash = addMomentHash(groupId)
           }}

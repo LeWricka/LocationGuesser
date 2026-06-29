@@ -12,29 +12,33 @@ const pinIcon = L.divIcon({
   iconAnchor: [15, 28],
 })
 
-// Capas base sin API key. Callejero = CARTO Voyager; Satélite = Esri.
+// Capas base sin API key. Satélite (por defecto) = Esri World Imagery; el
+// callejero (CARTO Voyager) queda como alternativa. El usuario pidió SATÉLITE por
+// defecto: el gris del callejero es soso y la foto aérea hace el mapa vivo.
 type BaseLayer = 'street' | 'satellite'
 
 const LAYERS: Record<BaseLayer, { label: string; url: string; attribution: string }> = {
-  street: {
-    label: 'Callejero',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  },
   satellite: {
     label: 'Satélite',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution:
       'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
   },
+  street: {
+    label: 'Mapa',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  },
 }
 
 const LAYER_KEY = 'lg.mapLayer'
 
+// Satélite por defecto (preferencia del usuario). Solo respetamos lo guardado si
+// el usuario eligió explícitamente "Mapa"; cualquier otro valor cae a satélite.
 function readStoredLayer(): BaseLayer {
   const v = localStorage.getItem(LAYER_KEY)
-  return v === 'satellite' || v === 'street' ? v : 'street'
+  return v === 'street' ? 'street' : 'satellite'
 }
 
 interface Props {
@@ -87,7 +91,11 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
           </button>
         ))}
       </div>
-      <MapContainer center={[center.lat, center.lng]} zoom={zoom} className="lg-map">
+      <MapContainer
+        center={[center.lat, center.lng]}
+        zoom={zoom}
+        className={`lg-map ${styles.map}`}
+      >
         {/* keepBuffer + updateWhenZooming reducen el parpadeo gris al hacer
             zoom (mismo motivo que en PlayMap). Sin `subdomains` porque la capa
             satélite (Esri) no usa el placeholder {s}. */}
