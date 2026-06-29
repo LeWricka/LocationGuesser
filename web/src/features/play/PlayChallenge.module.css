@@ -57,11 +57,11 @@
 }
 
 /* NO-SPOILER: relleno neutro mientras la escena NO debe verse (antes de pulsar
-   Empezar). Sin pistas del lugar; un degradado sobrio del tema bajo el modal. */
+   Empezar). Sin pistas del lugar; papel sobrio del tema bajo el modal. */
 .scenePlaceholder {
   width: 100%;
   height: 100%;
-  background: linear-gradient(160deg, var(--color-surface) 0%, var(--color-bg) 100%);
+  background: linear-gradient(160deg, var(--color-surface) 0%, var(--color-surface-hover) 100%);
 }
 
 .noScene {
@@ -96,7 +96,7 @@
   width: clamp(96px, 28vw, 168px);
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-md);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--color-border);
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   /* Es un botón: la miniatura de pista abre el visor a pantalla completa. */
@@ -127,7 +127,8 @@
   object-fit: cover;
 }
 
-/* Controles del panorama, abajo-izquierda: pequeños, de vidrio. */
+/* Controles del panorama, abajo-izquierda: pastillas blancas translúcidas
+   (chrome Atelier) sobre la escena a sangre. */
 .panoControls {
   position: absolute;
   left: calc(var(--space-3) + env(safe-area-inset-left));
@@ -145,25 +146,21 @@
   font-size: var(--font-size-lg);
   line-height: 1;
   border-radius: var(--radius-full);
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
+  background: var(--chrome-bg);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
   color: var(--color-text);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   cursor: pointer;
   transition: transform var(--transition-fast);
-}
-.glassBtn:hover {
-  border-color: var(--color-border-strong);
 }
 .glassBtn:active {
   transform: scale(0.94);
 }
 
-/* FAB del mapa, CENTRO inferior: prominente, con el gradiente de marca. Va
- * centrado (no a la derecha) para no pisar el control +/- del Street View, que
- * Google pinta abajo-derecha. */
+/* FAB del mapa, CENTRO inferior: círculo sólido salvia/pizarra (sin gradiente ni
+ * glow). Va centrado (no a la derecha) para no pisar el control +/- del Street
+ * View, que Google pinta abajo-derecha. */
 .mapFab {
   position: absolute;
   left: 50%;
@@ -177,15 +174,17 @@
   font-size: 1.75rem;
   border: none;
   border-radius: var(--radius-full);
-  background: var(--gradient-accent);
-  box-shadow: var(--shadow-accent);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-md), var(--ring-contact);
   cursor: pointer;
   transition:
     transform var(--transition-fast),
     box-shadow var(--transition-fast);
 }
 .mapFab:hover {
-  box-shadow: var(--shadow-accent-hover);
+  background: var(--color-accent-hover);
+  box-shadow: var(--shadow-lg), var(--ring-contact);
 }
 .mapFab:active {
   transform: translateX(-50%) scale(0.94);
@@ -208,7 +207,7 @@
   position: absolute;
   inset: 0;
   z-index: 4;
-  background: rgba(2, 10, 16, 0.5);
+  background: var(--color-scrim);
   opacity: 0;
   visibility: hidden;
   transition:
@@ -371,7 +370,7 @@
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
-/* Gran tiro: el titular se vuelve cálido y "vibra" de entrada. */
+/* Gran tiro: el titular se tiñe del acento y entra con énfasis. */
 .scoreEyebrowWin {
   color: var(--color-accent);
   font-weight: var(--font-weight-black);
@@ -391,7 +390,7 @@
   letter-spacing: var(--letter-spacing-tight);
 }
 
-/* Puntos en el centro del anillo: número GIGANTE tabular, cálido. El dato manda. */
+/* Puntos en el centro del anillo: número GIGANTE tabular en tinta. El dato manda. */
 .ringPoints {
   font-size: 2.75rem;
   font-weight: var(--font-weight-black);
@@ -420,7 +419,7 @@
   font-size: var(--font-size-md);
 }
 
-/* La distancia es el dato cálido: número resaltado bajo regla de acento. */
+/* La distancia es el dato clave: número resaltado en el acento. */
 .resultKm {
   color: var(--color-accent);
   font-weight: var(--font-weight-black);
@@ -477,7 +476,7 @@
 }
 
 /* Aviso anti-trampa en el resultado: "saliste de la app durante la jugada".
-   Informativo (no penaliza), con el ámbar de "warning" de la marca. */
+   Informativo (no penaliza), en el ocre de "warning" de la marca. */
 .leftAppNotice {
   margin: 0;
   padding: var(--space-2) var(--space-3);

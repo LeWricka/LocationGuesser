@@ -1,5 +1,5 @@
 /* ==========================================================================
- * Celebración de acierto cercano (RevealBurst): destello cálido + confeti que
+ * Celebración de acierto cercano (RevealBurst): destello sobrio + confeti que
  * cae. Cubre el bloque de puntuación sin capturar toques (pointer-events:none) y
  * se autodestruye visualmente al terminar las animaciones (el componente deja de
  * montarse desde el padre tras un tiempo). Solo se monta si NO hay reduced-motion.
@@ -12,8 +12,8 @@
   z-index: 1;
 }
 
-/* Destello: halo cálido que aparece y se desvanece tras el anillo, dando la
- * sensación de "fogonazo" de logro. Usa el glow de marca de los tokens. */
+/* Destello: halo sobrio que aparece y se desvanece tras el anillo, dando la
+ * sensación de "fogonazo" de logro. Usa el destello de marca (Pizarra) de los tokens. */
 .flash {
   position: absolute;
   inset: 0;
@@ -24,7 +24,7 @@
 }
 
 /* Cada pieza de confeti: rectángulo pequeño que cae desde arriba con deriva y
- * giro, y se desvanece. Colores cálidos de marca (ámbar→coral→oro) según --hue. */
+ * giro, y se desvanece. Colores de marca (Pizarra → activo → oro de medalla) según --hue. */
 .piece {
   position: absolute;
   top: -8%;
