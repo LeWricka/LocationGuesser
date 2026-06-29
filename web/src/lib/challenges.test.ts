@@ -71,6 +71,7 @@ import {
   getAnswers,
   countVotes,
   updateChallenge,
+  updateMoment,
   isPracticeChallenge,
 } from './challenges'
 
@@ -389,6 +390,57 @@ describe('updateChallenge', () => {
     results['challenges'] = { data: sampleChallenge, error: null }
     await updateChallenge('c1', { imagePath: null })
     expect(calls.update).toHaveBeenCalledWith('challenges', { image_path: null })
+  })
+})
+
+describe('updateMoment', () => {
+  test('edita título y fecha del recuerdo (created_at)', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { title: 'Nuevo título', createdAt: '2026-04-08T10:00:00.000Z' })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      title: 'Nuevo título',
+      created_at: '2026-04-08T10:00:00.000Z',
+    })
+  })
+
+  test('descripción vacía se guarda como null', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { description: '   ' })
+    expect(calls.update).toHaveBeenCalledWith('challenges', { description: null })
+  })
+
+  test('cambiar el lugar escribe place_* (no lat/lng: el lugar es visible)', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { place: { lat: 1, lng: 2 } })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      place_lat: 1,
+      place_lng: 2,
+      sv_pano_id: null,
+      sv_heading: null,
+      sv_pitch: null,
+    })
+    // No toca la respuesta oculta (lat/lng): un recuerdo no tiene respuesta.
+    const patch = calls.update.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(patch).not.toHaveProperty('lat')
+    expect(patch).not.toHaveProperty('lng')
+  })
+
+  test('place null quita el lugar y el panorama del recuerdo', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { place: null })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      place_lat: null,
+      place_lng: null,
+      sv_pano_id: null,
+      sv_heading: null,
+      sv_pitch: null,
+    })
+  })
+
+  test('sin campos presentes no manda nada espurio (patch vacío)', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', {})
+    expect(calls.update).toHaveBeenCalledWith('challenges', {})
   })
 })
 
