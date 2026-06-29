@@ -410,6 +410,46 @@
   color: var(--color-accent);
 }
 
+/* Cinta de cierre: flota bajo la cabecera (overlay z-4) e invita a abrir el recap.
+   Acento pizarra sobre papel; no compite con el contenido (no ocupa hueco). */
+.wrapBanner {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  top: calc(env(safe-area-inset-top) + 4.5rem);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  appearance: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+  animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
+  transition: transform var(--transition-fast);
+}
+.wrapBanner:hover {
+  transform: translateY(-1px);
+}
+.wrapBanner:active {
+  transform: scale(0.99);
+}
+.wrapBannerText {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.01em;
+}
+
 @keyframes lg-fab-menu-in {
   from {
     opacity: 0;
@@ -460,6 +500,14 @@
     transition: none;
   }
   .iconPill:active {
+    transform: none;
+  }
+  .wrapBanner {
+    animation: none;
+    transition: none;
+  }
+  .wrapBanner:hover,
+  .wrapBanner:active {
     transform: none;
   }
 }

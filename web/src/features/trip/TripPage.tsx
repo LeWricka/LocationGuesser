@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ImagePlus, Plus, Target } from 'lucide-react'
+import { ArrowLeft, ChevronRight, ImagePlus, Plus, Target } from 'lucide-react'
 import { EmptyState, Icon, useReducedMotion } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
@@ -7,6 +7,7 @@ import type { Moment } from '../../lib/trip'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
 import { TripRetos } from './TripRetos'
+import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import styles from './TripPage.module.css'
 
@@ -74,6 +75,7 @@ export function TripPage({
     leaderboard,
     recentResults,
     recentTitle,
+    winnersByChallenge,
     loading,
     error,
     refresh,
@@ -103,6 +105,30 @@ export function TripPage({
   // Menú del FAB "＋": elegir entre crear un Momento o un Reto.
   const [fabOpen, setFabOpen] = useState(false)
   const fabWrapRef = useRef<HTMLDivElement>(null)
+
+  // Recap de cierre: el viaje está cerrado (closed_at) → ofrecemos el "wrap".
+  const isClosed = group?.closed_at != null
+  const [wrapOpen, setWrapOpen] = useState(false)
+  // Auto-mostrar el recap la PRIMERA vez que se entra a un viaje ya cerrado, una
+  // sola vez por viaje (lo recordamos en localStorage para no atrapar al usuario
+  // cada vez que vuelve). Si falla el storage, no bloquea: solo no auto-muestra.
+  const autoShownRef = useRef(false)
+  useEffect(() => {
+    if (!isClosed || autoShownRef.current) return
+    autoShownRef.current = true
+    const key = `lg-wrap-seen-${groupId}`
+    try {
+      if (!localStorage.getItem(key)) {
+        // setState directo en efecto: es un disparo ÚNICO por viaje (guardado en ref
+        // + localStorage), no un bucle de render. Patrón aceptado aquí.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setWrapOpen(true)
+        localStorage.setItem(key, '1')
+      }
+    } catch {
+      // Sin storage (modo privado, etc.): no auto-mostramos; el banner basta.
+    }
+  }, [isClosed, groupId])
 
   // Permisos + miembros (tolerante: si falla, no bloquea ver el viaje).
   useEffect(() => {
@@ -366,6 +392,22 @@ export function TripPage({
         </div>
       </header>
 
+      {/* Cinta de cierre: con el viaje cerrado, ofrece abrir el recap a pantalla
+          completa. Flota bajo la cabecera para no robar sitio al mapa/contenido. */}
+      {isClosed && (
+        <button
+          type="button"
+          className={styles.wrapBanner}
+          onClick={() => setWrapOpen(true)}
+          aria-label="Ver el resumen del viaje"
+        >
+          <span className={styles.wrapBannerText}>
+            <span aria-hidden="true">🏁</span> Viaje cerrado — Ver resumen
+          </span>
+          <Icon icon={ChevronRight} size={16} />
+        </button>
+      )}
+
       {/* Pista deslizable: dos paneles hermanos (Diario / Retos). */}
       <div className={styles.viewport}>
         <div
@@ -507,6 +549,21 @@ export function TripPage({
         }
         onPromoted={() => void refresh()}
       />
+
+      {/* Recap de cierre a pantalla completa: solo con el viaje cerrado y abierto
+          (por el banner o auto-mostrado la primera vez). Reúne mapa, stats, podio
+          y el timeline-resumen de TODOS los momentos. */}
+      {isClosed && wrapOpen && (
+        <TripWrap
+          tripName={title}
+          moments={moments}
+          route={route}
+          leaderboard={leaderboard}
+          prizes={group?.prizes ?? null}
+          winnersByChallenge={winnersByChallenge}
+          onClose={() => setWrapOpen(false)}
+        />
+      )}
     </div>
   )
 }
