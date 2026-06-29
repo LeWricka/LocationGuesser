@@ -51,7 +51,7 @@ export const ResultCard = forwardRef<HTMLDivElement, Props>(function ResultCard(
         <span className={styles.logoMark} aria-hidden="true">
           📍
         </span>
-        <span className={styles.brandName}>LocationGuesser</span>
+        <span className={styles.brandName}>Lugares</span>
       </div>
 
       <div className={styles.header}>

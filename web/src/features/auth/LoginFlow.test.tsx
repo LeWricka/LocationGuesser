@@ -62,7 +62,7 @@ describe('LoginFlow', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     await screen.findByLabelText('Código de 6 dígitos')
     await userEvent.click(screen.getByRole('button', { name: 'Cambiar email' }))
-    expect(screen.getByRole('heading', { name: 'Entra a LocationGuesser' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Entra a Lugares' })).toBeInTheDocument()
   })
 
   test('con groupName muestra el copy de unirse', () => {
