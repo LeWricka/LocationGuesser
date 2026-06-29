@@ -23,52 +23,72 @@ afterEach(() => {
 })
 
 describe('Landing', () => {
-  test('muestra el hero y el formulario de entrada', () => {
+  test('la portada es visual: hero + CTA + cómo funciona, sin email a la vista', () => {
     render(<Landing />)
     expect(
       screen.getByRole('heading', {
-        name: /Que los que más quieres lo vivan contigo/i,
+        name: /Comparte tus momentos de una forma diferente/i,
       }),
     ).toBeInTheDocument()
     // Los 3 pasos reutilizados de HowItWorks.
     expect(screen.getByRole('heading', { name: 'Cómo funciona' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
+    // El CTA emotivo abre el popup; el email NO está a la vista de primeras.
     expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Tu correo')).not.toBeInTheDocument()
+  })
+
+  test('el CTA abre el popup con el campo de correo', async () => {
+    render(<Landing />)
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Enviarme el código' })).toBeInTheDocument()
+  })
+
+  test('"¿Ya tienes cuenta? Entra" abre el mismo popup', async () => {
+    render(<Landing />)
+    await userEvent.click(screen.getByRole('button', { name: /Ya tienes cuenta/i }))
+    expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
   })
 
   test('email inválido no llama a Supabase y muestra error', async () => {
     render(<Landing />)
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
     expect(signIn).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('correo válido')
   })
 
-  test('email válido envía el código y pasa a la pantalla del código', async () => {
+  test('email válido envía el código y pasa al paso del código', async () => {
     render(<Landing />)
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
     expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, undefined)
     expect(await screen.findByLabelText('Código de 6 dígitos')).toBeInTheDocument()
   })
 
   test('pasa el redirectTo al enviar el código', async () => {
     render(<Landing redirectTo="https://app.example/#g=abc" />)
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
+    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
     expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, 'https://app.example/#g=abc')
   })
 
-  test('con groupName adapta el copy del hero a unirse al grupo', () => {
+  test('con groupName adapta el copy del hero y el CTA a unirse al viaje', async () => {
     render(<Landing groupName="Finde Lisboa" />)
     expect(
       screen.getByRole('heading', { name: /Vive los viajes de Finde Lisboa/i }),
     ).toBeInTheDocument()
-    // En el deep-link el grupo ya viene dado: no se ofrece el atajo de código.
+    // En el deep-link el viaje ya viene dado: no se ofrece el atajo de código.
     expect(screen.queryByText('¿Te han pasado un código de viaje?')).not.toBeInTheDocument()
+    // El CTA invita a unirse y abre el popup con el copy de unirse.
+    await userEvent.click(screen.getByRole('button', { name: 'Únete al viaje' }))
+    expect(screen.getByRole('heading', { name: 'Entra y vive el viaje' })).toBeInTheDocument()
   })
 
-  test('el atajo de código de grupo navega a #g=<código>', async () => {
+  test('el atajo de código de viaje navega a #g=<código>', async () => {
     render(<Landing />)
     await userEvent.click(screen.getByText('¿Te han pasado un código de viaje?'))
     await userEvent.type(screen.getByLabelText('Código o enlace del viaje'), 'lisboa123')
