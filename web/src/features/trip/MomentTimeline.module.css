@@ -72,8 +72,13 @@
   -webkit-overflow-scrolling: touch;
   /* No encadenar el scroll horizontal al carrusel/página de debajo. */
   overscroll-behavior-x: contain;
-  /* Línea continua de fondo que une las marcas (la "ruta" en miniatura). */
-  background-image: linear-gradient(var(--route-line), var(--route-line));
+  /* Línea continua de fondo que une las marcas (la "ruta" en miniatura). En ACENTO
+     con cuerpo: se lee como ruta sobre cualquier satélite (no se diluye como la
+     tinta translúcida sobre fondos oscuros). */
+  background-image: linear-gradient(
+    color-mix(in srgb, var(--color-accent) 78%, transparent),
+    color-mix(in srgb, var(--color-accent) 78%, transparent)
+  );
   background-repeat: no-repeat;
   background-position: 0 12px;
   background-size: 100% var(--pin-ring-width, 3px);
@@ -117,7 +122,10 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   white-space: nowrap;
-  opacity: 0.82;
+  /* Plena opacidad + sombra sutil: la etiqueta se lee sobre cualquier satélite
+     (no se desvanece como antes a 0.82 sobre fondos claros del mapa). */
+  opacity: 1;
+  text-shadow: 0 1px 2px var(--photo-text-shadow);
 }
 
 /* Momento EN JUEGO: punto rojo pulsante (🔴, coherente con la livePill del chrome;
