@@ -2,6 +2,25 @@
    estado de error usa el EmptyState del kit. Aquí va solo la cabecera del hero de
    bienvenida (recién llegado, sin grupos). */
 
+/* SNAP vertical de la home con viajes: el contenedor de página pasa a ser el
+   scroller (alto de viewport) con puntos de anclaje. Al hacer scroll, el héroe
+   (mapamundi) y la galería de viajes "encajan" de golpe — sensación nativa móvil.
+   `proximity` (no `mandatory`) para no atrapar el scroll dentro de una lista larga
+   de viajes. Solo se aplica en el dashboard (clase condicional en HomePage). */
+.snapScroll {
+  height: 100dvh;
+  overflow-y: auto;
+  scroll-snap-type: y proximity;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+@media (prefers-reduced-motion: reduce) {
+  .snapScroll {
+    scroll-snap-type: none;
+    scroll-behavior: auto;
+  }
+}
+
 /* --- Hero de bienvenida (sin grupos) --- */
 .welcome {
   display: flex;
