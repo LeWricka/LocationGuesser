@@ -176,11 +176,12 @@ export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: P
       // Un dedo mueve el mapa en móvil (sin el banner "usa dos dedos"), igual que
       // el worldCopyJump/arrastre fluido de antes.
       gestureHandling="greedy"
-      // Mapa estándar de Google → POIs/bares visibles por defecto (lo que pide el
-      // juego). Sin mapId: usamos Marker clásico, no AdvancedMarker.
-      // Atelier: basemap CLARO tipo atlas (roadmap), nunca el oscuro; forzamos el
-      // esquema claro para que no siga el modo oscuro del sistema.
-      mapTypeId="roadmap"
+      // Basemap SATÉLITE con etiquetas (hybrid): coherente con el mapa del flujo de
+      // crear reto (Esri World Imagery por defecto) y con la app inmersiva — la foto
+      // aérea hace el mapa vivo y da más pistas que el gris del callejero, sin perder
+      // los topónimos. Sin mapId: usamos Marker clásico, no AdvancedMarker. Forzamos
+      // esquema claro para no seguir el modo oscuro del sistema.
+      mapTypeId="hybrid"
       colorScheme="LIGHT"
       disableDefaultUI
       zoomControl
