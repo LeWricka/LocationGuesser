@@ -486,9 +486,10 @@ export function TripPage({
         )}
       </div>
 
-      {/* FAB "＋" con menú de dos acciones: Momento (recuerdo) o Reto (a adivinar).
-          Solo el dueño. En vacío el CTA de momento ya está en el EmptyState del Diario. */}
-      {canCreate && moments.length > 0 && (
+      {/* FAB "＋" flotante con menú de dos acciones: Momento (recuerdo) o Reto (a
+          adivinar). Solo el dueño y siempre disponible (fijo abajo), salvo con el
+          recap abierto (es una pantalla de cierre, no de creación). */}
+      {canCreate && !wrapOpen && (
         <div className={styles.fabWrap} ref={fabWrapRef}>
           {fabOpen && (
             <div className={styles.fabMenu} role="menu" aria-label="Crear">

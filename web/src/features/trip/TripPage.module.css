@@ -322,11 +322,14 @@
 }
 
 /* FAB "＋" con menú: contenedor flotando abajo-derecha; ancla el popover de acciones. */
+/* FAB flotante FIJO: pegado al viewport (no al panel), siempre en la parte inferior
+   y por encima de TODO el contenido (z-sticky). Los modales (hoja de momento, recap)
+   van en z-overlay, así que lo cubren cuando tocan. */
 .fabWrap {
-  position: absolute;
+  position: fixed;
   right: var(--space-4);
   bottom: calc(env(safe-area-inset-bottom) + var(--space-5));
-  z-index: 5;
+  z-index: var(--z-sticky);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
