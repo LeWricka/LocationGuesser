@@ -98,9 +98,9 @@ const STEP_ORDER: Step[] = ['place', 'photo', 'summary']
 // la RESPUESTA OCULTA que los demás deberán adivinar (no un sitio que se ve).
 const STEP_META: Record<Step, { eyebrow: string; title: string; hint: string }> = {
   place: {
-    eyebrow: 'La respuesta',
-    title: '¿Dónde es?',
-    hint: 'Marca el punto en el mapa: será la respuesta secreta que los demás tienen que adivinar. Si quieres, deja que exploren tu calle en Street View.',
+    eyebrow: 'El lugar',
+    title: '¿Dónde estás?',
+    hint: 'Marca el punto en el mapa: quedará oculto y los demás tendrán que adivinarlo. Si quieres, deja que exploren tu calle en Street View.',
   },
   photo: {
     eyebrow: 'La pista',
@@ -524,7 +524,7 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
                 {point ? (
                   <span className={styles.mapStatusMarked}>
                     <TargetIcon size={16} />
-                    <span>Respuesta marcada</span>
+                    <span>Sitio marcado</span>
                     <span className={styles.coords}>
                       {point.lat.toFixed(4)}, {point.lng.toFixed(4)}
                     </span>
