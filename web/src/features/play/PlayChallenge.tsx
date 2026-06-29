@@ -28,11 +28,22 @@ import { useSignedImage } from '../../lib/useSignedImage'
 // READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
 import {
+  AlarmClockOff,
+  Eye,
+  EyeOff,
+  Globe2,
+  RotateCcw,
+  Share2,
+  Sparkles,
+  TriangleAlert,
+} from 'lucide-react'
+import {
   BackHomeButton,
   Button,
   Card,
   ChallengePhoto,
   CountUp,
+  Icon,
   Row,
   ScoreRing,
   Skeleton,
@@ -619,8 +630,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             onClose: goBack,
             body: (
               <>
-                <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
-                  🌍
+                <span className={styles.startIcon} aria-hidden="true">
+                  <Icon icon={Globe2} size={40} strokeWidth={1.5} />
                 </span>
                 <p>
                   Cuando pulses <strong>Empezar</strong>, podrás{' '}
@@ -675,7 +686,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           <Stack gap={4}>
             {timedOut ? (
               <Stack gap={2}>
-                <strong>⏰ No diste a tiempo</strong>
+                <strong className={styles.noticeHeading}>
+                  <Icon icon={AlarmClockOff} size={18} />
+                  No diste a tiempo
+                </strong>
                 <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
               </Stack>
             ) : result ? (
@@ -690,7 +704,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     result.points >= GREAT_SHOT ? styles.scoreEyebrowWin : ''
                   }`}
                 >
-                  {result.points >= GREAT_SHOT ? '🎉 ¡Gran tiro!' : 'Resultado'}
+                  {result.points >= GREAT_SHOT && (
+                    <span className={styles.eyebrowIcon} aria-hidden="true">
+                      <Icon icon={Sparkles} size={15} />
+                    </span>
+                  )}
+                  {result.points >= GREAT_SHOT ? '¡Gran tiro!' : 'Resultado'}
                 </span>
                 {/* Anillo de acierto protagonista: % de la puntuación máxima, con
                     los puntos (count-up) gigantes en el centro. */}
@@ -727,7 +746,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 en el marcador se ve junto a mi nombre). */}
             {iLeftApp && (
               <p className={styles.leftAppNotice} role="note">
-                ⚠️ Saliste de la app durante la jugada
+                <Icon icon={TriangleAlert} size={15} />
+                Saliste de la app durante la jugada
               </p>
             )}
 
@@ -742,7 +762,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 onClick={() => void onShareResult()}
                 loading={sharingResult}
               >
-                📤 Compartir mi resultado
+                <span className={styles.btnIcon} aria-hidden="true">
+                  <Icon icon={Share2} size={18} />
+                </span>
+                Compartir mi resultado
               </Button>
             )}
 
@@ -765,11 +788,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   onClick={() => setShowStreetView((v) => !v)}
                   aria-expanded={showStreetView}
                 >
-                  {showStreetView
-                    ? '✕ Ocultar'
-                    : hasStreetView
-                      ? '👀 Ver Street View'
-                      : '👀 Ver la foto'}
+                  <span className={styles.btnIcon} aria-hidden="true">
+                    <Icon icon={showStreetView ? EyeOff : Eye} size={16} />
+                  </span>
+                  {showStreetView ? 'Ocultar' : hasStreetView ? 'Ver Street View' : 'Ver la foto'}
                 </Button>
                 {showStreetView && (
                   <div className={styles.secondaryScene}>
@@ -799,7 +821,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 tras ver la respuesta sería trampa). */}
             {isPractice && (
               <Button variant="secondary" fullWidth onClick={() => void replay()}>
-                🔄 Volver a jugar
+                <span className={styles.btnIcon} aria-hidden="true">
+                  <Icon icon={RotateCcw} size={16} />
+                </span>
+                Volver a jugar
               </Button>
             )}
 

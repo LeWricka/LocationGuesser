@@ -176,11 +176,13 @@ export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: P
       // Un dedo mueve el mapa en móvil (sin el banner "usa dos dedos"), igual que
       // el worldCopyJump/arrastre fluido de antes.
       gestureHandling="greedy"
-      // Mapa estándar de Google → POIs/bares visibles por defecto (lo que pide el
-      // juego). Sin mapId: usamos Marker clásico, no AdvancedMarker.
-      // Atelier: basemap CLARO tipo atlas (roadmap), nunca el oscuro; forzamos el
-      // esquema claro para que no siga el modo oscuro del sistema.
-      mapTypeId="roadmap"
+      // Basemap HÍBRIDO (satélite + etiquetas): coherente con la identidad satélite
+      // de la app y con la propia foto/Street View del reto (se adivina sobre
+      // imagen real, no sobre un atlas claro). Mantenemos las etiquetas (hybrid, no
+      // satellite puro) para que los topónimos sigan ayudando a situarse. Sin mapId:
+      // Marker clásico, no AdvancedMarker. colorScheme LIGHT: no sigue el modo oscuro
+      // del sistema (el satélite ya es oscuro de por sí).
+      mapTypeId="hybrid"
       colorScheme="LIGHT"
       disableDefaultUI
       zoomControl

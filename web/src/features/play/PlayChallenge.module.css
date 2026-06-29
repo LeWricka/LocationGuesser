@@ -40,7 +40,9 @@
    sugiere por sí sola). Flota abajo-centro, sobre el notch inferior. */
 .photoExpandHint {
   position: absolute;
-  bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  /* Por encima de la barra de acción inferior (56px de botón + su separación):
+     la pista de ampliar flota libre sobre la foto, no detrás del botón. */
+  bottom: calc(56px + var(--space-4) + var(--space-3) + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   display: inline-flex;
@@ -54,6 +56,9 @@
   font-weight: 600;
   backdrop-filter: blur(4px);
   pointer-events: none;
+}
+.photoExpandHint svg {
+  display: block;
 }
 
 /* NO-SPOILER: relleno neutro mientras la escena NO debe verse (antes de pulsar
@@ -73,24 +78,35 @@
   text-align: center;
 }
 
-/* Clúster arriba-izquierda: salida + brújula + temporizador. Respeta el notch. */
+/* Clúster superior: salida (izquierda) + temporizador (derecha), repartidos a lo
+   ancho. Antes el reloj "flotaba suelto"; ahora vive anclado a la esquina opuesta
+   del botón de salir, leyéndose como chrome deliberado y simétrico. Respeta el
+   notch por los cuatro lados. */
 .topCluster {
   position: absolute;
   top: calc(var(--space-3) + env(safe-area-inset-top));
   left: calc(var(--space-3) + env(safe-area-inset-left));
+  right: calc(var(--space-3) + env(safe-area-inset-right));
   z-index: 3;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--space-2);
-  flex-wrap: wrap;
-  max-width: calc(100% - var(--space-6));
+  pointer-events: none;
+}
+/* Los controles sí reciben toques; el contenedor no (deja pasar el gesto sobre la
+   escena entre ellos). */
+.topCluster > * {
+  pointer-events: auto;
 }
 
 /* Foto-pista flotante arriba-derecha: pequeña, no tapa la escena. El recuadro
  * fija tamaño/forma; la imagen (o su esqueleto) lo llena por dentro. */
 .hintFloat {
   position: absolute;
-  top: calc(var(--space-3) + env(safe-area-inset-top));
+  /* Baja lo suficiente para no chocar con el temporizador, que ahora vive en la
+     esquina superior derecha (56px + holgura). Sin reloj, igual queda bien. */
+  top: calc(var(--space-3) + 56px + var(--space-2) + env(safe-area-inset-top));
   right: calc(var(--space-3) + env(safe-area-inset-right));
   z-index: 3;
   width: clamp(96px, 28vw, 168px);
@@ -117,9 +133,11 @@
   border-radius: var(--radius-full);
   background: rgb(0 0 0 / 0.55);
   color: #fff;
-  font-size: var(--font-size-sm);
   backdrop-filter: blur(4px);
   pointer-events: none;
+}
+.hintExpand svg {
+  display: block;
 }
 .hintImg {
   width: 100%;
@@ -128,11 +146,12 @@
 }
 
 /* Controles del panorama, abajo-izquierda: pastillas blancas translúcidas
-   (chrome Atelier) sobre la escena a sangre. */
+   (chrome Atelier) sobre la escena a sangre. Se elevan POR ENCIMA de la barra de
+   acción (56px de botón + su separación) para no solaparse con ella. */
 .panoControls {
   position: absolute;
   left: calc(var(--space-3) + env(safe-area-inset-left));
-  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  bottom: calc(56px + var(--space-4) + var(--space-3) + env(safe-area-inset-bottom));
   z-index: 3;
   display: flex;
   gap: var(--space-2);
@@ -157,51 +176,115 @@
 .glassBtn:active {
   transform: scale(0.94);
 }
+.glassBtn svg {
+  display: block;
+}
 
-/* FAB del mapa, CENTRO inferior: círculo sólido salvia/pizarra (sin gradiente ni
- * glow). Va centrado (no a la derecha) para no pisar el control +/- del Street
- * View, que Google pinta abajo-derecha. */
-.mapFab {
+/* ==========================================================================
+ * Barra de acción inferior — abrir el mapa para adivinar.
+ * Sustituye al antiguo FAB redondo (icono 🗺️ que se solapaba con su etiqueta).
+ * Es un botón ANCHO con la etiqueta DENTRO, así el texto nunca se corta. Vive en
+ * una barra centrada con ancho máximo (cómodo a una mano en móvil, contenido en
+ * tablet/desktop). Eleva el resto de chrome inferior con --action-bar-height.
+ * ======================================================================== */
+.actionBar {
+  --action-bar-height: 56px;
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   z-index: 3;
-  width: 64px;
-  height: 64px;
-  display: grid;
-  place-items: center;
-  font-size: 1.75rem;
+  display: flex;
+  justify-content: center;
+  padding-inline: var(--space-4);
+  /* Deja pasar el gesto sobre la escena a los lados del botón (sin tragarse el
+     arrastre del panorama); solo el botón captura el toque. */
+  pointer-events: none;
+}
+
+.guessAction {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 420px;
+  min-height: var(--action-bar-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-5);
   border: none;
   border-radius: var(--radius-full);
   background: var(--color-accent);
   color: var(--color-on-accent);
-  box-shadow: var(--shadow-md), var(--ring-contact);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+  box-shadow: var(--shadow-lg), var(--ring-contact);
   cursor: pointer;
   transition:
     transform var(--transition-fast),
+    background var(--transition-fast),
     box-shadow var(--transition-fast);
 }
-.mapFab:hover {
+.guessAction:hover {
   background: var(--color-accent-hover);
-  box-shadow: var(--shadow-lg), var(--ring-contact);
 }
-.mapFab:active {
-  transform: translateX(-50%) scale(0.94);
+.guessAction:active {
+  transform: scale(0.985);
 }
 
-/* Punto que avisa de que ya hay un pin colocado (sin abrir el mapa). Más grande y
-   con anillo + sombra para que se lea claramente sobre el FAB salvia. */
-.fabDot {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
+/* El icono entra centrado verticalmente y sin baseline raro (Lucide es inline). */
+.guessActionIcon {
+  display: inline-flex;
+}
+.guessActionIcon svg,
+.guessActionBadge svg,
+.btnIcon svg,
+.badgeIcon svg,
+.eyebrowIcon svg,
+.noticeHeading svg,
+.leftAppNotice svg,
+.startIcon svg {
+  display: block;
+}
+
+.guessActionLabel {
+  white-space: nowrap;
+}
+
+/* Estado "pin puesto": el botón se vuelve confirmación serena (relleno tenue del
+   acento + borde) y aparece un check. No grita; confirma. */
+.guessActionPlaced {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow:
+    var(--shadow-md),
+    inset 0 0 0 1.5px var(--color-accent);
+}
+.guessActionPlaced:hover {
+  background: var(--color-surface-hover);
+}
+
+/* Check del estado "pin puesto": píldora del acento al final del botón. */
+.guessActionBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-full);
-  background: var(--color-success);
-  border: 2px solid var(--color-bg);
-  box-shadow: var(--shadow-sm);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+/* Iconos inline dentro de botones/badges/eyebrows del kit: alinean el glifo al
+   texto sin tocar el componente del UI kit. */
+.btnIcon,
+.badgeIcon,
+.eyebrowIcon {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-right: var(--space-1);
 }
 
 /* Velo tras la hoja (oscurece la escena, capta el toque para cerrar). */
@@ -366,11 +449,17 @@
 
 /* Eyebrow del resultado (mayúsculas, tracking ancho). */
 .scoreEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
   color: var(--color-text-muted);
+}
+.eyebrowIcon {
+  margin-right: 0;
 }
 /* Gran tiro: el titular se tiñe del acento y entra con énfasis. */
 .scoreEyebrowWin {
@@ -481,10 +570,28 @@
    Informativo (no penaliza), en el ocre de "warning" de la marca. */
 .leftAppNotice {
   margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-warning-soft);
   color: var(--color-warning);
   font-size: var(--font-size-sm);
   text-align: center;
+}
+
+/* Encabezado de "no diste a tiempo": icono + texto alineados (reemplaza al ⏰). */
+.noticeHeading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Icono del overlay "¿Listo para jugar?" (reemplaza al 🌍): glifo en el acento,
+   centrado, como sello editorial del arranque. */
+.startIcon {
+  display: inline-flex;
+  color: var(--color-accent);
 }
