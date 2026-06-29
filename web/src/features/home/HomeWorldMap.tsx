@@ -29,10 +29,11 @@ const SATELLITE_ATTRIBUTION =
 const WORLD_CENTER: [number, number] = [10, 28]
 const WORLD_ZOOM = 1.35
 // Encuadre que abarque TODAS las constelaciones sin acercarse de más (han de convivir
-// varios viajes en pantalla, como en la maqueta). Padding generoso para el chrome y la
-// franja de portadas que flotan encima.
+// varios viajes en pantalla). Padding ASIMÉTRICO y generoso: arriba deja sitio a la topbar
+// y el pie editorial; ABAJO deja libre la franja que ocupa la bandeja de viajes plegada,
+// para que los pines NO queden tapados (clave de la inmersión: el globo y sus pines mandan).
 const FIT_MAX_ZOOM = 4.5
-const FIT_PADDING = { top: 96, bottom: 132, left: 56, right: 56 }
+const FIT_PADDING = { top: 120, bottom: 300, left: 56, right: 56 }
 // Entrada cinematográfica: arranca más lejos (globo entero) y "aterriza" en el encuadre.
 const INTRO_START_ZOOM = 0.5
 const INTRO_DURATION = 1500
