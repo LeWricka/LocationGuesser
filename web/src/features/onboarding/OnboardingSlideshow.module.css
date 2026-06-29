@@ -16,9 +16,9 @@
   flex-direction: column;
   gap: var(--space-5);
   width: 100%;
-  padding: var(--space-6) var(--space-4) var(--space-5);
+  padding: var(--space-7) var(--space-5) var(--space-6);
+  /* Hoja de papel opaca (sin sheen): el lenguaje es "papel, no vidrio". */
   background-color: var(--color-surface);
-  background-image: linear-gradient(var(--color-surface-sheen), transparent 160px);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
   outline: none;
@@ -62,11 +62,25 @@
   line-height: 1;
 }
 
+/* Eyebrow editorial: mayúsculas pequeñas en tinta suave (no acento). */
+.eyebrow {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Titular del slide en serif (la voz editorial), no sans negro. */
 .title {
   margin: 0;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-black);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
+  text-wrap: balance;
 }
 
 .body {
@@ -84,13 +98,18 @@
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: var(--radius-full);
   background: var(--color-border-strong);
-  transition: background var(--transition-fast);
+  transition:
+    background var(--transition-fast),
+    width var(--transition-fast);
 }
+/* El paso activo se alarga en pastilla de acento (gesto de la maqueta). */
 .dotActive {
+  width: 22px;
+  border-radius: var(--radius-sm);
   background: var(--color-accent);
 }
 

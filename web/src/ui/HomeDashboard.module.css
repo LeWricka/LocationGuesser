@@ -25,33 +25,22 @@
   line-height: 1.2;
 }
 
+/* Nombre del usuario: titular serif en tinta sólida (la voz editorial). Sin
+ * degradado de texto ni brillo en bucle: la jerarquía la da el tamaño/familia. */
 .name {
+  font-family: var(--font-serif);
   font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-black);
-  letter-spacing: var(--letter-spacing-tighter);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
   line-height: var(--line-height-tight);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  /* El nombre capta el degradado cálido sobre el frío y un brillo que lo recorre
-   * muy lentamente: protagonista cálido y "vivo". */
-  background: linear-gradient(
-    100deg,
-    var(--color-text) 0%,
-    #bfe9e3 35%,
-    var(--color-accent) 60%,
-    #bfe9e3 85%,
-    var(--color-text) 100%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: lg-shimmer 9s var(--ease-smooth) infinite;
 }
 
-/* Botón que envuelve el avatar (acceso a perfil): reset + foco redondo + halo
- * cálido que se aviva al pasar el ratón. */
+/* Botón que envuelve el avatar (acceso a perfil): reset + foco redondo + lift
+ * sutil. Sin halo cálido: la quietud es premium. */
 .profileButton {
   flex-shrink: 0;
   padding: 0;
@@ -60,23 +49,16 @@
   border-radius: var(--radius-full);
   cursor: pointer;
   line-height: 0;
-  box-shadow: var(--glow-accent);
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-base);
+  transition: transform var(--transition-fast);
 }
 .profileButton:hover {
   transform: translateY(-1px) scale(1.04);
-  box-shadow: var(--glow-accent-strong);
 }
 .profileButton:active {
   transform: scale(0.94);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .name {
-    animation: none;
-  }
   .profileButton:hover {
     transform: none;
   }
@@ -95,40 +77,23 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- Te toca jugar — tarjeta-héroe que reclama acción --- */
+/* --- Te toca jugar — hoja de papel con filo de acento que reclama acción --- */
 .turn {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
   overflow: hidden;
-  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--glass-border));
-  /* Velo cálido sobre el vidrio: este reto destaca del resto de tarjetas. */
-  background-image:
-    linear-gradient(120deg, rgba(255, 138, 89, 0.16), transparent 55%),
-    linear-gradient(var(--glass-sheen), transparent 96px);
-  box-shadow: var(--shadow-md), var(--glow-accent);
 }
-/* Filo cálido vertical a la izquierda. */
+/* Filo de acento sólido a la izquierda: marca quieta, sin halo ni degradado. */
 .turn::before {
   content: '';
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 4px;
-  background: var(--gradient-accent);
-}
-/* Destello radial decorativo en la esquina (energía tipo arcade, contenido). */
-.turnSpark {
-  position: absolute;
-  right: -32px;
-  top: -32px;
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--color-accent-glow-soft), transparent 66%);
-  pointer-events: none;
+  width: 3px;
+  background: var(--color-accent);
 }
 
 .turnInfo {
@@ -139,8 +104,10 @@
   position: relative;
 }
 
+/* Nombre del grupo: titular serif (la voz editorial), no sans negro. */
 .turnGroup {
-  font-weight: var(--font-weight-black);
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-lg);
   letter-spacing: var(--letter-spacing-tight);
   overflow: hidden;
@@ -153,7 +120,8 @@
   color: var(--color-text-muted);
 }
 
-/* Reloj "en vivo": pastilla con punto pulsante (la cuenta atrás respira). */
+/* Reloj de cuenta atrás: chip discreto sobre tint de acento, con un punto
+ * (semáforo). Sin halo ni palpito: información de estado, no decoración. */
 .turnClock {
   display: inline-flex;
   align-items: center;
@@ -162,31 +130,17 @@
   margin-top: var(--space-1);
   padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
-  background: rgba(6, 29, 40, 0.5);
+  background: var(--color-accent-soft);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
-  color: var(--color-accent);
+  color: var(--accent-deep);
 }
 .turnDot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--color-accent);
-  box-shadow: 0 0 8px var(--color-accent);
-  animation: lg-turn-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes lg-turn-pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(0.8);
-  }
 }
 
 /* --- Tus números — rejilla de tarjetas-dato con barra de color y datos gigantes. --- */
@@ -213,13 +167,9 @@
   container-type: inline-size;
 }
 
-/* La tarjeta de puntos es la "caliente": velo ámbar + halo cálido. */
+/* La tarjeta de puntos destaca con un filo de acento, no con velos cálidos. */
 .statCardAccent {
-  background-image:
-    linear-gradient(140deg, rgba(255, 138, 89, 0.14), transparent 60%),
-    linear-gradient(var(--glass-sheen), transparent 96px);
-  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--glass-border));
-  box-shadow: var(--shadow-sm), var(--glow-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
 }
 
 .statValue {
@@ -272,25 +222,21 @@
 
 /* Barrita de color bajo cada dato: refuerza la categoría (cálida vs fría). */
 .statBar {
-  height: 5px;
+  height: 4px;
   border-radius: var(--radius-full);
   margin-top: var(--space-2);
 }
+/* El dato de puntos lleva el acento; el resto, una hairline neutra. Sin
+ * degradados (color sólido, lenguaje "tinta sobre papel"). */
 .statBarAccent {
-  background: var(--gradient-accent);
+  background: var(--color-accent);
 }
 .statBarTeal {
-  background: linear-gradient(90deg, var(--land-400), var(--teal-bright));
+  background: var(--color-border-strong);
 }
 
 .statsEmpty {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .turnDot {
-    animation: none;
-  }
 }

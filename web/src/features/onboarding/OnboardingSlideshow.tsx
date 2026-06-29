@@ -64,6 +64,11 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
           <span className={styles.icon} aria-hidden="true">
             {slide.icon}
           </span>
+          {/* Eyebrow editorial con el paso actual (p.ej. "Lugares · 1 de 3"):
+              ubica al usuario en el recorrido sin robar peso al titular. */}
+          <span className={styles.eyebrow}>
+            Lugares · {index + 1} de {slides.length}
+          </span>
           <h2 id="lg-onboarding-title" className={styles.title}>
             {slide.title}
           </h2>

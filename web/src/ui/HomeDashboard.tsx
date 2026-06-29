@@ -96,7 +96,8 @@ export function HomeDashboard({
         </header>
 
         {/* 🔔 Te toca jugar — solo si hay retos pendientes (no ocupa en vacío).
-            Tarjeta-héroe: degradado cálido, halo pulsante y reloj "en vivo". */}
+            Hoja de papel con filo de acento a la izquierda y reloj de cuenta
+            atrás discreto: la marca es quieta (sin halos ni palpitos cálidos). */}
         {turns.length > 0 && (
           <section aria-labelledby="home-turns">
             <h2 id="home-turns" className={styles.sectionTitle}>
@@ -105,7 +106,6 @@ export function HomeDashboard({
             <Stack gap={3}>
               {turns.map((turn) => (
                 <Card key={turn.id} padding="md" raised className={styles.turn}>
-                  <span className={styles.turnSpark} aria-hidden="true" />
                   <div className={styles.turnInfo}>
                     <span className={styles.turnGroup}>{turn.groupName}</span>
                     <span className={styles.turnMeta}>reto de {turn.author}</span>

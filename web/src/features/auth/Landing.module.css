@@ -31,10 +31,9 @@
   align-items: center;
 }
 
-/* Ancla de marca (el pin) en disco cálido con glow: rompe el frío del fondo,
- * igual que la cabecera de las pantallas de auth. */
-/* Hero compacto (issue #183): el pin más pequeño y menos margen para que el
- * formulario de email entre en pantalla sin scroll en móvil. */
+/* Ancla de marca (el pin) en disco de tint de acento con hairline: quieto, sin
+ * halo. Hero compacto (issue #183): el pin pequeño para que el formulario de
+ * email entre en pantalla sin scroll en móvil. */
 .brand {
   display: grid;
   place-items: center;
@@ -44,30 +43,32 @@
   font-size: var(--font-size-lg);
   line-height: 1;
   background: var(--color-accent-soft);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
-  box-shadow: var(--shadow-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
   margin-bottom: var(--space-4);
 }
 
 .eyebrow {
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
   color: var(--color-text-muted);
   margin-bottom: var(--space-2);
 }
 
+/* Frase ancla en serif (la voz editorial), peso medio que respira. */
 .headline {
+  font-family: var(--font-serif);
   font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-black);
-  letter-spacing: var(--letter-spacing-tighter);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
   line-height: var(--line-height-tight);
   text-wrap: balance;
 }
 
-/* La parte que "canta": acento cálido sobre el frío. */
+/* La parte que "canta": cursiva en acento (gesto de la maqueta). */
 .accent {
+  font-style: italic;
   color: var(--color-accent);
 }
 
@@ -92,9 +93,11 @@
 }
 
 .entryTitle {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-black);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
+  line-height: var(--line-height-tight);
 }
 
 .entryLead {
