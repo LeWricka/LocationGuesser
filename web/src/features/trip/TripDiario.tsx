@@ -83,7 +83,6 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
                 <MomentCard
                   moment={m}
                   selected={m.challengeId === selectedId}
-                  onSelect={() => onSelectFromCarousel(m.challengeId)}
                   onExpand={() => {
                     onSelectFromCarousel(m.challengeId)
                     onExpand(m)
