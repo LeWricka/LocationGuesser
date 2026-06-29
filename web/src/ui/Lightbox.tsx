@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Icon } from './Icon'
 import styles from './Lightbox.module.css'
 
 /** Una imagen del visor: URL + texto alternativo. */
@@ -174,7 +176,7 @@ export function Lightbox({
         onClick={(e) => e.stopPropagation()}
       >
         <button type="button" className={styles.close} onClick={close} aria-label="Cerrar">
-          ✕
+          <Icon icon={X} />
         </button>
         {/* Flechas prev/next: solo con varias imágenes (con una, sin flechas). */}
         {multiple && (
@@ -185,7 +187,7 @@ export function Lightbox({
               onClick={() => go(-1)}
               aria-label="Foto anterior"
             >
-              ‹
+              <Icon icon={ChevronLeft} size={28} />
             </button>
             <button
               type="button"
@@ -193,7 +195,7 @@ export function Lightbox({
               onClick={() => go(1)}
               aria-label="Foto siguiente"
             >
-              ›
+              <Icon icon={ChevronRight} size={28} />
             </button>
           </>
         )}

@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { Avatar } from './Avatar'
+import { Icon } from './Icon'
 import { Button } from './Button'
 import { Card } from './Card'
 import { CountUp } from './CountUp'
@@ -113,7 +115,7 @@ export function HomeDashboard({
                     </span>
                   </div>
                   <Button size="sm" onClick={onPlayTurn ? () => onPlayTurn(turn.id) : undefined}>
-                    Jugar <span aria-hidden="true">▸</span>
+                    Jugar <Icon icon={ChevronRight} size={16} />
                   </Button>
                 </Card>
               ))}

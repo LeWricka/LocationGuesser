@@ -1,5 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { X } from 'lucide-react'
+import { Icon } from './Icon'
 import { ToastContext } from './toast-context'
 import type { ToastOptions, ToastTone } from './toast-context'
 import styles from './Toast.module.css'
@@ -60,7 +62,7 @@ export function ToastProvider({ children }: Props) {
               onClick={() => dismiss(t.id)}
               aria-label="Cerrar aviso"
             >
-              ✕
+              <Icon icon={X} size={16} />
             </button>
           </div>
         ))}

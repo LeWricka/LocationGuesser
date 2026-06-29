@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { EmptyState, Spinner, useReducedMotion } from '../../ui'
+import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react'
+import { EmptyState, Icon, Spinner, useReducedMotion } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import type { Moment } from '../../lib/trip'
@@ -323,7 +324,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
       {/* (b) Chrome flotante arriba (pastillas de vidrio sobre el mapa). */}
       <header className={styles.chrome}>
         <button type="button" className={styles.iconPill} onClick={onBack} aria-label="Volver">
-          ←
+          <Icon icon={ArrowLeft} />
         </button>
         {/* Portada editorial (Fase 2, §1.8): eleva la antigua titlePill al nombre
             en cursiva manuscrita + stats del viaje (días/km/momentos). Sigue
@@ -349,7 +350,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
           onClick={onOpenClassic}
           aria-label="Ver marcador y ajustes"
         >
-          ⋯
+          <Icon icon={MoreHorizontal} />
         </button>
       </header>
 
@@ -408,7 +409,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
           onClick={onAddMoment}
           aria-label="Añadir momento"
         >
-          <span aria-hidden="true">＋</span>
+          <Icon icon={Plus} size={26} />
         </button>
       )}
 

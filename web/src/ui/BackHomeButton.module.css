@@ -22,9 +22,9 @@
   color: var(--color-text);
 }
 
+/* El icono Lucide hereda el color por currentColor; aquí solo el micro-desliz al
+   hover (el tamaño lo fija la prop del Icon). */
 .arrow {
-  font-size: var(--font-size-lg);
-  line-height: 1;
   transition: transform var(--transition-fast);
 }
 
