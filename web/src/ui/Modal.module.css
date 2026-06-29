@@ -19,12 +19,13 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+  /* Hoja de papel blanca (sin sheen). La hoja "sube" sobre el velo de tinta. */
   background-color: var(--color-surface);
-  background-image: linear-gradient(var(--color-surface-sheen), transparent 160px);
   /* Móvil: hoja ajustada al contenido (hasta 92vh; el body hace scroll si no
-     cabe), con las esquinas superiores redondeadas. */
+     cabe), con las esquinas superiores muy redondeadas (la hoja sube redonda). */
   max-height: 92vh;
-  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-sheet);
   outline: none;
   animation: slide-up var(--transition-base) var(--ease-emphasized);
 }
@@ -38,10 +39,13 @@
   border-bottom: 1px solid var(--color-border);
 }
 
+/* Título en serif (la voz editorial), peso medio: la serif respira. */
 .title {
   margin: 0;
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-black);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-tight);
   letter-spacing: var(--letter-spacing-tight);
 }
 

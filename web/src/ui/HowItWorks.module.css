@@ -32,7 +32,7 @@
   gap: var(--space-3);
 }
 
-/* Icono del paso sobre un círculo cálido tenue: ancla visual de la marca. */
+/* Icono del paso sobre un círculo de acento tenue (tint pizarra): ancla visual. */
 .icon {
   flex-shrink: 0;
   display: inline-flex;
@@ -59,7 +59,7 @@
   letter-spacing: var(--letter-spacing-tight);
 }
 
-/* Número del paso: pastilla cálida pequeña que marca el orden 1→2→3. */
+/* Número del paso: pastilla de acento SÓLIDO pequeña que marca el orden 1→2→3. */
 .stepNum {
   display: inline-flex;
   align-items: center;
@@ -68,7 +68,7 @@
   height: 20px;
   flex-shrink: 0;
   border-radius: var(--radius-full);
-  background: var(--gradient-accent);
+  background: var(--color-accent);
   color: var(--color-on-accent);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-black);

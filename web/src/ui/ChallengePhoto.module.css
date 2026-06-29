@@ -76,8 +76,8 @@
   width: 100%;
   height: 100%;
   font-size: var(--font-size-2xl);
-  /* Halo tenue de marca para que el hueco no se vea muerto. */
-  background-image: var(--gradient-app-bg);
+  /* Hueco de carga = papel sutil (no halo de marca). */
+  background-color: var(--photo-loading-bg);
   color: var(--color-text-faint);
 }
 

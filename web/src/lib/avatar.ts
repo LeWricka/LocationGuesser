@@ -150,6 +150,66 @@ export const AVATAR_BACKGROUNDS: readonly AvatarBg[] = [
   { background: 'linear-gradient(135deg, #58a85e 0%, #2f7740 100%)' },
 ] as const
 
+// Avatares-animal en SVG de línea (estilo Kinfolk/Pizarra): el set por defecto
+// son 8 animales dibujados a trazo, recuperados de la maqueta. Se mapean sobre
+// 8 emojis del set existente (la CLAVE sigue siendo el emoji, así el MODELO de
+// datos —token `emoji:<char>`, `parseAvatar`, `ANIMAL_EMOJIS` y los pines de
+// mapa en `avatarPin`— no cambia). Para esos 8 emojis el componente Avatar pinta
+// el SVG; para el resto de animales del set cae al emoji. El contenido del SVG
+// es el INTERIOR del <svg viewBox="0 0 24 24">; el componente lo envuelve.
+export const ANIMAL_SVG_VIEWBOX = '0 0 24 24'
+
+export const ANIMAL_SVGS: Readonly<Record<string, string>> = {
+  // Zorro
+  '🦊':
+    '<path d="M4 6l5 4 3-1 3 1 5-4-1 7c0 4-3 7-7 7s-7-3-7-7L4 6Z"/>' +
+    '<circle cx="9.5" cy="12" r=".9" fill="currentColor"/>' +
+    '<circle cx="14.5" cy="12" r=".9" fill="currentColor"/>',
+  // Búho
+  '🦉':
+    '<circle cx="9" cy="10" r="3"/><circle cx="15" cy="10" r="3"/>' +
+    '<path d="M6 14c0 4 2.7 6 6 6s6-2 6-6"/><path d="M5 6l3 2M19 6l-3 2"/>',
+  // Ballena
+  '🐳':
+    '<path d="M4 12c0-3 3-5 7-5s9 2 9 7c0 0-3-1-5-1-1 3-5 4-8 2-2-1-3-2-3-4Z"/>' +
+    '<path d="M11 4c1 1 1 2 0 3"/>',
+  // Gato
+  '🐱':
+    '<path d="M5 5l3 4M19 5l-3 4"/>' +
+    '<path d="M6 9c0-2 2-3 6-3s6 1 6 3v5c0 3-3 5-6 5s-6-2-6-5V9Z"/>' +
+    '<circle cx="10" cy="12" r=".8" fill="currentColor"/>' +
+    '<circle cx="14" cy="12" r=".8" fill="currentColor"/>',
+  // Conejo
+  '🐰':
+    '<path d="M9 9C8 6 8 3 10 3s2 4 1 6M15 9c1-3 1-6-1-6s-2 4-1 6"/>' +
+    '<circle cx="12" cy="15" r="5"/>',
+  // Oso
+  '🐻':
+    '<circle cx="7" cy="7" r="2.4"/><circle cx="17" cy="7" r="2.4"/>' +
+    '<circle cx="12" cy="14" r="6"/>' +
+    '<circle cx="10" cy="13" r=".8" fill="currentColor"/>' +
+    '<circle cx="14" cy="13" r=".8" fill="currentColor"/>',
+  // Pingüino
+  '🐧':
+    '<path d="M12 3c3 0 5 2.5 5 7v6c0 3-2 5-5 5s-5-2-5-5V10c0-4.5 2-7 5-7Z"/>' +
+    '<path d="M10 9c1 1 3 1 4 0"/>',
+  // Ciervo
+  '🦌':
+    '<path d="M7 3l2 4M17 3l-2 4M5 5l2 1M19 5l-2 1"/>' +
+    '<path d="M8 9c0-1 2-2 4-2s4 1 4 2v6c0 3-2 5-4 5s-4-2-4-5V9Z"/>',
+}
+
+/**
+ * Los 8 animales del set por defecto (los que tienen dibujo SVG). En el orden de
+ * la maqueta — útil para selectores que quieran destacarlos primero.
+ */
+export const DEFAULT_ANIMAL_EMOJIS: readonly string[] = Object.keys(ANIMAL_SVGS)
+
+/** ¿Este emoji tiene un avatar SVG de línea en el set por defecto? */
+export function svgForEmoji(emoji: string): string | null {
+  return ANIMAL_SVGS[emoji] ?? null
+}
+
 /** Resultado de resolver un avatar: o un emoji sobre fondo, o una imagen. */
 export type ResolvedAvatar =
   | { kind: 'emoji'; emoji: string; bg: AvatarBg }
