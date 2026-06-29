@@ -94,13 +94,15 @@
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-lg);
-  color: var(--color-on-photo);
+  /* Pastilla CLARA translúcida sobre mapa claro (Atelier): icono en tinta, no en
+     blanco-sobre-foto (que sería invisible sobre el papel). */
+  color: var(--color-text);
   background: var(--map-chrome-bg);
   -webkit-backdrop-filter: var(--map-chrome-blur);
   backdrop-filter: var(--map-chrome-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  /* Sombra de chrome (despega la pastilla del satélite) + anillo de contacto que
+  /* Sombra de chrome (despega la pastilla del mapa) + anillo de contacto que
      la define contra tiles claros (token del pase de craft). */
   box-shadow: var(--shadow-chrome), var(--ring-contact);
   cursor: pointer;
@@ -126,7 +128,8 @@
   padding: 0 var(--space-3);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-on-photo);
+  /* Texto en tinta sobre la pastilla clara (el punto rojo da el color "en juego"). */
+  color: var(--color-text);
   background: var(--map-chrome-bg);
   -webkit-backdrop-filter: var(--map-chrome-blur);
   backdrop-filter: var(--map-chrome-blur);
@@ -150,7 +153,9 @@
   width: 9px;
   height: 9px;
   border-radius: var(--radius-full);
-  background: var(--color-accent);
+  /* Punto rojo discreto (🔴 en juego): da el único toque de color cálido del chrome
+     sobre el papel; el texto va en tinta. */
+  background: var(--color-danger);
   box-shadow: 0 0 0 0 var(--color-accent-glow-soft);
   animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
 }

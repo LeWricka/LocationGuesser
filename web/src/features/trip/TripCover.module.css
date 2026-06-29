@@ -1,8 +1,8 @@
 /*
- * Portada editorial del viaje (§1.8): pastilla de vidrio que reemplaza al
- * titlePill simple. Nombre en cursiva manuscrita + fila de stats gigantes.
- * Va sobre el mapa contrastado, así que usa el chrome glass más opaco de
- * tokens; texto en blanco-sobre-foto con sombra para legibilidad sobre satélite.
+ * Portada editorial del viaje (estilo Atelier): pastilla CLARA que reemplaza al
+ * titlePill simple. Nombre del viaje en serif (Cormorant) + fila de stats. Va
+ * sobre el mapa claro, así que usa el chrome glass blanco translúcido de tokens y
+ * el texto en TINTA (no blanco-sobre-foto, que sería invisible sobre el papel).
  */
 .cover {
   flex: 1 1 auto;
@@ -23,8 +23,8 @@
   text-align: center;
 }
 
-/* Nombre del viaje en cursiva manuscrita (token display). Grande y con holgura:
-   es el protagonista de la portada. Sombra para asentarlo sobre el satélite. */
+/* Nombre del viaje en serif (Cormorant, token display). Grande y con holgura: es
+   el protagonista de la portada. En tinta sobre la pastilla clara. */
 .name {
   margin: 0;
   max-width: 100%;
@@ -32,20 +32,18 @@
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-xl);
   line-height: var(--line-height-tight);
-  color: var(--color-on-photo);
-  text-shadow: 0 1px 8px var(--photo-text-shadow);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Participantes: secundario, debajo del nombre. */
+/* Participantes: secundario, debajo del nombre, en tinta tenue. */
 .members {
   margin: 0;
   max-width: 100%;
   font-size: var(--font-size-xs);
-  color: var(--color-on-photo);
-  opacity: 0.78;
+  color: var(--color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -69,13 +67,11 @@
   gap: 2px;
 }
 
-/* Baja el tamaño del número de dato gigante (56px) a una escala de cabecera:
-   tres stats no caben a 56px en una pastilla móvil. Hereda tabular-nums y peso
-   black de `lg-data`. */
+/* Baja el tamaño del número de dato a una escala de cabecera: tres stats no caben
+   al tamaño gigante en una pastilla móvil. Hereda tabular-nums de `lg-data`; el
+   color (tinta) lo da `lg-data` —no lo pisamos para no volver al blanco-sobre-foto. */
 .value {
   font-size: var(--font-size-xl);
-  color: var(--color-on-photo);
-  text-shadow: 0 1px 6px var(--photo-text-shadow);
 }
 
 /* Etiqueta: el eyebrow ya es cálido/mayúsculas; solo ajustamos a micro-tamaño. */
