@@ -79,6 +79,8 @@ export function MomentSheet({ moment, onClose, onPlay }: Props) {
 
   const isActive = moment.status === 'active'
   const date = formatMomentDate(moment.date)
+  // País ya resuelto (solo CERRADOS con coord); con bandera válida para pintarlo.
+  const country = moment.country?.flag ? moment.country : null
 
   // Arrastre desde el asa: seguimos el dedo solo hacia abajo; al soltar, si pasó
   // el umbral cerramos, si no la hoja vuelve a su sitio.
@@ -141,7 +143,20 @@ export function MomentSheet({ moment, onClose, onPlay }: Props) {
           </div>
 
           <h2 className={styles.title}>{moment.title}</h2>
-          {date && <p className={styles.meta}>{date}</p>}
+          {/* Meta-línea estilo Polarsteps: "🇲🇾 MALASIA · 8 de abril de 2026". El país
+              solo está si ya se resolvió (CERRADOS con coord); si no, queda solo la
+              fecha. El separador "·" únicamente cuando hay ambos. */}
+          {(country || date) && (
+            <p className={styles.meta}>
+              {country && (
+                <span className={styles.country}>
+                  <span aria-hidden="true">{country.flag}</span> {country.name}
+                </span>
+              )}
+              {country && date && <span aria-hidden="true"> · </span>}
+              {date}
+            </p>
+          )}
 
           {/* Social ligero. Lo REAL es el contador de adivinadores (derivado de
               votos); ❤/💬 se omiten en v1 por no existir en BD (ver resumen). */}

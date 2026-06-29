@@ -61,6 +61,16 @@ export function MomentCard({ moment, selected, onSelect, onExpand, onPlay }: Pro
         <span aria-hidden="true">⤢</span>
       </button>
 
+      {/* Bandera del país en disco de vidrio, esquina sup-izq (estilo Polarsteps).
+          Solo aparece cuando el país ya se ha resuelto (CERRADOS con coord); si aún
+          no hay, no pintamos nada (sin placeholder). No colisiona con el badge EN
+          JUEGO porque los activos no tienen coord ni país. */}
+      {moment.country?.flag && (
+        <div className={styles.flag} aria-hidden="true">
+          <span className={styles.flagEmoji}>{moment.country.flag}</span>
+        </div>
+      )}
+
       {/* Overlay + contenido sobre la foto. aria-hidden: el contenido textual ya
           vive accesible vía el alt de la foto-botón y los controles tienen label. */}
       <div className={styles.overlay} aria-hidden="true">

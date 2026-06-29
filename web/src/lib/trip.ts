@@ -12,6 +12,8 @@
  *  - `closed`   = cerrado (plazo vencido). Ya está "clavado" en el mapa.
  *  - `practice` = reto de práctica (plazo a más de un año, `isPracticeChallenge`).
  */
+import type { CountryInfo } from './countryFlag'
+
 export type MomentStatus = 'active' | 'closed' | 'practice'
 
 /**
@@ -42,6 +44,13 @@ export interface Moment {
   guessSeconds: number | null
   /** Panorama de Street View encajado al momento, o null si no tiene. */
   svPanoId: string | null
+  /**
+   * País resuelto desde lat/lng (bandera + nombre), estilo Polarsteps. Solo los
+   * momentos CERRADOS con coordenada pueden tenerlo; se rellena de forma
+   * ESCALONADA y NO bloqueante en `useTripData` (anti rate-limit de Nominatim).
+   * `undefined` = aún sin resolver; `null` = resuelto y sin país (mar abierto, etc.).
+   */
+  country?: CountryInfo | null
 }
 
 /**
