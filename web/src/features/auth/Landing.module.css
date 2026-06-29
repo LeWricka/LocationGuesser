@@ -80,6 +80,9 @@
 }
 
 /* ── Entrada por magic link ───────────────────────────────────────────────── */
+/* La tarjeta de entrada es el foco de la landing: debe destacar sobre el papel,
+ * no fundirse. Degradado sutil (blanco→tinte de acento), borde de acento algo más
+ * marcado y elevación mayor para que el formulario "flote" y cante. */
 .entry {
   width: 100%;
   max-width: 420px;
@@ -87,9 +90,13 @@
   text-align: center;
   padding: var(--space-6);
   border-radius: var(--radius-lg);
-  background: var(--card-surface);
-  border: 1px solid var(--card-border);
-  box-shadow: var(--shadow-md);
+  background: linear-gradient(
+    180deg,
+    var(--color-surface) 0%,
+    color-mix(in srgb, var(--color-accent-soft) 60%, var(--color-surface)) 100%
+  );
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  box-shadow: var(--shadow-lg);
 }
 
 .entryTitle {

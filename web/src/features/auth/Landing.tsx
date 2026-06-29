@@ -186,7 +186,9 @@ export function Landing({ groupName, redirectTo }: Props) {
           )}
         </section>
 
-        <HowItWorks />
+        {/* Compacto: el bucle se entiende de un vistazo sin empujar el email +
+            CTA fuera de pantalla en móvil (mobile-first). */}
+        <HowItWorks compact />
       </div>
     </main>
   )

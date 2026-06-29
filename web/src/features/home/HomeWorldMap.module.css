@@ -6,12 +6,15 @@
   width: 100%;
 }
 
-/* Lienzo del mapa: casi cuadrado (como la maqueta, aspect 1/0.92). overflow:hidden
-   recorta el globo al radio. La sombra "alza" la lámina del papel. */
+/* Lienzo del mapa: en móvil más contenido (paisaje 4/3 con tope de alto) para que
+   el usuario vea también sus viajes sin scroll forzado; en desktop se vuelve
+   generoso (casi cuadrado). overflow:hidden recorta el globo al radio. La sombra
+   "alza" la lámina del papel. */
 .frame {
   position: relative;
   width: 100%;
-  aspect-ratio: 1 / 0.92;
+  aspect-ratio: 4 / 3;
+  max-height: 56svh;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -19,6 +22,14 @@
   /* Fondo NOCHE mientras carga el globo: que el flash inicial case con el cielo
      oscuro del satélite, no un papel claro. Tinta de marca (token). */
   background: var(--ink-900);
+}
+
+/* Desktop: el globo recupera protagonismo (casi cuadrado, como la maqueta). */
+@media (min-width: 600px) {
+  .frame {
+    aspect-ratio: 1 / 0.92;
+    max-height: none;
+  }
 }
 
 /* El TripMap ocupa todo el marco (es position:relative por dentro; lo estiramos). */
@@ -35,7 +46,7 @@
   left: var(--space-5);
   bottom: var(--space-5);
   z-index: 2;
-  color: #fff;
+  color: var(--color-on-photo);
   pointer-events: none;
   text-shadow: 0 1px 8px rgba(15, 26, 36, 0.7);
 }
