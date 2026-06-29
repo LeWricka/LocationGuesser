@@ -1,38 +1,47 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Avatar,
   Card,
   EmptyState,
   HomeDashboard,
   HomeEmptyState,
-  HowItWorks,
   Skeleton,
   SkeletonCard,
   Stack,
   Row,
 } from '../../ui'
+import type { HomeGroup } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { supabase } from '../../lib/supabase'
 import { track } from '../../lib/analytics'
 import { useHomeData } from './useHomeData'
+import { useWorldTrips } from './useWorldTrips'
+import { HomeWorldMap } from './HomeWorldMap'
 import { JoinGroupModal } from './JoinGroupModal'
-import { gotoChallenge, gotoCreateGroup, gotoGroup, gotoProfile } from './navigation'
+import { gotoCreateGroup, gotoGroup, gotoProfile } from './navigation'
 import styles from './HomePage.module.css'
 
-// Home / dashboard cableada (cuentas-y-home.md §3): centro de gravedad de la app
-// para sesión iniciada. Lee la sesión (useSession) y la membresía (useHomeData)
-// y alimenta el layout presentacional HomeDashboard. La navegación se hace por
-// hash (la home no posee el router; ver ./navigation.ts) para que la pieza #4 la
-// enrute: #g=<id>, #g=<id>&c=<challenge>, #nuevo, #perfil.
+// Home logueada (fase "nuevo enfoque"): centro de gravedad de la app. Lee la sesión
+// (useSession) y la membresía (useHomeData) y alimenta el layout presentacional
+// HomeDashboard con el RELATO de recuerdos. La navegación se hace por hash (la home
+// no posee el router; ver ./navigation.ts): #g=<id>, #nuevo, #perfil.
 //
-// Para el recién llegado (sin grupos) la home es un HERO que explica el producto
-// (issue #131): qué es + cómo funciona en 3 pasos + crear/unirse. Cuando ya hay
-// grupos, manda el dashboard y el "cómo funciona" pasa a un recordatorio compacto
-// al final, para no estorbar al usuario recurrente.
+// El HÉROE es el mapamundi satélite (useWorldTrips → HomeWorldMap): un pin-foto por
+// viaje del usuario sobre el globo real. Para el recién llegado (sin grupos) la home
+// es el HERO de bienvenida (crear/unirse). SIN "cómo funciona": la promesa es guardar
+// y compartir recuerdos; adivinar es un guiño que vive dentro del viaje, no en el home.
 export function HomePage() {
   const { user, profile, loading: sessionLoading } = useSession()
   const { loading: dataLoading, error, data, reload } = useHomeData(user?.id)
   const [joinOpen, setJoinOpen] = useState(false)
+
+  // Coordenada representativa por viaje para el mapamundi. Toma la lista de grupos ya
+  // cargada por la home (id + nombre) y resuelve sus coords en lote, tolerante a fallo.
+  const worldGroups = useMemo(
+    () => data.groups.map((g) => ({ id: g.id, name: g.name })),
+    [data.groups],
+  )
+  const world = useWorldTrips(worldGroups)
 
   // Analítica: una vista de home por montaje. No depende de los datos (cuenta la
   // llegada, no la carga), así que va una sola vez al montar.
@@ -106,32 +115,35 @@ export function HomePage() {
   const userId = user?.id ?? ''
   const hasGroups = data.groups.length > 0
 
+  // Portada por viaje: reutilizamos la foto que el mapamundi ya firmó (un fetch menos).
+  const coverByGroup = new Map(world.trips.map((t) => [t.groupId, t.imageUrl]))
+  const groups: HomeGroup[] = data.groups.map((g) => ({
+    ...g,
+    coverUrl: coverByGroup.get(g.id) ?? null,
+  }))
+
   return (
     <main className="lg-page">
       {hasGroups ? (
-        <>
-          <HomeDashboard
-            userId={userId}
-            displayName={displayName}
-            avatarUrl={profile?.avatar_url}
-            turns={data.turns}
-            groups={data.groups}
-            stats={data.stats}
-            onOpenProfile={gotoProfile}
-            onCreateGroup={onCreateGroup}
-            onOpenGroup={gotoGroup}
-            onPlayTurn={(challengeId) => {
-              // El reto necesita su grupo para el deep link #g=<grupo>&c=<reto>.
-              const groupId = data.groupIdByTurn.get(challengeId)
-              if (groupId) gotoChallenge(groupId, challengeId)
-            }}
-          />
-          {/* Recordatorio compacto del bucle para el usuario recurrente: sin
-              robar protagonismo al dashboard, queda al final. */}
-          <div className={styles.recap}>
-            <HowItWorks compact />
-          </div>
-        </>
+        <HomeDashboard
+          userId={userId}
+          displayName={displayName}
+          avatarUrl={profile?.avatar_url}
+          groups={groups}
+          worldMap={
+            <HomeWorldMap
+              trips={world.trips}
+              tripCount={data.groups.length}
+              totalKm={world.totalKm}
+              loading={world.loading}
+              onOpenTrip={gotoGroup}
+            />
+          }
+          onOpenProfile={gotoProfile}
+          onCreateGroup={onCreateGroup}
+          onJoinGroup={onJoinGroup}
+          onOpenGroup={gotoGroup}
+        />
       ) : (
         // Recién llegado: el hero explicativo es protagonista. Mantenemos la
         // cabecera (saludo + acceso al perfil) y el FAB para no perder utilidad.

@@ -1,23 +1,19 @@
 // Carga y compone los datos de la home a partir de la membresía (lib/membership)
-// y los mapea a las formas que consume el UI kit (HomeGroup/HomeTurn/HomeStats).
-// La home es presentación: aquí solo orquestamos helpers de lib/ y traducimos
-// tipos; no hay lógica de datos nueva (esa vive en lib/).
+// y los mapea a la forma que consume el UI kit (HomeGroup). La home es presentación:
+// aquí solo orquestamos helpers de lib/ y traducimos tipos; no hay lógica de datos
+// nueva (esa vive en lib/).
+//
+// Fase "nuevo enfoque": el home vende recuerdos + compartir. Ya NO calculamos "tus
+// números" ni la sección "te toca jugar" (eso vivía en el dashboard viejo); el estado
+// "en juego"/"te toca" baja al indicador de cada tarjeta de viaje vía group.status.
 
 import { useCallback, useEffect, useState } from 'react'
-import type { HomeGroup, HomeStats, HomeTurn } from '../../ui'
-import { myGroups, pendingChallenges } from '../../lib/membership'
-import type { MyGroup, PendingChallenge } from '../../lib/membership'
-import { getGroupVotes } from '../../lib/leaderboard'
-import { supabase } from '../../lib/supabase'
-import { formatCountdown } from './countdown'
+import type { HomeGroup } from '../../ui'
+import { myGroups } from '../../lib/membership'
+import type { MyGroup } from '../../lib/membership'
 
 interface HomeData {
   groups: HomeGroup[]
-  turns: HomeTurn[]
-  stats: HomeStats | null
-  /** challengeId → groupId, para construir el deep link #g=<grupo>&c=<reto> al
-   * jugar un turno (el callback onPlayTurn solo recibe el challengeId). */
-  groupIdByTurn: Map<string, string>
 }
 
 interface State {
@@ -26,7 +22,7 @@ interface State {
   data: HomeData
 }
 
-const EMPTY: HomeData = { groups: [], turns: [], stats: null, groupIdByTurn: new Map() }
+const EMPTY: HomeData = { groups: [] }
 
 // El estado de membresía es 'live' | 'your-turn' | 'idle'; el GroupCard del kit
 // usa 'live' | 'toplay' | 'idle'. Solo cambia el nombre del caso "te toca".
@@ -43,77 +39,9 @@ function toHomeGroup(group: MyGroup): HomeGroup {
   }
 }
 
-/**
- * Resuelve los display_name de los creadores de los retos pendientes (su
- * `created_by` es un uuid). Una sola consulta a profiles por todos los autores
- * distintos; si falta alguno, cae a "alguien" para no romper la tarjeta.
- */
-async function resolveAuthors(pending: PendingChallenge[]): Promise<Map<string, string>> {
-  const ids = [...new Set(pending.map((p) => p.challenge.created_by))]
-  if (ids.length === 0) return new Map()
-  const { data, error } = await supabase.from('profiles').select('id, display_name').in('id', ids)
-  if (error) throw error
-  return new Map((data ?? []).map((p) => [p.id, p.display_name]))
-}
-
-function toHomeTurn(pending: PendingChallenge, authors: Map<string, string>): HomeTurn {
-  return {
-    id: pending.challenge.id,
-    groupName: pending.groupName ?? pending.groupId,
-    author: authors.get(pending.challenge.created_by) ?? 'alguien',
-    countdown: formatCountdown(pending.challenge.deadline_at),
-  }
-}
-
-/**
- * "Tus números" v1 (cuentas-y-home.md §3.1/§3.4): agregado mínimo del usuario
- * sobre sus grupos —puntos totales, nº de grupos jugados y mejor reto—. El
- * ranking fino es la pieza #6; aquí basta sumar los votos del usuario en sus
- * grupos. Si no hay puntos, devolvemos null y el dashboard muestra el mensaje
- * guía. Calcularlo es barato porque reutiliza getGroupVotes (ya cacheado por
- * grupo en el camino del leaderboard).
- */
-async function computeStats(userId: string, groups: MyGroup[]): Promise<HomeStats | null> {
-  if (groups.length === 0) return null
-
-  const votesByGroup = await Promise.all(
-    groups.map(async (g) => ({ group: g, votes: await getGroupVotes(g.id) })),
-  )
-
-  let totalPoints = 0
-  const groupsPlayed = new Set<string>()
-  let best: { points: number; groupName: string } | null = null
-
-  for (const { group, votes } of votesByGroup) {
-    for (const vote of votes) {
-      if (vote.user_id !== userId) continue
-      totalPoints += vote.points
-      groupsPlayed.add(group.id)
-      if (!best || vote.points > best.points) {
-        best = { points: vote.points, groupName: group.name ?? group.id }
-      }
-    }
-  }
-
-  if (groupsPlayed.size === 0) return null
-
-  return {
-    totalPoints,
-    groupsPlayed: groupsPlayed.size,
-    best: best ? { points: best.points, groupName: best.groupName } : null,
-  }
-}
-
 async function loadHomeData(userId: string): Promise<HomeData> {
-  const [groups, pending] = await Promise.all([myGroups(userId), pendingChallenges(userId)])
-  const authors = await resolveAuthors(pending)
-  const stats = await computeStats(userId, groups)
-  return {
-    groups: groups.map(toHomeGroup),
-    turns: pending.map((p) => toHomeTurn(p, authors)),
-    stats,
-    groupIdByTurn: new Map(pending.map((p) => [p.challenge.id, p.groupId])),
-  }
+  const groups = await myGroups(userId)
+  return { groups: groups.map(toHomeGroup) }
 }
 
 /**

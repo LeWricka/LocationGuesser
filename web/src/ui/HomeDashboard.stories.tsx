@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { HomeDashboard } from './HomeDashboard'
-import type { HomeGroup, HomeTurn } from './HomeDashboard'
+import type { HomeGroup } from './HomeDashboard'
 
 const groups: HomeGroup[] = [
   { id: 'a', name: "Interrail '26", status: 'toplay', owned: true },
@@ -8,9 +8,23 @@ const groups: HomeGroup[] = [
   { id: 'c', name: 'Pirineos', status: 'idle' },
 ]
 
-const turns: HomeTurn[] = [
-  { id: 't1', groupName: "Interrail '26", author: 'Ana', countdown: '3 h 12 m' },
-]
+// El mapamundi real (HomeWorldMap) vive en features/home y depende de la capa de
+// mapa; en Storybook lo sustituimos por un marcador visual para encuadrar el layout.
+const worldMapPlaceholder = (
+  <div
+    style={{
+      aspectRatio: '1 / 0.92',
+      borderRadius: 'var(--radius-lg)',
+      background: 'var(--ink-900)',
+      display: 'grid',
+      placeItems: 'center',
+      color: '#fff',
+      fontFamily: 'var(--font-serif)',
+    }}
+  >
+    Mapamundi satélite
+  </div>
+)
 
 const meta = {
   title: 'Cuentas/HomeDashboard',
@@ -20,8 +34,7 @@ const meta = {
     userId: 'lewis-123',
     displayName: 'Lewis',
     groups,
-    turns,
-    stats: { totalPoints: 12480, groupsPlayed: 3, best: { points: 4932, groupName: 'Lisboa' } },
+    worldMap: worldMapPlaceholder,
   },
 } satisfies Meta<typeof HomeDashboard>
 
@@ -30,10 +43,8 @@ type Story = StoryObj<typeof meta>
 
 export const Completa: Story = {}
 
-export const SinTurnos: Story = { args: { turns: [] } }
+export const SinMapa: Story = { args: { worldMap: undefined } }
 
-export const UsuarioNuevo: Story = {
-  args: { groups: [], turns: [], stats: null },
+export const UnViaje: Story = {
+  args: { groups: [{ id: 'a', name: "Interrail '26", status: 'live', owned: true }] },
 }
-
-export const SinNumeros: Story = { args: { stats: null } }

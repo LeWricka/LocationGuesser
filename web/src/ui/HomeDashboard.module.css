@@ -1,74 +1,69 @@
 .home {
   width: 100%;
-  /* Holgura inferior para que el FAB no tape el final del contenido. */
-  padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom));
+  /* Holgura inferior para que las CTAs no queden pegadas al borde inferior. */
+  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
 }
 
+/* --- Cabecera: eyebrow con avatar + lema serif + subcopy de recuerdos --- */
 .header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: column;
   gap: var(--space-3);
 }
 
-.greeting {
-  min-width: 0;
+/* Eyebrow editorial clicable (acceso a perfil): avatar pequeño + "Tus lugares" en
+   mayúsculas tracking ancho. Reset de botón + foco visible heredado del kit. */
+.eyebrowButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-full);
+  color: var(--color-accent);
+  transition: transform var(--transition-fast);
 }
-
-/* Saludo editorial: eyebrow cálido pequeño sobre el nombre gigante. */
-.hello {
+.eyebrowButton:hover {
+  transform: translateY(-1px);
+}
+.eyebrowButton:active {
+  transform: scale(0.97);
+}
+.eyebrowText {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
-  color: var(--color-text-muted);
-  line-height: 1.2;
 }
 
-/* Nombre del usuario: titular serif en tinta sólida (la voz editorial). Sin
- * degradado de texto ni brillo en bucle: la jerarquía la da el tamaño/familia. */
-.name {
+/* Lema: titular serif grande, la voz editorial. El énfasis ("y compártelos") va en
+   itálica de acento, igual que la maqueta. */
+.lede {
   font-family: var(--font-serif);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
   line-height: var(--line-height-tight);
   color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-wrap: balance;
+}
+.lede em {
+  font-style: italic;
+  color: var(--color-accent);
 }
 
-/* Botón que envuelve el avatar (acceso a perfil): reset + foco redondo + lift
- * sutil. Sin halo cálido: la quietud es premium. */
-.profileButton {
-  flex-shrink: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-full);
-  cursor: pointer;
-  line-height: 0;
-  transition: transform var(--transition-fast);
-}
-.profileButton:hover {
-  transform: translateY(-1px) scale(1.04);
-}
-.profileButton:active {
-  transform: scale(0.94);
+.subcopy {
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  max-width: 36ch;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .profileButton:hover {
-    transform: none;
-  }
-}
-
-/* Título de sección como eyebrow editorial: mayúsculas, tracking ancho. */
+/* Título de sección como eyebrow editorial. */
 .sectionTitle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-eyebrow);
@@ -77,166 +72,158 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- Te toca jugar — hoja de papel con filo de acento que reclama acción --- */
-.turn {
+/* --- Tus viajes: carrusel horizontal de tarjetas-portada --- */
+.rail {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  overflow: hidden;
+  gap: var(--space-3);
+  /* Sangrado de bordes para que el carrusel "sangre" hasta el borde del lienzo: las
+     tarjetas se desplazan bajo el borde sin que se vea el corte. */
+  margin: 0 calc(-1 * var(--space-4));
+  padding: var(--space-1) var(--space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
 }
-/* Filo de acento sólido a la izquierda: marca quieta, sin halo ni degradado. */
-.turn::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: var(--color-accent);
+.rail::-webkit-scrollbar {
+  display: none;
 }
 
-.turnInfo {
+.tripCard {
+  flex: 0 0 12.5rem; /* 200px, como la maqueta */
+  scroll-snap-align: start;
+}
+
+/* La tarjeta entera es el botón que abre el viaje. */
+.tripButton {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+.tripButton:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+.tripButton:active:not(:disabled) {
+  transform: scale(0.99);
+}
+.tripButton:disabled {
+  cursor: default;
+}
+
+/* Portada: foto a sangre con velo inferior para que el nombre serif (blanco) se lea
+   AA encima. Sin foto: degradado de marca sobre superficie (no queda vacío). */
+.tripCover {
+  position: relative;
+  height: 11.5rem;
+  background-color: var(--color-surface-hover);
+  background-size: cover;
+  background-position: center;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  min-width: 0;
+  justify-content: flex-end;
+  padding: var(--space-3);
+}
+.tripCover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(15, 26, 36, 0.72), rgba(15, 26, 36, 0) 58%);
+}
+
+/* Nombre del viaje: serif blanco sobre el velo, sobre el resto del contenido. */
+.tripName {
   position: relative;
-}
-
-/* Nombre del grupo: titular serif (la voz editorial), no sans negro. */
-.turnGroup {
+  z-index: 1;
   font-family: var(--font-serif);
-  font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-lg);
-  letter-spacing: var(--letter-spacing-tight);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.05;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(15, 26, 36, 0.6);
 }
 
-.turnMeta {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-/* Reloj de cuenta atrás: chip discreto sobre tint de acento, con un punto
- * (semáforo). Sin halo ni palpito: información de estado, no decoración. */
-.turnClock {
+/* Indicador SUTIL "en juego" / "te toca": pill de acento arriba a la derecha con un
+   punto que palpita (respeta reduced-motion abajo). */
+.tripLive {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  align-self: flex-start;
-  margin-top: var(--space-1);
-  padding: var(--space-1) var(--space-3);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--color-accent-soft);
-  font-size: var(--font-size-sm);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  color: var(--accent-deep);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
 }
-.turnDot {
+.tripBlip {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--color-accent);
+  background: #fff;
+  animation: tripBlip 1.6s ease-in-out infinite;
+}
+@keyframes tripBlip {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
-/* --- Tus números — rejilla de tarjetas-dato con barra de color y datos gigantes. --- */
-.statGrid {
-  display: grid;
-  /* minmax(0,1fr) deja que las columnas ENCOJAN por debajo del contenido (sin
-     esto, un número largo desborda la tarjeta). Las 3 reparten el ancho a
-     partes iguales y se adaptan a cualquier pantalla. */
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.statCard {
-  display: flex;
-  flex-direction: column;
+/* Chip "Tuyo" (dueño) arriba a la izquierda sobre papel translúcido. */
+.tripOwned {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-1);
-  overflow: hidden;
-  /* min-width:0 es lo que permite a la tarjeta encoger dentro del grid y que el
-     truncado/elipsis del subtítulo funcione. */
-  min-width: 0;
-  /* Contenedor de consultas: el número de .statValue escala con el ANCHO DE LA
-     TARJETA (cqi), no del viewport. Antes el tamaño dependía de 8vw y un número
-     de 5-6 cifras se salía de su columna (1/3) y se cortaba con elipsis. */
-  container-type: inline-size;
-}
-
-/* La tarjeta de puntos destaca con un filo de acento, no con velos cálidos. */
-.statCardAccent {
-  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
-}
-
-.statValue {
-  /* Tamaño FLUIDO atado al ANCHO DE LA TARJETA (cqi), no al viewport: así un
-     número de 5-6 cifras (p.ej. "17.834") cabe en su columna estrecha (1/3) sin
-     cortarse. El cap (2rem) y el cqi están calibrados para que 6 cifras quepan
-     en cualquier ancho; la elipsis queda solo de red de seguridad. */
-  font-size: clamp(1rem, 24cqi, 2rem);
-  font-weight: var(--font-weight-black);
-  letter-spacing: var(--letter-spacing-tighter);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* El número de puntos totales es el dato más cálido del panel. */
-.statValueAccent {
-  color: var(--color-accent);
-}
-
-.statValueSm {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-}
-
-.statLabel {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-bg) 88%, transparent);
+  color: var(--color-text);
   font-size: var(--font-size-xs);
-  color: var(--color-text-faint);
-  letter-spacing: var(--letter-spacing-wide);
-  text-transform: uppercase;
   font-weight: var(--font-weight-semibold);
 }
 
-/* Subtítulo del dato (p.ej. el grupo del mejor reto): pequeño y TRUNCADO a una
- * línea para no desbordar la tarjeta (antes metía nombre+emojis en el número
- * grande y rompía el layout). */
-.statSub {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* --- Acciones: empezar un viaje (primaria) / unirme --- */
+.ctas {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+.ctaPrimary {
+  flex: 1;
+}
+.ctaSecondary {
+  flex: 0 0 auto;
 }
 
-/* Barrita de color bajo cada dato: refuerza la categoría (cálida vs fría). */
-.statBar {
-  height: 4px;
-  border-radius: var(--radius-full);
-  margin-top: var(--space-2);
-}
-/* El dato de puntos lleva el acento; el resto, una hairline neutra. Sin
- * degradados (color sólido, lenguaje "tinta sobre papel"). */
-.statBarAccent {
-  background: var(--color-accent);
-}
-.statBarTeal {
-  background: var(--color-border-strong);
-}
-
-.statsEmpty {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+@media (prefers-reduced-motion: reduce) {
+  .tripBlip {
+    animation: none;
+  }
+  .eyebrowButton:hover,
+  .tripButton:hover:not(:disabled) {
+    transform: none;
+  }
 }

@@ -1,14 +1,9 @@
 import type { ReactNode } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { Icon } from './Icon'
 import { Button } from './Button'
-import { Card } from './Card'
-import { CountUp } from './CountUp'
-import { CreateGroupFab } from './CreateGroupFab'
-import { GroupCard } from './GroupCard'
 import type { GroupStatus } from './GroupCard'
-import { HomeEmptyState } from './HomeEmptyState'
 import { Stack } from './Stack'
 import styles from './HomeDashboard.module.css'
 
@@ -18,26 +13,8 @@ export interface HomeGroup {
   status: GroupStatus
   owned?: boolean
   meta?: ReactNode
-}
-
-export interface HomeTurn {
-  /** Id del reto a jugar. */
-  id: string
-  /** Grupo al que pertenece el reto. */
-  groupName: string
-  /** Quién creó el reto (p.ej. "Ana"). */
-  author: string
-  /** Cuenta atrás ya formateada (p.ej. "3 h 12 m"). Lo formatea #3/#6. */
-  countdown: string
-}
-
-export interface HomeStats {
-  /** Puntos totales del usuario. */
-  totalPoints: number
-  /** Nº de grupos jugados. */
-  groupsPlayed: number
-  /** Mejor reto: puntos (número grande) + grupo (subtítulo). Opcional. */
-  best?: { points: number; groupName: string } | null
+  /** URL de la foto de portada del viaje, o null (cae a un fondo de papel). */
+  coverUrl?: string | null
 }
 
 interface Props {
@@ -46,157 +23,128 @@ interface Props {
   /** Nombre a mostrar del usuario (display_name). */
   displayName: string
   avatarUrl?: string | null
-  /** Retos abiertos sin votar (sección "Te toca jugar"). Vacío → no se muestra. */
-  turns?: HomeTurn[]
-  /** Grupos del usuario. Vacío → estado de bienvenida (§3.3). */
+  /** Grupos (viajes) del usuario. Vacío → estado de bienvenida (lo decide HomePage). */
   groups?: HomeGroup[]
-  /** Agregado "Tus números". Sin partidas → mensaje guía. */
-  stats?: HomeStats | null
+  /**
+   * Mapamundi satélite (héroe visual). Si no se pasa, no se pinta el mapa (p.ej. en
+   * tests/stories que solo verifican el listado). El componente del mapa lo inyecta
+   * HomePage (vive en features/home) para no acoplar el UI kit a la capa de mapa.
+   */
+  worldMap?: ReactNode
   onOpenProfile?: () => void
   onCreateGroup?: () => void
+  onJoinGroup?: () => void
   onOpenGroup?: (id: string) => void
-  onPlayTurn?: (id: string) => void
   className?: string
 }
 
-// Layout presentacional de la home/dashboard (§3.2). Sin auth ni datos reales:
-// todo entra por props. Las secciones siguen la jerarquía de atención del doc.
+// Layout presentacional de la home logueada (fase "nuevo enfoque", variante A de la
+// maqueta): el RELATO de recuerdos manda. Cabecera con el lema en serif + subcopy,
+// el MAPAMUNDI satélite como héroe (inyectado por HomePage), el carrusel de "Tus
+// viajes" y las acciones (Empezar un viaje / Unirme). SIN "cómo funciona" y sin el
+// panel de números: la promesa es guardar y compartir recuerdos, no el juego.
 export function HomeDashboard({
   userId,
   displayName,
   avatarUrl,
-  turns = [],
   groups = [],
-  stats,
+  worldMap,
   onOpenProfile,
   onCreateGroup,
+  onJoinGroup,
   onOpenGroup,
-  onPlayTurn,
   className,
 }: Props) {
-  const hasGroups = groups.length > 0
-
   return (
     <div className={[styles.home, className].filter(Boolean).join(' ')}>
       <Stack gap={6} className="lg-stagger">
-        {/* Cabecera: saludo + acceso al perfil por el avatar. */}
+        {/* Cabecera: eyebrow con avatar (acceso a perfil) + lema serif + subcopy. */}
         <header className={styles.header}>
-          <div className={styles.greeting}>
-            <p className={styles.hello}>Hola,</p>
-            <h1 className={styles.name}>{displayName}</h1>
-          </div>
           <button
             type="button"
-            className={styles.profileButton}
+            className={styles.eyebrowButton}
             onClick={onOpenProfile}
             aria-label="Abrir tu perfil"
           >
-            <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="md" />
+            <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
+            <span className={styles.eyebrowText}>Tus lugares</span>
           </button>
+          <h1 className={styles.lede}>
+            Guarda tus recuerdos <em>y compártelos</em>.
+          </h1>
+          <p className={styles.subcopy}>
+            Los lugares que viviste, en un mapa que cuentas con quien más quieres.
+          </p>
         </header>
 
-        {/* 🔔 Te toca jugar — solo si hay retos pendientes (no ocupa en vacío).
-            Hoja de papel con filo de acento a la izquierda y reloj de cuenta
-            atrás discreto: la marca es quieta (sin halos ni palpitos cálidos). */}
-        {turns.length > 0 && (
-          <section aria-labelledby="home-turns">
-            <h2 id="home-turns" className={styles.sectionTitle}>
-              <span aria-hidden="true">🔔</span> Te toca jugar
-            </h2>
-            <Stack gap={3}>
-              {turns.map((turn) => (
-                <Card key={turn.id} padding="md" raised className={styles.turn}>
-                  <div className={styles.turnInfo}>
-                    <span className={styles.turnGroup}>{turn.groupName}</span>
-                    <span className={styles.turnMeta}>reto de {turn.author}</span>
-                    <span className={styles.turnClock}>
-                      <span className={styles.turnDot} aria-hidden="true" />
-                      {turn.countdown}
-                    </span>
-                  </div>
-                  <Button size="sm" onClick={onPlayTurn ? () => onPlayTurn(turn.id) : undefined}>
-                    Jugar <Icon icon={ChevronRight} size={16} />
-                  </Button>
-                </Card>
-              ))}
-            </Stack>
-          </section>
-        )}
+        {/* MAPAMUNDI satélite — el héroe visual. Lo inyecta HomePage (capa de mapa). */}
+        {worldMap}
 
-        {/* 👥 Tus grupos — o estado de bienvenida si el usuario es nuevo. */}
-        {hasGroups ? (
-          <section aria-labelledby="home-groups">
-            <h2 id="home-groups" className={styles.sectionTitle}>
-              <span aria-hidden="true">👥</span> Tus grupos
-            </h2>
-            <Stack gap={3}>
-              {groups.map((group) => (
-                <GroupCard
-                  key={group.id}
-                  name={group.name}
-                  status={group.status}
-                  owned={group.owned}
-                  meta={group.meta}
-                  onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
-                />
-              ))}
-            </Stack>
-          </section>
-        ) : (
-          <HomeEmptyState name={displayName} onCreateGroup={onCreateGroup} />
-        )}
-
-        {/* 🏆 Tus números — agregado del usuario. */}
-        {hasGroups && (
-          <section aria-labelledby="home-stats">
-            <h2 id="home-stats" className={styles.sectionTitle}>
-              <span aria-hidden="true">🏆</span> Tus números
-            </h2>
-            {stats ? (
-              <div className={styles.statGrid}>
-                <Card padding="md" className={`${styles.statCard} ${styles.statCardAccent}`}>
-                  <CountUp
-                    value={stats.totalPoints}
-                    className={`${styles.statValue} ${styles.statValueAccent}`}
-                  />
-                  <span className={styles.statLabel}>puntos</span>
-                  <span
-                    className={`${styles.statBar} ${styles.statBarAccent}`}
-                    aria-hidden="true"
-                  />
-                </Card>
-                <Card padding="md" className={styles.statCard}>
-                  <span className={styles.statValue}>{stats.groupsPlayed}</span>
-                  <span className={styles.statLabel}>grupos</span>
-                  <span className={`${styles.statBar} ${styles.statBarTeal}`} aria-hidden="true" />
-                </Card>
-                {stats.best && (
-                  <Card padding="md" className={styles.statCard}>
-                    <CountUp value={stats.best.points} className={styles.statValue} />
-                    <span className={styles.statLabel}>mejor reto</span>
-                    <span className={styles.statSub} title={stats.best.groupName}>
-                      {stats.best.groupName}
-                    </span>
-                    <span
-                      className={`${styles.statBar} ${styles.statBarTeal}`}
-                      aria-hidden="true"
-                    />
-                  </Card>
-                )}
-              </div>
-            ) : (
-              <Card padding="md">
-                <p className={styles.statsEmpty}>
-                  Cuando juegues tu primer reto, aquí verás tus puntos.
-                </p>
-              </Card>
-            )}
-          </section>
-        )}
+        {/* Tus viajes — carrusel horizontal de tarjetas-portada (variante A). */}
+        <section aria-labelledby="home-trips">
+          <h2 id="home-trips" className={styles.sectionTitle}>
+            Tus viajes
+          </h2>
+          <div className={styles.rail}>
+            {groups.map((group) => (
+              <TripCard
+                key={group.id}
+                group={group}
+                onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+              />
+            ))}
+          </div>
+        </section>
       </Stack>
 
-      {/* Acción primaria siempre accesible. */}
-      <CreateGroupFab onClick={onCreateGroup} />
+      {/* Acciones: empezar un viaje (primaria) / unirse con un código. */}
+      <div className={styles.ctas}>
+        <Button onClick={onCreateGroup} className={styles.ctaPrimary}>
+          <Icon icon={Plus} size={18} /> Empezar un viaje
+        </Button>
+        <Button variant="secondary" onClick={onJoinGroup} className={styles.ctaSecondary}>
+          Unirme
+        </Button>
+      </div>
     </div>
+  )
+}
+
+// Tarjeta-portada de un viaje (variante A): foto de portada con velo inferior, nombre
+// serif sobre el velo y un indicador SUTIL de estado ("en juego" / "te toca"). Tocar
+// abre el viaje. La foto es decorativa (aria-hidden); el nombre da la etiqueta del botón.
+function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }) {
+  const isButton = typeof onClick === 'function'
+  const live = group.status === 'live' || group.status === 'toplay'
+  const liveLabel = group.status === 'toplay' ? 'Te toca' : 'En juego'
+
+  return (
+    <article className={styles.tripCard}>
+      <button
+        type="button"
+        className={styles.tripButton}
+        onClick={onClick}
+        disabled={!isButton}
+        aria-label={`Abrir viaje ${group.name}`}
+      >
+        <div
+          className={styles.tripCover}
+          style={group.coverUrl ? { backgroundImage: `url('${group.coverUrl}')` } : undefined}
+        >
+          {live && (
+            <span className={styles.tripLive}>
+              <span className={styles.tripBlip} aria-hidden="true" />
+              {liveLabel}
+            </span>
+          )}
+          {group.owned && (
+            <span className={styles.tripOwned}>
+              <span aria-hidden="true">👑</span> Tuyo
+            </span>
+          )}
+          <h3 className={styles.tripName}>{group.name}</h3>
+        </div>
+      </button>
+    </article>
   )
 }

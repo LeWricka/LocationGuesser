@@ -1,0 +1,57 @@
+/* Mapamundi satélite de la home: globo cuadrado protagonista, enmarcado como una
+   lámina (radio grande + hairline + sombra de elevación). El TripMap se sitúa a
+   sangre dentro del marco; el caption editorial flota en una esquina. */
+
+.wrap {
+  width: 100%;
+}
+
+/* Lienzo del mapa: casi cuadrado (como la maqueta, aspect 1/0.92). overflow:hidden
+   recorta el globo al radio. La sombra "alza" la lámina del papel. */
+.frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 0.92;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+  /* Fondo NOCHE mientras carga el globo: que el flash inicial case con el cielo
+     oscuro del satélite, no un papel claro. Tinta de marca (token). */
+  background: var(--ink-900);
+}
+
+/* El TripMap ocupa todo el marco (es position:relative por dentro; lo estiramos). */
+.frame > :first-child {
+  position: absolute;
+  inset: 0;
+}
+
+/* Caption editorial sobre el globo (esquina inferior izquierda), como en la maqueta:
+   recuento de recuerdos en serif + km en eyebrow. Texto claro con sombra para legibilidad
+   AA sobre el satélite oscuro. No intercepta toques (el mapa sí). */
+.caption {
+  position: absolute;
+  left: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 2;
+  color: #fff;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgba(15, 26, 36, 0.7);
+}
+
+.captionName {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: 1.1;
+}
+
+.captionMeta {
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.92;
+}
