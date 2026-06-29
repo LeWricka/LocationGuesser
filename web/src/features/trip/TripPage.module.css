@@ -96,40 +96,6 @@
   }
 }
 
-/* Pastilla central con el nombre del viaje y la línea de miembros. */
-.titlePill {
-  flex: 1 1 auto;
-  min-width: 0;
-  padding: var(--space-2) var(--space-4);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-md);
-  text-align: center;
-}
-
-.tripName {
-  margin: 0;
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-on-photo);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tripSub {
-  margin: 0;
-  font-size: var(--font-size-xs);
-  color: var(--color-on-photo);
-  opacity: 0.78;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 /* (c) Dock inferior: línea temporal + carrusel, anclados abajo. El velo de fondo
    separa el conjunto del mapa (token §4.2) y cubre timeline y carrusel a la vez. */
 .dock {

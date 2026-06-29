@@ -180,6 +180,12 @@
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
 
+  /* Display manuscrita SOLO para portadas/nombres de viaje (cursiva estilo
+   * Polarsteps). Fallback de SISTEMA a propósito: 'Caveat' aún no está
+   * self-host (es Fase 2b, requiere el .woff2 + @font-face); mientras tanto,
+   * en iPhone 'Snell Roundhand' se ve digna y no cuesta ni un byte de carga. */
+  --font-display: 'Caveat', 'Snell Roundhand', 'Brush Script MT', cursive;
+
   --font-size-xs: 0.75rem; /* 12px — micro-ayudas, eyebrows */
   --font-size-sm: 0.875rem; /* 14px — texto secundario */
   --font-size-md: 1rem; /* 16px — cuerpo (evita zoom en iOS) */
