@@ -43,3 +43,6 @@ export { ProfileStep } from './ProfileStep'
 // Estados vacíos y de carga reutilizables (issue #156).
 export { EmptyState } from './EmptyState'
 export { SkeletonCard } from './SkeletonCard'
+
+// Logo de marca "Lugar + gente" (pin de mapa que abraza a tu gente).
+export { Logo } from './Logo'

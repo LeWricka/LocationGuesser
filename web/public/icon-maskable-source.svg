@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Lugares">
+  <!-- Icono PWA maskable: fondo a sangre en azul pizarra (Android lo recorta a
+       círculo/squircle, así que el color debe cubrir todo el lienzo). La gota +
+       gente, en papel, vive dentro de la "safe zone" central (~66% del lado)
+       para no perderse al recortar. Fuente del PNG pwa-maskable-512. -->
+  <rect width="512" height="512" fill="#34506b" />
+  <g transform="translate(256 270) scale(4.8) translate(-16 -20)">
+    <path
+      fill="#f6f7f9"
+      d="M16 1.6c-7.2 0-13 5.5-13 12.4 0 8.6 11.3 22 12.4 23.3a.8.8 0 0 0 1.2 0C18.7 36 30 22.6 30 14 30 7.1 23.2 1.6 16 1.6Z"
+    />
+    <g fill="#34506b">
+      <circle cx="12.4" cy="11.2" r="2.7" />
+      <path d="M7.4 21.4c0-2.8 2.2-5 5-5s5 2.2 5 5a.7.7 0 0 1-.7.7H8.1a.7.7 0 0 1-.7-.7Z" />
+      <circle cx="19.6" cy="11.2" r="2.7" />
+      <path d="M14.6 21.4c0-2.8 2.2-5 5-5s5 2.2 5 5a.7.7 0 0 1-.7.7h-8.6a.7.7 0 0 1-.7-.7Z" />
+    </g>
+  </g>
+</svg>

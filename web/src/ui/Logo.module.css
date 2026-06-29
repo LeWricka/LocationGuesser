@@ -1,0 +1,28 @@
+/* Logo "LUGAR + GENTE". El símbolo hereda color por `currentColor`; el wordmark
+   pone la voz serif de marca (Cormorant) junto a la gota. */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.mark {
+  display: block;
+  flex: none;
+}
+
+.wordmark {
+  gap: 0.32em; /* relativo al fontSize: escala con el tamaño del logo */
+}
+
+/* "Lugares" en serif de display. El tamaño lo fija `font-size` inline (= size);
+   aquí solo familia, peso y ajuste óptico. */
+.word {
+  font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  /* Cormorant tiene mucha altura-x baja: subimos un pelín para alinear la
+     mayúscula con el centro óptico de la gota. */
+  transform: translateY(-0.04em);
+}
