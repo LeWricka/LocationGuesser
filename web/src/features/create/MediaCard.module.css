@@ -1,10 +1,12 @@
 /* Tarjeta de un medio opcional (foto / Street View). El borde se tiñe de verde
    cuando el medio está listo, reforzando el check del badge. */
 .card {
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface-raised);
+  box-shadow: var(--shadow-xs);
+  transition: border-color var(--transition-base);
 }
 
 .card[data-done] {
@@ -17,6 +19,31 @@
   justify-content: space-between;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
+}
+
+/* Icono + título del medio, agrupados a la izquierda. */
+.titleGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Disco del icono del medio: acento tenue, trazo en acento (se vuelve verde
+   cuando el medio ya está puesto, en armonía con el borde). */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.card[data-done] .icon {
+  background: var(--color-success-soft);
+  color: var(--color-success);
 }
 
 .title {

@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react'
+import { CheckIcon } from './CreateIcons'
 import styles from './MediaCard.module.css'
 
 interface Props {
-  /** Título corto del medio (con icono), p.ej. «📷 Foto». */
+  /** Icono propio del medio (SVG inline), p.ej. <CameraIcon />. */
+  icon: ReactNode
+  /** Título corto del medio, p.ej. «Foto». */
   title: string
   /** ¿Este medio ya está listo? Cambia el badge «Opcional» por un check. */
   done: boolean
@@ -16,14 +19,19 @@ interface Props {
 // vistazo que es opcional con un badge; cuando el medio ya está puesto, el badge
 // pasa a un check verde. Foto y SV son dos tarjetas iguales: al menos una
 // obligatoria (la regla la aplica el gating del paso, no la tarjeta).
-export function MediaCard({ title, done, doneLabel, children }: Props) {
+export function MediaCard({ icon, title, done, doneLabel, children }: Props) {
   return (
     <section className={styles.card} data-done={done || undefined}>
       <header className={styles.head}>
-        <span className={styles.title}>{title}</span>
+        <span className={styles.titleGroup}>
+          <span className={styles.icon} aria-hidden>
+            {icon}
+          </span>
+          <span className={styles.title}>{title}</span>
+        </span>
         {done ? (
           <span className={styles.doneBadge}>
-            <span aria-hidden>✓</span> {doneLabel}
+            <CheckIcon size={14} /> {doneLabel}
           </span>
         ) : (
           <span className={styles.optionalBadge}>Opcional</span>
