@@ -1,47 +1,90 @@
+/* Home logueada — variante A "el globo" (maqueta home-wow): IMAGEN-DOMINANTE. El
+   mapamundi a sangre manda y el chrome flota encima; debajo, los viajes son portadas
+   grandes y separadas. Mínimo de tarjeta blanca: que dominen mapa e imágenes. */
+
 .home {
   width: 100%;
-  /* Holgura inferior para que las CTAs no queden pegadas al borde inferior. */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  /* Holgura inferior para que las CTAs no queden pegadas al borde. */
   padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
 }
 
-/* --- Cabecera: eyebrow con avatar + lema serif + subcopy de recuerdos --- */
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+/* --- HÉROE: el mapamundi con el chrome flotando encima --- */
+.hero {
+  position: relative;
 }
 
-/* Eyebrow editorial clicable (acceso a perfil): avatar pequeño + "Tus lugares" en
-   mayúsculas tracking ancho. Reset de botón + foco visible heredado del kit. */
-.eyebrowButton {
-  display: inline-flex;
+/* Topbar flotante sobre el satélite: marca + perfil en pastillas papel translúcidas. */
+.topbar {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  right: var(--space-3);
+  z-index: 3;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.topbar > * {
+  pointer-events: auto;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: baseline;
   gap: var(--space-2);
-  align-self: flex-start;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-full);
-  color: var(--color-accent);
-  transition: transform var(--transition-fast);
+  background: color-mix(in srgb, #fff 90%, transparent);
+  box-shadow: var(--shadow-md);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
+  backdrop-filter: blur(14px) saturate(120%);
 }
-.eyebrowButton:hover {
-  transform: translateY(-1px);
+.brand b {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  color: var(--color-text);
 }
-.eyebrowButton:active {
-  transform: scale(0.97);
-}
-.eyebrowText {
+.brand i {
+  font-style: normal;
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
-/* Lema: titular serif grande, la voz editorial. El énfasis ("y compártelos") va en
-   itálica de acento, igual que la maqueta. */
+/* Avatar como botón de perfil, anillo claro para destacar sobre el satélite. */
+.avatarButton {
+  display: inline-flex;
+  padding: 2px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, #fff 85%, transparent);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transition: transform var(--transition-fast);
+}
+.avatarButton:hover {
+  transform: translateY(-1px);
+}
+.avatarButton:active {
+  transform: scale(0.97);
+}
+
+/* --- Lema editorial bajo el héroe --- */
 .lede {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ledeTitle {
   font-family: var(--font-serif);
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
@@ -50,11 +93,10 @@
   color: var(--color-text);
   text-wrap: balance;
 }
-.lede em {
+.ledeTitle em {
   font-style: italic;
   color: var(--color-accent);
 }
-
 .subcopy {
   font-size: var(--font-size-md);
   line-height: 1.5;
@@ -72,37 +114,27 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- Tus viajes: carrusel horizontal de tarjetas-portada --- */
-.rail {
-  display: flex;
+/* --- TUS VIAJES: rejilla de portadas grandes y separadas (no carrusel apretado) --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-3);
-  /* Sangrado de bordes para que el carrusel "sangre" hasta el borde del lienzo: las
-     tarjetas se desplazan bajo el borde sin que se vea el corte. */
-  margin: 0 calc(-1 * var(--space-4));
-  padding: var(--space-1) var(--space-4);
-  overflow-x: auto;
-  scrollbar-width: none;
-  scroll-snap-type: x mandatory;
-}
-.rail::-webkit-scrollbar {
-  display: none;
 }
 
 .tripCard {
-  flex: 0 0 12.5rem; /* 200px, como la maqueta */
-  scroll-snap-align: start;
+  min-width: 0;
 }
 
-/* La tarjeta entera es el botón que abre el viaje. */
+/* La portada entera es el botón que abre el viaje: la FOTO es la tarjeta. */
 .tripButton {
   display: block;
   width: 100%;
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, #fff 10%, transparent);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: var(--color-surface);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   cursor: pointer;
   text-align: left;
   transition:
@@ -110,7 +142,7 @@
     box-shadow var(--transition-fast);
 }
 .tripButton:hover:not(:disabled) {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   box-shadow: var(--shadow-hover);
 }
 .tripButton:active:not(:disabled) {
@@ -121,10 +153,11 @@
 }
 
 /* Portada: foto a sangre con velo inferior para que el nombre serif (blanco) se lea
-   AA encima. Sin foto: degradado de marca sobre superficie (no queda vacío). */
+   AA encima. Sin foto: degradado de marca sobre superficie (no queda vacío). Retrato
+   alto estilo Polarsteps. */
 .tripCover {
   position: relative;
-  height: 11.5rem;
+  aspect-ratio: 3 / 4;
   background-color: var(--color-surface-hover);
   background-size: cover;
   background-position: center;
@@ -137,23 +170,26 @@
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(15, 26, 36, 0.72), rgba(15, 26, 36, 0) 58%);
+  background: linear-gradient(
+    to top,
+    rgba(8, 12, 18, 0.82) 0%,
+    rgba(8, 12, 18, 0.05) 52%,
+    transparent 74%
+  );
 }
 
-/* Nombre del viaje: serif blanco sobre el velo, sobre el resto del contenido. */
 .tripName {
   position: relative;
   z-index: 1;
   font-family: var(--font-serif);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   line-height: 1.05;
   color: #fff;
-  text-shadow: 0 1px 6px rgba(15, 26, 36, 0.6);
+  text-shadow: 0 1px 6px rgba(8, 12, 18, 0.6);
 }
 
-/* Indicador SUTIL "en juego" / "te toca": pill de acento arriba a la derecha con un
-   punto que palpita (respeta reduced-motion abajo). */
+/* Indicador SUTIL "en juego"/"te toca": pill de acento con un punto que palpita. */
 .tripLive {
   position: absolute;
   top: var(--space-3);
@@ -203,13 +239,52 @@
   color: var(--color-text);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* Portada-fantasma "nuevo viaje": misma silueta que las portadas, contorno discontinuo
+   (sin card blanca opaca). Mantiene la rejilla de fotos coherente. */
+.ghostCard {
+  aspect-ratio: 3 / 4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border: 1.5px dashed var(--color-border-strong, var(--color-border));
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    transform var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.ghostCard:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.ghostCard:active {
+  transform: scale(0.99);
+}
+.ghostPlus {
+  font-family: var(--font-serif);
+  font-size: 2.25rem;
+  line-height: 1;
+}
+.ghostLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 /* --- Acciones: empezar un viaje (primaria) / unirme --- */
 .ctas {
   display: flex;
   gap: var(--space-3);
-  margin-top: var(--space-6);
+  margin-top: var(--space-2);
 }
 .ctaPrimary {
   flex: 1;
@@ -222,8 +297,9 @@
   .tripBlip {
     animation: none;
   }
-  .eyebrowButton:hover,
-  .tripButton:hover:not(:disabled) {
+  .avatarButton:hover,
+  .tripButton:hover:not(:disabled),
+  .ghostCard:hover {
     transform: none;
   }
 }

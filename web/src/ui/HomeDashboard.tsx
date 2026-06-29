@@ -4,7 +4,6 @@ import { Avatar } from './Avatar'
 import { Icon } from './Icon'
 import { Button } from './Button'
 import type { GroupStatus } from './GroupCard'
-import { Stack } from './Stack'
 import styles from './HomeDashboard.module.css'
 
 export interface HomeGroup {
@@ -38,11 +37,12 @@ interface Props {
   className?: string
 }
 
-// Layout presentacional de la home logueada (fase "nuevo enfoque", variante A de la
-// maqueta): el RELATO de recuerdos manda. Cabecera con el lema en serif + subcopy,
-// el MAPAMUNDI satélite como héroe (inyectado por HomePage), el carrusel de "Tus
-// viajes" y las acciones (Empezar un viaje / Unirme). SIN "cómo funciona" y sin el
-// panel de números: la promesa es guardar y compartir recuerdos, no el juego.
+// Layout presentacional de la home logueada — variante A "el globo" (maqueta home-wow):
+// IMAGEN-DOMINANTE. El mapamundi satélite a sangre es el protagonista; el chrome (marca,
+// perfil, lema) son pastillas papel translúcidas que flotan, no tarjetas blancas. Debajo,
+// los viajes son unidades visuales GRANDES y separadas (su portada-foto manda), no un
+// carrusel apretado. SIN "cómo funciona" ni panel de números: la promesa es guardar y
+// compartir recuerdos; adivinar es un guiño que vive dentro del viaje.
 export function HomeDashboard({
   userId,
   displayName,
@@ -57,45 +57,60 @@ export function HomeDashboard({
 }: Props) {
   return (
     <div className={[styles.home, className].filter(Boolean).join(' ')}>
-      <Stack gap={6} className="lg-stagger">
-        {/* Cabecera: eyebrow con avatar (acceso a perfil) + lema serif + subcopy. */}
-        <header className={styles.header}>
+      {/* HÉROE: el mapamundi a sangre con el chrome flotando encima. */}
+      <section className={styles.hero}>
+        {/* Topbar flotante: marca + acceso a perfil, en pastillas papel translúcidas. */}
+        <div className={styles.topbar}>
+          <span className={styles.brand}>
+            <b>Lugares</b>
+            <i>tu mundo</i>
+          </span>
           <button
             type="button"
-            className={styles.eyebrowButton}
+            className={styles.avatarButton}
             onClick={onOpenProfile}
             aria-label="Abrir tu perfil"
           >
             <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
-            <span className={styles.eyebrowText}>Tus lugares</span>
           </button>
-          <h1 className={styles.lede}>
-            Guarda tus recuerdos <em>y compártelos</em>.
-          </h1>
-          <p className={styles.subcopy}>
-            Los lugares que viviste, en un mapa que cuentas con quien más quieres.
-          </p>
-        </header>
+        </div>
 
-        {/* MAPAMUNDI satélite — el héroe visual. Lo inyecta HomePage (capa de mapa). */}
+        {/* El mapamundi satélite (lo inyecta HomePage). Si no llega, no se pinta. */}
         {worldMap}
+      </section>
 
-        {/* Tus viajes — carrusel horizontal de tarjetas-portada (variante A). */}
-        <section aria-labelledby="home-trips">
-          <h2 id="home-trips" className={styles.sectionTitle}>
-            Tus viajes
-          </h2>
-          <div className={styles.rail}>
-            {groups.map((group) => (
-              <TripCard
-                key={group.id}
-                group={group}
-                onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
-              />
-            ))}
-          </div>
-        </section>
-      </Stack>
+      {/* Lema editorial (cumple el contrato de copy: "Guarda tus recuerdos y compártelos"). */}
+      <header className={styles.lede}>
+        <h1 className={styles.ledeTitle}>
+          Guarda tus recuerdos <em>y compártelos</em>.
+        </h1>
+        <p className={styles.subcopy}>
+          Los lugares que viviste, en un mapa que cuentas con quien más quieres.
+        </p>
+      </header>
+
+      {/* TUS VIAJES: rejilla de portadas GRANDES y separadas (imagen-dominante). */}
+      <section aria-labelledby="home-trips">
+        <h2 id="home-trips" className={styles.sectionTitle}>
+          Tus viajes
+        </h2>
+        <div className={styles.grid}>
+          {groups.map((group) => (
+            <TripCard
+              key={group.id}
+              group={group}
+              onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+            />
+          ))}
+          {/* Portada-fantasma "nuevo": empezar un viaje sin romper la rejilla de fotos. */}
+          <button type="button" className={styles.ghostCard} onClick={onCreateGroup}>
+            <span className={styles.ghostPlus} aria-hidden="true">
+              +
+            </span>
+            <span className={styles.ghostLabel}>Nuevo viaje</span>
+          </button>
+        </div>
+      </section>
 
       {/* Acciones: empezar un viaje (primaria) / unirse con un código. */}
       <div className={styles.ctas}>
@@ -110,9 +125,9 @@ export function HomeDashboard({
   )
 }
 
-// Tarjeta-portada de un viaje (variante A): foto de portada con velo inferior, nombre
-// serif sobre el velo y un indicador SUTIL de estado ("en juego" / "te toca"). Tocar
-// abre el viaje. La foto es decorativa (aria-hidden); el nombre da la etiqueta del botón.
+// Tarjeta-portada de un viaje (variante A): la FOTO es la tarjeta. Velo inferior, nombre
+// serif sobre el velo e indicadores sutiles ("en juego"/"te toca"/"tuyo"). Tocar abre el
+// viaje. La foto es decorativa (la etiqueta del botón da el nombre).
 function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }) {
   const isButton = typeof onClick === 'function'
   const live = group.status === 'live' || group.status === 'toplay'

@@ -116,7 +116,7 @@ export function HomePage() {
   const hasGroups = data.groups.length > 0
 
   // Portada por viaje: reutilizamos la foto que el mapamundi ya firmó (un fetch menos).
-  const coverByGroup = new Map(world.trips.map((t) => [t.groupId, t.imageUrl]))
+  const coverByGroup = new Map(world.trips.map((t) => [t.groupId, t.coverUrl]))
   const groups: HomeGroup[] = data.groups.map((g) => ({
     ...g,
     coverUrl: coverByGroup.get(g.id) ?? null,

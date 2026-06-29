@@ -1,92 +1,138 @@
-// Datos del MAPAMUNDI de la home (fase "nuevo enfoque"): una coordenada
-// representativa por viaje (grupo) para clavar un pin-foto en el globo satélite.
-// Es PRESENTACIÓN derivada: aquí solo orquestamos helpers de lib/ (getGroupChallenges,
-// getAnswers, splitByStatus, signedImageUrl) y los traducimos a la forma que consume
-// el mapa de viaje (RoutePoint). No hay lógica de datos nueva (vive en lib/).
+// Datos del MAPAMUNDI de la home (variante A "el globo"): cada viaje (grupo) es su
+// propia CONSTELACIÓN de puntos sobre el globo satélite —sus pines + una mini-ruta
+// que une SOLO sus puntos, nunca a otro viaje—. Es PRESENTACIÓN derivada: aquí solo
+// orquestamos helpers de lib/ (getGroupChallenges, getAnswers, splitByStatus,
+// signedImageUrl) y los traducimos a la forma que consume el mapa de la home.
 //
-// REGLA: tolerante a fallo y barato. Resolver la coord de TODOS los viajes a la vez
-// puede fallar por grupo (RLS, sin retos cerrados, red); cada viaje se resuelve por
-// separado con Promise.allSettled, y un viaje que no aporte coordenada simplemente no
-// pinta pin (sigue listado en "Tus viajes"). Nunca rompe la home.
+// REGLA ANTI-SPOILER: un punto solo aparece si su coordenada es VISIBLE —el lugar de
+// un RECUERDO (`place_lat`/`place_lng`) o la respuesta de un reto YA CERRADO (vía
+// `getAnswers`, que la RLS solo sirve para cerrados/ya votados)—. Un reto ABIERTO no
+// aporta punto: revelaría dónde es.
+//
+// REGLA: tolerante a fallo y barato. Cada viaje se resuelve por separado con
+// Promise.allSettled; un viaje que falle (RLS, red) simplemente no aporta puntos
+// (sigue como portada en "Tus viajes"). Nunca rompe la home.
 
 import { useEffect, useState } from 'react'
 import { getGroupChallenges, splitByStatus } from '../../lib/groupData'
 import { getAnswers } from '../../lib/challenges'
 import { signedImageUrl } from '../../lib/storage'
 import { haversine } from '../../lib/geo'
-import type { RoutePoint } from '../../lib/trip'
 
-export interface WorldTrip {
-  /** Id del grupo (lo usamos como `challengeId` del RoutePoint: el click abre el viaje). */
-  groupId: string
-  /** Nombre del viaje (para el alt/tooltip del pin; el mapa no lo pinta). */
-  name: string
+/** Un punto situado de un viaje (un momento con coordenada visible). */
+export interface TripPoint {
+  /** Id del reto/recuerdo (clave estable del pin; el click abre el viaje). */
+  id: string
   lat: number
   lng: number
-  /** URL firmada de la foto de portada del viaje, o null (el pin cae a marcador genérico). */
+  /** Título del momento (alt del pin). */
+  title: string
+  /** URL firmada de la miniatura del pin, o null (cae a un marcador genérico). */
   imageUrl: string | null
-  /** Fecha del momento representativo en ISO (RoutePoint la pide para ordenar). */
+  /** Fecha del momento en ISO (orden cronológico de la mini-ruta). */
   date: string
 }
 
+/** Un viaje como clúster en el globo: su portada + sus puntos (su propia ruta). */
+export interface WorldTrip {
+  /** Id del grupo: el click en cualquier pin del clúster abre este viaje. */
+  groupId: string
+  /** Nombre del viaje (etiqueta del clúster + alt). */
+  name: string
+  /** Portada del viaje (foto del momento representativo), o null. */
+  coverUrl: string | null
+  /** Puntos situados del viaje, en orden cronológico ASC (la mini-ruta los cose). */
+  points: TripPoint[]
+}
+
 export interface WorldData {
-  /** Un punto por viaje con coordenada resoluble. Vacío hasta que resuelve el lote. */
+  /** Un clúster por viaje con al menos un punto situado. Vacío hasta resolver el lote. */
   trips: WorldTrip[]
-  /** Suma de las distancias entre puntos consecutivos (km), para el caption del globo. */
+  /** Suma de km de todas las mini-rutas (tramos dentro de cada viaje), para el caption. */
   totalKm: number
   loading: boolean
 }
 
 const EMPTY: WorldData = { trips: [], totalKm: 0, loading: true }
 
+/** Firma el path de una foto a URL; null si no hay path o si falla (no rompe el pin). */
+async function signOrNull(imagePath: string | null | undefined): Promise<string | null> {
+  if (!imagePath) return null
+  try {
+    return await signedImageUrl(imagePath)
+  } catch {
+    return null
+  }
+}
+
 /**
- * Resuelve la coordenada + portada representativa de UN grupo. Tomamos el último
- * reto CERRADO con respuesta visible (el más reciente del viaje) como "dónde está"
- * el viaje en el mundo, y su foto como portada del pin. Si el grupo no tiene ningún
- * reto cerrado con coordenada visible (RLS, viaje recién creado…), devuelve null y
- * el viaje no pinta pin. Cualquier error se propaga (lo captura allSettled arriba).
+ * Resuelve TODOS los puntos visibles de un grupo (su constelación) + su portada.
+ * Recorre los momentos del viaje:
+ *  - RECUERDO con lugar visible (`place_lat`/`place_lng`) → punto.
+ *  - RETO CERRADO con respuesta visible (`getAnswers`) → punto.
+ *  - RETO ABIERTO → se omite (anti-spoiler).
+ * La portada es la foto del momento situado MÁS RECIENTE (o la primera con foto).
+ * Si el viaje no aporta ningún punto situado, devuelve null (no pinta clúster, pero
+ * sigue listado como portada en "Tus viajes").
  */
 async function resolveTrip(groupId: string, name: string): Promise<WorldTrip | null> {
   const challenges = await getGroupChallenges(groupId)
+  // `splitByStatus` separa retos ABIERTOS (anti-spoiler: sin coordenada) de los demás.
   const { past } = splitByStatus(challenges)
   if (past.length === 0) return null
 
-  // `past` viene en orden DESC (más reciente primero): el primero con coordenada
-  // visible es el momento representativo del viaje.
-  const answers = await getAnswers(past.map((c) => c.id))
-  const pick = past.find((c) => answers.has(c.id))
-  if (!pick) return null
-  const coord = answers.get(pick.id)
-  if (!coord) return null
+  // Respuestas de los retos cerrados (la RLS solo sirve las visibles). Los recuerdos
+  // no necesitan respuesta: su lugar visible va en place_lat/place_lng.
+  const challengeIds = past.filter((c) => c.is_challenge).map((c) => c.id)
+  const answers = await getAnswers(challengeIds)
 
-  // Portada: la foto del momento elegido si la tiene; firmamos su path (bucket privado).
-  // Un fallo al firmar no debe tumbar el pin: cae a marcador genérico (imageUrl null).
-  let imageUrl: string | null = null
-  if (pick.image_path) {
-    try {
-      imageUrl = await signedImageUrl(pick.image_path)
-    } catch {
-      imageUrl = null
+  // `past` viene DESC (más reciente primero). Construimos los puntos en ese orden y
+  // luego ordenamos ASC por fecha para que la mini-ruta los cosa cronológicamente.
+  const raw: { c: (typeof past)[number]; lat: number; lng: number }[] = []
+  for (const c of past) {
+    if (c.is_challenge) {
+      const ans = answers.get(c.id)
+      if (ans) raw.push({ c, lat: ans.lat, lng: ans.lng })
+    } else if (c.place_lat != null && c.place_lng != null) {
+      // Recuerdo con lugar visible (no es spoiler).
+      raw.push({ c, lat: c.place_lat, lng: c.place_lng })
     }
   }
+  if (raw.length === 0) return null
 
-  return { groupId, name, lat: coord.lat, lng: coord.lng, imageUrl, date: pick.created_at }
+  // Portada: foto del primer momento situado con foto (el más reciente, orden DESC).
+  const coverSource = raw.find((r) => r.c.image_path)?.c ?? raw[0].c
+  const coverUrl = await signOrNull(coverSource.image_path)
+
+  // Firmamos las miniaturas de los pines en paralelo (cada una tolerante a fallo).
+  const points: TripPoint[] = await Promise.all(
+    raw.map(async (r) => ({
+      id: r.c.id,
+      lat: r.lat,
+      lng: r.lng,
+      title: r.c.title,
+      imageUrl: await signOrNull(r.c.image_path),
+      date: r.c.created_at,
+    })),
+  )
+  // Orden cronológico ASC para la mini-ruta (el recorrido del viaje en el tiempo).
+  points.sort((a, b) => a.date.localeCompare(b.date))
+
+  return { groupId, name, coverUrl, points }
 }
 
-/** Suma de tramos consecutivos (km) entre los puntos, en su orden de llegada. */
-function sumKm(trips: WorldTrip[]): number {
+/** Suma de los tramos consecutivos (km) DENTRO de un viaje (su mini-ruta). */
+function tripKm(points: TripPoint[]): number {
   let total = 0
-  for (let i = 1; i < trips.length; i++) {
-    total += haversine(trips[i - 1], trips[i])
-  }
-  return Math.round(total)
+  for (let i = 1; i < points.length; i++) total += haversine(points[i - 1], points[i])
+  return total
 }
 
 /**
- * Hook del mapamundi: dado el listado de viajes del usuario (id + nombre), resuelve
- * en LOTE una coordenada representativa por viaje. Tolerante a fallo (allSettled):
- * los viajes que no resuelvan se omiten del mapa sin afectar al resto. La lista de
- * viajes que recibe ya la ha cargado la home, así que esto solo añade las coords.
+ * Hook del mapamundi (variante A): dado el listado de viajes del usuario (id + nombre),
+ * resuelve en LOTE la constelación de cada viaje (sus puntos visibles + portada).
+ * Tolerante a fallo (allSettled): los viajes que no resuelvan se omiten del globo sin
+ * afectar al resto. La lista de viajes la ha cargado ya la home; esto añade las coords.
  */
 export function useWorldTrips(groups: { id: string; name: string }[]): WorldData {
   const [data, setData] = useState<WorldData>(EMPTY)
@@ -107,7 +153,8 @@ export function useWorldTrips(groups: { id: string; name: string }[]): WorldData
         .filter((r): r is PromiseFulfilledResult<WorldTrip | null> => r.status === 'fulfilled')
         .map((r) => r.value)
         .filter((t): t is WorldTrip => t !== null)
-      setData({ trips, totalKm: sumKm(trips), loading: false })
+      const totalKm = Math.round(trips.reduce((sum, t) => sum + tripKm(t.points), 0))
+      setData({ trips, totalKm, loading: false })
     })()
     return () => {
       cancelled = true
@@ -117,16 +164,4 @@ export function useWorldTrips(groups: { id: string; name: string }[]): WorldData
   }, [key])
 
   return data
-}
-
-/** Mapea los viajes del mundo a RoutePoint (contrato del mapa de viaje reusado). */
-export function tripsToRoute(trips: WorldTrip[]): RoutePoint[] {
-  return trips.map((t) => ({
-    challengeId: t.groupId, // el "challengeId" del pin es el groupId: el click abre el viaje
-    lat: t.lat,
-    lng: t.lng,
-    title: t.name,
-    imageUrl: t.imageUrl,
-    date: t.date,
-  }))
 }
