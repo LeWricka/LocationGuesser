@@ -113,6 +113,21 @@ Requiere estar logueado en el CLI (`npx supabase login`).
 
 ---
 
+## 5. Migraciones automáticas
+
+El pipeline aplica las migraciones de Supabase con `supabase db push` en cada
+push a `main`. El deploy del front lo sigue haciendo Vercel por su auto-deploy de
+git. El orden Vercel-vs-migración no importa gracias a la **regla de 2 fases**
+(migración aditiva primero, front que la usa después; el front nunca selecciona
+una columna que aún no existe). Guía de puesta en marcha — secrets de Supabase,
+regla de 2 fases y reconciliación única del historial:
+
+➡️ **[docs/migraciones-automaticas.md](migraciones-automaticas.md)**
+
+Workflow: [`.github/workflows/db-migrate.yml`](../.github/workflows/db-migrate.yml).
+
+---
+
 ## Email transaccional (magic link de login)
 
 El login es **passwordless por magic link**: Supabase Auth manda el email. El

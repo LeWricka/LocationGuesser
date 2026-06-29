@@ -1,0 +1,62 @@
+# Auto-migraciones: aplica las migraciones de Supabase en cada push a main.
+#
+# Por qué: aplicar a mano las migraciones (SQL Editor) es frágil y se olvida (fue
+# el bug tipo closed_at). Este workflow las aplica solas con `supabase db push`.
+#
+# El deploy del front lo sigue haciendo Vercel por su auto-deploy de git; este
+# workflow NO lo toca. Para que el orden Vercel-vs-migración no importe usamos la
+# REGLA DE 2 FASES (ver docs/migraciones-automaticas.md): las migraciones son
+# aditivas y se mergean ANTES que el front que usa la columna nueva, así el front
+# nunca selecciona algo que aún no existe en la BD.
+#
+# PRE-REQUISITO OPERATIVO (una sola vez, lo hace el usuario): ver
+# docs/migraciones-automaticas.md
+#   1. Crear los secrets SUPABASE_ACCESS_TOKEN y SUPABASE_DB_PASSWORD en el repo.
+#   2. Reconciliar el historial de migraciones (0001-0020 se aplicaron a mano):
+#      `supabase migration repair --status applied <version>` para cada una,
+#      o `supabase db pull`. Sin esto, `db push` intentaría re-aplicarlas y fallaría.
+
+name: DB migrate
+
+on:
+  push:
+    branches: [main]
+    # Solo nos interesa relanzar cuando cambia el esquema o el propio pipeline.
+    # db push es idempotente, así que acotar evita runs inútiles.
+    paths:
+      - 'supabase/migrations/**'
+      - 'supabase/config.toml'
+      - '.github/workflows/db-migrate.yml'
+
+# Un solo run a la vez: dos pushes seguidos a main no deben pisarse aplicando
+# migraciones en paralelo. No cancelamos el run en curso (cancel-in-progress:
+# false) porque abortar un `db push` a medias dejaría el historial inconsistente;
+# encolamos y dejamos terminar.
+concurrency:
+  group: db-migrate-main
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: Aplicar migraciones (supabase db push)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: latest
+
+      # `link` y `db push` leen el token y la password de la BD del entorno
+      # (SUPABASE_ACCESS_TOKEN / SUPABASE_DB_PASSWORD). NUNCA se hardcodean ni se
+      # imprimen; vienen de los secrets del repo. db push aplica solo las
+      # migraciones que el historial remoto aún no tiene registradas.
+      - name: Aplicar migraciones (supabase db push)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref ykquigyjvgxisgdxryxr
+          supabase db push
