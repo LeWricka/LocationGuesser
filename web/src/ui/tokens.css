@@ -164,8 +164,57 @@
   --route-line: rgba(255, 255, 255, 0.78);
   --route-line-dash: rgba(255, 255, 255, 0.55); /* tramo no clavado (hacia el activo) */
 
-  /* Velo bajo el carrusel para separar tarjetas del mapa (degradado al pie). */
-  --map-bottom-scrim: linear-gradient(to top, rgba(2, 10, 16, 0.85), transparent);
+  /* Velo bajo el carrusel para separar tarjetas del mapa (degradado al pie).
+     Más alto y en dos paradas para que la transición al mapa sea cremosa (no un
+     corte duro): el satélite se funde con la oscuridad bajo las tarjetas. */
+  --map-bottom-scrim: linear-gradient(
+    to top,
+    rgba(2, 10, 16, 0.86) 0%,
+    rgba(2, 10, 16, 0.45) 42%,
+    transparent 100%
+  );
+
+  /* Craft del chrome flotante (§ pase visual 2/2). El chrome va SOBRE satélite muy
+     contrastado: necesita una sombra que lo despegue del mapa con credibilidad
+     (sombra larga difusa + un fino anillo de contacto oscuro que define el borde
+     contra tiles claros, como en la referencia Polarsteps). NO usa el sheen frío de
+     las tarjetas (ahí el fondo es océano, aquí es foto). */
+  --shadow-chrome:
+    0 1px 0 0 rgba(255, 255, 255, 0.14) inset, 0 10px 28px -10px rgba(0, 0, 0, 0.62),
+    0 2px 8px -2px rgba(0, 0, 0, 0.45);
+  /* Halo de contacto fino: un anillo oscuro 1px que asienta la pastilla sobre
+     cualquier tile (claro u oscuro) sin depender solo del blur. Se suma a la
+     sombra. */
+  --ring-contact: 0 0 0 1px rgba(0, 0, 0, 0.16);
+
+  /* Pin-foto del mapa: sombra que lo levanta sobre el satélite (no una mancha
+     plana). Corona de contacto + caída difusa, como un objeto físico clavado. */
+  --shadow-pin:
+    0 0 0 1px rgba(0, 0, 0, 0.18), 0 6px 16px -4px rgba(0, 0, 0, 0.55),
+    0 2px 5px -2px rgba(0, 0, 0, 0.4);
+
+  /* Sombra de la hoja de detalle (bottom sheet): sube desde abajo, así que la
+     sombra es ancha y se proyecta HACIA ARRIBA (la hoja flota sobre el mapa). */
+  --shadow-sheet:
+    0 1px 0 0 var(--glass-sheen) inset, 0 -18px 50px -16px rgba(0, 0, 0, 0.55),
+    0 -4px 16px -8px rgba(0, 0, 0, 0.4);
+
+  /* Tratamiento de imagen (la foto manda). Overlay de legibilidad CALIBRADO: solo
+     ennegrece el pie donde de verdad va texto, y deja la foto respirar arriba (la
+     referencia NO oscurece de más). Tres paradas para un degradado suave. */
+  --photo-scrim-card: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.32) 32%,
+    transparent 62%
+  );
+
+  /* Superficie base bajo una foto que aún carga (mientras llega el bitmap): tinte
+     frío del atlas para que el hueco no se vea muerto ni destelle en blanco. */
+  --photo-loading-bg: var(--ocean-800);
+  /* Banda de brillo del shimmer sobre la superficie de carga (foto/skeleton).
+     Fría y tenue: insinúa "cargando" sin parecer un flash. */
+  --shimmer-band: rgba(150, 220, 225, 0.14);
 
   /* ----------------------------------------------------------------------
    * Tarjetas rasterizadas (LeaderboardCard / ResultCard)
@@ -274,6 +323,20 @@
   --shadow-hover:
     0 1px 0 0 var(--glass-sheen) inset, 0 26px 56px -16px rgba(0, 0, 0, 0.62),
     0 10px 24px -8px rgba(0, 0, 0, 0.5);
+
+  /* Sombra de la tarjeta-foto del carrusel SOBRE el mapa satélite (§ pase visual
+     2/2). A diferencia de --shadow-lg (pensada para vidrio sobre océano), añade un
+     anillo de contacto oscuro 1px que separa la foto del satélite contrastado y un
+     sheen blanco superior tenue (la foto no es vidrio: el realce es de borde, no de
+     blur). Da la profundidad "objeto físico" de la referencia. */
+  --shadow-photo-card:
+    0 0 0 1px rgba(0, 0, 0, 0.22), 0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
+    0 18px 36px -14px rgba(0, 0, 0, 0.6), 0 6px 14px -6px rgba(0, 0, 0, 0.42);
+  /* La misma tarjeta cuando está seleccionada (centrada): la sombra crece un punto
+     para que "salte" hacia el usuario al enfocarla, reforzando el anillo de foco. */
+  --shadow-photo-card-active:
+    0 0 0 1px rgba(0, 0, 0, 0.22), 0 1px 0 0 rgba(255, 255, 255, 0.16) inset,
+    0 26px 50px -14px rgba(0, 0, 0, 0.66), 0 10px 22px -8px rgba(0, 0, 0, 0.46);
 
   /* ----------------------------------------------------------------------
    * Layout

@@ -72,7 +72,7 @@ export function TripMap(props: Props) {
     <GlobeErrorBoundary fallback={flat}>
       {/* Mientras baja el chunk del globo, fondo océano (no pantalla en blanco ni un
           Leaflet de usar y tirar). Si el globo falla, el boundary cae al plano. */}
-      <Suspense fallback={<div className={styles.loading} />}>
+      <Suspense fallback={<div className={`${styles.loading} lg-shimmer-surface`} />}>
         <TripMapGlobe {...props} />
       </Suspense>
     </GlobeErrorBoundary>

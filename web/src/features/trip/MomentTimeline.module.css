@@ -29,8 +29,25 @@
   backdrop-filter: var(--map-chrome-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.play:hover {
+  background: var(--glass-bg-strong);
+}
+.play:active {
+  transform: scale(0.92);
+}
+@media (prefers-reduced-motion: reduce) {
+  .play {
+    transition: none;
+  }
+  .play:active {
+    transform: none;
+  }
 }
 /* Reproduciendo: anillo cálido para que se lea el estado activo de un vistazo. */
 .play[aria-pressed='true'] {
@@ -89,8 +106,9 @@
   border-radius: var(--radius-full, 999px);
   background: var(--map-chrome-bg);
   border: 2px solid var(--pin-ring-closed);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-fast);
+  box-shadow: var(--shadow-sm), var(--ring-contact);
+  /* Muelle al seleccionar: el dot "salta" de tamaño con un pelín de overshoot. */
+  transition: transform var(--duration-base) var(--ease-spring);
 }
 
 .label {

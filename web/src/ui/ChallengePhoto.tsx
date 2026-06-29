@@ -39,6 +39,15 @@ export function ChallengePhoto({
   className,
 }: Props) {
   const [open, setOpen] = useState(false)
+  // La foto manda: mientras el bitmap llega, mostramos un shimmer frío bajo el
+  // hueco y revelamos la imagen con un breve fundido al cargar (en vez de un salto
+  // o un flash en blanco). `loaded` salta a true en onLoad; si la imagen ya estaba
+  // en caché, el navegador puede no disparar onLoad, así que comprobamos
+  // `img.complete` en el ref para no dejar el shimmer colgado.
+  const [loaded, setLoaded] = useState(false)
+  const markLoaded = (el: HTMLImageElement | null) => {
+    if (el?.complete) setLoaded(true)
+  }
 
   // Prioridad: onClick explícito > lightbox interno (si hay foto y es zoomable).
   const opensLightbox = !onClick && zoomable && Boolean(src)
@@ -52,7 +61,23 @@ export function ChallengePhoto({
   const content = (
     <>
       {src ? (
-        <img className={styles.img} src={src} alt={alt} loading="lazy" />
+        <>
+          {/* Capa de carga: shimmer frío que ocupa el marco hasta que la foto
+              carga. Se desvanece bajo la imagen ya revelada (no salta a blanco). */}
+          {!loaded && (
+            <span className={`${styles.loading} lg-shimmer-surface`} aria-hidden="true" />
+          )}
+          <img
+            ref={markLoaded}
+            className={[styles.img, loaded ? 'lg-photo-in' : styles.imgHidden]
+              .filter(Boolean)
+              .join(' ')}
+            src={src}
+            alt={alt}
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+          />
+        </>
       ) : (
         <span className={styles.placeholder} aria-label={alt} role="img">
           <span aria-hidden="true">🏔️</span>

@@ -27,6 +27,51 @@
   z-index: 0;
 }
 
+/* ----------------------------------------------------------------------
+ * Esqueleto de carga del viaje (carga con clase, § pase visual 2/2). En vez de
+ * un spinner desnudo, prefiguramos la pantalla: el lienzo del mapa con un shimmer
+ * frío, pastillas de chrome arriba y tarjetas-foto fantasma abajo. El cerebro
+ * empieza a procesar el layout antes de que lleguen los datos → la espera se
+ * percibe más corta (NN/g). Decorativo (aria-hidden); el estado lo anuncia el
+ * contenedor con role=status.
+ * -------------------------------------------------------------------- */
+.skeletonMap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Pastilla fantasma del chrome (volver / portada / más): mismo lenguaje glass que
+   las reales, con shimmer en vez de contenido. */
+.skelPill {
+  border-radius: var(--radius-full);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+}
+.skelIcon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+}
+.skelCover {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 56px;
+}
+
+/* Tarjeta-foto fantasma del carrusel: misma proporción/altura que MomentCard, con
+   el shimmer de superficie. */
+.skelCard {
+  flex: 0 0 80%;
+  max-width: 320px;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-photo-card);
+}
+
 /* (b) Chrome flotante arriba: respeta el notch (safe-area). */
 .chrome {
   position: absolute;
@@ -55,8 +100,19 @@
   backdrop-filter: var(--map-chrome-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-md);
+  /* Sombra de chrome (despega la pastilla del satélite) + anillo de contacto que
+     la define contra tiles claros (token del pase de craft). */
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.iconPill:hover {
+  background: var(--glass-bg-strong);
+}
+.iconPill:active {
+  transform: scale(0.92);
 }
 
 /* Pastilla "🔴 N en juego": indicador cálido de momentos jugables (point 5). El
@@ -76,9 +132,18 @@
   backdrop-filter: var(--map-chrome-blur);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.livePill:hover {
+  background: var(--glass-bg-strong);
+}
+.livePill:active {
+  transform: scale(0.96);
 }
 
 .liveDot {
@@ -166,6 +231,33 @@
   background: var(--gradient-accent);
   border: none;
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-lg);
+  /* Glow cálido bajo el FAB (única acción cálida flotando sobre el mapa): tira el
+     ojo y lo despega del satélite con el lenguaje de marca, no con negro. */
+  box-shadow: var(--shadow-accent), var(--ring-contact);
   cursor: pointer;
+  transition:
+    box-shadow var(--transition-base),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.fab:hover {
+  background: var(--gradient-accent-hover);
+  box-shadow: var(--shadow-accent-hover), var(--glow-fab-hover);
+  transform: translateY(-2px);
+}
+.fab:active {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconPill,
+  .livePill,
+  .fab {
+    transition: none;
+  }
+  .iconPill:active,
+  .livePill:active,
+  .fab:hover,
+  .fab:active {
+    transform: none;
+  }
 }

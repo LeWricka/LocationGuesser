@@ -7,6 +7,7 @@
 .loading {
   width: 100%;
   height: 100%;
-  /* Océano profundo bajo el globo que aún no ha montado (sin flash blanco). */
-  background: var(--ocean-900);
+  /* Océano profundo bajo el globo que aún no ha montado (sin flash blanco). El
+     shimmer frío lo aporta `lg-shimmer-surface` (clase global); no fijamos
+     `background` aquí para no pisar su banda de brillo. */
 }

@@ -53,6 +53,22 @@
   object-fit: cover;
 }
 
+/* La imagen aún no cargada queda invisible (el shimmer ocupa su sitio); al cargar
+   se le aplica `lg-photo-in` que la revela con un fundido. Sin esto la imagen
+   parpadearía a medio cargar sobre el shimmer. */
+.imgHidden {
+  opacity: 0;
+}
+
+/* Capa de carga (shimmer) que cubre el marco hasta que la foto está lista. El
+   shimmer y su pausa por reduced-motion los aporta la clase global
+   `lg-shimmer-surface`; aquí solo la posicionamos a sangre. */
+.loading {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
 .placeholder {
   display: flex;
   align-items: center;
