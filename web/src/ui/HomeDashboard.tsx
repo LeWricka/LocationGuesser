@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Plus } from 'lucide-react'
+import { ChevronUp, Plus } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { Icon } from './Icon'
 import { Button } from './Button'
@@ -54,12 +55,13 @@ interface Props {
   className?: string
 }
 
-// Layout presentacional de la home logueada — variante A "el globo" (maqueta home-wow):
-// IMAGEN-DOMINANTE. El mapamundi satélite a sangre es el protagonista; el chrome (marca,
-// perfil, lema) son pastillas papel translúcidas que flotan, no tarjetas blancas. Debajo,
-// los viajes son unidades visuales GRANDES y separadas (su portada-foto manda), no un
-// carrusel apretado. SIN "cómo funciona" ni panel de números: la promesa es guardar y
-// compartir recuerdos; adivinar es un guiño que vive dentro del viaje.
+// Layout presentacional de la home logueada — enfoque "GLOBO INMERSIVO DOMINANTE":
+// el mapamundi satélite ocupa TODA la pantalla a sangre (como la pantalla de viaje) y es
+// el lienzo permanente. El chrome (marca, perfil) flota en pastillas papel translúcidas.
+// Los viajes viven en una BANDEJA inferior translúcida tipo "sheet": plegada deja ver una
+// fila de portadas que flotan sobre el globo; al subirla se despliega la lista completa
+// con secciones y CTAs. El mundo del usuario es el protagonista; la lista nunca tapa los
+// pines (plegada solo ocupa la franja inferior). SIN "cómo funciona" ni panel de números.
 export function HomeDashboard({
   userId,
   displayName,
@@ -72,53 +74,99 @@ export function HomeDashboard({
   onOpenGroup,
   className,
 }: Props) {
+  // Bandeja plegada por defecto: el globo manda al entrar. Subirla despliega la lista.
+  const [expanded, setExpanded] = useState(false)
+
   // Separamos TUS viajes (los que posees) del RESTO (donde solo participas); cada
   // grupo ordenado con los que piden acción primero y luego por más reciente.
   const owned = sortTrips(groups.filter((g) => g.owned))
   const others = sortTrips(groups.filter((g) => !g.owned))
+  // Fila plegada: una sola tira con todo, acción primero (lo que urge se ve sin desplegar).
+  const peekTrips = sortTrips(groups)
+  const tripCount = groups.length
 
   return (
     <div className={[styles.home, className].filter(Boolean).join(' ')}>
-      {/* HÉROE: el mapamundi a sangre con el chrome flotando encima. */}
-      <section className={styles.hero}>
-        {/* Topbar flotante: marca + acceso a perfil, en pastillas papel translúcidas. */}
-        <div className={styles.topbar}>
-          <span className={styles.brand}>
-            <b>Lugares</b>
-            <i>tu mundo</i>
+      {/* HÉROE INMERSIVO: el mapamundi a sangre ocupa toda la pantalla, detrás del chrome. */}
+      <div className={styles.globe}>{worldMap}</div>
+
+      {/* Topbar flotante: marca + acceso a perfil, en pastillas papel translúcidas. */}
+      <div className={styles.topbar}>
+        <span className={styles.brand}>
+          <b>Lugares</b>
+          <i>tu mundo</i>
+        </span>
+        <button
+          type="button"
+          className={styles.avatarButton}
+          onClick={onOpenProfile}
+          aria-label="Abrir tu perfil"
+        >
+          <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
+        </button>
+      </div>
+
+      {/* BANDEJA inferior translúcida que flota sobre el globo. Plegada: tira de portadas.
+          Desplegada: lista completa por secciones + CTAs. */}
+      <section
+        className={[styles.tray, expanded ? styles.trayOpen : ''].filter(Boolean).join(' ')}
+        aria-label="Tus viajes"
+      >
+        {/* Asa: pulsar pliega/despliega la bandeja. El recuento da contexto sin desplegar. */}
+        <button
+          type="button"
+          className={styles.grabber}
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          aria-label={expanded ? 'Plegar tus viajes' : 'Desplegar tus viajes'}
+        >
+          <span className={styles.grabberBar} aria-hidden="true" />
+          <span className={styles.grabberRow}>
+            <span className={styles.grabberLabel}>
+              {tripCount === 1 ? '1 viaje' : `${tripCount} viajes`}
+            </span>
+            <Icon
+              icon={ChevronUp}
+              size={18}
+              className={[styles.grabberChevron, expanded ? styles.grabberChevronOpen : '']
+                .filter(Boolean)
+                .join(' ')}
+            />
           </span>
-          <button
-            type="button"
-            className={styles.avatarButton}
-            onClick={onOpenProfile}
-            aria-label="Abrir tu perfil"
-          >
-            <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
-          </button>
+        </button>
+
+        {/* Plegada: tira horizontal de portadas que flotan (se oculta al desplegar). */}
+        <div className={styles.peek} aria-hidden={expanded}>
+          {peekTrips.map((group) => (
+            <PeekCard
+              key={group.id}
+              group={group}
+              onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+            />
+          ))}
         </div>
 
-        {/* El mapamundi satélite (lo inyecta HomePage). Si no llega, no se pinta. */}
-        {worldMap}
+        {/* Desplegada: la lista completa por secciones + acciones (scrollea dentro). */}
+        <div className={styles.sheetBody}>
+          {/* Headings SIEMPRE en el DOM (contrato de la home): se muestran al desplegar. */}
+          {owned.length > 0 && (
+            <TripSection title="Tus viajes" trips={owned} onOpenGroup={onOpenGroup} />
+          )}
+          {others.length > 0 && (
+            <TripSection title="Donde participas" trips={others} onOpenGroup={onOpenGroup} />
+          )}
+
+          {/* Acciones: empezar un viaje (primaria) / unirse con un código. */}
+          <div className={styles.ctas}>
+            <Button onClick={onCreateGroup} className={styles.ctaPrimary}>
+              <Icon icon={Plus} size={18} /> Empezar un viaje
+            </Button>
+            <Button variant="secondary" onClick={onJoinGroup} className={styles.ctaSecondary}>
+              Unirme
+            </Button>
+          </div>
+        </div>
       </section>
-
-      {/* TUS VIAJES (los que posees) y, aparte, DONDE PARTICIPAS. Portadas a todo el
-          ancho, una por fila (imagen-dominante). Cada sección solo si tiene viajes. */}
-      {owned.length > 0 && (
-        <TripSection title="Tus viajes" trips={owned} onOpenGroup={onOpenGroup} />
-      )}
-      {others.length > 0 && (
-        <TripSection title="Donde participas" trips={others} onOpenGroup={onOpenGroup} />
-      )}
-
-      {/* Acciones: empezar un viaje (primaria) / unirse con un código. */}
-      <div className={styles.ctas}>
-        <Button onClick={onCreateGroup} className={styles.ctaPrimary}>
-          <Icon icon={Plus} size={18} /> Empezar un viaje
-        </Button>
-        <Button variant="secondary" onClick={onJoinGroup} className={styles.ctaSecondary}>
-          Unirme
-        </Button>
-      </div>
     </div>
   )
 }
@@ -149,13 +197,24 @@ function TripSection({
   )
 }
 
-// Tarjeta-portada de un viaje (variante A): la FOTO es la tarjeta. Velo inferior, nombre
-// serif sobre el velo e indicadores sutiles ("en juego"/"te toca"/"tuyo"). Tocar abre el
-// viaje. La foto es decorativa (la etiqueta del botón da el nombre).
+// Indicador SUTIL del estado del viaje ("en juego"/"te toca"), reutilizado por ambas
+// tarjetas. Devuelve null si el viaje no pide acción.
+function LiveTag({ status }: { status: GroupStatus }) {
+  if (status !== 'live' && status !== 'toplay') return null
+  const liveLabel = status === 'toplay' ? 'Te toca' : 'En juego'
+  return (
+    <span className={styles.tripLive}>
+      <span className={styles.tripBlip} aria-hidden="true" />
+      {liveLabel}
+    </span>
+  )
+}
+
+// Tarjeta-portada de un viaje (lista desplegada): la FOTO es la tarjeta. Velo inferior,
+// nombre serif sobre el velo e indicadores sutiles. Tocar abre el viaje. La foto es
+// decorativa (la etiqueta del botón da el nombre).
 function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }) {
   const isButton = typeof onClick === 'function'
-  const live = group.status === 'live' || group.status === 'toplay'
-  const liveLabel = group.status === 'toplay' ? 'Te toca' : 'En juego'
 
   return (
     <article className={styles.tripCard}>
@@ -170,12 +229,7 @@ function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }
           className={styles.tripCover}
           style={group.coverUrl ? { backgroundImage: `url('${group.coverUrl}')` } : undefined}
         >
-          {live && (
-            <span className={styles.tripLive}>
-              <span className={styles.tripBlip} aria-hidden="true" />
-              {liveLabel}
-            </span>
-          )}
+          <LiveTag status={group.status} />
           {group.owned && (
             <span className={styles.tripOwned}>
               <span aria-hidden="true">👑</span> Tuyo
@@ -185,5 +239,39 @@ function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }
         </div>
       </button>
     </article>
+  )
+}
+
+// Mini-portada de la tira plegada: una foto cuadrada que flota sobre el globo. Tocar abre
+// el viaje. Es un PREVIEW visual del mismo viaje que ya está en la lista desplegada, así
+// que se marca aria-hidden + tabIndex=-1: no duplica el botón accesible "Abrir viaje X"
+// (lo posee la tarjeta de la lista); el lector de pantalla y el foco usan esa.
+function PeekCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }) {
+  const isButton = typeof onClick === 'function'
+
+  return (
+    <button
+      type="button"
+      className={styles.peekCard}
+      onClick={onClick}
+      disabled={!isButton}
+      aria-hidden="true"
+      tabIndex={-1}
+    >
+      <span
+        className={styles.peekCover}
+        style={group.coverUrl ? { backgroundImage: `url('${group.coverUrl}')` } : undefined}
+      >
+        {/* En la mini-portada el estado se reduce a un PUNTO de acento que palpita (sin
+            texto): la etiqueta legible "Te toca"/"En juego" vive en la lista desplegada
+            (y evita duplicar ese texto en el DOM, que es el contrato accesible). */}
+        {(group.status === 'live' || group.status === 'toplay') && (
+          <span className={styles.peekLive} aria-hidden="true">
+            <span className={styles.tripBlip} />
+          </span>
+        )}
+      </span>
+      <span className={styles.peekName}>{group.name}</span>
+    </button>
   )
 }

@@ -123,9 +123,10 @@ export function HomePage() {
   }))
 
   return (
-    // Con viajes, la home es un lienzo con SNAP vertical: el héroe (mapamundi) y la
-    // galería de viajes encajan de golpe al hacer scroll (sensación nativa móvil).
-    <main className={hasGroups ? `lg-page ${styles.snapScroll}` : 'lg-page'}>
+    // Con viajes, la home es un LIENZO INMERSIVO a pantalla completa: el mapamundi a sangre
+    // ocupa todo y la bandeja de viajes flota encima (el propio HomeDashboard se gestiona el
+    // alto de viewport y el scroll interno de la bandeja; la página no scrollea).
+    <main className={hasGroups ? `lg-page ${styles.immersive}` : 'lg-page'}>
       {hasGroups ? (
         <HomeDashboard
           userId={userId}
