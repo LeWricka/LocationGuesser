@@ -1,35 +1,40 @@
 /*
  * Sección RETOS: el hub de juego del viaje (protagonista del nuevo enfoque).
  * Lenguaje Atelier/Pizarra: papel, tinta, acento pizarra con disciplina, oro SOLO
- * en el podio. Vive dentro de un panel deslizable de TripPage (scroll vertical).
+ * en el podio/medallas. Vive dentro de un panel deslizable de TripPage (scroll
+ * vertical, fondo papel; NO a sangre). La jerarquía la dan tamaño/peso/familia
+ * (serif en titulares, eyebrows en mayúsculas espaciadas), nunca fondos de color.
  */
 .hub {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-6);
 }
 
-/* eyebrow del hub: título serif + meta en mayúsculas espaciadas. */
+/* ---- cabecera editorial del hub: eyebrow + titular serif ---- */
 .eyebrow {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.eyebrowLabel {
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
 }
 .eyebrowTitle {
+  margin: 0;
   font-family: var(--font-display);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
 }
-.eyebrowMeta {
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--color-text-faint);
-}
 
-/* ---- (a) EN JUEGO ---- */
+/* ---- (a) EN JUEGO — héroe de la sección ---- */
 .nowPlaying {
   position: relative;
 }
@@ -49,7 +54,7 @@
 .npGrad {
   position: absolute;
   inset: 0;
-  background: linear-gradient(rgba(24, 32, 43, 0) 35%, rgba(24, 32, 43, 0.82) 100%);
+  background: linear-gradient(rgba(24, 32, 43, 0) 28%, rgba(24, 32, 43, 0.86) 100%);
   pointer-events: none;
 }
 .npTag {
@@ -65,17 +70,19 @@
   text-transform: uppercase;
   color: #fff;
   background: var(--color-accent);
-  padding: 0.3rem 0.6rem;
+  padding: 0.32rem 0.62rem;
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-md);
 }
-.live {
-  width: 7px;
-  height: 7px;
-  border-radius: var(--radius-full);
-  background: #e7d3a2;
-  box-shadow: 0 0 0 0 rgba(231, 211, 162, 0.6);
+/* El punto "en juego": el SVG hereda este color cálido (único oro fuera del podio
+   permitido por su semántica de "vivo"); el anillo externo late. */
+.liveDot {
+  color: #e7d3a2;
+  flex: 0 0 auto;
+}
+.livePulse {
   animation: lg-pulse-glow 1.8s ease-out infinite;
+  border-radius: var(--radius-full);
 }
 .npFoot {
   position: absolute;
@@ -83,14 +90,33 @@
   right: var(--space-4);
   bottom: var(--space-4);
 }
+.npKicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.88);
+}
+.npKickerIcon {
+  color: #e7d3a2;
+}
 .npPrompt {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-4);
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
-  line-height: 1.05;
+  line-height: 1.04;
   color: #fff;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
+  /* dos líneas máx. para títulos largos; el resto, elipsis. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .npBottom {
   display: flex;
@@ -109,9 +135,9 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
   letter-spacing: 0.02em;
-  color: var(--color-text);
-  background: #fff;
-  padding: 0.55rem 1rem;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  padding: 0.6rem 1.15rem;
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-md);
   transition: transform var(--transition-fast);
@@ -122,6 +148,10 @@
 .ctaPlay:active {
   transform: scale(0.95);
 }
+.ctaPlay:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
 .npSocial {
   display: flex;
   align-items: center;
@@ -131,40 +161,81 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
 }
+.npSocial b {
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.npSocialDot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
 
+/* Estado vacío: ilustración (brújula) + título serif + ayuda. Caja papel con
+   borde discontinuo suave, centrada. */
 .npEmpty {
-  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-5);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
 }
-.npEmptyText {
+.npEmptyArt {
+  display: grid;
+  place-items: center;
+  color: var(--color-accent);
+  opacity: 0.7;
+  margin-bottom: var(--space-1);
+}
+.npEmptyTitle {
   margin: 0;
-  font-size: var(--font-size-sm);
-  line-height: 1.55;
-  color: var(--color-text-muted);
-  text-align: center;
-}
-
-/* ---- cabeceras de bloque ---- */
-.blockHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-.blockTitle {
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
 }
+.npEmptyText {
+  margin: 0;
+  max-width: 30ch;
+  font-size: var(--font-size-sm);
+  line-height: 1.55;
+  color: var(--color-text-muted);
+}
+
+/* ---- cabeceras de bloque (eyebrow con icono + meta) ---- */
+.blockHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.blockEyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-muted);
+}
+.blockEyebrowIcon {
+  color: var(--color-accent);
+  flex: 0 0 auto;
+}
 .blockMeta {
   font-size: var(--font-size-xs);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--color-text-faint);
+  font-style: italic;
+  font-family: var(--font-display);
   max-width: 50%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -188,6 +259,23 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+.resultRank {
+  flex: 0 0 auto;
+  width: 22px;
+  display: grid;
+  place-items: center;
+}
+.resultPos {
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-faint);
+}
+.resultMedal {
+  color: var(--medal-gold);
 }
 .resultInfo {
   flex: 1;
@@ -198,6 +286,9 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .resultSub {
   display: block;
@@ -207,16 +298,18 @@
 .resultKm {
   flex: 0 0 auto;
   text-align: right;
+  line-height: 1;
+}
+.resultKmValue {
+  display: block;
   font-family: var(--font-display);
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   color: var(--color-accent);
-  line-height: 1;
 }
 .resultKmTag {
   display: block;
-  font-family: var(--font-sans, inherit);
   font-size: 0.625rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -224,7 +317,14 @@
   font-weight: var(--font-weight-semibold);
   margin-top: 2px;
 }
-.resultWin .resultKm {
+/* El ganador recibe un hairline de oro a la izquierda + km en oro (único cálido). */
+.resultWin {
+  border-color: color-mix(in srgb, var(--medal-gold) 45%, var(--color-border));
+  box-shadow:
+    inset 3px 0 0 var(--medal-gold),
+    var(--shadow-xs);
+}
+.resultWin .resultKmValue {
   color: var(--medal-gold);
 }
 
@@ -235,7 +335,7 @@
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   box-shadow: var(--shadow-md);
-  padding: var(--space-4);
+  padding: var(--space-5) var(--space-4) var(--space-4);
   overflow: hidden;
 }
 /* hilo de oro arriba: señala "esto es lo importante" (único toque cálido). */
@@ -251,10 +351,27 @@
 }
 .standingsHead {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
+}
+.standingsTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+/* Sello del trofeo: disco con tinte cálido sutil, el SVG hereda el oro. */
+.standingsBadge {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--medal-gold) 16%, var(--color-surface));
+  color: var(--medal-gold);
 }
 .standingsKicker {
   display: block;
@@ -263,7 +380,7 @@
   text-transform: uppercase;
   color: var(--medal-gold);
   font-weight: var(--font-weight-bold);
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 .standingsTitle {
   display: block;
@@ -274,6 +391,7 @@
   color: var(--color-text);
 }
 .standingsMeta {
+  flex: 0 0 auto;
   text-align: right;
 }
 .leaderLine {
@@ -424,7 +542,6 @@
 .allChallenges {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
   text-align: left;
@@ -434,6 +551,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  box-shadow: var(--shadow-xs);
   transition:
     background-color var(--transition-fast),
     transform var(--transition-fast);
@@ -444,7 +562,18 @@
 .allChallenges:active {
   transform: scale(0.99);
 }
+.acIcon {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
 .acText {
+  flex: 1;
   min-width: 0;
 }
 .acTitle {
@@ -473,7 +602,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .live {
+  .livePulse {
     animation: none;
   }
   .ctaPlay,
@@ -496,7 +625,7 @@
   grid-template-columns: 1fr 1.15fr 1fr;
   align-items: end;
   gap: var(--space-2);
-  margin: var(--space-2) 0 var(--space-3);
+  margin: var(--space-2) 0 var(--space-4);
 }
 .podiumCol {
   display: flex;
@@ -516,27 +645,31 @@
   order: 3;
 }
 .crown {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
   line-height: 1;
   margin-bottom: 2px;
 }
 .podiumDisc {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   border-radius: var(--radius-full);
   display: grid;
   place-items: center;
   overflow: hidden;
   border: 2px solid var(--color-border);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 .placeFirst .podiumDisc {
-  width: 58px;
-  height: 58px;
+  width: 62px;
+  height: 62px;
 }
 .podiumDisc.gold {
   border-color: var(--medal-gold);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--medal-gold) 22%, transparent),
+    var(--shadow-sm);
 }
 .podiumDisc.silver {
   border-color: var(--medal-silver);
@@ -565,11 +698,12 @@
 }
 .podiumPoints {
   font-family: var(--font-display);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   color: var(--color-text);
   margin-top: 1px;
+  line-height: 1;
 }
 .placeFirst .podiumPoints {
   color: var(--medal-gold);
@@ -582,29 +716,29 @@
 .pedestal {
   margin-top: var(--space-2);
   width: 100%;
-  height: 26px;
+  height: 28px;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   display: grid;
   place-items: center;
   background: var(--color-accent-soft);
 }
 .placeFirst .pedestal {
-  height: 40px;
+  height: 44px;
 }
 .placeThird .pedestal {
-  height: 18px;
+  height: 20px;
 }
 .pedestal.gold {
-  background: color-mix(in srgb, var(--medal-gold) 22%, var(--color-surface));
+  background: color-mix(in srgb, var(--medal-gold) 24%, var(--color-surface));
 }
 .pedestal.silver {
-  background: color-mix(in srgb, var(--medal-silver) 22%, var(--color-surface));
+  background: color-mix(in srgb, var(--medal-silver) 24%, var(--color-surface));
 }
 .pedestal.bronze {
-  background: color-mix(in srgb, var(--medal-bronze) 22%, var(--color-surface));
+  background: color-mix(in srgb, var(--medal-bronze) 24%, var(--color-surface));
 }
 .pedestalMedal {
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   line-height: 1;
 }
 
@@ -615,7 +749,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  margin-top: var(--space-2);
+  margin-top: calc(-1 * var(--space-3));
   padding: var(--space-2) var(--space-3);
   appearance: none;
   border: 0;

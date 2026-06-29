@@ -1,10 +1,19 @@
 import type { CSSProperties } from 'react'
-import { ChevronRight, Play, Target } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 import { Avatar, ChallengePhoto, Icon, useReducedMotion } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { Moment } from '../../lib/trip'
 import { Podium, type PodiumClasses } from '../group/Podium'
 import { Countdown } from './Countdown'
+import {
+  CompassIcon,
+  FlagIcon,
+  LiveDotIcon,
+  MedalIcon,
+  PinTargetIcon,
+  PlayBadgeIcon,
+  TrophyIcon,
+} from './RetosIcons'
 import type { RecentResult } from './useTripData'
 import styles from './TripRetos.module.css'
 
@@ -61,16 +70,16 @@ function formatKm(km: number): string {
 
 /**
  * HUB de juego del viaje (la sección Retos, protagonista del nuevo enfoque). De
- * arriba a abajo:
- *   (a) EN JUEGO — foto grande con ken-burns, "Adivina dónde es", cuenta atrás
- *       viva y botón Jugar → enruta al flujo de adivinar EXISTENTE.
+ * arriba a abajo, con jerarquía editorial (eyebrow → héroe → bloques con regla):
+ *   (a) EN JUEGO — héroe de la sección: foto grande con ken-burns, "Adivina dónde
+ *       es", cuenta atrás viva y botón Jugar → enruta al flujo de adivinar.
  *   (b) RESULTADOS RECIENTES — quién acertó y a cuántos km en el último cerrado.
- *   (c) CLASIFICACIÓN — marcador del grupo con PODIO (reusa `Podium`) + lista, con
- *       barras que crecen al entrar y stagger del ranking.
- *   (d) TODOS LOS RETOS — acceso a la GroupPage clásica.
+ *   (c) CLASIFICACIÓN — marcador del grupo con PODIO (reusa `Podium`) + lista.
+ *   (d) TODOS LOS RETOS + pie de marcador/ajustes clásicos.
  *
- * Datos reales (live/past/votos) vía `useTripData`. Respeta reduced-motion: el
- * ken-burns y los reveals se anulan por las utilidades globales de `index.css`.
+ * Datos reales (live/past/votos) vía `useTripData`. Iconografía propia (SVG inline
+ * en `RetosIcons`, no emojis sueltos). Respeta reduced-motion vía utilidades de
+ * `index.css` (ken-burns, reveals, pulso del punto en juego).
  */
 export function TripRetos({
   activeMoment,
@@ -94,10 +103,10 @@ export function TripRetos({
 
   return (
     <div className={`${styles.hub} lg-stagger`}>
-      {/* (a) EN JUEGO ----------------------------------------------------- */}
+      {/* (a) EN JUEGO — héroe de la sección ------------------------------- */}
       <header className={styles.eyebrow}>
-        <span className={styles.eyebrowTitle}>El juego del viaje</span>
-        <span className={styles.eyebrowMeta}>{activeMoment ? 'Reto vivo' : 'Sin reto vivo'}</span>
+        <span className={styles.eyebrowLabel}>El juego del viaje</span>
+        <h2 className={styles.eyebrowTitle}>Retos</h2>
       </header>
 
       {activeMoment ? (
@@ -113,11 +122,18 @@ export function TripRetos({
             />
             <div className={styles.npGrad} aria-hidden="true" />
             <span className={styles.npTag}>
-              <span className={styles.live} aria-hidden="true" />
+              <LiveDotIcon
+                size={13}
+                className={reducedMotion ? styles.liveDot : `${styles.liveDot} ${styles.livePulse}`}
+              />
               En juego
             </span>
             <div className={styles.npFoot}>
-              <p className={styles.npPrompt}>Adivina dónde es</p>
+              <p className={styles.npKicker}>
+                <PinTargetIcon size={13} className={styles.npKickerIcon} />
+                Adivina dónde es
+              </p>
+              <p className={styles.npPrompt}>{activeMoment.title || '¿Dónde estoy?'}</p>
               <div className={styles.npBottom}>
                 <Countdown deadlineAt={activeMoment.deadlineAt} />
                 <button
@@ -125,24 +141,28 @@ export function TripRetos({
                   className={styles.ctaPlay}
                   onClick={() => onPlay(activeMoment.challengeId)}
                 >
+                  <PlayBadgeIcon size={14} />
                   Jugar
-                  <Icon icon={Play} size={15} />
                 </button>
               </div>
             </div>
           </div>
           {activeGuessedCount > 0 && (
             <p className={styles.npSocial}>
-              <Icon icon={Target} size={13} /> {activeGuessedCount}{' '}
+              <span className={styles.npSocialDot} aria-hidden="true" />
+              <b>{activeGuessedCount}</b>{' '}
               {activeGuessedCount === 1 ? 'ya ha jugado' : 'ya han jugado'}
             </p>
           )}
         </section>
       ) : (
         <section className={styles.npEmpty}>
+          <span className={styles.npEmptyArt} aria-hidden="true">
+            <CompassIcon size={52} />
+          </span>
+          <p className={styles.npEmptyTitle}>Sin reto vivo</p>
           <p className={styles.npEmptyText}>
-            Ahora mismo no hay ningún reto en juego. Cuando alguien comparta un momento, aparecerá
-            aquí para que lo adivinéis.
+            Cuando alguien comparta un momento, aparecerá aquí para que lo adivinéis.
           </p>
         </section>
       )}
@@ -151,28 +171,40 @@ export function TripRetos({
       {recentResults.length > 0 && (
         <section>
           <header className={styles.blockHead}>
-            <span className={styles.blockTitle}>Resultados recientes</span>
+            <span className={styles.blockEyebrow}>
+              <FlagIcon size={14} className={styles.blockEyebrowIcon} />
+              Resultados recientes
+            </span>
             {recentTitle && <span className={styles.blockMeta}>{recentTitle}</span>}
           </header>
           <ul className={styles.results}>
-            {recentResults.slice(0, 4).map((r, i) => (
-              <li key={r.userId} className={`${styles.result} ${i === 0 ? styles.resultWin : ''}`}>
-                <Avatar userId={r.userId} avatarUrl={r.avatar} name={r.name} size="sm" />
-                <div className={styles.resultInfo}>
-                  <span className={styles.resultName}>
-                    {r.name}
-                    {i === 0 && <span aria-hidden="true"> 🥇</span>}
+            {recentResults.slice(0, 4).map((r, i) => {
+              const isWin = i === 0 && r.distanceKm != null
+              return (
+                <li key={r.userId} className={`${styles.result} ${isWin ? styles.resultWin : ''}`}>
+                  <span className={styles.resultRank} aria-hidden="true">
+                    {isWin ? (
+                      <MedalIcon rank={1} size={22} className={styles.resultMedal} />
+                    ) : (
+                      <span className={styles.resultPos}>{i + 1}</span>
+                    )}
                   </span>
-                  <span className={styles.resultSub}>
-                    {r.distanceKm == null ? 'No marcó a tiempo' : `${r.points} pts`}
+                  <Avatar userId={r.userId} avatarUrl={r.avatar} name={r.name} size="sm" />
+                  <div className={styles.resultInfo}>
+                    <span className={styles.resultName}>{r.name}</span>
+                    <span className={styles.resultSub}>
+                      {r.distanceKm == null ? 'No marcó a tiempo' : `${r.points} pts`}
+                    </span>
+                  </div>
+                  <span className={styles.resultKm}>
+                    <span className={styles.resultKmValue}>
+                      {r.distanceKm == null ? '—' : formatKm(r.distanceKm)}
+                    </span>
+                    <span className={styles.resultKmTag}>de distancia</span>
                   </span>
-                </div>
-                <span className={styles.resultKm}>
-                  {r.distanceKm == null ? '—' : formatKm(r.distanceKm)}
-                  <span className={styles.resultKmTag}>de distancia</span>
-                </span>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         </section>
       )}
@@ -180,9 +212,14 @@ export function TripRetos({
       {/* (c) CLASIFICACIÓN protagonista ---------------------------------- */}
       <section className={styles.standings}>
         <header className={styles.standingsHead}>
-          <div>
-            <span className={styles.standingsKicker}>Liga del viaje</span>
-            <span className={styles.standingsTitle}>Clasificación</span>
+          <div className={styles.standingsTitleWrap}>
+            <span className={styles.standingsBadge} aria-hidden="true">
+              <TrophyIcon size={18} />
+            </span>
+            <div>
+              <span className={styles.standingsKicker}>Liga del viaje</span>
+              <span className={styles.standingsTitle}>Clasificación</span>
+            </div>
           </div>
           {leader && (
             <div className={styles.standingsMeta}>
@@ -263,6 +300,9 @@ export function TripRetos({
 
       {/* (d) TODOS LOS RETOS --------------------------------------------- */}
       <button type="button" className={styles.allChallenges} onClick={onOpenClassic}>
+        <span className={styles.acIcon} aria-hidden="true">
+          <FlagIcon size={18} />
+        </span>
         <span className={styles.acText}>
           <span className={styles.acTitle}>Todos los retos</span>
           <span className={styles.acSub}>
