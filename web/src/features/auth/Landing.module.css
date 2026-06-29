@@ -1,5 +1,7 @@
-/* Landing pública (issue #175): móvil-first, una columna centrada que respira
- * en pantallas anchas. Todo con tokens del kit; sin colores/espaciados crudos. */
+/* Landing pública (issue #175; portada visual #183): móvil-first, una columna
+ * centrada que respira en pantallas anchas. La portada es VISUAL — imagen de
+ * marca + frase emotiva en serif + un CTA; el correo vive en el popup, no aquí.
+ * Todo con tokens del sistema "Atelier"; sin colores/espaciados crudos. */
 .page {
   min-height: 100svh;
   display: flex;
@@ -14,16 +16,10 @@
   max-width: var(--container-max);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-7);
 }
 
-/* Más aire antes de "Cómo funciona": queda debajo de la entrada, separado para
- * leerse como una sección aparte (issue #183). */
-.content > section:last-child {
-  margin-top: var(--space-4);
-}
-
-/* ── Hero ─────────────────────────────────────────────────────────────────── */
+/* ── Hero / portada ─────────────────────────────────────────────────────────── */
 .hero {
   text-align: center;
   display: flex;
@@ -31,20 +27,15 @@
   align-items: center;
 }
 
-/* Ancla de marca (el pin) en disco de tint de acento con hairline: quieto, sin
- * halo. Hero compacto (issue #183): el pin pequeño para que el formulario de
- * email entre en pantalla sin scroll en móvil. */
-.brand {
-  display: grid;
-  place-items: center;
-  width: 60px;
-  height: 60px;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-lg);
-  line-height: 1;
-  background: var(--color-accent-soft);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
-  margin-bottom: var(--space-4);
+/* Imagen de marca: las dos hojas (el momento que compartes y el que lo vive).
+ * Decorativa (alt=""), el mensaje lo lleva el titular. Entra con un fundido
+ * suave hacia arriba; se respeta prefers-reduced-motion más abajo. */
+.heroImage {
+  width: 168px;
+  max-width: 60%;
+  height: auto;
+  margin-bottom: var(--space-5);
+  animation: hero-rise var(--duration-slower) var(--ease-emphasized) both;
 }
 
 .eyebrow {
@@ -74,60 +65,53 @@
 
 .lead {
   margin: var(--space-3) auto 0;
-  max-width: 46ch;
+  max-width: 38ch;
   color: var(--color-text-muted);
+  font-size: var(--font-size-md);
   line-height: var(--line-height-normal);
+  text-wrap: balance;
 }
 
-/* ── Entrada por magic link ───────────────────────────────────────────────── */
-/* La tarjeta de entrada es el foco de la landing: debe destacar sobre el papel,
- * no fundirse. Degradado sutil (blanco→tinte de acento), borde de acento algo más
- * marcado y elevación mayor para que el formulario "flote" y cante. */
-.entry {
+/* CTA principal: abre el popup de entrada. Ancho cómodo, no a sangre, para que la
+ * portada respire; en móvil estrecho se estira hasta el contenedor. */
+.cta {
+  margin-top: var(--space-6);
+  min-width: 260px;
+  max-width: 100%;
+}
+
+/* "¿Ya tienes cuenta? Entra": discreto, mismo flujo OTP que el CTA. */
+.signIn {
+  margin-top: var(--space-4);
+  border: none;
+  background: none;
+  padding: var(--space-2);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.signIn:hover {
+  color: var(--color-text);
+}
+.signIn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.signInAccent {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-accent);
+}
+
+/* ── Atajo "tengo un código de viaje" (issue #183) ────────────────────────────
+ * Discreto: un disclosure que despliega un campo para pegar código/enlace. Solo
+ * en la landing genérica; en el deep-link el viaje ya viene dado. */
+.codeDisclosure {
   width: 100%;
   max-width: 420px;
   margin: 0 auto;
   text-align: center;
-  padding: var(--space-6);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(
-    180deg,
-    var(--color-surface) 0%,
-    color-mix(in srgb, var(--color-accent-soft) 60%, var(--color-surface)) 100%
-  );
-  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
-  box-shadow: var(--shadow-lg);
-}
-
-.entryTitle {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-tight);
-  line-height: var(--line-height-tight);
-}
-
-.entryLead {
-  margin: var(--space-2) auto var(--space-5);
-  max-width: 36ch;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-normal);
-}
-
-/* El formulario se alinea a la izquierda dentro de la tarjeta centrada: la
- * etiqueta y el error leen mejor pegados al borde del campo. */
-.form {
-  text-align: left;
-}
-
-/* ── Atajo "tengo un código de grupo" (issue #183) ────────────────────────────
- * Discreto: un disclosure que despliega un campo para pegar código/enlace. Solo
- * en la landing genérica; en el deep-link el grupo ya viene dado. */
-.codeDisclosure {
-  margin-top: var(--space-5);
-  border-top: 1px solid var(--card-border);
-  padding-top: var(--space-4);
 }
 
 .codeSummary {
@@ -152,7 +136,24 @@
 }
 
 @media (min-width: 600px) {
-  .headline {
-    font-size: var(--font-size-2xl);
+  .heroImage {
+    width: 200px;
+  }
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroImage {
+    animation: none;
   }
 }
