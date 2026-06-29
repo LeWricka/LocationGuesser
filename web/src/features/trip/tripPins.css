@@ -15,27 +15,33 @@
   border-radius: var(--radius-full, 999px);
   background-size: cover;
   background-position: center;
-  background-color: var(--ocean-900);
+  background-color: var(--color-surface);
   /* Sombra de pin (anillo de contacto + caída difusa): clavado físico sobre el
-     satélite, no una mancha plana (token del pase de craft). */
+     mapa, no una mancha plana (token del pase de craft). */
   box-shadow: var(--shadow-pin);
   cursor: pointer;
   /* Anillo del estado: el cerrado es blanco; el activo lo sobreescribe abajo. */
   border: var(--pin-ring-width) solid var(--pin-ring-closed);
 }
 
-/* Pin sin foto: muestra un emoji centrado sobre el disco. */
+/* Pin sin foto: disco de ACENTO con un emoji claro centrado, para que destaque
+   sobre el basemap claro (un disco blanco con anillo blanco se perdería en el papel). */
 .lg-trip-pin--icon {
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 22px;
   line-height: 1;
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
-/* Pin del momento ACTIVO: anillo cálido + halo que respira (reusa lg-pulse-glow). */
+/* Pin del momento ACTIVO: disco rojo (🔴 en juego) con anillo claro + halo que
+   respira (reusa lg-pulse-glow). El rojo lo separa de los pines-foto cerrados y
+   lo ata a la livePill/timeline del chrome. */
 .lg-trip-pin--active {
-  border-color: var(--pin-ring-active);
+  background-color: var(--color-danger);
+  border-color: var(--pin-ring-closed);
   animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
 }
 

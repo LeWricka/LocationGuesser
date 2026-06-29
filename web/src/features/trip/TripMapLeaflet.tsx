@@ -1,14 +1,23 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { Layers } from 'lucide-react'
+import { Icon } from '../../ui'
 import type { RoutePoint } from '../../lib/trip'
 import type { TripMapProps as Props } from './TripMap.types'
 import './tripPins.css'
 import styles from './TripMapLeaflet.module.css'
 
-// Satélite Esri sin API key — la MISMA capa que usa MapPicker (recon §4). El
-// look "mundo real" encaja con el diario de viaje y no añade dependencias.
+// Basemap CLARO por defecto (estilo Atelier, restyle §5): Carto Positron, papel
+// gris minimalista sin API key. Deja que los pines-foto y la ruta en acento sean
+// los protagonistas de color; el fondo es "papel", coherente con el diario claro.
+const POSITRON_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+const POSITRON_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+
+// Satélite Esri sin API key — se jubila como fondo por defecto pero sigue como
+// capa OPT-IN (toggle en el chrome) para quien quiera la inmersión "mundo real".
 const ESRI_URL =
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const ESRI_ATTRIBUTION =
@@ -152,6 +161,11 @@ export function TripMapLeaflet({
   selectedChallengeId,
   onSelectMoment,
 }: Props) {
+  // Capa de fondo: CLARO (Positron) por defecto; satélite solo si el usuario lo
+  // pide con el toggle del chrome (opt-in, restyle §5). No persiste: cada visita
+  // arranca en claro, que es el estado de reposo del diario.
+  const [satellite, setSatellite] = useState(false)
+
   const activePos = useMemo<L.LatLngExpression | null>(
     () => (activeMoment ? floatingActivePos(route) : null),
     [activeMoment, route],
@@ -171,14 +185,29 @@ export function TripMapLeaflet({
   return (
     <div className={styles.wrap}>
       <MapContainer center={WORLD} zoom={WORLD_ZOOM} className={styles.map} worldCopyJump>
-        <TileLayer
-          attribution={ESRI_ATTRIBUTION}
-          url={ESRI_URL}
-          maxNativeZoom={19}
-          maxZoom={20}
-          keepBuffer={6}
-          updateWhenZooming={false}
-        />
+        {/* Capa de fondo según el modo. `key` fuerza el remonte del TileLayer al
+            alternar para que Leaflet cambie de juego de tiles sin estados raros. */}
+        {satellite ? (
+          <TileLayer
+            key="esri"
+            attribution={ESRI_ATTRIBUTION}
+            url={ESRI_URL}
+            maxNativeZoom={19}
+            maxZoom={20}
+            keepBuffer={6}
+            updateWhenZooming={false}
+          />
+        ) : (
+          <TileLayer
+            key="positron"
+            attribution={POSITRON_ATTRIBUTION}
+            url={POSITRON_URL}
+            maxNativeZoom={20}
+            maxZoom={20}
+            keepBuffer={6}
+            updateWhenZooming={false}
+          />
+        )}
 
         {/* Ruta continua entre cerrados (token --route-line). */}
         {closedLine.length >= 2 && (
@@ -223,6 +252,18 @@ export function TripMapLeaflet({
           activePos={activePos}
         />
       </MapContainer>
+
+      {/* Toggle de capa: pastilla clara del chrome (estilo Atelier). Alterna entre
+          el papel claro (Positron) por defecto y el satélite opt-in. */}
+      <button
+        type="button"
+        className={`${styles.layerToggle} ${satellite ? styles.layerToggleActive : ''}`}
+        onClick={() => setSatellite((s) => !s)}
+        aria-pressed={satellite}
+        aria-label={satellite ? 'Ver mapa claro' : 'Ver satélite'}
+      >
+        <Icon icon={Layers} size={18} />
+      </button>
     </div>
   )
 }

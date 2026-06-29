@@ -7,6 +7,7 @@
  * compartido con el globo MapLibre para que sea idéntico en ambos motores.
  */
 .wrap {
+  position: relative;
   width: 100%;
   height: 100%;
 }
@@ -14,6 +15,54 @@
 .map {
   width: 100%;
   height: 100%;
-  /* Fondo profundo bajo los tiles que aún no han cargado (evita el flash gris). */
+  /* Fondo "papel" bajo los tiles que aún no han cargado (token remapeado a papel
+     claro: el flash de carga ya no es océano oscuro, sino el papel del diario). */
   background: var(--ocean-900);
+}
+
+/* Toggle de capa (claro ↔ satélite): pastilla clara del chrome, abajo-derecha del
+   mapa, sobre el carrusel. Mismo lenguaje glass que iconPill (pastilla blanca
+   translúcida + icono en tinta), legible sobre basemap claro o satélite. */
+.layerToggle {
+  position: absolute;
+  right: var(--space-3);
+  top: calc(env(safe-area-inset-top) + 72px);
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.layerToggle:hover {
+  background: var(--glass-bg-strong);
+}
+.layerToggle:active {
+  transform: scale(0.92);
+}
+/* Satélite activo: el icono se tiñe de acento para señalar el estado opt-in. */
+.layerToggleActive {
+  color: var(--color-accent);
+  border-color: var(--pin-ring-active);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layerToggle {
+    transition: none;
+  }
+  .layerToggle:active {
+    transform: none;
+  }
 }
