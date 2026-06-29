@@ -35,6 +35,12 @@ export interface Route {
    * de RETO (flujos-viaje-po.md): el camino feliz es subir un recuerdo, no montar un juego.
    */
   groupAddMoment?: boolean
+  /**
+   * Intención de abrir el flujo INMERSIVO de crear reto (`#g=…&add=reto`): mapa
+   * satélite a sangre + hoja que crece por etapas. Es la entrada del FAB "Reto"
+   * del viaje. Sustituye al asistente clásico de 3 pasos (`&v=clasico&add=1`).
+   */
+  groupAddChallenge?: boolean
 }
 
 // Hashes atómicos (sin pares clave=valor) que mapean a vistas de la app.
@@ -83,6 +89,9 @@ export function parseHash(hash: string = window.location.hash): Route {
   // del asistente de reto clásico) cuando ambos no coexisten.
   if (params.get('add')?.trim() === 'recuerdo') route.groupAddMoment = true
 
+  // Flujo INMERSIVO de crear reto (`#g=…&add=reto`): la entrada del FAB "Reto".
+  if (params.get('add')?.trim() === 'reto') route.groupAddChallenge = true
+
   return route
 }
 
@@ -107,7 +116,11 @@ export function addMomentHash(groupId: string): string {
   return `#g=${encodeURIComponent(groupId)}&add=recuerdo`
 }
 
-/** Hash de la GroupPage clásica abriendo el asistente de reto (`…&v=clasico&add=1`). */
+/**
+ * Hash del flujo INMERSIVO de crear reto (`#g=…&add=reto`). Es la entrada del FAB
+ * "Reto" del viaje: abre el mapa satélite a sangre + la hoja que crece por etapas,
+ * en vez del asistente clásico de 3 pasos (que se retiró).
+ */
 export function addChallengeHash(groupId: string): string {
-  return `${classicGroupHash(groupId)}&add=1`
+  return `#g=${encodeURIComponent(groupId)}&add=reto`
 }
