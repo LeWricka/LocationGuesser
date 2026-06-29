@@ -70,6 +70,33 @@
   background: linear-gradient(to top, var(--photo-overlay-strong) 0%, transparent 55%);
 }
 
+/* Bandera del país: disco de vidrio arriba a la izquierda (estilo Polarsteps).
+   Mismo lenguaje que el botón "expandir" para que la tarjeta lea coherente. */
+.flag {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+  pointer-events: none;
+}
+
+/* El emoji de bandera; tamaño fijo para que el disco no baile entre países. */
+.flagEmoji {
+  font-size: var(--font-size-md);
+  line-height: 1;
+}
+
 /* Badge "EN JUEGO" anclado arriba a la izquierda. */
 .badge {
   position: absolute;

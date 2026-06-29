@@ -5,8 +5,13 @@ import { getAnswers, isPracticeChallenge, type ChallengeForPlay } from '../../li
 import { getGroupVotes, type VoteWithName } from '../../lib/leaderboard'
 import { signedImageUrl } from '../../lib/storage'
 import { supabase } from '../../lib/supabase'
+import { countryFromCoords, type CountryInfo } from '../../lib/countryFlag'
 import type { LatLng } from '../../lib/geo'
 import type { Moment, MomentStatus, RoutePoint } from '../../lib/trip'
+
+// Espera entre peticiones a coords NO cacheadas. Nominatim limita a ~1 req/s;
+// dejamos margen (1.1 s) para no rozar el límite ni en ráfaga.
+const COUNTRY_STAGGER_MS = 1100
 
 interface TripData {
   group: GroupInfo | null
@@ -47,6 +52,9 @@ export function useTripData(groupId: string): TripData {
   const [answersById, setAnswersById] = useState<Map<string, LatLng>>(new Map())
   // URL firmada de cada foto, indexada por challenge_id (bucket privado).
   const [imageUrlById, setImageUrlById] = useState<Record<string, string>>({})
+  // País por challenge_id, resuelto de forma escalonada y no bloqueante (abajo).
+  // Solo se rellena para CERRADOS con coord; va apareciendo según se resuelve.
+  const [countryById, setCountryById] = useState<Record<string, CountryInfo | null>>({})
   const [error, setError] = useState<string | null>(null)
 
   // Carga conjunta (grupo + retos + votos), reutilizable en el montaje y en cada
@@ -103,6 +111,49 @@ export function useTripData(groupId: string): TripData {
     }
   }, [groupId, refresh])
 
+  // Coordenadas candidatas a bandera: SOLO momentos CERRADOS con respuesta visible
+  // (los activos no tienen coord = anti-spoiler). Derivado de challenges+answers, NO
+  // de `moments`, para no crear un bucle con el estado de país que aquí se rellena.
+  const flagTargets = useMemo<{ challengeId: string; lat: number; lng: number }[]>(() => {
+    if (!challenges) return []
+    const now = new Date()
+    const out: { challengeId: string; lat: number; lng: number }[] = []
+    for (const ch of challenges) {
+      if (statusOf(ch, now) !== 'closed') continue
+      const answer = answersById.get(ch.id)
+      if (answer) out.push({ challengeId: ch.id, lat: answer.lat, lng: answer.lng })
+    }
+    return out
+  }, [challenges, answersById])
+
+  // Resolución ESCALONADA y NO bloqueante de los países. El render inicial (y el
+  // mapa) no esperan: la bandera aparece por momento según se resuelve. La util ya
+  // cachea por coord redondeada, así que solo espaciamos las peticiones REALES a
+  // Nominatim; las cacheadas resuelven al instante sin gastar el presupuesto de 1 req/s.
+  useEffect(() => {
+    if (flagTargets.length === 0) return
+    // `cancelled` corta el bucle si cambia el groupId/targets o se desmonta: así
+    // nunca hacemos setState tras unmount ni mezclamos datos de otro viaje.
+    let cancelled = false
+
+    const run = async () => {
+      for (const { challengeId, lat, lng } of flagTargets) {
+        if (cancelled) return
+        const info = await countryFromCoords(lat, lng)
+        if (cancelled) return
+        setCountryById((prev) => ({ ...prev, [challengeId]: info }))
+        // Espaciamos antes de la siguiente; barato si la próxima está cacheada
+        // (resolverá al instante), pero protege la primera carga de un viaje nuevo.
+        await new Promise((resolve) => setTimeout(resolve, COUNTRY_STAGGER_MS))
+      }
+    }
+    void run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [flagTargets])
+
   // Nº de votantes distintos por reto: el contador REAL de "quién ha adivinado".
   const guessedCountById = useMemo(() => {
     const byChallenge = new Map<string, Set<string>>()
@@ -133,9 +184,11 @@ export function useTripData(groupId: string): TripData {
         guessedCount: guessedCountById.get(ch.id)?.size ?? 0,
         guessSeconds: ch.guess_seconds,
         svPanoId: ch.sv_pano_id,
+        // `undefined` mientras no se ha resuelto: la UI no pinta bandera todavía.
+        country: countryById[ch.id],
       }
     })
-  }, [challenges, answersById, imageUrlById, guessedCountById])
+  }, [challenges, answersById, imageUrlById, guessedCountById, countryById])
 
   // Ruta: los momentos cerrados con lat/lng, en el mismo orden cronológico ASC.
   const route = useMemo<RoutePoint[]>(
