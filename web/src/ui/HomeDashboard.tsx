@@ -42,9 +42,10 @@ interface Props {
   /** Grupos (viajes) del usuario. Vacío → estado de bienvenida (lo decide HomePage). */
   groups?: HomeGroup[]
   /**
-   * Mapamundi satélite (héroe visual). Si no se pasa, no se pinta el mapa (p.ej. en
-   * tests/stories que solo verifican el listado). El componente del mapa lo inyecta
-   * HomePage (vive en features/home) para no acoplar el UI kit a la capa de mapa.
+   * Mapamundi satélite, ahora DEGRADADO a banda "atlas" secundaria (no el héroe). Si no
+   * se pasa, no se pinta la banda (p.ej. en tests/stories que solo verifican el mosaico).
+   * El componente del mapa lo inyecta HomePage (vive en features/home) para no acoplar el
+   * UI kit a la capa de mapa.
    */
   worldMap?: ReactNode
   onOpenProfile?: () => void
@@ -54,11 +55,11 @@ interface Props {
   className?: string
 }
 
-// Layout presentacional de la home logueada — variante A "el globo" (maqueta home-wow):
-// IMAGEN-DOMINANTE. El mapamundi satélite a sangre es el protagonista; el chrome (marca,
-// perfil, lema) son pastillas papel translúcidas que flotan, no tarjetas blancas. Debajo,
-// los viajes son unidades visuales GRANDES y separadas (su portada-foto manda), no un
-// carrusel apretado. SIN "cómo funciona" ni panel de números: la promesa es guardar y
+// Layout presentacional de la home logueada — variante "MOSAICO EDITORIAL" (revista de
+// viaje): las FOTOS mandan. Una cabecera editorial (masthead serif), un MOSAICO de
+// portadas con ritmo de revista (una portada-reportaje grande + teselas variadas), y el
+// mapamundi DEGRADADO a una banda "atlas" compacta más abajo (sección secundaria, no el
+// héroe absoluto). SIN "cómo funciona" ni panel de números: la promesa es guardar y
 // compartir recuerdos; adivinar es un guiño que vive dentro del viaje.
 export function HomeDashboard({
   userId,
@@ -79,35 +80,39 @@ export function HomeDashboard({
 
   return (
     <div className={[styles.home, className].filter(Boolean).join(' ')}>
-      {/* HÉROE: el mapamundi a sangre con el chrome flotando encima. */}
-      <section className={styles.hero}>
-        {/* Topbar flotante: marca + acceso a perfil, en pastillas papel translúcidas. */}
-        <div className={styles.topbar}>
-          <span className={styles.brand}>
-            <b>Lugares</b>
-            <i>tu mundo</i>
-          </span>
-          <button
-            type="button"
-            className={styles.avatarButton}
-            onClick={onOpenProfile}
-            aria-label="Abrir tu perfil"
-          >
-            <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
-          </button>
+      {/* MASTHEAD: cabecera de revista. El "título" es el nombre del usuario en serif. */}
+      <header className={styles.masthead}>
+        <div className={styles.mastheadText}>
+          <p className={styles.folio}>Tu diario de viaje</p>
+          <h1 className={styles.title}>{displayName}</h1>
         </div>
+        <button
+          type="button"
+          className={styles.avatarButton}
+          onClick={onOpenProfile}
+          aria-label="Abrir tu perfil"
+        >
+          <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="md" />
+        </button>
+      </header>
 
-        {/* El mapamundi satélite (lo inyecta HomePage). Si no llega, no se pinta. */}
-        {worldMap}
-      </section>
-
-      {/* TUS VIAJES (los que posees) y, aparte, DONDE PARTICIPAS. Portadas a todo el
-          ancho, una por fila (imagen-dominante). Cada sección solo si tiene viajes. */}
+      {/* TUS VIAJES (los que posees) como MOSAICO editorial. DONDE PARTICIPAS aparte.
+          Cada sección solo si tiene viajes. */}
       {owned.length > 0 && (
         <TripSection title="Tus viajes" trips={owned} onOpenGroup={onOpenGroup} />
       )}
       {others.length > 0 && (
         <TripSection title="Donde participas" trips={others} onOpenGroup={onOpenGroup} />
+      )}
+
+      {/* ATLAS: el mapamundi, ahora banda secundaria compacta (lo inyecta HomePage). */}
+      {worldMap && (
+        <section aria-label="Atlas de tus viajes" className={styles.atlas}>
+          <div className={styles.sectionHead}>
+            <h2 className={styles.sectionTitle}>Tu atlas</h2>
+          </div>
+          <div className={styles.atlasFrame}>{worldMap}</div>
+        </section>
       )}
 
       {/* Acciones: empezar un viaje (primaria) / unirse con un código. */}
@@ -123,7 +128,7 @@ export function HomeDashboard({
   )
 }
 
-// Sección de viajes con su título eyebrow + lista a todo el ancho (una portada por fila).
+// Sección de viajes: eyebrow editorial + contador serif y el MOSAICO de portadas.
 function TripSection({
   title,
   trips,
@@ -134,13 +139,21 @@ function TripSection({
   onOpenGroup?: (id: string) => void
 }) {
   return (
-    <section aria-label={title} className={styles.tripSection}>
-      <h2 className={styles.sectionTitle}>{title}</h2>
-      <div className={styles.list}>
-        {trips.map((group) => (
-          <TripCard
+    <section aria-label={title} className={styles.section}>
+      <div className={styles.sectionHead}>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+        <span className={styles.sectionCount} aria-hidden="true">
+          {trips.length}
+        </span>
+      </div>
+      <div className={styles.mosaic}>
+        {trips.map((group, i) => (
+          <TripTile
             key={group.id}
             group={group}
+            // Ritmo de revista: el 1.º es la "portada-reportaje" (ancha); luego alternamos
+            // teselas altas para romper la cuadrícula sin perder la malla.
+            variant={i === 0 ? 'feature' : i % 3 === 1 ? 'tall' : 'regular'}
             onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
           />
         ))}
@@ -149,39 +162,64 @@ function TripSection({
   )
 }
 
-// Tarjeta-portada de un viaje (variante A): la FOTO es la tarjeta. Velo inferior, nombre
-// serif sobre el velo e indicadores sutiles ("en juego"/"te toca"/"tuyo"). Tocar abre el
-// viaje. La foto es decorativa (la etiqueta del botón da el nombre).
-function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }) {
+// Tesela-portada de un viaje (mosaico): la FOTO es la tesela. Velo inferior, nombre serif
+// sobre el velo, kicker editorial e indicadores sutiles. Tocar abre el viaje. La foto es
+// decorativa (la etiqueta del botón da el nombre).
+function TripTile({
+  group,
+  variant,
+  onClick,
+}: {
+  group: HomeGroup
+  variant: 'feature' | 'tall' | 'regular'
+  onClick?: () => void
+}) {
   const isButton = typeof onClick === 'function'
   const live = group.status === 'live' || group.status === 'toplay'
   const liveLabel = group.status === 'toplay' ? 'Te toca' : 'En juego'
+  const hasCover = Boolean(group.coverUrl)
+  const initial = group.name.trim().charAt(0).toUpperCase() || '·'
+
+  const tileClass = [
+    styles.tile,
+    variant === 'feature' && styles.feature,
+    variant === 'tall' && styles.tall,
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
-    <article className={styles.tripCard}>
+    <article className={tileClass}>
       <button
         type="button"
-        className={styles.tripButton}
+        className={styles.tileButton}
         onClick={onClick}
         disabled={!isButton}
         aria-label={`Abrir viaje ${group.name}`}
       >
         <div
-          className={styles.tripCover}
-          style={group.coverUrl ? { backgroundImage: `url('${group.coverUrl}')` } : undefined}
+          className={[styles.tileCover, !hasCover && styles.placeholder].filter(Boolean).join(' ')}
+          style={hasCover ? { backgroundImage: `url('${group.coverUrl}')` } : undefined}
         >
+          {/* Tesela sin foto: inicial serif gigante de marca de agua (no un hueco gris). */}
+          {!hasCover && (
+            <span className={styles.tileWatermark} aria-hidden="true">
+              {initial}
+            </span>
+          )}
           {live && (
-            <span className={styles.tripLive}>
-              <span className={styles.tripBlip} aria-hidden="true" />
+            <span className={styles.tileLive}>
+              <span className={styles.tileBlip} aria-hidden="true" />
               {liveLabel}
             </span>
           )}
           {group.owned && (
-            <span className={styles.tripOwned}>
+            <span className={styles.tileOwned}>
               <span aria-hidden="true">👑</span> Tuyo
             </span>
           )}
-          <h3 className={styles.tripName}>{group.name}</h3>
+          {variant === 'feature' && <span className={styles.tileKicker}>Reportaje</span>}
+          <h3 className={styles.tileName}>{group.name}</h3>
         </div>
       </button>
     </article>

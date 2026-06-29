@@ -26,10 +26,11 @@ import styles from './HomePage.module.css'
 // HomeDashboard con el RELATO de recuerdos. La navegación se hace por hash (la home
 // no posee el router; ver ./navigation.ts): #g=<id>, #nuevo, #perfil.
 //
-// El HÉROE es el mapamundi satélite (useWorldTrips → HomeWorldMap): un pin-foto por
-// viaje del usuario sobre el globo real. Para el recién llegado (sin grupos) la home
-// es el HERO de bienvenida (crear/unirse). SIN "cómo funciona": la promesa es guardar
-// y compartir recuerdos; adivinar es un guiño que vive dentro del viaje, no en el home.
+// El HÉROE son las FOTOS: un MOSAICO editorial de portadas de viaje (variante "revista").
+// El mapamundi satélite (useWorldTrips → HomeWorldMap) baja a una banda "atlas" secundaria
+// y compacta dentro del dashboard. Para el recién llegado (sin grupos) la home es el HERO
+// de bienvenida (crear/unirse). SIN "cómo funciona": la promesa es guardar y compartir
+// recuerdos; adivinar es un guiño que vive dentro del viaje, no en el home.
 export function HomePage() {
   const { user, profile, loading: sessionLoading } = useSession()
   const { loading: dataLoading, error, data, reload } = useHomeData(user?.id)
@@ -123,9 +124,10 @@ export function HomePage() {
   }))
 
   return (
-    // Con viajes, la home es un lienzo con SNAP vertical: el héroe (mapamundi) y la
-    // galería de viajes encajan de golpe al hacer scroll (sensación nativa móvil).
-    <main className={hasGroups ? `lg-page ${styles.snapScroll}` : 'lg-page'}>
+    // Con viajes, la home es una REVISTA de viaje: scroll continuo y editorial (cabecera →
+    // mosaico de portadas → atlas). Sin snap vertical: el ojo recorre el mosaico de un tirón
+    // como una doble página, no a saltos.
+    <main className="lg-page">
       {hasGroups ? (
         <HomeDashboard
           userId={userId}
