@@ -1,0 +1,37 @@
+/* Marca "Lugares": símbolo (pin con centro hueco + constelación) + wordmark
+   en serif (Cormorant). Editorial y sobrio; el acento es el azul pizarra. */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em; /* relativo al tamaño => escala con el logo */
+  color: var(--color-accent); /* el símbolo hereda este color por currentColor */
+  line-height: 1;
+}
+
+.mark {
+  display: block;
+  flex: none;
+  width: 1em;
+  height: 1em;
+}
+
+.wordmark {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-semibold, 600);
+  /* El wordmark va en tinta para legibilidad editorial; el símbolo lleva el
+     acento. Se puede forzar a heredar con la prop `monochrome`. */
+  color: var(--color-text, #18202b);
+  letter-spacing: 0.005em;
+  /* El óptico de Cormorant queda mejor con un pelín menos de altura visual. */
+  font-size: 1.12em;
+}
+
+/* Variante monocroma: todo hereda currentColor (sobre fondos de color/acento). */
+.monochrome {
+  color: currentColor;
+}
+
+.monochrome .wordmark {
+  color: currentColor;
+}

@@ -43,3 +43,6 @@ export { ProfileStep } from './ProfileStep'
 // Estados vacíos y de carga reutilizables (issue #156).
 export { EmptyState } from './EmptyState'
 export { SkeletonCard } from './SkeletonCard'
+
+// Marca: logo de "Lugares" (símbolo + wordmark serif).
+export { Logo } from './Logo'

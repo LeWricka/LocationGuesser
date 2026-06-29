@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Lugares">
+  <!-- Icono PWA estándar: pin de marca centrado sobre papel, con esquinas suaves. -->
+  <rect width="512" height="512" rx="112" fill="#f6f7f9"/>
+  <defs>
+    <linearGradient id="pin" x1="256" y1="120" x2="256" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3d5c7a"/>
+      <stop offset="1" stop-color="#2a4256"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(256 256) scale(11.2) translate(-16 -15.5)">
+    <path fill="url(#pin)" fill-rule="evenodd"
+      d="M16 2.5c-5.06 0-9.16 4.04-9.16 9.02 0 3.2 1.9 6.18 4.05 8.52 2.16 2.35 4.6 4.07 5.11 4.42a1 1 0 0 0 1.14 0c.51-.35 2.95-2.07 5.11-4.42 2.15-2.34 4.05-5.32 4.05-8.52 0-4.98-4.1-9.02-9.16-9.02Zm0 5.42a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2Z"/>
+    <circle cx="26.7" cy="5.3" r="1.6" fill="#34506b"/>
+    <circle cx="5.4" cy="24.6" r="1.25" fill="#34506b" opacity="0.65"/>
+    <circle cx="25.6" cy="23.4" r="1" fill="#34506b" opacity="0.5"/>
+  </g>
+</svg>

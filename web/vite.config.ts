@@ -2,10 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Paleta de marca (tokens océano/ámbar de src/ui/tokens.css) para el manifest:
+// Paleta de marca (sistema "Atelier" de src/ui/tokens.css) para el manifest:
 // el navegador la usa para la barra de estado y la pantalla de carga al instalar.
-const OCEAN_900 = '#04141d' // background_color (lo más profundo)
-const ACCENT = '#ffb24d' // theme_color (ámbar de marca)
+const PAPER = '#f6f7f9' // background_color (papel claro de la app)
+const ACCENT = '#34506b' // theme_color (azul pizarra de marca)
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -33,15 +33,16 @@ export default defineConfig({
         enabled: false,
       },
       manifest: {
-        name: 'LocationGuesser',
-        short_name: 'LocationGuesser',
-        description: 'GeoGuessr con las fotos de tus amigos: adivina dónde se hizo la foto.',
+        name: 'Lugares',
+        short_name: 'Lugares',
+        description:
+          'Comparte tus viajes de una forma diferente: una foto, y los tuyos adivinan dónde es.',
         lang: 'es',
         display: 'standalone',
         start_url: '/',
         scope: '/',
         theme_color: ACCENT,
-        background_color: OCEAN_900,
+        background_color: PAPER,
         icons: [
           {
             src: 'pwa-192x192.png',

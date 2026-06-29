@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Lugares">
+  <!-- Maskable: el SO recorta a círculo/squircle. Fondo de acento a sangre y el
+       símbolo en papel dentro de la safe zone central (~80%). -->
+  <rect width="512" height="512" fill="#34506b"/>
+  <g transform="translate(256 256) scale(8.6) translate(-16 -15.5)">
+    <path fill="#f6f7f9" fill-rule="evenodd"
+      d="M16 2.5c-5.06 0-9.16 4.04-9.16 9.02 0 3.2 1.9 6.18 4.05 8.52 2.16 2.35 4.6 4.07 5.11 4.42a1 1 0 0 0 1.14 0c.51-.35 2.95-2.07 5.11-4.42 2.15-2.34 4.05-5.32 4.05-8.52 0-4.98-4.1-9.02-9.16-9.02Zm0 5.42a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2Z"/>
+    <circle cx="26.7" cy="5.3" r="1.6" fill="#f6f7f9"/>
+    <circle cx="5.4" cy="24.6" r="1.25" fill="#f6f7f9" opacity="0.7"/>
+    <circle cx="25.6" cy="23.4" r="1" fill="#f6f7f9" opacity="0.55"/>
+  </g>
+</svg>

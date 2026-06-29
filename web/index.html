@@ -2,16 +2,32 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- PWA: color de barra del navegador (azul pizarra de marca) e icono al instalar
-         en iOS. El <link rel="manifest"> lo inyecta vite-plugin-pwa en el build. -->
+
+    <!-- Marca "Lugares": favicon SVG vectorial (con respaldo en PNG para
+         navegadores que no lo soporten) y apple-touch-icon para "añadir a inicio". -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!-- PWA / pantalla de inicio: color de barra del navegador (azul pizarra de
+         marca) y comportamiento standalone en iOS. El <link rel="manifest"> lo
+         inyecta vite-plugin-pwa en el build. -->
     <meta name="theme-color" content="#34506b" />
-    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Lugares" />
+
+    <!-- SEO / compartir: descripción cálida y breve de qué es la app. -->
+    <meta
+      name="description"
+      content="Comparte tus viajes de una forma diferente: una foto, y los tuyos adivinan en el mapa dónde es."
+    />
+
     <!-- Precarga del peso de display más usado (Cormorant 500) para que los
          titulares no parpadeen al entrar (font-display: swap cubre el resto). -->
     <link rel="preload" href="/fonts/cormorant-500.woff2" as="font" type="font/woff2" crossorigin />
-    <title>LocationGuesser</title>
+    <title>Lugares — comparte tus viajes de una forma diferente</title>
   </head>
   <body>
     <div id="root"></div>
