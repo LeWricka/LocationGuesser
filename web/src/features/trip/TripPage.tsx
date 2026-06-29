@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ChevronRight, ImagePlus, Plus, Target } from 'lucide-react'
-import { EmptyState, Icon, useReducedMotion } from '../../ui'
+import { EmptyState, Icon, useReducedMotion, useToast } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
+import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import type { Moment } from '../../lib/trip'
+import { EditChallenge } from '../group/EditChallenge'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
 import { TripRetos } from './TripRetos'
@@ -81,11 +83,16 @@ export function TripPage({
     refresh,
   } = useTripData(groupId)
   const reducedMotion = useReducedMotion()
+  const toast = useToast()
 
   // Página activa (diario|retos). Gobierna el desplazamiento de la pista.
   const [section, setSection] = useState<Section>('diario')
   // Momento abierto en la hoja de detalle (null = cerrada).
   const [openMoment, setOpenMoment] = useState<Moment | null>(null)
+  // Reto en edición a pantalla completa (null = no editando). Editar un reto toca su
+  // mecánica (plazo, Street View, votos), así que reutilizamos el editor completo
+  // `EditChallenge` montado aquí en vez de hacerlo dentro de la hoja.
+  const [editingChallenge, setEditingChallenge] = useState<ChallengeForPlay | null>(null)
   // Momento seleccionado (centra su pin en el mapa). Se sincroniza carrusel↔mapa.
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // ¿Puede el usuario añadir/editar? (dueño del viaje). El RLS lo respalda igual.
@@ -286,6 +293,24 @@ export function TripPage({
 
   const togglePlay = () => setPlaying((p) => !p)
 
+  // Editar un RETO: cargamos su fila completa (sin la respuesta oculta; el editor
+  // la pide aparte con derecho del dueño) y abrimos el editor a pantalla completa.
+  // La hoja se cierra para que el editor sea el foco. Falla en silencio con aviso.
+  const openChallengeEditor = async (challengeId: string) => {
+    try {
+      const challenge = await getChallenge(challengeId)
+      setOpenMoment(null)
+      setEditingChallenge(challenge)
+    } catch (err) {
+      toast.show(
+        `No se pudo abrir el editor: ${err instanceof Error ? err.message : String(err)}`,
+        {
+          tone: 'danger',
+        },
+      )
+    }
+  }
+
   // Menú del FAB: cerrar al tocar fuera o con Escape (accesible con teclado).
   useEffect(() => {
     if (!fabOpen) return
@@ -318,6 +343,22 @@ export function TripPage({
       setSection('diario')
       e.preventDefault()
     }
+  }
+
+  // Editor de reto a pantalla completa: toma la pantalla mientras está abierto.
+  // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa
+  // reflejan los cambios). Reutiliza el editor completo de la GroupPage clásica.
+  if (editingChallenge) {
+    return (
+      <EditChallenge
+        challenge={editingChallenge}
+        onBack={() => setEditingChallenge(null)}
+        onSaved={() => {
+          setEditingChallenge(null)
+          void refresh()
+        }}
+      />
+    )
   }
 
   if (loading) {
@@ -549,6 +590,9 @@ export function TripPage({
             : undefined
         }
         onPromoted={() => void refresh()}
+        onEdited={() => void refresh()}
+        onEditChallenge={(challengeId) => void openChallengeEditor(challengeId)}
+        onDeleted={() => void refresh()}
       />
 
       {/* Recap de cierre a pantalla completa: solo con el viaje cerrado y abierto

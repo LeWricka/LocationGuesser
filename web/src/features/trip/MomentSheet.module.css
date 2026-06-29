@@ -284,6 +284,90 @@
   gap: var(--space-2);
 }
 
+/* ---- Editar el recuerdo (título, fecha, lugar) ---- */
+.metaEdit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.editLabel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.editInput {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.editInput:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+.editPlaceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* ---- Acciones del dueño al pie (editar / borrar) ---- */
+.ownerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+.ownerAction {
+  appearance: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  transition: background-color var(--transition-fast);
+}
+.ownerAction:hover {
+  background: var(--color-surface-hover);
+}
+.ownerAction:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.ownerActionDanger {
+  margin-left: auto;
+  color: var(--color-danger);
+}
+
+/* Botón de confirmar borrado en el modal: refuerzo de peligro sobre el secundario. */
+.dangerBtn {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ownerAction {
+    transition: none;
+  }
+}
+
 @keyframes lg-sheet-fade {
   from {
     opacity: 0;

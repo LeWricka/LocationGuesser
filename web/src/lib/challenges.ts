@@ -420,6 +420,83 @@ export async function updateChallengeDescription(id: string, description: string
 }
 
 /**
+ * Campos editables de un RECUERDO (momento sin capa de reto). A diferencia de un
+ * reto, el lugar de un recuerdo es VISIBLE (`place_lat`/`place_lng`) y se puede
+ * cambiar SIEMPRE (no hay respuesta oculta ni votos que romper). La "fecha" del
+ * momento es su `created_at` (no hay columna de fecha aparte: el diario ordena por
+ * ahí), así que editarla mueve el momento en la línea de tiempo. Todos los campos
+ * son opcionales: solo se aplican los presentes (patch parcial).
+ */
+export interface UpdateMomentInput {
+  title?: string
+  /** Descripción del día (texto libre); null o '' la deja vacía. */
+  description?: string | null
+  /**
+   * Lugar VISIBLE del recuerdo. `null` lo quita del mapa (queda solo en el diario).
+   * Va junto al panorama para no dejar un Street View incoherente con el sitio.
+   */
+  place?: {
+    lat: number
+    lng: number
+    svPanoId?: string | null
+    svHeading?: number | null
+    svPitch?: number | null
+  } | null
+  /**
+   * Fecha del momento en ISO (se guarda en `created_at`). Mueve el momento en la
+   * línea de tiempo del diario, que ordena por `created_at`.
+   */
+  createdAt?: string
+}
+
+/**
+ * Edita un RECUERDO (título, descripción, lugar visible y/o fecha). Solo el dueño
+ * del grupo lo consigue (RLS `challenges_update_owner`; la UI esconde la acción a
+ * los miembros). Devuelve el momento actualizado, sin la respuesta oculta.
+ *
+ * No toca la capa de reto (plazo, cronómetro, candados): para eso está
+ * `updateChallenge`. Aquí el lugar es VISIBLE, así que cambiarlo escribe
+ * `place_lat`/`place_lng` (no `lat`/`lng`: un recuerdo no tiene respuesta a ocultar).
+ */
+export async function updateMoment(
+  id: string,
+  input: UpdateMomentInput,
+): Promise<ChallengeForPlay> {
+  const patch: ChallengeUpdate = {}
+  if (input.title !== undefined) patch.title = input.title
+  if (input.description !== undefined) {
+    const trimmed = input.description?.trim() ?? ''
+    patch.description = trimmed === '' ? null : trimmed
+  }
+  if (input.createdAt !== undefined) patch.created_at = input.createdAt
+  if (input.place !== undefined) {
+    if (input.place === null) {
+      // Quitar el lugar: fuera del mapa y sin panorama colgando.
+      patch.place_lat = null
+      patch.place_lng = null
+      patch.sv_pano_id = null
+      patch.sv_heading = null
+      patch.sv_pitch = null
+    } else {
+      patch.place_lat = input.place.lat
+      patch.place_lng = input.place.lng
+      patch.sv_pano_id = input.place.svPanoId ?? null
+      patch.sv_heading = input.place.svHeading ?? null
+      patch.sv_pitch = input.place.svPitch ?? null
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('challenges')
+    .update(patch)
+    .eq('id', id)
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .single<ChallengeForPlay>()
+  if (error) throw error
+  return data
+}
+
+/**
  * Borra un reto. Solo el dueño del grupo lo consigue (RLS lo respalda; la UI
  * además esconde la acción a los miembros). Lanza si Supabase devuelve error.
  */
