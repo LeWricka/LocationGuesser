@@ -14,10 +14,19 @@
 /* --- HÉROE: el mapamundi A SANGRE con el chrome flotando encima --- */
 /* Rompe el padding del contenedor de página (.lg-page → var(--space-4)) para que el
    satélite toque los bordes de la pantalla (Polarsteps), no quede dentro de una tarjeta.
-   Sube también hasta el borde superior; el chrome flotante respeta el safe-area. */
+   Sube también hasta el borde superior; el chrome flotante respeta el safe-area.
+   Es el primer punto de anclaje del snap vertical de la home. */
 .hero {
   position: relative;
   margin: calc(var(--space-4) * -1) calc(var(--space-4) * -1) 0;
+  scroll-snap-align: start;
+}
+
+/* Cada sección de viajes es un punto de anclaje: al hacer scroll, la galería
+   "encaja" arriba de golpe. scroll-margin-top deja respirar el chrome flotante. */
+.tripSection {
+  scroll-snap-align: start;
+  scroll-margin-top: var(--space-4);
 }
 
 /* Topbar flotante sobre el satélite: marca + perfil en pastillas papel translúcidas.

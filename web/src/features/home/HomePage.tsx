@@ -123,7 +123,9 @@ export function HomePage() {
   }))
 
   return (
-    <main className="lg-page">
+    // Con viajes, la home es un lienzo con SNAP vertical: el héroe (mapamundi) y la
+    // galería de viajes encajan de golpe al hacer scroll (sensación nativa móvil).
+    <main className={hasGroups ? `lg-page ${styles.snapScroll}` : 'lg-page'}>
       {hasGroups ? (
         <HomeDashboard
           userId={userId}

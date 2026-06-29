@@ -134,7 +134,7 @@ function TripSection({
   onOpenGroup?: (id: string) => void
 }) {
   return (
-    <section aria-label={title}>
+    <section aria-label={title} className={styles.tripSection}>
       <h2 className={styles.sectionTitle}>{title}</h2>
       <div className={styles.list}>
         {trips.map((group) => (
