@@ -38,6 +38,7 @@ import {
   Skeleton,
   Spinner,
   Stack,
+  useReducedMotion,
   useToast,
 } from '../../ui'
 
@@ -71,6 +72,13 @@ function distanceLabel(km: number): string {
   if (km < 200) return 'Cerca'
   if (km < 1000) return 'Lejos'
   return 'Muy lejos'
+}
+
+// Háptica sutil (solo donde el navegador la soporte; iOS Safari la ignora). El
+// llamador ya filtra reduced-motion: aquí solo disparamos el patrón si existe la
+// API. Un toque corto al colocar el pin; un patrón al revelar un gran acierto.
+function haptic(pattern: number | number[]) {
+  navigator.vibrate?.(pattern)
 }
 
 export function PlayChallenge({ challengeId, groupId }: Props) {
@@ -130,6 +138,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
   // El perfil aporta el avatar para pintar la burbuja del pin del propio jugador.
   const { user, profile } = useSession()
+  // Respeto de reduced-motion: sin animaciones ⇒ tampoco háptica (un golpe de
+  // vibración es "movimiento" para quien lo desactiva). Guardamos en un ref para
+  // leerlo dentro de callbacks memoizados sin cambiar su identidad.
+  const reducedMotion = useReducedMotion()
+  const reducedMotionRef = useRef(reducedMotion)
+  useEffect(() => {
+    reducedMotionRef.current = reducedMotion
+  }, [reducedMotion])
   // URL firmada de la foto del reto (bucket privado). Hook al tope del componente
   // —no tras los early-return de carga— para no romper el orden de hooks.
   const photoUrl = useSignedImage(challenge?.image_path ?? null)
@@ -184,6 +200,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         // El servidor devuelve distancia + puntos + la respuesta real para el pin.
         const km = res.distanceKm ?? 0
         setResult({ km, points: res.points })
+        // Gran acierto: patrón háptico de celebración (si lo soporta y no hay
+        // reduced-motion), en sincronía con el destello/confeti del revelado.
+        if (res.points >= GREAT_SHOT && !reducedMotionRef.current) haptic([100, 50, 100])
         if (res.answerLat != null && res.answerLng != null) {
           setAnswer({ lat: res.answerLat, lng: res.answerLng })
         }
@@ -359,6 +378,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
   }, [phase])
+
+  // Colocar/mover el pin de la adivinanza: además de fijar la posición, damos un
+  // toque háptico sutil (si el navegador lo soporta y no hay reduced-motion) para
+  // que colocar el pin se sienta más satisfactorio.
+  function placeGuess(p: LatLng) {
+    setGuess(p)
+    if (!reducedMotionRef.current) haptic(80)
+  }
 
   function start() {
     if (!challenge) return
@@ -575,7 +602,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           backLabel={playing ? 'Salir (sigue el tiempo)' : backLabel}
           onBack={playing ? goBackWhilePlaying : goBack}
           guess={guess}
-          onGuess={setGuess}
+          onGuess={placeGuess}
           mapOpen={mapOpen}
           onOpenMap={() => setMapOpen(true)}
           onCloseMap={() => setMapOpen(false)}

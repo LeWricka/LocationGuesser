@@ -83,7 +83,9 @@ type Step = 'place' | 'photo' | 'summary'
 
 const STEP_ORDER: Step[] = ['place', 'photo', 'summary']
 const STEP_TITLES: Record<Step, string> = {
-  place: '1 · Lugar',
+  // El paso 1 marca la RESPUESTA OCULTA: dejamos claro que el punto del mapa es
+  // lo que los jugadores deberán adivinar (no un sitio visible como en recuerdo).
+  place: '1 · 🎯 La respuesta — ¿dónde está?',
   photo: '2 · Foto',
   summary: '3 · Resumen',
 }
@@ -303,9 +305,10 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
   // búsqueda de panorama pendiente (svPrompt sin decidir / búsqueda en curso) ni
   // GPS en vuelo. La foto y la validez de medios se resuelven en pasos siguientes.
   const canLeavePlace = point != null && !locating && !svPrompt && !checkingPano
-  // Paso «Foto»: nada obligatorio (la foto es opcional). Solo evitamos avanzar con
-  // una lectura de EXIF en curso para no dejar el punto a medio ajustar.
-  const canLeavePhoto = !readingExif
+  // Paso «Foto»: nada obligatorio (la foto es opcional). Evitamos avanzar mientras
+  // se procesa la foto: leyendo el GPS del EXIF (no dejar el punto a medio ajustar)
+  // o buscando/confirmando un Street View cercano disparado por ese GPS.
+  const canLeavePhoto = !readingExif && !checkingPano && !svPrompt
 
   // Listo para crear (en «Resumen»): hay punto, título, al menos un medio (foto o
   // Street View) y sin confirmaciones de panorama pendientes.
@@ -318,6 +321,12 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
     !checkingPano
 
   function goNext() {
+    // Si la foto aún se está procesando (EXIF/Street View), no avanzamos y lo
+    // decimos con un toast (como en «Añadir recuerdo»), en vez de un botón muerto.
+    if (step === 'photo' && !canLeavePhoto) {
+      toast.show('Analizando foto…', { tone: 'neutral' })
+      return
+    }
     const i = STEP_ORDER.indexOf(step)
     if (i < STEP_ORDER.length - 1) setStep(STEP_ORDER[i + 1])
   }
@@ -473,13 +482,17 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
 
               <MapPicker value={point} flyTo={flyTo} center={SPAIN} zoom={5} onPick={pickPoint} />
 
-              {point && (
+              {point ? (
                 <Row gap={2}>
-                  <Badge tone="accent">📍 Punto marcado</Badge>
+                  <Badge tone="accent">🎯 Respuesta marcada</Badge>
                   <span className={styles.coords}>
                     {point.lat.toFixed(5)}, {point.lng.toFixed(5)}
                   </span>
                 </Row>
+              ) : (
+                <span className={styles.hint}>
+                  👆 Toca el mapa para marcar la respuesta oculta.
+                </span>
               )}
             </Stack>
 
@@ -627,12 +640,9 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
               <Button variant="ghost" onClick={goBack}>
                 ← Anterior
               </Button>
-              <Button
-                size="lg"
-                className={styles.navNext}
-                disabled={!canLeavePhoto}
-                onClick={goNext}
-              >
+              {/* No deshabilitamos mientras se procesa la foto: goNext intercepta y
+                  muestra «Analizando foto…» en vez de dejar un botón muerto. */}
+              <Button size="lg" className={styles.navNext} onClick={goNext}>
                 Siguiente →
               </Button>
             </Row>
@@ -729,8 +739,9 @@ export function CreateChallenge({ groupId, onBack, onCreated }: Props) {
               fullWidth
               disabled={point == null || !mediaValid}
               onClick={() => setPreviewOpen(true)}
+              aria-label="Ver cómo se vería al jugar (pantalla completa)"
             >
-              👁️ Ver previa
+              👁️ Ver cómo se vería al jugar
             </Button>
 
             <Row gap={3} className={styles.nav}>
