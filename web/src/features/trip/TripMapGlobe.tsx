@@ -18,6 +18,18 @@ const ESRI_ATTRIBUTION =
 const WORLD_CENTER: [number, number] = [0, 25]
 const WORLD_ZOOM = 1.4
 
+// Encuadre de pines (compartido con el plano para que globo y fallback coincidan):
+//  - SINGLE_ZOOM: con un solo punto, zoom de CIUDAD (ni continente ni calle).
+//  - FIT_MAX_ZOOM: techo al encuadrar varios; evita acercarse de más si los pines
+//    están muy juntos. Por debajo de él, fitBounds elige el que enmarca todo.
+//  - FIT_PADDING: margen para que los pines no queden bajo el chrome ni el carrusel.
+//    Top mayor (chrome) y bottom mayor (carrusel) que los lados.
+const SINGLE_ZOOM = 11
+const FIT_MAX_ZOOM = 12
+const FIT_PADDING = { top: 88, bottom: 220, left: 48, right: 48 }
+// Zoom mínimo al volar a un pin seleccionado: ciudad, sin re-encuadrar todo.
+const SELECT_ZOOM = 11
+
 // Ids de fuente/capa de la ruta (line). Constantes para añadir/quitar sin colisión.
 const ROUTE_SRC = 'lg-route'
 const ROUTE_LINE = 'lg-route-line'
@@ -164,12 +176,14 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
     if (pts.length === 0) return
     const duration = prefersReducedMotion() ? 0 : 600
     if (pts.length === 1) {
-      map.easeTo({ center: pts[0], zoom: 5, duration })
+      // Un solo punto: zoom de ciudad (no de continente). fitBounds con un único
+      // punto degenera en un zoom máximo absurdo, así que centramos a mano.
+      map.easeTo({ center: pts[0], zoom: SINGLE_ZOOM, duration })
       return
     }
     const bounds = new gl.LngLatBounds(pts[0], pts[0])
     for (const p of pts) bounds.extend(p)
-    map.fitBounds(bounds, { padding: 64, maxZoom: 10, duration })
+    map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration })
   }, [])
 
   // ── Montaje: crea el mapa una sola vez (import dinámico de maplibre + su CSS). ──
@@ -246,10 +260,16 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
   useEffect(() => {
     const map = mapRef.current
     if (!map || !readyRef.current || !selectedChallengeId) return
+    // El momento activo no está clavado (anti-spoiler): si lo seleccionan, volamos
+    // a su posición FLOTANTE (centroide), no a una coordenada real que no existe.
     const target = route.find((p) => p.challengeId === selectedChallengeId)
-    if (!target) return
-    const zoom = Math.max(map.getZoom(), 7)
-    const center: [number, number] = [target.lng, target.lat]
+    const isActiveSelected = activeRef.current?.challengeId === selectedChallengeId
+    if (target == null && !isActiveSelected) return
+    const center: [number, number] = target
+      ? [target.lng, target.lat]
+      : floatingActivePos(routeRef.current)
+    // Tocar = ZOOM al punto (no solo pan): garantizamos al menos nivel ciudad.
+    const zoom = Math.max(map.getZoom(), SELECT_ZOOM)
     // Con reduced-motion saltamos sin vuelo (jumpTo); si no, vuelo suave.
     if (prefersReducedMotion()) {
       map.jumpTo({ center, zoom })

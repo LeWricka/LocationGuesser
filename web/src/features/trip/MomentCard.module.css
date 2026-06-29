@@ -11,6 +11,37 @@
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   background: var(--ocean-900);
+  /* Anillo de selección (se enciende en .selected); transición suave del borde. */
+  outline: 0 solid transparent;
+  outline-offset: 2px;
+  transition: outline-color var(--transition-fast);
+}
+
+/* Tarjeta seleccionada (centrada): anillo claro que la ata al pin resaltado. */
+.card.selected {
+  outline: 2px solid var(--color-on-photo);
+}
+
+/* Botón "expandir": disco de vidrio arriba a la derecha; abre la hoja de detalle. */
+.expand {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-md);
+  color: var(--color-on-photo);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
 }
 
 /*
@@ -90,4 +121,10 @@
   right: var(--space-3);
   bottom: var(--space-3);
   pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    transition: none;
+  }
 }

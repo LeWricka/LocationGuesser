@@ -18,6 +18,20 @@ const ESRI_ATTRIBUTION =
 const WORLD: L.LatLngExpression = [25, 0]
 const WORLD_ZOOM = 2
 
+// Encuadre de pines — MISMOS valores que el globo (`TripMapGlobe`) para que el
+// mapa se vea igual sea cual sea el motor:
+//  - SINGLE_ZOOM: un solo punto → zoom de ciudad.
+//  - FIT_MAX_ZOOM: techo al encuadrar varios (no acercarse de más con pines juntos).
+//  - FIT_PADDING: margen en px [top, right, bottom, left]; deja hueco al chrome
+//    (arriba) y al carrusel (abajo) sin tapar pines.
+const SINGLE_ZOOM = 11
+const FIT_MAX_ZOOM = 12
+// Leaflet acepta paddingTopLeft/paddingBottomRight para asimetría.
+const FIT_PAD_TOP_LEFT: L.PointTuple = [48, 88]
+const FIT_PAD_BOTTOM_RIGHT: L.PointTuple = [48, 220]
+// Zoom mínimo al volar a un pin seleccionado: ciudad.
+const SELECT_ZOOM = 11
+
 /**
  * Posición FLOTANTE del momento activo: nunca su coordenada real (spoiler), sino
  * el centroide de los puntos cerrados (o el centro del mapa si aún no hay ninguno).
@@ -76,10 +90,15 @@ function FitToPins({
     if (activePos) pts.push(activePos)
     if (pts.length === 0) return
     if (pts.length === 1) {
-      map.setView(pts[0], 6)
+      // Un solo punto: zoom de ciudad (no de país), igual que el globo.
+      map.setView(pts[0], SINGLE_ZOOM)
       return
     }
-    map.fitBounds(L.latLngBounds(pts), { padding: [56, 56], maxZoom: 12 })
+    map.fitBounds(L.latLngBounds(pts), {
+      paddingTopLeft: FIT_PAD_TOP_LEFT,
+      paddingBottomRight: FIT_PAD_BOTTOM_RIGHT,
+      maxZoom: FIT_MAX_ZOOM,
+    })
     // Solo al montar / cambiar el conjunto de puntos; el pan por selección lo
     // gestiona PanToSelected, que no debe re-encuadrar todo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -87,21 +106,35 @@ function FitToPins({
   return null
 }
 
-/** Al cambiar la selección, vuela suave al pin elegido (sin re-encuadrar todo). */
+/**
+ * Al cambiar la selección, vuela con ZOOM al pin elegido (no solo pan): tocar una
+ * tarjeta debe ACERCAR al punto. Si el seleccionado es el momento activo (sin
+ * coordenada real), volamos a su posición flotante; si no, a su lat/lng real.
+ */
 function PanToSelected({
   selectedChallengeId,
   route,
+  activeChallengeId,
+  activePos,
 }: {
   selectedChallengeId: string | null
   route: RoutePoint[]
+  activeChallengeId: string | null
+  activePos: L.LatLngExpression | null
 }) {
   const map = useMap()
   useEffect(() => {
     if (!selectedChallengeId) return
     const target = route.find((p) => p.challengeId === selectedChallengeId)
-    if (!target) return
-    map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), 9), { duration: 0.6 })
-  }, [selectedChallengeId, route, map])
+    const center: L.LatLngExpression | null = target
+      ? [target.lat, target.lng]
+      : selectedChallengeId === activeChallengeId
+        ? activePos
+        : null
+    if (!center) return
+    // Zoom a nivel ciudad como mínimo; conservamos el actual si ya está más cerca.
+    map.flyTo(center, Math.max(map.getZoom(), SELECT_ZOOM), { duration: 0.6 })
+  }, [selectedChallengeId, route, activeChallengeId, activePos, map])
   return null
 }
 
@@ -183,7 +216,12 @@ export function TripMapLeaflet({
         )}
 
         <FitToPins route={route} activePos={activePos} />
-        <PanToSelected selectedChallengeId={selectedChallengeId} route={route} />
+        <PanToSelected
+          selectedChallengeId={selectedChallengeId}
+          route={route}
+          activeChallengeId={activeMoment?.challengeId ?? null}
+          activePos={activePos}
+        />
       </MapContainer>
     </div>
   )

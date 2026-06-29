@@ -59,6 +59,43 @@
   cursor: pointer;
 }
 
+/* Pastilla "🔴 N en juego": indicador cálido de momentos jugables (point 5). El
+   punto rojo respira (reusa la animación global). Tocarla salta al momento activo. */
+.livePill {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 44px;
+  padding: 0 var(--space-3);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-on-photo);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.liveDot {
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  box-shadow: 0 0 0 0 var(--color-accent-glow-soft);
+  animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveDot {
+    animation: none;
+  }
+}
+
 /* Pastilla central con el nombre del viaje y la línea de miembros. */
 .titlePill {
   flex: 1 1 auto;
@@ -93,22 +130,31 @@
   text-overflow: ellipsis;
 }
 
-/* (c) Carrusel horizontal de momentos, anclado abajo con scroll-snap nativo. */
-.carousel {
+/* (c) Dock inferior: línea temporal + carrusel, anclados abajo. El velo de fondo
+   separa el conjunto del mapa (token §4.2) y cubre timeline y carrusel a la vez. */
+.dock {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 1;
   display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-6);
+  /* Velo al pie para separar el dock del mapa (timeline + carrusel). */
+  background: var(--map-bottom-scrim);
+}
+
+/* Carrusel horizontal de momentos con scroll-snap nativo (dentro del dock). */
+.carousel {
+  display: flex;
   gap: var(--space-3);
-  padding: var(--space-6) var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-4));
+  padding: 0 var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-4));
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  /* Velo al pie para separar las tarjetas del mapa (token §4.2). */
-  background: var(--map-bottom-scrim);
 }
 .carousel::-webkit-scrollbar {
   display: none;

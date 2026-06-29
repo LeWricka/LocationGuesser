@@ -4,8 +4,12 @@ import styles from './MomentCard.module.css'
 
 interface Props {
   moment: Moment
-  /** Abre la hoja de detalle del momento (toda la tarjeta es pulsable). */
-  onOpen: () => void
+  /** ¿Es la tarjeta seleccionada (centrada)? Resalta su marco. */
+  selected?: boolean
+  /** Tocar la foto: selecciona el momento y el mapa hace ZOOM a su pin. */
+  onSelect: () => void
+  /** Botón "expandir": abre la hoja de detalle (foto grande + texto). */
+  onExpand: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
 }
@@ -24,29 +28,41 @@ function formatMomentDate(value: string): string | null {
  * Tarjeta de un momento en el carrusel del viaje (anatomía §2 del spec).
  * Foto a sangre con overlay de legibilidad; título + fecha + nº de adivinadores.
  *
+ * INTERACCIÓN (reconciliación puntos 3/4):
+ *  - tocar la FOTO = SELECCIONAR el momento → el mapa hace ZOOM a su pin (acción
+ *    primaria, lo que la gente espera del diario visual);
+ *  - abrir el detalle (foto grande + texto) es una acción EXPLÍCITA: el botón
+ *    "⤢ Ver" arriba a la derecha. Así un toque no dispara a la vez zoom y hoja.
+ *
  * REGLA DE ORO DEL PIVOTE: jugar es capa, no peaje. Un momento CERRADO se ve y
- * ya (sin CTA); SOLO el momento en juego ofrece "Adivina →". Toda la tarjeta abre
- * el detalle; el CTA es la única acción cálida que tira del ojo hacia el juego.
+ * ya (sin CTA); SOLO el momento en juego ofrece "Adivina →" (única acción cálida).
  */
-export function MomentCard({ moment, onOpen, onPlay }: Props) {
+export function MomentCard({ moment, selected, onSelect, onExpand, onPlay }: Props) {
   const isActive = moment.status === 'active'
   const date = formatMomentDate(moment.date)
 
   return (
-    <article className={styles.card}>
-      {/* La foto NO es zoomable aquí: pulsar la tarjeta abre el detalle, no un
-          lightbox (el detalle ya ofrece la foto grande). */}
+    <article className={[styles.card, selected ? styles.selected : ''].filter(Boolean).join(' ')}>
+      {/* Tocar la foto SELECCIONA (mapa hace zoom al pin), no abre la hoja: abrir
+          el detalle es el botón "Ver". La foto no es zoomable aquí (eso vive en
+          el detalle), su click lo cableamos a la selección. */}
       <ChallengePhoto
         src={moment.imageUrl}
         alt={moment.title}
         ratio="wide"
         zoomable={false}
-        onClick={onOpen}
+        onClick={onSelect}
         className={styles.photo}
       />
 
+      {/* Botón explícito de expandir (abre la hoja de detalle). Sobre el overlay y
+          SÍ interactivo; el resto de la foto selecciona + hace zoom. */}
+      <button type="button" className={styles.expand} onClick={onExpand} aria-label="Ver detalle">
+        <span aria-hidden="true">⤢</span>
+      </button>
+
       {/* Overlay + contenido sobre la foto. aria-hidden: el contenido textual ya
-          vive accesible vía el alt de la foto-botón y el CTA tiene su propia label. */}
+          vive accesible vía el alt de la foto-botón y los controles tienen label. */}
       <div className={styles.overlay} aria-hidden="true">
         {isActive && (
           <div className={styles.badge}>
@@ -65,7 +81,7 @@ export function MomentCard({ moment, onOpen, onPlay }: Props) {
       </div>
 
       {/* CTA cálido SOLO si está en juego. Va por encima del overlay para ser
-          pulsable; el resto de la tarjeta sigue abriendo el detalle. */}
+          pulsable; el resto de la tarjeta sigue seleccionando. */}
       {isActive && onPlay && (
         <div className={styles.cta}>
           <Button size="sm" onClick={onPlay}>
