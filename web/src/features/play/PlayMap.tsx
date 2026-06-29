@@ -19,6 +19,14 @@ const TRANSPARENT_PX =
 const respectsMotion = () =>
   typeof window !== 'undefined' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
+// Acento Pizarra de los tokens (no hardcodear color): Google Maps necesita un
+// string literal para el trazo, así que leemos `--accent` del :root en runtime.
+function accentColor(): string {
+  if (typeof window === 'undefined') return '#34506b'
+  const value = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+  return value || '#34506b'
+}
+
 interface Props {
   /** Pin del jugador; null hasta que toca el mapa. */
   guess: LatLng | null
@@ -126,7 +134,7 @@ function DrawnLine({ guess, answer }: { guess: LatLng; answer: LatLng }) {
   return (
     <Polyline
       path={path}
-      strokeColor="#ff453a"
+      strokeColor={accentColor()}
       strokeWeight={3}
       strokeOpacity={1}
       clickable={false}
@@ -170,6 +178,10 @@ export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: P
       gestureHandling="greedy"
       // Mapa estándar de Google → POIs/bares visibles por defecto (lo que pide el
       // juego). Sin mapId: usamos Marker clásico, no AdvancedMarker.
+      // Atelier: basemap CLARO tipo atlas (roadmap), nunca el oscuro; forzamos el
+      // esquema claro para que no siga el modo oscuro del sistema.
+      mapTypeId="roadmap"
+      colorScheme="LIGHT"
       disableDefaultUI
       zoomControl
       clickableIcons={false}

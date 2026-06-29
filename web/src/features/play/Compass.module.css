@@ -1,15 +1,15 @@
-/* Pastilla de vidrio: cardinal a la izquierda + dial con aguja a la derecha. */
+/* Pastilla blanca translúcida (chrome Atelier): cardinal a la izquierda + dial
+   con aguja a la derecha. Flota sobre la escena a sangre. */
 .compass {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-sm);
+  background: var(--chrome-bg);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
 }
 
 .label {
@@ -28,8 +28,8 @@
 }
 
 .dialRing {
-  fill: rgba(6, 29, 40, 0.55);
-  stroke: rgba(150, 220, 225, 0.28);
+  fill: var(--color-surface-hover);
+  stroke: var(--color-border);
   stroke-width: 1.5;
 }
 
@@ -38,9 +38,9 @@
   transition: transform var(--duration-base) linear;
 }
 
-/* Mitad norte = acento cálido (apunta a dónde miras); mitad sur, fría tenue. */
+/* Mitad norte = acento Pizarra (apunta a dónde miras); mitad sur, tinta tenue. */
 .needleN {
-  fill: var(--color-accent-active);
+  fill: var(--color-accent);
 }
 .needleS {
   fill: var(--color-text-faint);
