@@ -10,5 +10,7 @@
 .map {
   width: 100%;
   height: 100%;
-  background: var(--ocean-900);
+  /* Fondo NOCHE mientras cargan los tiles satélite: que el flash inicial case con
+   * el cielo oscuro del globo (GLOBE_SKY), no un papel claro. Tinta de marca. */
+  background: var(--ink-900);
 }

@@ -18,9 +18,17 @@ html {
 body {
   margin: 0;
   min-height: 100svh;
-  /* Papel liso y QUIETO: sin aurora, sin rejilla náutica, sin halos en bucle.
-   * Una revista no parpadea (el fondo vivo del estilo viejo se ha retirado). */
-  background: var(--color-bg);
+  /* Papel con TEXTURA sutil y QUIETA: el blanco plano resultaba soso, así que el
+   * papel lleva ahora un grano SVG (feTurbulence) desaturado a opacidad muy baja
+   * + dos halos radiales tenues (acento pizarra frío + arena cálido). Todo
+   * ESTÁTICO (una revista no parpadea): nada anima, ni con/sin reduced-motion.
+   * Las capas no tintan el texto —el grano va a ~0.05 y los halos a <8% alpha—,
+   * así que el contraste tinta/papel sigue siendo AA/AAA (ver tokens).
+   * Orden: halo frío (arriba-izda) · halo cálido (arriba-dcha) · grano · papel. */
+  background-color: var(--color-bg);
+  background-image: var(--paper-halo-cool), var(--paper-halo-warm), var(--paper-grain);
+  background-attachment: fixed, fixed, fixed;
+  background-repeat: no-repeat, no-repeat, repeat;
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
