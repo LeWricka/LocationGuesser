@@ -18,85 +18,15 @@ html {
 body {
   margin: 0;
   min-height: 100svh;
+  /* Papel liso y QUIETO: sin aurora, sin rejilla náutica, sin halos en bucle.
+   * Una revista no parpadea (el fondo vivo del estilo viejo se ha retirado). */
   background: var(--color-bg);
-  /* Atlas vivo de fondo: halos cálidos/fríos + viñeta, fijos (no hacen scroll).
-   * Sobre esto flotan la AURORA animada (body::after), la rejilla de coordenadas
-   * (body::before) y los paneles de vidrio. Da color y profundidad sin pesar. */
-  background-image: var(--gradient-app-bg);
-  background-attachment: fixed;
-  background-repeat: no-repeat;
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
   line-height: var(--line-height-normal);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-}
-
-/* Rejilla de coordenadas (carta náutica) tenue sobre el océano del fondo. Fija
- * y no interactiva: vive bajo todo el contenido y refuerza el "mapa de alma".
- * Deriva muy lentamente para dar parallax/profundidad (el atlas se mueve bajo
- * los pies). El recuadro se sobredimensiona para que el borde nunca asome. */
-body::before {
-  content: '';
-  position: fixed;
-  inset: -10%;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(var(--line-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line-grid) 1px, transparent 1px);
-  background-size: 88px 88px;
-  /* Se desvanece hacia el centro para no competir con el contenido. */
-  -webkit-mask-image: radial-gradient(120% 100% at 50% 30%, transparent 18%, black 95%);
-  mask-image: radial-gradient(120% 100% at 50% 30%, transparent 18%, black 95%);
-  animation: lg-grid-drift var(--grid-drift-duration) linear infinite;
-  will-change: transform;
-}
-
-/* Aurora del fondo: halos de color (cálido ámbar/coral, teal frío, azul nocturno)
- * que respiran y se desplazan en bucle muy lento. Es lo que hace que la pantalla
- * deje de sentirse "plana": el fondo está VIVO sin distraer. Fijo, tras todo el
- * contenido, no interactivo. */
-body::after {
-  content: '';
-  position: fixed;
-  inset: -20%;
-  z-index: -2;
-  pointer-events: none;
-  background-image:
-    radial-gradient(38% 42% at 22% 16%, rgba(255, 138, 89, 0.22), transparent 60%),
-    radial-gradient(42% 46% at 82% 28%, rgba(69, 201, 176, 0.18), transparent 62%),
-    radial-gradient(50% 50% at 60% 94%, rgba(91, 124, 255, 0.12), transparent 65%);
-  filter: blur(6px);
-  animation: lg-aurora var(--aurora-duration) var(--ease-smooth) infinite alternate;
-  will-change: transform, opacity;
-}
-
-/* La aurora se desplaza/escala suavemente y palpita de intensidad. */
-@keyframes lg-aurora {
-  0% {
-    transform: translate3d(-3%, -2%, 0) scale(1.05) rotate(0deg);
-    opacity: 0.82;
-  }
-  50% {
-    transform: translate3d(3%, 2%, 0) scale(1.18) rotate(4deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translate3d(-2%, 3%, 0) scale(1.08) rotate(-3deg);
-    opacity: 0.8;
-  }
-}
-
-/* Deriva diagonal lenta de la rejilla (parallax de fondo). */
-@keyframes lg-grid-drift {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(88px, 88px, 0);
-  }
 }
 
 h1,
@@ -106,28 +36,34 @@ p {
   margin: 0;
 }
 
+/* Titulares en serif (Cormorant): la voz editorial. Peso 500-600 (la serif
+ * respira; nunca 700+), line-height holgado, tracking casi nulo. */
 h1 {
+  font-family: var(--font-serif);
   font-size: var(--font-size-2xl);
   line-height: var(--line-height-tight);
-  font-weight: var(--font-weight-black);
-  letter-spacing: var(--letter-spacing-tighter);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 h2 {
+  font-family: var(--font-serif);
   font-size: var(--font-size-xl);
   line-height: var(--line-height-tight);
-  font-weight: var(--font-weight-black);
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-tight);
 }
 
 h3 {
+  font-family: var(--font-serif);
   font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-tight);
 }
 
+/* Links en acento profundo (mejor contraste sobre papel para texto pequeño). */
 a {
-  color: var(--color-accent);
+  color: var(--accent-deep);
 }
 
 img {
@@ -154,39 +90,40 @@ img {
 }
 
 /* ----------------------------------------------------------------------
- * Vidrio + utilidades editoriales compartidas
+ * Superficie de papel + utilidades editoriales compartidas
  *
- * `lg-glass`: panel de vidrio esmerilado que flota sobre el atlas (blur, borde
- * de luz, sombra en capas). Lo usan Card y los paneles flotantes. Donde el
- * navegador no soporte backdrop-filter, el fondo semiopaco mantiene la
- * legibilidad (degradación elegante).
+ * `lg-glass`: ya NO es vidrio. Es una hoja de papel blanca opaca con hairline
+ * y sombra muy sutil (se conserva el nombre de clase para no romper a quien la
+ * usa; el lenguaje ahora es "papel, no vidrio").
  * -------------------------------------------------------------------- */
 .lg-glass {
   position: relative;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Eyebrow editorial: mayúsculas pequeñas, tracking ancho, cálido. */
+/* Eyebrow editorial: mayúsculas pequeñas, tracking ancho, en tinta suave
+ * (ya no en acento: el acento se reserva para CTA/foco/dato). */
 .lg-eyebrow {
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
-  color: var(--color-accent);
+  color: var(--color-text-faint);
 }
 
-/* Número gigante de dato (distancia, puntos): tabular para que no "baile". */
+/* Número gigante de dato (distancia, puntos): sans tabular en tinta para que
+ * no "baile" (la serif es para palabras, no para cifras de tablero). */
 .lg-data {
+  font-family: var(--font-sans);
   font-size: var(--font-size-data);
   font-weight: var(--font-weight-black);
-  line-height: 0.9;
+  line-height: 0.95;
   letter-spacing: var(--letter-spacing-tighter);
   font-variant-numeric: tabular-nums;
+  color: var(--color-text);
 }
 
 /* ----------------------------------------------------------------------
@@ -198,21 +135,20 @@ img {
   width: 100%;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-lg);
-  /* Fondo oscuro mientras carga el mapa (Google Maps en el de adivinar/resultado;
-   * Leaflet en crear/grupo): evita el flash claro en el tema oscuro. */
-  background: var(--ocean-900);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  /* Fondo de papel mientras carga el mapa: en un tema claro el flash de tile es
+   * papel, no océano. (El basemap claro por pantalla llega en la fase de mapas.) */
+  background: var(--photo-loading-bg);
   /* Contiene los z-index internos del mapa (Leaflet llega a ~1000; Google tiene
    * su propia pila) para que no tapen overlays externos como el buscador. */
   isolation: isolate;
 }
 
-/* Fondo oscuro del lienzo del mapa: mientras un tile carga (al hacer zoom) el
- * hueco se ve OSCURO, no el gris claro por defecto de Leaflet (que en un tema
- * oscuro canta mucho). No acelera la carga, pero el "gris" deja de molestar. */
+/* Fondo claro del lienzo del mapa mientras un tile carga (al hacer zoom): papel,
+ * no el gris/océano del tema oscuro. */
 .lg-map .leaflet-container {
-  background: var(--ocean-900);
+  background: var(--photo-loading-bg);
 }
 
 @media (min-width: 768px) {
@@ -254,9 +190,9 @@ img {
   }
 }
 
-/* Controles de zoom de Leaflet en tema oscuro. */
+/* Controles de zoom de Leaflet sobre superficie clara. */
 .leaflet-bar a {
-  background: var(--color-surface-raised);
+  background: var(--color-surface);
   color: var(--color-text);
   border-color: var(--color-border);
 }
@@ -479,13 +415,6 @@ img {
   .lg-shimmer-surface {
     animation: none;
     background-image: none;
-  }
-
-  /* El fondo vivo (aurora + deriva de rejilla) se congela: nada de movimiento
-   * ambiental para quien pide menos. La aurora queda fija (sigue dando color). */
-  body::before,
-  body::after {
-    animation: none;
   }
 
   ::view-transition-group(*),

@@ -1,5 +1,5 @@
-import { useState, type CSSProperties } from 'react'
-import { defaultAvatarFor, parseAvatar } from '../lib/avatar'
+import { useState } from 'react'
+import { defaultAvatarFor, parseAvatar, svgForEmoji, ANIMAL_SVG_VIEWBOX } from '../lib/avatar'
 import styles from './Avatar.module.css'
 
 type Size = 'sm' | 'md' | 'lg'
@@ -16,11 +16,11 @@ interface Props {
 }
 
 // Avatar circular del usuario: la foto de perfil (URL http) recortada en
-// círculo, o un emoji de animal GRANDE sobre un fondo de color (derivado del
-// id) cuando no hay foto. El emoji se refuerza con sombra suave + anillo
-// interior claro para leerse bien sobre cualquier fondo del set. Presentacional.
+// círculo, o un animal cuando no hay foto. Los 8 animales del set por defecto se
+// pintan como dibujo de LÍNEA en SVG (estilo Kinfolk: trazo de acento sobre tint
+// claro); el resto del set cae al emoji sobre un fondo de color. El MODELO de
+// datos no cambia: la clave sigue siendo el emoji (`emoji:<char>`). Presentacional.
 export function Avatar({ userId, avatarUrl, name, size = 'md', className }: Props) {
-  const classes = [styles.avatar, styles[size], className].filter(Boolean).join(' ')
   const label = name?.trim() || 'Avatar'
   const resolved = parseAvatar(avatarUrl, userId)
 
@@ -32,21 +32,41 @@ export function Avatar({ userId, avatarUrl, name, size = 'md', className }: Prop
   const imageFailed = src !== null && failedSrc === src
 
   if (resolved.kind === 'image' && !imageFailed) {
+    const classes = [styles.avatar, styles[size], className].filter(Boolean).join(' ')
     return (
-      <img
-        className={classes}
-        src={resolved.src}
-        alt={label}
-        onError={() => setFailedSrc(src)}
-      />
+      <img className={classes} src={resolved.src} alt={label} onError={() => setFailedSrc(src)} />
     )
   }
 
-  const bg = resolved.kind === 'emoji' ? resolved.bg : defaultAvatarFor(userId).bg
   const emoji = resolved.kind === 'emoji' ? resolved.emoji : defaultAvatarFor(userId).emoji
-  const style = { '--avatar-bg': bg.background } as CSSProperties
+  const svg = svgForEmoji(emoji)
+
+  // Animal del set por defecto → dibujo de línea (acento sobre tint), sin fondo
+  // de color: el lenguaje editorial Pizarra.
+  if (svg) {
+    const classes = [styles.avatar, styles.line, styles[size], className].filter(Boolean).join(' ')
+    return (
+      <span className={classes} role="img" aria-label={label}>
+        <svg
+          className={styles.svg}
+          viewBox={ANIMAL_SVG_VIEWBOX}
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </span>
+    )
+  }
+
+  // Resto del set → emoji grande sobre fondo de color (derivado del animal).
+  const bg = resolved.kind === 'emoji' ? resolved.bg : defaultAvatarFor(userId).bg
+  const classes = [styles.avatar, styles[size], className].filter(Boolean).join(' ')
   return (
-    <span className={classes} style={style} role="img" aria-label={label}>
+    <span
+      className={classes}
+      style={{ ['--avatar-bg' as string]: bg.background }}
+      role="img"
+      aria-label={label}
+    >
       <span className={styles.emoji} aria-hidden="true">
         {emoji}
       </span>

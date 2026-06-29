@@ -12,12 +12,14 @@ import type { TripMapProps as Props } from './TripMap.types'
 import './tripPins.css'
 import styles from './TripMapGlobe.module.css'
 
-// Satélite Esri sin API key — la MISMA capa que el mapa plano y MapPicker
-// (recon §4/§5). tileSize 256 es lo que sirve Esri; funciona en globo.
-const ESRI_URL =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-const ESRI_ATTRIBUTION =
-  'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+// Basemap CLARO por defecto (estilo Atelier, restyle §5): Esri Light Gray Canvas,
+// papel gris minimalista sin API key. Jubila el satélite oscuro a sangre y deja
+// que los pines-foto y la ruta en acento sean los protagonistas de color, igual
+// que el plano (Carto Positron). tileSize 256 es lo que sirve Esri; va en globo.
+const LIGHT_URL =
+  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+const LIGHT_ATTRIBUTION =
+  'Tiles &copy; Esri — Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
 
 // Centro/zoom del mundo hasta que fitBounds encuadra los pines (paridad con el plano).
 const WORLD_CENTER: [number, number] = [0, 25]
@@ -86,9 +88,10 @@ function pinElement(opts: { imageUrl: string | null; active: boolean }): HTMLDiv
 }
 
 /**
- * Mapa GLOBO 3D de la ruta (MapLibre GL + proyección globo + satélite Esri). Es el
- * "hero" estilo Polarsteps; el mapa plano (`TripMapLeaflet`) queda de red de
- * seguridad y `TripMap` decide cuál montar. Mismo contrato de Props que el plano:
+ * Mapa GLOBO 3D de la ruta (MapLibre GL + proyección globo + basemap CLARO Esri
+ * Light Gray). Es el "hero" estilo atlas editorial; el mapa plano
+ * (`TripMapLeaflet`) queda de red de seguridad y `TripMap` decide cuál montar.
+ * Mismo contrato de Props que el plano:
  *  - pin-foto clavado por momento cerrado (anillo blanco);
  *  - momento activo FLOTANDO sobre el centroide (anillo cálido pulsante, anti-spoiler);
  *  - ruta: línea continua entre cerrados + tramo discontinuo hacia el activo;
@@ -106,17 +109,16 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-// Atmósfera del globo (Fase 2): halo azul-noche en el borde de la esfera sobre el
-// fondo oscuro de espacio que ya da `.map` (var --ocean-900). `atmosphere-blend`
-// hace visible el halo; el degradado cielo→horizonte tiñe la esfera de azul frío,
-// coherente con la paleta "Atlas Editorial". Son colores de PAINT de MapLibre (no
-// CSS), así que no pueden ser `var(--token)`; quedan en valores concretos próximos
-// a los tokens del sistema.
+// Atmósfera del globo (estilo Atelier, restyle §5): halo CLARO y suave en el borde
+// de la esfera sobre el fondo de papel que da `.map` (var --ocean-900, remapeado a
+// papel claro). Adiós al azul nocturno: cielo casi blanco y horizonte gris-azul muy
+// tenue, coherente con el diario claro. Son colores de PAINT de MapLibre (no CSS),
+// así que no pueden ser `var(--token)`; quedan en valores próximos a los tokens.
 const GLOBE_SKY: SkySpecification = {
-  'sky-color': '#0a2233', // cielo: océano profundo (~ --ocean-800/900)
-  'horizon-color': '#1d5f7a', // horizonte: teal frío que ilumina el borde
-  'sky-horizon-blend': 0.8,
-  'atmosphere-blend': 0.9, // halo de atmósfera bien visible en proyección globo
+  'sky-color': '#eef0f3', // cielo: papel claro (~ --color-surface-hover)
+  'horizon-color': '#cfd6de', // horizonte: gris-azul muy tenue que ilumina el borde
+  'sky-horizon-blend': 0.7,
+  'atmosphere-blend': 0.6, // halo suave, no un anillo marcado sobre el papel
 }
 
 // Aplica atmósfera/cielo SOLO si la versión de maplibre soporta la API. Feature-detect
@@ -137,9 +139,9 @@ function applySky(map: MapLibreMap): void {
   }
   if (typeof withSky.setFog === 'function') {
     try {
-      // Niebla atmosférica sutil hacia el horizonte (refuerza la sensación de
-      // espacio). Opcional: si la versión la ignora o falla, da igual.
-      withSky.setFog({ color: '#0a2233', 'horizon-blend': 0.2 })
+      // Niebla atmosférica clara hacia el horizonte (refuerza la curvatura del
+      // globo sin oscurecerlo). Opcional: si la versión la ignora o falla, da igual.
+      withSky.setFog({ color: '#eef0f3', 'horizon-blend': 0.2 })
     } catch {
       // No disponible/aceptada: ignorar.
     }
@@ -207,9 +209,12 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
     // Ruta: continua entre cerrados + discontinua hacia el activo flotante. El paint
     // WebGL no entiende `var(--token)`, así que resolvemos el token a color concreto
     // leyendo la variable computada (mismo valor que usa el plano por CSS).
+    // Ruta en acento/tinta (tokens). El paint WebGL no entiende `var(--token)`, así
+    // que resolvemos el token a color concreto; el fallback es tinta translúcida
+    // (papel claro), no blanco —el basemap por defecto ya es claro.
     const css = getComputedStyle(map.getContainer())
-    const lineColor = css.getPropertyValue('--route-line').trim() || 'rgba(255,255,255,0.78)'
-    const dashColor = css.getPropertyValue('--route-line-dash').trim() || 'rgba(255,255,255,0.55)'
+    const lineColor = css.getPropertyValue('--route-line').trim() || 'rgba(24,32,43,0.6)'
+    const dashColor = css.getPropertyValue('--route-line-dash').trim() || 'rgba(24,32,43,0.35)'
     const closed: [number, number][] = pts.map((p) => [p.lng, p.lat])
     const dash: [number, number][] | null =
       active && pts.length > 0
@@ -319,18 +324,19 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
           if (disposed) return
           // Globo: la proyección llegó en v4 y se activa tras cargar el estilo.
           map.setProjection({ type: 'globe' })
-          // Atmósfera/cielo nocturno (Fase 2). Feature-detect dentro: si la versión
-          // no lo soporta, se omite sin romper el globo que ya funciona.
+          // Atmósfera/cielo CLARO (estilo Atelier). Feature-detect dentro: si la
+          // versión no lo soporta, se omite sin romper el globo que ya funciona.
           applySky(map)
-          // Raster Esri como capa de fondo (sin key). En globo da el look satélite.
-          map.addSource('esri', {
+          // Raster Esri Light Gray como capa de fondo (sin key). En globo da un
+          // look "atlas claro": papel gris con la ruta y los pines como color.
+          map.addSource('basemap', {
             type: 'raster',
-            tiles: [ESRI_URL],
+            tiles: [LIGHT_URL],
             tileSize: 256,
-            attribution: ESRI_ATTRIBUTION,
-            maxzoom: 19,
+            attribution: LIGHT_ATTRIBUTION,
+            maxzoom: 16,
           })
-          map.addLayer({ id: 'esri', type: 'raster', source: 'esri' })
+          map.addLayer({ id: 'basemap', type: 'raster', source: 'basemap' })
           readyRef.current = true
           repaint()
           // Entrada cinematográfica una sola vez; si no la hace, fitBounds normal.

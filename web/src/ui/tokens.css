@@ -1,275 +1,290 @@
 /*
- * LocationGuesser — Design tokens · "Atlas Editorial"
+ * LocationGuesser — Design tokens · "Atelier" (paleta Pizarra)
  *
  * Una sola fuente de verdad para color, tipografía, espaciado, etc.
  * Todo el UI kit consume estas variables; no se hardcodean valores en los
  * CSS Modules.
  *
- * Dirección visual (fusión B-Editorial + C-Atlas):
- *  - El MAPA es el alma: superficies frías de océano/tierra, fondo de atlas
- *    inmersivo, profundidad en capas (sombras difusas + viñeta).
- *  - PANELES DE VIDRIO (backdrop-filter blur) con borde de luz, que flotan
- *    sobre el fondo en vez de cajas opacas planas.
- *  - ACENTO CÁLIDO (ámbar/coral) reservado a lo crítico: CTAs, pines, cuenta
- *    atrás y la fila propia del ranking. Resalta sobre el frío.
- *  - Rigor editorial: alto contraste, jerarquía por TAMAÑO tipográfico,
- *    números gigantes tabulares para los datos.
+ * Dirección visual (Kinfolk editorial · paleta Pizarra):
+ *  - PAPEL, no vidrio: superficies blancas opacas sobre fondo papel claro, con
+ *    hairline finísimo y sombra MUY sutil. La elevación la da el hairline + una
+ *    sombra tenue, nunca un glow.
+ *  - TINTA SOBRE PAPEL: tinta gris-azulada casi negra (#18202B) por niveles. La
+ *    jerarquía la marca el TAMAÑO/PESO/FAMILIA, jamás un fondo de color.
+ *  - VOZ SERIF (Cormorant Garamond) para titulares/display; sans del sistema
+ *    para cuerpo y UI. El contraste serif/sans es la identidad.
+ *  - UN SOLO ACENTO sobrio: azul pizarra (#34506B), reservado a CTA, foco y el
+ *    dato "en juego". Color SÓLIDO, sin gradientes ni glows.
+ *  - QUIETUD: se retira el fondo "vivo" (aurora animada, rejilla náutica,
+ *    brillos en bucle). El movimiento queda solo en entradas y micro-feedback.
+ *
+ * Nota de migración: mantenemos VIVOS los nombres de token antiguos
+ * (--ocean-*, --land-*, --glass-*, --gradient-accent, --glow-*, etc.) remapeados
+ * a la nueva paleta, para que las pantallas de features sigan compilando y se
+ * vean coherentes sin tocarlas todavía (restyle por lotes; las features son una
+ * fase posterior). Se limpiarán cuando cada pantalla migre.
  */
 
 /*
- * Fuente manuscrita self-host (Fase 2b). 'Caveat' variable (pesos 400–700) para
- * portadas/nombres de viaje. Self-host = sin llamada a Google Fonts (privacidad +
- * un solo origen, encaja con el CSP del Artifact y el deploy estático). El token
- * --font-display sigue con fallback de sistema por si el .woff2 aún no cargó.
+ * Cormorant Garamond self-host (display/titulares). Pesos 500 y 600 + un
+ * itálico 500 (para acentos editoriales). Self-host = sin llamada a Google
+ * Fonts (privacidad + un solo origen). font-display: swap para no bloquear el
+ * render: hasta que carga, cae al serif de sistema (Georgia/Didot).
  */
 @font-face {
-  font-family: 'Caveat';
-  src: url('/fonts/caveat-variable.woff2') format('woff2');
-  font-weight: 400 700;
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/cormorant-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/cormorant-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('/fonts/cormorant-500-italic.woff2') format('woff2');
+  font-weight: 500;
+  font-style: italic;
   font-display: swap;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* ----------------------------------------------------------------------
-   * Color — paleta base
-   * Frío de mapa (océano profundo + tierra verde-cian) como superficies, y un
-   * acento cálido ámbar→coral como única nota caliente. El contraste cálido /
-   * frío hace que los CTAs y datos críticos "canten".
+   * Color — paleta Pizarra
+   * Papel claro + tinta gris-azulada por niveles + un acento azul pizarra.
    * -------------------------------------------------------------------- */
 
-  /* Océano (frío) — base de las superficies, de más al fondo a más al frente. */
-  --ocean-900: #04141d; /* fondo de página, lo más profundo */
-  --ocean-800: #081f2b; /* tarjetas base (tras el vidrio) */
-  --ocean-700: #0d2c3b; /* superficies elevadas */
-  --ocean-600: #123a4c; /* hover de superficies */
+  /* Papel / superficies (de fondo a frente). */
+  --paper: #f6f7f9; /* fondo de página */
+  --surface: #ffffff; /* hojas/tarjetas (blanco puro) */
 
-  /* Tierra (verde-cian) — para chips de mapa, pines de respuesta, barras. */
-  --land-600: #1a6b5d;
-  --land-500: #237d6c;
-  --land-400: #2f9b86;
-  --teal-bright: #45c9b0; /* respuesta real / barras de ranking */
+  /* Tinta (jerarquía de grises azulados sobre papel). */
+  --ink-900: #18202b; /* titulares, texto principal (~14:1 sobre papel, AAA) */
+  --ink-600: #5a6675; /* texto secundario / meta (~5.4:1, AA) */
+  --ink-400: #97a0ac; /* ayudas / placeholders / iconos decorativos */
 
-  /* Superficies (semántico). Tras el vidrio hay océano; las tarjetas reales
-   * usan los tokens de vidrio (--glass-*). */
-  --color-bg: var(--ocean-900);
-  --color-surface: var(--ocean-800);
-  --color-surface-raised: var(--ocean-700);
-  --color-surface-hover: var(--ocean-600);
+  /* Hairlines. */
+  --hairline: rgba(24, 32, 43, 0.1);
+  --hairline-soft: rgba(24, 32, 43, 0.06);
+  --hairline-strong: rgba(24, 32, 43, 0.18);
 
-  /* Realce sutil en bordes superiores de superficies (luz cenital sobre vidrio). */
-  --color-surface-sheen: rgba(180, 235, 240, 0.1);
-
-  /* Fondo de página: atlas vivo. Halo cálido arriba (sol bajo), océano que se
-   * hunde hacia el fondo y una viñeta para dar profundidad real de escena. */
-  --gradient-app-bg:
-    radial-gradient(1200px 760px at 50% -12%, rgba(255, 178, 77, 0.1), transparent 52%),
-    radial-gradient(1100px 900px at 18% 8%, rgba(69, 201, 176, 0.08), transparent 55%),
-    radial-gradient(1400px 1100px at 50% 120%, var(--ocean-900) 35%, transparent 60%),
-    radial-gradient(140% 130% at 50% 40%, transparent 52%, rgba(2, 10, 16, 0.62) 100%);
-
-  /* Rejilla de coordenadas tenue (sensación de carta náutica) para fondos de mapa. */
-  --line-grid: rgba(150, 220, 225, 0.1);
-  /* Pista fría tenue: fondo de barras de progreso/ranking sobre superficie oscura. */
-  --track-cool: rgba(150, 220, 225, 0.12);
-
-  /* Vidrio — paneles que flotan sobre el atlas. */
-  --glass-bg: rgba(10, 36, 49, 0.62);
-  --glass-bg-strong: rgba(12, 42, 56, 0.78);
-  --glass-border: rgba(170, 230, 235, 0.22);
-  --glass-sheen: rgba(255, 255, 255, 0.1);
-  --glass-blur: blur(18px) saturate(140%);
-
-  /* Bordes / separadores (hairlines editoriales sobre frío). */
-  --color-border: rgba(150, 220, 225, 0.16);
-  --color-border-strong: rgba(170, 230, 235, 0.3);
-
-  /* Texto — alto contraste sobre el frío. */
-  --color-text: #eef8f8; /* principal */
-  --color-text-muted: #aecdd1; /* secundario, ayudas */
-  --color-text-faint: #7299a0; /* deshabilitado, placeholders */
-
-  /* Acento de marca: ámbar → coral cálido (pin / CTA / dato crítico). */
-  --color-accent: #ffb24d;
-  --color-accent-hover: #ffc36b;
-  --color-accent-active: #f0603c;
-  --color-accent-soft: rgba(255, 178, 77, 0.14); /* fondos tenues, badges */
-  /* Relleno de halo cálido para destellos decorativos (radial-gradient de logro
-   * en RevealBurst y el halo del dashboard). Mismo ámbar, algo más presente. */
-  --color-accent-glow-soft: rgba(255, 178, 77, 0.32);
-  --color-on-accent: #2a1500; /* texto sobre acento (oscuro: cálido es claro) */
-
-  /* Gradiente de marca: ámbar → coral. Para CTA primario, FAB, pines, anillos. */
-  --gradient-accent: linear-gradient(135deg, #ffc36b 0%, #ffb24d 45%, #ff7a59 100%);
-  --gradient-accent-hover: linear-gradient(135deg, #ffce82 0%, #ffbe5f 45%, #ff8d6f 100%);
-
-  /* Acento secundario (teal "mapa") — para estados/realtime y data-viz fría. */
-  --color-accent-2: var(--teal-bright);
-  --color-accent-2-soft: rgba(69, 201, 176, 0.16);
-
-  /* Medallas del podio (oro/plata/bronce) — disco de puesto y barra del ranking
-   * en la tarjeta para compartir. Colores sólidos a propósito: la tarjeta se
-   * rasteriza con html-to-image y los filtros/transparencias raras no se captan.
-   * El token `-on-*` es el texto legible sobre cada medalla. */
-  --medal-gold: #ffcf5c;
-  --medal-on-gold: #2a1500;
-  --medal-silver: #cfe0e6;
-  --medal-on-silver: #11242b;
-  --medal-bronze: #d98a4e;
-  --medal-on-bronze: #2a1500;
-
-  /* Semánticos. "warning"/"toplay" se alinea con el ámbar de marca. */
-  --color-success: #45c9b0;
-  --color-success-soft: rgba(69, 201, 176, 0.16);
-  --color-warning: #ffb24d;
-  --color-warning-soft: rgba(255, 178, 77, 0.18);
-  --color-danger: #ff7a59;
-  --color-danger-soft: rgba(255, 122, 89, 0.18);
-
-  /* Anillo de foco accesible (visible sobre cualquier superficie fría). */
-  --color-focus-ring: #8fd6d0;
-
-  /* Velo modal/overlay: negro semiopaco tras diálogos y slideshow a pantalla
-   * completa. Mismo valor en Modal y en el slideshow de onboarding. */
-  --color-scrim: rgba(0, 0, 0, 0.62);
-
-  /* Blanco puro para texto/iconos SOBRE imágenes (lightbox, pie de foto): la
-   * foto ya da el contraste, no se usa el texto frío de marca. */
-  --color-on-photo: #fff;
-
-  /* Tinte/borde negro para leer texto sobre fotos arbitrarias (degradado al pie
-   * de la imagen, sombra de texto). Compartido por lightbox y ChallengePhoto. */
-  --photo-overlay-strong: rgba(0, 0, 0, 0.7);
-  --photo-text-shadow: rgba(0, 0, 0, 0.6);
+  /* Acento: azul pizarra. SÓLIDO (sin gradiente). */
+  --accent: #34506b;
+  --accent-deep: #2a4256; /* hover/active y links de texto */
+  --accent-tint: #eaeef2; /* fondo tenue de badge/chip/selección */
+  --accent-ink: #ffffff; /* texto/icono sobre acento (>7:1, AAA) */
+  --on-photo: #ffffff; /* texto/icono sobre foto */
 
   /* ----------------------------------------------------------------------
-   * Mapa "Viaje" (pivote diario visual) — deltas §4.2 del spec de diseño.
-   * El mapa va a sangre con satélite Esri; estos tokens visten el chrome, los
-   * pines-foto y la ruta SOBRE la imagen satélite (muy contrastada). NO se
-   * incluye el @font-face manuscrito (Fase 2: aún no tenemos el .woff2).
+   * Mapeo semántico sobre los nombres de token existentes (cascade).
+   * Cambiamos VALORES, no nombres: el kit y las features migran "gratis".
    * -------------------------------------------------------------------- */
 
-  /* Chrome flotante sobre el mapa hero (más opaco que el glass normal porque va
-   * sobre fotos satélite muy contrastadas). */
-  --map-chrome-bg: rgba(8, 24, 33, 0.66);
-  --map-chrome-blur: blur(14px) saturate(130%);
+  /* Superficies. */
+  --color-bg: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface); /* la elevación la da la sombra, no el color */
+  --color-surface-hover: #eef0f3; /* hover suave de superficie sólida */
+  /* Realce cenital del estilo viejo: en papel no hay sheen → transparente. */
+  --color-surface-sheen: transparent;
 
-  /* Anillo del pin-foto en cada estado. */
-  --pin-ring-closed: rgba(255, 255, 255, 0.92); /* cerrado: blanco */
-  --pin-ring-active: var(--color-accent); /* en juego: cálido pulsante */
+  /* Texto. */
+  --color-text: var(--ink-900);
+  --color-text-muted: var(--ink-600);
+  --color-text-faint: var(--ink-400);
+
+  /* Bordes / separadores. */
+  --color-border: var(--hairline);
+  --color-border-strong: var(--hairline-strong);
+
+  /* Acento de marca (azul pizarra). CTA / foco / dato "en juego". */
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-deep);
+  --color-accent-active: var(--accent-deep);
+  --color-accent-soft: var(--accent-tint); /* fondos tenues, badges */
+  --color-accent-glow-soft: rgba(52, 80, 107, 0.16); /* destello contenido (sin halo cálido) */
+  --color-on-accent: var(--accent-ink);
+
+  /* Acento secundario (antes teal "mapa"): se neutraliza a la misma pizarra. */
+  --color-accent-2: var(--accent);
+  --color-accent-2-soft: var(--accent-tint);
+
+  /* Gradiente de marca → ahora color SÓLIDO. Se conserva el NOMBRE para que las
+   * features que aún lo usan (FAB, anillos, HomeDashboard) no se rompan; el
+   * valor es un "gradiente" de un solo color = plano pizarra. */
+  --gradient-accent: linear-gradient(0deg, var(--accent), var(--accent));
+  --gradient-accent-hover: linear-gradient(0deg, var(--accent-deep), var(--accent-deep));
+
+  /* Foco. Anillo de acento sobre papel. */
+  --color-focus-ring: var(--accent);
+
+  /* Velo modal/overlay: tinta translúcida (no negro puro). */
+  --color-scrim: rgba(24, 32, 43, 0.42);
+
+  /* Blanco para texto/iconos SOBRE imágenes (lightbox, pie de foto). */
+  --color-on-photo: var(--on-photo);
+
+  /* Tinte/borde para leer texto sobre fotos arbitrarias. */
+  --photo-overlay-strong: rgba(18, 24, 32, 0.62);
+  --photo-text-shadow: rgba(18, 24, 32, 0.55);
+
+  /* ----------------------------------------------------------------------
+   * Tokens del estilo viejo, remapeados a Pizarra (vivos hasta migrar features).
+   * -------------------------------------------------------------------- */
+
+  /* Océano (frío) → niveles de papel/superficie claros. */
+  --ocean-900: var(--paper);
+  --ocean-800: var(--surface);
+  --ocean-700: var(--surface);
+  --ocean-600: var(--color-surface-hover);
+
+  /* Tierra / teal → acento pizarra neutralizado. */
+  --land-600: var(--accent-deep);
+  --land-500: var(--accent);
+  --land-400: var(--accent);
+  --teal-bright: var(--accent);
+
+  /* Rejilla náutica y pista fría → hairline tenue. */
+  --line-grid: var(--hairline-soft);
+  --track-cool: var(--hairline);
+
+  /* Fondo "atlas vivo" → papel liso (sin halos ni viñeta). Se conserva el nombre
+   * porque ChallengePhoto.placeholder lo usa como relleno; ahora es papel sólido. */
+  --gradient-app-bg: var(--paper);
+
+  /* Vidrio → papel opaco. backdrop-filter desactivado (none) para quitar el
+   * glass como lenguaje de tarjeta; el fondo queda blanco opaco. */
+  --glass-bg: var(--surface);
+  --glass-bg-strong: var(--surface);
+  --glass-border: var(--hairline);
+  --glass-sheen: transparent;
+  --glass-blur: none;
+
+  /* Medallas del podio (tarjetas rasterizadas) — recalibradas a papel. */
+  --medal-gold: #c9a24b;
+  --medal-on-gold: #2a2110;
+  --medal-silver: #a9a39a;
+  --medal-on-silver: #20211f;
+  --medal-bronze: #b07a4e;
+  --medal-on-bronze: #2a1b0f;
+
+  /* Semánticos (sobrios, sobre papel). */
+  --color-success: #3e7d5a;
+  --color-success-soft: #e7f0ea;
+  --color-warning: #9a6b2f; /* ocre tostado, NO el ámbar viejo */
+  --color-warning-soft: #f4ecdd;
+  --color-danger: #b23a36;
+  --color-danger-soft: #f7e6e5;
+
+  /* ----------------------------------------------------------------------
+   * Mapa "Viaje" / chrome flotante sobre foto/satélite.
+   * El chrome pasa de disco oscuro a PASTILLA BLANCA translúcida.
+   * -------------------------------------------------------------------- */
+  --map-chrome-bg: rgba(255, 255, 255, 0.86);
+  --map-chrome-blur: blur(14px) saturate(110%);
+
+  /* Anillo del pin-foto. */
+  --pin-ring-closed: #ffffff;
+  --pin-ring-active: var(--accent);
   --pin-ring-width: 3px;
 
-  /* Trazo de la ruta sobre satélite. */
-  --route-line: rgba(255, 255, 255, 0.78);
-  --route-line-dash: rgba(255, 255, 255, 0.55); /* tramo no clavado (hacia el activo) */
+  /* Trazo de la ruta sobre el mapa. Tinta sobre claro. */
+  --route-line: rgba(24, 32, 43, 0.6);
+  --route-line-dash: rgba(24, 32, 43, 0.35);
 
-  /* Velo bajo el carrusel para separar tarjetas del mapa (degradado al pie).
-     Más alto y en dos paradas para que la transición al mapa sea cremosa (no un
-     corte duro): el satélite se funde con la oscuridad bajo las tarjetas. */
+  /* Velo bajo el carrusel: funde el carrusel con el papel (blanco, no negro). */
   --map-bottom-scrim: linear-gradient(
     to top,
-    rgba(2, 10, 16, 0.86) 0%,
-    rgba(2, 10, 16, 0.45) 42%,
+    rgba(246, 247, 249, 0.92) 0%,
+    rgba(246, 247, 249, 0.45) 42%,
     transparent 100%
   );
 
-  /* Craft del chrome flotante (§ pase visual 2/2). El chrome va SOBRE satélite muy
-     contrastado: necesita una sombra que lo despegue del mapa con credibilidad
-     (sombra larga difusa + un fino anillo de contacto oscuro que define el borde
-     contra tiles claros, como en la referencia Polarsteps). NO usa el sheen frío de
-     las tarjetas (ahí el fondo es océano, aquí es foto). */
-  --shadow-chrome:
-    0 1px 0 0 rgba(255, 255, 255, 0.14) inset, 0 10px 28px -10px rgba(0, 0, 0, 0.62),
-    0 2px 8px -2px rgba(0, 0, 0, 0.45);
-  /* Halo de contacto fino: un anillo oscuro 1px que asienta la pastilla sobre
-     cualquier tile (claro u oscuro) sin depender solo del blur. Se suma a la
-     sombra. */
-  --ring-contact: 0 0 0 1px rgba(0, 0, 0, 0.16);
+  /* Chrome flotante claro: sombra que lo despega de la imagen + anillo de
+   * contacto fino (sin sheen frío del estilo viejo). */
+  --chrome-bg: rgba(255, 255, 255, 0.86);
+  --chrome-blur: blur(14px) saturate(110%);
+  --shadow-chrome: 0 4px 14px -4px rgba(24, 32, 43, 0.28), 0 1px 3px rgba(24, 32, 43, 0.18);
+  --ring-contact: 0 0 0 1px rgba(24, 32, 43, 0.06);
 
-  /* Pin-foto del mapa: sombra que lo levanta sobre el satélite (no una mancha
-     plana). Corona de contacto + caída difusa, como un objeto físico clavado. */
-  --shadow-pin:
-    0 0 0 1px rgba(0, 0, 0, 0.18), 0 6px 16px -4px rgba(0, 0, 0, 0.55),
-    0 2px 5px -2px rgba(0, 0, 0, 0.4);
+  /* Pin-foto del mapa. */
+  --shadow-pin: 0 4px 12px -3px rgba(24, 32, 43, 0.35), 0 1px 3px rgba(24, 32, 43, 0.25);
 
-  /* Sombra de la hoja de detalle (bottom sheet): sube desde abajo, así que la
-     sombra es ancha y se proyecta HACIA ARRIBA (la hoja flota sobre el mapa). */
-  --shadow-sheet:
-    0 1px 0 0 var(--glass-sheen) inset, 0 -18px 50px -16px rgba(0, 0, 0, 0.55),
-    0 -4px 16px -8px rgba(0, 0, 0, 0.4);
+  /* Hoja de detalle (bottom sheet): sube desde abajo → sombra HACIA ARRIBA, suave. */
+  --shadow-sheet: 0 -10px 36px -12px rgba(24, 32, 43, 0.16), 0 -2px 10px -6px rgba(24, 32, 43, 0.1);
 
-  /* Tratamiento de imagen (la foto manda). Overlay de legibilidad CALIBRADO: solo
-     ennegrece el pie donde de verdad va texto, y deja la foto respirar arriba (la
-     referencia NO oscurece de más). Tres paradas para un degradado suave. */
+  /* Tratamiento de imagen (la foto manda): scrim mínimo al pie. */
   --photo-scrim-card: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.72) 0%,
-    rgba(0, 0, 0, 0.32) 32%,
-    transparent 62%
+    rgba(18, 24, 32, 0.66) 0%,
+    rgba(18, 24, 32, 0.18) 36%,
+    transparent 64%
   );
 
-  /* Superficie base bajo una foto que aún carga (mientras llega el bitmap): tinte
-     frío del atlas para que el hueco no se vea muerto ni destelle en blanco. */
-  --photo-loading-bg: var(--ocean-800);
-  /* Banda de brillo del shimmer sobre la superficie de carga (foto/skeleton).
-     Fría y tenue: insinúa "cargando" sin parecer un flash. */
-  --shimmer-band: rgba(150, 220, 225, 0.14);
+  /* Hueco de carga de una foto = papel (no océano). */
+  --photo-loading-bg: #eef0f3;
+  /* Banda de brillo del shimmer: clara sobre papel. */
+  --shimmer-band: rgba(255, 255, 255, 0.55);
+
+  /* Tarjeta-foto del carrusel sobre el mapa. */
+  --shadow-photo-card:
+    0 8px 24px -8px rgba(24, 32, 43, 0.22), 0 2px 8px -3px rgba(24, 32, 43, 0.14);
+  --shadow-photo-card-active:
+    0 12px 30px -8px rgba(24, 32, 43, 0.28), 0 4px 12px -4px rgba(24, 32, 43, 0.18);
 
   /* ----------------------------------------------------------------------
    * Tarjetas rasterizadas (LeaderboardCard / ResultCard)
-   * Superficie "atlas" compartida por las dos tarjetas que se exportan a PNG
-   * con html-to-image. SOLO color/gradiente/borde SÓLIDOS (sin blur ni glow:
-   * el rasterizador no los capta). Estos tokens consolidan los literales
-   * idénticos repetidos entre ambas tarjetas SIN cambiar ningún valor.
+   * SOLO color/borde SÓLIDOS (html-to-image no capta blur/glow). A papel.
    * -------------------------------------------------------------------- */
-  --card-gradient:
-    radial-gradient(1100px 760px at 50% -8%, rgba(255, 178, 77, 0.22), transparent 55%),
-    radial-gradient(1000px 900px at 12% 6%, rgba(69, 201, 176, 0.16), transparent 58%),
-    linear-gradient(180deg, #07212e 0%, var(--ocean-900) 60%, #030f16 100%);
-  --card-surface: rgba(13, 44, 59, 0.85); /* fila / CTA / miniatura */
-  --card-tint-accent: rgba(255, 178, 77, 0.12); /* bloque de puntos / premios */
-  --card-border-accent: rgba(255, 178, 77, 0.32);
-  --card-border: rgba(170, 230, 235, 0.16); /* borde de fila */
-  --card-border-footer: rgba(170, 230, 235, 0.2); /* separador del pie */
+  --card-gradient: var(--surface);
+  --card-surface: #f1f3f5; /* fila / CTA / miniatura */
+  --card-tint-accent: var(--accent-tint); /* bloque de puntos / premios */
+  --card-border-accent: var(--accent);
+  --card-border: rgba(24, 32, 43, 0.12); /* borde de fila */
+  --card-border-footer: rgba(24, 32, 43, 0.14); /* separador del pie */
 
   /* ----------------------------------------------------------------------
    * Tipografía
-   * System UI: cero coste de carga, look nativo. Escala MÁS contrastada que
-   * antes (rigor editorial): el salto de tamaño marca la jerarquía, no el
-   * color de fondo. Números gigantes para los datos clave.
+   * Display = Cormorant Garamond (serif). Cuerpo/UI = sans del sistema.
+   * Números siempre en sans tabular (no "bailan").
    * -------------------------------------------------------------------- */
+  --font-serif: 'Cormorant Garamond', 'Didot', Georgia, 'Times New Roman', serif;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
 
-  /* Display manuscrita SOLO para portadas/nombres de viaje (cursiva estilo
-   * Polarsteps). 'Caveat' ya está self-host (ver @font-face arriba); el fallback
-   * de SISTEMA ('Snell Roundhand' en iPhone) cubre el lapso hasta que carga el
-   * .woff2 (font-display: swap) sin coste si la fuente fallara. */
-  --font-display: 'Caveat', 'Snell Roundhand', 'Brush Script MT', cursive;
+  /* Display = serif (remapeo del token existente; ya no es cursiva manuscrita). */
+  --font-display: var(--font-serif);
 
-  --font-size-xs: 0.75rem; /* 12px — micro-ayudas, eyebrows */
-  --font-size-sm: 0.875rem; /* 14px — texto secundario */
-  --font-size-md: 1rem; /* 16px — cuerpo (evita zoom en iOS) */
-  --font-size-lg: 1.375rem; /* 22px — subtítulos */
-  --font-size-xl: 2rem; /* 32px — títulos de sección */
-  --font-size-2xl: 3rem; /* 48px — hero / saludo */
-  --font-size-data: 3.5rem; /* 56px — números gigantes de dato */
+  --font-size-xs: 0.75rem; /* 12px — eyebrows, micro-meta */
+  --font-size-sm: 0.875rem; /* 14px — secundario, ayudas */
+  --font-size-md: 1.0625rem; /* 17px — cuerpo (lectura revista; >16 evita zoom iOS) */
+  --font-size-lg: 1.375rem; /* 22px — subtítulos, nombres */
+  --font-size-xl: 2rem; /* 32px — títulos de sección/sheet */
+  --font-size-2xl: 2.75rem; /* 44px — hero / saludo */
+  --font-size-data: 3.25rem; /* 52px — números gigantes de dato (sans tabular) */
 
   --font-weight-regular: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --font-weight-black: 800; /* títulos y números gigantes */
+  --font-weight-bold: 600; /* la serif respira: el "bold" de titular es 600, no 700 */
+  --font-weight-black: 700; /* reservado a números de dato */
 
-  --line-height-tight: 1.05;
-  --line-height-normal: 1.45;
+  /* Line-height "de revista". */
+  --line-height-tight: 1.12; /* titulares serif (respiran) */
+  --line-height-normal: 1.6; /* cuerpo (lectura cómoda) */
 
-  /* Tracking: títulos grandes y números respiran mejor con tracking negativo. */
-  --letter-spacing-tight: -0.02em;
-  --letter-spacing-tighter: -0.04em;
+  /* Tracking: la serif no quiere tracking negativo agresivo. */
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-tighter: -0.015em; /* números de dato */
   --letter-spacing-wide: 0.04em; /* mayúsculas pequeñas, badges */
-  --letter-spacing-eyebrow: 0.22em; /* eyebrows editoriales */
+  --letter-spacing-eyebrow: 0.3em; /* eyebrows editoriales */
 
   /* ----------------------------------------------------------------------
    * Espaciado — escala de 4px. Nombres por tamaño, no por uso.
@@ -282,70 +297,47 @@
   --space-6: 2rem; /* 32 */
   --space-7: 3rem; /* 48 */
   --space-8: 4rem; /* 64 */
+  --space-9: 5rem; /* 80 — separación entre bloques de página tipo revista */
 
   /* ----------------------------------------------------------------------
-   * Radios — algo más generosos (paneles de vidrio suaves).
+   * Radios — suaves pero no "burbuja" (Kinfolk = esquinas contenidas).
    * -------------------------------------------------------------------- */
-  --radius-sm: 12px; /* inputs, botones */
-  --radius-md: 18px; /* tarjetas */
-  --radius-lg: 22px; /* paneles grandes, mapa */
+  --radius-sm: 10px; /* inputs, botones */
+  --radius-md: 16px; /* tarjetas */
+  --radius-lg: 24px; /* hojas/sheets/mapa enmarcado */
+  --radius-xl: 28px; /* portada, sheet superior */
   --radius-full: 999px; /* badges, pills, spinner */
 
   /* ----------------------------------------------------------------------
-   * Sombras — profundidad en capas: difusa y larga (el panel "flota" sobre el
-   * atlas) + sheen interior de luz. La elevación se LEE de verdad.
+   * Sombras — papel: MUY sutiles. La elevación la lee el hairline + sombra
+   * tenue, no un glow. Negros bajos, difusos, sin sheen interior.
    * -------------------------------------------------------------------- */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
-  --shadow-md:
-    0 1px 0 0 var(--glass-sheen) inset, 0 18px 40px -12px rgba(0, 0, 0, 0.55),
-    0 6px 14px -6px rgba(0, 0, 0, 0.5);
-  --shadow-lg:
-    0 1px 0 0 var(--glass-sheen) inset, 0 30px 70px -16px rgba(0, 0, 0, 0.65),
-    0 12px 28px -10px rgba(0, 0, 0, 0.5);
+  --shadow-xs: 0 1px 2px rgba(24, 32, 43, 0.05);
+  --shadow-sm: 0 1px 3px rgba(24, 32, 43, 0.06), 0 1px 2px rgba(24, 32, 43, 0.04);
+  --shadow-md: 0 4px 12px -2px rgba(24, 32, 43, 0.08), 0 2px 6px -2px rgba(24, 32, 43, 0.06);
+  --shadow-lg: 0 12px 32px -8px rgba(24, 32, 43, 0.12), 0 4px 12px -4px rgba(24, 32, 43, 0.08);
+  --shadow-hover: 0 16px 40px -10px rgba(24, 32, 43, 0.16), 0 6px 16px -6px rgba(24, 32, 43, 0.1);
 
-  /* Resplandor de marca: glow cálido bajo el CTA primario / FAB / anillos. */
-  --shadow-accent: 0 14px 30px -10px rgba(255, 122, 89, 0.6);
-  --shadow-accent-hover: 0 18px 38px -10px rgba(255, 122, 89, 0.72);
+  /* Resplandor de marca (estilo viejo) → ahora una sombra suave, sin glow cálido.
+   * Se conserva el nombre para FAB/CTA de features hasta que migren. */
+  --shadow-accent: var(--shadow-md);
+  --shadow-accent-hover: var(--shadow-lg);
 
-  /* Glows de halo (anillos, datos "calientes", celebración). Más difusos que las
-   * sombras: rodean el elemento con luz de color en vez de proyectar hacia abajo. */
-  --glow-accent: 0 0 0 1px rgba(255, 178, 77, 0.18), 0 0 32px -4px rgba(255, 138, 89, 0.55);
-  --glow-accent-strong:
-    0 0 0 1px rgba(255, 178, 77, 0.3), 0 0 22px -2px rgba(255, 178, 77, 0.7),
-    0 0 60px -6px rgba(255, 122, 89, 0.5);
-  --glow-teal: 0 0 0 1px rgba(69, 201, 176, 0.22), 0 0 30px -6px rgba(69, 201, 176, 0.5);
-
-  /* Halo cálido extra que se suma a --shadow-accent-hover bajo un FAB al pasar el
-   * ratón. Mismo valor en el FAB de crear grupo y en el FAB de compartir ranking. */
-  --glow-fab-hover: 0 0 30px -4px rgba(255, 138, 89, 0.65);
-
-  /* Sombra de tarjeta elevada al hacer hover (lift con más presencia). */
-  --shadow-hover:
-    0 1px 0 0 var(--glass-sheen) inset, 0 26px 56px -16px rgba(0, 0, 0, 0.62),
-    0 10px 24px -8px rgba(0, 0, 0, 0.5);
-
-  /* Sombra de la tarjeta-foto del carrusel SOBRE el mapa satélite (§ pase visual
-     2/2). A diferencia de --shadow-lg (pensada para vidrio sobre océano), añade un
-     anillo de contacto oscuro 1px que separa la foto del satélite contrastado y un
-     sheen blanco superior tenue (la foto no es vidrio: el realce es de borde, no de
-     blur). Da la profundidad "objeto físico" de la referencia. */
-  --shadow-photo-card:
-    0 0 0 1px rgba(0, 0, 0, 0.22), 0 1px 0 0 rgba(255, 255, 255, 0.12) inset,
-    0 18px 36px -14px rgba(0, 0, 0, 0.6), 0 6px 14px -6px rgba(0, 0, 0, 0.42);
-  /* La misma tarjeta cuando está seleccionada (centrada): la sombra crece un punto
-     para que "salte" hacia el usuario al enfocarla, reforzando el anillo de foco. */
-  --shadow-photo-card-active:
-    0 0 0 1px rgba(0, 0, 0, 0.22), 0 1px 0 0 rgba(255, 255, 255, 0.16) inset,
-    0 26px 50px -14px rgba(0, 0, 0, 0.66), 0 10px 22px -8px rgba(0, 0, 0, 0.46);
+  /* Glows de halo → marca QUIETA: un anillo finísimo de contacto, sin halo. */
+  --glow-accent: 0 0 0 1px rgba(52, 80, 107, 0.16);
+  --glow-accent-strong: 0 0 0 1px rgba(52, 80, 107, 0.28);
+  --glow-teal: 0 0 0 1px rgba(52, 80, 107, 0.16);
+  --glow-fab-hover: var(--shadow-lg);
 
   /* ----------------------------------------------------------------------
    * Layout
    * -------------------------------------------------------------------- */
   --tap-target: 44px; /* objetivo táctil mínimo (WCAG / iOS) */
-  --container-max: 560px; /* columna estrecha tipo "atlas de bolsillo" */
+  --container-max: 600px; /* columna de lectura tipo revista */
+  --content-measure: 62ch; /* medida de línea máx. para párrafos */
 
   /* ----------------------------------------------------------------------
-   * Animación / Motion (conservado del primer pase; respeta reduced-motion).
+   * Animación / Motion (respeta reduced-motion).
    * -------------------------------------------------------------------- */
   --duration-fast: 120ms;
   --duration-base: 200ms;
@@ -359,10 +351,10 @@
   --transition-fast: var(--duration-fast) var(--ease-emphasized);
   --transition-base: var(--duration-base) var(--ease-emphasized);
 
-  --stagger-step: 70ms; /* paso de entrada escalonada (subido: se nota más la secuencia) */
+  --stagger-step: 70ms; /* paso de entrada escalonada */
 
-  /* Aurora del fondo: ciclos largos y lentos para que el atlas "respire" sin
-   * distraer. Movimiento casi subliminal, no animación de pantalla de carga. */
+  /* Duraciones del fondo "vivo" del estilo viejo: ya no se usan (el fondo es
+   * quieto), pero se conservan los nombres por si algún keyframe legacy las cita. */
   --aurora-duration: 26s;
   --grid-drift-duration: 70s;
 

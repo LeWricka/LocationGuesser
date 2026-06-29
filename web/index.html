@@ -4,10 +4,13 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- PWA: color de barra del navegador (ámbar de marca) e icono al instalar en iOS.
-         El <link rel="manifest"> lo inyecta vite-plugin-pwa en el build. -->
-    <meta name="theme-color" content="#ffb24d" />
+    <!-- PWA: color de barra del navegador (azul pizarra de marca) e icono al instalar
+         en iOS. El <link rel="manifest"> lo inyecta vite-plugin-pwa en el build. -->
+    <meta name="theme-color" content="#34506b" />
     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <!-- Precarga del peso de display más usado (Cormorant 500) para que los
+         titulares no parpadeen al entrar (font-display: swap cubre el resto). -->
+    <link rel="preload" href="/fonts/cormorant-500.woff2" as="font" type="font/woff2" crossorigin />
     <title>LocationGuesser</title>
   </head>
   <body>

@@ -1,7 +1,8 @@
 /*
- * Franja temporal sobre el carrusel. Flota sobre el mapa: usa el chrome de vidrio
- * y texto sobre foto (tokens), legible sobre el satélite. Scroll horizontal con
- * snap; sin librerías. La línea base "cose" las marcas como una mini-ruta.
+ * Franja temporal sobre el carrusel. Flota sobre el mapa claro (Atelier): el botón
+ * play usa la pastilla clara del chrome y las marcas van en TINTA (legibles sobre
+ * el papel + velo del dock). Scroll horizontal con snap; sin librerías. La línea
+ * base "cose" las marcas como una mini-ruta en acento.
  */
 /* Fila: botón ▶/⏸ fijo a la izquierda + franja de marcas que hace scroll a su
    derecha. El control no se desplaza con el scroll horizontal de la franja. */
@@ -23,7 +24,7 @@
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-sm);
-  color: var(--color-on-photo);
+  color: var(--color-text);
   background: var(--map-chrome-bg);
   -webkit-backdrop-filter: var(--map-chrome-blur);
   backdrop-filter: var(--map-chrome-blur);
@@ -96,16 +97,17 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--color-on-photo);
-  text-shadow: 0 1px 2px var(--photo-text-shadow);
+  /* Texto en tinta sobre el papel del dock (no blanco-sobre-foto). */
+  color: var(--color-text);
 }
 
 .dot {
   width: 11px;
   height: 11px;
   border-radius: var(--radius-full, 999px);
-  background: var(--map-chrome-bg);
-  border: 2px solid var(--pin-ring-closed);
+  /* Disco claro con anillo en acento (mini-pin sobre el papel del dock). */
+  background: var(--color-surface);
+  border: 2px solid var(--color-accent);
   box-shadow: var(--shadow-sm), var(--ring-contact);
   /* Muelle al seleccionar: el dot "salta" de tamaño con un pelín de overshoot. */
   transition: transform var(--duration-base) var(--ease-spring);
@@ -118,21 +120,23 @@
   opacity: 0.82;
 }
 
-/* Momento EN JUEGO: punto cálido pulsante (reusa la animación global). */
+/* Momento EN JUEGO: punto rojo pulsante (🔴, coherente con la livePill del chrome;
+   reusa la animación global). */
 .active .dot {
-  background: var(--color-accent);
-  border-color: var(--pin-ring-active);
+  background: var(--color-danger);
+  border-color: var(--color-danger);
   animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
 }
 .active .label {
-  color: var(--color-accent);
+  color: var(--color-danger);
   opacity: 1;
 }
 
-/* Marca seleccionada: dot agrandado y etiqueta a plena opacidad. */
+/* Marca seleccionada: dot agrandado, relleno de acento y etiqueta a plena opacidad. */
 .selected .dot {
   transform: scale(1.45);
-  border-color: var(--color-on-photo);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 .selected .label {
   opacity: 1;

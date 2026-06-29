@@ -2,7 +2,7 @@
  * Tarjeta de MI resultado para compartir como IMAGEN (poster vertical 4:5).
  * Ancho fijo 1080 px, alto mínimo 1350 px (ideal WhatsApp/stories). Igual que la
  * tarjeta de clasificación: NADA de backdrop-filter/filter/glow (html-to-image no
- * los rasteriza fiel); solo gradientes, colores y bordes sólidos. Centrada en el
+ * los rasteriza fiel); solo colores y bordes sólidos. Centrada en el
  * rendimiento — sin mapa ni ubicación (NO-SPOILER por construcción).
  */
 .card {
@@ -15,9 +15,8 @@
   flex-direction: column;
   gap: 48px;
 
-  /* Mismo atlas que la tarjeta de clasificación: océano sólido + halo ámbar. */
-  background-color: var(--ocean-900);
-  background-image: var(--card-gradient);
+  /* Papel sólido de revista (Atelier): hoja blanca, hairlines, acento Pizarra. */
+  background-color: var(--surface);
 
   color: var(--color-text);
   font-family: var(--font-sans);
@@ -61,10 +60,11 @@
 
 .challengeTitle {
   margin: 0;
-  font-size: 72px;
+  font-family: var(--font-serif);
+  font-size: 84px;
   line-height: 1.04;
-  font-weight: var(--font-weight-black);
-  letter-spacing: var(--letter-spacing-tighter);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
   overflow-wrap: anywhere;
 }
@@ -131,7 +131,7 @@
 }
 
 .distValue strong {
-  color: var(--teal-bright);
+  color: var(--color-accent);
   font-weight: var(--font-weight-black);
 }
 

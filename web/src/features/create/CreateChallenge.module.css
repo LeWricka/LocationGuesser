@@ -11,7 +11,7 @@
 /* Acciones del paso 3 (previa = juego real): flotan ARRIBA-CENTRO sobre la escena
    inmersiva (que es fija, z-index overlay). El back «← Editar» de la escena queda
    arriba-izquierda y el FAB del mapa abajo-centro: estas acciones no los pisan.
-   Una pastilla de vidrio para que «Crear reto» se lea sobre cualquier escena. */
+   Pastilla blanca translúcida (Atelier) para que «Crear reto» se lea sobre la foto. */
 .previewActions {
   position: fixed;
   top: calc(var(--space-3) + env(safe-area-inset-top));
@@ -24,11 +24,10 @@
   gap: var(--space-2);
   padding: var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow-md);
+  background: var(--chrome-bg);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   max-width: calc(100% - var(--space-6));
 }
 
@@ -98,7 +97,7 @@
 
 .status {
   font-size: var(--font-size-sm);
-  color: var(--color-accent-2);
+  color: var(--color-accent);
 }
 
 /* Pie de la foto y avisos del flujo. */

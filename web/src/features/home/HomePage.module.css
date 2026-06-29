@@ -29,19 +29,21 @@
   min-width: 0;
 }
 
-/* Saludo editorial: eyebrow cálido pequeño sobre el nombre. */
+/* Saludo editorial: eyebrow pequeño en tinta suave sobre el nombre serif. */
 .hello {
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
   color: var(--color-text-muted);
   line-height: 1.2;
 }
 
+/* Nombre del usuario en serif sólido: misma voz que el dashboard. */
 .name {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-black);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
   line-height: var(--line-height-tight);
   overflow: hidden;
@@ -49,8 +51,8 @@
   white-space: nowrap;
 }
 
-/* Botón que envuelve el avatar (acceso a perfil): reset + foco redondo + halo
-   cálido que se aviva al pasar el ratón. Mismo gesto que en el dashboard. */
+/* Botón que envuelve el avatar (acceso a perfil): reset + foco redondo + lift
+   sutil, sin halo. Mismo gesto que en el dashboard. */
 .profileButton {
   flex-shrink: 0;
   padding: 0;
@@ -59,14 +61,10 @@
   border-radius: var(--radius-full);
   cursor: pointer;
   line-height: 0;
-  box-shadow: var(--glow-accent);
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-base);
+  transition: transform var(--transition-fast);
 }
 .profileButton:hover {
   transform: translateY(-1px) scale(1.04);
-  box-shadow: var(--glow-accent-strong);
 }
 .profileButton:active {
   transform: scale(0.94);

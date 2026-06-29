@@ -1,5 +1,5 @@
-/* FAB fijo abajo-derecha, respetando el safe-area de iOS. Gradiente de marca
- * + glow para que "cante" como acción primaria. */
+/* FAB fijo abajo-derecha, respetando el safe-area de iOS. Círculo de acento
+ * SÓLIDO (azul pizarra), quieto: sin gradiente, sin glow, sin latido. */
 .fab {
   position: fixed;
   right: calc(var(--space-4) + env(safe-area-inset-right));
@@ -18,9 +18,9 @@
 
   border: none;
   border-radius: var(--radius-full);
-  background-image: var(--gradient-accent);
+  background-color: var(--color-accent);
   color: var(--color-on-accent);
-  box-shadow: var(--shadow-accent);
+  box-shadow: var(--shadow-md);
   cursor: pointer;
 
   font: inherit;
@@ -30,34 +30,17 @@
   transition:
     transform var(--transition-fast),
     box-shadow var(--transition-base),
-    background-image var(--transition-base);
-  /* Latido cálido en reposo: la acción primaria respira para captar la mirada
-   * sin moverse de sitio (solo el halo cambia). */
-  animation: lg-fab-breathe 3.2s var(--ease-smooth) infinite;
-}
-
-@keyframes lg-fab-breathe {
-  0%,
-  100% {
-    box-shadow: var(--shadow-accent);
-  }
-  50% {
-    box-shadow:
-      var(--shadow-accent-hover),
-      0 0 26px -4px rgba(255, 138, 89, 0.55);
-  }
+    background-color var(--transition-base);
 }
 
 .fab:hover {
-  background-image: var(--gradient-accent-hover);
-  box-shadow: var(--shadow-accent-hover), var(--glow-fab-hover);
-  transform: translateY(-3px) scale(1.04);
-  animation: none;
+  background-color: var(--color-accent-hover);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
 }
 
 .fab:active {
-  transform: scale(0.95);
-  animation: none;
+  transform: scale(0.96);
 }
 
 /* El "+" ahora es un icono Lucide (tamaño por prop, color por currentColor). */

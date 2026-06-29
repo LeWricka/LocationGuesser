@@ -10,9 +10,18 @@ describe('Avatar', () => {
     expect(node).toHaveTextContent(defaultAvatarFor('user-1').emoji)
   })
 
-  test('token emoji muestra ese animal', () => {
+  test('token emoji del set por defecto pinta el dibujo de línea (SVG)', () => {
+    // El zorro (🦊) es uno de los 8 animales con avatar SVG: se pinta a trazo,
+    // sin texto del emoji. Comprobamos que hay un <svg> dentro del avatar.
     render(<Avatar userId="user-1" avatarUrl="emoji:🦊" name="Ana" />)
-    expect(screen.getByRole('img', { name: 'Ana' })).toHaveTextContent('🦊')
+    const node = screen.getByRole('img', { name: 'Ana' })
+    expect(node.querySelector('svg')).toBeInTheDocument()
+  })
+
+  test('token emoji fuera del set por defecto muestra ese emoji', () => {
+    // El panda (🐼) no tiene dibujo SVG: cae al emoji sobre fondo de color.
+    render(<Avatar userId="user-1" avatarUrl="emoji:🐼" name="Ana" />)
+    expect(screen.getByRole('img', { name: 'Ana' })).toHaveTextContent('🐼')
   })
 
   test('URL http renderiza una imagen con alt = nombre (retrocompat)', () => {

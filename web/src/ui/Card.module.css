@@ -1,13 +1,9 @@
-/* Panel de vidrio esmerilado que flota sobre el atlas: blur del fondo, borde de
- * luz y sheen cenital. La unidad visual base del producto. */
+/* Hoja de papel: superficie blanca opaca con hairline y sombra muy sutil. Ya no
+ * es vidrio (sin blur). La unidad visual base del producto. */
 .card {
   position: relative;
-  background: var(--glass-bg);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  /* Sheen superior de luz cenital sobre el vidrio (no un rectángulo plano). */
-  background-image: linear-gradient(var(--glass-sheen), transparent 96px);
-  border: 1px solid var(--glass-border);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   transition:
@@ -17,14 +13,13 @@
 }
 
 .raised {
-  background: var(--glass-bg-strong);
-  border-color: var(--color-border-strong);
+  border-color: var(--color-border);
   box-shadow: var(--shadow-md);
 }
 .raised:hover {
   box-shadow: var(--shadow-hover);
-  border-color: color-mix(in srgb, var(--color-accent) 28%, var(--color-border-strong));
-  transform: translateY(-3px);
+  border-color: var(--color-border-strong);
+  transform: translateY(-2px);
 }
 
 @media (prefers-reduced-motion: reduce) {
