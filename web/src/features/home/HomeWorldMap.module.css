@@ -1,56 +1,104 @@
-/* Mapamundi satélite de la home: globo cuadrado protagonista, enmarcado como una
-   lámina (radio grande + hairline + sombra de elevación). El TripMap se sitúa a
-   sangre dentro del marco; el caption editorial flota en una esquina. */
+/* Mapamundi satélite de la home (variante A "el globo"): el globo a sangre es el
+   HÉROE. Marco-lámina (radio grande + hairline + sombra de elevación). El motor de
+   mapa (MapLibre) o el globo evocado (CSS) van a sangre dentro; el lema y el caption
+   flotan encima sobre el satélite oscuro. */
 
 .wrap {
   width: 100%;
 }
 
-/* Lienzo del mapa: en móvil más contenido (paisaje 4/3 con tope de alto) para que
-   el usuario vea también sus viajes sin scroll forzado; en desktop se vuelve
-   generoso (casi cuadrado). overflow:hidden recorta el globo al radio. La sombra
-   "alza" la lámina del papel. */
+/* Lienzo del mapa: rectángulo alto y protagonista (más alto que ancho, como un héroe
+   editorial). overflow:hidden recorta al radio; la sombra "alza" la lámina del papel.
+   Fondo NOCHE mientras carga, para que el flash case con el cielo del satélite. */
 .frame {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
-  max-height: 56svh;
+  aspect-ratio: 1 / 1.18;
+  max-height: 78vh;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-lg);
-  /* Fondo NOCHE mientras carga el globo: que el flash inicial case con el cielo
-     oscuro del satélite, no un papel claro. Tinta de marca (token). */
   background: var(--ink-900);
 }
 
-/* Desktop: el globo recupera protagonismo (casi cuadrado, como la maqueta). */
-@media (min-width: 600px) {
-  .frame {
-    aspect-ratio: 1 / 0.92;
-    max-height: none;
-  }
-}
-
-/* El TripMap ocupa todo el marco (es position:relative por dentro; lo estiramos). */
-.frame > :first-child {
+.map {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--ink-900);
 }
 
-/* Caption editorial sobre el globo (esquina inferior izquierda), como en la maqueta:
-   recuento de recuerdos en serif + km en eyebrow. Texto claro con sombra para legibilidad
-   AA sobre el satélite oscuro. No intercepta toques (el mapa sí). */
+/* --- Globo EVOCADO (fallback sin WebGL): esfera de satélite nocturno sin tiles --- */
+.evoked {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 90% at 50% 0%, #122637 0%, #0c1a26 45%, #0a121b 100%);
+  overflow: hidden;
+}
+.evokedGlobe {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 124%;
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 38% 32%,
+    #1a3344 0%,
+    #112739 42%,
+    #0a1a27 78%,
+    #06121c 100%
+  );
+  box-shadow:
+    inset 18px 14px 60px rgba(120, 180, 220, 0.12),
+    inset -30px -24px 80px rgba(0, 0, 0, 0.7),
+    0 0 70px 6px rgba(80, 150, 200, 0.18),
+    0 0 0 1px rgba(120, 180, 220, 0.12);
+}
+
+/* --- Lema integrado sobre el satélite (arriba, centrado), estilo maqueta --- */
+.lema {
+  position: absolute;
+  top: var(--space-6);
+  left: 0;
+  right: 0;
+  z-index: 2;
+  text-align: center;
+  padding: 0 var(--space-5);
+  pointer-events: none;
+}
+.lemaEyebrow {
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 1px 6px rgba(8, 12, 18, 0.8);
+  margin-bottom: var(--space-2);
+}
+.lemaTitle {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-medium);
+  font-style: italic;
+  font-size: var(--font-size-xl);
+  line-height: 1.18;
+  color: #fff;
+  text-shadow: 0 2px 14px rgba(8, 12, 18, 0.6);
+  text-wrap: balance;
+}
+
+/* --- Caption editorial (esquina inferior izquierda) sobre el satélite oscuro --- */
 .caption {
   position: absolute;
   left: var(--space-5);
   bottom: var(--space-5);
   z-index: 2;
-  color: var(--color-on-photo);
+  color: #fff;
   pointer-events: none;
   text-shadow: 0 1px 8px rgba(15, 26, 36, 0.7);
 }
-
 .captionName {
   font-family: var(--font-serif);
   font-size: var(--font-size-lg);
@@ -58,11 +106,93 @@
   letter-spacing: var(--letter-spacing-tight);
   line-height: 1.1;
 }
-
 .captionMeta {
   margin-top: 2px;
   font-size: var(--font-size-xs);
   letter-spacing: var(--letter-spacing-wide);
   font-variant-numeric: tabular-nums;
   opacity: 0.92;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lemaTitle {
+    text-wrap: normal;
+  }
+}
+
+/* ============================================================
+ * Clases GLOBALES de los marcadores del globo. Los HTML markers de MapLibre se
+ * inyectan FUERA del árbol de React, así que las clases CSS-module locales no los
+ * alcanzan; por eso van en :global. El look del pin lo comparte con el mapa de viaje
+ * (lg-trip-pin de tripPins.css); aquí solo ajustamos tamaño y el "lead" cálido.
+ * ============================================================ */
+
+/* Pin de la home: algo más compacto que el del viaje (caben varios clústeres). */
+:global(.lg-home-pin) {
+  width: 42px;
+  height: 42px;
+  border-width: 2.5px;
+}
+
+/* Momento más reciente del clúster: anillo cálido + halo pulsante (estilo maqueta). */
+:global(.lg-home-pin--lead) {
+  border-color: #d9b25a;
+  box-shadow:
+    0 4px 14px -3px rgba(0, 0, 0, 0.55),
+    0 0 0 4px rgba(217, 178, 90, 0.28),
+    0 0 18px 2px rgba(217, 178, 90, 0.4);
+}
+:global(.lg-home-pin--lead)::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid rgba(217, 178, 90, 0.55);
+  animation: lg-home-live-pulse 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+@keyframes lg-home-live-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70%,
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+/* Etiqueta serif del clúster (nombre del viaje), blanca sobre el satélite. */
+:global(.lg-home-cluster-label) {
+  font-family: var(--font-serif);
+  font-size: 1.1875rem;
+  font-weight: var(--font-weight-semibold);
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+  cursor: pointer;
+  /* Lo levantamos sobre el centroide para que no tape los pines del propio clúster. */
+  transform: translateY(-2.75rem);
+  pointer-events: auto;
+}
+
+/* Respiración sutil del globo evocado (se desactiva con reduced-motion abajo). */
+:global(.lg-home-globe-breathe) {
+  animation: lg-home-globe-breathe 22s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+@keyframes lg-home-globe-breathe {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) rotate(-1.2deg) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) rotate(1.2deg) scale(1.012);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global(.lg-home-pin--lead)::after,
+  :global(.lg-home-globe-breathe) {
+    animation: none;
+  }
 }

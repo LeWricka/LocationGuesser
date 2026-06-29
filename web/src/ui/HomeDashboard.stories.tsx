@@ -13,7 +13,7 @@ const groups: HomeGroup[] = [
 const worldMapPlaceholder = (
   <div
     style={{
-      aspectRatio: '1 / 0.92',
+      aspectRatio: '1 / 1.18',
       borderRadius: 'var(--radius-lg)',
       background: 'var(--ink-900)',
       display: 'grid',
