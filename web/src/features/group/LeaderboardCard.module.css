@@ -18,9 +18,9 @@
   flex-direction: column;
   gap: 40px;
 
-  /* Atlas océano sólido + halo cálido ámbar arriba (sin transparencias raras
-     que el snapshot no capte). Color de respaldo opaco bajo el gradiente. */
-  background-color: var(--ocean-900);
+  /* Papel sólido (Atelier): el poster es una hoja blanca, sin halos ni océano.
+     html-to-image no rasteriza filtros, así que solo color/borde sólidos. */
+  background-color: var(--surface);
   background-image: var(--card-gradient);
 
   color: var(--color-text);
@@ -30,8 +30,8 @@
 }
 
 /* ---- Marca -------------------------------------------------------------
-   Lockup de marca: pin sobre disco cálido + wordmark + tagline. Identidad
-   reconocible (como Strava/Wrapped) sin filtros: solo color sólido y borde. */
+   Lockup de marca: pin sobre disco de acento pizarra + wordmark + tagline.
+   Identidad reconocible (como Strava/Wrapped) sin filtros: solo color y borde. */
 .brand {
   display: flex;
   align-items: center;
@@ -49,7 +49,7 @@
   font-size: 42px;
   line-height: 1;
   background-color: var(--color-accent);
-  border: 2px solid rgba(255, 206, 130, 0.7);
+  border: 2px solid var(--color-accent);
 }
 
 .brandText {
@@ -59,8 +59,9 @@
 }
 
 .brandName {
-  font-size: 36px;
-  font-weight: var(--font-weight-black);
+  font-family: var(--font-serif);
+  font-size: 40px;
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
 }
@@ -89,7 +90,7 @@
   flex: 1;
 }
 
-/* Miniatura cuadrada del último reto: marco cálido y etiqueta sobre la foto.
+/* Miniatura cuadrada del último reto: filete de acento y etiqueta sobre la foto.
    No se encoge (flex 0) para que el título no la aplaste. */
 .thumb {
   position: relative;
@@ -98,7 +99,7 @@
   height: 260px;
   border-radius: 28px;
   overflow: hidden;
-  border: 3px solid rgba(255, 178, 77, 0.5);
+  border: 3px solid var(--card-border-accent);
   background-color: var(--card-surface);
 }
 
@@ -119,10 +120,11 @@
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
-  color: var(--color-text);
+  color: var(--color-on-photo);
   text-align: center;
-  /* Degradado oscuro sólido para que el texto se lea sobre cualquier foto. */
-  background-image: linear-gradient(180deg, transparent 0%, rgba(3, 15, 22, 0.85) 70%);
+  /* Velo oscuro sólido al pie para que el texto blanco se lea sobre cualquier
+     foto (la miniatura es la única superficie "sobre imagen" del poster). */
+  background-image: linear-gradient(180deg, transparent 0%, var(--photo-overlay-strong) 70%);
 }
 
 .eyebrow {
@@ -135,10 +137,11 @@
 
 .groupName {
   margin: 0;
+  font-family: var(--font-serif);
   font-size: 80px;
-  line-height: 1.02;
-  font-weight: var(--font-weight-black);
-  letter-spacing: var(--letter-spacing-tighter);
+  line-height: 1.04;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
   /* Evita que un nombre larguísimo desborde el lienzo fijo. */
   overflow-wrap: anywhere;
@@ -242,8 +245,9 @@ img.podiumAvatar {
 
 .podiumName {
   max-width: 100%;
-  font-size: 32px;
-  font-weight: var(--font-weight-bold);
+  font-family: var(--font-serif);
+  font-size: 34px;
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
   white-space: nowrap;
@@ -305,19 +309,20 @@ img.podiumAvatar {
   line-height: 1;
 }
 
-/* Tinte del pedestal: versión tenue del color de la medalla con borde sólido. */
+/* Tinte del pedestal: versión tenue del color de la medalla, OPACA (mezcla con
+   el papel, no con transparente) para que el snapshot la rasterice fiel. */
 .pedestal.gold {
-  background-color: rgba(255, 207, 92, 0.22);
+  background-color: color-mix(in srgb, var(--medal-gold) 22%, var(--surface));
   border: 2px solid var(--medal-gold);
   border-bottom: none;
 }
 .pedestal.silver {
-  background-color: rgba(207, 224, 230, 0.2);
+  background-color: color-mix(in srgb, var(--medal-silver) 22%, var(--surface));
   border: 2px solid var(--medal-silver);
   border-bottom: none;
 }
 .pedestal.bronze {
-  background-color: rgba(217, 138, 78, 0.22);
+  background-color: color-mix(in srgb, var(--medal-bronze) 22%, var(--surface));
   border: 2px solid var(--medal-bronze);
   border-bottom: none;
 }
@@ -342,10 +347,11 @@ img.podiumAvatar {
   border: 1px solid var(--card-border);
 }
 
-/* Las tres primeras filas (solo cuando NO hay podio) pesan algo más. */
+/* Las tres primeras filas (solo cuando NO hay podio) pesan algo más: tinte de
+   acento pizarra sobre papel + filete del acento. */
 .topRow {
-  background-color: rgba(18, 58, 76, 0.92);
-  border-color: rgba(255, 178, 77, 0.28);
+  background-color: var(--card-tint-accent);
+  border-color: var(--card-border-accent);
 }
 
 .medal {
@@ -361,8 +367,8 @@ img.podiumAvatar {
   line-height: 1;
 }
 
-/* Disco de puesto: medallas con su color; resto en teal/neutro. El número de
-   puesto (>3) hereda el color del texto del disco. */
+/* Disco de puesto: medallas con su color; resto en acento pizarra tenue. El
+   número de puesto (>3) hereda el color del texto del disco. */
 .gold {
   background-color: var(--medal-gold);
   color: var(--medal-on-gold);
@@ -376,8 +382,8 @@ img.podiumAvatar {
   color: var(--medal-on-bronze);
 }
 .other {
-  background-color: rgba(69, 201, 176, 0.18);
-  color: var(--teal-bright);
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent);
 }
 
 .mid {
@@ -396,8 +402,9 @@ img.podiumAvatar {
 }
 
 .name {
-  font-size: 38px;
-  font-weight: var(--font-weight-bold);
+  font-family: var(--font-serif);
+  font-size: 40px;
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
   white-space: nowrap;
@@ -416,7 +423,7 @@ img.podiumAvatar {
   max-width: 320px;
 }
 
-/* Barra proporcional al líder. El relleno reusa el color del disco (oro/teal…). */
+/* Barra proporcional al líder. El relleno reusa el color del disco (oro/acento…). */
 .bar {
   display: block;
   height: 16px;
@@ -444,7 +451,7 @@ img.podiumAvatar {
   background-color: var(--medal-bronze);
 }
 .bar > i.other {
-  background-color: var(--teal-bright);
+  background-color: var(--color-accent);
 }
 
 .points {
@@ -506,8 +513,9 @@ img.podiumAvatar {
 }
 
 .footerCta {
-  font-size: 34px;
-  font-weight: var(--font-weight-black);
+  font-family: var(--font-serif);
+  font-size: 36px;
+  font-weight: var(--font-weight-medium);
   letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
 }
