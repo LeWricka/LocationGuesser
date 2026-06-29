@@ -59,4 +59,8 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           supabase link --project-ref ykquigyjvgxisgdxryxr
-          supabase db push
+          # --include-all: 0014 (push_subscriptions) quedó pendiente y es ANTERIOR a
+          # 0020 (ya aplicada en la reconciliación), así que db push la trata como
+          # "fuera de orden" y la omite sin este flag. Nuestras migraciones son
+          # aditivas, así que aplicarlas en bloque es seguro.
+          supabase db push --include-all
