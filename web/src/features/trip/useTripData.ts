@@ -32,6 +32,20 @@ export interface RecentResult {
   points: number
 }
 
+/**
+ * Resumen de un reto CERRADO para el recap de cierre: quién ganó (más puntos),
+ * sus puntos y cuántos jugadores lo adivinaron. Indexado por `challengeId` para
+ * que el timeline-resumen del wrap añada el resultado a cada reto sin recalcular.
+ */
+export interface ChallengeWinner {
+  /** Nombre del jugador con más puntos en ese reto, o null si nadie votó. */
+  name: string | null
+  /** Puntos del ganador (0 si nadie votó). */
+  points: number
+  /** Nº de jugadores distintos que adivinaron el reto. */
+  guessedCount: number
+}
+
 interface TripData {
   group: GroupInfo | null
   /** Momentos en orden cronológico ASCENDENTE (del primero del viaje al último). */
@@ -44,6 +58,8 @@ interface TripData {
   recentResults: RecentResult[]
   /** Título del reto cuyos resultados se muestran en `recentResults`, o null. */
   recentTitle: string | null
+  /** Ganador y nº de aciertos por reto cerrado (challengeId → resumen). Alimenta el recap. */
+  winnersByChallenge: Map<string, ChallengeWinner>
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -293,6 +309,38 @@ export function useTripData(groupId: string): TripData {
 
   const recentTitle = lastClosed?.title ?? null
 
+  // Ganador (más puntos) y nº de aciertos por reto, derivado de los votos reales.
+  // Lo consume el TIMELINE-RESUMEN del recap de cierre: a cada reto le pega su
+  // resultado final sin recalcular. Un empate a puntos lo rompe el nombre (asc),
+  // igual criterio estable que la clasificación general.
+  const winnersByChallenge = useMemo<Map<string, ChallengeWinner>>(() => {
+    const byChallenge = new Map<string, { name: string; points: number; voters: Set<string> }>()
+    for (const v of votes ?? []) {
+      const current = byChallenge.get(v.challenge_id)
+      if (!current) {
+        byChallenge.set(v.challenge_id, {
+          name: v.display_name,
+          points: v.points,
+          voters: new Set([v.user_id]),
+        })
+        continue
+      }
+      current.voters.add(v.user_id)
+      if (
+        v.points > current.points ||
+        (v.points === current.points && v.display_name.localeCompare(current.name) < 0)
+      ) {
+        current.name = v.display_name
+        current.points = v.points
+      }
+    }
+    const out = new Map<string, ChallengeWinner>()
+    for (const [id, agg] of byChallenge) {
+      out.set(id, { name: agg.name, points: agg.points, guessedCount: agg.voters.size })
+    }
+    return out
+  }, [votes])
+
   // Cargando hasta tener la primera respuesta del grupo (challenges resuelto).
   const loading = challenges === null && error === null
 
@@ -303,6 +351,7 @@ export function useTripData(groupId: string): TripData {
     leaderboard,
     recentResults,
     recentTitle,
+    winnersByChallenge,
     loading,
     error,
     refresh,
