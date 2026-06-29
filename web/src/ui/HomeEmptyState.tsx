@@ -37,7 +37,7 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
 
         <Stack gap={2}>
           <Button size="lg" fullWidth onClick={onCreateGroup}>
-            Crear grupo
+            Crear viaje
           </Button>
           <Button variant="secondary" size="lg" fullWidth onClick={onJoinGroup}>
             Unirme con un código

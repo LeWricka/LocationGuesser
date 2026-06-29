@@ -23,7 +23,7 @@ export function CreateGroup({ onBack }: Props) {
 
   async function create() {
     if (!user) {
-      toast.show('Inicia sesión para crear un grupo.', { tone: 'danger' })
+      toast.show('Inicia sesión para crear un viaje.', { tone: 'danger' })
       return
     }
     setBusy(true)
@@ -51,7 +51,7 @@ export function CreateGroup({ onBack }: Props) {
       toast.show(
         networkish
           ? 'Sin conexión con el servidor. Prueba con datos en vez de WiFi (o al revés) y desactiva VPN, DNS privado o bloqueador; luego reinténtalo.'
-          : `No se pudo crear el grupo: ${msg}`,
+          : `No se pudo crear el viaje: ${msg}`,
         { tone: 'danger' },
       )
       setBusy(false)
@@ -65,19 +65,19 @@ export function CreateGroup({ onBack }: Props) {
           <Button variant="ghost" size="sm" onClick={onBack}>
             ← Volver
           </Button>
-          <h1 className={styles.title}>Crear un grupo</h1>
+          <h1 className={styles.title}>Crear un viaje</h1>
         </Row>
 
         <p className={styles.intro}>
-          El grupo es el contenedor de tu plan: un viaje, una despedida, un finde, una partida…
-          Dentro añadiréis retos y la clasificación se irá acumulando entre todos.
+          Un viaje es el espacio que compartes con los tuyos: lo creas, los invitas y lo viven
+          contigo. Dentro vais añadiendo momentos (y, de paso, se adivina dónde es).
         </p>
 
-        <Field label="Nombre del grupo" hint="Para que el grupo lo reconozca de un vistazo.">
+        <Field label="Nombre del viaje" hint="Para que los tuyos lo reconozcan de un vistazo.">
           {(fieldProps) => (
             <Input
               {...fieldProps}
-              placeholder="Despedida de Javi · Finde en Madrid · Viaje a Japón"
+              placeholder="Finde en Madrid · Interrail por Europa · Viaje a Japón"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => {
@@ -91,13 +91,13 @@ export function CreateGroup({ onBack }: Props) {
         </Field>
 
         <Button size="lg" fullWidth loading={busy} onClick={() => void create()}>
-          Crear grupo
+          Crear viaje
         </Button>
 
         {busy && (
           <Row gap={2} className={styles.status}>
             <Spinner size={16} />
-            <span>Creando el grupo…</span>
+            <span>Creando el viaje…</span>
           </Row>
         )}
       </Stack>

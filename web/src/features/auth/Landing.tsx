@@ -112,7 +112,7 @@ export function Landing({ groupName, redirectTo }: Props) {
 
         <section className={styles.entry} aria-labelledby="landing-entry-title">
           <h2 id="landing-entry-title" className={styles.entryTitle}>
-            {joining ? 'Entra y únete al grupo' : 'Comparte tu primer viaje'}
+            {joining ? 'Entra y únete al viaje' : 'Comparte tu primer viaje'}
           </h2>
           <p className={styles.entryLead}>
             Sin contraseñas: te mandamos un código para <strong>entrar o crear tu cuenta</strong>.
@@ -151,7 +151,7 @@ export function Landing({ groupName, redirectTo }: Props) {
               landing genérica (en el flujo deep-link ya viene el grupo). */}
           {!joining && (
             <details className={styles.codeDisclosure}>
-              <summary className={styles.codeSummary}>¿Te han pasado un código de grupo?</summary>
+              <summary className={styles.codeSummary}>¿Te han pasado un código de viaje?</summary>
               <form
                 className={styles.codeForm}
                 noValidate
@@ -160,12 +160,12 @@ export function Landing({ groupName, redirectTo }: Props) {
                   if (joinByCode(groupCode)) {
                     setCodeError(undefined)
                   } else {
-                    setCodeError('Pega un código o enlace de grupo válido.')
+                    setCodeError('Pega un código o enlace de viaje válido.')
                   }
                 }}
               >
                 <Stack gap={3}>
-                  <Field label="Código o enlace del grupo" error={codeError}>
+                  <Field label="Código o enlace del viaje" error={codeError}>
                     {(fieldProps) => (
                       <Input
                         {...fieldProps}
@@ -178,7 +178,7 @@ export function Landing({ groupName, redirectTo }: Props) {
                     )}
                   </Field>
                   <Button type="submit" variant="secondary" fullWidth>
-                    Unirme al grupo
+                    Unirme al viaje
                   </Button>
                 </Stack>
               </form>

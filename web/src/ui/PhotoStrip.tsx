@@ -24,7 +24,7 @@ interface Props {
 // tira scrolleable que no rompe el ancho de la página. Presentacional.
 export function PhotoStrip({
   photos,
-  emptyLabel = 'Aún no hay fotos en este grupo.',
+  emptyLabel = 'Aún no hay fotos en este viaje.',
   onSelect,
   className,
 }: Props) {

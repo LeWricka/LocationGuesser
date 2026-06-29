@@ -51,7 +51,7 @@ export function GroupSettingsModal({
     try {
       await updateGroupName(groupId, name)
       track('group_renamed', { group_id: groupId })
-      toast.show('Nombre del grupo actualizado', { tone: 'success' })
+      toast.show('Nombre del viaje actualizado', { tone: 'success' })
       onRenamed()
     } catch (err) {
       toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
@@ -109,7 +109,7 @@ export function GroupSettingsModal({
     <Modal
       open
       onClose={busy ? undefined : onClose}
-      title="⚙️ Ajustes del grupo"
+      title="⚙️ Ajustes del viaje"
       footer={
         confirmingDelete ? (
           <Row gap={2} justify="end">
@@ -129,7 +129,7 @@ export function GroupSettingsModal({
               disabled={!canDelete}
               onClick={() => void remove()}
             >
-              Borrar grupo
+              Borrar viaje
             </Button>
           </Row>
         ) : confirmingClose ? (
@@ -161,7 +161,7 @@ export function GroupSettingsModal({
       {confirmingDelete ? (
         <Stack gap={3}>
           <p className={styles.dangerText}>
-            Esto borra el grupo y, en cascada, <strong>todos sus retos, votos y miembros</strong>.
+            Esto borra el viaje y, en cascada, <strong>todos sus retos, votos y miembros</strong>.
             No se puede deshacer.
           </p>
           <Field label={`Escribe «${deleteTarget}» para confirmar`}>
@@ -179,14 +179,14 @@ export function GroupSettingsModal({
       ) : confirmingClose ? (
         <Stack gap={3}>
           <p>
-            Al cerrar la temporada el grupo queda <strong>congelado</strong>: nadie podrá añadir
+            Al cerrar la temporada el viaje queda <strong>congelado</strong>: nadie podrá añadir
             retos ni jugar, y se mostrará el podio final con el ganador. Podrás reabrirla cuando
             quieras.
           </p>
         </Stack>
       ) : (
         <Stack gap={4}>
-          <Field label="Nombre del grupo" hint="Vacío usa el código del grupo.">
+          <Field label="Nombre del viaje" hint="Vacío usa el código del viaje.">
             {(fieldProps) => (
               <Input
                 {...fieldProps}
@@ -226,7 +226,7 @@ export function GroupSettingsModal({
               size="sm"
               onClick={() => setConfirmingDelete(true)}
             >
-              Borrar grupo…
+              Borrar viaje…
             </Button>
           </div>
         </Stack>

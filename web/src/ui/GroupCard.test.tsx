@@ -28,7 +28,7 @@ describe('GroupCard', () => {
   test('es un boton accesible y llama a onClick cuando se le pasa', async () => {
     const onClick = vi.fn()
     render(<GroupCard name="Lisboa" status="idle" onClick={onClick} />)
-    const button = screen.getByRole('button', { name: 'Abrir grupo Lisboa' })
+    const button = screen.getByRole('button', { name: 'Abrir viaje Lisboa' })
     await userEvent.click(button)
     expect(onClick).toHaveBeenCalledOnce()
   })

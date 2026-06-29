@@ -64,7 +64,7 @@ describe('HomePage', () => {
     render(<HomePage />)
     await waitFor(() => expect(screen.getByText('Cómo funciona')).toBeInTheDocument())
     // CTAs de empezar: crear o unirse con código.
-    expect(screen.getByRole('button', { name: 'Crear grupo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Crear viaje' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Unirme con un código' })).toBeInTheDocument()
   })
 

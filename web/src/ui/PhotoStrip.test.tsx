@@ -6,7 +6,7 @@ import { PhotoStrip } from './PhotoStrip'
 describe('PhotoStrip', () => {
   test('vacío muestra el mensaje guía', () => {
     render(<PhotoStrip photos={[]} />)
-    expect(screen.getByText('Aún no hay fotos en este grupo.')).toBeInTheDocument()
+    expect(screen.getByText('Aún no hay fotos en este viaje.')).toBeInTheDocument()
   })
 
   test('renderiza una miniatura por foto', () => {

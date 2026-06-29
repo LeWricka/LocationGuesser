@@ -419,7 +419,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     setSharingResult(true)
     try {
       const link = buildChallengeLink(groupId, challenge.id)
-      const name = groupName ?? 'tu grupo'
+      const name = groupName ?? 'tu viaje'
       const text = buildResultShareText(name, link)
       const blob = await nodeToPngBlob(node)
       const outcome = await shareLeaderboardImage(blob, text, `Mi resultado · ${challenge.title}`)
@@ -486,7 +486,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     return (
       <main className="lg-page">
         <Stack gap={4}>
-          <BackHomeButton onClick={goBack} label={groupId ? 'Volver al grupo' : 'Inicio'} />
+          <BackHomeButton onClick={goBack} label={groupId ? 'Volver al viaje' : 'Inicio'} />
           <Card padding="md">
             <Stack gap={2}>
               <strong>No se pudo cargar el reto.</strong>
@@ -529,7 +529,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // panoId y nunca esta posición. La respuesta real (`answer`) solo se conoce tras
   // revelar; al jugar es null y NO debe alimentar la escena.
   const panoFallback: LatLng = answer ?? { lat: 0, lng: 0 }
-  const backLabel = groupId ? 'Volver al grupo' : 'Inicio'
+  const backLabel = groupId ? 'Volver al viaje' : 'Inicio'
   // Reto de práctica: plazo lejano (>1 año). Solo en estos mostramos "volver a
   // jugar" tras revelar; en un reto real rejugar tras ver la respuesta sería trampa.
   const isPractice = isPracticeChallenge(challenge.deadline_at)
@@ -803,7 +803,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         <div className={styles.shareCanvas} aria-hidden="true">
           <ResultCard
             ref={resultCardRef}
-            groupName={groupName ?? 'tu grupo'}
+            groupName={groupName ?? 'tu viaje'}
             challengeTitle={challenge.title}
             points={result.points}
             distanceKm={result.km}

@@ -25,7 +25,7 @@ const GROUP_SLIDES: OnboardingSlide[] = [
   {
     icon: '💛',
     title: 'Compártelo con los tuyos',
-    body: 'Tu grupo lo abre y vive el momento contigo.',
+    body: 'Los tuyos lo abren y viven el momento contigo.',
   },
   {
     icon: '🗺️',
