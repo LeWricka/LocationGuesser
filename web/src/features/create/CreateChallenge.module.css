@@ -8,10 +8,95 @@
   flex: 1;
 }
 
+/* PASO 1 — el mapa es el protagonista: contenedor relativo para colgarle el
+   chip de estado al pie y el botón flotante de "mi ubicación". */
+.mapBlock {
+  position: relative;
+}
+
+/* Chip de estado flotando sobre el pie del mapa (chrome Atelier): marcado o
+   pista. Centrado, no roba protagonismo a la foto satélite. */
+.mapStatus {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  z-index: var(--z-sticky);
+  max-width: calc(100% - var(--space-5));
+}
+
+.mapStatusMarked,
+.mapStatusHint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+/* Marcado: el icono de diana en acento (es el dato "en juego"). */
+.mapStatusMarked {
+  color: var(--color-text);
+}
+.mapStatusMarked svg {
+  color: var(--color-accent);
+  flex: 0 0 auto;
+}
+
+.mapStatusHint {
+  color: var(--color-text-muted);
+}
+.mapStatusHint svg {
+  flex: 0 0 auto;
+}
+
+/* "Mi ubicación" como botón redondo flotante sobre el mapa (esquina inf-izq),
+   no como botón gris a parte. Chrome Atelier, objetivo táctil cómodo. */
+.gpsButton {
+  position: absolute;
+  left: var(--space-3);
+  bottom: var(--space-3);
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  color: var(--color-accent);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.gpsButton:hover {
+  background: var(--color-surface);
+}
+
+.gpsButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.gpsButton:disabled {
+  cursor: progress;
+}
+
 /* Acciones del paso 3 (previa = juego real): flotan ARRIBA-CENTRO sobre la escena
    inmersiva (que es fija, z-index overlay). El back «← Editar» de la escena queda
    arriba-izquierda y el FAB del mapa abajo-centro: estas acciones no los pisan.
-   Pastilla blanca translúcida (Atelier) para que «Crear reto» se lea sobre la foto. */
+   Pastilla blanca translúcida (Atelier) para que «Lanzar reto» se lea sobre la foto. */
 .previewActions {
   position: fixed;
   top: calc(var(--space-3) + env(safe-area-inset-top));
@@ -45,28 +130,40 @@
   color: var(--color-text);
 }
 
-/* Dificultad en vivo (paso «El sitio»): se actualiza con la combinación de
-   medios elegida. Resumen de una línea bajo las tarjetas de foto y SV. */
-.difficultyBadge {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
+/* Dificultad en vivo: tira integrada (no caja blanca plana). Fondo de acento
+   tenue + borde finísimo de acento, que la liga al "dato en juego". Se adapta:
+   en una línea cabe lead + badge + frase; envuelve en móvil estrecho. */
+.difficultyStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-accent-glow-soft);
 }
 
 .difficultyLead {
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
-/* Aviso en «Resumen» cuando no hay ningún medio (ni foto ni Street View): un
-   reto no puede crearse sin al menos uno. Tono de atención, no destructivo. */
+/* Aviso en «Resumen» cuando no hay ninguna pista (ni foto ni Street View): un
+   reto no puede crearse sin al menos una. Tono de atención, no destructivo. */
 .mediaWarning {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
+  background: var(--color-warning-soft);
+  border: 1px solid var(--color-warning);
   font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
   color: var(--color-text);
 }
 
@@ -115,9 +212,15 @@
   font-size: var(--font-size-sm);
 }
 
-/* Duración elegida, destacada sobre el slider. */
+/* Duración elegida, destacada sobre el slider (icono + cifra grande + pastilla). */
 .durationValue {
-  align-items: baseline;
+  align-items: center;
+}
+
+/* Icono del cronómetro junto a la cifra, en acento (el dato en juego). */
+.durationIcon {
+  display: inline-flex;
+  color: var(--color-accent);
 }
 
 .durationLabel {
@@ -127,7 +230,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Pastilla "⚡ Express" para duraciones cortas. */
+/* Pastilla "Express" para duraciones cortas (icono propio, sin emoji). */
 .expressPill {
   display: inline-flex;
   align-items: center;
@@ -138,6 +241,13 @@
   color: var(--color-accent);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
+}
+
+/* Etiqueta del botón "Ver cómo quedará": icono + texto alineados. */
+.previewBtnLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* Slider de duración: usa el acento del tema; no hardcodear color. */
