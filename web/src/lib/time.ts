@@ -21,9 +21,11 @@ export function deadlineFromNow(hours: number): string {
 /**
  * Cuenta atrás hasta el plazo, en la forma "quedan 3 h 12 m" / "quedan 12 m" /
  * "quedan 45 s". Inequívoca en cualquier huso porque mide una diferencia de
- * instantes, no una hora de pared. Si el plazo ya pasó → "cerrado".
+ * instantes, no una hora de pared. Si el plazo ya pasó → "cerrado". Un momento SIN
+ * plazo (recuerdo, `iso = null` desde 0022) tampoco tiene cuenta atrás → "cerrado".
  */
-export function formatDeadline(iso: string): string {
+export function formatDeadline(iso: string | null): string {
+  if (iso == null) return 'cerrado'
   const ms = new Date(iso).getTime() - Date.now()
   if (ms <= 0) return 'cerrado'
 

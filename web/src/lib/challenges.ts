@@ -15,11 +15,12 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 
 // Columnas del reto SIN lat/lng: lo que CUALQUIER lectura de `challenges` por el
 // cliente puede pedir tras revocar el privilegio de columna lat/lng (migración 0010).
-// La respuesta (lat/lng) ya no es legible desde `challenges`; vive en
-// `challenge_answers` (RLS). Reutilizado por todos los lectores: jugar, lista del
-// grupo, home y el RETURNING de crear/editar.
+// La respuesta OCULTA del reto (lat/lng) NO es legible desde `challenges`; vive en
+// `challenge_answers` (RLS). En cambio `place_lat`/`place_lng` (lugar VISIBLE de un
+// recuerdo) e `is_challenge` SÍ se sirven: no son spoiler (0022). Reutilizado por
+// todos los lectores: jugar, lista del grupo, home y el RETURNING de crear/editar.
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, description, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
+  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -67,9 +68,11 @@ const DAY_MS = 24 * 60 * 60 * 1000
 /**
  * ¿Es un reto de PRÁCTICA? True si el plazo está a más de un año vista (los retos
  * reales son ≤48 h; el infinito de práctica cierra en 2999). Función pura para
- * gatear "volver a jugar" en la UI sin depender del servidor.
+ * gatear "volver a jugar" en la UI sin depender del servidor. Un momento SIN plazo
+ * (recuerdo, `deadline_at = null` desde 0022) nunca es de práctica → false.
  */
-export function isPracticeChallenge(deadlineAt: string): boolean {
+export function isPracticeChallenge(deadlineAt: string | null): boolean {
+  if (deadlineAt == null) return false
   const ms = new Date(deadlineAt).getTime() - Date.now()
   return ms > PRACTICE_DEADLINE_DAYS * DAY_MS
 }
@@ -111,6 +114,143 @@ export async function createChallenge(
   // (solo-dueño)—. El trigger es la única fuente de la respuesta.
 
   return { challenge: data, groupId }
+}
+
+/**
+ * Datos para crear un RECUERDO (momento SIN reto). A diferencia de un reto, NO
+ * lleva respuesta oculta (no setea `lat`/`lng` → el trigger `sync_challenge_answer`
+ * no escribe en `challenge_answers`), NI plazo, NI cronómetro. El lugar es VISIBLE
+ * (`place_lat`/`place_lng`) y opcional: un recuerdo puede ser solo foto + texto. 0022.
+ */
+export interface NewMomentInput {
+  title: string
+  /** uuid del usuario de la sesión (`user.id`). Queda como `created_by` del momento. */
+  createdBy: string
+  /** Viaje (grupo) al que pertenece el momento. */
+  groupId: string
+  /** Descripción del día (texto libre); por defecto sin texto. */
+  description?: string | null
+  /**
+   * Lugar VISIBLE del recuerdo en el mapa (no es spoiler; se sirve siempre).
+   * Opcional: un recuerdo sin lugar es válido (solo aparece en el diario, no en la ruta).
+   */
+  placeLat?: number | null
+  placeLng?: number | null
+  /** Path en Storage de la imagen (foto opcional, sin EXIF). */
+  imagePath?: string | null
+  /** Panorama de Street View del lugar (opcional). */
+  svPanoId?: string | null
+  /** POV inicial del panorama: rumbo en grados. */
+  svHeading?: number | null
+  /** POV inicial del panorama: inclinación en grados. */
+  svPitch?: number | null
+}
+
+/**
+ * Crea un RECUERDO (momento sin reto): `is_challenge = false`, `deadline_at = null`,
+ * sin respuesta oculta. El lugar (`place_lat`/`place_lng`) es visible y opcional. Es
+ * la unidad mínima de compartir: una foto y/o un sitio y una descripción, sin juego.
+ *
+ * No tocamos `lat`/`lng`: dejarlas a null evita que el trigger `sync_challenge_answer`
+ * (0022) cree fila en `challenge_answers` — un recuerdo no tiene respuesta que ocultar.
+ * Promocionarlo a reto después (con `promoteToChallenge`) ya espejará la respuesta.
+ */
+export async function createMoment(
+  input: NewMomentInput,
+): Promise<{ challenge: ChallengeForPlay; groupId: string }> {
+  const groupId = input.groupId
+  const { data, error } = await supabase
+    .from('challenges')
+    .insert({
+      group_id: groupId,
+      title: input.title,
+      description: input.description ?? null,
+      is_challenge: false,
+      // Sin respuesta oculta: lat/lng se quedan sin setear (el trigger no espeja).
+      place_lat: input.placeLat ?? null,
+      place_lng: input.placeLng ?? null,
+      image_path: input.imagePath ?? null,
+      sv_pano_id: input.svPanoId ?? null,
+      sv_heading: input.svHeading ?? null,
+      sv_pitch: input.svPitch ?? null,
+      // Un recuerdo no caduca: sin plazo ni cronómetro.
+      deadline_at: null,
+      created_by: input.createdBy,
+    })
+    // RETURNING sin lat/lng (columna revocada en 0010); place_lat/place_lng e
+    // is_challenge SÍ vienen (no son spoiler).
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .single<ChallengeForPlay>()
+  if (error) throw error
+  return { challenge: data, groupId }
+}
+
+/**
+ * Ajustes de la capa de RETO que se añade sobre un recuerdo existente. La respuesta
+ * (`lat`/`lng`) es la coordenada OCULTA a adivinar: normalmente la del lugar del
+ * recuerdo (`place_*`), o una ajustada por el creador. El resto es la mecánica de
+ * juego (plazo, cronómetro, Street View y sus candados).
+ */
+export interface PromoteToChallengeInput {
+  /** Respuesta oculta del reto (lo que hay que adivinar). El trigger la espeja a challenge_answers. */
+  lat: number
+  lng: number
+  /** Plazo del reto en ISO absoluto; por defecto, 24 h desde ahora (duración relativa). */
+  deadlineAt?: string
+  /** Segundos por jugada; null = sin límite. */
+  guessSeconds?: number | null
+  /** Panorama de Street View encajado a la respuesta (opcional). */
+  svPanoId?: string | null
+  /** POV inicial del panorama: rumbo en grados. */
+  svHeading?: number | null
+  /** POV inicial del panorama: inclinación en grados. */
+  svPitch?: number | null
+  /** Candado de MOVIMIENTO del SV (true = bloqueado). Default false (permitido). #187. */
+  svLockMove?: boolean
+  /** Candado de GIRO del SV (true = bloqueado). Default false (permitido). #187. */
+  svLockRotate?: boolean
+  /** Si hay foto, ¿pista visible al jugar (true) o sorpresa hasta el revelado (false)? */
+  photoIsHint?: boolean
+}
+
+/**
+ * Promociona un RECUERDO a RETO (un UPDATE, sin tabla nueva): `is_challenge = true`,
+ * fija la respuesta oculta (`lat`/`lng`), el plazo, el cronómetro y los candados de
+ * Street View. El trigger `sync_challenge_answer` (0022) espeja la respuesta a
+ * `challenge_answers` al detectar que ahora hay lat/lng con `is_challenge = true`;
+ * por eso NO escribimos `challenge_answers` desde el cliente (evita el 42501 de RLS).
+ *
+ * Solo el dueño del grupo lo consigue (RLS `challenges_update_owner`; la UI esconde
+ * la acción a los miembros). Devuelve el momento ya como reto, sin la respuesta.
+ */
+export async function promoteToChallenge(
+  challengeId: string,
+  input: PromoteToChallengeInput,
+): Promise<ChallengeForPlay> {
+  const patch: ChallengeUpdate = {
+    is_challenge: true,
+    lat: input.lat,
+    lng: input.lng,
+    deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
+    guess_seconds: input.guessSeconds ?? null,
+    sv_pano_id: input.svPanoId ?? null,
+    sv_heading: input.svHeading ?? null,
+    sv_pitch: input.svPitch ?? null,
+    sv_lock_move: input.svLockMove ?? false,
+    sv_lock_rotate: input.svLockRotate ?? false,
+  }
+  if (input.photoIsHint !== undefined) patch.photo_is_hint = input.photoIsHint
+
+  const { data, error } = await supabase
+    .from('challenges')
+    .update(patch)
+    .eq('id', challengeId)
+    // RETURNING sin lat/lng (columna revocada en 0010): la respuesta la sincroniza
+    // el trigger 0022, no la leemos aquí.
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .single<ChallengeForPlay>()
+  if (error) throw error
+  return data
 }
 
 /**
