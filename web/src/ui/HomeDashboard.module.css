@@ -33,8 +33,8 @@
   transform: scale(0.97);
 }
 .eyebrowText {
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-black);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
 }
@@ -72,25 +72,18 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- Tus viajes: carrusel horizontal de tarjetas-portada --- */
+/* --- Tus viajes: lista vertical de portadas grandes (estilo Polarsteps) ---
+   Cada viaje es una UNIDAD visual independiente: una portada grande con buen aire
+   entre viajes, no miniaturas en un catálogo apretado. Vertical en móvil; en
+   desktop sigue siendo lista para que cada portada respire a lo ancho. */
 .rail {
   display: flex;
-  gap: var(--space-3);
-  /* Sangrado de bordes para que el carrusel "sangre" hasta el borde del lienzo: las
-     tarjetas se desplazan bajo el borde sin que se vea el corte. */
-  margin: 0 calc(-1 * var(--space-4));
-  padding: var(--space-1) var(--space-4);
-  overflow-x: auto;
-  scrollbar-width: none;
-  scroll-snap-type: x mandatory;
-}
-.rail::-webkit-scrollbar {
-  display: none;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
 .tripCard {
-  flex: 0 0 12.5rem; /* 200px, como la maqueta */
-  scroll-snap-align: start;
+  width: 100%;
 }
 
 /* La tarjeta entera es el botón que abre el viaje. */
@@ -99,7 +92,7 @@
   width: 100%;
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: var(--color-surface);
   box-shadow: var(--shadow-md);
@@ -124,14 +117,14 @@
    AA encima. Sin foto: degradado de marca sobre superficie (no queda vacío). */
 .tripCover {
   position: relative;
-  height: 11.5rem;
+  height: 14rem; /* 224px — portada protagonista en móvil */
   background-color: var(--color-surface-hover);
   background-size: cover;
   background-position: center;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: var(--space-3);
+  padding: var(--space-4);
 }
 .tripCover::after {
   content: '';
@@ -145,10 +138,11 @@
   position: relative;
   z-index: 1;
   font-family: var(--font-serif);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
   line-height: 1.05;
-  color: #fff;
+  color: var(--color-on-photo);
   text-shadow: 0 1px 6px rgba(15, 26, 36, 0.6);
 }
 
@@ -165,7 +159,7 @@
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-full);
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-photo);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-wide);
@@ -175,7 +169,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--color-on-photo);
   animation: tripBlip 1.6s ease-in-out infinite;
 }
 @keyframes tripBlip {
@@ -216,6 +210,13 @@
 }
 .ctaSecondary {
   flex: 0 0 auto;
+}
+
+/* En desktop la portada respira más alta (foto dominante, estilo Polarsteps). */
+@media (min-width: 600px) {
+  .tripCover {
+    height: 16rem; /* 256px */
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
