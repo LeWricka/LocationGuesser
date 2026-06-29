@@ -1,0 +1,159 @@
+/*
+ * Pantalla "Viaje": mapa a sangre como fondo + chrome flotante arriba + carrusel
+ * de momentos abajo (§2 del spec). Mobile-first, a pantalla completa. El mapa es
+ * el fondo (capa 0); chrome y carrusel flotan encima con sus propios z.
+ */
+.screen {
+  position: relative;
+  width: 100%;
+  height: 100svh;
+  overflow: hidden;
+  background: var(--ocean-900);
+}
+
+/* Pantallas de carga/error: centradas sobre el fondo de la app. */
+.center {
+  min-height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+}
+
+/* (a) Mapa a sangre, detrás de todo. */
+.mapLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* (b) Chrome flotante arriba: respeta el notch (safe-area). */
+.chrome {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-3) var(--space-3);
+}
+
+/* Pastilla de icono (volver / más opciones): vidrio sobre el mapa contrastado. */
+.iconPill {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg);
+  color: var(--color-on-photo);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+/* Pastilla central con el nombre del viaje y la línea de miembros. */
+.titlePill {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-2) var(--space-4);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.tripName {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-on-photo);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tripSub {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-on-photo);
+  opacity: 0.78;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* (c) Carrusel horizontal de momentos, anclado abajo con scroll-snap nativo. */
+.carousel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-4));
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* Velo al pie para separar las tarjetas del mapa (token §4.2). */
+  background: var(--map-bottom-scrim);
+}
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+
+/* Cada slide ocupa casi todo el ancho (se intuye la siguiente). */
+.slide {
+  flex: 0 0 80%;
+  max-width: 320px;
+  scroll-snap-align: center;
+}
+
+/* Estado vacío: centrado en una tarjeta de vidrio sobre el mapa. */
+.emptyWrap {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-7);
+  z-index: 1;
+  transform: translateX(-50%);
+  width: min(92%, 420px);
+  padding: var(--space-4);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+
+/* FAB de añadir momento: cálido (acción primaria), abajo-derecha sobre el carrusel. */
+.fab {
+  position: absolute;
+  right: var(--space-4);
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-7));
+  z-index: 3;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-xl);
+  color: var(--ocean-900);
+  background: var(--gradient-accent);
+  border: none;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+}

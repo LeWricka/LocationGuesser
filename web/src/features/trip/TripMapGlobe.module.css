@@ -1,0 +1,14 @@
+/*
+ * Globo 3D (MapLibre GL) de la ruta del viaje. Ocupa todo el contenedor; el layout
+ * a pantalla completa lo decide la pantalla padre. Fondo océano profundo mientras
+ * cargan los tiles satélite (mismo criterio que el mapa plano: nada de flash gris).
+ *
+ * Los pines son HTML markers de MapLibre y reusan las clases GLOBALES `lg-trip-pin*`
+ * que define el módulo del mapa plano (`TripMapLeaflet.module.css`, vía :global).
+ * Por eso aquí no se redeclaran: el look del pin es ÚNICO y compartido.
+ */
+.map {
+  width: 100%;
+  height: 100%;
+  background: var(--ocean-900);
+}

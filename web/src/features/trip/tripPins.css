@@ -1,0 +1,44 @@
+/*
+ * Pin-foto del mapa de Viaje — look ÚNICO compartido por los dos motores de mapa
+ * (globo MapLibre y fallback plano Leaflet). Lo importan ambos componentes para
+ * que la miniatura redonda + anillo + pulso sean idénticos sea cual sea el motor.
+ *
+ * Clases globales a propósito: en Leaflet los `divIcon` se inyectan FUERA del árbol
+ * de React y en MapLibre los HTML markers también; las clases CSS-module locales no
+ * los alcanzarían. El color del anillo lo gobiernan los tokens, nunca hardcodeado.
+ */
+
+/* Pin-foto: miniatura redonda con anillo; el anillo (color) lo fija el estado. */
+.lg-trip-pin {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full, 999px);
+  background-size: cover;
+  background-position: center;
+  background-color: var(--ocean-900);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  /* Anillo del estado: el cerrado es blanco; el activo lo sobreescribe abajo. */
+  border: var(--pin-ring-width) solid var(--pin-ring-closed);
+}
+
+/* Pin sin foto: muestra un emoji centrado sobre el disco. */
+.lg-trip-pin--icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* Pin del momento ACTIVO: anillo cálido + halo que respira (reusa lg-pulse-glow). */
+.lg-trip-pin--active {
+  border-color: var(--pin-ring-active);
+  animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-trip-pin--active {
+    animation: none;
+  }
+}

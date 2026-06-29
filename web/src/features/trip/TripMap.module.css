@@ -1,0 +1,12 @@
+/*
+ * Selector del mapa de Viaje (globo MapLibre con fallback plano Leaflet). El
+ * propio mapa llena el contenedor; aquí solo el envoltorio de carga del globo, que
+ * mantiene el plano visible mientras el chunk de MapLibre baja (nunca pantalla en
+ * blanco).
+ */
+.loading {
+  width: 100%;
+  height: 100%;
+  /* Océano profundo bajo el globo que aún no ha montado (sin flash blanco). */
+  background: var(--ocean-900);
+}

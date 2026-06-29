@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react'
 import { CreateGroup } from './features/create/CreateGroup'
 import { PlayChallenge } from './features/play/PlayChallenge'
 import { GroupPage } from './features/group/GroupPage'
+import { TripPage } from './features/trip/TripPage'
 import { HomePage } from './features/home/HomePage'
 import { AdminPage } from './features/admin'
 import { isAdminEmail } from './lib/admin'
@@ -35,7 +36,7 @@ import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
 import { setNextDestination, takeNextDestination } from './lib/auth'
 import { getGroup } from './lib/groupData'
-import { parseHash } from './lib/route'
+import { parseHash, groupHash, classicGroupHash, addMomentHash } from './lib/route'
 import { Spinner, Stack, withViewTransition } from './ui'
 import styles from './App.module.css'
 
@@ -184,9 +185,41 @@ function LoggedIn({
     )
   }
   if (route.group) {
+    const groupId = route.group
+    // Por defecto, un grupo abre la pantalla "Viaje" (diario visual). `v=clasico`
+    // es el escape a la GroupPage de siempre (marcador, ajustes, fin de temporada),
+    // accesible desde el botón "⋯" del viaje, así que NO se pierde nada de ella.
+    if (route.groupView === 'clasico') {
+      return (
+        <OnboardingGate context="group" userId={user?.id}>
+          <GroupPage
+            groupId={groupId}
+            openAdd={route.groupAdd}
+            onBack={() => {
+              location.hash = groupHash(groupId)
+            }}
+          />
+        </OnboardingGate>
+      )
+    }
     return (
       <OnboardingGate context="group" userId={user?.id}>
-        <GroupPage groupId={route.group} />
+        <TripPage
+          groupId={groupId}
+          // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
+          onPlayChallenge={(challengeId) => {
+            location.hash = groupHash(groupId, challengeId)
+          }}
+          // "Añadir momento": a la GroupPage clásica abriendo el creador de retos.
+          onAddMoment={() => {
+            location.hash = addMomentHash(groupId)
+          }}
+          // "⋯": a la GroupPage clásica (marcador, ajustes, etc.).
+          onOpenClassic={() => {
+            location.hash = classicGroupHash(groupId)
+          }}
+          onBack={() => goHome()}
+        />
       </OnboardingGate>
     )
   }

@@ -54,6 +54,8 @@ interface Props {
   groupId: string
   /** Vuelve a la home (§3.4). Lo cablea #4; por defecto limpia el hash. */
   onBack?: () => void
+  /** Abre directamente "Añadir reto" al montar (FAB de la pantalla "Viaje"). */
+  openAdd?: boolean
 }
 
 /** Enlace del grupo (#g=) para compartir en el chat. */
@@ -85,7 +87,7 @@ function formatChallengeDate(value: string | null | undefined): string | null {
 // Página del grupo: clasificación general, retos en vivo y anteriores, histórico
 // de fotos. Distingue dueño (gestiona retos) de miembro (solo juega) y se
 // refresca en tiempo real al entrar cualquier voto del grupo.
-export function GroupPage({ groupId, onBack }: Props) {
+export function GroupPage({ groupId, onBack, openAdd = false }: Props) {
   const { user } = useSession()
   const [group, setGroup] = useState<GroupInfo | null>(null)
   const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(null)
@@ -191,6 +193,14 @@ export function GroupPage({ groupId, onBack }: Props) {
   // temporada abierta. El acceso a Ajustes sigue siendo del dueño aunque esté
   // cerrado (es donde se REABRE la temporada).
   const canManage = isOwner && !isClosed
+
+  // El FAB "Añadir momento" de la pantalla "Viaje" entra aquí con `openAdd`: abre
+  // directamente el creador de retos (mismo flujo que el botón ➕ Añadir reto).
+  // Solo si soy dueño y la temporada no está cerrada (igual gating que ese botón).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intención del enrutado (FAB del viaje): abrir el creador al montar, una vez
+    if (openAdd && canManage) setAdding(true)
+  }, [openAdd, canManage])
 
   // Votos agrupados por reto, para alimentar marcadores en vivo y revelados sin
   // más fetches (ya traen el display_name del join a profiles).

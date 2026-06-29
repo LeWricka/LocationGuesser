@@ -1,0 +1,19 @@
+/*
+ * Mapa plano de la ruta (Leaflet + satélite Esri). Ocupa todo el contenedor; el
+ * layout a pantalla completa lo decide la pantalla padre. Fondo océano mientras
+ * cargan los tiles satélite (mismo patrón que .lg-map).
+ *
+ * El look del pin-foto (clases globales `lg-trip-pin*`) vive en `tripPins.css`,
+ * compartido con el globo MapLibre para que sea idéntico en ambos motores.
+ */
+.wrap {
+  width: 100%;
+  height: 100%;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+  /* Fondo profundo bajo los tiles que aún no han cargado (evita el flash gris). */
+  background: var(--ocean-900);
+}

@@ -1,0 +1,127 @@
+/*
+ * Hoja de detalle (bottom sheet) autocontenida. Velo a pantalla completa + panel
+ * que sube desde abajo. El z-index la pone por encima del chrome del viaje pero
+ * dentro del flujo normal de la app (no compite con el Modal compartido).
+ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay, 1000);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: var(--color-scrim);
+  /* Aparición del velo (el panel sube por su cuenta). */
+  animation: lg-sheet-fade var(--transition-base, 200ms) ease both;
+}
+
+.panel {
+  width: 100%;
+  max-height: 88svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  /* Sube desde abajo con la curva enfatizada del sistema. */
+  animation: lg-sheet-rise 320ms var(--ease-emphasized, cubic-bezier(0.2, 0, 0, 1)) both;
+  /* Respeta el notch inferior. */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Zona de gesto del asa: ancha para agarrar fácil con el pulgar. */
+.handleZone {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0 var(--space-2);
+  cursor: grab;
+  touch-action: none;
+}
+.handleZone:active {
+  cursor: grabbing;
+}
+
+.handle {
+  width: 44px;
+  height: 5px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-border-strong, rgba(255, 255, 255, 0.3));
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-5);
+  overflow-y: auto;
+}
+
+/* Marco de la foto a sangre con el badge de estado encima. */
+.photoWrap {
+  position: relative;
+}
+
+.photoBadge {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-black);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}
+
+.meta {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.social {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.socialIcon {
+  font-size: var(--font-size-lg);
+}
+
+.cta {
+  margin-top: var(--space-2);
+}
+
+@keyframes lg-sheet-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lg-sheet-rise {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .panel {
+    animation: none;
+  }
+}
