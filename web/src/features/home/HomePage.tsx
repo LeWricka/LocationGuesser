@@ -115,12 +115,20 @@ export function HomePage() {
   const userId = user?.id ?? ''
   const hasGroups = data.groups.length > 0
 
-  // Portada por viaje: reutilizamos la foto que el mapamundi ya firmó (un fetch menos).
-  const coverByGroup = new Map(world.trips.map((t) => [t.groupId, t.coverUrl]))
-  const groups: HomeGroup[] = data.groups.map((g) => ({
-    ...g,
-    coverUrl: coverByGroup.get(g.id) ?? null,
-  }))
+  // Portada + metadatos por viaje: reutilizamos lo que el mapamundi ya resolvió (un
+  // fetch menos): su foto firmada y sus puntos situados (nº de momentos + fecha del más
+  // reciente). El metadato es sutil y editorial; si el viaje no situó nada, no se pinta.
+  const worldByGroup = new Map(world.trips.map((t) => [t.groupId, t]))
+  const groups: HomeGroup[] = data.groups.map((g) => {
+    const t = worldByGroup.get(g.id)
+    const lastPoint = t?.points.at(-1)
+    return {
+      ...g,
+      coverUrl: t?.coverUrl ?? null,
+      momentCount: t?.points.length,
+      dateLabel: tripDateLabel(lastPoint?.date),
+    }
+  })
 
   return (
     // Con viajes, la home es un lienzo con SNAP vertical: el héroe (mapamundi) y la
@@ -180,6 +188,15 @@ export function HomePage() {
       <JoinGroupModal open={joinOpen} onClose={() => setJoinOpen(false)} />
     </main>
   )
+}
+
+// Etiqueta de fecha legible para la portada ("jun 2026"), a partir del ISO del momento
+// situado más reciente del viaje. Sin fecha válida → undefined (la tarjeta no la pinta).
+function tripDateLabel(iso: string | undefined): string | undefined {
+  if (!iso) return undefined
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return undefined
+  return d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }).replace('.', '')
 }
 
 // Esqueleto que reproduce el layout de la home (cabecera + secciones) con

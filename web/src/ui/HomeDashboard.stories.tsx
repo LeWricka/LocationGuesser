@@ -3,9 +3,16 @@ import { HomeDashboard } from './HomeDashboard'
 import type { HomeGroup } from './HomeDashboard'
 
 const groups: HomeGroup[] = [
-  { id: 'a', name: "Interrail '26", status: 'toplay', owned: true },
-  { id: 'b', name: 'Finde Lisboa', status: 'live' },
-  { id: 'c', name: 'Pirineos', status: 'idle' },
+  {
+    id: 'a',
+    name: "Interrail '26",
+    status: 'toplay',
+    owned: true,
+    momentCount: 12,
+    dateLabel: 'jun 2026',
+  },
+  { id: 'b', name: 'Finde Lisboa', status: 'live', momentCount: 5, dateLabel: 'may 2026' },
+  { id: 'c', name: 'Pirineos', status: 'idle', momentCount: 8, dateLabel: 'ago 2025' },
 ]
 
 // El mapamundi real (HomeWorldMap) vive en features/home y depende de la capa de

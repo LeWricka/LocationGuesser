@@ -5,7 +5,14 @@ import { HomeDashboard } from './HomeDashboard'
 import type { HomeGroup } from './HomeDashboard'
 
 const groups: HomeGroup[] = [
-  { id: 'a', name: "Interrail '26", status: 'toplay', owned: true },
+  {
+    id: 'a',
+    name: "Interrail '26",
+    status: 'toplay',
+    owned: true,
+    momentCount: 12,
+    dateLabel: 'jun 2026',
+  },
   { id: 'b', name: 'Finde Lisboa', status: 'live' },
   { id: 'c', name: 'Pirineos', status: 'idle' },
 ]
@@ -28,6 +35,12 @@ describe('HomeDashboard', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: "Abrir viaje Interrail '26" }))
     expect(onOpenGroup).toHaveBeenCalledWith('a')
+  })
+
+  test('muestra el metadato editorial (momentos · fecha) cuando lo hay', () => {
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    // El viaje 'a' trae momentCount + dateLabel → "12 momentos · jun 2026".
+    expect(screen.getByText('12 momentos · jun 2026')).toBeInTheDocument()
   })
 
   test('marca "en juego"/"te toca" en los viajes con reto abierto', () => {

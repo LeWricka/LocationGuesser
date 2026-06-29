@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { Icon } from './Icon'
@@ -16,6 +16,10 @@ export interface HomeGroup {
   coverUrl?: string | null
   /** Fecha de creación (ISO) para ordenar por más reciente. Opcional en tests. */
   createdAt?: string
+  /** Nº de momentos situados del viaje (metadato editorial bajo el nombre). */
+  momentCount?: number
+  /** Etiqueta de fecha legible del viaje (p.ej. "jun 2026"), metadato sutil. */
+  dateLabel?: string
 }
 
 // Orden de los viajes: PRIMERO los que piden acción (te toca → en juego), luego el
@@ -60,6 +64,10 @@ interface Props {
 // los viajes son unidades visuales GRANDES y separadas (su portada-foto manda), no un
 // carrusel apretado. SIN "cómo funciona" ni panel de números: la promesa es guardar y
 // compartir recuerdos; adivinar es un guiño que vive dentro del viaje.
+//
+// La galería abre con UNA portada destacada (la primera, a doble alto, estilo editorial)
+// y el resto en una rejilla generosa; cada portada revela con un fade-in escalonado al
+// montar (respeta prefers-reduced-motion).
 export function HomeDashboard({
   userId,
   displayName,
@@ -99,31 +107,39 @@ export function HomeDashboard({
 
         {/* El mapamundi satélite (lo inyecta HomePage). Si no llega, no se pinta. */}
         {worldMap}
+
+        {/* Degradado papel que funde el satélite con la galería de abajo (sin costura). */}
+        <div className={styles.heroFade} aria-hidden="true" />
       </section>
 
-      {/* TUS VIAJES (los que posees) y, aparte, DONDE PARTICIPAS. Portadas a todo el
-          ancho, una por fila (imagen-dominante). Cada sección solo si tiene viajes. */}
-      {owned.length > 0 && (
-        <TripSection title="Tus viajes" trips={owned} onOpenGroup={onOpenGroup} />
-      )}
-      {others.length > 0 && (
-        <TripSection title="Donde participas" trips={others} onOpenGroup={onOpenGroup} />
-      )}
+      {/* GALERÍA: lámina de papel que sube sobre el héroe. TUS VIAJES (los que posees) y,
+          aparte, DONDE PARTICIPAS. Portadas grandes (la 1ª destacada). Cada sección solo
+          si tiene viajes. */}
+      <div className={styles.gallery}>
+        {owned.length > 0 && (
+          <TripSection title="Tus viajes" trips={owned} onOpenGroup={onOpenGroup} />
+        )}
+        {others.length > 0 && (
+          <TripSection title="Donde participas" trips={others} onOpenGroup={onOpenGroup} />
+        )}
 
-      {/* Acciones: empezar un viaje (primaria) / unirse con un código. */}
-      <div className={styles.ctas}>
-        <Button onClick={onCreateGroup} className={styles.ctaPrimary}>
-          <Icon icon={Plus} size={18} /> Empezar un viaje
-        </Button>
-        <Button variant="secondary" onClick={onJoinGroup} className={styles.ctaSecondary}>
-          Unirme
-        </Button>
+        {/* Acciones: empezar un viaje (primaria) / unirse con un código. */}
+        <div className={styles.ctas}>
+          <Button onClick={onCreateGroup} className={styles.ctaPrimary}>
+            <Icon icon={Plus} size={18} /> Empezar un viaje
+          </Button>
+          <Button variant="secondary" onClick={onJoinGroup} className={styles.ctaSecondary}>
+            Unirme
+          </Button>
+        </div>
       </div>
     </div>
   )
 }
 
-// Sección de viajes con su título eyebrow + lista a todo el ancho (una portada por fila).
+// Sección de viajes con su título eyebrow + galería editorial: la PRIMERA portada va
+// destacada (ancho completo, a más alto) y el resto en una rejilla generosa. Cada portada
+// revela con un fade escalonado (delay por índice) al entrar.
 function TripSection({
   title,
   trips,
@@ -133,32 +149,78 @@ function TripSection({
   trips: HomeGroup[]
   onOpenGroup?: (id: string) => void
 }) {
+  const [featured, ...rest] = trips
+
   return (
     <section aria-label={title} className={styles.tripSection}>
       <h2 className={styles.sectionTitle}>{title}</h2>
       <div className={styles.list}>
-        {trips.map((group) => (
+        {featured && (
           <TripCard
-            key={group.id}
-            group={group}
-            onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+            featured
+            index={0}
+            group={featured}
+            onClick={onOpenGroup ? () => onOpenGroup(featured.id) : undefined}
           />
-        ))}
+        )}
+        {rest.length > 0 && (
+          <div className={styles.grid}>
+            {rest.map((group, i) => (
+              <TripCard
+                key={group.id}
+                index={i + 1}
+                group={group}
+                onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </section>
   )
 }
 
+// Metadato editorial bajo el nombre: "N momentos · jun 2026" (puntos centrales sutiles).
+// Solo pinta las piezas que existen; sin datos no renderiza nada.
+function tripMeta(group: HomeGroup): string | null {
+  const parts: string[] = []
+  if (typeof group.momentCount === 'number' && group.momentCount > 0) {
+    parts.push(group.momentCount === 1 ? '1 momento' : `${group.momentCount} momentos`)
+  }
+  if (group.dateLabel) parts.push(group.dateLabel)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
 // Tarjeta-portada de un viaje (variante A): la FOTO es la tarjeta. Velo inferior, nombre
-// serif sobre el velo e indicadores sutiles ("en juego"/"te toca"/"tuyo"). Tocar abre el
-// viaje. La foto es decorativa (la etiqueta del botón da el nombre).
-function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }) {
+// serif sobre el velo, metadato sutil (momentos · fecha) e indicadores ("en juego"/"te
+// toca"/"tuyo"). `featured` la pinta a doble alto (apertura de la galería). `index` da el
+// retardo del fade-in escalonado. Tocar abre el viaje.
+function TripCard({
+  group,
+  onClick,
+  featured = false,
+  index = 0,
+}: {
+  group: HomeGroup
+  onClick?: () => void
+  featured?: boolean
+  index?: number
+}) {
   const isButton = typeof onClick === 'function'
   const live = group.status === 'live' || group.status === 'toplay'
   const liveLabel = group.status === 'toplay' ? 'Te toca' : 'En juego'
+  const meta = tripMeta(group)
+  // Retardo del reveal acotado: a partir de la 6ª portada no escalonamos más (evita
+  // que las del final aparezcan con un retraso perceptible).
+  const revealDelay = `${Math.min(index, 5) * 70}ms`
 
   return (
-    <article className={styles.tripCard}>
+    <article
+      className={[styles.tripCard, featured ? styles.tripCardFeatured : '']
+        .filter(Boolean)
+        .join(' ')}
+      style={{ '--reveal-delay': revealDelay } as CSSProperties}
+    >
       <button
         type="button"
         className={styles.tripButton}
@@ -181,7 +243,10 @@ function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }
               <span aria-hidden="true">👑</span> Tuyo
             </span>
           )}
-          <h3 className={styles.tripName}>{group.name}</h3>
+          <div className={styles.tripText}>
+            <h3 className={styles.tripName}>{group.name}</h3>
+            {meta && <p className={styles.tripMeta}>{meta}</p>}
+          </div>
         </div>
       </button>
     </article>

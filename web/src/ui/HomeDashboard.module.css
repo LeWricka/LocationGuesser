@@ -22,6 +22,30 @@
   scroll-snap-align: start;
 }
 
+/* Funde el satélite (oscuro) con el papel de la galería: degradado vertical pegado al
+   borde inferior del héroe. Sin él, el corte mapa→galería se ve como una costura dura. */
+.heroFade {
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--space-8);
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent 0%, var(--color-bg) 100%);
+}
+
+/* Lámina de papel que SUBE sobre el satélite: la galería trepa al héroe (sin costura,
+   estilo Polarsteps). El margen negativo la solapa; el z-index la pone por encima del
+   fundido; el padding-top recupera el aire que come el solape. */
+.gallery {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin-top: calc(var(--space-7) * -1);
+  padding-top: var(--space-2);
+}
+
 /* Cada sección de viajes es un punto de anclaje: al hacer scroll, la galería
    "encaja" arriba de golpe. scroll-margin-top deja respirar el chrome flotante. */
 .tripSection {
@@ -102,21 +126,50 @@
   margin-bottom: var(--space-3);
 }
 
-/* --- VIAJES: lista a TODO EL ANCHO, una portada grande por fila (Polarsteps) --- */
+/* --- VIAJES: galería editorial. La 1ª portada destacada (ancho completo, a más alto);
+   el resto en una rejilla generosa. Imagen-dominante, estilo Polarsteps. --- */
 .list {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
 }
 
+/* Rejilla del resto de portadas: 1 columna en móvil, 2 cuando hay sitio (≥440px).
+   auto-fit con minmax mantiene celdas grandes sin nunca apretar de más. */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+@media (min-width: 440px) {
+  .grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  }
+}
+
+/* Reveal escalonado al entrar: cada portada sube y aparece con un retardo por índice
+   (--reveal-delay, lo fija el componente). Se anula con prefers-reduced-motion abajo. */
 .tripCard {
   min-width: 0;
+  animation: tripReveal var(--duration-slower) var(--ease-emphasized) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+@keyframes tripReveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* La portada entera es el botón que abre el viaje: la FOTO es la tarjeta. */
 .tripButton {
   display: block;
   width: 100%;
+  height: 100%;
   padding: 0;
   border: 1px solid color-mix(in srgb, #fff 10%, transparent);
   border-radius: var(--radius-lg);
@@ -142,17 +195,21 @@
 
 /* Portada: foto a sangre con velo inferior para que el nombre serif (blanco) se lea
    AA encima. Sin foto: degradado de marca sobre superficie (no queda vacío). Retrato
-   alto estilo Polarsteps. */
+   alto estilo Polarsteps. Un zoom lentísimo de la foto al hover da vida sin distraer. */
 .tripCover {
   position: relative;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 11;
   background-color: var(--color-surface-hover);
   background-size: cover;
   background-position: center;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding: var(--space-3);
+  padding: var(--space-4);
+  transition: background-size var(--transition-base);
+}
+.tripButton:hover:not(:disabled) .tripCover {
+  background-size: 106%;
 }
 .tripCover::after {
   content: '';
@@ -160,21 +217,54 @@
   inset: 0;
   background: linear-gradient(
     to top,
-    rgba(8, 12, 18, 0.82) 0%,
-    rgba(8, 12, 18, 0.05) 52%,
-    transparent 74%
+    rgba(8, 12, 18, 0.85) 0%,
+    rgba(8, 12, 18, 0.28) 38%,
+    rgba(8, 12, 18, 0.02) 64%,
+    transparent 80%
   );
 }
 
-.tripName {
+/* La portada DESTACADA abre la galería: ancho completo y más alta (formato cartel). */
+.tripCardFeatured {
+  grid-column: 1 / -1;
+}
+.tripCardFeatured .tripCover {
+  aspect-ratio: 4 / 3;
+}
+@media (min-width: 560px) {
+  .tripCardFeatured .tripCover {
+    aspect-ratio: 16 / 9;
+  }
+}
+.tripCardFeatured .tripName {
+  font-size: var(--font-size-2xl);
+}
+
+/* Bloque de texto de la portada (nombre + metadato), sobre el velo. */
+.tripText {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tripName {
   font-family: var(--font-serif);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
   line-height: 1.05;
   color: #fff;
   text-shadow: 0 1px 6px rgba(8, 12, 18, 0.6);
+}
+
+/* Metadato sutil bajo el nombre: momentos · fecha. Sans pequeña, semitransparente. */
+.tripMeta {
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  color: rgba(255, 255, 255, 0.82);
+  text-shadow: 0 1px 4px rgba(8, 12, 18, 0.6);
+  font-variant-numeric: tabular-nums;
 }
 
 /* Indicador SUTIL "en juego"/"te toca": pill de acento con un punto que palpita. */
@@ -248,8 +338,14 @@
   .tripBlip {
     animation: none;
   }
+  .tripCard {
+    animation: none;
+  }
   .avatarButton:hover,
   .tripButton:hover:not(:disabled) {
     transform: none;
+  }
+  .tripButton:hover:not(:disabled) .tripCover {
+    background-size: cover;
   }
 }
