@@ -1,0 +1,82 @@
+/*
+ * Portada editorial del viaje (§1.8): pastilla de vidrio que reemplaza al
+ * titlePill simple. Nombre en cursiva manuscrita + fila de stats gigantes.
+ * Va sobre el mapa contrastado, así que usa el chrome glass más opaco de
+ * tokens; texto en blanco-sobre-foto con sombra para legibilidad sobre satélite.
+ */
+.cover {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+/* Nombre del viaje en cursiva manuscrita (token display). Grande y con holgura:
+   es el protagonista de la portada. Sombra para asentarlo sobre el satélite. */
+.name {
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--font-display);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  color: var(--color-on-photo);
+  text-shadow: 0 1px 8px var(--photo-text-shadow);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Participantes: secundario, debajo del nombre. */
+.members {
+  margin: 0;
+  max-width: 100%;
+  font-size: var(--font-size-xs);
+  color: var(--color-on-photo);
+  opacity: 0.78;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fila de stats: números gigantes + eyebrows, separados por aire. Envuelve en
+   pantallas estrechas para no romper la pastilla. */
+.stats {
+  margin: var(--space-2) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-5);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Baja el tamaño del número de dato gigante (56px) a una escala de cabecera:
+   tres stats no caben a 56px en una pastilla móvil. Hereda tabular-nums y peso
+   black de `lg-data`. */
+.value {
+  font-size: var(--font-size-xl);
+  color: var(--color-on-photo);
+  text-shadow: 0 1px 6px var(--photo-text-shadow);
+}
+
+/* Etiqueta: el eyebrow ya es cálido/mayúsculas; solo ajustamos a micro-tamaño. */
+.label {
+  font-size: 0.625rem;
+}

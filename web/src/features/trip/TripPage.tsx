@@ -5,6 +5,7 @@ import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import type { Moment } from '../../lib/trip'
 import { useTripData } from './useTripData'
 import { TripMap } from './TripMap'
+import { TripCover } from './TripCover'
 import { MomentCard } from './MomentCard'
 import { MomentSheet } from './MomentSheet'
 import { MomentTimeline } from './MomentTimeline'
@@ -174,10 +175,10 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
         <button type="button" className={styles.iconPill} onClick={onBack} aria-label="Volver">
           ←
         </button>
-        <div className={styles.titlePill}>
-          <p className={styles.tripName}>{title}</p>
-          {subtitle && <p className={styles.tripSub}>{subtitle}</p>}
-        </div>
+        {/* Portada editorial (Fase 2, §1.8): eleva la antigua titlePill al nombre
+            en cursiva manuscrita + stats del viaje (días/km/momentos). Sigue
+            siendo una pastilla glass sobre el mapa, no tapa el carrusel. */}
+        <TripCover title={title} members={subtitle} moments={moments} route={route} />
         {/* Point 5: indicador "🔴 N en juego". Tocarlo selecciona el momento en
             juego (centra su pin + lo trae a la vista), para que el sitio donde se
             puede jugar salte a la vista de un vistazo. */}
