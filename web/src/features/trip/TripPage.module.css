@@ -144,18 +144,20 @@
 }
 .blip {
   display: block;
-  width: 7px;
-  height: 7px;
+  width: 9px;
+  height: 9px;
   border-radius: var(--radius-full);
-  background: var(--color-text-faint);
-  opacity: 0.55;
+  /* El punto inactivo va en acento tenue (no gris): telegrafía que hay una 2ª
+     sección hermana navegable, no es decoración muerta. */
+  background: var(--color-accent);
+  opacity: 0.4;
   transition:
     width var(--duration-slow) var(--ease-emphasized),
     background-color var(--duration-base),
     opacity var(--duration-base);
 }
 .pagerActive .blip {
-  width: 20px;
+  width: 24px;
   background: var(--color-accent);
   opacity: 1;
 }
@@ -193,12 +195,15 @@
   overflow: hidden;
 }
 
-/* ---- Edge-peek: flecha sutil que late hacia la página vecina ---- */
+/* ---- Edge-peek: zona táctil ancha + sliver de la página vecina que asoma ----
+   Más ancha (46px) para que el dedo la encuentre a una mano, y con un "sliver"
+   (banda de papel translúcido pegada al borde) que insinúa que hay otra página
+   detrás: no es solo una flecha, es el canto del panel hermano asomando. */
 .peek {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 26px;
+  width: 46px;
   z-index: 2;
   display: flex;
   align-items: center;
@@ -216,33 +221,45 @@
   left: 0;
   justify-content: flex-start;
 }
+/* Sliver de la página vecina: una banda de superficie que se funde hacia dentro,
+   como si el panel hermano asomara 3-4% por el borde. Da profundidad al gesto. */
 .peek::before {
   content: '';
   position: absolute;
-  top: 12%;
-  bottom: 12%;
+  top: 0;
+  bottom: 0;
   width: 100%;
-  background: linear-gradient(var(--color-accent-glow-soft), transparent);
-  opacity: 0.5;
+  background: var(--color-surface);
   pointer-events: none;
 }
 .peekRight::before {
+  -webkit-mask-image: linear-gradient(to left, #000, transparent);
+  mask-image: linear-gradient(to left, #000, transparent);
   border-left: 1px solid var(--color-border);
 }
 .peekLeft::before {
+  -webkit-mask-image: linear-gradient(to right, #000, transparent);
+  mask-image: linear-gradient(to right, #000, transparent);
   border-right: 1px solid var(--color-border);
 }
 .peek:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
 }
+/* La flecha va en una pastilla de acento tenue para que se LEA como acción tocable
+   (antes era un glifo suelto fácil de pasar por alto). */
 .nudge {
   position: relative;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 44px;
-  font-size: 1.4rem;
+  width: 30px;
+  height: 56px;
+  margin: 0 var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  box-shadow: var(--shadow-sm);
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
   line-height: 1;
   color: var(--color-accent);
 }

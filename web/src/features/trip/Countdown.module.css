@@ -27,4 +27,20 @@
   /* origen centrado: el micro-rebote no descoloca la pastilla. */
   display: inline-block;
   transform-origin: center;
+  /* El número manda: algo más grande y en negrita para que el tiempo restante se
+     lea de un vistazo en móvil (antes heredaba el sm de la pastilla). */
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Últimos 30s: urgencia en rojo de peligro (borde, número y "Cierra en"). El
+   micro-rebote ya intensificado (lg-count-tick) refuerza la sensación; bajo
+   reduced-motion el color sigue comunicando la urgencia sin movimiento. */
+.urgent {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.urgent .label,
+.urgent .time {
+  color: var(--color-danger);
 }
