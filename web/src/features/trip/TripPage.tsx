@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react'
+import { ArrowLeft, ImagePlus, Plus, Target } from 'lucide-react'
 import { EmptyState, Icon, useReducedMotion } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
@@ -14,8 +14,10 @@ interface Props {
   groupId: string
   /** Lanza el flujo de adivinar de un momento (reto). Lo cablea App al router. */
   onPlayChallenge: (challengeId: string) => void
-  /** Abre el flujo de añadir momento (crear reto) del grupo. */
+  /** Abre el flujo de añadir momento (recuerdo: foto, lugar y texto). */
   onAddMoment: () => void
+  /** Abre el asistente de crear reto (clásico) del grupo. */
+  onAddChallenge: () => void
   /** Salta a la GroupPage clásica (marcador completo, todos los retos, ajustes…). */
   onOpenClassic: () => void
   /** Vuelve a la home. */
@@ -42,20 +44,28 @@ function membersLine(names: string[], myName: string | null): string {
   return base
 }
 
-// Saltos al "reproducir" el viaje (igual que antes): da tiempo al flyTo del mapa.
-const PLAYBACK_INTERVAL_MS = 2300
+// Saltos al "reproducir" el viaje: ágil, justo lo que tarda el flyTo del mapa.
+const PLAYBACK_INTERVAL_MS = 1100
 
 /**
- * Pantalla "Viaje" en DOS SECCIONES hermanas que se navegan deslizando: DIARIO
- * (mapa satélite + momentos) ↔ RETOS (hub de juego con clasificación). Fuera la
- * pestaña ancha: la navegación es swipe horizontal + teclado + un pager de dos
- * puntos (el activo se alarga) bajo la cabecera, con edge-peek (flecha que late)
- * que telegrafía el gesto. `role=tablist`/`aria-selected` y foco visible.
+ * Pantalla "Viaje" a PANTALLA COMPLETA en DOS SECCIONES hermanas: DIARIO (mapa
+ * satélite + momentos) ↔ RETOS (hub de juego con clasificación). La cabecera no es
+ * una barra: FLOTA por encima del mapa (overlay con scrim, consciente de la sección
+ * para la legibilidad) y lleva volver, marca del viaje y el pager de dos puntos.
+ * Navegación por el botón de borde (‹/›), el pager y el teclado (sin swipe, que
+ * chocaba con el carrusel). `role=tablist`/`aria-selected` y foco visible.
  *
  * La lógica de selección carrusel↔mapa y de reproducción del recorrido vive aquí
  * (es transversal a la sección Diario) y se delega a TripDiario por props.
  */
-export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic, onBack }: Props) {
+export function TripPage({
+  groupId,
+  onPlayChallenge,
+  onAddMoment,
+  onAddChallenge,
+  onOpenClassic,
+  onBack,
+}: Props) {
   const { user, profile } = useSession()
   const {
     group,
@@ -89,6 +99,10 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
 
   const [playing, setPlaying] = useState(false)
   const stepperSelecting = useRef(false)
+
+  // Menú del FAB "＋": elegir entre crear un Momento o un Reto.
+  const [fabOpen, setFabOpen] = useState(false)
+  const fabWrapRef = useRef<HTMLDivElement>(null)
 
   // Permisos + miembros (tolerante: si falla, no bloquea ver el viaje).
   useEffect(() => {
@@ -246,6 +260,23 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
 
   const togglePlay = () => setPlaying((p) => !p)
 
+  // Menú del FAB: cerrar al tocar fuera o con Escape (accesible con teclado).
+  useEffect(() => {
+    if (!fabOpen) return
+    const onPointerDown = (e: PointerEvent) => {
+      if (!fabWrapRef.current?.contains(e.target as Node)) setFabOpen(false)
+    }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setFabOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [fabOpen])
+
   // --- Navegación entre secciones (botón "›"/"‹" + pager + teclado) ----------
   // SIN swipe horizontal de página: chocaba con el scroll del carrusel de fotos del
   // Diario (ambos gestos horizontales). Se navega solo con el botón de borde, los dos
@@ -266,12 +297,12 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
   if (loading) {
     return (
       <div className={styles.screen} role="status" aria-label="Cargando el viaje">
-        <header className={styles.chrome} aria-hidden="true">
+        <header className={`${styles.overlay} ${styles.overlayLight}`} aria-hidden="true">
           <span className={`${styles.skelPill} ${styles.skelIcon} lg-shimmer-surface`} />
           <span className={`${styles.skelPill} ${styles.skelTitle} lg-shimmer-surface`} />
           <span className={`${styles.skelPill} ${styles.skelIcon} lg-shimmer-surface`} />
         </header>
-        <div className={styles.panel}>
+        <div className={`${styles.panel} ${styles.panelRetos}`}>
           <span className={`${styles.skelHero} lg-shimmer-surface`} />
           <span className={`${styles.skelCard} lg-shimmer-surface`} />
         </div>
@@ -296,8 +327,14 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
 
   return (
     <div className={styles.screen}>
-      {/* Cabecera: marca del viaje + pager de dos puntos (sin pestaña ancha). */}
-      <header className={styles.chrome}>
+      {/* Cabecera FLOTANTE sobre el mapa a pantalla completa: pastilla de volver,
+          marca del viaje (nombre + miembros) y el pager de dos puntos. Es consciente
+          de la sección activa para la legibilidad: en DIARIO va sobre el mapa satélite
+          (scrim oscuro + texto blanco) y en RETOS sobre papel claro (fondo papel +
+          tinta). Quitamos la fila "Diario/Retos": los dos puntos ya marcan la sección. */}
+      <header
+        className={`${styles.overlay} ${section === 'diario' ? styles.overlayDark : styles.overlayLight}`}
+      >
         <button type="button" className={styles.iconPill} onClick={onBack} aria-label="Volver">
           <Icon icon={ArrowLeft} />
         </button>
@@ -307,22 +344,6 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
           {subtitle && <span className={styles.tripMeta}>{subtitle}</span>}
         </div>
 
-        <button
-          type="button"
-          className={styles.iconPill}
-          onClick={onOpenClassic}
-          aria-label="Marcador y ajustes"
-        >
-          <Icon icon={MoreHorizontal} />
-        </button>
-      </header>
-
-      {/* Fila de navegación: título de la sección actual (cross-fade) + pager. */}
-      <div className={styles.headNav}>
-        <div className={styles.secTitle} aria-hidden="true">
-          <span className={section === 'diario' ? styles.secOn : styles.secOff}>Diario</span>
-          <span className={section === 'retos' ? styles.secOn : styles.secOff}>Retos</span>
-        </div>
         <div
           className={styles.pager}
           role="tablist"
@@ -343,7 +364,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
             </button>
           ))}
         </div>
-      </div>
+      </header>
 
       {/* Pista deslizable: dos paneles hermanos (Diario / Retos). */}
       <div className={styles.viewport}>
@@ -376,7 +397,7 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
           </section>
 
           <section
-            className={styles.panel}
+            className={`${styles.panel} ${styles.panelRetos}`}
             role="tabpanel"
             aria-label="Retos"
             aria-hidden={section !== 'retos'}
@@ -423,17 +444,53 @@ export function TripPage({ groupId, onPlayChallenge, onAddMoment, onOpenClassic,
         )}
       </div>
 
-      {/* FAB de añadir momento: solo el dueño y solo en la sección Diario (es donde
-          viven los momentos). En vacío el CTA ya está en el EmptyState. */}
-      {canCreate && moments.length > 0 && section === 'diario' && (
-        <button
-          type="button"
-          className={styles.fab}
-          onClick={onAddMoment}
-          aria-label="Añadir momento"
-        >
-          <Icon icon={Plus} size={26} />
-        </button>
+      {/* FAB "＋" con menú de dos acciones: Momento (recuerdo) o Reto (a adivinar).
+          Solo el dueño. En vacío el CTA de momento ya está en el EmptyState del Diario. */}
+      {canCreate && moments.length > 0 && (
+        <div className={styles.fabWrap} ref={fabWrapRef}>
+          {fabOpen && (
+            <div className={styles.fabMenu} role="menu" aria-label="Crear">
+              <button
+                type="button"
+                role="menuitem"
+                className={styles.fabItem}
+                onClick={() => {
+                  setFabOpen(false)
+                  onAddMoment()
+                }}
+              >
+                <span className={styles.fabItemIcon}>
+                  <Icon icon={ImagePlus} size={18} />
+                </span>
+                Momento
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                className={styles.fabItem}
+                onClick={() => {
+                  setFabOpen(false)
+                  onAddChallenge()
+                }}
+              >
+                <span className={styles.fabItemIcon}>
+                  <Icon icon={Target} size={18} />
+                </span>
+                Reto
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            className={`${styles.fab} ${fabOpen ? styles.fabActive : ''}`}
+            onClick={() => setFabOpen((o) => !o)}
+            aria-label="Crear momento o reto"
+            aria-haspopup="menu"
+            aria-expanded={fabOpen}
+          >
+            <Icon icon={Plus} size={26} />
+          </button>
+        </div>
       )}
 
       {/* Hoja de detalle del momento: descripción editable + (en un recuerdo del

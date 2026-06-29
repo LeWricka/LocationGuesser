@@ -37,7 +37,13 @@ import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
 import { setNextDestination, takeNextDestination } from './lib/auth'
 import { getGroup } from './lib/groupData'
-import { parseHash, groupHash, classicGroupHash, addMomentHash } from './lib/route'
+import {
+  parseHash,
+  groupHash,
+  classicGroupHash,
+  addMomentHash,
+  addChallengeHash,
+} from './lib/route'
 import { Spinner, Stack, withViewTransition } from './ui'
 import styles from './App.module.css'
 
@@ -235,7 +241,11 @@ function LoggedIn({
           onAddMoment={() => {
             location.hash = addMomentHash(groupId)
           }}
-          // "⋯": a la GroupPage clásica (marcador, ajustes, etc.).
+          // "Reto" (menú del FAB "＋"): al asistente de reto clásico (#g=…&v=clasico&add=1).
+          onAddChallenge={() => {
+            location.hash = addChallengeHash(groupId)
+          }}
+          // Acceso al marcador completo y ajustes, desde el pie de la sección Retos.
           onOpenClassic={() => {
             location.hash = classicGroupHash(groupId)
           }}
