@@ -3,30 +3,65 @@
  * y texto sobre foto (tokens), legible sobre el satélite. Scroll horizontal con
  * snap; sin librerías. La línea base "cose" las marcas como una mini-ruta.
  */
+/* Fila: botón ▶/⏸ fijo a la izquierda + franja de marcas que hace scroll a su
+   derecha. El control no se desplaza con el scroll horizontal de la franja. */
 .timeline {
+  display: flex;
+  align-items: center;
   width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  /* No encadenar el scroll horizontal al carrusel/página de debajo. */
-  overscroll-behavior-x: contain;
-}
-.timeline::-webkit-scrollbar {
-  display: none;
+  gap: var(--space-2);
+  padding-left: var(--space-3);
 }
 
+/* Botón de reproducir el viaje: pastilla de vidrio sobre el mapa, mismo lenguaje
+   que el chrome (livePill / iconPill). Recorre los momentos en orden al darle play. */
+.play {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-on-photo);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+/* Reproduciendo: anillo cálido para que se lea el estado activo de un vistazo. */
+.play[aria-pressed='true'] {
+  color: var(--color-accent);
+  border-color: var(--pin-ring-active);
+}
+
+/* Franja de marcas: el scroll horizontal vive aquí (no en el contenedor) para que
+   el botón de play quede fijo. */
 .track {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: var(--space-4);
   margin: 0;
   padding: var(--space-2) var(--space-4);
   list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  /* No encadenar el scroll horizontal al carrusel/página de debajo. */
+  overscroll-behavior-x: contain;
   /* Línea continua de fondo que une las marcas (la "ruta" en miniatura). */
   background-image: linear-gradient(var(--route-line), var(--route-line));
   background-repeat: no-repeat;
   background-position: 0 12px;
   background-size: 100% var(--pin-ring-width, 3px);
+}
+.track::-webkit-scrollbar {
+  display: none;
 }
 
 .item {

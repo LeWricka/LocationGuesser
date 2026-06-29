@@ -16,6 +16,19 @@
  *    números gigantes tabulares para los datos.
  */
 
+/*
+ * Fuente manuscrita self-host (Fase 2b). 'Caveat' variable (pesos 400–700) para
+ * portadas/nombres de viaje. Self-host = sin llamada a Google Fonts (privacidad +
+ * un solo origen, encaja con el CSP del Artifact y el deploy estático). El token
+ * --font-display sigue con fallback de sistema por si el .woff2 aún no cargó.
+ */
+@font-face {
+  font-family: 'Caveat';
+  src: url('/fonts/caveat-variable.woff2') format('woff2');
+  font-weight: 400 700;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
 
@@ -181,9 +194,9 @@
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
 
   /* Display manuscrita SOLO para portadas/nombres de viaje (cursiva estilo
-   * Polarsteps). Fallback de SISTEMA a propósito: 'Caveat' aún no está
-   * self-host (es Fase 2b, requiere el .woff2 + @font-face); mientras tanto,
-   * en iPhone 'Snell Roundhand' se ve digna y no cuesta ni un byte de carga. */
+   * Polarsteps). 'Caveat' ya está self-host (ver @font-face arriba); el fallback
+   * de SISTEMA ('Snell Roundhand' en iPhone) cubre el lapso hasta que carga el
+   * .woff2 (font-display: swap) sin coste si la fuente fallara. */
   --font-display: 'Caveat', 'Snell Roundhand', 'Brush Script MT', cursive;
 
   --font-size-xs: 0.75rem; /* 12px — micro-ayudas, eyebrows */
