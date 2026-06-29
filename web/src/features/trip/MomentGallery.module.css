@@ -1,0 +1,178 @@
+/* Galería del recuerdo en la hoja de detalle: carrusel con scroll-snap (swipe en
+   móvil), indicador "n/N" y controles del dueño. Reusa los tokens "Atelier". */
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
+/* Marco de carga (mientras llega la galería): muestra la portada que ya trae el
+   momento, sin parpadeo. Misma altura que los slides. */
+.frame {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-photo-card);
+  height: min(46svh, 60vw);
+}
+
+.track {
+  display: flex;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-lg);
+}
+
+/* Cada foto ocupa el ancho del carrusel (un slide por vista). */
+.slide {
+  position: relative;
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  height: min(46svh, 60vw);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-photo-card);
+  background: var(--color-surface-raised);
+}
+
+.photoBtn {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.photo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-muted);
+}
+
+.coverBadge {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.slideActions {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: flex;
+  gap: var(--space-2);
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--color-on-photo);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+.action:hover,
+.action:focus-visible {
+  background: rgba(0, 0, 0, 0.6);
+  border-color: var(--color-on-photo);
+}
+
+.action:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+/* Indicador de posición: puntos bajo el carrusel. */
+.dots {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  transition: background-color var(--transition-fast);
+}
+
+.dot[data-on] {
+  background: var(--color-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    transition: none;
+  }
+}
+
+/* Fila "añadir más fotos" (solo dueño): discreta, bajo el carrusel. */
+.addRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.addRow:hover,
+.addRow:focus-within {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
+}
+
+.addRow[aria-busy='true'] {
+  cursor: progress;
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

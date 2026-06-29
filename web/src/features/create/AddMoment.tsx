@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
-import { PhotoDropzone } from './PhotoDropzone'
+import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
 import type { LatLng } from '../../lib/geo'
 import { createMoment, promoteToChallenge, type ChallengeForPlay } from '../../lib/challenges'
+import { addMomentImages } from '../../lib/momentImages'
 import { deadlineFromMinutes } from '../../lib/time'
 import { findPanorama, findPanoramaNear, type PanoramaMatch } from '../../lib/streetview'
 import { uploadImage } from '../../lib/storage'
@@ -88,10 +89,10 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
   const [flyTo, setFlyTo] = useState<LatLng | null>(null)
   const [locating, setLocating] = useState(false)
 
-  // Foto del recuerdo (se sube SIN EXIF). `photoPreview` es un object URL que
-  // revocamos al cambiar para no fugar memoria.
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  // GALERÍA del recuerdo: varias fotos del móvil, la 1ª es la portada. Cada una
+  // se sube SIN EXIF al guardar. `previewUrl` es un object URL que revocamos al
+  // quitar/desmontar para no fugar memoria. Un RETO usa solo la portada.
+  const [photos, setPhotos] = useState<DraftPhoto[]>([])
   const [readingExif, setReadingExif] = useState(false)
 
   // ── Capa de RETO (opcional) ────────────────────────────────────────────────
@@ -118,34 +119,35 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
   // Token para descartar búsquedas de panorama obsoletas (si se mueve el pin
   // mientras una búsqueda está en curso, ignoramos la vieja).
   const panoSearchToken = useRef(0)
-  const hasPhoto = Boolean(photoFile)
+  const hasPhoto = photos.length > 0
 
-  function pickPhoto(file: File | null) {
-    setPhotoPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
-      return file ? URL.createObjectURL(file) : null
-    })
-    setPhotoFile(file)
-  }
-
-  // Revoca el object URL de la foto al desmontar (no fugar memoria).
+  // Revoca TODOS los object URLs de la galería al desmontar (no fugar memoria).
   useEffect(() => {
     return () => {
-      setPhotoPreview((prev) => {
-        if (prev) URL.revokeObjectURL(prev)
-        return null
+      setPhotos((prev) => {
+        prev.forEach((p) => URL.revokeObjectURL(p.previewUrl))
+        return []
       })
     }
   }, [])
 
-  // Adjuntar foto: leemos el GPS del File ORIGINAL (antes de estriparlo al subir).
-  // Con GPS → fija el lugar (ajustable); sin GPS → invitamos a tocar el mapa.
-  async function onPhotoChange(file: File | null) {
-    pickPhoto(file)
-    if (!file) return
+  // Añadir fotos (selección múltiple del móvil). Se anexan al final. Si es la
+  // PRIMERA tanda (galería vacía), leemos el GPS de la portada (File ORIGINAL,
+  // antes de estriparlo al subir): con GPS fija el lugar; sin GPS, a tocar el mapa.
+  async function onAddPhotos(files: File[]) {
+    const wasEmpty = photos.length === 0
+    const drafts: DraftPhoto[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      previewUrl: URL.createObjectURL(file),
+    }))
+    setPhotos((prev) => [...prev, ...drafts])
+
+    if (!wasEmpty) return
+    // El GPS solo lo leemos de la portada (la primera de la primera tanda).
     setReadingExif(true)
     try {
-      const gps = await readGpsFromExif(file)
+      const gps = await readGpsFromExif(files[0])
       if (gps) {
         setPlace(gps)
         setFlyTo(gps)
@@ -154,6 +156,24 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
     } finally {
       setReadingExif(false)
     }
+  }
+
+  // Quita una foto de la galería y revoca su object URL.
+  function onRemovePhoto(id: string) {
+    setPhotos((prev) => {
+      const found = prev.find((p) => p.id === id)
+      if (found) URL.revokeObjectURL(found.previewUrl)
+      return prev.filter((p) => p.id !== id)
+    })
+  }
+
+  // Marca una foto como portada moviéndola al frente (orden estable del resto).
+  function onMakeCover(id: string) {
+    setPhotos((prev) => {
+      const target = prev.find((p) => p.id === id)
+      if (!target) return prev
+      return [target, ...prev.filter((p) => p.id !== id)]
+    })
   }
 
   function pickPlace(p: LatLng) {
@@ -311,13 +331,21 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
 
     setBusy(true)
     try {
-      // Foto opcional: subida comprimida y SIN EXIF. El GPS ya se leyó del File
-      // original al adjuntar.
-      let imagePath: string | undefined
-      if (photoFile) {
-        setStatus('Subiendo la foto…')
-        imagePath = await uploadImage(photoFile)
+      // Fotos opcionales: subida comprimida y SIN EXIF, en ORDEN (la 1ª es la
+      // portada). Para un RETO solo subimos la portada (se queda con una sola
+      // foto, la que se adivina). Las paths conservan el orden de la galería.
+      const uploadList = isChallenge ? photos.slice(0, 1) : photos
+      const paths: string[] = []
+      for (let i = 0; i < uploadList.length; i++) {
+        setStatus(
+          uploadList.length > 1
+            ? `Subiendo fotos… (${i + 1}/${uploadList.length})`
+            : 'Subiendo la foto…',
+        )
+        paths.push(await uploadImage(uploadList[i].file))
       }
+      // La portada espeja `image_path` (lo lee la tarjeta del viaje y el mapamundi).
+      const coverPath = paths[0]
 
       setStatus(isChallenge ? 'Creando el reto…' : 'Guardando el recuerdo…')
       // 1) Siempre nace como RECUERDO (la unidad mínima). El lugar es VISIBLE.
@@ -328,11 +356,18 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
         description: buildDescription(),
         placeLat: place?.lat ?? null,
         placeLng: place?.lng ?? null,
-        imagePath: imagePath ?? null,
+        imagePath: coverPath ?? null,
         svPanoId: isChallenge ? (pano?.panoId ?? null) : null,
         svHeading: isChallenge && pano ? pov.heading : null,
         svPitch: isChallenge && pano ? pov.pitch : null,
       })
+
+      // 1b) Galería del recuerdo: registramos TODAS las fotos en `moment_images`
+      // con su orden. Solo para recuerdo (un reto se queda con su foto única, ya
+      // en `image_path`). `image_path` ya quedó espejado por `createMoment`.
+      if (!isChallenge && paths.length > 0) {
+        await addMomentImages(challenge.id, paths)
+      }
 
       // 2) Si el toggle de reto está ON, lo promocionamos: el lugar VISIBLE pasa a
       // ser la respuesta OCULTA, con plazo, cronómetro y candados de Street View.
@@ -357,7 +392,8 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
       track('moment_created', {
         group_id: groupId,
         challenge_id: result.id,
-        has_photo: Boolean(imagePath),
+        has_photo: paths.length > 0,
+        photo_count: paths.length,
         has_place: place != null,
         promoted_to_challenge: isChallenge,
       })
@@ -396,18 +432,24 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
           </div>
         </header>
 
-        {/* FOTO — a sangre dentro de la tarjeta, es lo que más luce. */}
+        {/* FOTOS — galería del recuerdo (la 1ª es la portada). Un reto usa solo la
+            portada (se queda con una foto, la que se adivina). */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            Foto <span className={styles.optional}>opcional</span>
+            {isChallenge ? 'Foto' : 'Fotos'} <span className={styles.optional}>opcional</span>
           </span>
-          <PhotoDropzone
-            preview={photoPreview}
+          <MomentGalleryPicker
+            photos={photos}
             loading={readingExif}
-            label="Sube una foto del día"
-            onPick={(file) => void onPhotoChange(file)}
-            onClear={() => pickPhoto(null)}
+            onAdd={(files) => void onAddPhotos(files)}
+            onRemove={onRemovePhoto}
+            onMakeCover={onMakeCover}
           />
+          {isChallenge && photos.length > 1 && (
+            <span className={styles.hint}>
+              Un reto usa solo la portada (la 1ª). Las demás no se guardan.
+            </span>
+          )}
         </section>
 
         {/* LUGAR — mapa satélite. En recuerdo es el sitio VISIBLE; con el toggle de
