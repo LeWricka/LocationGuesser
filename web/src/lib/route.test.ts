@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { parseHash, groupHash, classicGroupHash, addMomentHash } from './route'
+import { parseHash, groupHash, classicGroupHash, addMomentHash, addChallengeHash } from './route'
 
 describe('parseHash', () => {
   test('grupo y reto juntos', () => {
@@ -74,12 +74,20 @@ describe('parseHash', () => {
     expect(parseHash('#g=abc123&v=otra')).toEqual({ view: 'home', group: 'abc123' })
   })
 
-  test('add=1 marca la intención de añadir momento', () => {
+  test('add=1 marca la intención de añadir momento (asistente clásico)', () => {
     expect(parseHash('#g=abc123&v=clasico&add=1')).toEqual({
       view: 'home',
       group: 'abc123',
       groupView: 'clasico',
       groupAdd: true,
+    })
+  })
+
+  test('add=recuerdo marca el flujo ligero "Añadir recuerdo"', () => {
+    expect(parseHash('#g=abc123&add=recuerdo')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      groupAddMoment: true,
     })
   })
 })
@@ -101,9 +109,16 @@ describe('classicGroupHash / addMomentHash', () => {
     expect(parseHash(classicGroupHash('abc123')).groupView).toBe('clasico')
   })
 
-  test('addMomentHash abre el creador en la vista clásica', () => {
-    expect(addMomentHash('abc123')).toBe('#g=abc123&v=clasico&add=1')
+  test('addMomentHash abre el flujo ligero "Añadir recuerdo"', () => {
+    expect(addMomentHash('abc123')).toBe('#g=abc123&add=recuerdo')
     const r = parseHash(addMomentHash('abc123'))
+    expect(r.group).toBe('abc123')
+    expect(r.groupAddMoment).toBe(true)
+  })
+
+  test('addChallengeHash abre el asistente de reto en la vista clásica', () => {
+    expect(addChallengeHash('abc123')).toBe('#g=abc123&v=clasico&add=1')
+    const r = parseHash(addChallengeHash('abc123'))
     expect(r.groupView).toBe('clasico')
     expect(r.groupAdd).toBe(true)
   })

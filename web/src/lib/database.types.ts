@@ -98,14 +98,24 @@ export interface Database {
           title: string
           // Descripción del día (texto libre opcional, null = sin texto). Migración 0021.
           description: string | null
+          // ¿Es un RETO (lleva capa de juego) o un RECUERDO puro? Migración 0022.
+          // Default true en BD = los existentes siguen siendo retos (cero regresión).
+          is_challenge: boolean
           lat: number
           lng: number
+          // Lugar VISIBLE del momento (no es spoiler): se sirve siempre. Para un
+          // RECUERDO es su sitio en el mapa; para un RETO la respuesta oculta sigue
+          // en lat/lng → challenge_answers. Nullable (un recuerdo puede no tener
+          // lugar). Migración 0022.
+          place_lat: number | null
+          place_lng: number | null
           image_path: string | null
           sv_pano_id: string | null
           sv_heading: number | null
           sv_pitch: number | null
           guess_seconds: number | null
-          deadline_at: string
+          // Nullable desde 0022: un RECUERDO no caduca (solo los retos tienen plazo).
+          deadline_at: string | null
           photo_is_hint: boolean
           // Candados de exploración del Street View (false = permitido). Migración 0013.
           sv_lock_move: boolean
@@ -118,14 +128,18 @@ export interface Database {
           group_id: string
           title: string
           description?: string | null
-          lat: number
-          lng: number
+          // Default true en BD: omitirlo crea un reto (compat con createChallenge).
+          is_challenge?: boolean
+          lat?: number
+          lng?: number
+          place_lat?: number | null
+          place_lng?: number | null
           image_path?: string | null
           sv_pano_id?: string | null
           sv_heading?: number | null
           sv_pitch?: number | null
           guess_seconds?: number | null
-          deadline_at: string
+          deadline_at?: string | null
           photo_is_hint?: boolean
           sv_lock_move?: boolean
           sv_lock_rotate?: boolean
@@ -137,14 +151,17 @@ export interface Database {
           group_id?: string
           title?: string
           description?: string | null
+          is_challenge?: boolean
           lat?: number
           lng?: number
+          place_lat?: number | null
+          place_lng?: number | null
           image_path?: string | null
           sv_pano_id?: string | null
           sv_heading?: number | null
           sv_pitch?: number | null
           guess_seconds?: number | null
-          deadline_at?: string
+          deadline_at?: string | null
           photo_is_hint?: boolean
           sv_lock_move?: boolean
           sv_lock_rotate?: boolean

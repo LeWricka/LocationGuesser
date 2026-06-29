@@ -4,8 +4,8 @@ import { Icon, useReducedMotion } from '../../ui'
 import styles from './Countdown.module.css'
 
 interface Props {
-  /** Instante de cierre del reto en ISO (deadline_at). */
-  deadlineAt: string
+  /** Instante de cierre del reto en ISO (deadline_at); null si el momento no caduca (recuerdo). */
+  deadlineAt: string | null
   /** Texto cuando ya venció (por defecto "Cerrado"). */
   closedLabel?: string
 }
@@ -31,7 +31,8 @@ export function Countdown({ deadlineAt, closedLabel = 'Cerrado' }: Props) {
   const reducedMotion = useReducedMotion()
   const [now, setNow] = useState(() => Date.now())
 
-  const target = new Date(deadlineAt).getTime()
+  // Sin plazo (recuerdo) → NaN → cae al estado "cerrado" (no tic-taquea).
+  const target = new Date(deadlineAt ?? NaN).getTime()
   const remaining = target - now
   const isClosed = Number.isNaN(target) || remaining <= 0
 

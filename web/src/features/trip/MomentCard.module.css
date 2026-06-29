@@ -127,11 +127,11 @@
   line-height: 1;
 }
 
-/* Badge "EN JUEGO" anclado arriba a la izquierda. */
-.badge {
-  position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
+/* Chip de estado ("EN JUEGO" / "🎯 Reto") sobre el título, dentro del pie. En flujo
+   (no absoluto) para no chocar con la bandera (sup-izq) ni el botón expandir (sup-der). */
+.chip {
+  display: inline-flex;
+  margin-bottom: var(--space-1);
 }
 
 .body {

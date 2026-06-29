@@ -1,97 +1,123 @@
 /*
- * Sección DIARIO: mapa satélite enmarcado (hero) + timeline + carrusel de
- * momentos. Vive en un panel deslizable de TripPage (scroll vertical propio).
- * Lenguaje Atelier/Pizarra con tokens; el mapa es satélite por defecto.
+ * Sección DIARIO: el MAPA A SANGRE es el protagonista (llena la sección, estilo
+ * Polarsteps) y los momentos FLOTAN encima en un dock inferior. No es un mapa
+ * enmarcado con lista debajo: el mapa manda y el contenido se posa sobre él.
+ * Vive en un panel a sangre de TripPage (sin padding ni scroll propio).
  */
 .diario {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
-/* Hero del recorrido: marco con el mapa a sangre dentro (el mapa rellena inset:0).
-   Altura fija para que el carrusel quede a la vista bajo el pliegue. */
-.heroMap {
-  position: relative;
-  height: 240px;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-lg);
+/* Mapa a sangre: ocupa toda la sección. El propio TripMap (globo/plano) se
+   posiciona absoluto dentro y rellena inset:0. */
+.map {
+  position: absolute;
+  inset: 0;
 }
-/* El mapa (TripMap) se posiciona absoluto dentro de su contenedor relativo. */
-.heroMap > :global(*) {
+.map > :global(*) {
   position: absolute;
   inset: 0;
 }
 
-/* Pie del mapa: rótulo del recorrido sobre un velo inferior para legibilidad. */
-.heroCap {
+/* Rótulo flotante del recorrido sobre el mapa, arriba-izq. Pastilla de vidrio del
+   chrome (legible sobre satélite/globo), no roba protagonismo. */
+.routeCap {
   position: absolute;
-  left: var(--space-4);
-  bottom: var(--space-3);
-  z-index: 1;
-  color: #fff;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+  top: var(--space-3);
+  left: var(--space-3);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  max-width: 70%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   pointer-events: none;
 }
-.heroLabel {
-  display: block;
+.routeLabel {
   font-size: 0.625rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  opacity: 0.85;
-  margin-bottom: 2px;
-}
-.heroBig {
-  display: block;
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.05;
-}
-
-.eyebrow {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-.eyebrowTitle {
-  font-family: var(--font-display);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-}
-.eyebrowMeta {
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
   color: var(--color-text-faint);
 }
+.routeBig {
+  font-family: var(--font-display);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.1;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-/* Carrusel horizontal de momentos con scroll-snap (igual patrón que antes). */
+/* Dock flotante inferior: timeline + carrusel posados sobre el mapa. El velo funde
+   el dock con el mapa (token compartido) para que los momentos respiren sin tapar
+   el mapa entero. No intercepta toques fuera de sus hijos (el mapa sigue arrastrable
+   por encima del velo). */
+.dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6) 0 calc(env(safe-area-inset-bottom) + var(--space-3));
+  background: var(--map-bottom-scrim);
+  pointer-events: none;
+}
+/* Los hijos del dock SÍ son interactivos (timeline, carrusel); el velo no. */
+.dock > * {
+  pointer-events: auto;
+}
+
+/* Carrusel horizontal de momentos con scroll-snap (igual patrón que antes). Altura
+   fija de tarjeta: ahora flota, no la dicta el flujo vertical de la página. */
 .carousel {
   display: flex;
   gap: var(--space-3);
-  padding-bottom: var(--space-2);
+  padding: var(--space-1) var(--space-4) 0;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  /* deja respirar el gesto vertical del panel; el swipe horizontal de página lo
-     gestiona TripPage solo en los bordes/áreas sin scroll-x. */
+  /* deja respirar el swipe horizontal de página que gestiona TripPage en los bordes;
+     el del carrusel es local a su pista con scroll-snap. */
   overscroll-behavior-x: contain;
 }
 .carousel::-webkit-scrollbar {
   display: none;
 }
 .slide {
-  flex: 0 0 86%;
-  max-width: 320px;
+  flex: 0 0 82%;
+  max-width: 300px;
+  /* Tarjeta horizontal (16:9) de altura fija: el dock no depende del flujo. */
+  height: 168px;
   scroll-snap-align: center;
 }
 
-.emptyWrap {
-  padding: var(--space-5) var(--space-2);
+/* Vacío: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre). */
+.emptyDock {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-6);
+  transform: translateX(-50%);
+  z-index: 2;
+  width: min(92%, 420px);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
 }

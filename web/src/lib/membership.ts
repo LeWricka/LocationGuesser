@@ -273,14 +273,20 @@ export async function pendingChallenges(userId: string): Promise<PendingChalleng
   ])
 
   const now = new Date()
-  return challenges
-    .filter((c) => isLive(c, now) && !votedChallengeIds.has(c.id))
-    .sort((a, b) => new Date(a.deadline_at).getTime() - new Date(b.deadline_at).getTime())
-    .map((c) => ({
-      challenge: c,
-      groupId: c.group_id,
-      groupName: nameById.get(c.group_id) ?? null,
-    }))
+  return (
+    challenges
+      .filter((c) => isLive(c, now) && !votedChallengeIds.has(c.id))
+      // Tras `isLive`, el plazo no es null (un recuerdo nunca está en vivo); el `?? 0`
+      // solo satisface al tipo `string | null` (deadline_at nullable desde 0022).
+      .sort(
+        (a, b) => new Date(a.deadline_at ?? 0).getTime() - new Date(b.deadline_at ?? 0).getTime(),
+      )
+      .map((c) => ({
+        challenge: c,
+        groupId: c.group_id,
+        groupName: nameById.get(c.group_id) ?? null,
+      }))
+  )
 }
 
 // ── Helpers internos ─────────────────────────────────────────────────────────

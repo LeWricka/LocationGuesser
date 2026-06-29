@@ -64,6 +64,8 @@ vi.mock('./supabase', () => ({
 
 import {
   createChallenge,
+  createMoment,
+  promoteToChallenge,
   getChallenge,
   getAnswer,
   getAnswers,
@@ -77,8 +79,11 @@ const sampleChallenge: Challenge = {
   group_id: 'g1',
   title: 'Plaza Mayor',
   description: null,
+  is_challenge: true,
   lat: 40.4155,
   lng: -3.7074,
+  place_lat: null,
+  place_lng: null,
   image_path: null,
   sv_pano_id: 'PANO123',
   sv_heading: 0,
@@ -90,6 +95,18 @@ const sampleChallenge: Challenge = {
   sv_lock_rotate: false,
   created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
+}
+
+// Un RECUERDO: sin reto, lugar visible en place_*, sin respuesta oculta ni plazo.
+const sampleMoment: Challenge = {
+  ...sampleChallenge,
+  id: 'm1',
+  title: 'Cena en el puerto',
+  is_challenge: false,
+  place_lat: 43.32,
+  place_lng: -1.98,
+  deadline_at: null,
+  guess_seconds: null,
 }
 
 beforeEach(() => {
@@ -154,6 +171,89 @@ describe('createChallenge', () => {
     >
     expect(insertArg.sv_lock_move).toBe(true)
     expect(insertArg.sv_lock_rotate).toBe(true)
+  })
+})
+
+describe('createMoment', () => {
+  test('inserta un recuerdo: is_challenge=false, sin respuesta oculta ni plazo', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    const out = await createMoment({
+      title: 'Cena en el puerto',
+      createdBy: 'u',
+      groupId: 'g1',
+      placeLat: 43.32,
+      placeLng: -1.98,
+      description: 'Qué cena',
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.is_challenge).toBe(false)
+    // Lugar VISIBLE en place_*; NO setea lat/lng (sin respuesta oculta → el trigger
+    // no crea fila en challenge_answers).
+    expect(insertArg.place_lat).toBe(43.32)
+    expect(insertArg.place_lng).toBe(-1.98)
+    expect('lat' in insertArg).toBe(false)
+    expect('lng' in insertArg).toBe(false)
+    // Un recuerdo no caduca.
+    expect(insertArg.deadline_at).toBeNull()
+    // El cliente NO escribe la respuesta.
+    const wroteAnswer =
+      calls.upsert.mock.calls.some((c) => c[0] === 'challenge_answers') ||
+      calls.insert.mock.calls.some((c) => c[0] === 'challenge_answers')
+    expect(wroteAnswer).toBe(false)
+    expect(out.challenge).toEqual(sampleMoment)
+    expect(out.groupId).toBe('g1')
+  })
+
+  test('un recuerdo sin lugar es válido (place_* a null)', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await createMoment({ title: 'Solo foto', createdBy: 'u', groupId: 'g1' })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.place_lat).toBeNull()
+    expect(insertArg.place_lng).toBeNull()
+  })
+})
+
+describe('promoteToChallenge', () => {
+  test('convierte un recuerdo en reto: is_challenge=true + respuesta + plazo; la respuesta la espeja el trigger', async () => {
+    results['challenges'] = { data: { ...sampleChallenge, id: 'm1' }, error: null }
+    await promoteToChallenge('m1', {
+      lat: 43.32,
+      lng: -1.98,
+      deadlineAt: '2026-07-01T00:00:00.000Z',
+      guessSeconds: 60,
+      svLockMove: true,
+    })
+    const updateArg = calls.update.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(updateArg.is_challenge).toBe(true)
+    expect(updateArg.lat).toBe(43.32)
+    expect(updateArg.lng).toBe(-1.98)
+    expect(updateArg.deadline_at).toBe('2026-07-01T00:00:00.000Z')
+    expect(updateArg.guess_seconds).toBe(60)
+    expect(updateArg.sv_lock_move).toBe(true)
+    expect(updateArg.sv_lock_rotate).toBe(false)
+    expect(calls.eq).toHaveBeenCalledWith('challenges', 'id', 'm1')
+    // El cliente NO escribe challenge_answers: lo hace el trigger 0022.
+    const wroteAnswer = calls.upsert.mock.calls.some((c) => c[0] === 'challenge_answers')
+    expect(wroteAnswer).toBe(false)
+  })
+
+  test('sin plazo explícito cae al default (24 h desde ahora, futuro)', async () => {
+    results['challenges'] = { data: { ...sampleChallenge, id: 'm1' }, error: null }
+    await promoteToChallenge('m1', { lat: 1, lng: 2 })
+    const updateArg = calls.update.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(new Date(updateArg.deadline_at as string).getTime()).toBeGreaterThan(Date.now())
   })
 })
 

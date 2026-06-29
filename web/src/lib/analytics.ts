@@ -33,6 +33,10 @@ export type AnalyticsEvent =
   | 'group_created'
   | 'group_joined'
   | 'challenge_created'
+  // Recuerdo creado (momento SIN reto, separación contenido/reto). Props:
+  // group_id, challenge_id, has_photo, has_place, promoted_to_challenge (¿se
+  // convirtió en reto al crearlo?). SIN lat/lng ni nombre del lugar.
+  | 'moment_created'
   | 'challenge_played'
   | 'result_revealed'
   // Compartir MI resultado tras revelar (apuesta viral nº1). Props: surface

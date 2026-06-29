@@ -8,13 +8,15 @@
 
 /**
  * Estado de un momento, derivado en cliente sin BD extra (ver `useTripData`):
- *  - `active`   = en juego (su plazo aún no ha vencido, `isLive`).
- *  - `closed`   = cerrado (plazo vencido). Ya está "clavado" en el mapa.
+ *  - `recuerdo` = momento SIN reto (`is_challenge = false`): foto + lugar visible +
+ *                 texto, sin respuesta oculta ni plazo. Su lugar se pinta siempre.
+ *  - `active`   = reto en juego (su plazo aún no ha vencido, `isLive`).
+ *  - `closed`   = reto cerrado (plazo vencido). Ya está "clavado" en el mapa.
  *  - `practice` = reto de práctica (plazo a más de un año, `isPracticeChallenge`).
  */
 import type { CountryInfo } from './countryFlag'
 
-export type MomentStatus = 'active' | 'closed' | 'practice'
+export type MomentStatus = 'recuerdo' | 'active' | 'closed' | 'practice'
 
 /**
  * Un momento del viaje (un reto, en lenguaje de juego). Reúne lo que la pantalla
@@ -31,15 +33,27 @@ export interface Moment {
   /** Descripción del día (texto libre del dueño), o null si no la han escrito. Migración 0021. */
   description: string | null
   status: MomentStatus
+  /**
+   * ¿Lleva capa de RETO (`is_challenge = true`) o es un RECUERDO puro? La UI lo usa
+   * para decidir badge "🎯 Reto", "Adivina →" y la acción "Convertir en reto". 0022.
+   */
+  isChallenge: boolean
   /** Fecha del momento en ISO (usamos `created_at`: cuándo se añadió al viaje). */
   date: string
-  /** Instante de cierre del reto en ISO (`deadline_at`): alimenta la cuenta atrás. */
-  deadlineAt: string
+  /**
+   * Instante de cierre del reto en ISO (`deadline_at`): alimenta la cuenta atrás.
+   * `null` para un RECUERDO (no caduca, no tiene cuenta atrás). 0022.
+   */
+  deadlineAt: string | null
   /** URL firmada de la foto (bucket privado), o null si el momento no tiene foto. */
   imageUrl: string | null
   /** Path en Storage de la foto (para re-firmar/lightbox), o null si no hay foto. */
   imagePath: string | null
-  /** Coordenada real; null mientras el momento esté activo (anti-spoiler) o sin respuesta visible. */
+  /**
+   * Coordenada a pintar en el mapa. Para un RECUERDO es su lugar VISIBLE
+   * (`place_lat`/`place_lng`), siempre que lo tenga. Para un RETO es la respuesta:
+   * null mientras esté activo (anti-spoiler), visible solo si cerrado/ya jugado.
+   */
   lat: number | null
   lng: number | null
   /** Nº de jugadores distintos que ya han adivinado este momento (real, derivado de votos). */

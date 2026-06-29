@@ -116,8 +116,13 @@ export async function getGroupChallenges(groupId: string): Promise<ChallengeForP
   return (data ?? []) as ChallengeForPlay[]
 }
 
-/** Un reto está abierto si su plazo aún no ha vencido (comparado con `now`). */
+/**
+ * Un reto está abierto si su plazo aún no ha vencido (comparado con `now`). Un
+ * momento SIN plazo (`deadline_at = null`: un recuerdo, desde 0022) nunca está "en
+ * vivo" → false (no es un reto jugable).
+ */
 export function isLive(challenge: Pick<Challenge, 'deadline_at'>, now: Date = new Date()): boolean {
+  if (challenge.deadline_at == null) return false
   return new Date(challenge.deadline_at).getTime() > now.getTime()
 }
 

@@ -36,11 +36,18 @@ function formatMomentDate(value: string): string | null {
  *    "Ver detalle" (icono expandir) arriba a la derecha. Así un toque no dispara
  *    a la vez zoom y hoja.
  *
- * REGLA DE ORO DEL PIVOTE: jugar es capa, no peaje. Un momento CERRADO se ve y
- * ya (sin CTA); SOLO el momento en juego ofrece "Adivina →" (única acción cálida).
+ * RECUERDO vs RETO (separación contenido/reto):
+ *  - un RECUERDO (`is_challenge = false`) es solo contenido: foto + lugar visible +
+ *    fecha, SIN "Adivina" ni cuenta atrás. No lleva chip de reto.
+ *  - un RETO lleva chip "🎯 Reto" para distinguirlo; si está EN JUEGO añade el badge
+ *    "EN JUEGO" y la única acción cálida "Adivina →" (regla del pivote: jugar es
+ *    capa, no peaje — un reto ya cerrado se ve y ya).
  */
 export function MomentCard({ moment, selected, onSelect, onExpand, onPlay }: Props) {
   const isActive = moment.status === 'active'
+  // Lleva capa de reto (en juego, cerrado o práctica) → chip "🎯 Reto". Un recuerdo
+  // puro no lo lleva: la tarjeta lee como contenido, no como juego.
+  const isReto = moment.isChallenge && moment.status !== 'recuerdo'
   const date = formatMomentDate(moment.date)
 
   return (
@@ -76,14 +83,22 @@ export function MomentCard({ moment, selected, onSelect, onExpand, onPlay }: Pro
       {/* Overlay + contenido sobre la foto. aria-hidden: el contenido textual ya
           vive accesible vía el alt de la foto-botón y los controles tienen label. */}
       <div className={styles.overlay} aria-hidden="true">
-        {isActive && (
-          <div className={styles.badge}>
-            <Badge tone="live" dot>
-              EN JUEGO
-            </Badge>
-          </div>
-        )}
         <div className={styles.body}>
+          {/* Chip de estado, sobre el título (no colisiona con la bandera sup-izq ni
+              el botón expandir sup-der). Un reto EN JUEGO lleva "EN JUEGO" (cálido,
+              pulsa); un reto cerrado/práctica, el chip "🎯 Reto" que lo distingue del
+              recuerdo. Un recuerdo no lleva chip: lee como contenido, no como juego. */}
+          {isActive ? (
+            <span className={styles.chip}>
+              <Badge tone="live" dot>
+                EN JUEGO
+              </Badge>
+            </span>
+          ) : isReto ? (
+            <span className={styles.chip}>
+              <Badge tone="accent">🎯 Reto</Badge>
+            </span>
+          ) : null}
           <p className={styles.title}>{moment.title}</p>
           <div className={styles.meta}>
             {date && <span className={styles.date}>{date}</span>}

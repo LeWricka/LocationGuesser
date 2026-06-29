@@ -1,18 +1,24 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pencil } from 'lucide-react'
+import { Pencil, Target } from 'lucide-react'
 import { Badge, Button, ChallengePhoto, Icon, useToast } from '../../ui'
 import type { Moment } from '../../lib/trip'
-import { updateChallengeDescription } from '../../lib/challenges'
+import type { LatLng } from '../../lib/geo'
+import { promoteToChallenge, updateChallengeDescription } from '../../lib/challenges'
+import { deadlineFromMinutes } from '../../lib/time'
+import { MapPicker } from '../create/MapPicker'
+import { Countdown } from './Countdown'
 import styles from './MomentSheet.module.css'
 
 interface Props {
   /** Momento a mostrar; `null` = hoja cerrada. */
   moment: Moment | null
-  /** El usuario es dueño del viaje: puede editar la descripción del día. */
+  /** El usuario es dueño del viaje: puede editar la descripción y convertir en reto. */
   canEdit?: boolean
   onClose: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
+  /** Tras convertir un recuerdo en reto: refresca el viaje (recarga datos). */
+  onPromoted?: () => void
 }
 
 // Fecha larga legible del momento ("8 de abril de 2026"). Null si no es válida.
@@ -31,17 +37,43 @@ function formatMomentDate(value: string): string | null {
 // la hoja vuelve a su sitio (gesto cancelado).
 const DRAG_CLOSE_PX = 110
 
+// Duración del reto al convertir: mismas paradas que el asistente de "Añadir
+// recuerdo" para coherencia. El plazo se calcula relativo a AHORA al guardar.
+const DURATION_STOPS: { minutes: number; label: string }[] = [
+  { minutes: 15, label: '15 min' },
+  { minutes: 30, label: '30 min' },
+  { minutes: 60, label: '1 h' },
+  { minutes: 240, label: '4 h' },
+  { minutes: 720, label: '12 h' },
+  { minutes: 1440, label: '24 h' },
+  { minutes: 2880, label: '48 h' },
+]
+const DEFAULT_DURATION_INDEX = DURATION_STOPS.findIndex((s) => s.minutes === 240)
+
+// Tiempo por jugada en segundos; null = sin límite. Default: 1 min.
+const GUESS_OPTIONS: { value: number | null; label: string }[] = [
+  { value: 60, label: '1 min' },
+  { value: 120, label: '2 min' },
+  { value: 180, label: '3 min' },
+  { value: null, label: 'Sin límite' },
+]
+
+const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
+
 /**
  * Hoja de detalle de un momento (bottom sheet, §2 del spec). AUTOCONTENIDA a
  * propósito: no usa el `Modal` compartido para poder subir desde abajo y cerrarse
- * arrastrando, sin tocar ese componente. Foto a sangre arriba + título + fecha +
- * social ligero (lo REAL es el contador de adivinadores) + CTA "Adivina →" solo
- * si el momento está en juego (regla del pivote: jugar es capa, no peaje).
+ * arrastrando, sin tocar ese componente.
+ *
+ * RECUERDO vs RETO (separación contenido/reto):
+ *  - RECUERDO (`is_challenge = false`): foto + lugar VISIBLE (país/fecha) + descripción.
+ *    SIN "Adivina" ni cuenta atrás. El DUEÑO ve "Convertir en reto" (promueve a juego).
+ *  - RETO: chip "🎯 Reto"; si está EN JUEGO, badge + cuenta atrás + "Adivina →".
  *
  * Accesibilidad: rol diálogo, cierra con Escape y al tocar el fondo; respeta
  * `prefers-reduced-motion` vía CSS (la animación de subida se anula por media query).
  */
-export function MomentSheet({ moment, canEdit = false, onClose, onPlay }: Props) {
+export function MomentSheet({ moment, canEdit = false, onClose, onPlay, onPromoted }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
   // Desplazamiento vertical en curso del gesto de arrastre (0 = en su sitio).
@@ -55,6 +87,15 @@ export function MomentSheet({ moment, canEdit = false, onClose, onPlay }: Props)
   const [description, setDescription] = useState(moment?.description ?? '')
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  // ── Convertir en reto (sub-flujo del dueño sobre un recuerdo) ───────────────
+  const [promoting, setPromoting] = useState(false)
+  // Punto-RESPUESTA del reto: arranca en el lugar visible del recuerdo (place_*), el
+  // dueño puede ajustarlo en el mapa. Al promover pasa a ser la coordenada OCULTA.
+  const [answer, setAnswer] = useState<LatLng | null>(null)
+  const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
+  const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
+  const [promoteBusy, setPromoteBusy] = useState(false)
 
   // Cierra reseteando el arrastre, para que la próxima apertura entre limpia
   // (el panel además se remonta por `key`, ver más abajo).
@@ -106,13 +147,56 @@ export function MomentSheet({ moment, canEdit = false, onClose, onPlay }: Props)
     }
   }
 
+  // Abre el sub-flujo de convertir: siembra el punto-respuesta con el lugar visible
+  // del recuerdo (si lo tiene), que el dueño puede ajustar antes de esconderlo.
+  const startPromote = () => {
+    if (!moment) return
+    setAnswer(
+      moment.lat != null && moment.lng != null ? { lat: moment.lat, lng: moment.lng } : null,
+    )
+    setPromoting(true)
+  }
+
+  // Convierte el recuerdo en reto: el lugar visible pasa a respuesta OCULTA, con
+  // plazo (relativo a ahora) y tiempo por jugada. Al terminar, refresca el viaje.
+  const confirmPromote = async () => {
+    if (!moment || !answer) return
+    setPromoteBusy(true)
+    try {
+      await promoteToChallenge(moment.challengeId, {
+        lat: answer.lat,
+        lng: answer.lng,
+        deadlineAt: deadlineFromMinutes(DURATION_STOPS[durationIndex].minutes),
+        guessSeconds,
+        photoIsHint: true,
+      })
+      toast.show('¡Reto creado! Ya pueden adivinar dónde es.', { tone: 'success' })
+      setPromoting(false)
+      onPromoted?.()
+      close()
+    } catch (err) {
+      toast.show(
+        `No se pudo convertir en reto: ${err instanceof Error ? err.message : String(err)}`,
+        {
+          tone: 'danger',
+        },
+      )
+    } finally {
+      setPromoteBusy(false)
+    }
+  }
+
   if (!moment) return null
 
   const isActive = moment.status === 'active'
+  // Recuerdo = sin capa de reto. Solo un recuerdo puede convertirse en reto.
+  const isRecuerdo = moment.status === 'recuerdo'
+  const isReto = moment.isChallenge && !isRecuerdo
   const trimmedDesc = description.trim()
   const date = formatMomentDate(moment.date)
-  // País ya resuelto (solo CERRADOS con coord); con bandera válida para pintarlo.
+  // País ya resuelto (recuerdos con lugar o cerrados con coord); con bandera válida.
   const country = moment.country?.flag ? moment.country : null
+  const durationStop = DURATION_STOPS[durationIndex]
 
   // Arrastre desde el asa: seguimos el dedo solo hacia abajo; al soltar, si pasó
   // el umbral cerramos, si no la hoja vuelve a su sitio.
@@ -156,9 +240,8 @@ export function MomentSheet({ moment, canEdit = false, onClose, onPlay }: Props)
           <span className={styles.handle} aria-hidden="true" />
         </div>
 
-        {/* lg-stagger: el bloque editorial (foto → título → meta → social → CTA)
-            se ensambla en cascada al subir la hoja. Se anula bajo reduced-motion
-            (la utilidad global ya lo gestiona). */}
+        {/* lg-stagger: el bloque editorial se ensambla en cascada al subir la hoja.
+            Se anula bajo reduced-motion (la utilidad global ya lo gestiona). */}
         <div className={`${styles.content} lg-stagger`}>
           <div className={styles.photoWrap}>
             <ChallengePhoto
@@ -168,19 +251,25 @@ export function MomentSheet({ moment, canEdit = false, onClose, onPlay }: Props)
               size="lg"
               className={styles.photo}
             />
-            {isActive && (
+            {/* Estado sobre la foto: EN JUEGO (cálido) o "🎯 Reto" (cerrado/práctica).
+                Un recuerdo no lleva badge: es contenido, no juego. */}
+            {isActive ? (
               <div className={styles.photoBadge}>
                 <Badge tone="live" dot>
                   EN JUEGO
                 </Badge>
               </div>
-            )}
+            ) : isReto ? (
+              <div className={styles.photoBadge}>
+                <Badge tone="accent">🎯 Reto</Badge>
+              </div>
+            ) : null}
           </div>
 
           <h2 className={styles.title}>{moment.title}</h2>
           {/* Meta-línea estilo Polarsteps: "🇲🇾 MALASIA · 8 de abril de 2026". El país
-              solo está si ya se resolvió (CERRADOS con coord); si no, queda solo la
-              fecha. El separador "·" únicamente cuando hay ambos. */}
+              solo está si ya se resolvió; si no, queda solo la fecha. El separador "·"
+              únicamente cuando hay ambos. */}
           {(country || date) && (
             <p className={styles.meta}>
               {country && (
@@ -193,9 +282,14 @@ export function MomentSheet({ moment, canEdit = false, onClose, onPlay }: Props)
             </p>
           )}
 
-          {/* Descripción del día (columna `challenges.description`). Se muestra a
-              todos; el DUEÑO puede editarla en línea (textarea → guardar). Si está
-              vacía, solo el dueño ve el incentivo para añadirla. */}
+          {/* Cuenta atrás VIVA solo si el reto está EN JUEGO (un recuerdo no caduca). */}
+          {isActive && (
+            <div className={styles.countdown}>
+              <Countdown deadlineAt={moment.deadlineAt} />
+            </div>
+          )}
+
+          {/* Descripción del día. Se muestra a todos; el DUEÑO la edita en línea. */}
           {editing ? (
             <div className={styles.descEdit}>
               <textarea
@@ -244,19 +338,113 @@ export function MomentSheet({ moment, canEdit = false, onClose, onPlay }: Props)
           ) : null}
 
           {/* Social ligero. Lo REAL es el contador de adivinadores (derivado de
-              votos); ❤/💬 se omiten en v1 por no existir en BD (ver resumen). */}
-          <p className={styles.social}>
-            <span className={styles.socialIcon} aria-hidden="true">
-              👤
-            </span>
-            {moment.guessedCount}{' '}
-            {moment.guessedCount === 1 ? 'persona adivinó' : 'personas adivinaron'}
-          </p>
+              votos); solo tiene sentido en un reto (un recuerdo no se "adivina"). */}
+          {isReto || isActive ? (
+            <p className={styles.social}>
+              <span className={styles.socialIcon} aria-hidden="true">
+                👤
+              </span>
+              {moment.guessedCount}{' '}
+              {moment.guessedCount === 1 ? 'persona adivinó' : 'personas adivinaron'}
+            </p>
+          ) : null}
 
           {isActive && onPlay && (
             <Button size="lg" fullWidth onClick={onPlay} className={styles.cta}>
               Adivina →
             </Button>
+          )}
+
+          {/* CONVERTIR EN RETO — solo el dueño, solo sobre un RECUERDO. Esconde el
+              lugar (ahora respuesta a adivinar) con plazo y tiempo por jugada. */}
+          {canEdit && isRecuerdo && !promoting && (
+            <Button
+              size="lg"
+              fullWidth
+              variant="secondary"
+              onClick={startPromote}
+              className={styles.cta}
+            >
+              <Icon icon={Target} size={16} /> Convertir en reto
+            </Button>
+          )}
+
+          {canEdit && isRecuerdo && promoting && (
+            <section className={styles.promote}>
+              <header className={styles.promoteHead}>
+                <span className={styles.promoteTitle}>🎯 Convertir en reto</span>
+                <span className={styles.promoteHint}>
+                  Esconde el lugar y que adivinen dónde es, con cuenta atrás.
+                </span>
+              </header>
+
+              <div className={styles.promoteField}>
+                <span className={styles.promoteLabel}>Punto a adivinar</span>
+                <MapPicker
+                  value={answer}
+                  flyTo={answer}
+                  center={answer ?? SPAIN}
+                  zoom={answer ? 13 : 5}
+                  onPick={setAnswer}
+                />
+                {!answer && (
+                  <span className={styles.promoteWarn}>
+                    Marca en el mapa el sitio que habrá que adivinar.
+                  </span>
+                )}
+              </div>
+
+              <div className={styles.promoteField}>
+                <span className={styles.promoteLabel}>Duración: {durationStop.label}</span>
+                <input
+                  type="range"
+                  className={styles.promoteSlider}
+                  min={0}
+                  max={DURATION_STOPS.length - 1}
+                  step={1}
+                  value={durationIndex}
+                  onChange={(e) => setDurationIndex(Number(e.target.value))}
+                  aria-label="Duración del reto"
+                  aria-valuetext={durationStop.label}
+                />
+              </div>
+
+              <div className={styles.promoteField}>
+                <span className={styles.promoteLabel}>Tiempo por jugada</span>
+                <div className={styles.promoteOptions}>
+                  {GUESS_OPTIONS.map((opt) => (
+                    <Button
+                      key={opt.label}
+                      variant={guessSeconds === opt.value ? 'primary' : 'secondary'}
+                      size="sm"
+                      aria-pressed={guessSeconds === opt.value}
+                      onClick={() => setGuessSeconds(opt.value)}
+                    >
+                      {opt.label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className={styles.descActions}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setPromoting(false)}
+                  disabled={promoteBusy}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => void confirmPromote()}
+                  loading={promoteBusy}
+                  disabled={!answer}
+                >
+                  Crear reto
+                </Button>
+              </div>
+            </section>
           )}
         </div>
       </div>

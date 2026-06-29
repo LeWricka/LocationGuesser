@@ -49,10 +49,16 @@ interface TripData {
   refresh: () => Promise<void>
 }
 
-/** Estado de un momento sin mirar lat/lng: práctica > activo > cerrado. */
+/**
+ * Estado de un momento sin mirar lat/lng. Un RECUERDO (`is_challenge = false`) no
+ * tiene juego ni plazo → `recuerdo`, antes de mirar nada más. Para los RETOS:
+ * práctica > activo > cerrado.
+ */
 function statusOf(challenge: ChallengeForPlay, now: Date): MomentStatus {
+  // Sin reto, o sin plazo (no debería pasar en un reto): es un recuerdo, sin juego.
+  if (!challenge.is_challenge || challenge.deadline_at == null) return 'recuerdo'
   if (isPracticeChallenge(challenge.deadline_at)) return 'practice'
-  return isLive(challenge, now) ? 'active' : 'closed'
+  return isLive({ deadline_at: challenge.deadline_at }, now) ? 'active' : 'closed'
 }
 
 /**
@@ -136,15 +142,24 @@ export function useTripData(groupId: string): TripData {
     }
   }, [groupId, refresh])
 
-  // Coordenadas candidatas a bandera: SOLO momentos CERRADOS con respuesta visible
-  // (los activos no tienen coord = anti-spoiler). Derivado de challenges+answers, NO
-  // de `moments`, para no crear un bucle con el estado de país que aquí se rellena.
+  // Coordenadas candidatas a bandera: momentos con un lugar VISIBLE en el mapa.
+  //  - RECUERDO: su lugar (`place_lat`/`place_lng`), siempre visible.
+  //  - RETO CERRADO: su respuesta (`answersById`), ya revelada.
+  // Los retos ACTIVOS no entran (su coord es spoiler). Derivado de challenges+answers,
+  // NO de `moments`, para no crear un bucle con el estado de país que aquí se rellena.
   const flagTargets = useMemo<{ challengeId: string; lat: number; lng: number }[]>(() => {
     if (!challenges) return []
     const now = new Date()
     const out: { challengeId: string; lat: number; lng: number }[] = []
     for (const ch of challenges) {
-      if (statusOf(ch, now) !== 'closed') continue
+      const status = statusOf(ch, now)
+      if (status === 'recuerdo') {
+        if (ch.place_lat != null && ch.place_lng != null) {
+          out.push({ challengeId: ch.id, lat: ch.place_lat, lng: ch.place_lng })
+        }
+        continue
+      }
+      if (status !== 'closed') continue
       const answer = answersById.get(ch.id)
       if (answer) out.push({ challengeId: ch.id, lat: answer.lat, lng: answer.lng })
     }
@@ -195,19 +210,26 @@ export function useTripData(groupId: string): TripData {
     if (!challenges) return []
     const now = new Date()
     return [...challenges].reverse().map((ch) => {
+      const status = statusOf(ch, now)
       const answer = answersById.get(ch.id)
+      // Coordenada a pintar: el lugar VISIBLE del recuerdo (place_*) si es recuerdo;
+      // si es reto, su respuesta solo cuando ya es visible (cerrado/ya jugado).
+      const coord =
+        status === 'recuerdo'
+          ? { lat: ch.place_lat, lng: ch.place_lng }
+          : { lat: answer?.lat ?? null, lng: answer?.lng ?? null }
       return {
         challengeId: ch.id,
         title: ch.title,
         description: ch.description,
-        status: statusOf(ch, now),
+        status,
+        isChallenge: ch.is_challenge,
         date: ch.created_at,
         deadlineAt: ch.deadline_at,
         imageUrl: imageUrlById[ch.id] ?? null,
         imagePath: ch.image_path,
-        // Solo los cerrados con respuesta visible llevan coordenada (anti-spoiler).
-        lat: answer?.lat ?? null,
-        lng: answer?.lng ?? null,
+        lat: coord.lat,
+        lng: coord.lng,
         guessedCount: guessedCountById.get(ch.id)?.size ?? 0,
         guessSeconds: ch.guess_seconds,
         svPanoId: ch.sv_pano_id,
@@ -217,13 +239,15 @@ export function useTripData(groupId: string): TripData {
     })
   }, [challenges, answersById, imageUrlById, guessedCountById, countryById])
 
-  // Ruta: los momentos cerrados con lat/lng, en el mismo orden cronológico ASC.
+  // Ruta: los momentos con un lugar VISIBLE en el mapa, en orden cronológico ASC.
+  // Entran los RECUERDOS con lugar (place_*) y los RETOS CERRADOS con respuesta
+  // revelada; los retos ACTIVOS no (su coord es spoiler → llevan lat/lng null).
   const route = useMemo<RoutePoint[]>(
     () =>
       moments
         .filter(
           (m): m is Moment & { lat: number; lng: number } =>
-            m.status === 'closed' && m.lat != null && m.lng != null,
+            (m.status === 'closed' || m.status === 'recuerdo') && m.lat != null && m.lng != null,
         )
         .map((m) => ({
           challengeId: m.challengeId,

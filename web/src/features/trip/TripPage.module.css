@@ -186,6 +186,13 @@
   display: none;
 }
 
+/* Panel "a sangre" (Diario): el mapa lo llena de borde a borde y el dock de momentos
+   flota encima, así que NO lleva padding ni scroll vertical (el mapa ocupa todo). */
+.panelBleed {
+  padding: 0;
+  overflow: hidden;
+}
+
 /* ---- Edge-peek: flecha sutil que late hacia la página vecina ---- */
 .peek {
   position: absolute;
