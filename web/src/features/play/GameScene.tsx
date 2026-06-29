@@ -1,9 +1,10 @@
 import { type RefObject } from 'react'
+import { ArrowLeft, Check, Compass, House, MapPin, Maximize2, X } from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { SceneImage } from './SceneImage'
 import type { LatLng } from '../../lib/geo'
-import { Badge, BackHomeButton, Button, CountdownRing, Lightbox, Modal, Row, Stack } from '../../ui'
+import { BackHomeButton, Button, CountdownRing, Icon, Lightbox, Modal, Row, Stack } from '../../ui'
 import styles from './PlayChallenge.module.css'
 
 // Escena de Street View del reto (lo que de verdad se monta a pantalla completa).
@@ -48,7 +49,7 @@ interface Props {
   backLabel: string
   onBack: () => void
 
-  // --- Mapa de adivinar (hoja inferior) ---
+  // --- Mapa de adivinar (mini-mapa expansible) ---
   guess: LatLng | null
   onGuess: (p: LatLng) => void
   mapOpen: boolean
@@ -84,6 +85,13 @@ interface Props {
 // jugadores. Es 100% presentacional; toda la lógica (votar, reloj, anti-trampa)
 // vive en el padre. En modo previa el padre deshabilita confirmar y no monta el
 // overlay de Empezar, así el flujo real de votar no se toca.
+//
+// Patrón de adivinar (GeoGuessr / Street View): un MINI-MAPA persistente vive en la
+// esquina inferior derecha (siempre visible, sin solaparse con nada). Al tocarlo se
+// EXPANDE a una hoja casi a pantalla completa para colocar el pin con precisión y
+// confirmar. La MISMA instancia de mapa se conserva entre los dos estados (un solo
+// `PlayMap` montado): así no se pierde el zoom/posición ni se paga doble el coste
+// de Google Maps; solo cambia el contenedor (mini ↔ expandido).
 export function GameScene({
   title,
   scene,
@@ -144,7 +152,8 @@ export function GameScene({
               skeletonRadius="sm"
             />
             <span className={styles.photoExpandHint} aria-hidden="true">
-              ⤢ Ampliar
+              <Icon icon={Maximize2} size={15} />
+              Ampliar
             </span>
           </button>
         ) : (
@@ -179,7 +188,7 @@ export function GameScene({
             skeletonRadius="md"
           />
           <span className={styles.hintExpand} aria-hidden="true">
-            ⤢
+            <Icon icon={Maximize2} size={13} />
           </span>
         </button>
       )}
@@ -194,7 +203,7 @@ export function GameScene({
             aria-label="Volver a la posición inicial"
             title="Volver a la posición inicial"
           >
-            ⌂
+            <Icon icon={House} size={20} />
           </button>
           <button
             type="button"
@@ -203,45 +212,43 @@ export function GameScene({
             aria-label="Enderezar la vista al norte"
             title="Enderezar (norte)"
           >
-            🧭
+            <Icon icon={Compass} size={20} />
           </button>
         </div>
       )}
 
-      {/* Abajo-derecha: FAB del mapa. Abre la hoja inferior para adivinar. */}
-      <button
-        type="button"
-        className={styles.mapFab}
-        onClick={onOpenMap}
-        aria-label="Abrir el mapa para adivinar"
-      >
-        <span aria-hidden="true">🗺️</span>
-        {guess && <span className={styles.fabDot} aria-hidden="true" />}
-      </button>
-
-      {/* Hoja inferior con el mapa de adivinar. El mapa se mantiene SIEMPRE montado
-          (solo se traslada fuera de pantalla al cerrar) para conservar zoom/posición. */}
+      {/* Velo tras la hoja expandida (oscurece la escena, capta el toque para
+          cerrar). Solo cuenta cuando el mapa está expandido. */}
       <div
         className={`${styles.sheetScrim} ${mapOpen ? styles.sheetScrimOpen : ''}`}
         onClick={onCloseMap}
         aria-hidden={!mapOpen}
       />
-      <section
-        className={`${styles.sheet} ${mapOpen ? styles.sheetOpen : ''}`}
-        role="dialog"
-        aria-label="Mapa para adivinar"
-        aria-hidden={!mapOpen}
-      >
-        <div className={styles.sheetHandle} aria-hidden="true" />
-        <button
-          type="button"
-          className={styles.sheetClose}
-          onClick={onCloseMap}
-          aria-label="Cerrar el mapa"
-        >
-          ✕
-        </button>
-        <div className={styles.sheetMap}>
+
+      {/* MINI-MAPA EXPANSIBLE (patrón GeoGuessr): un único contenedor con UNA sola
+          instancia de PlayMap que se MORFEA entre dos estados — mini (esquina) y
+          expandido (hoja). El mapa permanece montado siempre, así conserva el zoom
+          y la posición al expandir/cerrar y no se paga doble el coste de Google. */}
+      <div className={`${styles.mapShell} ${mapOpen ? styles.mapShellOpen : styles.mapShellMini}`}>
+        {/* Cabecera del mapa expandido: título + cerrar. Solo visible al expandir. */}
+        {mapOpen && (
+          <div className={styles.sheetHeader}>
+            <span className={styles.sheetTitle}>
+              <Icon icon={MapPin} size={18} />
+              ¿Dónde es?
+            </span>
+            <button
+              type="button"
+              className={styles.sheetClose}
+              onClick={onCloseMap}
+              aria-label="Cerrar el mapa"
+            >
+              <Icon icon={X} size={20} />
+            </button>
+          </div>
+        )}
+
+        <div className={styles.mapCanvas}>
           <PlayMap
             guess={guess}
             answer={null}
@@ -249,27 +256,60 @@ export function GameScene({
             onPick={onGuess}
             meAvatar={meAvatar}
             meUserId={meUserId}
+            // Mini = teaser (sin gestos ni zoom); expandido = interacción real. El
+            // prop reactivo cambia las opciones del mapa sin remontarlo.
+            preview={!mapOpen}
           />
-        </div>
-        <div className={styles.sheetFooter}>
-          {guess ? (
-            <Row gap={2} align="center">
-              <Badge tone="accent">📍 Tu pin</Badge>
-              <span className={styles.coords}>
-                {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
+          {/* En mini, una capa de toque sobre el mapa lo EXPANDE (un solo gesto,
+              cero ambigüedad sobre dónde se adivina). El mapa en `preview` no
+              captura clics, así que este botón recibe el toque limpio. */}
+          {!mapOpen && (
+            <button
+              type="button"
+              className={styles.miniTap}
+              onClick={onOpenMap}
+              aria-label="Abrir el mapa para adivinar"
+            >
+              <span className={styles.miniHint}>
+                <Icon icon={MapPin} size={15} />
+                {guess ? 'Ajustar pin' : 'Adivinar'}
               </span>
-            </Row>
-          ) : (
-            <span className={styles.status}>Toca el mapa para colocar tu pin.</span>
+              {guess && <span className={styles.miniDot} aria-hidden="true" />}
+            </button>
           )}
-          <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
-            ✓ Confirmar y revelar
-          </Button>
-          <Button variant="secondary" fullWidth onClick={onCloseMap}>
-            ← Volver a {hasStreetView ? 'Street View' : 'la imagen'}
-          </Button>
         </div>
-      </section>
+
+        {/* Pie del mapa expandido: estado del pin + confirmar / volver. */}
+        {mapOpen && (
+          <div className={styles.sheetFooter}>
+            {guess ? (
+              <Row gap={2} align="center">
+                <span className={styles.pinChip}>
+                  <Icon icon={MapPin} size={14} />
+                  Tu pin
+                </span>
+                <span className={styles.coords}>
+                  {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
+                </span>
+              </Row>
+            ) : (
+              <span className={styles.status}>Toca el mapa para colocar tu pin.</span>
+            )}
+            <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
+              <span className={styles.btnInner}>
+                <Icon icon={Check} size={18} />
+                Confirmar y revelar
+              </span>
+            </Button>
+            <Button variant="secondary" fullWidth onClick={onCloseMap}>
+              <span className={styles.btnInner}>
+                <Icon icon={ArrowLeft} size={18} />
+                Volver a {hasStreetView ? 'Street View' : 'la imagen'}
+              </span>
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* Visor a pantalla completa de la foto del reto. */}
       {(imageUrl || hintPhotoUrl) && (

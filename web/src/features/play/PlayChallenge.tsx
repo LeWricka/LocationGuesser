@@ -27,12 +27,14 @@ import { useSignedImage } from '../../lib/useSignedImage'
 // Rasterización + compartir reutilizadas de la tarjeta de clasificación (import
 // READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
+import { Eye, EyeOff, Globe, RotateCcw, Share2, TriangleAlert } from 'lucide-react'
 import {
   BackHomeButton,
   Button,
   Card,
   ChallengePhoto,
   CountUp,
+  Icon,
   Row,
   ScoreRing,
   Skeleton,
@@ -619,9 +621,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             onClose: goBack,
             body: (
               <>
-                <span aria-hidden="true" style={{ fontSize: '2.5rem' }}>
-                  🌍
-                </span>
+                <Icon icon={Globe} size={40} className={styles.startGlyph} />
                 <p>
                   Cuando pulses <strong>Empezar</strong>, podrás{' '}
                   {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y abrir el mapa para
@@ -675,7 +675,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           <Stack gap={4}>
             {timedOut ? (
               <Stack gap={2}>
-                <strong>⏰ No diste a tiempo</strong>
+                <strong>No diste a tiempo</strong>
                 <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
               </Stack>
             ) : result ? (
@@ -727,7 +727,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 en el marcador se ve junto a mi nombre). */}
             {iLeftApp && (
               <p className={styles.leftAppNotice} role="note">
-                ⚠️ Saliste de la app durante la jugada
+                <Icon icon={TriangleAlert} size={15} />
+                Saliste de la app durante la jugada
               </p>
             )}
 
@@ -742,7 +743,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 onClick={() => void onShareResult()}
                 loading={sharingResult}
               >
-                📤 Compartir mi resultado
+                <span className={styles.btnInner}>
+                  <Icon icon={Share2} size={18} />
+                  Compartir mi resultado
+                </span>
               </Button>
             )}
 
@@ -765,11 +769,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   onClick={() => setShowStreetView((v) => !v)}
                   aria-expanded={showStreetView}
                 >
-                  {showStreetView
-                    ? '✕ Ocultar'
-                    : hasStreetView
-                      ? '👀 Ver Street View'
-                      : '👀 Ver la foto'}
+                  <span className={styles.btnInner}>
+                    <Icon icon={showStreetView ? EyeOff : Eye} size={16} />
+                    {showStreetView ? 'Ocultar' : hasStreetView ? 'Ver Street View' : 'Ver la foto'}
+                  </span>
                 </Button>
                 {showStreetView && (
                   <div className={styles.secondaryScene}>
@@ -799,7 +802,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 tras ver la respuesta sería trampa). */}
             {isPractice && (
               <Button variant="secondary" fullWidth onClick={() => void replay()}>
-                🔄 Volver a jugar
+                <span className={styles.btnInner}>
+                  <Icon icon={RotateCcw} size={18} />
+                  Volver a jugar
+                </span>
               </Button>
             )}
 

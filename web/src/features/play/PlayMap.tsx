@@ -39,6 +39,10 @@ interface Props {
   meAvatar?: string | null
   /** Id del jugador: ancla el avatar por defecto cuando no hay avatar elegido. */
   meUserId: string
+  /** Modo mini-mapa: oculta el control de zoom y desactiva el gesto. Se usa para
+   * la vista persistente en miniatura (GeoGuessr): es solo una previa "tócame
+   * para adivinar", la interacción de verdad ocurre al expandirla. */
+  preview?: boolean
 }
 
 // Icono emoji para el Marker clásico: el emoji va como `label` centrado sobre un
@@ -166,7 +170,35 @@ function AnswerMarker({ answer }: { answer: LatLng }) {
   )
 }
 
-export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: Props) {
+// El mini-mapa expansible cambia de tamaño con una transición CSS. Google Maps
+// ancla la esquina superior-izquierda al redimensionar el contenedor (no
+// recentra), así que el mundo quedaría descolocado tras expandir. Aquí
+// observamos el tamaño del contenedor y RE-CENTRAMOS en el centro previo en cada
+// cambio, de modo que la vista se conserve estable mini ↔ expandido.
+function KeepCenterOnResize() {
+  const map = useMap()
+  useEffect(() => {
+    if (!map) return
+    const el = map.getDiv()
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let raf = 0
+    const observer = new ResizeObserver(() => {
+      const center = map.getCenter()
+      if (!center) return
+      // Reaplicar el centro tras el reflow del frame (Google ya midió el div nuevo).
+      cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() => map.setCenter(center))
+    })
+    observer.observe(el)
+    return () => {
+      cancelAnimationFrame(raf)
+      observer.disconnect()
+    }
+  }, [map])
+  return null
+}
+
+export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId, preview }: Props) {
   return (
     <Map
       className="lg-map"
@@ -174,8 +206,10 @@ export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: P
       defaultZoom={WORLD_ZOOM}
       minZoom={2}
       // Un dedo mueve el mapa en móvil (sin el banner "usa dos dedos"), igual que
-      // el worldCopyJump/arrastre fluido de antes.
-      gestureHandling="greedy"
+      // el worldCopyJump/arrastre fluido de antes. En el mini-mapa (preview) se
+      // desactiva el gesto: es un teaser "tócame para adivinar", no se interactúa
+      // ahí (un arrastre fortuito al rozarlo no debe mover la vista de adivinar).
+      gestureHandling={preview ? 'none' : 'greedy'}
       // Mapa estándar de Google → POIs/bares visibles por defecto (lo que pide el
       // juego). Sin mapId: usamos Marker clásico, no AdvancedMarker.
       // Atelier: basemap CLARO tipo atlas (roadmap), nunca el oscuro; forzamos el
@@ -183,15 +217,20 @@ export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: P
       mapTypeId="roadmap"
       colorScheme="LIGHT"
       disableDefaultUI
-      zoomControl
+      // Sin chrome de Google en el mini-mapa (es un teaser); zoom solo al expandir.
+      zoomControl={!preview}
       clickableIcons={false}
-      // Colocar/mover el pin tocando el mapa, solo mientras no esté bloqueado.
+      // Colocar/mover el pin tocando el mapa, solo mientras no esté bloqueado ni en
+      // modo mini-mapa (ahí el toque lo gestiona el contenedor para EXPANDIR).
       onClick={(e) => {
-        if (locked) return
+        if (locked || preview) return
         const latLng = e.detail.latLng
         if (latLng) onPick({ lat: latLng.lat, lng: latLng.lng })
       }}
     >
+      {/* Solo en el mapa de adivinar (no bloqueado): conserva el centro cuando el
+          mini-mapa se expande a hoja. El mapa de resultado es de tamaño fijo. */}
+      {!locked && <KeepCenterOnResize />}
       {guess && <Marker position={guess} icon={guessIcon(meAvatar, meUserId)} clickable={false} />}
       {answer && <AnswerMarker answer={answer} />}
       {guess && answer && <DrawnLine guess={guess} answer={answer} />}

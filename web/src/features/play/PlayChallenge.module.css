@@ -158,53 +158,7 @@
   transform: scale(0.94);
 }
 
-/* FAB del mapa, CENTRO inferior: círculo sólido salvia/pizarra (sin gradiente ni
- * glow). Va centrado (no a la derecha) para no pisar el control +/- del Street
- * View, que Google pinta abajo-derecha. */
-.mapFab {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
-  z-index: 3;
-  width: 64px;
-  height: 64px;
-  display: grid;
-  place-items: center;
-  font-size: 1.75rem;
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  box-shadow: var(--shadow-md), var(--ring-contact);
-  cursor: pointer;
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-.mapFab:hover {
-  background: var(--color-accent-hover);
-  box-shadow: var(--shadow-lg), var(--ring-contact);
-}
-.mapFab:active {
-  transform: translateX(-50%) scale(0.94);
-}
-
-/* Punto que avisa de que ya hay un pin colocado (sin abrir el mapa). Más grande y
-   con anillo + sombra para que se lea claramente sobre el FAB salvia. */
-.fabDot {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
-  border-radius: var(--radius-full);
-  background: var(--color-success);
-  border: 2px solid var(--color-bg);
-  box-shadow: var(--shadow-sm);
-}
-
-/* Velo tras la hoja (oscurece la escena, capta el toque para cerrar). */
+/* Velo tras la hoja expandida (oscurece la escena, capta el toque para cerrar). */
 .sheetScrim {
   position: absolute;
   inset: 0;
@@ -221,67 +175,150 @@
   visibility: visible;
 }
 
-/* Hoja inferior con el mapa de adivinar: sube desde abajo casi a pantalla. */
-.sheet {
+/* ==========================================================================
+ * MINI-MAPA EXPANSIBLE (patrón GeoGuessr / Street View).
+ * UN solo contenedor con UNA instancia de PlayMap, que se MORFEA entre dos
+ * estados con una sola transición: mini (esquina inferior derecha, siempre
+ * visible) ↔ expandido (hoja inferior casi a pantalla, para colocar el pin).
+ * El mapa permanece montado siempre → conserva zoom/posición y no se paga doble
+ * el coste de Google Maps. Animamos posición/tamaño/radio (no display).
+ * ======================================================================== */
+.mapShell {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
   z-index: 5;
-  height: min(92svh, 760px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background: var(--color-surface);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding-bottom: env(safe-area-inset-bottom);
-  transform: translateY(100%);
-  transition: transform var(--duration-slow) var(--ease-emphasized);
-}
-.sheetOpen {
-  transform: translateY(0);
+  transition:
+    inset var(--duration-slow) var(--ease-emphasized),
+    width var(--duration-slow) var(--ease-emphasized),
+    height var(--duration-slow) var(--ease-emphasized),
+    border-radius var(--duration-slow) var(--ease-emphasized),
+    box-shadow var(--duration-slow) var(--ease-emphasized);
 }
 
-.sheetHandle {
-  width: 44px;
-  height: 5px;
-  margin: var(--space-2) auto 0;
-  border-radius: var(--radius-full);
-  background: var(--color-border-strong);
+/* Estado MINI: tarjeta enmarcada (chrome Atelier) anclada abajo-derecha. Va a la
+   derecha (no al centro) para no pisar el control +/- que Google pinta ahí cuando
+   se expande, y deja la izquierda libre para los controles del panorama. */
+.mapShellMini {
+  right: calc(var(--space-3) + env(safe-area-inset-right));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  width: clamp(116px, 34vw, 188px);
+  height: clamp(116px, 34vw, 188px);
+  border-radius: var(--radius-md);
+  border: 2px solid var(--chrome-bg);
+  box-shadow: var(--shadow-lg), var(--ring-contact);
+  cursor: pointer;
+}
+
+/* Estado EXPANDIDO: hoja inferior casi a pantalla completa. */
+.mapShellOpen {
+  inset: auto 0 0 0;
+  width: 100%;
+  height: min(92svh, 760px);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-lg);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Cabecera del mapa expandido: título "¿Dónde es?" + cerrar. */
+.sheetHeader {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2) var(--space-4);
+}
+
+.sheetTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+.sheetTitle svg {
+  color: var(--color-accent);
 }
 
 .sheetClose {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-3);
-  z-index: 1;
+  flex-shrink: 0;
   width: var(--tap-target);
   height: var(--tap-target);
   display: grid;
   place-items: center;
-  font-size: var(--font-size-lg);
   border: none;
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
+  transition: color var(--transition-fast);
 }
 .sheetClose:hover {
   color: var(--color-text);
 }
 
-/* El mapa llena la hoja; se monta ya a este tamaño → carga sin gris. */
-.sheetMap {
+/* Lienzo del mapa: llena el espacio disponible del shell en ambos estados. En
+   mini es la tarjeta entera; expandido, el hueco entre cabecera y pie. */
+.mapCanvas {
+  position: relative;
   flex: 1;
   min-height: 0;
-  padding: var(--space-3) var(--space-3) 0;
 }
-.sheetMap :global(.lg-map) {
-  height: 100%;
+.mapShellOpen .mapCanvas {
+  margin: 0 var(--space-3);
   border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.mapCanvas :global(.lg-map) {
+  height: 100%;
   box-shadow: none;
+}
+
+/* Capa de toque del mini-mapa: cubre la tarjeta y la EXPANDE al tocarla. El mapa
+   en modo `preview` no captura clics, así que el toque llega limpio aquí. */
+.miniTap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  padding: var(--space-2);
+  border: none;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+/* Pastilla "Adivinar" sobre el mini-mapa: deja claro que se toca para adivinar
+   (cero ambigüedad sobre dónde se hace la jugada). */
+.miniHint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Punto que avisa de que ya hay un pin colocado, sobre el mini-mapa. */
+.miniDot {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .sheetFooter {
@@ -292,8 +329,28 @@
   padding: var(--space-3) var(--space-4) var(--space-4);
 }
 
+/* Chip "Tu pin" del pie (coherente con el Badge tone=accent del kit). */
+.pinChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Icono + texto centrados dentro de un botón del kit. */
+.btnInner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .sheet {
+  .mapShell {
     transition: none;
   }
   .sheetScrim {
@@ -464,6 +521,11 @@
   text-align: center;
 }
 
+/* Glifo del overlay "Empezar": el globo en el acento Pizarra. */
+.startGlyph {
+  color: var(--color-accent);
+}
+
 /* Lienzo de captura de la tarjeta de "compartir mi resultado": vive a tamaño real
    (1080px) FUERA del viewport. No usamos display:none (mediría 0×0 y html-to-image
    fallaría) ni visibility:hidden; lo sacamos del flujo con posición fija y un
@@ -486,5 +548,8 @@
   background: var(--color-warning-soft);
   color: var(--color-warning);
   font-size: var(--font-size-sm);
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
 }
