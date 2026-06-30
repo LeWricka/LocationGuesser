@@ -14,3 +14,9 @@ dist/
 
 # Worktrees de agentes paralelos
 .claude/worktrees/
+
+# Capturas de la galería visual (PNGs generados por `npm run gallery:shots`)
+web/gallery-shots/
+# Artefactos de Playwright
+web/test-results/
+web/playwright-report/

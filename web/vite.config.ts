@@ -1,4 +1,5 @@
-import { defineConfig } from 'vite'
+import { fileURLToPath } from 'node:url'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
@@ -7,10 +8,63 @@ import { VitePWA } from 'vite-plugin-pwa'
 const PAPER = '#f6f7f9' // background_color (papel claro de la app)
 const ACCENT = '#34506b' // theme_color (azul pizarra de marca)
 
+// GALERÍA (issue #364): entry de DESARROLLO para revisar visualmente cada pantalla
+// con fixtures deterministas (sin login ni red). Se activa SOLO con GALLERY=1 (lo
+// pone `npm run gallery:shots`); con eso (1) añadimos gallery.html como input de
+// Rollup y (2) aliaseamos la capa de datos y los paquetes de mapas a sus dobles de
+// `src/gallery/`. Sin la env, la app de producción no se ve afectada en absoluto.
+const galleryMode = process.env.GALLERY === '1'
+const resolvePath = (rel: string) => fileURLToPath(new URL(rel, import.meta.url))
+
+// Redirige los módulos reales a sus dobles cuando se compila la galería. Lo hacemos
+// con un `resolveId` (no con resolve.alias) porque los imports de la capa de datos
+// son RELATIVOS (`./supabase`, `../../lib/session`): un alias por string no casa de
+// forma fiable, pero sí podemos inspeccionar el id YA RESUELTO y redirigir por sufijo
+// de ruta. Solo se enchufa con GALLERY=1, así producción no se toca.
+function galleryDoublesPlugin(): Plugin {
+  const bareDoubles: Record<string, string> = {
+    'maplibre-gl/dist/maplibre-gl.css': resolvePath('./src/gallery/stubs/empty.css'),
+    'maplibre-gl': resolvePath('./src/gallery/stubs/maplibre-gl.ts'),
+    '@vis.gl/react-google-maps': resolvePath('./src/gallery/stubs/react-google-maps.tsx'),
+  }
+  const fileDoubles: { suffix: string; target: string }[] = [
+    { suffix: '/lib/supabase.ts', target: resolvePath('./src/gallery/fakeSupabase.ts') },
+    { suffix: '/lib/session.tsx', target: resolvePath('./src/gallery/FakeSession.tsx') },
+  ]
+  return {
+    name: 'gallery-doubles',
+    enforce: 'pre',
+    async resolveId(source, importer) {
+      // Paquetes de mapas: por nombre exacto (specifier "bare").
+      if (source in bareDoubles) return bareDoubles[source]
+      // Capa de datos: resolvemos el import relativo a su fichero real y, si su ruta
+      // termina en uno de los sufijos vigilados, devolvemos el doble en su lugar.
+      const resolved = await this.resolve(source, importer, { skipSelf: true })
+      if (!resolved) return null
+      const hit = fileDoubles.find((d) => resolved.id.endsWith(d.suffix))
+      // Evita el bucle: no redirijas el propio doble (que importa session-context, etc.).
+      if (hit && !resolved.id.includes('/src/gallery/')) return hit.target
+      return null
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  build: galleryMode
+    ? {
+        rollupOptions: {
+          input: {
+            main: resolvePath('./index.html'),
+            gallery: resolvePath('./gallery.html'),
+          },
+        },
+      }
+    : {},
   plugins: [
     react(),
+    // Dobles de la galería (solo con GALLERY=1; si no, no hace nada).
+    ...(galleryMode ? [galleryDoublesPlugin()] : []),
     // PWA ADITIVA: hace la app instalable y registra el service worker que
     // precachea el app-shell. `autoUpdate` = el SW nuevo toma el control en
     // cuanto está listo, sin pedir nada al usuario (clientsClaim + skipWaiting).
