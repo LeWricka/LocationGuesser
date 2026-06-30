@@ -62,6 +62,7 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
           route={route}
           activeMoment={activeMoment}
           selectedChallengeId={selectedId}
+          playing={playing}
           onSelectMoment={onSelectFromMap}
         />
       </div>
