@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "design-lint": "node scripts/design-lint.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",

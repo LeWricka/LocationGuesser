@@ -94,7 +94,9 @@
   }
   .panel {
     width: min(480px, 100%);
-    max-height: calc(100vh - var(--space-7));
+    max-height: calc(
+      100vh - var(--space-7)
+    ); /* design-lint-allow: max-height calc, no alto de contenedor */
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
