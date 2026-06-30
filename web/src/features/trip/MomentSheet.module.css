@@ -1,7 +1,9 @@
 /*
- * Hoja de detalle (bottom sheet) autocontenida. Velo a pantalla completa + panel
- * que sube desde abajo. El z-index la pone por encima del chrome del viaje pero
- * dentro del flujo normal de la app (no compite con el Modal compartido).
+ * Detalle del momento FOTO-PROTAGONISTA (issue #313). Vista inmersiva: la foto
+ * manda a sangre arriba (con velo editorial encima) y debajo un cuerpo de
+ * artículo sobre papel (descripción, galería "tira de fotogramas", tarjeta-mapa,
+ * acciones). Sigue siendo una hoja autocontenida que sube desde abajo y se cierra
+ * arrastrando, por encima del chrome del viaje, sin tocar el Modal compartido.
  */
 .overlay {
   position: fixed;
@@ -20,33 +22,33 @@
   /* Tope al alto del viewport (svh = visible, sin contar la barra del navegador
      móvil): la hoja NUNCA es más alta que la pantalla, así que nada empuja al
      fondo a hacer scroll. El alto real lo da el contenido hasta ese tope. */
-  max-height: 92svh;
+  max-height: 96svh;
   display: flex;
   flex-direction: column;
   /* min-height:0 permite que el hijo scrollable (.content) se encoja y reciba el
      scroll en vez de desbordar el panel (regla flexbox). */
   min-height: 0;
   background: var(--color-surface);
-  /* Hairline de luz cenital en el borde superior: la hoja "capta luz" al subir,
-     como un material real (no un rectángulo opaco). */
+  /* Hairline de luz cenital en el borde superior: la hoja "capta luz" al subir. */
   border-top: 1px solid var(--color-surface-sheen);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
-  /* Sombra proyectada HACIA ARRIBA: la hoja flota sobre el mapa que asoma (token
-     del pase de craft), no una caja pegada al borde inferior. */
+  /* Sombra proyectada HACIA ARRIBA: la hoja flota sobre el fondo (token del craft). */
   box-shadow: var(--shadow-sheet);
-  /* Sube desde abajo con la curva enfatizada (decelera al final): el "asentado"
-     premium de la referencia. No usamos --ease-spring aquí porque su overshoot
-     pasaría de translateY(0) y dejaría asomar un sliver de velo bajo la hoja; el
-     muelle lo damos con un pelín de escala en el contenido (.content). */
+  /* Sube desde abajo con la curva enfatizada (decelera al final). */
   animation: lg-sheet-rise var(--duration-slower) var(--ease-emphasized) both;
-  /* Respeta el notch inferior. */
-  padding-bottom: env(safe-area-inset-bottom);
+  /* La foto a sangre llega al borde redondeado: recortamos el desborde. */
   overflow: hidden;
 }
 
-/* Zona de gesto del asa: ancha para agarrar fácil con el pulgar. */
+/* Zona de gesto del asa: ancha para agarrar fácil con el pulgar. Va SOBRE la foto
+   (la foto sube a sangre hasta el borde superior), así que la pintamos clara. */
 .handleZone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
   display: flex;
   justify-content: center;
   padding: var(--space-3) 0 var(--space-2);
@@ -61,12 +63,13 @@
   width: 40px;
   height: 5px;
   border-radius: var(--radius-full, 999px);
-  background: var(--color-border-strong, rgba(255, 255, 255, 0.3));
+  /* Sobre la foto: asa clara semitransparente con caída para legibilidad. */
+  background: rgba(246, 247, 249, 0.7);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
   transition: background-color var(--transition-fast);
 }
-/* Agarrar el asa la ilumina: micro-feedback de que es interactiva. */
 .handleZone:active .handle {
-  background: var(--color-text-muted);
+  background: rgba(246, 247, 249, 0.95);
 }
 @media (prefers-reduced-motion: reduce) {
   .handle {
@@ -75,94 +78,258 @@
 }
 
 /*
- * Bloque de contenido: es el ÚNICO scrollable. Si el texto es largo, el scroll
- * ocurre AQUÍ (controlado, con momentum táctil), no en toda la página. min-height:0
- * + flex:1 hace que reciba el espacio restante del panel y se encoja para scrollear.
+ * Contenido scrollable: foto a sangre (.hero) + cuerpo de artículo (.article).
+ * El scroll vive AQUÍ (momentum táctil), nunca en la página de detrás.
  */
 .content {
   flex: 1 1 auto;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: 0 var(--space-4) var(--space-5);
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  /* El scroll de la hoja no debe encadenarse al fondo al llegar a los topes. */
+  /* El scroll de la hoja no se encadena al fondo al llegar a los topes. */
   overscroll-behavior: contain;
+  /* Respeta el notch inferior. */
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Marco de la foto a sangre con el badge de estado encima. La foto NO debe comerse
-   la hoja entera: la acotamos a una fracción del viewport para que título y texto
-   quepan sin scroll en el caso común. */
-.photoWrap {
+/* ── HERO: FOTO A SANGRE ──────────────────────────────────────────────────── */
+.hero {
   position: relative;
-  flex: 0 0 auto;
-  border-radius: var(--radius-lg);
+  isolation: isolate;
+}
+
+/* Caja de la foto: alto fijo (fracción del viewport) para que una foto vertical
+   no dispare el alto y el título quepa en el velo. object-fit:cover recorta. */
+.heroPhoto {
+  position: relative;
+  height: min(62svh, 128vw);
   overflow: hidden;
-  /* La foto manda: anillo de contacto fino que define el marco contra la hoja
-     clara y una caída difusa que la "asienta" (no flota descolgada). */
-  box-shadow: var(--shadow-photo-card);
+  background: var(--color-surface-hover);
+}
+/* Fondo neutro si el momento no tiene foto (no rompemos el layout). */
+.heroPhoto[data-empty] {
+  background: linear-gradient(160deg, var(--color-surface-hover), var(--color-bg));
 }
 
-/*
- * La foto del detalle: anulamos la altura por aspect-ratio del marco y la fijamos a
- * una fracción del viewport (object-fit:cover ya recorta). Así una foto vertical no
- * dispara el alto del panel y la hoja encaja sin scroll incómodo.
- */
-.photo {
-  height: min(46svh, 60vw);
-  aspect-ratio: auto;
+/* La foto en sí: anulamos el aspect-ratio del marco y la fijamos a la caja. */
+.heroImg {
+  width: 100%;
+  height: 100%;
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: 0;
+  aspect-ratio: auto;
+  /* Ken Burns sutil: deriva lenta de escala/posición. Se anula bajo reduced-motion. */
+  animation: lg-kenburns 22s ease-in-out infinite alternate;
 }
 
-.photoBadge {
+/* Velo de legibilidad sobre la foto: oscurece arriba (chips) y abajo (info). */
+.hero::after {
+  content: '';
   position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(24, 32, 43, 0.32) 0%,
+    transparent 22%,
+    transparent 44%,
+    rgba(20, 26, 35, 0.55) 78%,
+    rgba(16, 22, 30, 0.82) 100%
+  );
 }
 
+@keyframes lg-kenburns {
+  from {
+    transform: scale(1.04);
+  }
+  to {
+    transform: scale(1.14) translate(2%, -1.5%);
+  }
+}
+
+/* Cerrar: chip flotante translúcido arriba-izquierda. */
+.heroClose {
+  position: absolute;
+  top: var(--space-5);
+  left: var(--space-4);
+  z-index: 5;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: #f6f7f9;
+  background: rgba(24, 32, 43, 0.42);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+.heroClose:hover {
+  background: rgba(24, 32, 43, 0.62);
+}
+.heroClose:focus-visible {
+  outline: 2px solid #f6f7f9;
+  outline-offset: 2px;
+}
+
+/* Contenedor del estado (badge EN JUEGO / sello Reto) arriba-derecha. */
+.heroSeal {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-4);
+  z-index: 5;
+}
+
+/* Sello dorado "Reto": pastilla cálida con relieve, sobre la foto. */
+.seal {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 12px 6px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--ink-900, #18202b);
+  background: linear-gradient(135deg, #d9bd7e, var(--medal-gold, #c9a24b));
+  box-shadow:
+    0 4px 14px rgba(169, 134, 67, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Chip de lugar (país) sobre la foto: estilo "place-chip" de la maqueta A. */
+.placeChip {
+  position: absolute;
+  bottom: var(--space-7);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 2 * var(--space-5));
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--ink-900, #18202b);
+  background: rgba(246, 247, 249, 0.94);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+}
+.placeChip svg {
+  color: var(--accent, #34506b);
+  flex: 0 0 auto;
+}
+
+/* Velo inferior con la info editorial sobre la foto. */
+.veil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: var(--space-7) var(--space-5) var(--space-5);
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(246, 247, 249, 0.86);
+}
+
+/* Título serif GRANDE (injerto C): la voz editorial sobre la foto. */
 .title {
   margin: 0;
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-black);
-  line-height: var(--line-height-tight);
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: clamp(2.5rem, 12vw, 3.5rem);
+  line-height: 0.96;
   letter-spacing: var(--letter-spacing-tight);
-  color: var(--color-text);
+  text-wrap: balance;
+  color: #f6f7f9;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Filete dorado bajo el título (detalle editorial de C). */
+.rule {
+  display: block;
+  width: 46px;
+  height: 2px;
+  margin: var(--space-4) 0 var(--space-3);
+  background: var(--medal-gold, #c9a24b);
 }
 
 .meta {
   margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: rgba(246, 247, 249, 0.82);
 }
 
-/* Bandera + país de la meta-línea: el nombre ya viene en MAYÚSCULAS de la util,
-   le damos el ligero espaciado de "eyebrow" para que lea como etiqueta de viaje. */
+/* Bandera + país de la meta-línea (nombre ya en MAYÚSCULAS de la util). */
 .country {
   letter-spacing: var(--letter-spacing-wide);
 }
 
-.social {
-  margin: 0;
+/* Cuenta atrás viva del reto en juego, sobre la foto bajo la meta-línea. */
+.countdown {
+  display: flex;
+  margin-top: var(--space-3);
+}
+
+/* ── CUERPO EDITORIAL (papel) ─────────────────────────────────────────────── */
+.article {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  /* Solapa la foto con esquinas redondeadas: el papel "monta" sobre la imagen. */
+  margin-top: calc(-1 * var(--radius-lg));
+  padding: var(--space-5) var(--space-4) var(--space-6);
+  background: var(--color-surface);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+
+/* Etiqueta de sección con filete a la derecha (injerto C). */
+.sectionLabel {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  font-size: var(--font-size-md);
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sectionLabel::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
 }
 
-.socialIcon {
-  font-size: var(--font-size-lg);
-}
-
-.cta {
-  margin-top: var(--space-2);
-}
-
-/* ---- Descripción del día (lectura + edición del dueño) ---- */
+/* ---- Descripción del día (lectura con drop-cap + edición del dueño) ---- */
 .descBlock {
   display: flex;
   flex-direction: column;
@@ -172,9 +339,19 @@
 .description {
   margin: 0;
   font-size: var(--font-size-md);
-  line-height: 1.6;
-  color: var(--color-text-muted);
+  line-height: 1.62;
+  color: var(--color-text);
   white-space: pre-wrap;
+}
+/* Drop-cap sutil (injerto C): la primera letra en serif del color de acento. */
+.description::first-letter {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: 3.1em;
+  line-height: 0.78;
+  float: left;
+  padding: 0.06em 0.12em 0 0;
+  color: var(--accent-deep, #2a4256);
 }
 .descEditBtn,
 .descAdd {
@@ -226,9 +403,110 @@
   gap: var(--space-2);
 }
 
-/* Cuenta atrás viva del reto en juego, alineada al inicio bajo la meta-línea. */
-.countdown {
+/* ---- Galería "la serie" (tira de fotogramas) ---- */
+.gallerySection {
   display: flex;
+  flex-direction: column;
+}
+
+/* ---- Tarjeta-mapa elegante (injerto C): ligera, CSS, NO un mapa pesado ---- */
+.mapSection {
+  display: flex;
+  flex-direction: column;
+}
+.mapCard {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-photo-card);
+}
+.mapView {
+  position: relative;
+  height: 150px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #e7ecef, #dde5e9);
+}
+.mapWater {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(140% 90% at 80% 110%, #bcd0d6 0%, transparent 55%),
+    linear-gradient(160deg, #e9eef0, #d7e1e4);
+}
+.mapLand {
+  position: absolute;
+  width: 240px;
+  height: 200px;
+  left: -40px;
+  top: -50px;
+  transform: rotate(-12deg);
+  border-radius: 40% 55% 48% 52%;
+  background: linear-gradient(150deg, #ede7dc, #e2dac9);
+  box-shadow: inset 0 0 0 1px rgba(52, 80, 107, 0.06);
+}
+.mapGrid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(52, 80, 107, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(52, 80, 107, 0.05) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+.mapPin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -100%);
+  z-index: 2;
+  color: var(--accent, #34506b);
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
+}
+.mapFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.mapPlace {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mapPlaceName {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  color: var(--color-text);
+  letter-spacing: var(--letter-spacing-wide);
+}
+.coord {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* ---- Social ---- */
+.social {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.socialIcon {
+  display: inline-flex;
+  font-size: var(--font-size-lg);
+}
+
+.cta {
+  margin-top: var(--space-1);
 }
 
 /* ---- Convertir en reto (sub-flujo del dueño sobre un recuerdo) ---- */
@@ -236,7 +514,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  margin-top: var(--space-2);
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -324,7 +601,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   padding-top: var(--space-3);
   border-top: 1px solid var(--color-border);
 }
@@ -363,8 +640,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ownerAction {
+  .ownerAction,
+  .heroClose {
     transition: none;
+  }
+  /* Ken Burns OFF: la foto se queda quieta (la maqueta lo exige). */
+  .heroImg {
+    animation: none;
+    transform: none;
   }
 }
 
