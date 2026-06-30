@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { newGroupCode } from '../../lib/group'
 import { createGroup } from '../../lib/groupData'
 import { joinGroupAsOwner } from '../../lib/membership'
@@ -20,8 +20,31 @@ interface Props {
 // se añade después desde el viaje.
 type Stage = 0 | 1
 const TOTAL_STAGES = 2
-// Alturas (px) de la hoja por etapa: amplia para que respire (no encajada).
+// Alturas IDEALES (px) de la hoja por etapa: amplias para que el contenido respire.
+// La hoja es del tamaño de su contenido; NO crece para llenar pantallas altas (eso es
+// trabajo del backdrop de escena, que va a sangre detrás). El alto real solo se acota
+// contra el viewport (ver `useSheetHeight`).
 const STAGE_HEIGHTS: Record<Stage, number> = { 0: 560, 1: 480 }
+// Aire mínimo (px) que la hoja deja por arriba en pantallas cortas: la cabecera
+// flotante y un asomo de escena siempre se ven; el cuerpo de la hoja hace scroll.
+const SHEET_TOP_GAP = 120
+
+// Alto real de la hoja para la etapa. Se queda en su alto IDEAL (tamaño de contenido):
+// en pantallas altas el backdrop de escena llena el espacio sobrante (sin desierto, es
+// escena viva), y la hoja sigue siendo una hoja limpia, no un muro blanco. En pantallas
+// cortas se acota dejando `SHEET_TOP_GAP` de aire arriba y su cuerpo hace scroll.
+// Reacciona a rotaciones/cambios de viewport (teclado incluido) vía innerHeight (dvh).
+function useSheetHeight(stage: Stage): number {
+  const [vh, setVh] = useState(() => (typeof window === 'undefined' ? 844 : window.innerHeight))
+  useEffect(() => {
+    function onResize() {
+      setVh(window.innerHeight)
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return Math.min(STAGE_HEIGHTS[stage], vh - SHEET_TOP_GAP)
+}
 
 // Crear un viaje (flujo grupo-primero). El viaje es el contenedor social del
 // plan: lo creas, los invitas y lo viven contigo. No se crea ningún reto aquí;
@@ -40,6 +63,8 @@ export function CreateGroup({ onBack }: Props) {
   const [moreOpen, setMoreOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
+
+  const sheetHeight = useSheetHeight(stage)
 
   const toast = useToast()
   const { user } = useSession()
@@ -166,7 +191,7 @@ export function CreateGroup({ onBack }: Props) {
       <ImmersiveSheet
         stage={stage}
         total={TOTAL_STAGES}
-        height={STAGE_HEIGHTS[stage]}
+        height={sheetHeight}
         canAdvance={canAdvanceFromStage[stage]}
         onAdvance={advance}
         onRetreat={retreat}
