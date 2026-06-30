@@ -11,26 +11,33 @@ const ACCENT = '#34506b' // theme_color (azul pizarra de marca)
 export default defineConfig({
   plugins: [
     react(),
-    // PWA ADITIVA: hace la app instalable y genera el service worker (Workbox)
-    // que precachea el app-shell. `autoUpdate` = el SW nuevo toma el control en
+    // PWA ADITIVA: hace la app instalable y registra el service worker que
+    // precachea el app-shell. `autoUpdate` = el SW nuevo toma el control en
     // cuanto está listo, sin pedir nada al usuario (clientsClaim + skipWaiting).
     // No rompe nada en el navegador normal: si el SW no se registra, la app va
     // igual. `cleanupOutdatedCaches` borra precachés viejos para que un deploy
     // nuevo no quede servido desde caché obsoleta.
+    //
+    // injectManifest: usamos NUESTRO propio service worker (`src/sw.ts`) en vez
+    // del que autogenera Workbox, porque necesitamos manejar los eventos `push` y
+    // `notificationclick` de Web Push (Workbox no los cubre). El plugin inyecta en
+    // ese SW el precache-manifest de Workbox (`self.__WB_MANIFEST`), así que el
+    // app-shell se sigue precacheando igual; solo añadimos los handlers de push
+    // encima. El build sigue 100% estático en Vercel (emite `sw.js` + manifest a
+    // `dist/`); no introduce backend.
     VitePWA({
       registerType: 'autoUpdate',
       // El plugin inyecta el registro del SW en el bundle (injectRegister 'auto').
       injectRegister: 'auto',
-      workbox: {
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
-        // El SW NO debe interceptar las funciones serverless de previsualización
-        // (`/api/*`) ni las rutas limpias `/v/*` y `/j/*`: esas las sirve Vercel
-        // (la función `share` con las metas OG). Si el navigateFallback las
-        // capturara, serviría el index.html cacheado y se perdería la tarjeta OG.
-        navigateFallbackDenylist: [/^\/api\//, /^\/v\//, /^\/j\//],
+        // OJO: en injectManifest el SPA navigation fallback (y su denylist para
+        // `/api/*`, `/v/*`, `/j/*`, que protege las metas OG de Vercel) se registra
+        // en el propio SW (`src/sw.ts`), NO aquí: `navigateFallbackDenylist` solo es
+        // válido en modo generateSW.
       },
       // En desarrollo NO activamos el SW: evita cachés agresivas mientras se
       // programa y mantiene el dev server limpio (el SW solo en build/prod).

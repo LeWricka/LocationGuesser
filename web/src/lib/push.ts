@@ -21,12 +21,21 @@ const isTest = import.meta.env.MODE === 'test'
 export type PushStatus = 'unsupported' | 'denied' | 'default' | 'subscribed' | 'unsubscribed'
 
 /**
- * ¿Puede este navegador recibir Web Push Y está la app configurada para ello?
- * Exige service worker + PushManager + Notification en window Y una clave VAPID.
- * No-op (false) en tests o sin clave: la UI entonces ni ofrece la opción.
+ * ¿Está la app configurada para push? = hay clave VAPID pública en el bundle.
+ * En tests siempre false (no tocamos red/APIs). Separado del soporte del navegador
+ * para que la UI pueda distinguir "tu navegador no puede" de "aún no está montado".
  */
-export function isPushSupported(): boolean {
-  if (isTest || !vapidPublicKey) return false
+export function isPushConfigured(): boolean {
+  return !isTest && Boolean(vapidPublicKey)
+}
+
+/**
+ * ¿Tiene ESTE navegador las APIs de Web Push? (service worker + PushManager +
+ * Notification). Independiente de la config: en iOS Safari sin instalar, p.ej.,
+ * esto es false aunque haya VAPID. En tests siempre false.
+ */
+export function isBrowserPushCapable(): boolean {
+  if (isTest) return false
   return (
     typeof navigator !== 'undefined' &&
     'serviceWorker' in navigator &&
@@ -34,6 +43,15 @@ export function isPushSupported(): boolean {
     'PushManager' in window &&
     'Notification' in window
   )
+}
+
+/**
+ * ¿Puede este navegador recibir Web Push Y está la app configurada para ello?
+ * Exige soporte del navegador Y una clave VAPID. Es el gate que usan
+ * subscribe/unsubscribe: sin esto, son no-op.
+ */
+export function isPushSupported(): boolean {
+  return isPushConfigured() && isBrowserPushCapable()
 }
 
 /** Permiso actual de notificaciones, o 'unsupported' si no aplica. */
