@@ -1,10 +1,9 @@
 import type { FormEvent } from 'react'
-import { MapPin } from 'lucide-react'
 import { AuthScreen } from './AuthScreen'
 import { Button } from './Button'
 import { Field } from './Field'
-import { Icon } from './Icon'
 import { Input } from './Input'
+import { Logo } from './Logo'
 import { Stack } from './Stack'
 import styles from './LoginScreen.module.css'
 
@@ -48,7 +47,7 @@ export function LoginScreen({
   return (
     <AuthScreen
       className={className}
-      icon={<Icon icon={MapPin} size={40} />}
+      icon={<Logo variant="mark" size={40} />}
       title={joining ? 'Únete para jugar este reto' : 'Entra a Tabide'}
       subtitle={
         joining ? (

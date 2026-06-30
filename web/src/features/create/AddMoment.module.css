@@ -1,9 +1,25 @@
 /* AÑADIR RECUERDO — estilo Atelier (Kinfolk · Pizarra): papel, hairlines, serif
    en el titular, acento pizarra sobrio y micro-interacciones contenidas. */
 
-/* Presentación tipo móvil: la pantalla de crear "sube" al entrar. */
+/* Página de papel a sangre: la cabecera (AppHeader) va flush arriba con su
+   hairline y el cuerpo (.body) lleva el gutter. Antes el gutter de `lg-page`
+   envolvía también la cabecera, que quedaba como una barra blanca recortada
+   distinta al papel. Presentación tipo móvil: "sube" al entrar. */
 .screen {
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--color-bg);
   animation: lg-create-rise 320ms var(--ease-emphasized) both;
+}
+
+/* Cuerpo: ancho cómodo de lectura, centrado, con el gutter de página y aire
+   inferior (safe-area de iOS). */
+.body {
+  width: 100%;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: var(--space-gutter);
+  padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
 }
 @keyframes lg-create-rise {
   from {
@@ -19,12 +35,6 @@
   .screen {
     animation: none;
   }
-}
-
-.header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
 }
 
 .heading {

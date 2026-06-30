@@ -1,5 +1,5 @@
 import { Hash, MapPin } from 'lucide-react'
-import { Icon } from '../../ui'
+import { AppHeader, Icon } from '../../ui'
 import type { ChallengeKind } from '../../lib/challenges'
 import styles from './CreateChallengeKindPicker.module.css'
 
@@ -20,21 +20,16 @@ interface Props {
 export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) {
   return (
     <div className={styles.root}>
-      <div className={styles.top}>
-        <button type="button" className={styles.iconBtn} aria-label="Atrás" onClick={onBack}>
-          <BackArrow />
-        </button>
-        <div className={styles.topTitle}>
-          <b>Nuevo reto</b>
-          {groupName ? <small>Viaje · {groupName}</small> : null}
-        </div>
-        {/* Hueco simétrico para centrar el título (sin acción a la derecha). */}
-        <span className={styles.iconBtnGhost} aria-hidden />
-      </div>
+      {/* Cabecera ÚNICA del producto (variante papel): mismo título serif y
+          back-disco de 44px que el resto del flujo de crear. El contexto del
+          viaje vive en el eyebrow del cuerpo (la cabecera es de una sola línea). */}
+      <AppHeader lead="back" onLead={onBack} leadLabel="Atrás" title="Nuevo reto" />
 
       <div className={styles.body}>
         <header className={styles.lede}>
-          <span className={styles.eyebrow}>Elige el tipo</span>
+          <span className={styles.eyebrow}>
+            {groupName ? `Viaje · ${groupName} · Elige el tipo` : 'Elige el tipo'}
+          </span>
           <h1 className={styles.h}>¿A qué jugamos?</h1>
           <p className={styles.sub}>Dos formas de retar al grupo. Eliges una y a por ello.</p>
         </header>
@@ -74,14 +69,6 @@ export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) 
         </div>
       </div>
     </div>
-  )
-}
-
-function BackArrow() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   )
 }
 
