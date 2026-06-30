@@ -1,0 +1,33 @@
+/* Mini-mapa REAL del detalle del momento ("En el mapa"): Leaflet estático centrado
+   en las coordenadas con el pin. Sustituye al blob abstracto de CSS. */
+.wrap {
+  position: relative;
+  height: 170px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+.map {
+  width: 100%;
+  height: 100%;
+  /* El mapa no es interactivo: ignora los gestos para que el scroll de la hoja mande. */
+  pointer-events: none;
+  background: var(--color-surface-hover);
+}
+
+/* Pin clavado en la coordenada (divIcon de Leaflet): disco de acento con el glifo
+   MapPin en tinta clara, con punta hacia abajo (anclado por iconAnchor en el TSX). */
+.pin {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full) var(--radius-full) 2px var(--radius-full);
+  transform: rotate(45deg);
+  background: var(--color-accent);
+  color: #fff;
+  box-shadow: var(--shadow-md);
+}
+/* El glifo va derecho dentro del pin girado. */
+.pin svg {
+  transform: rotate(-45deg);
+}

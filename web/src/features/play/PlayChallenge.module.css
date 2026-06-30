@@ -22,6 +22,29 @@
   inset: 0;
 }
 
+/* Montaje SUAVE de la escena al entrar en juego (tras la cuenta atrás): la escena
+   real aparece con un fundido + leve acercamiento en vez de un salto seco desde el
+   placeholder. Encadena con el zoom-out de la foto en la cuenta. Se anula bajo
+   reduced-motion. */
+.sceneEnter {
+  animation: lg-scene-in var(--duration-slower) var(--ease-smooth) both;
+}
+@keyframes lg-scene-in {
+  from {
+    opacity: 0;
+    transform: scale(1.04);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sceneEnter {
+    animation: none;
+  }
+}
+
 .photoFull {
   width: 100%;
   height: 100%;

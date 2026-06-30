@@ -12,6 +12,18 @@
   place-items: center;
   overflow: hidden;
   background: var(--color-bg);
+  /* La cuenta atrás ENTRA con un fundido suave (no aparece de golpe): la transición a
+     jugar deja de ser seca. */
+  animation: countOverlayIn var(--duration-slow) var(--ease-smooth) both;
+}
+
+@keyframes countOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* Fondo: capa que contiene la foto (o el degradado neutro) y el velo. */
@@ -24,6 +36,18 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Zoom-out lento de la foto durante la cuenta: da vida y "presencia" al fondo sin
+     distraer, y encadena con el montaje suave de la escena al entrar en juego. */
+  animation: countBgSettle calc(var(--duration-slower) * 6) var(--ease-smooth) both;
+}
+
+@keyframes countBgSettle {
+  from {
+    transform: scale(1.12);
+  }
+  to {
+    transform: scale(1);
+  }
 }
 
 /* Sin foto: degradado sobrio de la marca (mismo tono que el placeholder de escena). */
@@ -53,28 +77,37 @@
   letter-spacing: var(--letter-spacing-tighter);
   color: var(--color-on-photo);
   text-shadow: 0 8px 40px rgb(0 0 0 / 0.45);
-  animation: countPop var(--duration-slow, 320ms) var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1))
-    both;
+  /* Entrada más LARGA y elegante en cada cambio de dígito: el número entra grande y
+     difuminado, asienta con un muelle suave y se desvanece un poco al final del
+     segundo, de modo que la cuenta respira en vez de cortar en seco. */
+  animation: countPop var(--duration-slower) var(--ease-spring) both;
 }
 
 @keyframes countPop {
   0% {
     opacity: 0;
-    transform: scale(0.55);
+    transform: scale(1.4);
+    filter: blur(6px);
   }
-  55% {
+  35% {
     opacity: 1;
-    transform: scale(1.12);
+    filter: blur(0);
+  }
+  60% {
+    transform: scale(0.98);
   }
   100% {
-    opacity: 1;
+    opacity: 0.92;
     transform: scale(1);
+    filter: blur(0);
   }
 }
 
 /* Movimiento reducido: el componente ya no se monta (salta al juego), pero por si
    acaso, sin animación. */
 @media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .bgImg,
   .number {
     animation: none;
   }
