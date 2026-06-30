@@ -80,6 +80,16 @@ export type AnalyticsEvent =
   // Fin de temporada (#236): cerrar/reabrir el grupo. Props: group_id.
   | 'group_closed'
   | 'group_reopened'
+  // Recepción de un enlace compartido (#330): el visitante aterriza por una ruta
+  // compartida (/v/<code>, /j/<code> o el hash #g=) ANTES de login/join. Mide la
+  // entrada del embudo del receptor (hoy ciego). Props: kind ('trip'|'challenge'),
+  // has_session (¿llegó ya con sesión?). SIN datos sensibles: nada de lat/lng ni
+  // del lugar, y tampoco mandamos el código del grupo/reto (es identificable).
+  | 'share_link_opened'
+  // La bienvenida del receptor se muestra (#330): un invitado primerizo (no dueño)
+  // ve el slideshow "te invitan". Cierra el embudo: aterrizó → se le saludó.
+  // Props: group_id.
+  | 'receptor_welcome_shown'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

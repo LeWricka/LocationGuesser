@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, Flag, Globe, ImagePlus, Plus, Target } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Flag, Globe, ImagePlus, Plus, Share2, Target } from 'lucide-react'
 import { EmptyState, Icon, useReducedMotion, useToast } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
+import { tripShareUrl } from '../../lib/shareLinks'
 import type { Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
+import { InviteModal } from '../group/InviteModal'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
 import { TripRetos } from './TripRetos'
@@ -113,6 +115,11 @@ export function TripPage({
   const [fabOpen, setFabOpen] = useState(false)
   const fabWrapRef = useRef<HTMLDivElement>(null)
 
+  // Invitar al viaje: hoja de compartir (reusa InviteModal). El botón vive en la
+  // cabecera flotante para que compartir sea SIEMPRE visible (P0: hoy estaba
+  // escondido en la GroupPage clásica).
+  const [inviting, setInviting] = useState(false)
+
   // Recap de cierre: el viaje está cerrado (closed_at) → ofrecemos el "wrap".
   const isClosed = group?.closed_at != null
   const [wrapOpen, setWrapOpen] = useState(false)
@@ -161,6 +168,8 @@ export function TripPage({
   const activeMoment = useMemo(() => moments.find((m) => m.status === 'active') ?? null, [moments])
   const liveCount = useMemo(() => moments.filter((m) => m.status === 'active').length, [moments])
   const playedCount = useMemo(() => moments.filter((m) => m.status === 'closed').length, [moments])
+  // Nº de RETOS (no recuerdos) para el preview de la hoja de invitar.
+  const challengeCount = useMemo(() => moments.filter((m) => m.isChallenge).length, [moments])
 
   const subtitle = useMemo(
     () => membersLine(memberNames, profile?.display_name ?? null),
@@ -411,6 +420,17 @@ export function TripPage({
           {subtitle && <span className={styles.tripMeta}>{subtitle}</span>}
         </div>
 
+        {/* Compartir/Invitar SIEMPRE visible (P0): abre la hoja de invitar de ESE
+            viaje (reusa InviteModal). Cualquier miembro puede repartir el enlace. */}
+        <button
+          type="button"
+          className={styles.iconPill}
+          onClick={() => setInviting(true)}
+          aria-label="Invitar al viaje"
+        >
+          <Icon icon={Share2} />
+        </button>
+
         <div
           className={styles.pager}
           role="tablist"
@@ -609,6 +629,18 @@ export function TripPage({
           onClose={() => setWrapOpen(false)}
         />
       )}
+
+      {/* Hoja de invitar al viaje (reusa el InviteModal de la GroupPage clásica):
+          preview de marca + Web Share / copiar / WhatsApp con el enlace LIMPIO
+          (`…/v/<code>`) que genera la tarjeta OG. */}
+      <InviteModal
+        open={inviting}
+        onClose={() => setInviting(false)}
+        groupId={groupId}
+        groupName={title}
+        link={tripShareUrl(location.origin, groupId)}
+        challengeCount={challengeCount}
+      />
     </div>
   )
 }

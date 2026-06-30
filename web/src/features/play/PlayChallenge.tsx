@@ -428,7 +428,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     if (challenge && guess) {
       // Adivinanza enviada (con pin). El timeout sin marcar NO es "jugar": no
       // hubo adivinanza, se contabiliza solo como result_revealed (timed_out).
-      track('challenge_played', { group_id: challenge.group_id, challenge_id: challenge.id })
+      track('challenge_played', {
+        group_id: challenge.group_id,
+        challenge_id: challenge.id,
+        challenge_kind: 'location',
+      })
       void reveal(challenge, guess)
     }
   }
