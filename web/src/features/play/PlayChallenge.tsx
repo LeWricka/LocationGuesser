@@ -695,6 +695,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             onPick={setGuess}
             meAvatar={profile?.avatar_url}
             meUserId={user?.id ?? ''}
+            // Revelado = "ver dónde era": lienzo DIARIO (satélite con etiquetas), que
+            // sitúa el resultado sobre la foto aérea. El lienzo JUGAR (callejero
+            // etiquetado) es el de colocar el pin, no el de revelar.
+            preset="diario"
           />
         </div>
 
