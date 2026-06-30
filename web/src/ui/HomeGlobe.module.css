@@ -1,0 +1,115 @@
+/* Globo héroe de la home (patrón globo + hoja): satélite/globo a sangre que llena su
+   zona superior. El motor MapLibre (o el globo evocado en CSS sin WebGL) va a sangre
+   dentro; la marca/ajustes flotan encima (desde GlobeSheet) y la hoja sube debajo. */
+
+.globe {
+  position: absolute;
+  inset: 0;
+  background: var(--scene-bg);
+  overflow: hidden;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--scene-bg);
+}
+
+/* --- Globo EVOCADO (fallback sin WebGL): esfera nocturna con relieve, sin tiles ---
+   Red de seguridad cuando no hay WebGL; mantiene el héroe visual. */
+.evoked {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 60% at 50% 46%, #2d4a5e 0%, #233c4d 52%, #16242f 100%), var(--scene-bg);
+  overflow: hidden;
+}
+.evokedGlobe {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(38% 30% at 30% 34%, rgba(120, 140, 90, 0.5), transparent 60%),
+    radial-gradient(46% 38% at 66% 30%, rgba(150, 130, 80, 0.45), transparent 62%),
+    radial-gradient(44% 36% at 54% 66%, rgba(80, 110, 70, 0.5), transparent 60%),
+    repeating-linear-gradient(48deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 7px);
+  mix-blend-mode: overlay;
+  opacity: 0.7;
+}
+
+/* ============================================================
+ * Clases GLOBALES de los marcadores del globo. Los HTML markers de MapLibre se
+ * inyectan FUERA del árbol de React, así que las clases CSS-module locales no los
+ * alcanzan; por eso van en :global. El look del pin lo comparte con el mapa de viaje
+ * (lg-trip-pin de tripPins.css); aquí solo ajustamos tamaño y el "lead" cálido.
+ * ============================================================ */
+
+/* Pin de la home: algo más compacto que el del viaje (caben varios). */
+:global(.lg-home-pin) {
+  width: 42px;
+  height: 42px;
+  border-width: 2.5px;
+}
+
+/* Pin "lead" del grupo: anillo cálido + halo pulsante (acento ORO de "lo vivo"). */
+:global(.lg-home-pin--lead) {
+  border-color: var(--route-gold);
+  box-shadow:
+    0 4px 14px -3px rgba(0, 0, 0, 0.55),
+    0 0 0 4px rgba(217, 178, 90, 0.28),
+    0 0 18px 2px rgba(217, 178, 90, 0.4);
+}
+:global(.lg-home-pin--lead)::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid rgba(217, 178, 90, 0.55);
+  animation: lg-home-live-pulse 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+@keyframes lg-home-live-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70%,
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+/* Deriva sutil de la textura del globo evocado. Se desactiva con reduced-motion. */
+:global(.lg-home-globe-breathe) {
+  animation: lg-home-globe-breathe 50s linear infinite;
+}
+@keyframes lg-home-globe-breathe {
+  to {
+    transform: translateX(-32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :global(.lg-home-pin--lead)::after,
+  :global(.lg-home-globe-breathe) {
+    animation: none;
+  }
+}
+
+/* Atribución de Esri DISCRETA sobre el globo: obligatoria pero discreta (translúcida,
+   pequeña, pegada a la esquina). Su DOM lo inyecta MapLibre fuera de React → :global. */
+:global(.maplibregl-ctrl-attrib) {
+  background: rgba(8, 12, 18, 0.35) !important;
+  border-radius: var(--radius-sm);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+:global(.maplibregl-ctrl-attrib),
+:global(.maplibregl-ctrl-attrib a) {
+  color: rgba(255, 255, 255, 0.62) !important;
+  font-size: 9px;
+}
+:global(.maplibregl-ctrl-attrib-button) {
+  background-color: rgba(8, 12, 18, 0.4) !important;
+}

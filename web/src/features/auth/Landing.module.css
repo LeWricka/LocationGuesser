@@ -1,41 +1,25 @@
-/* Landing pública (issue #175; portada visual #183): móvil-first, una columna
- * centrada que respira en pantallas anchas. La portada es VISUAL — imagen de
- * marca + frase emotiva en serif + un CTA; el correo vive en el popup, no aquí.
- * Todo con tokens del sistema "Atelier"; sin colores/espaciados crudos. */
+/* Landing pública (issue #175; portada visual #183; patrón globo + hoja #343):
+ * móvil-first. El héroe es el globo (GlobeSheet); aquí va el contenido de la HOJA
+ * blanca (hero + CTA + cómo funciona) con tokens del sistema "Atelier". */
 .page {
-  min-height: 100svh;
-  display: flex;
-  justify-content: center;
-  padding: var(--space-6) var(--space-4);
-  padding-top: calc(var(--space-7) + env(safe-area-inset-top));
-  padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+  min-height: 100dvh;
 }
 
-.content {
+/* Marca en el overlay sobre el globo: tinta de escena clara (hereda --scene-ink). */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  color: var(--scene-ink);
+}
+
+/* ── Hero dentro de la hoja: titular serif + subtítulo + acciones ──────────────── */
+.hero {
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: var(--container-max);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-7);
-}
-
-/* ── Hero / portada ─────────────────────────────────────────────────────────── */
-.hero {
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-/* Imagen de marca: las dos hojas (el momento que compartes y el que lo vive).
- * Decorativa (alt=""), el mensaje lo lleva el titular. Entra con un fundido
- * suave hacia arriba; se respeta prefers-reduced-motion más abajo. */
-.heroImage {
-  width: 168px;
-  max-width: 60%;
-  height: auto;
-  margin-bottom: var(--space-5);
-  animation: hero-rise var(--duration-slower) var(--ease-emphasized) both;
+  margin: 0 auto;
+  padding-top: var(--space-3);
 }
 
 .eyebrow {
@@ -55,6 +39,7 @@
   letter-spacing: var(--letter-spacing-tight);
   line-height: var(--line-height-tight);
   text-wrap: balance;
+  margin: 0;
 }
 
 /* La parte que "canta": cursiva en acento (gesto de la maqueta). */
@@ -64,7 +49,7 @@
 }
 
 .lead {
-  margin: var(--space-3) auto 0;
+  margin: var(--space-3) 0 0;
   max-width: 38ch;
   color: var(--color-text-muted);
   font-size: var(--font-size-md);
@@ -72,88 +57,24 @@
   text-wrap: balance;
 }
 
-/* CTA principal: abre el popup de entrada. Ancho cómodo, no a sangre, para que la
- * portada respire; en móvil estrecho se estira hasta el contenedor. */
-.cta {
-  margin-top: var(--space-6);
-  min-width: 260px;
-  max-width: 100%;
-}
-
-/* "¿Ya tienes cuenta? Entra": discreto, mismo flujo OTP que el CTA. */
-.signIn {
-  margin-top: var(--space-4);
-  border: none;
-  background: none;
-  padding: var(--space-2);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-.signIn:hover {
-  color: var(--color-text);
-}
-.signIn:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-.signInAccent {
-  font-weight: var(--font-weight-medium);
-  color: var(--color-accent);
-}
-
-/* ── Atajo "tengo un código de viaje" (issue #183) ────────────────────────────
- * Discreto: un disclosure que despliega un campo para pegar código/enlace. Solo
- * en la landing genérica; en el deep-link el viaje ya viene dado. */
-.codeDisclosure {
-  width: 100%;
-  max-width: 420px;
-  margin: 0 auto;
-  text-align: center;
-}
-
-.codeSummary {
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-muted);
-  list-style: none;
-}
-
-.codeSummary::-webkit-details-marker {
-  display: none;
-}
-
-.codeSummary:hover {
-  color: var(--color-text);
+.actions {
+  margin-top: var(--space-5);
 }
 
 .codeForm {
   margin-top: var(--space-4);
   text-align: left;
+  width: 100%;
+  max-width: var(--container-max);
+  margin-left: auto;
+  margin-right: auto;
 }
 
-@media (min-width: 600px) {
-  .heroImage {
-    width: 200px;
-  }
-}
-
-@keyframes hero-rise {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .heroImage {
-    animation: none;
-  }
+/* "Cómo funciona" dentro de la hoja: separación del bloque del hero. */
+.how {
+  margin-top: var(--space-7);
+  width: 100%;
+  max-width: var(--container-max);
+  margin-left: auto;
+  margin-right: auto;
 }
