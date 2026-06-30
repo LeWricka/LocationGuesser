@@ -140,6 +140,10 @@ export interface Database {
           // Candados de exploración del Street View (false = permitido). Migración 0013.
           sv_lock_move: boolean
           sv_lock_rotate: boolean
+          // PRECISIÓN del reto: calibra la D de la puntuación 5000·e^(−km/D).
+          // mundo=2000km (default = comportamiento histórico), pais/ciudad/barrio
+          // cada vez más estrictos. Migración 0028.
+          score_scale: 'mundo' | 'pais' | 'ciudad' | 'barrio'
           created_by: string
           created_at: string
         }
@@ -163,6 +167,8 @@ export interface Database {
           photo_is_hint?: boolean
           sv_lock_move?: boolean
           sv_lock_rotate?: boolean
+          // Default 'mundo' en BD: omitirlo crea un reto con el scoring histórico.
+          score_scale?: 'mundo' | 'pais' | 'ciudad' | 'barrio'
           created_by: string
           created_at?: string
         }
@@ -185,6 +191,7 @@ export interface Database {
           photo_is_hint?: boolean
           sv_lock_move?: boolean
           sv_lock_rotate?: boolean
+          score_scale?: 'mundo' | 'pais' | 'ciudad' | 'barrio'
           created_by?: string
           created_at?: string
         }
