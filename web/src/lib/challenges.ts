@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import type { Challenge, Database } from './database.types'
-import type { LatLng } from './geo'
+import { DEFAULT_SCORE_SCALE, type LatLng, type ScoreScale } from './geo'
 import { deadlineFromNow } from './time'
 
 type ChallengeUpdate = Database['public']['Tables']['challenges']['Update']
@@ -19,8 +19,10 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // `challenge_answers` (RLS). En cambio `place_lat`/`place_lng` (lugar VISIBLE de un
 // recuerdo) e `is_challenge` SÍ se sirven: no son spoiler (0022). Reutilizado por
 // todos los lectores: jugar, lista del grupo, home y el RETURNING de crear/editar.
+// `score_scale` (0028) NO es spoiler (no revela la ubicación): es la precisión del
+// reto. Se sirve para que la previsualización/score local coincida con el servidor.
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
+  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -51,6 +53,12 @@ export interface NewChallengeInput {
   svLockMove?: boolean
   /** Candado de GIRO del Street View (true = no se puede mirar alrededor). (#187.) */
   svLockRotate?: boolean
+  /**
+   * Precisión del reto: calibra cómo de estricto es el conteo de distancia (0028).
+   * Por defecto 'mundo' (D=2000 km) = el scoring de siempre. A menor escala, más
+   * estricto: pais=300, ciudad=25, barrio=2 km.
+   */
+  scoreScale?: ScoreScale
 }
 
 // Plazo por defecto si el creador no eligió uno: 24 h desde ahora. La duración
@@ -98,6 +106,8 @@ export async function createChallenge(
       sv_lock_rotate: input.svLockRotate ?? false,
       guess_seconds: input.guessSeconds ?? null,
       deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
+      // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
+      score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
       created_by: input.createdBy,
     })
     // RETURNING sin lat/lng: tras revocar la columna (0010), pedirlas aquí daría
@@ -211,6 +221,8 @@ export interface PromoteToChallengeInput {
   svLockRotate?: boolean
   /** Si hay foto, ¿pista visible al jugar (true) o sorpresa hasta el revelado (false)? */
   photoIsHint?: boolean
+  /** Precisión del reto (0028); por defecto 'mundo' = scoring histórico. */
+  scoreScale?: ScoreScale
 }
 
 /**
@@ -238,6 +250,8 @@ export async function promoteToChallenge(
     sv_pitch: input.svPitch ?? null,
     sv_lock_move: input.svLockMove ?? false,
     sv_lock_rotate: input.svLockRotate ?? false,
+    // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
+    score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
   }
   if (input.photoIsHint !== undefined) patch.photo_is_hint = input.photoIsHint
 

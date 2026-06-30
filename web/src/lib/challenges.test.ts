@@ -94,6 +94,7 @@ const sampleChallenge: Challenge = {
   photo_is_hint: true,
   sv_lock_move: false,
   sv_lock_rotate: false,
+  score_scale: 'mundo',
   created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
 }
@@ -172,6 +173,33 @@ describe('createChallenge', () => {
     >
     expect(insertArg.sv_lock_move).toBe(true)
     expect(insertArg.sv_lock_rotate).toBe(true)
+  })
+
+  test('la precisión por defecto es "mundo" (scoring histórico)', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await createChallenge({ title: 'x', lat: 1, lng: 2, createdBy: 'u', groupId: 'g1' })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.score_scale).toBe('mundo')
+  })
+
+  test('escribe la precisión elegida (score_scale) cuando se pasa', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await createChallenge({
+      title: 'x',
+      lat: 1,
+      lng: 2,
+      createdBy: 'u',
+      groupId: 'g1',
+      scoreScale: 'ciudad',
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.score_scale).toBe('ciudad')
   })
 })
 
@@ -255,6 +283,26 @@ describe('promoteToChallenge', () => {
       unknown
     >
     expect(new Date(updateArg.deadline_at as string).getTime()).toBeGreaterThan(Date.now())
+  })
+
+  test('promociona con la precisión por defecto "mundo" si no se elige', async () => {
+    results['challenges'] = { data: { ...sampleChallenge, id: 'm1' }, error: null }
+    await promoteToChallenge('m1', { lat: 1, lng: 2 })
+    const updateArg = calls.update.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(updateArg.score_scale).toBe('mundo')
+  })
+
+  test('promociona escribiendo la precisión elegida (barrio)', async () => {
+    results['challenges'] = { data: { ...sampleChallenge, id: 'm1' }, error: null }
+    await promoteToChallenge('m1', { lat: 1, lng: 2, scoreScale: 'barrio' })
+    const updateArg = calls.update.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(updateArg.score_scale).toBe('barrio')
   })
 })
 

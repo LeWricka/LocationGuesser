@@ -3,7 +3,7 @@ import { AlertTriangle, Check, Map as MapIcon, MapPin, Target, Zap } from 'lucid
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
-import type { LatLng } from '../../lib/geo'
+import type { LatLng, ScoreScale } from '../../lib/geo'
 import { createMoment, promoteToChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { addMomentImages } from '../../lib/momentImages'
 import { deadlineFromMinutes } from '../../lib/time'
@@ -68,6 +68,15 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: 'Sin límite' },
 ]
 
+// PRECISIÓN del reto: calibra cómo de estricto es el conteo de distancia (0028).
+// 'mundo' (default) = scoring de siempre; cuanto más acotado, más estricto.
+const PRECISION_OPTIONS: { value: ScoreScale; label: string }[] = [
+  { value: 'mundo', label: 'Mundo' },
+  { value: 'pais', label: 'País' },
+  { value: 'ciudad', label: 'Ciudad' },
+  { value: 'barrio', label: 'Barrio' },
+]
+
 // Fecha de hoy en formato `yyyy-mm-dd` (zona local), para el valor por defecto del
 // input date. La usamos también como "centinela": si el usuario no cambia la fecha,
 // no la guardamos (no hay columna de fecha; ver nota en `save`).
@@ -111,6 +120,8 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
   const [isChallenge, setIsChallenge] = useState(false)
   const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
   const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
+  // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
+  const [scoreScale, setScoreScale] = useState<ScoreScale>('mundo')
   // Street View del reto (opcional). Con foto es contexto cercano; sin foto, ES la
   // escena. Candados de exploración: ambos permitidos por defecto.
   const [wantsStreetView, setWantsStreetView] = useState(false)
@@ -400,6 +411,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
           svLockMove: pano ? !allowMove : false,
           svLockRotate: pano ? !allowRotate : false,
           photoIsHint: true,
+          scoreScale,
         })
       }
 
@@ -411,6 +423,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
         photo_count: paths.length,
         has_place: place != null,
         promoted_to_challenge: isChallenge,
+        score_scale: isChallenge ? scoreScale : null,
       })
       // Efecto móvil al guardar: vibración corta + la pantalla se desliza hacia abajo
       // (como descartar una hoja nativa) y luego volvemos al viaje. Sin animación con
@@ -637,6 +650,27 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                         size="sm"
                         aria-pressed={guessSeconds === opt.value}
                         onClick={() => setGuessSeconds(opt.value)}
+                      >
+                        {opt.label}
+                      </Button>
+                    ))}
+                  </Row>
+                )}
+              </Field>
+
+              <Field
+                label="Precisión"
+                hint="¿Hay que acertar el país, la ciudad o la calle? Cuanto más acotado, más estricto se puntúa."
+              >
+                {() => (
+                  <Row gap={2} wrap>
+                    {PRECISION_OPTIONS.map((opt) => (
+                      <Button
+                        key={opt.value}
+                        variant={scoreScale === opt.value ? 'primary' : 'secondary'}
+                        size="sm"
+                        aria-pressed={scoreScale === opt.value}
+                        onClick={() => setScoreScale(opt.value)}
                       >
                         {opt.label}
                       </Button>
