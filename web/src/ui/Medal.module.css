@@ -1,0 +1,25 @@
+.medal {
+  flex: none;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* El número va en sans tabular y pequeño para caber en el disco. El SVG escala
+ * todo en su viewBox, así que el tamaño se controla con la prop `size`. */
+.number {
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: var(--font-weight-black);
+}
+
+.rank-1 {
+  color: var(--medal-gold);
+}
+
+.rank-2 {
+  color: var(--medal-silver);
+}
+
+.rank-3 {
+  color: var(--medal-bronze);
+}

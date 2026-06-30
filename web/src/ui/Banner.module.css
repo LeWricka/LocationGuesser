@@ -1,0 +1,43 @@
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.icon {
+  flex: none;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+
+.action {
+  flex: none;
+}
+
+/* info — acento pizarra tenue (el caso por defecto: "te toca jugar"). */
+.info {
+  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  color: var(--accent-deep);
+}
+
+/* aviso — ocre tostado (offline, atención sin alarmar). */
+.aviso {
+  background: var(--color-warning-soft);
+  border-color: color-mix(in srgb, var(--color-warning) 28%, transparent);
+  color: var(--color-warning);
+}
+
+/* oferta — verde sobrio (algo bueno disponible). */
+.oferta {
+  background: var(--color-success-soft);
+  border-color: color-mix(in srgb, var(--color-success) 28%, transparent);
+  color: var(--color-success);
+}

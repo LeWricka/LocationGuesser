@@ -1,0 +1,74 @@
+.field {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+}
+
+.field:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow-soft);
+  background: var(--color-surface);
+}
+
+/* Número gigante en sans tabular (no "baila" al teclear). Es el protagonista. */
+.number {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-data);
+  font-weight: var(--font-weight-black);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-tighter);
+  line-height: 1;
+  /* Quitamos las flechas del number en navegadores que las pinten. */
+  appearance: textfield;
+}
+.number:focus {
+  outline: none;
+}
+.number::placeholder {
+  color: var(--color-text-faint);
+}
+
+/* Unidad a la DERECHA del número. El <select> nativo cubre toda la zona. */
+.unit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.symbol {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.chevron {
+  flex: none;
+}
+
+/* Select transparente encima de símbolo+chevron: aporta el menú del sistema. */
+.select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+}
+.select:focus-visible + * {
+  outline: 2px solid var(--color-focus-ring);
+}
