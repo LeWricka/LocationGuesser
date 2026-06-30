@@ -1,20 +1,11 @@
-import { type RefObject } from 'react'
-import { Check, Compass as CompassIcon, Expand, House, MapPin, Maximize2, X } from 'lucide-react'
+import { type CSSProperties, type RefObject } from 'react'
+import { Compass as CompassIcon, Expand, House, Lock, MapPin, Maximize2, X } from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { SceneImage } from './SceneImage'
 import type { LatLng } from '../../lib/geo'
-import {
-  Badge,
-  BackHomeButton,
-  Button,
-  CountdownRing,
-  Icon,
-  Lightbox,
-  Modal,
-  Row,
-  Stack,
-} from '../../ui'
+import { AppHeader } from '../../ui/AppHeader'
+import { Badge, Button, CountdownRing, Icon, Lightbox, Modal, Row, Stack } from '../../ui'
 import styles from './PlayChallenge.module.css'
 
 // Escena de Street View del reto (lo que de verdad se monta a pantalla completa).
@@ -88,6 +79,12 @@ interface Props {
     onClose: () => void
     body: React.ReactNode
   }
+  /**
+   * Alto VISIBLE real en px (de `useVisualViewport`). Fija el contenedor inmersivo
+   * a ese alto en vez de a `100vh`, que colapsa cuando aparece el teclado del sistema
+   * o la barra del navegador móvil. `null`/omitido → fallback CSS a `100dvh`.
+   */
+  viewportHeight?: number | null
 }
 
 // Escena de JUGAR a pantalla completa, extraída de PlayChallenge para reutilizarla
@@ -117,14 +114,20 @@ export function GameScene({
   onClosePhoto,
   panoRef,
   startOverlay,
+  viewportHeight,
 }: Props) {
   const hasStreetView = scene.kind === 'streetview'
   const imageUrl = scene.kind === 'photo' ? scene.photoUrl : null
   const hintPhotoUrl = scene.kind === 'streetview' ? scene.hintPhotoUrl : null
   const urgent = remaining != null && remaining <= 10
+  // Modelo de viewport: el contenedor se ata al alto VISIBLE real (px) cuando lo
+  // conocemos; si no, el CSS cae a `100dvh`. Evita que el chrome/teclado colapse
+  // el layout y empuje la escena fuera de pantalla.
+  const immersiveStyle =
+    viewportHeight != null ? ({ '--play-vh': `${viewportHeight}px` } as CSSProperties) : undefined
 
   return (
-    <div className={styles.immersive}>
+    <div className={styles.immersive} style={immersiveStyle}>
       {/* Escena protagonista: panorama interactivo o foto (legacy). Solo cuando
           está lista; antes, placeholder neutro (nada que delate el lugar). */}
       <div className={styles.sceneFull}>
@@ -166,14 +169,20 @@ export function GameScene({
         )}
       </div>
 
-      {/* Clúster arriba-izquierda: salida + temporizador, flotando sobre la
-          escena (respeta el notch con safe-area). */}
-      <div className={styles.topCluster}>
-        <BackHomeButton onClick={onBack} label={backLabel} />
-        {remaining != null && guessSeconds != null && (
-          <CountdownRing remaining={remaining} total={guessSeconds} urgent={urgent} />
-        )}
-      </div>
+      {/* Cabecera flotante sobre la escena: atrás + temporizador (respeta el notch
+          con safe-area; tinta clara con velo de legibilidad). */}
+      <AppHeader
+        variant="floating"
+        className={styles.sceneHeader}
+        lead="back"
+        leadLabel={backLabel}
+        onLead={onBack}
+        action={
+          remaining != null && guessSeconds != null ? (
+            <CountdownRing remaining={remaining} total={guessSeconds} urgent={urgent} />
+          ) : undefined
+        }
+      />
 
       {/* Foto-pista flotante (si el reto la marcó como pista). */}
       {sceneReady && hintPhotoUrl && (
@@ -272,6 +281,9 @@ export function GameScene({
           </button>
         </div>
         <div className={styles.sheetMap}>
+          {/* Mapa etiquetado (preset `jugar`, tipo GeoGuessr) con PIN DE CENTRO FIJO:
+              mueves el mapa y el pin queda clavado al centro; el voto = centro al
+              asentarse el arrastre. Más preciso a una mano en móvil. */}
           <PlayMap
             guess={guess}
             answer={null}
@@ -279,8 +291,12 @@ export function GameScene({
             onPick={onGuess}
             meAvatar={meAvatar}
             meUserId={meUserId}
+            preset="jugar"
+            fixedCenterPin
           />
         </div>
+        {/* Barra de acción PROPIA bajo el mapa (no flota sobre él: así no tapa la zona
+            de pan). Anclada con safe-area por el padding de la hoja. */}
         <div className={styles.sheetFooter}>
           {guess ? (
             <Row gap={2} align="center">
@@ -292,12 +308,12 @@ export function GameScene({
               </span>
             </Row>
           ) : (
-            <span className={styles.status}>Toca el mapa para colocar tu pin.</span>
+            <span className={styles.status}>Mueve el mapa para apuntar con el pin central.</span>
           )}
           <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
             <span className={styles.btnIcon}>
-              <Icon icon={Check} size={18} />
-              Confirmar y revelar
+              <Icon icon={Lock} size={18} />
+              Bloquear mi respuesta
             </span>
           </Button>
           <Button variant="secondary" fullWidth onClick={onCloseMap}>

@@ -9,6 +9,11 @@
   z-index: var(--z-overlay);
   background: var(--color-bg);
   overflow: hidden;
+  /* Modelo de viewport correcto: el alto se ata al VISIBLE real en px (`--play-vh`,
+     de useVisualViewport) cuando se conoce; si no, al dynamic viewport `100dvh`
+     (nunca `100vh`, que infla con la barra del navegador y colapsa con el teclado).
+     Así la escena y la hoja del mapa no se salen ni se desploman en móvil. */
+  height: var(--play-vh, 100dvh);
 }
 
 /* Escena (panorama o foto): llena toda la pantalla. */
@@ -73,17 +78,15 @@
   text-align: center;
 }
 
-/* Clúster arriba-izquierda: salida + brújula + temporizador. Respeta el notch. */
-.topCluster {
+/* Cabecera flotante sobre la escena (AppHeader variante floating): se ancla arriba
+   y por encima de la escena/controles. El propio AppHeader respeta el safe-area
+   superior y pinta el velo de legibilidad; aquí solo la elevamos. */
+.sceneHeader {
   position: absolute;
-  top: calc(var(--space-3) + env(safe-area-inset-top));
-  left: calc(var(--space-3) + env(safe-area-inset-left));
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  max-width: calc(100% - var(--space-6));
 }
 
 /* Foto-pista flotante arriba-derecha: pequeña, no tapa la escena. El recuadro
@@ -250,9 +253,14 @@
   right: 0;
   bottom: 0;
   z-index: 5;
-  height: min(92svh, 760px);
+  /* % del contenedor inmersivo (ya atado al alto visible real): la hoja nunca pasa
+     del viewport visible aunque haya teclado/chrome. Cap en px para tablets. */
+  height: min(92%, 760px);
+  max-height: 100%;
   display: flex;
   flex-direction: column;
+  /* min-height:0 para que el mapa interior (hijo flex) pueda encoger sin desbordar. */
+  min-height: 0;
   background: var(--color-surface);
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);

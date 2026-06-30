@@ -137,7 +137,7 @@ describe('PlayNumberChallenge', () => {
     await u.click(screen.getByRole('button', { name: '7' }))
     await u.click(screen.getByRole('button', { name: '2' }))
 
-    await u.click(screen.getByRole('button', { name: /Bloquear mi número/ }))
+    await u.click(screen.getByRole('button', { name: /Bloquear mi respuesta/ }))
 
     expect(submitNumberVoteMock).toHaveBeenCalledTimes(1)
     // Revelado: la cifra correcta grande + tu adivinanza (texto estático; los puntos
