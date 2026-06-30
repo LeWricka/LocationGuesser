@@ -76,6 +76,14 @@ const SINGLE_ZOOM = 2.2
 // hoja que sube sobre el globo), para que los pines no queden tapados.
 const FIT_PADDING = { top: 72, bottom: 120, left: 48, right: 48 }
 
+// Deriva del globo en reposo (grados de longitud por segundo): lento y aspiracional,
+// como una Tierra que gira sola. Tan suave que no marea ni distrae de los pines, pero da
+// vida al héroe. Se desactiva con `prefers-reduced-motion` y se pausa al interactuar / con
+// la hoja subida.
+const SPIN_DEG_PER_SEC = 3
+// Tras una interacción del usuario, espera a reanudar la deriva (deja que termine de mirar).
+const SPIN_RESUME_DELAY_MS = 4000
+
 // Estilo base mínimo: sin sprite/glyphs; los rasters se añaden tras `load`.
 const BASE_STYLE: StyleSpecification = { version: 8, sources: {}, layers: [] }
 
@@ -104,14 +112,36 @@ function hasWebGL(): boolean {
 /** Pin-foto del globo de la home: el MISMO markup que el mapa de viaje
  * (`photoPinHtml`: círculo con foto + puntita inferior; sin foto = disco de acento con
  * la inicial del lugar). Le añadimos `lg-home-pin` para compactarlo y `lg-home-pin--lead`
- * para el anillo cálido pulsante del pin "lead". El borde/look lo gobiernan los tokens. */
+ * para el anillo cálido pulsante del pin "lead". El borde/look lo gobiernan los tokens.
+ *
+ * Carga con RED DE SEGURIDAD: el `photoPinHtml` clava la foto vía `background-image`, que
+ * NO dispara `onerror`. Para no quedarnos con un disco roto si una imagen falla (asset
+ * ausente, red caída), arrancamos con el pin SIN foto (disco de acento con inicial) y solo
+ * lo cambiamos a la miniatura cuando la imagen ha PRECARGADO bien. Así el fallback es el
+ * estado por defecto y la foto un upgrade que solo ocurre si carga de verdad. */
 function pinElement(pin: GlobePin): HTMLDivElement {
   const wrapper = document.createElement('div')
-  wrapper.innerHTML = photoPinHtml({ imageUrl: pin.imageUrl, title: pin.title })
+  // Markup base sin foto (disco de acento + inicial): es el fallback visible de entrada.
+  wrapper.innerHTML = photoPinHtml({ imageUrl: null, title: pin.title })
   // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como elemento del Marker.
   const el = wrapper.firstElementChild as HTMLDivElement
   el.classList.add('lg-home-pin')
   if (pin.lead) el.classList.add('lg-home-pin--lead')
+
+  if (pin.imageUrl) {
+    const disc = el.querySelector<HTMLElement>('.lg-trip-pin__disc')
+    const src = pin.imageUrl
+    const img = new Image()
+    img.onload = () => {
+      if (!disc) return
+      // Carga OK: quita el estado "vacío" (disco de acento + inicial) y clava la foto.
+      el.classList.remove('lg-trip-pin--empty')
+      disc.replaceChildren()
+      disc.style.backgroundImage = `url('${src.replace(/'/g, "\\'")}')`
+    }
+    // onerror: no hacemos nada → se queda el disco de acento con la inicial (fallback).
+    img.src = src
+  }
   return el
 }
 
@@ -181,7 +211,20 @@ export function HomeGlobe({
     pinsRef.current = pins
     onOpenRef.current = onOpenPin
     framingRef.current = framing
+    relaxedRef.current = relaxed
   })
+
+  // Deriva (auto-spin) del globo en reposo: hace que el héroe se sienta VIVO. La
+  // gestiona el rAF de abajo; estos refs la pausan/reanudan sin recrear el mapa.
+  const spinRafRef = useRef<number | null>(null)
+  // Pausada (hoja subida = `relaxed`, o el usuario interactúa): NO derivar.
+  const spinPausedRef = useRef(false)
+  // Marca de tiempo del último frame, para que la velocidad sea constante (grados/seg)
+  // independientemente del refresco de pantalla.
+  const spinLastTsRef = useRef(0)
+  // Valor de `relaxed` en ref: el handler `load` (async) y el montaje lo leen sin meter
+  // `relaxed` en sus deps (recrear el mapa WebGL al arrastrar la hoja sería carísimo).
+  const relaxedRef = useRef(relaxed)
 
   // Repinta los marcadores (pines-foto) desde las refs.
   const repaint = useCallback(() => {
@@ -221,12 +264,64 @@ export function HomeGlobe({
     map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration })
   }, [])
 
+  // Bucle de deriva: empuja la longitud del centro a velocidad constante (grados/seg), de
+  // modo que el globo gira solo. Solo en reposo (no pausado) y sin reduced-motion. Mover el
+  // CENTRO (no el bearing) mantiene el norte arriba y la esfera viva sin desorientar.
+  const stopSpin = useCallback(() => {
+    if (spinRafRef.current != null) {
+      cancelAnimationFrame(spinRafRef.current)
+      spinRafRef.current = null
+    }
+  }, [])
+  const startSpin = useCallback(() => {
+    if (prefersReducedMotion() || spinRafRef.current != null) return
+    spinLastTsRef.current = 0
+    const step = (ts: number) => {
+      const map = mapRef.current
+      if (!map || !readyRef.current || spinPausedRef.current) {
+        spinRafRef.current = null
+        return
+      }
+      // Robustez: si el motor (o un doble de test) no expone get/setCenter, no derivamos
+      // en vez de reventar el rAF. La home nunca debe romperse por el adorno del globo.
+      if (typeof map.getCenter !== 'function' || typeof map.setCenter !== 'function') {
+        spinRafRef.current = null
+        return
+      }
+      // Delta de tiempo → grados a avanzar este frame (velocidad constante real).
+      const last = spinLastTsRef.current || ts
+      spinLastTsRef.current = ts
+      const dLng = (SPIN_DEG_PER_SEC * (ts - last)) / 1000
+      const c = map.getCenter()
+      // Envolvemos la longitud en [-180, 180): jitterless al cruzar el antimeridiano.
+      let lng = c.lng + dLng
+      if (lng > 180) lng -= 360
+      map.setCenter([lng, c.lat])
+      spinRafRef.current = requestAnimationFrame(step)
+    }
+    spinRafRef.current = requestAnimationFrame(step)
+  }, [])
+
   // ── Montaje: crea el mapa una sola vez (import dinámico de maplibre + su CSS). ──
   useEffect(() => {
     if (!webgl) return
     const container = containerRef.current
     if (!container) return
     let disposed = false
+
+    // Al interactuar: pausa la deriva y programa su reanudación tras un respiro (solo en la
+    // landing decorativa; en `pins` la deriva ni arranca, así que esto es no-op allí).
+    let resumeTimer: ReturnType<typeof setTimeout> | null = null
+    const pauseSpinThenResume = () => {
+      spinPausedRef.current = true
+      stopSpin()
+      if (resumeTimer != null) clearTimeout(resumeTimer)
+      resumeTimer = setTimeout(() => {
+        if (disposed || framingRef.current !== 'world') return
+        spinPausedRef.current = false
+        startSpin()
+      }, SPIN_RESUME_DELAY_MS)
+    }
 
     void (async () => {
       try {
@@ -280,7 +375,22 @@ export function HomeGlobe({
           readyRef.current = true
           repaint()
           fitToPins()
+
+          // Deriva en reposo: solo en la landing decorativa (`world`); en la home con
+          // viajes reales (`pins`) el globo queda encuadrado en los pines, sin girar. Si la
+          // hoja ya arranca subida (`relaxed`), no derivamos (el efecto de `relaxed` la
+          // reanudará al recogerse).
+          if (framingRef.current === 'world' && !relaxedRef.current) {
+            spinPausedRef.current = false
+            startSpin()
+          }
         })
+
+        // Interacción del usuario: pausa la deriva y la reanuda tras un respiro. Así el
+        // gesto manda (no peleamos con su paneo) pero el globo vuelve a sentirse vivo.
+        map.on('mousedown', pauseSpinThenResume)
+        map.on('touchstart', pauseSpinThenResume)
+        map.on('wheel', pauseSpinThenResume)
       } catch {
         if (!disposed) setFailed(true)
       }
@@ -289,13 +399,18 @@ export function HomeGlobe({
     return () => {
       disposed = true
       readyRef.current = false
+      stopSpin()
+      if (resumeTimer != null) clearTimeout(resumeTimer)
       for (const m of markersRef.current) m.remove()
       markersRef.current = []
       mapRef.current?.remove()
       mapRef.current = null
       glRef.current = null
     }
-  }, [webgl, repaint, fitToPins])
+    // `relaxed` NO va en las deps: cambia al arrastrar la hoja y recrear el mapa WebGL en
+    // cada toque sería carísimo. Su efecto vive en el useEffect de abajo (pausa/reanuda la
+    // deriva y el render sin recrear nada). El montaje lee su valor inicial vía `relaxedRef`.
+  }, [webgl, repaint, fitToPins, startSpin, stopSpin])
 
   // Repinta + reencuadra cuando cambian los pines (no recrea el mapa).
   useEffect(() => {
@@ -303,14 +418,21 @@ export function HomeGlobe({
     if (readyRef.current) fitToPins()
   }, [pins, repaint, fitToPins])
 
-  // Rendimiento: con la hoja extendida el globo queda casi tapado. Pausamos la rotación
-  // de teselas (stop) para no malgastar batería con WebGL bajo la hoja; al recogerse la
-  // hoja, el render se reanuda solo en la siguiente interacción/cambio.
+  // Rendimiento + deriva según la hoja. Con la hoja SUBIDA (`relaxed`) el globo queda casi
+  // tapado: paramos la rotación de teselas (batería) y PAUSAMOS la deriva. Al RECOGERSE la
+  // hoja (héroe a la vista de nuevo), reanudamos la deriva en la landing decorativa.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !readyRef.current) return
-    if (relaxed) map.stop()
-  }, [relaxed])
+    if (relaxed) {
+      spinPausedRef.current = true
+      stopSpin()
+      map.stop()
+    } else if (framingRef.current === 'world') {
+      spinPausedRef.current = false
+      startSpin()
+    }
+  }, [relaxed, startSpin, stopSpin])
 
   const evoked = !webgl || failed
 

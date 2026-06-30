@@ -139,6 +139,16 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; /* el scroll de la hoja no arrastra al globo/página */
   padding: 0 var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+  /* Oculta la barra de scroll del SO sin perder el scroll: en Android/WebKit el track gris
+     + thumb de esta capa scrollable asomaba como una franja/"||" gris pegada al borde
+     derecho del globo (lo reportó el dueño en su móvil 1080×2400; headless no pinta
+     scrollbars del SO, por eso no salía en captura). La hoja flota sobre el satélite, así
+     que una barra del navegador rompe el patrón globo+hoja. El scroll sigue funcionando
+     (gesto táctil), solo ocultamos el chrome de la barra. */
+  scrollbar-width: none; /* Firefox / estándar */
+}
+.scroll::-webkit-scrollbar {
+  display: none; /* Chromium / WebKit (Android, iOS) */
 }
 
 /* FAB "+" constante: anclado abajo-derecha sobre la hoja (crear viaje). Por encima de
