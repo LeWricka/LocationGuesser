@@ -46,4 +46,16 @@ describe('useOnboarding', () => {
     const u2 = renderHook(() => useOnboarding('group', 'u2'))
     expect(u2.result.current.shouldShow).toBe(true)
   })
+
+  test('los contextos nuevos también se ven una sola vez', () => {
+    const contexts = ['welcome', 'create-trip', 'add-moment', 'create-challenge'] as const
+    for (const context of contexts) {
+      const first = renderHook(() => useOnboarding(context, 'u1'))
+      expect(first.result.current.shouldShow).toBe(true)
+      act(() => first.result.current.markSeen())
+
+      const again = renderHook(() => useOnboarding(context, 'u1'))
+      expect(again.result.current.shouldShow).toBe(false)
+    }
+  })
 })
