@@ -10,6 +10,12 @@ interface Props {
   /** Tocar un pin → abre su destino. */
   onOpenPin?: (targetId: string) => void
   /**
+   * Encuadre del globo (se pasa tal cual a HomeGlobe):
+   *  - `'pins'` (por defecto): encuadra los pines (home logueada con viajes reales).
+   *  - `'world'`: vista mundo fija, sin fit (landing, pines decorativos → globo esférico).
+   */
+  framing?: 'pins' | 'world'
+  /**
    * Overlay mínimo sobre el globo (marca "Tabide" + ajustes/acción). Va con tinta de
    * escena y safe-area; no debe tapar los pines (es una franja fina arriba).
    */
@@ -38,7 +44,15 @@ const RAISED = 0.12 // hoja subida: el globo queda como una cinta fina arriba
  * La hoja tiene dos posiciones (recogida/subida) que el asa alterna por toque o arrastre.
  * Con la hoja subida relajamos el render del globo (queda tapado). 100dvh + safe-area.
  */
-export function GlobeSheet({ pins, onOpenPin, overlay, children, fab, sheetLabel }: Props) {
+export function GlobeSheet({
+  pins,
+  onOpenPin,
+  framing = 'pins',
+  overlay,
+  children,
+  fab,
+  sheetLabel,
+}: Props) {
   // Posición de la hoja como fracción del alto del visor (top de la hoja). Arranca recogida.
   const [topFrac, setTopFrac] = useState(PEEK)
   // Arrastre activo del asa: durante el drag seguimos el dedo; al soltar, enganchamos.
@@ -83,7 +97,7 @@ export function GlobeSheet({ pins, onOpenPin, overlay, children, fab, sheetLabel
       {/* Zona del GLOBO: gestiona sus propios gestos (paneo/zoom). Ocupa el alto hasta
           donde llega la hoja, así sus pines no quedan bajo ella cuando está recogida. */}
       <div className={styles.globeZone} style={{ height: `${topFrac * 100}dvh` }}>
-        <HomeGlobe pins={pins} onOpenPin={onOpenPin} relaxed={raised} />
+        <HomeGlobe pins={pins} onOpenPin={onOpenPin} framing={framing} relaxed={raised} />
       </div>
 
       {/* Overlay (marca + ajustes): hermano del shell (NO dentro de la zona del globo)
