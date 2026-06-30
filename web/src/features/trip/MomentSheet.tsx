@@ -14,6 +14,7 @@ import { lockBodyScroll } from '../../lib/scrollLock'
 import { MapPicker } from '../create/MapPicker'
 import { Countdown } from './Countdown'
 import { MomentGallery } from './MomentGallery'
+import { MomentMiniMap } from './MomentMiniMap'
 import styles from './MomentSheet.module.css'
 
 interface Props {
@@ -591,20 +592,15 @@ export function MomentSheet({
                   </section>
                 )}
 
-                {/* TARJETA-MAPA elegante (injerto C): no un mapa pesado, una tarjeta
-                    ligera CSS con pin y coordenadas. Solo si hay lugar visible. */}
+                {/* "EN EL MAPA": mapa REAL (Leaflet estático, preset diario) centrado
+                    en las coordenadas con el pin, para que se vea DÓNDE es. Antes era un
+                    blob abstracto de CSS que no decía nada. Solo si hay lugar visible
+                    (recuerdo con lugar o reto cerrado). */}
                 {hasPlace && !promoting && (
                   <section className={styles.mapSection}>
                     <p className={styles.sectionLabel}>En el mapa</p>
                     <div className={styles.mapCard}>
-                      <div className={styles.mapView} aria-hidden="true">
-                        <span className={styles.mapWater} />
-                        <span className={styles.mapLand} />
-                        <span className={styles.mapGrid} />
-                        <span className={styles.mapPin}>
-                          <Icon icon={MapPin} size={22} />
-                        </span>
-                      </div>
+                      <MomentMiniMap lat={moment.lat as number} lng={moment.lng as number} />
                       <div className={styles.mapFoot}>
                         <span className={styles.mapPlace}>
                           {country ? (
@@ -617,15 +613,16 @@ export function MomentSheet({
                   </section>
                 )}
 
-                {/* Social ligero: contador real de adivinadores (derivado de votos);
-                    solo tiene sentido en un reto. */}
+                {/* Social ligero: contador real de PARTICIPACIÓN (derivado de votos);
+                    solo tiene sentido en un reto. Es un recuento de quién JUGÓ, no de
+                    aciertos, así que el copy dice "participó / participaron". */}
                 {(isReto || isActive) && !promoting ? (
                   <p className={styles.social}>
                     <span className={styles.socialIcon} aria-hidden="true">
                       <Icon icon={User} size={15} />
                     </span>
                     {moment.guessedCount}{' '}
-                    {moment.guessedCount === 1 ? 'persona adivinó' : 'personas adivinaron'}
+                    {moment.guessedCount === 1 ? 'persona participó' : 'personas participaron'}
                   </p>
                 ) : null}
 

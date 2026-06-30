@@ -129,8 +129,10 @@ export function GameScene({
   return (
     <div className={styles.immersive} style={immersiveStyle}>
       {/* Escena protagonista: panorama interactivo o foto (legacy). Solo cuando
-          está lista; antes, placeholder neutro (nada que delate el lugar). */}
-      <div className={styles.sceneFull}>
+          está lista; antes, placeholder neutro (nada que delate el lugar). Al pasar a
+          lista (entrar en juego tras la cuenta), la escena ENTRA con un montaje suave
+          (fundido + leve acercamiento) en vez de un salto seco. */}
+      <div className={`${styles.sceneFull} ${sceneReady ? styles.sceneEnter : ''}`}>
         {!sceneReady ? (
           <div className={styles.scenePlaceholder} aria-hidden="true" />
         ) : scene.kind === 'streetview' ? (

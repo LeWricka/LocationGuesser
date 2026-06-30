@@ -30,9 +30,8 @@ import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import styles from './TripPage.module.css'
 
-/** Las dos secciones del viaje. El orden importa: Diario a la izquierda. */
+/** Las dos secciones del viaje (tab). Solo la activa se monta en el DOM. */
 type Section = 'diario' | 'marcador'
-const SECTIONS: Section[] = ['diario', 'marcador']
 
 const SECTION_OPTIONS = [
   { value: 'diario' as const, label: 'Diario' },
@@ -399,7 +398,6 @@ export function TripPage({
     )
   }
 
-  const activeIndex = SECTIONS.indexOf(section)
   const onDiario = section === 'diario'
 
   return (
@@ -460,14 +458,20 @@ export function TripPage({
         </button>
       )}
 
-      {/* Pista deslizable: dos paneles hermanos (Diario / Marcador). */}
+      {/* Viewport de UN SOLO panel: renderizamos SOLO la sección activa (la inactiva
+          NO está en el DOM). Antes había una pista al 200% con dos paneles hermanos y
+          translateX; el panel inactivo, pegado al borde y oculto solo por overflow,
+          asomaba al menor sub-píxel o frame del canvas del mapa (el solapamiento que
+          se reportó una y otra vez). Sin pista 200% no hay nada que asome. La
+          transición entre tabs es un cross-fade del único panel montado (key=section),
+          anulado bajo reduced-motion. */}
       <div className={styles.viewport}>
-        <div className={styles.track} style={{ transform: `translateX(-${activeIndex * 50}%)` }}>
+        {onDiario ? (
           <section
-            className={`${styles.panel} ${styles.panelBleed}`}
+            key="diario"
+            className={`${styles.panel} ${styles.panelBleed} ${reducedMotion ? '' : styles.panelEnter}`}
             role="tabpanel"
             aria-label="Diario"
-            aria-hidden={section !== 'diario'}
           >
             <TripDiario
               ref={carouselRef}
@@ -485,19 +489,19 @@ export function TripPage({
               onAddMoment={onAddMoment}
             />
           </section>
-
-          {/* MARCADOR: el marcador completo + retos + miembros, reutilizando la
-              GroupPage en modo INCRUSTADO (sin su chrome propio: el viaje aporta
-              cabecera, ⋯ y FAB). Es la pestaña del viaje, no una pantalla suelta. */}
+        ) : (
+          /* MARCADOR: el marcador completo + retos + miembros, reutilizando la
+             GroupPage en modo INCRUSTADO (sin su chrome propio: el viaje aporta
+             cabecera, ⋯ y FAB). Es la pestaña del viaje, no una pantalla suelta. */
           <section
-            className={`${styles.panel} ${styles.panelMarcador}`}
+            key="marcador"
+            className={`${styles.panel} ${styles.panelMarcador} ${reducedMotion ? '' : styles.panelEnter}`}
             role="tabpanel"
             aria-label="Marcador"
-            aria-hidden={section !== 'marcador'}
           >
             <GroupPage groupId={groupId} embedded onBack={onBack} />
           </section>
-        </div>
+        )}
       </div>
 
       {/* FAB "＋" flotante con menú de dos acciones: Momento (recuerdo) o Reto (a

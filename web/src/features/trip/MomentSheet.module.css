@@ -294,19 +294,37 @@
   margin-top: var(--space-3);
 }
 
-/* ── CUERPO EDITORIAL (papel) ─────────────────────────────────────────────── */
+/* ── CUERPO EDITORIAL (papel) ─────────────────────────────────────────────────
+   FUSIÓN héroe → hoja (estilo Polarsteps): la foto NO termina en un corte recto. El
+   papel monta sobre la imagen (margin-top negativo amplio + esquinas redondeadas) y,
+   sobre la frontera, un degradado del color de la hoja (opaco abajo → transparente
+   arriba) hace que la foto se DISUELVA dentro del papel en vez de cortarse. */
 .article {
   position: relative;
   z-index: 2;
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  /* Solapa la foto con esquinas redondeadas: el papel "monta" sobre la imagen. */
-  margin-top: calc(-1 * var(--radius-lg));
+  /* Solape sobre la foto + esquinas más redondeadas (curva suave que "monta"). */
+  margin-top: calc(-1 * var(--space-5));
   padding: var(--space-5) var(--space-4) var(--space-6);
   background: var(--color-surface);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
+}
+/* Puente de degradado: sube por encima del borde del papel y funde la base de la foto
+   con la hoja (la imagen se DISUELVE en el papel, no se corta). Opaco (color de la
+   hoja) en su base, transparente arriba; queda bajo el título grande del velo.
+   pointer-events off para no robar gestos al contenido. */
+.article::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: var(--space-6);
+  pointer-events: none;
+  background: linear-gradient(to top, var(--color-surface) 0%, transparent 100%);
 }
 
 /* Etiqueta de sección con filete a la derecha (injerto C). */
@@ -409,7 +427,7 @@
   flex-direction: column;
 }
 
-/* ---- Tarjeta-mapa elegante (injerto C): ligera, CSS, NO un mapa pesado ---- */
+/* ---- "En el mapa": tarjeta con el mini-mapa REAL (MomentMiniMap) + pie ---- */
 .mapSection {
   display: flex;
   flex-direction: column;
@@ -420,47 +438,6 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   box-shadow: var(--shadow-photo-card);
-}
-.mapView {
-  position: relative;
-  height: 150px;
-  overflow: hidden;
-  background: linear-gradient(135deg, #e7ecef, #dde5e9);
-}
-.mapWater {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(140% 90% at 80% 110%, #bcd0d6 0%, transparent 55%),
-    linear-gradient(160deg, #e9eef0, #d7e1e4);
-}
-.mapLand {
-  position: absolute;
-  width: 240px;
-  height: 200px;
-  left: -40px;
-  top: -50px;
-  transform: rotate(-12deg);
-  border-radius: 40% 55% 48% 52%;
-  background: linear-gradient(150deg, #ede7dc, #e2dac9);
-  box-shadow: inset 0 0 0 1px rgba(52, 80, 107, 0.06);
-}
-.mapGrid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(52, 80, 107, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(52, 80, 107, 0.05) 1px, transparent 1px);
-  background-size: 34px 34px;
-}
-.mapPin {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -100%);
-  z-index: 2;
-  color: var(--accent, #34506b);
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3));
 }
 .mapFoot {
   display: flex;
