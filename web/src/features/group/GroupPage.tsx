@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import {
   AlertTriangle,
   Flag,
@@ -67,6 +67,14 @@ interface Props {
   groupId: string
   /** Vuelve a la home (§3.4). Lo cablea #4; por defecto limpia el hash. */
   onBack?: () => void
+  /**
+   * Modo incrustado: la página vive como pestaña "Marcador" DENTRO del viaje, no
+   * como pantalla suelta. Suprime el chrome propio (volver, contenedor de página
+   * `lg-page`, acciones de cabecera, FAB de compartir y los modales de
+   * Invitar/Ajustes), que ahora los gobierna el viaje (cabecera con ⋯ + FAB). Deja
+   * el contenido: marcador completo, fotos, retos en vivo/anteriores y miembros.
+   */
+  embedded?: boolean
 }
 
 /**
@@ -97,7 +105,7 @@ function formatChallengeDate(value: string | null | undefined): string | null {
 // Página del grupo: clasificación general, retos en vivo y anteriores, histórico
 // de fotos. Distingue dueño (gestiona retos) de miembro (solo juega) y se
 // refresca en tiempo real al entrar cualquier voto del grupo.
-export function GroupPage({ groupId, onBack }: Props) {
+export function GroupPage({ groupId, onBack, embedded = false }: Props) {
   const { user } = useSession()
   const [group, setGroup] = useState<GroupInfo | null>(null)
   const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(null)
@@ -290,52 +298,57 @@ export function GroupPage({ groupId, onBack }: Props) {
 
   if (error) {
     return (
-      <main className="lg-page">
+      <PageRoot embedded={embedded}>
         <Card>
           <p className={styles.error}>{error}</p>
         </Card>
-      </main>
+      </PageRoot>
     )
   }
 
   if (!challenges || !votes) {
-    return <GroupSkeleton />
+    return <GroupSkeleton embedded={embedded} />
   }
 
   const hasChallenges = challenges.length > 0
 
   return (
-    <main className="lg-page">
+    <PageRoot embedded={embedded}>
       <Stack gap={6} className="lg-stagger">
-        <BackHomeButton onClick={goBack} />
-        <header className={styles.header}>
-          <div>
-            <h1 className={styles.title}>{group?.name?.trim() || groupId}</h1>
-            {/* El código siempre visible (en secundario) para poder compartirlo. */}
-            <p className={styles.code}>Código {groupId}</p>
-          </div>
-          <Row gap={2} wrap>
-            <Button variant="secondary" size="sm" onClick={() => setInviting(true)}>
-              Invitar
-            </Button>
-            {isOwner && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setSettingsOpen(true)}
-                aria-label="Ajustes del viaje"
-              >
-                <Icon icon={Settings} size={16} /> Ajustes
+        {!embedded && <BackHomeButton onClick={goBack} />}
+        {/* Incrustado en el viaje: el nombre ya vive en la cabecera del viaje y las
+            acciones (Invitar/Ajustes/Añadir) cuelgan del ⋯ y del FAB. Suprimimos la
+            cabecera propia para no duplicar chrome; solo en la página suelta se pinta. */}
+        {!embedded && (
+          <header className={styles.header}>
+            <div>
+              <h1 className={styles.title}>{group?.name?.trim() || groupId}</h1>
+              {/* El código siempre visible (en secundario) para poder compartirlo. */}
+              <p className={styles.code}>Código {groupId}</p>
+            </div>
+            <Row gap={2} wrap>
+              <Button variant="secondary" size="sm" onClick={() => setInviting(true)}>
+                Invitar
               </Button>
-            )}
-            {/* Grupo archivado (solo-lectura): no se añaden retos. */}
-            {isOwner && !isClosed && (
-              <Button size="sm" onClick={goCreateChallenge}>
-                <Icon icon={Plus} size={16} /> Añadir reto
-              </Button>
-            )}
-          </Row>
-        </header>
+              {isOwner && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setSettingsOpen(true)}
+                  aria-label="Ajustes del viaje"
+                >
+                  <Icon icon={Settings} size={16} /> Ajustes
+                </Button>
+              )}
+              {/* Grupo archivado (solo-lectura): no se añaden retos. */}
+              {isOwner && !isClosed && (
+                <Button size="sm" onClick={goCreateChallenge}>
+                  <Icon icon={Plus} size={16} /> Añadir reto
+                </Button>
+              )}
+            </Row>
+          </header>
+        )}
 
         {/* Banner de fin de temporada: el grupo está congelado y en solo-lectura.
             La fecha del cierre la da closed_at. */}
@@ -418,47 +431,64 @@ export function GroupPage({ groupId, onBack }: Props) {
         />
       </Stack>
 
-      {isOwner && settingsOpen && (
-        <GroupSettingsModal
-          groupId={groupId}
-          currentName={group?.name ?? null}
-          isClosed={isClosed}
-          onClose={() => setSettingsOpen(false)}
-          onRenamed={() => {
-            setSettingsOpen(false)
-            void refresh()
-          }}
-          onSeasonChanged={() => {
-            setSettingsOpen(false)
-            void refresh()
-          }}
-          onDeleted={goBack}
-        />
+      {/* Modales y FAB propios SOLO en la página suelta. Incrustado en el viaje,
+          Invitar/Ajustes/Cerrar/Borrar cuelgan del menú ⋯ del viaje (sus propias
+          instancias), y compartir es la acción del FAB del viaje: aquí los
+          suprimimos para no duplicar overlays ni FABs flotantes solapados. */}
+      {!embedded && (
+        <>
+          {isOwner && settingsOpen && (
+            <GroupSettingsModal
+              groupId={groupId}
+              currentName={group?.name ?? null}
+              isClosed={isClosed}
+              onClose={() => setSettingsOpen(false)}
+              onRenamed={() => {
+                setSettingsOpen(false)
+                void refresh()
+              }}
+              onSeasonChanged={() => {
+                setSettingsOpen(false)
+                void refresh()
+              }}
+              onDeleted={goBack}
+            />
+          )}
+
+          {/* FAB: abre la previa de la tarjeta de clasificación para compartirla como
+              IMAGEN en el chat (motor del bucle social). Siempre accesible. */}
+          <ShareLeaderboardFab onShare={() => setSharingLeaderboard(true)} />
+
+          <ShareLeaderboardModal
+            open={sharingLeaderboard}
+            onClose={() => setSharingLeaderboard(false)}
+            groupName={group?.name?.trim() || groupId}
+            entries={leaderboard}
+            prizes={group?.prizes ?? null}
+            link={groupLink(groupId)}
+          />
+
+          <InviteModal
+            open={inviting}
+            onClose={() => setInviting(false)}
+            groupId={groupId}
+            groupName={group?.name?.trim() || groupId}
+            link={groupLink(groupId)}
+            challengeCount={challenges.length}
+          />
+        </>
       )}
-
-      {/* FAB: abre la previa de la tarjeta de clasificación para compartirla como
-          IMAGEN en el chat (motor del bucle social). Siempre accesible. */}
-      <ShareLeaderboardFab onShare={() => setSharingLeaderboard(true)} />
-
-      <ShareLeaderboardModal
-        open={sharingLeaderboard}
-        onClose={() => setSharingLeaderboard(false)}
-        groupName={group?.name?.trim() || groupId}
-        entries={leaderboard}
-        prizes={group?.prizes ?? null}
-        link={groupLink(groupId)}
-      />
-
-      <InviteModal
-        open={inviting}
-        onClose={() => setInviting(false)}
-        groupId={groupId}
-        groupName={group?.name?.trim() || groupId}
-        link={groupLink(groupId)}
-        challengeCount={challenges.length}
-      />
-    </main>
+    </PageRoot>
   )
+}
+
+// Contenedor raíz de la página del grupo. En la página suelta es el `<main>` con
+// `lg-page` (ancho de lectura, min-height, safe-area). Incrustado como pestaña
+// "Marcador" del viaje es un simple bloque sin ese chrome: el viaje ya aporta el
+// scroll del panel, la cabecera y el safe-area inferior.
+function PageRoot({ embedded, children }: { embedded: boolean; children: ReactNode }) {
+  if (embedded) return <div className={styles.embeddedRoot}>{children}</div>
+  return <main className="lg-page">{children}</main>
 }
 
 // FAB de "Compartir clasificación": pastilla flotante abajo-izquierda (la
@@ -482,17 +512,22 @@ function ShareLeaderboardFab({ onShare }: { onShare: () => void }) {
 // + clasificación + tarjetas) con shimmer. Reduce la espera percibida frente a
 // un spinner suelto (el ojo ya "lee" la estructura). role=status anuncia la
 // carga al lector de pantalla; los bloques shimmer van aria-hidden.
-function GroupSkeleton() {
+function GroupSkeleton({ embedded = false }: { embedded?: boolean }) {
+  const className = embedded ? styles.embeddedRoot : 'lg-page'
   return (
-    <main className="lg-page" role="status" aria-label="Cargando el viaje">
+    <div className={className} role="status" aria-label="Cargando el viaje">
       <Stack gap={6}>
-        <Row justify="between" align="center" gap={3}>
-          <Stack gap={2}>
-            <Skeleton width={180} height={28} radius="md" />
-            <Skeleton width={110} height={14} />
-          </Stack>
-          <Skeleton width={120} height={36} radius="sm" />
-        </Row>
+        {/* La fila de cabecera (título + botón) solo en la página suelta: incrustado
+            la cabecera la pone el viaje, así que el esqueleto no la reserva. */}
+        {!embedded && (
+          <Row justify="between" align="center" gap={3}>
+            <Stack gap={2}>
+              <Skeleton width={180} height={28} radius="md" />
+              <Skeleton width={110} height={14} />
+            </Stack>
+            <Skeleton width={120} height={36} radius="sm" />
+          </Row>
+        )}
 
         <Stack gap={3}>
           <Skeleton width={200} height={22} radius="md" />
@@ -522,7 +557,7 @@ function GroupSkeleton() {
           ))}
         </Stack>
       </Stack>
-    </main>
+    </div>
   )
 }
 

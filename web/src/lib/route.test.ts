@@ -1,5 +1,12 @@
 import { describe, test, expect } from 'vitest'
-import { parseHash, groupHash, classicGroupHash, addMomentHash, addChallengeHash } from './route'
+import {
+  parseHash,
+  groupHash,
+  classicGroupHash,
+  marcadorGroupHash,
+  addMomentHash,
+  addChallengeHash,
+} from './route'
 
 describe('parseHash', () => {
   test('grupo y reto juntos', () => {
@@ -57,28 +64,37 @@ describe('parseHash', () => {
     expect(parseHash('#g=nuevo')).toEqual({ view: 'home', group: 'nuevo' })
   })
 
-  test('grupo sin v → pantalla Viaje (sin groupView)', () => {
-    // Por defecto el grupo abre el "Viaje": parseHash no marca groupView.
+  test('grupo sin v → abre en Diario (sin groupView)', () => {
+    // Por defecto el viaje abre en "Diario": parseHash no marca groupView.
     expect(parseHash('#g=abc123')).toEqual({ view: 'home', group: 'abc123' })
   })
 
-  test('v=clasico → escape a la GroupPage clásica', () => {
-    expect(parseHash('#g=abc123&v=clasico')).toEqual({
+  test('v=marcador → arranca en la pestaña Marcador', () => {
+    expect(parseHash('#g=abc123&v=marcador')).toEqual({
       view: 'home',
       group: 'abc123',
-      groupView: 'clasico',
+      groupView: 'marcador',
     })
   })
 
-  test('v desconocido se ignora (cae al Viaje)', () => {
+  test('v=clasico (legado) → arranca también en la pestaña Marcador', () => {
+    // Los enlaces viejos a la GroupPage clásica no se rompen: aterrizan en Marcador.
+    expect(parseHash('#g=abc123&v=clasico')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      groupView: 'marcador',
+    })
+  })
+
+  test('v desconocido se ignora (cae a Diario)', () => {
     expect(parseHash('#g=abc123&v=otra')).toEqual({ view: 'home', group: 'abc123' })
   })
 
   test('add=1 marca la intención de añadir momento (asistente clásico)', () => {
-    expect(parseHash('#g=abc123&v=clasico&add=1')).toEqual({
+    expect(parseHash('#g=abc123&v=marcador&add=1')).toEqual({
       view: 'home',
       group: 'abc123',
-      groupView: 'clasico',
+      groupView: 'marcador',
       groupAdd: true,
     })
   })
@@ -110,11 +126,17 @@ describe('groupHash', () => {
   })
 })
 
-describe('classicGroupHash / addMomentHash', () => {
-  test('classicGroupHash apunta a la vista clásica', () => {
+describe('marcadorGroupHash / classicGroupHash / addMomentHash', () => {
+  test('marcadorGroupHash apunta a la pestaña Marcador', () => {
+    expect(marcadorGroupHash('abc123')).toBe('#g=abc123&v=marcador')
+    // Y parseHash lo reconoce (ida y vuelta).
+    expect(parseHash(marcadorGroupHash('abc123')).groupView).toBe('marcador')
+  })
+
+  test('classicGroupHash (legado) sigue aterrizando en Marcador', () => {
     expect(classicGroupHash('abc123')).toBe('#g=abc123&v=clasico')
-    // Y parseHash lo reconoce como tal (ida y vuelta).
-    expect(parseHash(classicGroupHash('abc123')).groupView).toBe('clasico')
+    // El enlace viejo se mapea a la pestaña Marcador (compatibilidad).
+    expect(parseHash(classicGroupHash('abc123')).groupView).toBe('marcador')
   })
 
   test('addMomentHash abre el flujo ligero "Añadir recuerdo"', () => {
