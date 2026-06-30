@@ -10,6 +10,7 @@ import { Logo } from './Logo'
 import type { GroupStatus } from './GroupCard'
 import { GlobeSheet } from './GlobeSheet'
 import type { GlobePin } from './HomeGlobe'
+import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
 import styles from './HomeDashboard.module.css'
 
 export interface HomeGroup {
@@ -269,7 +270,11 @@ function TripCard({
   const isButton = typeof onClick === 'function'
   const dates = formatTripDates(group.startsOn, group.endsOn)
   const live = !group.closed && (group.status === 'live' || group.status === 'toplay')
-  const hasCover = Boolean(group.coverUrl)
+  // Portada AUTOMÁTICA del nombre del lugar cuando el viaje no tiene foto propia. Solo
+  // se intenta si falta `coverUrl`; mientras carga (o si no hay foto) cae al placeholder.
+  const autoCover = useAutoCover(group.coverUrl ? null : group.name)
+  const coverUrl = group.coverUrl ?? autoCover
+  const hasCover = Boolean(coverUrl)
 
   return (
     <button
@@ -282,7 +287,7 @@ function TripCard({
       {hasCover ? (
         <span
           className={styles.cover}
-          style={{ backgroundImage: `url('${group.coverUrl}')` }}
+          style={{ backgroundImage: `url('${coverUrl}')` }}
           aria-hidden="true"
         />
       ) : (
@@ -325,6 +330,30 @@ function TripCard({
       </span>
     </button>
   )
+}
+
+// Portada AUTOMÁTICA derivada del nombre del lugar (fallback cuando el viaje no tiene
+// foto propia). `resolvePlaceCover` nunca lanza y cachea; si no hay foto (o la Edge
+// Function `place-cover` aún no está desplegada) devuelve null y la tarjeta se queda con
+// su placeholder elegante — es el comportamiento correcto, no un error. No bloquea el
+// render: arranca null y, si llega imagen y el viaje sigue vivo, la fija.
+function useAutoCover(name: string | null): string | null {
+  // Guardamos la foto JUNTO al nombre que la originó: si el nombre cambia, el render
+  // descarta la anterior sin un setState de reseteo en el efecto (que el linter veta).
+  const [resolved, setResolved] = useState<{ name: string; url: string } | null>(null)
+
+  useEffect(() => {
+    if (!name) return
+    let active = true
+    void resolvePlaceCover(normalizePlaceName(name)).then((cover) => {
+      if (active && cover.imageUrl) setResolved({ name, url: cover.imageUrl })
+    })
+    return () => {
+      active = false
+    }
+  }, [name])
+
+  return resolved && resolved.name === name ? resolved.url : null
 }
 
 // Cuenta atrás VIVA del plazo del reto fijado: refresca cada minuto. Sin plazo
