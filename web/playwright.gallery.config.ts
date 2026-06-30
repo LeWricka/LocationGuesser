@@ -5,6 +5,11 @@ import { defineConfig, devices } from '@playwright/test'
 // (la galería va con fixtures, sin login ni red), (2) levanta el dev server con
 // GALLERY=1 para servir gallery.html con los dobles, (3) bloquea cualquier red
 // externa (tiles/SDK/CDN) para que las capturas sean 100% deterministas y offline.
+//
+// El viewport/escala NO se fijan aquí: el spec abre un contexto propio por cada
+// viewport representativo (ver VIEWPORTS en gallery-capture.spec.ts) para cazar las
+// franjas muertas y el escalado que solo asoman en móviles altos (ratio ~2.2, tipo
+// 1080×2400). Por eso aquí solo dejamos la base de Desktop Chrome.
 
 const PORT = 5188
 const baseURL = `http://localhost:${PORT}`
@@ -14,21 +19,15 @@ export default defineConfig({
   testMatch: /gallery-capture\.spec\.ts/,
   fullyParallel: false,
   reporter: 'list',
-  // Viewport móvil con densidad 2x (lo que pide el encargo): iPhone-ish.
+  // Un único test recorre todos los casos × todos los viewports, así que el límite
+  // por test de 30s se queda corto: lo subimos para que quepan las ~3× capturas.
+  timeout: 180_000,
   use: {
     baseURL,
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 2,
     ...devices['Desktop Chrome'],
-    // Re-afirmamos viewport/escala tras el spread de devices (que trae los suyos).
     isMobile: false,
   },
-  projects: [
-    {
-      name: 'gallery',
-      use: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 },
-    },
-  ],
+  projects: [{ name: 'gallery' }],
   webServer: {
     command: 'npm run dev -- --port ' + PORT,
     url: baseURL + '/gallery.html',
