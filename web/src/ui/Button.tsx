@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Spinner } from './Spinner'
 import styles from './Button.module.css'
 
-type Variant = 'primary' | 'secondary' | 'ghost'
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 type Size = 'sm' | 'md' | 'lg'
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -12,6 +12,11 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean
   /** Ocupa todo el ancho disponible (típico en CTAs móviles). */
   fullWidth?: boolean
+  /**
+   * Botón-icono circular de 44px (atrás, cerrar, ⋯). El contenido es un único
+   * `Icon`; exige `aria-label` propio porque no hay texto visible.
+   */
+  iconButton?: boolean
   children: ReactNode
 }
 
@@ -20,6 +25,7 @@ export function Button({
   size = 'md',
   loading = false,
   fullWidth = false,
+  iconButton = false,
   disabled,
   className,
   children,
@@ -29,7 +35,7 @@ export function Button({
   const classes = [
     styles.button,
     styles[variant],
-    styles[size],
+    iconButton ? styles.iconButton : styles[size],
     fullWidth ? styles.fullWidth : null,
     loading ? styles.loading : null,
     className,

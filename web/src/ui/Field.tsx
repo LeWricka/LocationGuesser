@@ -1,5 +1,7 @@
 import { useId } from 'react'
 import type { ReactElement, ReactNode } from 'react'
+import { AlertTriangle } from 'lucide-react'
+import { Icon } from './Icon'
 import styles from './Field.module.css'
 
 interface Props {
@@ -8,6 +10,8 @@ interface Props {
   error?: string | null
   /** Texto de ayuda bajo la etiqueta. */
   hint?: ReactNode
+  /** Marca el campo como obligatorio (asterisco junto a la etiqueta). */
+  required?: boolean
   /** Oculta visualmente la etiqueta pero la deja para lectores de pantalla. */
   hideLabel?: boolean
   /**
@@ -22,7 +26,14 @@ interface Props {
 }
 
 // Agrupa label + control + ayuda/error con el cableado de accesibilidad hecho.
-export function Field({ label, error, hint, hideLabel = false, children }: Props) {
+export function Field({
+  label,
+  error,
+  hint,
+  required = false,
+  hideLabel = false,
+  children,
+}: Props) {
   const id = useId()
   const hintId = `${id}-hint`
   const errorId = `${id}-error`
@@ -32,6 +43,12 @@ export function Field({ label, error, hint, hideLabel = false, children }: Props
     <div className={styles.field}>
       <label htmlFor={id} className={hideLabel ? styles.labelHidden : styles.label}>
         {label}
+        {required && (
+          // Marca visible de obligatorio; el lector lo anuncia como "obligatorio".
+          <span className={styles.required} aria-label="obligatorio">
+            *
+          </span>
+        )}
       </label>
       {hint && (
         <p id={hintId} className={styles.hint}>
@@ -45,6 +62,7 @@ export function Field({ label, error, hint, hideLabel = false, children }: Props
       })}
       {error && (
         <p id={errorId} className={styles.error} role="alert">
+          <Icon icon={AlertTriangle} size={16} className={styles.errorIcon} />
           {error}
         </p>
       )}

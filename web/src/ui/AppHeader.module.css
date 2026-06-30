@@ -1,0 +1,109 @@
+/* Cabecera de tres ranuras: [atrás/cerrar] · [título centrado] · [acción]. Las
+ * ranuras laterales tienen ancho mínimo igual (tap target) para que el título
+ * quede ópticamente centrado aunque solo haya control en un lado. */
+.header {
+  position: relative;
+  z-index: var(--z-header);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target);
+  padding: var(--space-2) var(--space-3);
+}
+
+.slotStart,
+.slotEnd {
+  display: flex;
+  align-items: center;
+  /* Ambas ranuras reservan al menos un tap target → título centrado. */
+  min-width: var(--tap-target);
+}
+
+.slotEnd {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+/* Título serif, una sola línea, truncado con elipsis para nombres largos. */
+.title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Control izquierdo: icon-button circular de 44px (tap target cómodo). */
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.iconButton:hover {
+  background: var(--color-surface-hover);
+}
+
+.iconButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- Variante plain: sobre papel, hairline inferior ---- */
+.plain {
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+/* ---- Variante floating: sobre escena inmersiva (mapa/foto a sangre) ----
+ * Tinta clara + velo de legibilidad bajo la cabecera + safe-area superior, para
+ * que el título se lea sobre cualquier imagen sin hardcodear blancos/negros. */
+.floating {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding-top: calc(var(--space-2) + env(safe-area-inset-top));
+  color: var(--scene-ink);
+  /* Velo de arriba a abajo: oscurece la franja superior para que la tinta clara
+   * tenga contraste, fundiéndose con la escena hacia abajo. */
+  background: linear-gradient(to bottom, var(--scene-veil), transparent);
+}
+
+.floating .iconButton {
+  background: var(--scene-surface);
+  border: 1px solid var(--scene-hairline);
+}
+
+.floating .iconButton:hover {
+  background: color-mix(in srgb, var(--scene-surface) 70%, white);
+}
+
+.floating .title {
+  /* Realce sutil para despegar el título de imágenes claras (el velo lleva el
+   * grueso del contraste; esto es el remate). */
+  text-shadow: 0 1px 4px var(--scene-veil);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iconButton {
+    transition: none;
+  }
+}
