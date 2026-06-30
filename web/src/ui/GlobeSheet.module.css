@@ -4,12 +4,14 @@
    asa que la sube/baja (gestos separados, no pelean). */
 
 .shell {
-  position: relative;
-  /* Rompe el padding del contenedor de página (.lg-page) para llegar a los bordes del
-     visor por los cuatro lados (el globo y la hoja van a sangre). */
-  width: calc(100% + var(--space-4) * 2);
+  /* A sangre real en el visor: `fixed` lo desliga del padding/`max-width` del contenedor
+     de página (.lg-page lo capa a 600px y centra en desktop), así el globo y la hoja
+     llenan el ancho completo en móvil sin overflow horizontal ni recortes laterales. */
+  position: fixed;
+  /* `inset: 0` fija left/right a los bordes → ancho = visor SIN contar la barra de scroll
+     (evita el overflow horizontal de `100vw` en desktop). */
+  inset: 0;
   height: 100dvh;
-  margin: calc(var(--space-4) * -1);
   overflow: hidden;
   background: var(--scene-bg);
   isolation: isolate;
@@ -25,24 +27,55 @@
 }
 
 /* Overlay mínimo sobre el globo: franja fina arriba (marca + ajustes). Tinta de escena
-   y safe-area; no captura gestos salvo en sus controles (pointer-events en hijos). */
+   y safe-area; no captura gestos salvo en sus controles (pointer-events en hijos).
+   z-index alto: por encima de la hoja y la costura, para que la marca NUNCA quede
+   pisada/cortada por el mapa o el borde de la hoja. */
 .overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  padding-top: calc(env(safe-area-inset-top) + var(--space-3));
+  /* Suelo de aire arriba aunque no haya safe-area (navegador sin notch): la marca no
+     se pega al borde superior. `max()` toma el mayor de los dos. */
+  padding: max(env(safe-area-inset-top), var(--space-4)) var(--space-4) var(--space-4);
   color: var(--scene-ink);
   pointer-events: none;
-  background: linear-gradient(to bottom, var(--scene-veil), transparent);
+  /* Velo más alto y firme: la marca/iconos se leen AA sobre cualquier zona del satélite
+     (mar claro, nubes) sin parecer recortados. */
+  background: linear-gradient(to bottom, var(--scene-veil) 0%, transparent 100%);
 }
 .overlay > * {
   pointer-events: auto;
+}
+
+/* COSTURA héroe + hoja: velo de fusión anclado al borde de la hoja y que sube SOBRE el
+   globo. Degrada de transparente (arriba, deja ver el globo) a la superficie de la hoja
+   (abajo, ya es blanco), así el globo se funde con la hoja sin corte seco ni banda
+   intermedia. Hereda el `top` inline de la hoja (mismo borde) y se eleva con un alto
+   propio restando de su `top`. Encima del globo, debajo del contenido de la hoja. */
+.seam {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* Altura del fundido: una franja generosa para que la transición sea suave. */
+  height: calc(var(--space-8) + var(--space-6));
+  /* Sube sobre el globo: el borde inferior coincide con el top de la hoja (mismo inline
+     `top`), y el cuerpo se eleva con translateY negativo. */
+  transform: translateY(calc((var(--space-8) + var(--space-6)) * -1));
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 32%,
+    rgba(255, 255, 255, 0.45) 62%,
+    var(--surface) 100%
+  );
+  transition: top var(--duration-slow) var(--ease-emphasized);
 }
 
 /* HOJA BLANCA: ocupa del `top` (inline, según la posición) hasta el fondo del visor.
@@ -53,7 +86,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   background: var(--surface);
