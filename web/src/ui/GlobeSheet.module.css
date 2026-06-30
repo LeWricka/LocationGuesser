@@ -1,0 +1,128 @@
+/* Patrón GLOBO + HOJA (referencia Polarsteps): globo héroe a sangre arriba y una hoja
+   blanca que sube debajo. El shell ocupa el visor entero (100dvh + safe-area); el globo
+   vive en su zona superior (gestos de mapa) y la hoja es una capa de scroll propia con
+   asa que la sube/baja (gestos separados, no pelean). */
+
+.shell {
+  position: relative;
+  /* Rompe el padding del contenedor de página (.lg-page) para llegar a los bordes del
+     visor por los cuatro lados (el globo y la hoja van a sangre). */
+  width: calc(100% + var(--space-4) * 2);
+  height: 100dvh;
+  margin: calc(var(--space-4) * -1);
+  overflow: hidden;
+  background: var(--scene-bg);
+  isolation: isolate;
+}
+
+/* Zona del globo: a sangre arriba; su alto lo fija el shell (= top de la hoja) por estilo
+   inline. Los gestos de mapa quedan aquí (la hoja, encima, tapa lo que no asoma). */
+.globeZone {
+  position: absolute;
+  inset: 0 0 auto 0;
+  width: 100%;
+  z-index: 0;
+}
+
+/* Overlay mínimo sobre el globo: franja fina arriba (marca + ajustes). Tinta de escena
+   y safe-area; no captura gestos salvo en sus controles (pointer-events en hijos). */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  padding-top: calc(env(safe-area-inset-top) + var(--space-3));
+  color: var(--scene-ink);
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--scene-veil), transparent);
+}
+.overlay > * {
+  pointer-events: auto;
+}
+
+/* HOJA BLANCA: ocupa del `top` (inline, según la posición) hasta el fondo del visor.
+   Sube/baja con el asa; su contenido scrollea dentro. Sombra HACIA ARRIBA (sube desde
+   abajo). El radio superior la despega del globo. */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-sheet);
+  transition: top var(--duration-slow) var(--ease-emphasized);
+  /* No deja que el contenido se salga por las esquinas redondeadas de arriba. */
+  overflow: hidden;
+}
+
+/* Asa (grab): zona de arrastre/toque de la hoja. Botón → accesible (alterna posición). */
+.grabZone {
+  flex: none;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: var(--space-3) 0 var(--space-2);
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  touch-action: none; /* el asa gestiona el arrastre vertical, no el scroll de página */
+  -webkit-tap-highlight-color: transparent;
+}
+.grabZone:active {
+  cursor: grabbing;
+}
+.grab {
+  width: 40px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--hairline-strong);
+}
+.grabZone:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Scroll propio de la hoja: aquí scrollea el contenido (feed/mensaje), NO la página ni
+   el globo. Holgura inferior para que el FAB no tape el final + safe-area. */
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; /* el scroll de la hoja no arrastra al globo/página */
+  padding: 0 var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+}
+
+/* FAB "+" constante: anclado abajo-derecha sobre la hoja (crear viaje). Por encima de
+   la hoja; respeta safe-area. */
+.fab {
+  position: absolute;
+  right: var(--space-4);
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-5));
+  z-index: var(--z-sticky);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    transition: none;
+  }
+}
+
+@media (min-width: 480px) {
+  /* En pantallas anchas la hoja conserva una columna de lectura centrada (el globo sigue
+     a sangre detrás). El contenido se centra dentro del scroll vía su propio max-width. */
+  .scroll {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
+}

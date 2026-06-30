@@ -1,30 +1,27 @@
-// Landing pública para visitantes SIN sesión (issue #175; portada visual #183).
+// Landing pública para visitantes SIN sesión (issue #175; portada visual #183;
+// patrón globo + hoja #343).
 //
-// Antes el visitante veía un formulario de email en una tarjeta nada más entrar.
-// Ahora ve una PORTADA con alma: una imagen de marca, una frase emotiva en serif
-// y poco texto. El correo no está a la vista: aparece en un POPUP fino (LoginPopup,
-// una hoja del kit) al pulsar el CTA. El relato es COMPARTIR tus recuerdos y
-// vivirlos con los tuyos; adivinar en el mapa es el guiño, no el qué somos.
+// Patrón GLOBO + HOJA (referencia Polarsteps): un globo a sangre arriba con pines-foto
+// de datos demo curados (el wow y la identidad) y una HOJA BLANCA que sube debajo con el
+// mensaje y el CTA (la legibilidad). Sustituye a la portada con imagen estática: ahora el
+// héroe es el globo real, interactivo, y el relato vive en la hoja. El correo NO está a la
+// vista: aparece en un popup fino (LoginPopup) al pulsar "Empieza".
 //
-// La política sigue siendo passwordless puro: sin contraseñas (cuentas-y-home.md
-// §1.2 y §2). Login y registro son el MISMO flujo OTP, así que un solo popup sirve
-// para ambos ("empieza a compartir" y "ya tengo cuenta" abren la misma hoja).
+// La política sigue siendo passwordless puro: sin contraseñas (cuentas-y-home.md §1.2 y
+// §2). Login y registro son el MISMO flujo OTP, así que un solo popup sirve para ambos.
 //
 // Reutiliza:
-//  - `ui/Modal` (vía LoginPopup) para la hoja de entrada, con transición fina.
-//  - `useMagicLink` (dentro de LoginPopup) para todo el wiring OTP, el mismo que
-//    usa LoginFlow (código de 6 dígitos; enlace del correo como respaldo).
-//  - `ui/HowItWorksImmersive` para la sección "cómo funciona" inmersiva (satélite
-//    a sangre + hoja que crece + bucle animado del mapa). La variante compacta
-//    `ui/HowItWorks` se sigue usando en el dashboard/estado vacío.
-//  - `features/home/navigation.joinByCode` para el atajo "tengo un código de
-//    viaje" en la landing genérica (lleva a `#g=<código>`).
+//  - `features/home/GlobeSheet` (+ HomeGlobe) para el patrón globo + hoja, con el preset
+//    de mapa `diario` (satélite + etiquetas) y los pines-foto del mapa de viaje.
+//  - `ui/Modal` (vía LoginPopup) para la hoja de entrada, con todo el wiring OTP.
+//  - `ui/HowItWorksImmersive` para la sección "cómo funciona" dentro de la hoja.
+//  - `features/home/navigation.joinByCode` para el atajo "tengo un código de viaje".
 
 import { useState } from 'react'
-import { Button, HowItWorksImmersive, Field, Input, Stack } from '../../ui'
+import { Button, GlobeSheet, HowItWorksImmersive, Field, Input, Logo, Stack } from '../../ui'
+import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { joinByCode } from '../home/navigation'
 import { LoginPopup } from './LoginPopup'
-import heroImage from '../../assets/hero.png'
 import styles from './Landing.module.css'
 
 interface Props {
@@ -41,13 +38,14 @@ interface Props {
 }
 
 export function Landing({ groupName, redirectTo }: Props) {
-  // El email no está a la vista: se abre la hoja al pulsar el CTA (o "ya tengo
-  // cuenta", que es el mismo flujo OTP — login y registro no se distinguen).
+  // El email no está a la vista: se abre la hoja al pulsar el CTA (o "ya tengo cuenta",
+  // que es el mismo flujo OTP — login y registro no se distinguen).
   const [authOpen, setAuthOpen] = useState(false)
 
-  // Atajo opcional (solo landing genérica): el visitante que ya tiene un código
-  // de VIAJE lo pega aquí y entra directo al flujo de unirse (#g=<código>). Es
-  // distinto del código OTP de login: este navega, no autentica.
+  // Atajo opcional (solo landing genérica): el visitante que ya tiene un código de VIAJE
+  // lo pega aquí y entra directo al flujo de unirse (#g=<código>). Se despliega bajo el
+  // botón ghost. Es distinto del código OTP de login: este navega, no autentica.
+  const [codeOpen, setCodeOpen] = useState(false)
   const [groupCode, setGroupCode] = useState('')
   const [codeError, setCodeError] = useState<string | undefined>(undefined)
 
@@ -55,12 +53,18 @@ export function Landing({ groupName, redirectTo }: Props) {
 
   return (
     <main className={styles.page}>
-      <div className={styles.content}>
-        <section className={styles.hero}>
-          {/* Imagen de marca: las dos hojas (el momento compartido y el que lo
-              vive). Decorativa; el mensaje lo lleva el titular. */}
-          <img className={styles.heroImage} src={heroImage} alt="" aria-hidden="true" />
-
+      <GlobeSheet
+        pins={HOME_DEMO_PINS}
+        // Tocar un pin demo en la landing = invitar a empezar (no hay viaje real).
+        onOpenPin={() => setAuthOpen(true)}
+        sheetLabel="Empieza a compartir"
+        overlay={
+          <span className={styles.brand}>
+            <Logo variant="wordmark" size={20} monochrome />
+          </span>
+        }
+      >
+        <div className={styles.hero}>
           {joining ? (
             <>
               <p className={styles.eyebrow}>Te han invitado</p>
@@ -74,31 +78,31 @@ export function Landing({ groupName, redirectTo }: Props) {
               <h1 className={styles.headline}>
                 Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
               </h1>
-              <p className={styles.lead}>Haz que los que más quieres vivan tus viajes contigo.</p>
+              <p className={styles.lead}>
+                Tu gente adivina dónde estuviste. Gana quien más se acerca.
+              </p>
             </>
           )}
 
-          {/* CTA emotivo: abre la hoja de entrada. El correo aparece allí. */}
-          <Button
-            className={styles.cta}
-            size="lg"
-            onClick={() => setAuthOpen(true)}
-            data-testid="open-auth"
-          >
-            {joining ? 'Únete al viaje' : 'Empieza a compartir'}
-          </Button>
+          <Stack gap={2} className={styles.actions}>
+            {/* CTA primario: abre la hoja de entrada (el correo vive allí). */}
+            <Button size="lg" fullWidth onClick={() => setAuthOpen(true)} data-testid="open-auth">
+              {joining ? 'Únete al viaje' : 'Empieza'}
+            </Button>
+            {joining ? (
+              // Login y registro son el mismo flujo: este enlace abre el mismo popup.
+              <Button variant="ghost" size="lg" fullWidth onClick={() => setAuthOpen(true)}>
+                ¿Ya tienes cuenta? Entra
+              </Button>
+            ) : (
+              // Atajo de código de viaje: despliega el campo bajo el botón.
+              <Button variant="ghost" size="lg" fullWidth onClick={() => setCodeOpen((v) => !v)}>
+                Tengo un código
+              </Button>
+            )}
+          </Stack>
 
-          {/* Login y registro son el mismo flujo: este enlace abre el mismo popup. */}
-          <button type="button" className={styles.signIn} onClick={() => setAuthOpen(true)}>
-            ¿Ya tienes cuenta? <span className={styles.signInAccent}>Entra</span>
-          </button>
-        </section>
-
-        {/* Atajo para quien llega con un código de viaje a mano: solo en la landing
-            genérica (en el flujo deep-link ya viene el viaje dado). */}
-        {!joining && (
-          <details className={styles.codeDisclosure}>
-            <summary className={styles.codeSummary}>¿Te han pasado un código de viaje?</summary>
+          {!joining && codeOpen && (
             <form
               className={styles.codeForm}
               noValidate
@@ -129,13 +133,17 @@ export function Landing({ groupName, redirectTo }: Props) {
                 </Button>
               </Stack>
             </form>
-          </details>
-        )}
+          )}
+        </div>
 
-        {/* Sección inmersiva "cómo funciona": el bucle se vive de un vistazo
-            debajo de la portada. El CTA abre el mismo popup de entrada. */}
-        <HowItWorksImmersive ctaLabel="Empieza un viaje" onCta={() => setAuthOpen(true)} />
-      </div>
+        {/* Sección inmersiva "cómo funciona": el bucle se vive de un vistazo, dentro de la
+            hoja (scrolleable). El CTA abre el mismo popup de entrada. */}
+        <HowItWorksImmersive
+          className={styles.how}
+          ctaLabel="Empieza un viaje"
+          onCta={() => setAuthOpen(true)}
+        />
+      </GlobeSheet>
 
       <LoginPopup
         open={authOpen}

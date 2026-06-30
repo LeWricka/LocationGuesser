@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, Crown, Link2, MapPin, Pin, Plus } from 'lucide-react'
+import { Crown, MapPin, Play, Plus, Settings } from 'lucide-react'
 import { Avatar } from './Avatar'
+import { Banner } from './Banner'
+import { Button } from './Button'
+import { Chip } from './Chip'
 import { Icon } from './Icon'
 import { Logo } from './Logo'
 import type { GroupStatus } from './GroupCard'
+import { GlobeSheet } from './GlobeSheet'
+import type { GlobePin } from './HomeGlobe'
 import styles from './HomeDashboard.module.css'
 
 export interface HomeGroup {
@@ -40,11 +45,11 @@ export interface HomePinned {
 
 // Orden del feed: PRIMERO los viajes que piden acción (te toca → en juego), luego el
 // resto por más reciente. Así lo que urge sube en la lista (el reto concreto, además,
-// va fijado arriba como tarjeta destacada).
+// va fijado arriba como banner).
 function actionRank(status: GroupStatus): number {
-  if (status === 'toplay') return 0 // 🟡 te toca jugar
-  if (status === 'live') return 1 // 🔴 hay reto abierto
-  return 2 // ⚪ sin acción pendiente
+  if (status === 'toplay') return 0 // te toca jugar
+  if (status === 'live') return 1 // hay reto abierto
+  return 2 // sin acción pendiente
 }
 function sortTrips(list: HomeGroup[]): HomeGroup[] {
   return [...list].sort(
@@ -97,31 +102,33 @@ interface Props {
   avatarUrl?: string | null
   /** Grupos (viajes) del usuario. Vacío → estado de bienvenida (lo decide HomePage). */
   groups?: HomeGroup[]
+  /** Pines-foto de los viajes para el globo héroe (los situados; los compone HomePage). */
+  pins?: GlobePin[]
   /** Reto abierto a fijar arriba ("Te toca jugar"). Sin reto → no se fija nada. */
   pinned?: HomePinned | null
   onOpenProfile?: () => void
   onCreateGroup?: () => void
-  onJoinGroup?: () => void
   onOpenGroup?: (id: string) => void
   /** Jugar el reto fijado (lo cablea HomePage a #g=<id>&c=<challengeId>). */
   onPlayPinned?: () => void
   className?: string
 }
 
-// Layout presentacional de la home logueada — maqueta B "diario visual": un FEED
-// vertical de portadas a sangre (la foto del viaje ES la tarjeta) con scroll natural,
-// y el reto abierto FIJADO arriba como tarjeta destacada ("Te toca jugar", en oro: lo
-// urgente). Cabecera fina sticky con el wordmark + crear/unirse + avatar. SIN mapamundi
-// a sangre de héroe: el mapa, si acaso, es una mini-cinta CSS dentro de cada tarjeta.
+// Layout presentacional de la home logueada — patrón GLOBO + HOJA (referencia
+// Polarsteps): globo héroe a sangre arriba (con los pines-foto de tus viajes, tocables) y
+// una HOJA BLANCA debajo con el contenido legible: un Banner "Te toca jugar" si hay reto
+// pendiente, la sección "Tus viajes" con tarjetas-portada y el FAB "+" constante. La
+// marca "Tabide" y los ajustes flotan en un overlay mínimo sobre el globo. El feed va EN
+// la hoja (legible), no sobre el globo oscuro.
 export function HomeDashboard({
   userId,
   displayName,
   avatarUrl,
   groups = [],
+  pins = [],
   pinned,
   onOpenProfile,
   onCreateGroup,
-  onJoinGroup,
   onOpenGroup,
   onPlayPinned,
   className,
@@ -129,44 +136,49 @@ export function HomeDashboard({
   const feed = sortTrips(groups)
 
   return (
-    <div className={[styles.home, className].filter(Boolean).join(' ')}>
-      {/* Cabecera fina, sticky: marca + unirse/crear + perfil. */}
-      <header className={styles.header}>
-        <span className={styles.brand}>
-          <Logo variant="wordmark" size={22} />
-        </span>
-
+    <GlobeSheet
+      pins={pins}
+      onOpenPin={onOpenGroup}
+      sheetLabel="Tus viajes"
+      fab={
         <button
           type="button"
-          className={styles.iconButton}
-          onClick={onJoinGroup}
-          aria-label="Unirme a un viaje con un código"
-        >
-          <Icon icon={Link2} size={20} />
-        </button>
-        <button
-          type="button"
-          className={styles.iconButton}
+          className={styles.fab}
           onClick={onCreateGroup}
           aria-label="Empezar un viaje nuevo"
         >
-          <Icon icon={Plus} size={20} />
+          <Icon icon={Plus} size={26} />
         </button>
-        <button
-          type="button"
-          className={styles.avatarButton}
-          onClick={onOpenProfile}
-          aria-label="Abrir tu perfil"
-        >
-          <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
-        </button>
-      </header>
+      }
+      overlay={
+        <>
+          <span className={styles.brand}>
+            <Logo variant="wordmark" size={20} monochrome />
+          </span>
+          <button
+            type="button"
+            className={styles.sceneButton}
+            onClick={onOpenProfile}
+            aria-label="Abrir tus ajustes"
+          >
+            <Icon icon={Settings} size={20} />
+          </button>
+          <button
+            type="button"
+            className={styles.avatarButton}
+            onClick={onOpenProfile}
+            aria-label="Abrir tu perfil"
+          >
+            <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
+          </button>
+        </>
+      }
+    >
+      <div className={[styles.content, className].filter(Boolean).join(' ')}>
+        {/* Reto fijado arriba: lo urgente, como Banner del kit. Sin reto → nada. */}
+        {pinned && <PinnedBanner pinned={pinned} onPlay={onPlayPinned} />}
 
-      <main className={styles.main}>
-        {/* Reto fijado arriba: lo urgente. Sin reto → no se pinta nada (solo el feed). */}
-        {pinned && <PinnedCard pinned={pinned} onPlay={onPlayPinned} />}
-
-        {/* Feed de viajes: una portada por fila, scroll natural de la página. */}
+        {/* Feed de viajes: una portada por fila, scroll de la hoja. */}
         <section aria-label="Tus viajes" className={styles.feed}>
           <div className={styles.feedHead}>
             <h2 className={styles.feedTitle}>Tus viajes</h2>
@@ -195,71 +207,38 @@ export function HomeDashboard({
             </span>
           </button>
         </section>
-      </main>
-    </div>
+      </div>
+    </GlobeSheet>
   )
 }
 
-// Tarjeta FIJADA "Te toca jugar": la foto del reto a sangre, chip "Reto abierto",
-// cuenta atrás del plazo y un CTA primario "Jugar ahora". Es lo urgente → acento oro.
-function PinnedCard({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => void }) {
-  const isButton = typeof onPlay === 'function'
+// Banner "Te toca jugar": aviso ancho con el título del reto, su viaje + cuenta atrás y un
+// CTA primario "Jugar". Usa el componente Banner del kit (tono oferta = lo urgente, oro).
+function PinnedBanner({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => void }) {
   const countdown = useCountdown(pinned.deadlineAt)
+  const meta = [pinned.groupName ? `Viaje a ${pinned.groupName}` : null, countdown]
+    .filter(Boolean)
+    .join(' · ')
 
   return (
-    <section className={[styles.pinned, styles.rise].join(' ')} aria-labelledby="home-pinned-title">
-      <p className={styles.pinLabel}>
-        <Icon icon={Pin} size={13} /> Te toca jugar
-      </p>
-
-      <button
-        type="button"
-        className={[styles.card, styles.cardPinned].join(' ')}
-        onClick={onPlay}
-        disabled={!isButton}
-        aria-labelledby="home-pinned-title"
-      >
-        <span
-          className={styles.cover}
-          style={pinned.coverUrl ? { backgroundImage: `url('${pinned.coverUrl}')` } : undefined}
-          aria-hidden="true"
-        />
-        <span className={styles.cardBody}>
-          <span className={styles.cardTop}>
-            <span className={[styles.chip, styles.chipLive].join(' ')}>
-              <span className={styles.pulse} aria-hidden="true" />
-              Reto abierto
-            </span>
-          </span>
-
-          <h3 className={styles.pinTitle} id="home-pinned-title">
-            {pinned.title}
-          </h3>
-          {pinned.groupName && (
-            <span className={styles.meta}>
-              Viaje a <b>{pinned.groupName}</b>
-            </span>
-          )}
-
-          {countdown && (
-            <span className={styles.countdown}>
-              <span className={styles.countdownLabel}>Cierra en</span>
-              <span className={styles.countdownTime}>{countdown}</span>
-            </span>
-          )}
-
-          <span className={styles.play} aria-hidden="true">
-            Jugar ahora
-            <Icon icon={ArrowRight} size={18} />
-          </span>
-        </span>
-      </button>
-    </section>
+    <Banner
+      tone="oferta"
+      className={[styles.pinned, styles.rise].join(' ')}
+      action={
+        <Button size="sm" onClick={onPlay} disabled={typeof onPlay !== 'function'}>
+          <Icon icon={Play} size={16} /> Jugar
+        </Button>
+      }
+    >
+      <span className={styles.pinnedLabel}>Te toca jugar</span>
+      <span className={styles.pinnedTitle}>{pinned.title}</span>
+      {meta && <span className={styles.pinnedMeta}>{meta}</span>}
+    </Banner>
   )
 }
 
 // Tarjeta-portada de un viaje del feed: la FOTO es la tarjeta. Velo inferior, nombre
-// serif sobre el velo, fechas + estado, corona si es tuyo y mini-cinta de mapa (CSS).
+// serif sobre el velo, fechas (chip) + estado, corona si es tuyo y mini-cinta de mapa.
 // Tocar abre el viaje. La foto es decorativa (la etiqueta del botón da el nombre).
 function TripCard({
   group,
@@ -308,15 +287,18 @@ function TripCard({
         </span>
 
         <span className={styles.name}>{group.name}</span>
-        {dates && <span className={styles.meta}>{dates}</span>}
+        {dates && (
+          <Chip tone="neutral" className={styles.dates}>
+            {dates}
+          </Chip>
+        )}
       </span>
     </button>
   )
 }
 
-// Cuenta atrás VIVA del plazo del reto fijado: refresca cada minuto (el plazo se mide
-// en minutos, así que un tick por minuto basta y no malgasta renders). Sin plazo
-// (recuerdo) → null: la tarjeta omite la cuenta atrás.
+// Cuenta atrás VIVA del plazo del reto fijado: refresca cada minuto. Sin plazo
+// (recuerdo) → null: el banner omite la cuenta atrás.
 function useCountdown(deadlineIso: string | null): string | null {
   const [now, setNow] = useState(() => Date.now())
 
@@ -334,8 +316,8 @@ function useCountdown(deadlineIso: string | null): string | null {
   const days = Math.floor(totalMinutes / 1_440)
   const hours = Math.floor((totalMinutes % 1_440) / 60)
   const minutes = totalMinutes % 60
-  if (days > 0) return hours > 0 ? `${days} d ${hours} h` : `${days} d`
-  if (hours > 0) return `${hours} h ${minutes} m`
-  if (minutes > 0) return `${minutes} m`
-  return 'menos de 1 m'
+  if (days > 0) return hours > 0 ? `cierra en ${days} d ${hours} h` : `cierra en ${days} d`
+  if (hours > 0) return `cierra en ${hours} h ${minutes} m`
+  if (minutes > 0) return `cierra en ${minutes} m`
+  return 'cierra en menos de 1 m'
 }

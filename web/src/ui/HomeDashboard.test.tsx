@@ -19,10 +19,10 @@ const pinned: HomePinned = {
   coverUrl: null,
 }
 
-describe('HomeDashboard', () => {
+describe('HomeDashboard (patrón globo + hoja)', () => {
   test('el feed lista los viajes y no muestra el lema de marketing', () => {
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
-    // Un solo feed editorial "Tus viajes" (maqueta B); el lema de marketing baja de aquí.
+    // Un solo feed editorial "Tus viajes" dentro de la hoja; el lema de marketing baja.
     expect(screen.getByRole('heading', { name: 'Tus viajes' })).toBeInTheDocument()
     expect(screen.queryByText(/Guarda tus recuerdos/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Los lugares que viviste/)).not.toBeInTheDocument()
@@ -50,31 +50,35 @@ describe('HomeDashboard', () => {
     expect(screen.queryByText(/Tus números/i)).not.toBeInTheDocument()
   })
 
-  test('CTA de empezar un viaje y de unirme', async () => {
+  test('cierre del feed: CTA de empezar un viaje', async () => {
     const onCreateGroup = vi.fn()
-    const onJoinGroup = vi.fn()
     render(
       <HomeDashboard
         userId="u1"
         displayName="Lewis"
         groups={groups}
         onCreateGroup={onCreateGroup}
-        onJoinGroup={onJoinGroup}
       />,
     )
     await userEvent.click(screen.getByRole('button', { name: /Empieza un viaje/ }))
-    await userEvent.click(screen.getByRole('button', { name: /Unirme a un viaje con un código/ }))
     expect(onCreateGroup).toHaveBeenCalled()
-    expect(onJoinGroup).toHaveBeenCalled()
   })
 
-  test('NO monta un mapamundi a sangre (no hay héroe de mapa)', () => {
-    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
-    // La home B no acepta ni renderiza un mapamundi: solo el feed de portadas.
-    expect(screen.queryByTestId('world')).not.toBeInTheDocument()
+  test('el FAB "+" constante crea un viaje', async () => {
+    const onCreateGroup = vi.fn()
+    render(
+      <HomeDashboard
+        userId="u1"
+        displayName="Lewis"
+        groups={groups}
+        onCreateGroup={onCreateGroup}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Empezar un viaje nuevo' }))
+    expect(onCreateGroup).toHaveBeenCalled()
   })
 
-  test('el reto fijado "Te toca jugar" muestra título y CTA de jugar', async () => {
+  test('el reto fijado "Te toca jugar" se muestra como banner con CTA de jugar', async () => {
     const onPlayPinned = vi.fn()
     render(
       <HomeDashboard
@@ -86,13 +90,13 @@ describe('HomeDashboard', () => {
       />,
     )
     expect(screen.getByText('Te toca jugar')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '¿Dónde tomé esta foto?' })).toBeInTheDocument()
-    // La tarjeta fijada es el botón de jugar (su título lo etiqueta).
-    await userEvent.click(screen.getByRole('button', { name: '¿Dónde tomé esta foto?' }))
+    expect(screen.getByText('¿Dónde tomé esta foto?')).toBeInTheDocument()
+    // El CTA del banner ("Jugar") dispara onPlayPinned.
+    await userEvent.click(screen.getByRole('button', { name: /Jugar/ }))
     expect(onPlayPinned).toHaveBeenCalled()
   })
 
-  test('sin reto fijado no se pinta la tarjeta destacada', () => {
+  test('sin reto fijado no se pinta el banner destacado', () => {
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} pinned={null} />)
     expect(screen.queryByText('Te toca jugar')).not.toBeInTheDocument()
   })
