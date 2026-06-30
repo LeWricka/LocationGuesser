@@ -312,6 +312,7 @@
   --font-size-lg: 1.375rem; /* 22px — subtítulos, nombres */
   --font-size-xl: 2rem; /* 32px — títulos de sección/sheet */
   --font-size-2xl: 2.75rem; /* 44px — hero / saludo */
+  --font-size-3xl: 3.5rem; /* 56px — portada inmersiva (titular héroe, aire Polarsteps) */
   --font-size-data: 3.25rem; /* 52px — números gigantes de dato (sans tabular) */
 
   --font-weight-regular: 400;
@@ -320,8 +321,11 @@
   --font-weight-bold: 600; /* la serif respira: el "bold" de titular es 600, no 700 */
   --font-weight-black: 700; /* reservado a números de dato */
 
-  /* Line-height "de revista". */
-  --line-height-tight: 1.12; /* titulares serif (respiran) */
+  /* Line-height — calibrado tipo Polarsteps: titulares MUY holgados (dan aire),
+   * cuerpo cómodo. --line-height-snug es el punto medio para subtítulos de varias
+   * líneas (la serif a 1.1 se apelmaza con 2-3 líneas; ahí respira mejor a 1.28). */
+  --line-height-tight: 1.1; /* titulares serif grandes (1 línea) */
+  --line-height-snug: 1.28; /* títulos de 2-3 líneas, nombres largos */
   --line-height-normal: 1.6; /* cuerpo (lectura cómoda) */
 
   /* Tracking: la serif no quiere tracking negativo agresivo. */
@@ -332,7 +336,9 @@
 
   /* ----------------------------------------------------------------------
    * Espaciado — escala de 4px. Nombres por tamaño, no por uso.
+   * --space-0 existe para resetear a cero "por token" (no escribir 0 suelto).
    * -------------------------------------------------------------------- */
+  --space-0: 0; /* reset explícito (no escribir `0` suelto donde lintamos px) */
   --space-1: 0.25rem; /* 4 */
   --space-2: 0.5rem; /* 8 */
   --space-3: 0.75rem; /* 12 */
@@ -343,9 +349,16 @@
   --space-8: 4rem; /* 64 */
   --space-9: 5rem; /* 80 — separación entre bloques de página tipo revista */
 
+  /* Gutter de página: el margen lateral del contenido. Polarsteps respira con
+   * gutters generosos; lo subimos a --space-5 (24) en móvil ancho vía media query
+   * en index.css. Token semántico para que las pantallas no inventen el padding. */
+  --space-gutter: var(--space-4);
+
   /* ----------------------------------------------------------------------
    * Radios — suaves pero no "burbuja" (Kinfolk = esquinas contenidas).
+   * --radius-xs para micro-elementos (chips de zona, badges cuadrados, recortes).
    * -------------------------------------------------------------------- */
+  --radius-xs: 6px; /* micro-elementos: tags, recortes pequeños */
   --radius-sm: 10px; /* inputs, botones */
   --radius-md: 16px; /* tarjetas */
   --radius-lg: 24px; /* hojas/sheets/mapa enmarcado */
@@ -377,8 +390,35 @@
    * Layout
    * -------------------------------------------------------------------- */
   --tap-target: 44px; /* objetivo táctil mínimo (WCAG / iOS) */
+  --tap-target-sm: 36px; /* control compacto (botón sm, icon-button denso) */
   --container-max: 600px; /* columna de lectura tipo revista */
   --content-measure: 62ch; /* medida de línea máx. para párrafos */
+
+  /* ----------------------------------------------------------------------
+   * Tokens de componente — valores que se repetían hardcodeados por el kit.
+   * Centralizarlos cierra la deuda de px sueltos y deja una sola fuente de verdad.
+   * -------------------------------------------------------------------- */
+  /* Anillo de foco (WCAG): grosor + separación. Antes hardcodeado `2px` por todo
+   * el kit (Modal, AppHeader, Toast, Button…). Ahora un solo token. */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+
+  /* Tirador de bottom sheet (la "barra" que se arrastra). */
+  --grab-bar-width: 36px;
+  --grab-bar-height: 4px;
+
+  /* Barra-acento: el filo de color que marca tono (borde izq. del toast, etc.). */
+  --accent-bar-width: 3px;
+
+  /* Alto máximo de una hoja inferior en móvil (dvh: sigue al chrome del navegador). */
+  --sheet-max-height: 92dvh;
+
+  /* Avatares: tamaños del disco (sm/md/lg) y anillo interior de contraste. */
+  --avatar-sm: 28px;
+  --avatar-md: 40px;
+  --avatar-lg: 64px;
+  --avatar-ring: rgba(255, 255, 255, 0.28); /* anillo interior sobre fondos del set */
+  --avatar-emoji-shadow: 0 1px 1px rgba(0, 0, 0, 0.45); /* sombra para leer el emoji */
 
   /* ----------------------------------------------------------------------
    * Animación / Motion (respeta reduced-motion).
@@ -433,6 +473,7 @@
  * rol y dejan de inventar `font-size`. Reutiliza los `--font-size-*`/pesos ya
  * definidos arriba (una sola fuente de verdad).
  *
+ *  - .t-hero     titular de portada inmersiva a sangre (serif, máximo aire).
  *  - .t-display  titular de portada/hero (serif, respira).
  *  - .t-title    cabecera de pantalla/sección (serif).
  *  - .t-body     texto de lectura (sans, 17px → no zoom iOS).
@@ -440,18 +481,38 @@
  *  - .t-label    etiqueta en versalitas (sans, tracking, tinta tenue).
  * ----------------------------------------------------------------------
  */
+.t-hero {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+  text-wrap: balance; /* el titular héroe reparte líneas para no dejar viudas */
+}
+
 .t-display {
   font-family: var(--font-serif);
   font-size: var(--font-size-2xl);
   line-height: var(--line-height-tight);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
+  text-wrap: balance;
+}
+
+/* Titular de sección/sheet (serif, peso medio). Antes lo improvisaban con h2/h3
+ * o font-size suelto; ahora hay un rol explícito en la escala. */
+.t-section {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--letter-spacing-tight);
 }
 
 .t-title {
   font-family: var(--font-serif);
   font-size: var(--font-size-lg);
-  line-height: var(--line-height-tight);
+  line-height: var(--line-height-snug); /* nombres largos de 2 líneas respiran */
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-tight);
 }

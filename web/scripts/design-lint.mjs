@@ -31,6 +31,26 @@
 //  4 overlap — `width: 200%` (el patron de "pistas" de tabs que causaba el
 //              solapamiento de paneles; se resolvio renderizando solo el tab
 //              activo). Avisa si reaparece.
+//  5 radius  — border-radius con px crudos en vez de var(--radius-*). El sistema
+//              tiene una escala de radios (xs/sm/md/lg/xl/full); un px suelto
+//              rompe la coherencia de esquina del producto. Alta senal: detectar
+//              es trivial y el remedio es claro (incl. 999px → var(--radius-full)).
+//  6 zindex  — z-index numerico en vez de var(--z-*). El z-index suelto fue causa
+//              raiz de bugs de solapamiento (paneles del mapa tapando hojas); la
+//              escala de pisos con nombre existe justo para eso. Numeros sueltos
+//              son fragiles al mergear y reintroducen el problema.
+//  7 fontsize— font-size con px/rem crudos en vez de var(--font-size-*) o un rol
+//              tipografico (.t-*). El tamano suelto es como se "escapa" la escala
+//              de texto; centralizarlo mantiene la jerarquia. NOTA: las tarjetas
+//              rasterizadas (ResultCard/LeaderboardCard/Medal) renderizan a tamano
+//              fijo para exportar imagen y usan px a proposito → su deuda queda
+//              CONGELADA en el baseline (no se exige refactor), pero recaidas en UI
+//              interactiva nueva SI fallan.
+//
+// Por que NO hay regla de spacing (margin/padding crudos): se evaluo y tiene mala
+// relacion senal/ruido sin trocear por selector — las mismas tarjetas rasterizadas
+// y los ajustes opticos de 1px generan demasiados falsos positivos. Queda como
+// limpieza manual / posible Fase 2 con scoping por clase (.sheet/.overlay).
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -137,6 +157,21 @@ const EMOJI_RE =
 const VH_RE = /\b100vh\b/
 const OVERLAP_RE = /width:\s*200%/i
 
+// border-radius con una longitud en px (cruda). Captura `border-radius: 12px`,
+// shorthands (`18px 18px 0 0`) y `999px`. NO marca: `0` puro, `%`, `var(--…)`,
+// `calc(…)` ni `inherit`. Mira solo declaraciones de border-radius (incl. las
+// long-hand border-*-radius) para no pisar otras props.
+const RADIUS_PROP_RE = /\bborder(-[a-z]+)*-radius\s*:/i
+const PX_LEN_RE = /\b\d*\.?\d+px\b/
+
+// z-index numerico literal (positivo o negativo). NO marca var(--z-*) ni `auto`.
+const ZINDEX_RE = /\bz-index\s*:\s*-?\d+\b/i
+
+// font-size con px o rem crudos. NO marca var(--…), %, em, ch, ni keywords
+// (inherit/smaller/larger). Se evalua sobre la declaracion font-size.
+const FONTSIZE_PROP_RE = /\bfont-size\s*:/i
+const FONTSIZE_RAW_RE = /\bfont-size\s*:\s*[^;]*\b\d*\.?\d+(px|rem)\b/i
+
 function lintCssCode(path, code) {
   const out = []
   const isTokens = path === TOKENS_FILE
@@ -151,6 +186,22 @@ function lintCssCode(path, code) {
       ruleId: 'overlap',
       msg: 'width:200% (patron de paneles solapados); renderiza solo el tab activo',
     })
+  }
+  // El archivo de tokens DEFINE la escala de radios/tamaños/pisos → exento de
+  // radius/fontsize/zindex igual que de color.
+  if (!isTokens) {
+    if (RADIUS_PROP_RE.test(code) && PX_LEN_RE.test(code)) {
+      out.push({ ruleId: 'radius', msg: 'border-radius en px; usa var(--radius-*)' })
+    }
+    if (ZINDEX_RE.test(code)) {
+      out.push({ ruleId: 'zindex', msg: 'z-index numerico; usa var(--z-*) (pisos con nombre)' })
+    }
+    if (FONTSIZE_PROP_RE.test(code) && FONTSIZE_RAW_RE.test(code)) {
+      out.push({
+        ruleId: 'fontsize',
+        msg: 'font-size en px/rem; usa var(--font-size-*) o un rol .t-*',
+      })
+    }
   }
   return out
 }
