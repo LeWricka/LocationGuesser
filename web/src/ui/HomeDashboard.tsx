@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { Crown, MapPin, Play, Plus, Settings } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { Banner } from './Banner'
@@ -60,6 +61,22 @@ function sortTrips(list: HomeGroup[]): HomeGroup[] {
 }
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+// Portada-placeholder para viajes SIN foto: un degradado de dos tonos derivado del nombre
+// (mismo nombre → mismo color, estable) más la inicial grande, en vez de un gris vacío. El
+// tono se calcula con un hash simple del nombre y se expone como variables CSS de matiz.
+// Solo dos matices base (azul noche / verde Atelier) para no romper la paleta sobria.
+function placeholderHue(name: string): number {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
+  // Rango cálido-frío contenido (180–320): azules, verdosos y violáceos sobrios.
+  return 180 + (Math.abs(hash) % 140)
+}
+
+/** Inicial visible del nombre del viaje (primera letra, en mayúscula). */
+function tripInitial(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || '·'
+}
 
 /** Parte una fecha de calendario 'YYYY-MM-DD' sin pasar por Date (evita saltos de huso). */
 function parseDay(iso: string): { y: number; m: number; d: number } | null {
@@ -252,6 +269,7 @@ function TripCard({
   const isButton = typeof onClick === 'function'
   const dates = formatTripDates(group.startsOn, group.endsOn)
   const live = !group.closed && (group.status === 'live' || group.status === 'toplay')
+  const hasCover = Boolean(group.coverUrl)
 
   return (
     <button
@@ -261,11 +279,23 @@ function TripCard({
       disabled={!isButton}
       aria-label={`Abrir viaje ${group.name}`}
     >
-      <span
-        className={styles.cover}
-        style={group.coverUrl ? { backgroundImage: `url('${group.coverUrl}')` } : undefined}
-        aria-hidden="true"
-      />
+      {hasCover ? (
+        <span
+          className={styles.cover}
+          style={{ backgroundImage: `url('${group.coverUrl}')` }}
+          aria-hidden="true"
+        />
+      ) : (
+        // Sin portada todavía: placeholder digno (degradado derivado del nombre + inicial)
+        // en lugar de un gris vacío. La inicial es decorativa (el nombre ya va en el cuerpo).
+        <span
+          className={styles.placeholder}
+          style={{ '--hue': placeholderHue(group.name) } as CSSProperties}
+          aria-hidden="true"
+        >
+          <span className={styles.placeholderInitial}>{tripInitial(group.name)}</span>
+        </span>
+      )}
       <span className={styles.cardBody}>
         <span className={styles.cardTop}>
           {group.owned && (

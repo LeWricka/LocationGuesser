@@ -179,6 +179,33 @@
 .card:hover:not(:disabled) .cover {
   transform: scale(1.05);
 }
+
+/* Placeholder de portada (viaje SIN foto): degradado de dos tonos derivado del nombre
+   (--hue lo fija el componente) + inicial grande translúcida. Sustituye al gris vacío;
+   el texto blanco del cuerpo sigue leyendo AA sobre el tono oscuro y el velo al pie. */
+.placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  display: grid;
+  place-items: center;
+  background-image: linear-gradient(
+    150deg,
+    hsl(var(--hue, 210) 32% 32%) 0%,
+    hsl(calc(var(--hue, 210) + 24) 38% 18%) 100%
+  );
+}
+.placeholderInitial {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: 7rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.16);
+  user-select: none;
+  /* Centrado óptico hacia arriba: el velo de lectura al pie pesa abajo. */
+  transform: translateY(-12%);
+}
+
 /* Velo de lectura al pie: la foto manda, el texto serif blanco se lee AA encima. */
 .card::after {
   content: '';

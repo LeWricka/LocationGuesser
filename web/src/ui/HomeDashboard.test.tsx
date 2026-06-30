@@ -101,6 +101,14 @@ describe('HomeDashboard (patrón globo + hoja)', () => {
     expect(screen.queryByText('Te toca jugar')).not.toBeInTheDocument()
   })
 
+  test('un viaje sin portada muestra placeholder con la inicial (no gris vacío)', () => {
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    // Los tres viajes de prueba no traen coverUrl → cada tarjeta pinta su inicial.
+    expect(screen.getByText('I')).toBeInTheDocument() // Interrail
+    expect(screen.getByText('F')).toBeInTheDocument() // Finde Lisboa
+    expect(screen.getByText('P')).toBeInTheDocument() // Pirineos
+  })
+
   test('el avatar abre el perfil', async () => {
     const onOpenProfile = vi.fn()
     render(

@@ -41,14 +41,19 @@ const { base: SATELLITE, labels: LABELS } = MAP_PRESETS.diario
 // Vista inicial del globo: mundo entero centrado en la franja poblada del norte. El
 // globo es interactivo (gira/zoom); este es solo el encuadre de arranque.
 const WORLD_CENTER: [number, number] = [10, 25]
-const WORLD_ZOOM = 1.5
+const WORLD_ZOOM = 1.6
 const MIN_ZOOM = 0.8
-// Techo al encuadrar varios pines: que no se acerque tanto que pierda el "globo".
-const FIT_MAX_ZOOM = 4
-const SINGLE_ZOOM = 3.5
+// Techo al encuadrar varios pines: deliberadamente BAJO. La proyección globo de MapLibre
+// solo se "ve" esférica a zoom bajo; al pasar de ~3 se aplana en un mapa 2D (el bug que
+// reportó el dueño en la deslogueada, donde los pines demo agrupados en Iberia/Italia
+// forzaban un fit cercano que aplanaba el globo). Capamos en 2.6 para que SIEMPRE se lea
+// como globo héroe, agrupados o no.
+const FIT_MAX_ZOOM = 2.6
+// Un solo pin: acercamos algo más, pero sin perder la curvatura del globo.
+const SINGLE_ZOOM = 2.4
 // Padding asimétrico: deja aire arriba (marca/ajustes flotantes) y abajo (asa de la
 // hoja que sube sobre el globo), para que los pines no queden tapados.
-const FIT_PADDING = { top: 64, bottom: 96, left: 40, right: 40 }
+const FIT_PADDING = { top: 72, bottom: 120, left: 48, right: 48 }
 
 // Estilo base mínimo: sin sprite/glyphs; los rasters se añaden tras `load`.
 const BASE_STYLE: StyleSpecification = { version: 8, sources: {}, layers: [] }

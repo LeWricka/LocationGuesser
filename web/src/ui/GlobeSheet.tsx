@@ -84,8 +84,21 @@ export function GlobeSheet({ pins, onOpenPin, overlay, children, fab, sheetLabel
           donde llega la hoja, así sus pines no quedan bajo ella cuando está recogida. */}
       <div className={styles.globeZone} style={{ height: `${topFrac * 100}dvh` }}>
         <HomeGlobe pins={pins} onOpenPin={onOpenPin} relaxed={raised} />
-        {overlay && <div className={styles.overlay}>{overlay}</div>}
       </div>
+
+      {/* Overlay (marca + ajustes): hermano del shell (NO dentro de la zona del globo)
+          para que su z-index compita con la hoja y la marca nunca quede pisada/cortada. */}
+      {overlay && <div className={styles.overlay}>{overlay}</div>}
+
+      {/* Costura héroe + hoja (referencia Polarsteps): un velo que FUNDE el borde del
+          globo con el blanco de la hoja. Sin él hay un corte seco con una banda del mapa
+          en medio. Va anclado JUSTO encima del borde de la hoja (mismo top, desplazado
+          hacia arriba) y degrada de transparente (globo) a la superficie de la hoja. */}
+      <div
+        className={styles.seam}
+        style={{ top: `${topFrac * 100}dvh`, transition: dragging ? 'none' : undefined }}
+        aria-hidden="true"
+      />
 
       {/* HOJA BLANCA: capa de scroll propia con asa. Sube/baja con el asa; su contenido
           scrollea dentro. El transform la coloca según topFrac; sin transición durante
