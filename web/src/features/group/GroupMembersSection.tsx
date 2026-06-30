@@ -3,11 +3,13 @@ import {
   getGroupMembers,
   kickMember,
   leaveGroup,
+  setMemberRole,
   transferOwnership,
   type GroupMemberInfo,
 } from '../../lib/membership'
 import { track } from '../../lib/analytics'
-import { Avatar, Badge, Button, Card, Modal, Row, Skeleton, Stack, useToast } from '../../ui'
+import { Crown, Users } from 'lucide-react'
+import { Avatar, Badge, Button, Card, Icon, Modal, Row, Skeleton, Stack, useToast } from '../../ui'
 import styles from './GroupPage.module.css'
 
 interface Props {
@@ -58,6 +60,38 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
     }
   }
 
+  // Promover a co-dueño: el miembro pasa a tener los permisos de dueño (editar el
+  // viaje, retos, premios, imágenes). Lo gobierna la RLS group_members_update_owner.
+  async function makeCoOwner(member: GroupMemberInfo) {
+    if (!confirm(`¿Hacer a ${member.name} co-dueño del viaje? Podrá gestionarlo como tú.`)) return
+    try {
+      await setMemberRole(groupId, member.userId, 'owner')
+      track('member_role_changed', { group_id: groupId, role: 'owner' })
+      toast.show(`${member.name} ya es co-dueño`, { tone: 'success' })
+      void refresh()
+    } catch (err) {
+      toast.show(`No se pudo promover: ${err instanceof Error ? err.message : String(err)}`, {
+        tone: 'danger',
+      })
+    }
+  }
+
+  // Degradar a miembro. La RLS impide degradar al CREADOR del grupo (dueño raíz);
+  // la UI ya esconde la acción en ese caso (member.isCreator), pero el servidor manda.
+  async function removeCoOwner(member: GroupMemberInfo) {
+    if (!confirm(`¿Quitar a ${member.name} como co-dueño? Volverá a ser miembro.`)) return
+    try {
+      await setMemberRole(groupId, member.userId, 'member')
+      track('member_role_changed', { group_id: groupId, role: 'member' })
+      toast.show(`${member.name} ya no es co-dueño`, { tone: 'neutral' })
+      void refresh()
+    } catch (err) {
+      toast.show(`No se pudo degradar: ${err instanceof Error ? err.message : String(err)}`, {
+        tone: 'danger',
+      })
+    }
+  }
+
   async function leave() {
     // El dueño no puede salir sin transferir: se lo decimos y abrimos el flujo.
     if (isOwner) {
@@ -84,7 +118,9 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
       {members === null ? (
         <>
           <Row justify="between" align="center" gap={2}>
-            <h2 className={styles.sectionTitle}>👥 Miembros</h2>
+            <h2 className={styles.sectionTitle}>
+              <Icon icon={Users} size={18} /> Miembros
+            </h2>
             {meId && (
               <button type="button" className={styles.editPrizesBtn} onClick={() => void leave()}>
                 Salir del viaje
@@ -110,7 +146,9 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
               <summary> para no entrar/salir del colapso al pulsarlo. */}
           <details className={styles.membersDetails}>
             <summary className={styles.membersSummary}>
-              <span className={styles.sectionTitle}>👥 Miembros ({members.length})</span>
+              <span className={styles.sectionTitle}>
+                <Icon icon={Users} size={18} /> Miembros ({members.length})
+              </span>
               <span className={styles.membersChevron} aria-hidden="true">
                 ▼
               </span>
@@ -131,11 +169,25 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
                       </span>
                       <Row gap={2} align="center">
                         {m.isOwner ? (
-                          <Badge tone="accent">👑 Dueño</Badge>
+                          <Badge tone="accent">
+                            <Icon icon={Crown} size={14} /> Dueño
+                          </Badge>
                         ) : (
                           <Badge tone="neutral">Miembro</Badge>
                         )}
-                        {/* El dueño puede expulsar a cualquier otro miembro. */}
+                        {/* Un dueño promueve a un miembro a co-dueño. */}
+                        {isOwner && !m.isOwner && !isMe && (
+                          <Button variant="ghost" size="sm" onClick={() => void makeCoOwner(m)}>
+                            <Icon icon={Crown} size={14} /> Hacer co-dueño
+                          </Button>
+                        )}
+                        {/* Degradar a un co-dueño; nunca al creador raíz (isCreator). */}
+                        {isOwner && m.isOwner && !m.isCreator && !isMe && (
+                          <Button variant="ghost" size="sm" onClick={() => void removeCoOwner(m)}>
+                            Quitar co-dueño
+                          </Button>
+                        )}
+                        {/* El dueño puede expulsar a cualquier otro miembro (no a dueños). */}
                         {isOwner && !m.isOwner && (
                           <Button variant="ghost" size="sm" onClick={() => void kick(m)}>
                             Expulsar
@@ -165,7 +217,7 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
             className={styles.editPrizesBtn}
             onClick={() => setTransferring(true)}
           >
-            👑 Transferir propiedad
+            <Icon icon={Crown} size={15} /> Transferir propiedad
           </button>
         </Row>
       )}
@@ -230,7 +282,11 @@ function TransferOwnershipModal({
     <Modal
       open
       onClose={busy ? undefined : onClose}
-      title="👑 Transferir propiedad"
+      title={
+        <>
+          <Icon icon={Crown} size={18} /> Transferir propiedad
+        </>
+      }
       footer={
         <Row gap={2} justify="end">
           <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>

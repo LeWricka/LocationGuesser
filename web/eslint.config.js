@@ -26,4 +26,16 @@ export default defineConfig([
       globals: globals.node,
     },
   },
+  {
+    // Funciones serverless/edge de Vercel (web/api): corren en Node/Edge, no en el
+    // navegador, y exportan un `handler` por defecto (no son componentes React),
+    // así que apagamos la regla de react-refresh que solo aplica a la SPA.
+    files: ['api/**/*.{ts,tsx}'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

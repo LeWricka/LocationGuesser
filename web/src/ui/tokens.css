@@ -1,5 +1,5 @@
 /*
- * LocationGuesser — Design tokens · "Atelier" (paleta Pizarra)
+ * Lugares — Design tokens · "Atelier" (paleta Pizarra)
  *
  * Una sola fuente de verdad para color, tipografía, espaciado, etc.
  * Todo el UI kit consume estas variables; no se hardcodean valores en los
@@ -214,9 +214,15 @@
   --pin-ring-active: var(--accent);
   --pin-ring-width: 3px;
 
-  /* Trazo de la ruta sobre el mapa. Tinta sobre claro. */
+  /* Trazo de la ruta sobre el mapa.
+   * La ruta del VIAJE es ORO: el oro marca "lo vivo" (el recorrido recorrido) y los
+   * retos, coherente con crear-reto/jugar y con el anillo lead del home. El tramo
+   * pendiente (hacia el activo) va en un oro más tenue y discontinuo.
+   * `--route-line`/`--route-line-dash` (tinta) se conservan como fallback histórico. */
   --route-line: rgba(24, 32, 43, 0.6);
   --route-line-dash: rgba(24, 32, 43, 0.35);
+  --route-gold: #d9b25a; /* trazo recorrido (oro brillante, "lo vivo") */
+  --route-gold-soft: rgba(217, 178, 90, 0.5); /* tramo pendiente / mini-rutas del home */
 
   /* Velo bajo el carrusel: funde el carrusel con el papel (blanco, no negro). */
   --map-bottom-scrim: linear-gradient(

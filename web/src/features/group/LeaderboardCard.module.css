@@ -48,6 +48,8 @@
   border-radius: 22px;
   font-size: 42px;
   line-height: 1;
+  /* Pin de marca (Icon, currentColor) en contraste sobre el cuadro de acento. */
+  color: var(--color-on-accent);
   background-color: var(--color-accent);
   border: 2px solid var(--color-accent);
 }
@@ -197,6 +199,13 @@
   margin-bottom: -4px;
 }
 
+/* El icono (SVG lucide) hereda el tamaño del font-size del contenedor (1em),
+ * igual que hacía el emoji, para conservar la escala del póster a 1080px. */
+.crown svg {
+  width: 1em;
+  height: 1em;
+}
+
 /* Disco con el avatar del jugador: el fondo lo inyecta el componente (gradiente
    del avatar). Anillo claro de la medalla (oro/plata/bronce) alrededor para no
    perder la jerarquía de puesto. La 1ª plaza es mayor para marcarla. */
@@ -279,6 +288,13 @@ img.podiumAvatar {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* Icono (Gift) alineado con la línea base del texto del premio, sin romper el
+   truncado por ellipsis del contenedor. */
+.podiumPrize svg {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
 }
 
 /* Pedestal: barra de color del puesto con su medalla; altura por plaza (1ª la
@@ -421,6 +437,10 @@ img.podiumAvatar {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 320px;
+}
+/* Icono (Gift) alineado con el texto del premio sin romper el ellipsis. */
+.prize svg {
+  vertical-align: -0.15em;
 }
 
 /* Barra proporcional al líder. El relleno reusa el color del disco (oro/acento…). */

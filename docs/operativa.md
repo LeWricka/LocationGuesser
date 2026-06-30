@@ -155,7 +155,7 @@ regenera, las suscripciones existentes dejan de validar y hay que re-suscribir a
 | `VITE_VAPID_PUBLIC_KEY` (= Public Key) | **Pública** (va en el bundle) | `web/.env.local` + **Vercel** (Production + Preview). Redeploy tras añadirla. |
 | `VAPID_PUBLIC_KEY` (la misma Public Key) | Pública | **Secret de Supabase** (la function la necesita para firmar). |
 | `VAPID_PRIVATE_KEY` (= Private Key) | **SECRETA** | **Secret de Supabase**. NUNCA en git, en `web/`, ni en el cliente. |
-| `VAPID_SUBJECT` | — | **Secret de Supabase**. `mailto:` de contacto (p.ej. `mailto:icka69@gmail.com`). Opcional (hay default). |
+| `VAPID_SUBJECT` | — | **Secret de Supabase**. `mailto:` de contacto (p.ej. `mailto:Iker@540deg.com`). Opcional (hay default). |
 | `PUSH_SEND_TOKEN` | **SECRETO** | **Secret de Supabase** + GUC de la BD (§6.4). Token aleatorio largo que solo conoce la BD; protege la función. |
 
 `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` ya están disponibles para las Edge
@@ -168,7 +168,7 @@ para leer las suscripciones de todos los miembros (se salta RLS); **jamás** al 
 npx supabase secrets set \
   VAPID_PUBLIC_KEY=<Public Key> \
   VAPID_PRIVATE_KEY=<Private Key> \
-  VAPID_SUBJECT=mailto:icka69@gmail.com \
+  VAPID_SUBJECT=mailto:Iker@540deg.com \
   PUSH_SEND_TOKEN=<token aleatorio largo> \
   --project-ref ykquigyjvgxisgdxryxr
 ```

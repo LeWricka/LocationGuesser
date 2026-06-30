@@ -13,7 +13,7 @@ import {
   StopwatchIcon,
   TargetIcon,
 } from './CreateIcons'
-import type { LatLng } from '../../lib/geo'
+import type { LatLng, ScoreScale } from '../../lib/geo'
 import { createChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes } from '../../lib/time'
 import { findPanorama, findPanoramaNear, type PanoramaMatch } from '../../lib/streetview'
@@ -24,7 +24,8 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
-import { Button, Spinner, useToast } from '../../ui'
+import { AlertTriangle } from 'lucide-react'
+import { Button, Icon, Spinner, useToast } from '../../ui'
 import styles from './CreateChallengeImmersive.module.css'
 
 interface Props {
@@ -66,6 +67,16 @@ const GUESS_OPTIONS: { value: number | null; label: string; review: string }[] =
 ]
 const DEFAULT_GUESS_INDEX = 1 // 30 s
 
+// PRECISIÓN del reto: calibra cómo de estricto es el conteo de distancia (0028).
+// 'mundo' (default) = scoring de siempre; cuanto más acotado, más estricto.
+const PRECISION_OPTIONS: { value: ScoreScale; label: string; review: string }[] = [
+  { value: 'mundo', label: 'Mundo', review: 'precisión: el país lejano' },
+  { value: 'pais', label: 'País', review: 'precisión: el país' },
+  { value: 'ciudad', label: 'Ciudad', review: 'precisión: la ciudad' },
+  { value: 'barrio', label: 'Barrio', review: 'precisión: casi la calle' },
+]
+const DEFAULT_PRECISION_INDEX = 0 // mundo
+
 // Etapas de la hoja: 0=marcar (baja) · 1=foto · 2=detalles · 3=resumen.
 type Stage = 0 | 1 | 2 | 3
 const TOTAL_STAGES = 4
@@ -97,6 +108,7 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
 
   const [deadlineIndex, setDeadlineIndex] = useState(DEFAULT_DEADLINE_INDEX)
   const [guessIndex, setGuessIndex] = useState(DEFAULT_GUESS_INDEX)
+  const [precisionIndex, setPrecisionIndex] = useState(DEFAULT_PRECISION_INDEX)
 
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -327,6 +339,7 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
         guessSeconds,
         imagePath,
         photoIsHint: true,
+        scoreScale: PRECISION_OPTIONS[precisionIndex].value,
       })
       setStatus(null)
       track('challenge_created', {
@@ -338,6 +351,7 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
         photo_is_hint: imagePath ? true : null,
         duration_hours: DEADLINE_OPTIONS[deadlineIndex].minutes / 60,
         difficulty: realDifficulty,
+        score_scale: PRECISION_OPTIONS[precisionIndex].value,
         location_source: locationSource ?? 'manual',
       })
       // Microcelebración antes de volver al viaje (la maqueta: burst + confeti).
@@ -589,6 +603,26 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
               </div>
             </div>
 
+            <div className={styles.field}>
+              <label className={styles.label}>
+                Precisión <span>· cómo de estricto se puntúa</span>
+              </label>
+              <div className={styles.seg}>
+                {PRECISION_OPTIONS.map((opt, i) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={i === precisionIndex ? styles.segSel : undefined}
+                    aria-pressed={i === precisionIndex}
+                    onClick={() => setPrecisionIndex(i)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className={styles.segHint}>¿Hay que acertar el país, la ciudad o la calle?</p>
+            </div>
+
             <button className={styles.cta} type="button" onClick={advance}>
               Revisar y lanzar
               <ArrowRight />
@@ -647,7 +681,7 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
 
             {!mediaValid && (
               <div className={styles.warning}>
-                <span aria-hidden>⚠️</span>
+                <Icon icon={AlertTriangle} size={18} />
                 <span>
                   Falta la pista: vuelve atrás y añade una foto o un Street View. Sin ninguna no se
                   puede lanzar el reto.

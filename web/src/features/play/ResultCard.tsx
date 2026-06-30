@@ -1,5 +1,7 @@
 import { forwardRef } from 'react'
+import { MapPin } from 'lucide-react'
 import { fmtDist } from '../../lib/geo'
+import { Icon } from '../../ui'
 import styles from './ResultCard.module.css'
 
 interface Props {
@@ -49,9 +51,9 @@ export const ResultCard = forwardRef<HTMLDivElement, Props>(function ResultCard(
     <div ref={ref} className={styles.card}>
       <div className={styles.brand}>
         <span className={styles.logoMark} aria-hidden="true">
-          📍
+          <Icon icon={MapPin} size={44} />
         </span>
-        <span className={styles.brandName}>LocationGuesser</span>
+        <span className={styles.brandName}>Lugares</span>
       </div>
 
       <div className={styles.header}>

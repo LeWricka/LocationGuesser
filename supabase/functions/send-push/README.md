@@ -51,7 +51,7 @@ npx web-push generate-vapid-keys
 npx supabase secrets set \
   VAPID_PUBLIC_KEY=<publica> \
   VAPID_PRIVATE_KEY=<privada> \
-  VAPID_SUBJECT=mailto:icka69@gmail.com \
+  VAPID_SUBJECT=mailto:Iker@540deg.com \
   PUSH_SEND_TOKEN=<token-aleatorio-largo> \
   --project-ref ykquigyjvgxisgdxryxr
 ```

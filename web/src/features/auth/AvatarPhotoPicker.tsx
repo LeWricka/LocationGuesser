@@ -1,5 +1,6 @@
 import type { ChangeEvent } from 'react'
-import { Spinner } from '../../ui'
+import { Camera, Repeat } from 'lucide-react'
+import { Icon, Spinner } from '../../ui'
 import styles from './AvatarPhotoPicker.module.css'
 
 interface Props {
@@ -36,7 +37,7 @@ export function AvatarPhotoPicker({ preview, loading = false, onPick, onClear }:
         )}
         <div className={styles.actions}>
           <label className={styles.change}>
-            <span aria-hidden>🔁</span>
+            <Icon icon={Repeat} size={16} />
             <span>Cambiar</span>
             <input
               type="file"
@@ -58,7 +59,7 @@ export function AvatarPhotoPicker({ preview, loading = false, onPick, onClear }:
   return (
     <label className={styles.empty} aria-busy={loading || undefined}>
       <span className={styles.icon} aria-hidden>
-        {loading ? <Spinner size={22} /> : '📷'}
+        {loading ? <Spinner size={22} /> : <Icon icon={Camera} size={22} />}
         {!loading && <span className={styles.plus}>+</span>}
       </span>
       <span className={styles.emptyLabel}>{loading ? 'Subiendo…' : 'Subir foto'}</span>

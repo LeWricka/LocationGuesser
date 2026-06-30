@@ -16,6 +16,7 @@
 //       raíz    → HomePage
 
 import { useEffect, useState } from 'react'
+import { Settings } from 'lucide-react'
 import { CreateGroup } from './features/create/CreateGroup'
 import { AddMoment } from './features/create/AddMoment'
 import { CreateChallengeImmersive } from './features/create/CreateChallengeImmersive'
@@ -32,7 +33,7 @@ import {
   useDeepLinkJoin,
   needsProfileStep,
 } from './features/auth'
-import { OnboardingGate } from './features/onboarding'
+import { OnboardingGate, ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
@@ -45,7 +46,7 @@ import {
   addMomentHash,
   addChallengeHash,
 } from './lib/route'
-import { Spinner, Stack, withViewTransition } from './ui'
+import { Icon, Spinner, Stack, withViewTransition } from './ui'
 import styles from './App.module.css'
 
 function App() {
@@ -187,9 +188,11 @@ function LoggedIn({
   // paralelo; la lectura ya exige ser miembro por RLS, por eso unimos primero.)
   if (route.challenge && route.group) {
     return (
-      <OnboardingGate context="challenge" userId={user?.id}>
-        <PlayChallenge challengeId={route.challenge} groupId={route.group} />
-      </OnboardingGate>
+      <ReceptorWelcomeGate groupId={route.group} userId={user?.id}>
+        <OnboardingGate context="challenge" userId={user?.id}>
+          <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+        </OnboardingGate>
+      </ReceptorWelcomeGate>
     )
   }
   if (route.group) {
@@ -200,7 +203,7 @@ function LoggedIn({
     // directo al asistente de reto clásico.
     if (route.groupAddMoment) {
       return (
-        <OnboardingGate context="group" userId={user?.id}>
+        <OnboardingGate context="add-moment" userId={user?.id}>
           <AddMoment
             groupId={groupId}
             onBack={() => {
@@ -218,7 +221,7 @@ function LoggedIn({
     // crear, volvemos al reto recién lanzado (deep link) para ofrecer su enlace.
     if (route.groupAddChallenge) {
       return (
-        <OnboardingGate context="group" userId={user?.id}>
+        <OnboardingGate context="create-challenge" userId={user?.id}>
           <CreateChallengeImmersive
             groupId={groupId}
             onBack={() => {
@@ -236,44 +239,52 @@ function LoggedIn({
     // accesible desde el botón "⋯" del viaje, así que NO se pierde nada de ella.
     if (route.groupView === 'clasico') {
       return (
-        <OnboardingGate context="group" userId={user?.id}>
-          <GroupPage
-            groupId={groupId}
-            onBack={() => {
-              location.hash = groupHash(groupId)
-            }}
-          />
-        </OnboardingGate>
+        <ReceptorWelcomeGate groupId={groupId} userId={user?.id}>
+          <OnboardingGate context="group" userId={user?.id}>
+            <GroupPage
+              groupId={groupId}
+              onBack={() => {
+                location.hash = groupHash(groupId)
+              }}
+            />
+          </OnboardingGate>
+        </ReceptorWelcomeGate>
       )
     }
     return (
-      <OnboardingGate context="group" userId={user?.id}>
-        <TripPage
-          groupId={groupId}
-          // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
-          onPlayChallenge={(challengeId) => {
-            location.hash = groupHash(groupId, challengeId)
-          }}
-          // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
-          // un momento sin reto por defecto (el reto es una capa opcional con toggle).
-          onAddMoment={() => {
-            location.hash = addMomentHash(groupId)
-          }}
-          // "Reto" (menú del FAB "＋"): al asistente de reto clásico (#g=…&v=clasico&add=1).
-          onAddChallenge={() => {
-            location.hash = addChallengeHash(groupId)
-          }}
-          // Acceso al marcador completo y ajustes, desde el pie de la sección Retos.
-          onOpenClassic={() => {
-            location.hash = classicGroupHash(groupId)
-          }}
-          onBack={() => goHome()}
-        />
-      </OnboardingGate>
+      <ReceptorWelcomeGate groupId={groupId} userId={user?.id}>
+        <OnboardingGate context="group" userId={user?.id}>
+          <TripPage
+            groupId={groupId}
+            // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
+            onPlayChallenge={(challengeId) => {
+              location.hash = groupHash(groupId, challengeId)
+            }}
+            // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
+            // un momento sin reto por defecto (el reto es una capa opcional con toggle).
+            onAddMoment={() => {
+              location.hash = addMomentHash(groupId)
+            }}
+            // "Reto" (menú del FAB "＋"): al asistente de reto clásico (#g=…&v=clasico&add=1).
+            onAddChallenge={() => {
+              location.hash = addChallengeHash(groupId)
+            }}
+            // Acceso al marcador completo y ajustes, desde el pie de la sección Retos.
+            onOpenClassic={() => {
+              location.hash = classicGroupHash(groupId)
+            }}
+            onBack={() => goHome()}
+          />
+        </OnboardingGate>
+      </ReceptorWelcomeGate>
     )
   }
   if (route.view === 'new') {
-    return <CreateGroup onBack={() => goHome()} />
+    return (
+      <OnboardingGate context="create-trip" userId={user?.id}>
+        <CreateGroup onBack={() => goHome()} />
+      </OnboardingGate>
+    )
   }
   if (route.view === 'profile') {
     return (
@@ -309,7 +320,7 @@ function LoggedIn({
 function AdminLink() {
   return (
     <a className={styles.adminLink} href="#admin" aria-label="Abrir administración">
-      ⚙︎ Admin
+      <Icon icon={Settings} size={18} /> Admin
     </a>
   )
 }

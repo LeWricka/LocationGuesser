@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, Check, Map as MapIcon, MapPin, Target, Zap } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
-import type { LatLng } from '../../lib/geo'
+import type { LatLng, ScoreScale } from '../../lib/geo'
 import { createMoment, promoteToChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { addMomentImages } from '../../lib/momentImages'
 import { deadlineFromMinutes } from '../../lib/time'
@@ -18,6 +19,7 @@ import {
   Button,
   Field,
   Input,
+  Icon,
   Row,
   Spinner,
   Stack,
@@ -66,6 +68,15 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: 'Sin límite' },
 ]
 
+// PRECISIÓN del reto: calibra cómo de estricto es el conteo de distancia (0028).
+// 'mundo' (default) = scoring de siempre; cuanto más acotado, más estricto.
+const PRECISION_OPTIONS: { value: ScoreScale; label: string }[] = [
+  { value: 'mundo', label: 'Mundo' },
+  { value: 'pais', label: 'País' },
+  { value: 'ciudad', label: 'Ciudad' },
+  { value: 'barrio', label: 'Barrio' },
+]
+
 // Fecha de hoy en formato `yyyy-mm-dd` (zona local), para el valor por defecto del
 // input date. La usamos también como "centinela": si el usuario no cambia la fecha,
 // no la guardamos (no hay columna de fecha; ver nota en `save`).
@@ -109,6 +120,8 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
   const [isChallenge, setIsChallenge] = useState(false)
   const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
   const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
+  // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
+  const [scoreScale, setScoreScale] = useState<ScoreScale>('mundo')
   // Street View del reto (opcional). Con foto es contexto cercano; sin foto, ES la
   // escena. Candados de exploración: ambos permitidos por defecto.
   const [wantsStreetView, setWantsStreetView] = useState(false)
@@ -398,6 +411,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
           svLockMove: pano ? !allowMove : false,
           svLockRotate: pano ? !allowRotate : false,
           photoIsHint: true,
+          scoreScale,
         })
       }
 
@@ -409,6 +423,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
         photo_count: paths.length,
         has_place: place != null,
         promoted_to_challenge: isChallenge,
+        score_scale: isChallenge ? scoreScale : null,
       })
       // Efecto móvil al guardar: vibración corta + la pantalla se desliza hacia abajo
       // (como descartar una hoja nativa) y luego volvemos al viaje. Sin animación con
@@ -478,24 +493,34 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             reto ON es la respuesta OCULTA a adivinar (cambia el lenguaje). */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            {isChallenge ? '🎯 Lugar a adivinar' : '📍 Sitio del recuerdo'}{' '}
+            {isChallenge ? (
+              <>
+                <Icon icon={Target} size={16} /> Lugar a adivinar
+              </>
+            ) : (
+              <>
+                <Icon icon={MapPin} size={16} /> Sitio del recuerdo
+              </>
+            )}{' '}
             <span className={styles.optional}>{isChallenge ? 'obligatorio' : 'opcional'}</span>
           </span>
           <Stack gap={3}>
             <Button variant="secondary" fullWidth loading={locating} onClick={useGps}>
-              📍 Mi ubicación
+              <Icon icon={MapPin} size={18} /> Mi ubicación
             </Button>
             <MapPicker value={place} flyTo={flyTo} center={SPAIN} zoom={5} onPick={pickPlace} />
             {place ? (
               <Row gap={2} align="center">
-                <Badge tone="accent">📍 Sitio marcado</Badge>
+                <Badge tone="accent">
+                  <Icon icon={MapPin} size={14} /> Sitio marcado
+                </Badge>
                 <span className={styles.coords}>
                   {place.lat.toFixed(5)}, {place.lng.toFixed(5)}
                 </span>
               </Row>
             ) : (
               <span className={styles.hint}>
-                👆 Toca el mapa para marcar dónde es. Sin lugar también vale.
+                Toca el mapa para marcar dónde es. Sin lugar también vale.
               </span>
             )}
             {isChallenge && (
@@ -512,7 +537,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             {(fieldProps) => (
               <Input
                 {...fieldProps}
-                placeholder="Atardecer en Santorini 🌅"
+                placeholder="Atardecer en Santorini"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
@@ -556,7 +581,15 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
           >
             <span className={styles.toggleText}>
               <span className={styles.toggleTitle}>
-                {isChallenge ? '✓ Es un reto' : '🎯 Convertirlo en reto'}
+                {isChallenge ? (
+                  <>
+                    <Icon icon={Check} size={16} /> Es un reto
+                  </>
+                ) : (
+                  <>
+                    <Icon icon={Target} size={16} /> Convertirlo en reto
+                  </>
+                )}
               </span>
               <span className={styles.toggleHint}>
                 Esconde el lugar y que adivinen dónde es, con cuenta atrás.
@@ -571,7 +604,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             <Stack gap={5} className={styles.challengeBody}>
               {!place && (
                 <Row gap={2} align="center" className={styles.warn}>
-                  <span aria-hidden>⚠️</span>
+                  <Icon icon={AlertTriangle} size={18} />
                   <span>Un reto necesita un lugar a adivinar. Márcalo en el mapa de arriba.</span>
                 </Row>
               )}
@@ -581,7 +614,11 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                   <Stack gap={2}>
                     <Row gap={2} className={styles.durationValue}>
                       <span className={styles.durationLabel}>{durationStop.label}</span>
-                      {isExpress && <span className={styles.expressPill}>⚡ Express</span>}
+                      {isExpress && (
+                        <span className={styles.expressPill}>
+                          <Icon icon={Zap} size={14} /> Express
+                        </span>
+                      )}
                     </Row>
                     <input
                       {...fieldProps}
@@ -621,6 +658,27 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                 )}
               </Field>
 
+              <Field
+                label="Precisión"
+                hint="¿Hay que acertar el país, la ciudad o la calle? Cuanto más acotado, más estricto se puntúa."
+              >
+                {() => (
+                  <Row gap={2} wrap>
+                    {PRECISION_OPTIONS.map((opt) => (
+                      <Button
+                        key={opt.value}
+                        variant={scoreScale === opt.value ? 'primary' : 'secondary'}
+                        size="sm"
+                        aria-pressed={scoreScale === opt.value}
+                        onClick={() => setScoreScale(opt.value)}
+                      >
+                        {opt.label}
+                      </Button>
+                    ))}
+                  </Row>
+                )}
+              </Field>
+
               {/* Street View opcional (solo con lugar fijado). */}
               <Stack gap={3}>
                 <span className={styles.blockLabel}>
@@ -634,7 +692,15 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                   aria-pressed={wantsStreetView}
                   onClick={toggleStreetView}
                 >
-                  {wantsStreetView ? '✓ Street View' : '🗺️ Añadir Street View'}
+                  {wantsStreetView ? (
+                    <>
+                      <Icon icon={Check} size={16} /> Street View
+                    </>
+                  ) : (
+                    <>
+                      <Icon icon={MapIcon} size={16} /> Añadir Street View
+                    </>
+                  )}
                 </Button>
                 {!place && <span className={styles.hint}>Marca antes el lugar en el mapa.</span>}
 
@@ -679,7 +745,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                           aria-pressed={allowMove}
                           onClick={() => setAllowMove((v) => !v)}
                         >
-                          {allowMove ? '✓ ' : ''}Permitir moverse
+                          {allowMove && <Icon icon={Check} size={14} />} Permitir moverse
                         </Button>
                         <span className={styles.hint}>
                           {allowMove ? 'Pueden avanzar por la calle.' : 'No pueden avanzar.'}
@@ -692,7 +758,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                           aria-pressed={allowRotate}
                           onClick={() => setAllowRotate((v) => !v)}
                         >
-                          {allowRotate ? '✓ ' : ''}Permitir mirar alrededor
+                          {allowRotate && <Icon icon={Check} size={14} />} Permitir mirar alrededor
                         </Button>
                         <span className={styles.hint}>
                           {allowRotate ? 'Pueden girar la cámara.' : 'Vista fija.'}
@@ -710,7 +776,15 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             muestra el estado (subiendo fotos n/N, guardando…) para que se vea qué
             pasa y no parezca colgado. */}
         <Button size="lg" fullWidth loading={busy} disabled={!canSave} onClick={() => void save()}>
-          {busy ? (status ?? 'Guardando…') : isChallenge ? '🎯 Crear reto' : 'Guardar recuerdo'}
+          {busy ? (
+            (status ?? 'Guardando…')
+          ) : isChallenge ? (
+            <>
+              <Icon icon={Target} size={18} /> Crear reto
+            </>
+          ) : (
+            'Guardar recuerdo'
+          )}
         </Button>
       </Stack>
     </main>

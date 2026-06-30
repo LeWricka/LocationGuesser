@@ -8,16 +8,18 @@ import { track } from '../../lib/analytics'
 import type { OnboardingContext } from '../../lib/onboardingFlags'
 import { useOnboarding } from './useOnboarding'
 import { OnboardingSlideshow } from './OnboardingSlideshow'
-import { getSlides } from './slides'
+import { getSlides, type SlideParams } from './slides'
 
 interface Props {
   context: OnboardingContext
   /** Id del usuario (de useSession). Sin él, el flag cae a una clave global. */
   userId?: string | null
+  /** Datos para personalizar las slides (p.ej. el nombre del viaje en el welcome). */
+  slideParams?: SlideParams
   children: ReactNode
 }
 
-export function OnboardingGate({ context, userId, children }: Props) {
+export function OnboardingGate({ context, userId, slideParams, children }: Props) {
   const { shouldShow, markSeen, skip } = useOnboarding(context, userId)
 
   // Emite onboarding_started una sola vez al abrirse el tutorial (no en cada
@@ -45,7 +47,7 @@ export function OnboardingGate({ context, userId, children }: Props) {
       {children}
       {shouldShow && (
         <OnboardingSlideshow
-          slides={getSlides(context)}
+          slides={getSlides(context, slideParams)}
           onComplete={handleComplete}
           onSkip={handleSkip}
         />

@@ -1,0 +1,582 @@
+/* "Cómo funciona" inmersiva (issue #299). Dirección ganadora del panel:
+ * satélite/mapa CSS a sangre como héroe (gradientes, 0 KB) + una hoja que crece
+ * por encima + el bucle animado del mapa. Todo con tokens "Atelier"; no se
+ * hardcodean colores/espaciados salvo gradientes del satélite (textura
+ * generativa que no existe como token). El movimiento se desactiva entero con
+ * prefers-reduced-motion. */
+
+.root {
+  position: relative;
+  width: 100%;
+  /* Recorta el satélite a sangre dentro de la columna de la portada. */
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: var(--radius-lg);
+  background: var(--ink-900, #18202b);
+}
+
+/* ── Stage: satélite a sangre ──────────────────────────────────────────────── */
+.stage {
+  position: relative;
+  height: 56svh;
+  /* svh evita que la barra dinámica de Safari iOS desencaje la altura. */
+  min-height: 300px;
+  max-height: 460px;
+  overflow: hidden;
+}
+
+.sat {
+  position: absolute;
+  inset: -6%;
+  animation: drift 26s ease-in-out infinite alternate;
+}
+
+.satLand {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 80% at 78% 18%, #3c5468 0%, transparent 55%),
+    radial-gradient(90% 70% at 18% 82%, #2f4a40 0%, transparent 60%),
+    linear-gradient(135deg, #20303d 0%, #2a4256 48%, #1c2935 100%);
+}
+
+.satWater {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(60% 45% at 24% 30%, rgba(42, 66, 86, 0.9) 0%, transparent 60%),
+    radial-gradient(40% 30% at 70% 75%, rgba(34, 80, 107, 0.55) 0%, transparent 55%);
+  mix-blend-mode: screen;
+  opacity: 0.7;
+}
+
+.satRelief {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(58deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 9px),
+    repeating-linear-gradient(122deg, rgba(0, 0, 0, 0.22) 0 3px, transparent 3px 14px);
+  opacity: 0.5;
+}
+
+.satGrid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(246, 247, 249, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(246, 247, 249, 0.06) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(80% 70% at 50% 40%, #000 35%, transparent 85%);
+}
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(24, 32, 43, 0.25) 0%,
+    transparent 30%,
+    rgba(24, 32, 43, 0.9) 100%
+  );
+}
+
+/* ── Pins del bucle ────────────────────────────────────────────────────────── */
+.pin {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -100%);
+}
+
+.pinQ {
+  left: 30%;
+  top: 38%;
+}
+
+/* El pin "?" es una gota; el "?" se pinta en un pseudo para girarlo derecho. */
+.pinQMark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50% 50% 50% 2px;
+  background: rgba(246, 247, 249, 0.92);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.4);
+  transform: rotate(-45deg);
+}
+.pinQMark::after {
+  content: '?';
+  transform: rotate(45deg);
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  line-height: 1;
+  color: var(--accent-deep, #2a4256);
+}
+
+.pinA {
+  left: 67%;
+  top: 65%;
+  opacity: 0;
+}
+
+.pinDot {
+  display: block;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--medal-gold, #c9a24b);
+  border: 3px solid var(--paper, #f6f7f9);
+  box-shadow: 0 6px 16px rgba(201, 162, 75, 0.55);
+  position: relative;
+  z-index: 2;
+}
+
+.pinRing {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--medal-gold, #c9a24b);
+  transform: translate(-50%, -50%);
+}
+
+.line {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+}
+.line line {
+  stroke: rgba(246, 247, 249, 0.55);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 6;
+  stroke-dashoffset: 200;
+  opacity: 0;
+}
+
+.dist {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  z-index: 4;
+  text-align: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(24, 32, 43, 0.78);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(201, 162, 75, 0.45);
+  opacity: 0;
+}
+.dist b {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  color: var(--paper, #f6f7f9);
+}
+.dist small {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--medal-gold, #c9a24b);
+}
+
+/* ── Hoja que crece ────────────────────────────────────────────────────────── */
+.sheet {
+  position: relative;
+  z-index: 5;
+  /* Margen negativo: la hoja monta sobre el satélite (gesto de bottom sheet). */
+  margin-top: -28px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding: var(--space-3) var(--space-5) var(--space-7);
+  box-shadow: var(--shadow-sheet);
+}
+
+.handle {
+  display: block;
+  width: 44px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--hairline-strong);
+  margin: 0 auto var(--space-5);
+}
+
+.head {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+.eyebrow {
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 var(--space-2);
+}
+.title {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
+  margin: 0 0 var(--space-3);
+  color: var(--color-text);
+}
+.lede {
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-muted);
+  margin: 0 auto;
+  max-width: 32ch;
+}
+
+/* ── Pasos ─────────────────────────────────────────────────────────────────── */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+}
+
+.media {
+  position: relative;
+  height: 138px;
+  overflow: hidden;
+  background: var(--accent-deep, #2a4256);
+}
+.ph {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+/* Foto del paso 1: costa generada con gradientes (sin imagen pesada). */
+.phCoast {
+  background:
+    radial-gradient(120% 60% at 50% 0%, #cfe0e6 0%, transparent 55%),
+    linear-gradient(180deg, #aac6cf 0%, #6f97a4 46%, #355c66 47%, #244349 100%);
+}
+
+.chip {
+  position: absolute;
+  z-index: 2;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: rgba(24, 32, 43, 0.62);
+  backdrop-filter: blur(4px);
+  color: var(--paper, #f6f7f9);
+}
+.chipCam {
+  left: var(--space-3);
+  bottom: var(--space-3);
+}
+.chipTime {
+  right: var(--space-3);
+  top: var(--space-3);
+  background: var(--medal-gold, #c9a24b);
+  color: var(--ink-900, #18202b);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Paso 2: mini-mapa con un pin "?". */
+.mediaMap {
+  background:
+    radial-gradient(90% 70% at 22% 78%, #2f4a40 0%, transparent 60%),
+    linear-gradient(135deg, #20303d, #2a4256 55%, #1c2935);
+}
+.miniSat {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(246, 247, 249, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(246, 247, 249, 0.07) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(70% 70% at 50% 50%, #000 40%, transparent 90%);
+}
+.miniPin {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -100%) rotate(-45deg);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50% 50% 50% 2px;
+  background: var(--paper, #f6f7f9);
+  box-shadow: 0 7px 16px rgba(0, 0, 0, 0.4);
+}
+.miniPin::after {
+  content: '?';
+  transform: rotate(45deg);
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  color: var(--accent-deep, #2a4256);
+}
+
+/* Paso 3: el marcador (injerto de la maqueta A) cierra "quién ganó". */
+.mediaBoard {
+  height: auto;
+  background: var(--color-surface);
+}
+.leaderboard {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-4) var(--space-3);
+}
+.lbRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+.lbRow:last-child {
+  border-bottom: none;
+}
+.lbRank {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  width: 16px;
+}
+.lbWin .lbRank {
+  color: var(--medal-gold, #c9a24b);
+}
+.lbName {
+  flex: 1;
+  font-weight: var(--font-weight-semibold);
+}
+.lbWin .lbName {
+  color: var(--accent-deep, #2a4256);
+}
+.lbKm {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+}
+.lbWin .lbKm {
+  color: var(--medal-gold, #c9a24b);
+}
+
+.cardBody {
+  padding: var(--space-4) var(--space-4) var(--space-5);
+}
+.num {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-md);
+  letter-spacing: 0.08em;
+  color: var(--medal-gold, #c9a24b);
+}
+.stepTitle {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-tight);
+  margin: 2px 0 var(--space-2);
+  color: var(--color-text);
+}
+.stepBody {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* ── CTA + pie ─────────────────────────────────────────────────────────────── */
+.cta {
+  margin-top: var(--space-6);
+  text-align: center;
+}
+.ctaBtn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  width: 100%;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--accent-deep, #2a4256);
+  color: var(--color-on-accent);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  letter-spacing: var(--letter-spacing-tight);
+  box-shadow: var(--shadow-md);
+  transition:
+    transform var(--transition-fast),
+    background var(--transition-fast);
+}
+.ctaBtn:hover {
+  background: var(--color-accent);
+}
+.ctaBtn:active {
+  transform: scale(0.98);
+}
+/* Foco visible (la maqueta B no lo traía; copiado de A .closer-cta). */
+.ctaBtn:focus-visible {
+  outline: 2px solid var(--medal-gold, #c9a24b);
+  outline-offset: 3px;
+}
+.foot {
+  margin: var(--space-3) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* ── Animaciones de entrada (steps + bucle del mapa) ───────────────────────── */
+.step {
+  opacity: 0;
+  transform: translateY(26px) scale(0.985);
+  transition:
+    opacity var(--duration-slower) var(--ease-smooth),
+    transform var(--duration-slower) var(--ease-spring);
+}
+.stepIn {
+  opacity: 1;
+  transform: none;
+}
+
+/* El bucle del mapa se activa con la clase `revealed` (la pone el JS cuando la
+ * hoja entra en viewport). */
+.revealed .pinA {
+  animation: drop 0.9s cubic-bezier(0.3, 1.4, 0.5, 1) 0.15s forwards;
+}
+.revealed .pinRing {
+  animation: ping 1.6s ease-out 0.9s infinite;
+}
+.revealed .line line {
+  animation: draw 0.7s ease-out 0.95s forwards;
+}
+.revealed .dist {
+  animation: pop 0.55s cubic-bezier(0.3, 1.5, 0.5, 1) 1.5s forwards;
+}
+.revealed .pinQ {
+  animation: bob 3.4s ease-in-out 0.4s infinite;
+}
+
+@keyframes drift {
+  from {
+    transform: scale(1.04) translate(-1.5%, -1%);
+  }
+  to {
+    transform: scale(1.1) translate(2%, 1.5%);
+  }
+}
+@keyframes drop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -240%);
+  }
+  60% {
+    opacity: 1;
+    transform: translate(-50%, -86%);
+  }
+  78% {
+    transform: translate(-50%, -108%);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -100%);
+  }
+}
+@keyframes ping {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(3.6);
+    opacity: 0;
+  }
+}
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes bob {
+  0%,
+  100% {
+    transform: translate(-50%, -100%);
+  }
+  50% {
+    transform: translate(-50%, -116%);
+  }
+}
+
+/* Desktop: la columna respira; la hoja monta un poco más. */
+@media (min-width: 600px) {
+  .title {
+    font-size: var(--font-size-2xl);
+  }
+}
+
+/* Menos movimiento: todo visible y estático (el JS además no observa nada). */
+@media (prefers-reduced-motion: reduce) {
+  .sat,
+  .pinQ,
+  .pinRing {
+    animation: none !important;
+  }
+  .step {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .pinA {
+    opacity: 1;
+    animation: none !important;
+  }
+  .line line {
+    stroke-dashoffset: 0;
+    opacity: 1;
+    animation: none !important;
+  }
+  .dist {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+    animation: none !important;
+  }
+  .ctaBtn {
+    transition: none;
+  }
+}

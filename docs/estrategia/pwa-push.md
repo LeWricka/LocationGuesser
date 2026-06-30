@@ -149,7 +149,7 @@ create policy "push_subscriptions_delete_self" on public.push_subscriptions
 import webpush from 'npm:web-push' // libreria estandar de Web Push para Deno/Node
 
 webpush.setVapidDetails(
-  'mailto:icka69@gmail.com',
+  'mailto:Iker@540deg.com',
   Deno.env.get('VAPID_PUBLIC_KEY')!,
   Deno.env.get('VAPID_PRIVATE_KEY')!, // SECRET — solo aqui
 )

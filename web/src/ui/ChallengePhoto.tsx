@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { ImageOff } from 'lucide-react'
+import { Icon } from './Icon'
 import { Lightbox } from './Lightbox'
 import styles from './ChallengePhoto.module.css'
 
@@ -80,7 +82,7 @@ export function ChallengePhoto({
         </>
       ) : (
         <span className={styles.placeholder} aria-label={alt} role="img">
-          <span aria-hidden="true">🏔️</span>
+          <Icon icon={ImageOff} size={40} />
         </span>
       )}
       {caption && <span className={styles.caption}>{caption}</span>}

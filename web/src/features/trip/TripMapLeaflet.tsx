@@ -6,6 +6,8 @@ import { Layers } from 'lucide-react'
 import { Icon } from '../../ui'
 import type { RoutePoint } from '../../lib/trip'
 import type { TripMapProps as Props } from './TripMap.types'
+import { HELP_MARKER_SVG, PIN_MARKER_SVG } from './pinMarkers'
+import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapLeaflet.module.css'
 
@@ -55,15 +57,15 @@ function floatingActivePos(route: RoutePoint[]): L.LatLngExpression {
 }
 
 // Pin-foto de un momento CERRADO: miniatura redonda con anillo blanco, clavada en
-// su lat/lng. Sin foto → disco con emoji 📍. El color del anillo va inline para que
-// el token gobierne sin hardcodear (el module fija el resto del estilo).
+// su lat/lng. Sin foto → disco con el pin lucide (MapPin). El color del anillo va
+// inline para que el token gobierne sin hardcodear (el module fija el resto).
 function closedPinIcon(point: RoutePoint): L.DivIcon {
   const ring = 'var(--pin-ring-closed)'
   const inner = point.imageUrl
     ? `background-image:url('${point.imageUrl.replace(/'/g, "\\'")}')`
     : ''
   const klass = point.imageUrl ? 'lg-trip-pin' : 'lg-trip-pin lg-trip-pin--icon'
-  const body = point.imageUrl ? '' : '📍'
+  const body = point.imageUrl ? '' : PIN_MARKER_SVG
   return L.divIcon({
     className: '',
     html: `<div class="${klass}" style="border-color:${ring};${inner}">${body}</div>`,
@@ -72,11 +74,11 @@ function closedPinIcon(point: RoutePoint): L.DivIcon {
   })
 }
 
-// Pin del momento ACTIVO: anillo cálido pulsante + ❓ (no clavado en su sitio real).
+// Pin del momento ACTIVO: anillo cálido pulsante + icono "?" (no clavado en su sitio).
 function activePinIcon(): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: '<div class="lg-trip-pin lg-trip-pin--icon lg-trip-pin--active">❓</div>',
+    html: `<div class="lg-trip-pin lg-trip-pin--icon lg-trip-pin--active">${HELP_MARKER_SVG}</div>`,
     iconSize: [52, 52],
     iconAnchor: [26, 26],
   })
@@ -160,6 +162,7 @@ export function TripMapLeaflet({
   route,
   activeMoment,
   selectedChallengeId,
+  playing = false,
   onSelectMoment,
 }: Props) {
   // Capa de fondo: SATÉLITE (Esri) por defecto (fase "nuevo enfoque"); el plano
@@ -172,8 +175,28 @@ export function TripMapLeaflet({
     [activeMoment, route],
   )
 
-  // Línea continua que cose los momentos cerrados en orden.
+  // Línea ORO que cose los momentos cerrados en orden cronológico.
   const closedLine = useMemo<L.LatLngExpression[]>(() => route.map((p) => [p.lat, p.lng]), [route])
+
+  // DIBUJADO POR ETAPAS en play: el tramo recorrido (hasta el momento seleccionado,
+  // inclusive) va en oro sólido; el pendiente queda en oro tenue y discontinuo, como
+  // si la ruta se trazara a medida que el "avión" avanza. En reposo NO partimos: la
+  // ruta entera se ve sólida. (Lógica pura compartida con el globo en `routeDraw`.)
+  const drawnCount = useMemo<number>(
+    () => drawnRouteCount(route, selectedChallengeId, playing),
+    [playing, selectedChallengeId, route],
+  )
+
+  // Tramo recorrido (oro sólido) y pendiente (oro tenue discontinuo). Compartimos el
+  // vértice de corte para que las dos líneas se toquen sin hueco.
+  const drawnLine = useMemo<L.LatLngExpression[]>(
+    () => closedLine.slice(0, Math.max(drawnCount, 0)),
+    [closedLine, drawnCount],
+  )
+  const pendingLine = useMemo<L.LatLngExpression[]>(
+    () => (drawnCount < closedLine.length ? closedLine.slice(Math.max(drawnCount - 1, 0)) : []),
+    [closedLine, drawnCount],
+  )
 
   // Tramo discontinuo del último cerrado a la posición flotante del activo (aún
   // "no clavado"): la ruta no termina en su sitio real, solo apunta hacia él.
@@ -210,19 +233,25 @@ export function TripMapLeaflet({
           />
         )}
 
-        {/* Ruta continua entre cerrados (token --route-line). */}
-        {closedLine.length >= 2 && (
+        {/* Tramo RECORRIDO en oro sólido (token --route-gold). En reposo es la ruta
+            entera; en play crece hasta el momento seleccionado. */}
+        {drawnLine.length >= 2 && (
+          <Polyline positions={drawnLine} pathOptions={{ color: 'var(--route-gold)', weight: 3 }} />
+        )}
+
+        {/* Tramo PENDIENTE en oro tenue y discontinuo (solo durante el dibujado). */}
+        {pendingLine.length >= 2 && (
           <Polyline
-            positions={closedLine}
-            pathOptions={{ color: 'var(--route-line)', weight: 3 }}
+            positions={pendingLine}
+            pathOptions={{ color: 'var(--route-gold-soft)', weight: 3, dashArray: '4 8' }}
           />
         )}
 
-        {/* Tramo discontinuo hacia el activo flotante (token --route-line-dash). */}
+        {/* Tramo discontinuo hacia el activo flotante (oro tenue). */}
         {dashLine && (
           <Polyline
             positions={dashLine}
-            pathOptions={{ color: 'var(--route-line-dash)', weight: 3, dashArray: '6 8' }}
+            pathOptions={{ color: 'var(--route-gold-soft)', weight: 3, dashArray: '6 8' }}
           />
         )}
 

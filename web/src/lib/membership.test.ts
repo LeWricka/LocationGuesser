@@ -48,6 +48,7 @@ import {
   getGroupMembers,
   leaveGroup,
   kickMember,
+  setMemberRole,
   transferOwnership,
 } from './membership'
 
@@ -167,9 +168,36 @@ describe('getGroupMembers', () => {
     const members = await getGroupMembers('g1')
     expect(members[0].userId).toBe('u-owner')
     expect(members[0].isOwner).toBe(true)
+    expect(members[0].isCreator).toBe(true)
     expect(members[0].name).toBe('Ana')
     expect(members[1].isOwner).toBe(false)
+    expect(members[1].isCreator).toBe(false)
     expect(members[1].name).toBe('Bea')
+  })
+
+  test('un co-dueño (role owner, no creador) es owner pero no creator', async () => {
+    results['group_members'] = {
+      data: [
+        { user_id: 'u-creator', role: 'owner' },
+        { user_id: 'u-coowner', role: 'owner' },
+        { user_id: 'u-plain', role: 'member' },
+      ],
+      error: null,
+    }
+    results['groups'] = { data: { created_by: 'u-creator' }, error: null }
+    results['profiles'] = {
+      data: [
+        { id: 'u-creator', display_name: 'Ana' },
+        { id: 'u-coowner', display_name: 'Bob' },
+        { id: 'u-plain', display_name: 'Cris' },
+      ],
+      error: null,
+    }
+    const members = await getGroupMembers('g1')
+    const byId = Object.fromEntries(members.map((m) => [m.userId, m]))
+    expect(byId['u-creator']).toMatchObject({ isOwner: true, isCreator: true })
+    expect(byId['u-coowner']).toMatchObject({ isOwner: true, isCreator: false })
+    expect(byId['u-plain']).toMatchObject({ isOwner: false, isCreator: false })
   })
 
   test('sin miembros devuelve []', async () => {
@@ -201,6 +229,27 @@ describe('kickMember', () => {
     await kickMember('g1', 'u-victim')
     expect(deleteCalls).toHaveBeenCalledWith('group_members')
     expect(eqCalls).toHaveBeenCalledWith('group_members', 'user_id', 'u-victim')
+  })
+})
+
+describe('setMemberRole', () => {
+  test('promueve a co-dueño (role owner) del miembro indicado', async () => {
+    results['group_members'] = { data: null, error: null }
+    await setMemberRole('g1', 'u-member', 'owner')
+    expect(updateCalls).toHaveBeenCalledWith('group_members', { role: 'owner' })
+    expect(eqCalls).toHaveBeenCalledWith('group_members', 'group_id', 'g1')
+    expect(eqCalls).toHaveBeenCalledWith('group_members', 'user_id', 'u-member')
+  })
+
+  test('degrada a miembro (role member)', async () => {
+    results['group_members'] = { data: null, error: null }
+    await setMemberRole('g1', 'u-coowner', 'member')
+    expect(updateCalls).toHaveBeenCalledWith('group_members', { role: 'member' })
+  })
+
+  test('propaga el error de la RLS', async () => {
+    results['group_members'] = { data: null, error: new Error('denied') }
+    await expect(setMemberRole('g1', 'u', 'owner')).rejects.toThrow('denied')
   })
 })
 

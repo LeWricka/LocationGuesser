@@ -31,4 +31,16 @@ describe('computeResult', () => {
     expect(km).toBeGreaterThan(19000)
     expect(points).toBe(0)
   })
+
+  test('sin escala == "mundo": el cálculo no cambia para los retos de siempre', () => {
+    const a = { lat: 40, lng: -3 }
+    const b = { lat: 41, lng: -2 }
+    expect(computeResult(a, b).points).toBe(computeResult(a, b, 'mundo').points)
+  })
+
+  test('una escala más estricta da menos puntos a la misma distancia', () => {
+    const a = { lat: 40, lng: -3 }
+    const b = { lat: 40.1, lng: -3 } // ~11 km
+    expect(computeResult(a, b, 'barrio').points).toBeLessThan(computeResult(a, b, 'mundo').points)
+  })
 })

@@ -71,6 +71,7 @@ import {
   getAnswers,
   countVotes,
   updateChallenge,
+  updateMoment,
   isPracticeChallenge,
 } from './challenges'
 
@@ -93,6 +94,12 @@ const sampleChallenge: Challenge = {
   photo_is_hint: true,
   sv_lock_move: false,
   sv_lock_rotate: false,
+  score_scale: 'mundo',
+  challenge_kind: 'location',
+  number_question: null,
+  number_unit: null,
+  number_decimals: 0,
+  number_tolerance: 'normal',
   created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
 }
@@ -171,6 +178,33 @@ describe('createChallenge', () => {
     >
     expect(insertArg.sv_lock_move).toBe(true)
     expect(insertArg.sv_lock_rotate).toBe(true)
+  })
+
+  test('la precisión por defecto es "mundo" (scoring histórico)', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await createChallenge({ title: 'x', lat: 1, lng: 2, createdBy: 'u', groupId: 'g1' })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.score_scale).toBe('mundo')
+  })
+
+  test('escribe la precisión elegida (score_scale) cuando se pasa', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await createChallenge({
+      title: 'x',
+      lat: 1,
+      lng: 2,
+      createdBy: 'u',
+      groupId: 'g1',
+      scoreScale: 'ciudad',
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.score_scale).toBe('ciudad')
   })
 })
 
@@ -254,6 +288,26 @@ describe('promoteToChallenge', () => {
       unknown
     >
     expect(new Date(updateArg.deadline_at as string).getTime()).toBeGreaterThan(Date.now())
+  })
+
+  test('promociona con la precisión por defecto "mundo" si no se elige', async () => {
+    results['challenges'] = { data: { ...sampleChallenge, id: 'm1' }, error: null }
+    await promoteToChallenge('m1', { lat: 1, lng: 2 })
+    const updateArg = calls.update.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(updateArg.score_scale).toBe('mundo')
+  })
+
+  test('promociona escribiendo la precisión elegida (barrio)', async () => {
+    results['challenges'] = { data: { ...sampleChallenge, id: 'm1' }, error: null }
+    await promoteToChallenge('m1', { lat: 1, lng: 2, scoreScale: 'barrio' })
+    const updateArg = calls.update.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(updateArg.score_scale).toBe('barrio')
   })
 })
 
@@ -389,6 +443,57 @@ describe('updateChallenge', () => {
     results['challenges'] = { data: sampleChallenge, error: null }
     await updateChallenge('c1', { imagePath: null })
     expect(calls.update).toHaveBeenCalledWith('challenges', { image_path: null })
+  })
+})
+
+describe('updateMoment', () => {
+  test('edita título y fecha del recuerdo (created_at)', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { title: 'Nuevo título', createdAt: '2026-04-08T10:00:00.000Z' })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      title: 'Nuevo título',
+      created_at: '2026-04-08T10:00:00.000Z',
+    })
+  })
+
+  test('descripción vacía se guarda como null', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { description: '   ' })
+    expect(calls.update).toHaveBeenCalledWith('challenges', { description: null })
+  })
+
+  test('cambiar el lugar escribe place_* (no lat/lng: el lugar es visible)', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { place: { lat: 1, lng: 2 } })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      place_lat: 1,
+      place_lng: 2,
+      sv_pano_id: null,
+      sv_heading: null,
+      sv_pitch: null,
+    })
+    // No toca la respuesta oculta (lat/lng): un recuerdo no tiene respuesta.
+    const patch = calls.update.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(patch).not.toHaveProperty('lat')
+    expect(patch).not.toHaveProperty('lng')
+  })
+
+  test('place null quita el lugar y el panorama del recuerdo', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { place: null })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      place_lat: null,
+      place_lng: null,
+      sv_pano_id: null,
+      sv_heading: null,
+      sv_pitch: null,
+    })
+  })
+
+  test('sin campos presentes no manda nada espurio (patch vacío)', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', {})
+    expect(calls.update).toHaveBeenCalledWith('challenges', {})
   })
 })
 

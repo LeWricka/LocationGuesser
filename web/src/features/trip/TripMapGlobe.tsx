@@ -9,6 +9,8 @@ import type {
 } from 'maplibre-gl'
 import type { RoutePoint } from '../../lib/trip'
 import type { TripMapProps as Props } from './TripMap.types'
+import { HELP_MARKER_SVG, PIN_MARKER_SVG } from './pinMarkers'
+import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapGlobe.module.css'
 
@@ -49,6 +51,8 @@ const INTRO_DURATION = 1500
 // Ids de fuente/capa de la ruta (line). Constantes para añadir/quitar sin colisión.
 const ROUTE_SRC = 'lg-route'
 const ROUTE_LINE = 'lg-route-line'
+const PENDING_SRC = 'lg-route-pending'
+const PENDING_LINE = 'lg-route-pending-line'
 const DASH_SRC = 'lg-route-dash'
 const DASH_LINE = 'lg-route-dash-line'
 
@@ -79,13 +83,13 @@ function pinElement(opts: { imageUrl: string | null; active: boolean }): HTMLDiv
   const el = document.createElement('div')
   if (opts.active) {
     el.className = 'lg-trip-pin lg-trip-pin--icon lg-trip-pin--active'
-    el.textContent = '❓'
+    el.innerHTML = HELP_MARKER_SVG
   } else if (opts.imageUrl) {
     el.className = 'lg-trip-pin'
     el.style.backgroundImage = `url('${opts.imageUrl.replace(/'/g, "\\'")}')`
   } else {
     el.className = 'lg-trip-pin lg-trip-pin--icon'
-    el.textContent = '📍'
+    el.innerHTML = PIN_MARKER_SVG
   }
   return el
 }
@@ -151,7 +155,13 @@ function applySky(map: MapLibreMap): void {
   }
 }
 
-export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelectMoment }: Props) {
+export function TripMapGlobe({
+  route,
+  activeMoment,
+  selectedChallengeId,
+  playing = false,
+  onSelectMoment,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const glRef = useRef<MapLibreModule | null>(null)
@@ -174,10 +184,14 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
   // escritura va en un efecto (no en render) para no romper la regla de hooks.
   const routeRef = useRef(route)
   const activeRef = useRef(activeMoment)
+  const selectedRef = useRef(selectedChallengeId)
+  const playingRef = useRef(playing)
   const onSelectRef = useRef(onSelectMoment)
   useEffect(() => {
     routeRef.current = route
     activeRef.current = activeMoment
+    selectedRef.current = selectedChallengeId
+    playingRef.current = playing
     onSelectRef.current = onSelectMoment
   })
 
@@ -209,23 +223,33 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
       )
     }
 
-    // Ruta: continua entre cerrados + discontinua hacia el activo flotante. El paint
-    // WebGL no entiende `var(--token)`, así que resolvemos el token a color concreto
-    // leyendo la variable computada (mismo valor que usa el plano por CSS).
-    // Ruta en acento/tinta (tokens). El paint WebGL no entiende `var(--token)`, así
-    // que resolvemos el token a color concreto leyendo la variable computada (mismo
-    // valor que el plano usa por CSS). El fallback solo aplica si el token faltara.
+    // Ruta en ORO (token): el oro marca el recorrido "vivo". El paint WebGL no entiende
+    // `var(--token)`, así que resolvemos el token a color concreto leyendo la variable
+    // computada (mismo valor que usa el plano por CSS). El fallback solo aplica si el
+    // token faltara. Dos colores: oro sólido (recorrido) y oro tenue (pendiente/activo).
     const css = getComputedStyle(map.getContainer())
-    const lineColor = css.getPropertyValue('--route-line').trim() || 'rgba(24,32,43,0.6)'
-    const dashColor = css.getPropertyValue('--route-line-dash').trim() || 'rgba(24,32,43,0.35)'
+    const goldColor = css.getPropertyValue('--route-gold').trim() || '#d9b25a'
+    const goldSoft = css.getPropertyValue('--route-gold-soft').trim() || 'rgba(217,178,90,0.5)'
     const closed: [number, number][] = pts.map((p) => [p.lng, p.lat])
+
+    // DIBUJADO POR ETAPAS en play: oro sólido hasta el seleccionado, oro tenue después
+    // (paridad con el plano vía la lógica pura compartida). En reposo se ve entera.
+    const drawnCount = drawnRouteCount(pts, selectedRef.current, playingRef.current)
+    const drawn = closed.slice(0, drawnCount)
+    const pending = drawnCount < closed.length ? closed.slice(Math.max(drawnCount - 1, 0)) : []
+
+    // Tramo discontinuo del último cerrado hacia el activo flotante.
     const dash: [number, number][] | null =
       active && pts.length > 0
         ? [[pts[pts.length - 1].lng, pts[pts.length - 1].lat], floatingActivePos(pts)]
         : null
 
-    upsertLine(map, ROUTE_SRC, ROUTE_LINE, closed.length >= 2 ? closed : [], { color: lineColor })
-    upsertLine(map, DASH_SRC, DASH_LINE, dash ?? [], { color: dashColor, dash: [2, 2.5] })
+    upsertLine(map, ROUTE_SRC, ROUTE_LINE, drawn.length >= 2 ? drawn : [], { color: goldColor })
+    upsertLine(map, PENDING_SRC, PENDING_LINE, pending.length >= 2 ? pending : [], {
+      color: goldSoft,
+      dash: [2, 4],
+    })
+    upsertLine(map, DASH_SRC, DASH_LINE, dash ?? [], { color: goldSoft, dash: [2, 2.5] })
   }, [])
 
   // Encuadra todos los pines (cerrados + posición flotante del activo).
@@ -372,11 +396,11 @@ export function TripMapGlobe({ route, activeMoment, selectedChallengeId, onSelec
     }
   }, [repaint, fitToPins, introFlight])
 
-  // Repinta cuando cambian los datos (no recrea el mapa). No-op hasta que el
-  // estilo cargó; el handler `load` hace el primer pintado.
+  // Repinta cuando cambian los datos O el dibujado por etapas (selección/play). No-op
+  // hasta que el estilo cargó; el handler `load` hace el primer pintado.
   useEffect(() => {
     repaint()
-  }, [route, activeMoment, repaint])
+  }, [route, activeMoment, selectedChallengeId, playing, repaint])
 
   // ── Vuela al pin seleccionado (sin re-encuadrar todo). ──
   useEffect(() => {

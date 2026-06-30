@@ -1,7 +1,9 @@
 import type { CSSProperties } from 'react'
+import { Crown, Gift } from 'lucide-react'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import { parseAvatar } from '../../lib/avatar'
+import { Icon } from '../../ui'
 import { prizeForRow } from './prizes'
 
 // Mapa de clases CSS que cada contexto inyecta. Compartimos el MARKUP del podio
@@ -75,7 +77,7 @@ function PodiumColumn({
     <div className={`${classes.podiumCol} ${place}`}>
       {index === 0 && (
         <span className={classes.crown} aria-hidden="true">
-          👑
+          <Icon icon={Crown} />
         </span>
       )}
       <span
@@ -96,7 +98,11 @@ function PodiumColumn({
       </span>
       <span className={classes.podiumName}>{entry.name}</span>
       <span className={classes.podiumPoints}>{entry.points.toLocaleString('es-ES')}</span>
-      {prize && <span className={classes.podiumPrize}>🎁 {prize}</span>}
+      {prize && (
+        <span className={classes.podiumPrize}>
+          <Icon icon={Gift} /> {prize}
+        </span>
+      )}
       <span className={`${classes.pedestal} ${rankClass}`}>
         <span className={classes.pedestalMedal} aria-hidden="true">
           {medalFor(index)}

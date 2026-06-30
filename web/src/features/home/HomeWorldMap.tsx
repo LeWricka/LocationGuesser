@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // import() dinámico dentro del efecto, para que quede en su propio chunk WebGL.
 import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
 import '../trip/tripPins.css'
+import { PIN_MARKER_SVG } from '../trip/pinMarkers'
 import type { WorldTrip } from './useWorldTrips'
 import styles from './HomeWorldMap.module.css'
 
@@ -25,17 +26,22 @@ const SATELLITE_URL =
 const SATELLITE_ATTRIBUTION =
   'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
 
-// Vista de mundo: el globo entero, ligeramente inclinado hacia el norte poblado.
+// Vista de mundo: satélite PLANO a sangre (Mercator), centrado en el norte poblado.
+// Dirección "satélite a sangre" (coherente con crear-reto/jugar): NO globo nocturno;
+// el mapa real llena el lienzo de borde a borde y las constelaciones se posan encima.
 const WORLD_CENTER: [number, number] = [10, 28]
-const WORLD_ZOOM = 1.35
+// Suelo de zoom para que el satélite SIEMPRE llene el lienzo (sin bordes de "fin del
+// mundo"). En plano, ~2.4 cubre el alto de un móvil en retrato.
+const MIN_FILL_ZOOM = 2.4
+const WORLD_ZOOM = 2.6
 // Encuadre que abarque TODAS las constelaciones sin acercarse de más (han de convivir
 // varios viajes en pantalla). Padding ASIMÉTRICO y generoso: arriba deja sitio a la topbar
 // y el pie editorial; ABAJO deja libre la franja que ocupa la bandeja de viajes plegada,
-// para que los pines NO queden tapados (clave de la inmersión: el globo y sus pines mandan).
+// para que los pines NO queden tapados (clave de la inmersión: el satélite y sus pines mandan).
 const FIT_MAX_ZOOM = 4.5
 const FIT_PADDING = { top: 120, bottom: 300, left: 56, right: 56 }
-// Entrada cinematográfica: arranca más lejos (globo entero) y "aterriza" en el encuadre.
-const INTRO_START_ZOOM = 0.5
+// Entrada cinematográfica: arranca algo más lejos (mundo) y "aterriza" en el encuadre.
+const INTRO_START_ZOOM = 1.6
 const INTRO_DURATION = 1500
 
 // Estilo base mínimo: sin sprite/glyphs; el raster Esri se añade tras `load`.
@@ -82,7 +88,7 @@ function pinElement(opts: { imageUrl: string | null; lead: boolean }): HTMLDivEl
     el.style.backgroundImage = `url('${opts.imageUrl.replace(/'/g, "\\'")}')`
   } else {
     el.classList.add('lg-trip-pin--icon')
-    el.textContent = '📍'
+    el.innerHTML = PIN_MARKER_SVG
   }
   return el
 }
@@ -96,14 +102,15 @@ function labelElement(name: string): HTMLDivElement {
 }
 
 /**
- * MAPAMUNDI satélite de la home — variante A "el globo". Cada viaje es su propia
- * CONSTELACIÓN: sus pines-foto + una mini-ruta (línea discontinua) que une SOLO sus
- * puntos, y una etiqueta serif con el nombre del viaje. NUNCA hay línea entre viajes
- * distintos. El click en cualquier pin o etiqueta abre ese viaje.
+ * MAPAMUNDI satélite de la home — dirección "satélite A SANGRE" (plano Mercator,
+ * NO globo nocturno; coherente con crear-reto y jugar). Cada viaje es su propia
+ * CONSTELACIÓN: sus pines-foto + una mini-ruta en ORO (línea discontinua) que une
+ * SOLO sus puntos, y una etiqueta serif con el nombre del viaje. NUNCA hay línea
+ * entre viajes distintos. El click en cualquier pin o etiqueta abre ese viaje.
  *
- * Motor: MapLibre GL (globo 3D + raster Esri), import dinámico (chunk aparte). Si el
- * navegador no tiene WebGL o el globo revienta, caemos a un globo EVOCADO en CSS
- * (sin tiles) que mantiene el héroe visual sin romper la home.
+ * Motor: MapLibre GL (satélite plano Esri), import dinámico (chunk aparte). Si el
+ * navegador no tiene WebGL o el mapa revienta, caemos a un satélite EVOCADO en CSS
+ * (relieve plano sin tiles) que mantiene el héroe visual sin romper la home.
  */
 export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -136,9 +143,10 @@ export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }:
     for (const m of markersRef.current) m.remove()
     markersRef.current = []
 
-    // Color de la ruta desde el token (el paint WebGL no entiende var()).
+    // Color de la mini-ruta desde el token ORO (el paint WebGL no entiende var()).
+    // El oro ata la home con el viaje: la ruta es "lo vivo" en ambos.
     const css = getComputedStyle(map.getContainer())
-    const routeColor = css.getPropertyValue('--route-line-dash').trim() || 'rgba(255,255,255,0.72)'
+    const routeColor = css.getPropertyValue('--route-gold-soft').trim() || 'rgba(217,178,90,0.5)'
 
     list.forEach((trip, ti) => {
       // El más reciente del clúster (orden ASC → el último) lleva el anillo cálido.
@@ -258,6 +266,9 @@ export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }:
           style: BASE_STYLE,
           center: WORLD_CENTER,
           zoom: WORLD_ZOOM,
+          // Suelo de zoom: el satélite PLANO siempre llena el lienzo a sangre (sin
+          // globo flotando en cielo negro ni bordes de "fin del mundo").
+          minZoom: MIN_FILL_ZOOM,
           attributionControl: { compact: true },
           fadeDuration: prefersReducedMotion() ? 0 : 300,
         })
@@ -265,22 +276,9 @@ export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }:
 
         map.on('load', () => {
           if (disposed) return
-          map.setProjection({ type: 'globe' })
-          const withSky = map as MapLibreMap & {
-            setSky?: (sky: Record<string, unknown>) => unknown
-          }
-          if (typeof withSky.setSky === 'function') {
-            try {
-              withSky.setSky({
-                'sky-color': '#0d1722',
-                'horizon-color': '#21384e',
-                'sky-horizon-blend': 0.6,
-                'atmosphere-blend': 0.7,
-              })
-            } catch {
-              // Versión sin soporte real: omitir, no romper.
-            }
-          }
+          // Satélite PLANO a sangre (Mercator, la proyección por defecto): coherente con
+          // el viaje y crear-reto. Ya NO activamos `globe` ni el cielo nocturno — el mapa
+          // real llena el lienzo de borde a borde, estilo Polarsteps.
           map.addSource('basemap', {
             type: 'raster',
             tiles: [SATELLITE_URL],

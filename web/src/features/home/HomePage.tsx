@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AlertTriangle } from 'lucide-react'
 import {
   Avatar,
   Card,
   EmptyState,
   HomeDashboard,
   HomeEmptyState,
+  Icon,
   Skeleton,
   SkeletonCard,
   Stack,
@@ -94,7 +96,7 @@ export function HomePage() {
           {/* Estado de error con UNA salida clara: reintentar la carga (no deja
               al usuario en un callejón sin acción). */}
           <EmptyState
-            icon="⚠️"
+            icon={<Icon icon={AlertTriangle} size={32} />}
             tone="danger"
             title="No hemos podido cargar tu inicio"
             description="Puede ser un fallo de conexión. Inténtalo de nuevo."

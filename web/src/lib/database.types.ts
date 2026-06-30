@@ -72,6 +72,16 @@ export interface Database {
           // Fin de temporada: null = grupo activo; con fecha = cerrado/archivado
           // (solo-lectura). Migración 0019.
           closed_at: string | null
+          // Datos del viaje (contenido editorial opcional, null = sin dato). Migración 0027.
+          // Rango de fechas de calendario (sin hora/zona): 'YYYY-MM-DD'.
+          starts_on: string | null
+          ends_on: string | null
+          // De qué va y con quién (texto libre). `companions` NO es membresía:
+          // es solo informativo (los miembros reales entran por el enlace).
+          description: string | null
+          companions: string | null
+          // Portada del viaje: path en Storage (como challenges.image_path).
+          cover_image_path: string | null
         }
         Insert: {
           id: string
@@ -80,6 +90,11 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           closed_at?: string | null
+          starts_on?: string | null
+          ends_on?: string | null
+          description?: string | null
+          companions?: string | null
+          cover_image_path?: string | null
         }
         Update: {
           id?: string
@@ -88,6 +103,11 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           closed_at?: string | null
+          starts_on?: string | null
+          ends_on?: string | null
+          description?: string | null
+          companions?: string | null
+          cover_image_path?: string | null
         }
         Relationships: []
       }
@@ -120,6 +140,23 @@ export interface Database {
           // Candados de exploración del Street View (false = permitido). Migración 0013.
           sv_lock_move: boolean
           sv_lock_rotate: boolean
+          // PRECISIÓN del reto: calibra la D de la puntuación 5000·e^(−km/D).
+          // mundo=2000km (default = comportamiento histórico), pais/ciudad/barrio
+          // cada vez más estrictos. Migración 0028.
+          score_scale: 'mundo' | 'pais' | 'ciudad' | 'barrio'
+          // TIPO de reto: location (¿Dónde es?, default histórico) o number
+          // (¿Cuánto?, adivinar una cifra). No es spoiler. Migración 0029.
+          challenge_kind: 'location' | 'number'
+          // Metadatos VISIBLES del reto de número (no spoiler; se sirven al jugar).
+          // La pregunta ("¿cuánto costó?"), la unidad (€/km/kg…, ≤8), los decimales
+          // a mostrar (0–4) y lo estricto del conteo. Migración 0029.
+          number_question: string | null
+          number_unit: string | null
+          number_decimals: number
+          number_tolerance: 'indulgente' | 'normal' | 'estricto'
+          // OJO: `answer_number_src` (la cifra correcta de origen) NO se expone aquí:
+          // su privilegio de columna está REVOCADO (anti-spoiler, 0029), igual que
+          // lat/lng. La respuesta vive oculta en challenge_answers.answer_number.
           created_by: string
           created_at: string
         }
@@ -143,6 +180,19 @@ export interface Database {
           photo_is_hint?: boolean
           sv_lock_move?: boolean
           sv_lock_rotate?: boolean
+          // Default 'mundo' en BD: omitirlo crea un reto con el scoring histórico.
+          score_scale?: 'mundo' | 'pais' | 'ciudad' | 'barrio'
+          // Reto de número (0029). Default 'location' en BD: omitirlo crea un reto
+          // de lugar (compat con createChallenge/createMoment).
+          challenge_kind?: 'location' | 'number'
+          number_question?: string | null
+          number_unit?: string | null
+          number_decimals?: number
+          number_tolerance?: 'indulgente' | 'normal' | 'estricto'
+          // ENTRADA de la cifra correcta (spoiler): se ESCRIBE pero NO se lee (su
+          // privilegio de SELECT está revocado). El trigger la copia a
+          // challenge_answers.answer_number. Migración 0029.
+          answer_number_src?: number | null
           created_by: string
           created_at?: string
         }
@@ -165,6 +215,15 @@ export interface Database {
           photo_is_hint?: boolean
           sv_lock_move?: boolean
           sv_lock_rotate?: boolean
+          score_scale?: 'mundo' | 'pais' | 'ciudad' | 'barrio'
+          // Reto de número (0029).
+          challenge_kind?: 'location' | 'number'
+          number_question?: string | null
+          number_unit?: string | null
+          number_decimals?: number
+          number_tolerance?: 'indulgente' | 'normal' | 'estricto'
+          // Spoiler: se escribe, no se lee (privilegio de SELECT revocado). 0029.
+          answer_number_src?: number | null
           created_by?: string
           created_at?: string
         }
@@ -198,22 +257,28 @@ export interface Database {
         Relationships: []
       }
       challenge_answers: {
-        // La respuesta del reto (lat/lng), gobernada por RLS aparte de `challenges`:
+        // La respuesta OCULTA del reto, gobernada por RLS aparte de `challenges`:
         // legible solo si el reto está cerrado o el usuario ya votó (migración 0010).
+        // Una fila es O de lugar (lat/lng) O de número (answer_number): constraint
+        // XOR por tipo (0029). Por eso lat/lng pasan a nullable.
         Row: {
           challenge_id: string
-          lat: number
-          lng: number
+          lat: number | null
+          lng: number | null
+          // Reto de número: la cifra correcta (null en retos de lugar). Migración 0029.
+          answer_number: number | null
         }
         Insert: {
           challenge_id: string
-          lat: number
-          lng: number
+          lat?: number | null
+          lng?: number | null
+          answer_number?: number | null
         }
         Update: {
           challenge_id?: string
-          lat?: number
-          lng?: number
+          lat?: number | null
+          lng?: number | null
+          answer_number?: number | null
         }
         Relationships: []
       }
@@ -227,6 +292,10 @@ export interface Database {
           guess_lat: number | null
           guess_lng: number | null
           distance_km: number | null
+          // Reto de número: la cifra adivinada y el error absoluto |guess − respuesta|
+          // (null en votos de lugar o timeout). `points` es compartido. Migración 0029.
+          guess_number: number | null
+          abs_error: number | null
           points: number
           // El jugador cambió de pestaña/app durante la jugada (anti-trampa). Migración 0015.
           left_app: boolean
@@ -242,6 +311,8 @@ export interface Database {
           guess_lat?: number | null
           guess_lng?: number | null
           distance_km?: number | null
+          guess_number?: number | null
+          abs_error?: number | null
           points: number
           left_app?: boolean
           elapsed_seconds?: number | null
@@ -255,6 +326,8 @@ export interface Database {
           guess_lat?: number | null
           guess_lng?: number | null
           distance_km?: number | null
+          guess_number?: number | null
+          abs_error?: number | null
           points?: number
           left_app?: boolean
           elapsed_seconds?: number | null
@@ -313,6 +386,24 @@ export interface Database {
           points: number
           answer_lat: number | null
           answer_lng: number | null
+        }[]
+      }
+      // RPC HERMANA de submit_vote para el reto de NÚMERO (¿Cuánto?): recibe la cifra
+      // adivinada (p_guess null = voto de timeout), calcula el error relativo y los
+      // puntos server-side contra la respuesta oculta y devuelve el revelado. Mismas
+      // reglas anti-trampa. Migración 0029. Devuelve un array de una fila.
+      submit_number_vote: {
+        Args: {
+          p_challenge_id: string
+          p_guess: number | null
+          p_left_app?: boolean
+          p_elapsed_seconds?: number | null
+        }
+        Returns: {
+          abs_error: number | null
+          rel_error: number | null
+          points: number
+          answer_number: number | null
         }[]
       }
       // Cerrar la temporada del grupo (closed_at = now). Solo el dueño; SECURITY
@@ -455,3 +546,6 @@ export type ChallengeAnswer = Database['public']['Tables']['challenge_answers'][
 export type PushSubscriptionRow = Database['public']['Tables']['push_subscriptions']['Row']
 /** Una fila del retorno de la RPC `submit_vote` (revelado al votar). */
 export type SubmitVoteResult = Database['public']['Functions']['submit_vote']['Returns'][number]
+/** Una fila del retorno de la RPC `submit_number_vote` (revelado del reto de número). */
+export type SubmitNumberVoteResult =
+  Database['public']['Functions']['submit_number_vote']['Returns'][number]

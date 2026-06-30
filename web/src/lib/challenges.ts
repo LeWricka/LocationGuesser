@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import type { Challenge, Database } from './database.types'
-import type { LatLng } from './geo'
+import { DEFAULT_SCORE_SCALE, type LatLng, type ScoreScale } from './geo'
 import { deadlineFromNow } from './time'
 
 type ChallengeUpdate = Database['public']['Tables']['challenges']['Update']
@@ -19,8 +19,14 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // `challenge_answers` (RLS). En cambio `place_lat`/`place_lng` (lugar VISIBLE de un
 // recuerdo) e `is_challenge` SÍ se sirven: no son spoiler (0022). Reutilizado por
 // todos los lectores: jugar, lista del grupo, home y el RETURNING de crear/editar.
+// `score_scale` (0028) NO es spoiler (no revela la ubicación): es la precisión del
+// reto. Se sirve para que la previsualización/score local coincida con el servidor.
+// `challenge_kind` y los `number_*` (0029) tampoco son spoiler: describen el TIPO y la
+// PREGUNTA del reto de número (no la cifra). Se sirven al jugar para montar la mecánica.
+// La respuesta del número (`answer_number`) NO está aquí (vive oculta en
+// challenge_answers); `answer_number_src` tampoco (privilegio de columna revocado, 0029).
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, created_by, created_at'
+  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -51,6 +57,12 @@ export interface NewChallengeInput {
   svLockMove?: boolean
   /** Candado de GIRO del Street View (true = no se puede mirar alrededor). (#187.) */
   svLockRotate?: boolean
+  /**
+   * Precisión del reto: calibra cómo de estricto es el conteo de distancia (0028).
+   * Por defecto 'mundo' (D=2000 km) = el scoring de siempre. A menor escala, más
+   * estricto: pais=300, ciudad=25, barrio=2 km.
+   */
+  scoreScale?: ScoreScale
 }
 
 // Plazo por defecto si el creador no eligió uno: 24 h desde ahora. La duración
@@ -98,6 +110,8 @@ export async function createChallenge(
       sv_lock_rotate: input.svLockRotate ?? false,
       guess_seconds: input.guessSeconds ?? null,
       deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
+      // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
+      score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
       created_by: input.createdBy,
     })
     // RETURNING sin lat/lng: tras revocar la columna (0010), pedirlas aquí daría
@@ -211,6 +225,8 @@ export interface PromoteToChallengeInput {
   svLockRotate?: boolean
   /** Si hay foto, ¿pista visible al jugar (true) o sorpresa hasta el revelado (false)? */
   photoIsHint?: boolean
+  /** Precisión del reto (0028); por defecto 'mundo' = scoring histórico. */
+  scoreScale?: ScoreScale
 }
 
 /**
@@ -238,6 +254,8 @@ export async function promoteToChallenge(
     sv_pitch: input.svPitch ?? null,
     sv_lock_move: input.svLockMove ?? false,
     sv_lock_rotate: input.svLockRotate ?? false,
+    // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
+    score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
   }
   if (input.photoIsHint !== undefined) patch.photo_is_hint = input.photoIsHint
 
@@ -282,7 +300,16 @@ export async function getAnswers(challengeIds: string[]): Promise<Map<string, La
     .select('challenge_id, lat, lng')
     .in('challenge_id', challengeIds)
   if (error) throw error
-  return new Map((data ?? []).map((a) => [a.challenge_id, { lat: a.lat, lng: a.lng }]))
+  // Solo respuestas de LUGAR (lat/lng presentes). Las de NÚMERO (0029) tienen lat/lng
+  // null y no aportan pin en el mapa: se filtran. El estrechado de tipo deja LatLng.
+  return new Map(
+    (data ?? [])
+      .filter(
+        (a): a is { challenge_id: string; lat: number; lng: number } =>
+          a.lat != null && a.lng != null,
+      )
+      .map((a) => [a.challenge_id, { lat: a.lat, lng: a.lng }]),
+  )
 }
 
 /**
@@ -299,7 +326,8 @@ export async function getAnswer(challengeId: string): Promise<LatLng | null> {
     .eq('challenge_id', challengeId)
     .maybeSingle()
   if (error) throw error
-  return data ? { lat: data.lat, lng: data.lng } : null
+  // Solo respuesta de LUGAR: una de NÚMERO (0029) tiene lat/lng null → sin pin.
+  return data && data.lat != null && data.lng != null ? { lat: data.lat, lng: data.lng } : null
 }
 
 /**
@@ -417,6 +445,83 @@ export async function updateChallengeDescription(id: string, description: string
     .update({ description: trimmed === '' ? null : trimmed })
     .eq('id', id)
   if (error) throw error
+}
+
+/**
+ * Campos editables de un RECUERDO (momento sin capa de reto). A diferencia de un
+ * reto, el lugar de un recuerdo es VISIBLE (`place_lat`/`place_lng`) y se puede
+ * cambiar SIEMPRE (no hay respuesta oculta ni votos que romper). La "fecha" del
+ * momento es su `created_at` (no hay columna de fecha aparte: el diario ordena por
+ * ahí), así que editarla mueve el momento en la línea de tiempo. Todos los campos
+ * son opcionales: solo se aplican los presentes (patch parcial).
+ */
+export interface UpdateMomentInput {
+  title?: string
+  /** Descripción del día (texto libre); null o '' la deja vacía. */
+  description?: string | null
+  /**
+   * Lugar VISIBLE del recuerdo. `null` lo quita del mapa (queda solo en el diario).
+   * Va junto al panorama para no dejar un Street View incoherente con el sitio.
+   */
+  place?: {
+    lat: number
+    lng: number
+    svPanoId?: string | null
+    svHeading?: number | null
+    svPitch?: number | null
+  } | null
+  /**
+   * Fecha del momento en ISO (se guarda en `created_at`). Mueve el momento en la
+   * línea de tiempo del diario, que ordena por `created_at`.
+   */
+  createdAt?: string
+}
+
+/**
+ * Edita un RECUERDO (título, descripción, lugar visible y/o fecha). Solo el dueño
+ * del grupo lo consigue (RLS `challenges_update_owner`; la UI esconde la acción a
+ * los miembros). Devuelve el momento actualizado, sin la respuesta oculta.
+ *
+ * No toca la capa de reto (plazo, cronómetro, candados): para eso está
+ * `updateChallenge`. Aquí el lugar es VISIBLE, así que cambiarlo escribe
+ * `place_lat`/`place_lng` (no `lat`/`lng`: un recuerdo no tiene respuesta a ocultar).
+ */
+export async function updateMoment(
+  id: string,
+  input: UpdateMomentInput,
+): Promise<ChallengeForPlay> {
+  const patch: ChallengeUpdate = {}
+  if (input.title !== undefined) patch.title = input.title
+  if (input.description !== undefined) {
+    const trimmed = input.description?.trim() ?? ''
+    patch.description = trimmed === '' ? null : trimmed
+  }
+  if (input.createdAt !== undefined) patch.created_at = input.createdAt
+  if (input.place !== undefined) {
+    if (input.place === null) {
+      // Quitar el lugar: fuera del mapa y sin panorama colgando.
+      patch.place_lat = null
+      patch.place_lng = null
+      patch.sv_pano_id = null
+      patch.sv_heading = null
+      patch.sv_pitch = null
+    } else {
+      patch.place_lat = input.place.lat
+      patch.place_lng = input.place.lng
+      patch.sv_pano_id = input.place.svPanoId ?? null
+      patch.sv_heading = input.place.svHeading ?? null
+      patch.sv_pitch = input.place.svPitch ?? null
+    }
+  }
+
+  const { data, error } = await supabase
+    .from('challenges')
+    .update(patch)
+    .eq('id', id)
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .single<ChallengeForPlay>()
+  if (error) throw error
+  return data
 }
 
 /**

@@ -158,20 +158,23 @@
   transform: scale(0.94);
 }
 
-/* FAB del mapa, CENTRO inferior: círculo sólido salvia/pizarra (sin gradiente ni
- * glow). Va centrado (no a la derecha) para no pisar el control +/- del Street
- * View, que Google pinta abajo-derecha. */
-.mapFab {
+/* Asa-pastilla del mapa, CENTRO inferior: la pieza única que SUBE la hoja del mapa
+ * (lenguaje de "hoja que sube"). Icono + texto + asa de arrastre en una sola
+ * pastilla salvia → no hay etiqueta flotante aparte que pueda solaparse. Centrada
+ * (no a la derecha) para no pisar el control +/- del Street View, que Google pinta
+ * abajo-derecha. Ancho acotado para que no choque con los controles del panorama. */
+.mapHandle {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   z-index: 3;
-  width: 64px;
-  height: 64px;
-  display: grid;
-  place-items: center;
-  font-size: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: min(58vw, 240px);
+  padding: var(--space-2) var(--space-4) calc(var(--space-2) + 2px);
   border: none;
   border-radius: var(--radius-full);
   background: var(--color-accent);
@@ -182,26 +185,45 @@
     transform var(--transition-fast),
     box-shadow var(--transition-fast);
 }
-.mapFab:hover {
+.mapHandle:hover {
   background: var(--color-accent-hover);
   box-shadow: var(--shadow-lg), var(--ring-contact);
 }
-.mapFab:active {
-  transform: translateX(-50%) scale(0.94);
+.mapHandle:active {
+  transform: translateX(-50%) translateY(1px) scale(0.98);
 }
 
-/* Punto que avisa de que ya hay un pin colocado (sin abrir el mapa). Más grande y
-   con anillo + sombra para que se lea claramente sobre el FAB salvia. */
-.fabDot {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
+/* Asa de arrastre: la "pestaña" clara que insinúa que esta pieza es la cabeza de
+   una hoja que sube. Puramente visual. */
+.mapHandleGrip {
+  width: 32px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-on-accent);
+  opacity: 0.55;
+}
+
+.mapHandleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  line-height: 1;
+}
+
+.mapHandleLabel {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  white-space: nowrap;
+}
+
+/* Punto que avisa de que ya hay un pin colocado. Vive DENTRO de la pastilla (no
+   flotando sobre una esquina), así nunca se solapa con texto ni con el borde. */
+.mapHandleDot {
+  width: 10px;
+  height: 10px;
   border-radius: var(--radius-full);
   background: var(--color-success);
-  border: 2px solid var(--color-bg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 0 0 2px var(--color-on-accent);
 }
 
 /* Velo tras la hoja (oscurece la escena, capta el toque para cerrar). */
@@ -243,25 +265,46 @@
   transform: translateY(0);
 }
 
+/* Asa de arrastre de la hoja: zona táctil ancha (toda la cabecera) que cierra al
+   tocarla, con la "pestaña" centrada — el affordance de detents tipo Apple Maps. */
+.sheetGrabber {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding: var(--space-2) 0 var(--space-1);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  appearance: none;
+}
 .sheetHandle {
   width: 44px;
   height: 5px;
-  margin: var(--space-2) auto 0;
   border-radius: var(--radius-full);
   background: var(--color-border-strong);
+}
+
+/* Cabecera de la hoja: título a la izquierda, cerrar a la derecha. */
+.sheetHeader {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-3) 0 var(--space-4);
+}
+.sheetTitle {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
 }
 
 .sheetClose {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-3);
-  z-index: 1;
   width: var(--tap-target);
   height: var(--tap-target);
   display: grid;
   place-items: center;
-  font-size: var(--font-size-lg);
   border: none;
   border-radius: var(--radius-full);
   background: transparent;
@@ -276,7 +319,7 @@
 .sheetMap {
   flex: 1;
   min-height: 0;
-  padding: var(--space-3) var(--space-3) 0;
+  padding: var(--space-2) var(--space-3) 0;
 }
 .sheetMap :global(.lg-map) {
   height: 100%;
@@ -337,6 +380,23 @@
 .status {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+}
+
+/* Icono + texto alineados en una línea (labels de botón, avisos): centra el glifo
+   con la línea base del texto sin tener que tocar cada llamada. */
+.inlineIcon,
+.btnIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.btnIcon {
+  justify-content: center;
+}
+
+/* Globo del overlay "¿Listo para jugar?": el acento de la marca, tamaño grande. */
+.startGlobe {
+  color: var(--color-accent);
 }
 
 /*
@@ -486,5 +546,8 @@
   background: var(--color-warning-soft);
   color: var(--color-warning);
   font-size: var(--font-size-sm);
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
 }

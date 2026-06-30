@@ -1,10 +1,10 @@
-/* Mapamundi satélite de la home (variante A "el globo"): el globo a sangre es el
-   HÉROE. Marco-lámina (radio grande + hairline + sombra de elevación). El motor de
-   mapa (MapLibre) o el globo evocado (CSS) van a sangre dentro; el lema y el caption
-   flotan encima sobre el satélite oscuro. */
+/* Mapamundi satélite de la home (dirección "satélite A SANGRE", plano Mercator): el
+   satélite real es el HÉROE y llena el lienzo de borde a borde. El motor de mapa
+   (MapLibre, plano) o el satélite evocado (CSS, relieve plano) van a sangre dentro;
+   el lema y el caption flotan encima. */
 
-/* Enfoque GLOBO INMERSIVO DOMINANTE: el wrap llena el lienzo a pantalla completa que le
-   da el contenedor de la home (.globe). Cae a 100% si el padre no fija alto. */
+/* Enfoque SATÉLITE INMERSIVO DOMINANTE: el wrap llena el lienzo a pantalla completa que
+   le da el contenedor de la home (.globe). Cae a 100% si el padre no fija alto. */
 .wrap {
   width: 100%;
   height: 100%;
@@ -31,33 +31,31 @@
   background: var(--ink-900);
 }
 
-/* --- Globo EVOCADO (fallback sin WebGL): esfera de satélite nocturno sin tiles --- */
+/* --- Satélite EVOCADO (fallback sin WebGL): relieve PLANO a sangre, sin tiles ---
+   Dirección "satélite a sangre": ya no es una esfera nocturna, sino un relieve
+   verde-ocre-pizarra tipo Esri World Imagery que llena el lienzo de borde a borde
+   (mismo lenguaje que el mapa real y que la maqueta). Es la red de seguridad cuando
+   no hay WebGL; los pines/rutas reales viven en el motor MapLibre. */
 .evoked {
   position: absolute;
   inset: 0;
-  background: radial-gradient(120% 90% at 50% 0%, #122637 0%, #0c1a26 45%, #0a121b 100%);
+  background:
+    radial-gradient(40% 30% at 22% 30%, rgba(120, 140, 90, 0.55), transparent 60%),
+    radial-gradient(50% 40% at 70% 22%, rgba(150, 130, 80, 0.5), transparent 62%),
+    radial-gradient(46% 38% at 58% 70%, rgba(80, 110, 70, 0.55), transparent 60%),
+    radial-gradient(60% 50% at 30% 78%, rgba(64, 96, 72, 0.5), transparent 65%),
+    radial-gradient(70% 60% at 50% 50%, #2d4a5e 0%, #233c4d 55%, #1a2f3d 100%);
   overflow: hidden;
 }
+/* Relieve fino: sombras direccionales sobre el satélite evocado (montañas/textura). */
 .evokedGlobe {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 124%;
-  aspect-ratio: 1 / 1;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: radial-gradient(
-    circle at 38% 32%,
-    #1a3344 0%,
-    #112739 42%,
-    #0a1a27 78%,
-    #06121c 100%
-  );
-  box-shadow:
-    inset 18px 14px 60px rgba(120, 180, 220, 0.12),
-    inset -30px -24px 80px rgba(0, 0, 0, 0.7),
-    0 0 70px 6px rgba(80, 150, 200, 0.18),
-    0 0 0 1px rgba(120, 180, 220, 0.12);
+  inset: 0;
+  background:
+    repeating-linear-gradient(48deg, rgba(255, 255, 255, 0.03) 0 2px, transparent 2px 7px),
+    repeating-linear-gradient(132deg, rgba(0, 0, 0, 0.1) 0 2px, transparent 2px 9px);
+  mix-blend-mode: overlay;
+  opacity: 0.7;
 }
 
 /* --- Caption editorial sobre el satélite oscuro --- */
@@ -144,17 +142,14 @@
   pointer-events: auto;
 }
 
-/* Respiración sutil del globo evocado (se desactiva con reduced-motion abajo). */
+/* Deriva sutil de la textura del satélite evocado (sin rotación: el relieve es plano,
+   no una esfera). Se desactiva con reduced-motion abajo. */
 :global(.lg-home-globe-breathe) {
-  animation: lg-home-globe-breathe 22s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+  animation: lg-home-globe-breathe 50s linear infinite;
 }
 @keyframes lg-home-globe-breathe {
-  0%,
-  100% {
-    transform: translate(-50%, -50%) rotate(-1.2deg) scale(1);
-  }
-  50% {
-    transform: translate(-50%, -50%) rotate(1.2deg) scale(1.012);
+  to {
+    transform: translateX(-32px);
   }
 }
 

@@ -29,6 +29,14 @@
   height: 100%;
   background: #1c2530;
   cursor: crosshair;
+  /* CONFINAR la pila interna de Leaflet. Sus paneles llegan a z-index 600 (markers)
+     y 1000 (.leaflet-top), y el contenedor por sí solo NO crea contexto de apilado
+     (tiene position pero sin z-index). Sin esto, esos paneles compiten con el chrome
+     (.top z-5) y la hoja (.sheet z-10) en el contexto de .root y los TAPAN: se ve
+     solo el satélite con el pin caído. `isolation` + `z-index:0` encierran todo el
+     mapa en una sola capa por debajo del chrome y la hoja. */
+  z-index: 0;
+  isolation: isolate;
 }
 /* Ocultamos cualquier control de Leaflet: el satélite manda. */
 .map :global(.leaflet-control-container) {
@@ -608,6 +616,14 @@
   background: var(--accent) !important;
   border-color: var(--accent) !important;
   color: #fff !important;
+}
+
+/* Texto de ayuda bajo unos segmentos (p. ej. la precisión del reto). */
+.segHint {
+  margin: 7px 0 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--ink-600);
 }
 
 /* ---------- ETAPA 3: resumen ------------------------------------- */

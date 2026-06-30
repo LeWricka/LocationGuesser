@@ -7,6 +7,13 @@ import App from './App.tsx'
 import { ToastProvider } from './ui'
 import { initAnalytics } from './lib/analytics'
 import { initObservability } from './lib/observability'
+import { applyCleanRoute } from './lib/cleanRoute'
+
+// Rutas limpias (`/v/<code>`, `/j/<code>`) → hash que ya enruta la app. Lo
+// lanzamos sin bloquear el montaje: la app pinta la landing mientras se resuelve
+// y el `hashchange` que dispara repinta al destino. No-op si la URL ya trae hash
+// (enlace viejo) o no es una ruta limpia.
+void applyCleanRoute()
 
 // Clave pública (restringida por dominio) para Maps/Street View. El APIProvider
 // gestiona la carga del SDK; las features usan useMapsLibrary cuando lo necesitan.

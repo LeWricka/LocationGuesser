@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    { "source": "/v/:code", "destination": "/api/share?kind=trip&code=:code" },
+    { "source": "/j/:code", "destination": "/api/share?kind=challenge&code=:code" }
+  ]
+}

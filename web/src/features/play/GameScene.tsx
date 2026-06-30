@@ -1,9 +1,20 @@
 import { type RefObject } from 'react'
+import { Check, Compass as CompassIcon, Expand, House, MapPin, Maximize2, X } from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { SceneImage } from './SceneImage'
 import type { LatLng } from '../../lib/geo'
-import { Badge, BackHomeButton, Button, CountdownRing, Lightbox, Modal, Row, Stack } from '../../ui'
+import {
+  Badge,
+  BackHomeButton,
+  Button,
+  CountdownRing,
+  Icon,
+  Lightbox,
+  Modal,
+  Row,
+  Stack,
+} from '../../ui'
 import styles from './PlayChallenge.module.css'
 
 // Escena de Street View del reto (lo que de verdad se monta a pantalla completa).
@@ -144,7 +155,8 @@ export function GameScene({
               skeletonRadius="sm"
             />
             <span className={styles.photoExpandHint} aria-hidden="true">
-              ⤢ Ampliar
+              <Icon icon={Expand} size={16} />
+              Ampliar
             </span>
           </button>
         ) : (
@@ -179,7 +191,7 @@ export function GameScene({
             skeletonRadius="md"
           />
           <span className={styles.hintExpand} aria-hidden="true">
-            ⤢
+            <Icon icon={Maximize2} size={14} />
           </span>
         </button>
       )}
@@ -194,7 +206,7 @@ export function GameScene({
             aria-label="Volver a la posición inicial"
             title="Volver a la posición inicial"
           >
-            ⌂
+            <Icon icon={House} size={20} />
           </button>
           <button
             type="button"
@@ -203,20 +215,26 @@ export function GameScene({
             aria-label="Enderezar la vista al norte"
             title="Enderezar (norte)"
           >
-            🧭
+            <Icon icon={CompassIcon} size={20} />
           </button>
         </div>
       )}
 
-      {/* Abajo-derecha: FAB del mapa. Abre la hoja inferior para adivinar. */}
+      {/* Asa-pastilla inferior: SUBE la hoja del mapa para adivinar. Es una sola
+          pieza (icono + texto + asa) — no hay etiqueta flotante aparte que pueda
+          solaparse. El asa superior la liga visualmente a la hoja que asoma. */}
       <button
         type="button"
-        className={styles.mapFab}
+        className={styles.mapHandle}
         onClick={onOpenMap}
         aria-label="Abrir el mapa para adivinar"
       >
-        <span aria-hidden="true">🗺️</span>
-        {guess && <span className={styles.fabDot} aria-hidden="true" />}
+        <span className={styles.mapHandleGrip} aria-hidden="true" />
+        <span className={styles.mapHandleRow}>
+          <Icon icon={MapPin} size={20} />
+          <span className={styles.mapHandleLabel}>{guess ? 'Ajustar tu pin' : 'Adivinar'}</span>
+          {guess && <span className={styles.mapHandleDot} aria-hidden="true" />}
+        </span>
       </button>
 
       {/* Hoja inferior con el mapa de adivinar. El mapa se mantiene SIEMPRE montado
@@ -232,15 +250,27 @@ export function GameScene({
         aria-label="Mapa para adivinar"
         aria-hidden={!mapOpen}
       >
-        <div className={styles.sheetHandle} aria-hidden="true" />
+        {/* Asa de arrastre + cabecera: el asa la liga al gesto de "hoja que sube"
+            (lenguaje de detents tipo Apple Maps); también cierra al tocarla. */}
         <button
           type="button"
-          className={styles.sheetClose}
+          className={styles.sheetGrabber}
           onClick={onCloseMap}
           aria-label="Cerrar el mapa"
         >
-          ✕
+          <span className={styles.sheetHandle} aria-hidden="true" />
         </button>
+        <div className={styles.sheetHeader}>
+          <span className={styles.sheetTitle}>¿Dónde es?</span>
+          <button
+            type="button"
+            className={styles.sheetClose}
+            onClick={onCloseMap}
+            aria-label="Cerrar el mapa"
+          >
+            <Icon icon={X} size={20} />
+          </button>
+        </div>
         <div className={styles.sheetMap}>
           <PlayMap
             guess={guess}
@@ -254,7 +284,9 @@ export function GameScene({
         <div className={styles.sheetFooter}>
           {guess ? (
             <Row gap={2} align="center">
-              <Badge tone="accent">📍 Tu pin</Badge>
+              <Badge tone="accent">
+                <Icon icon={MapPin} size={14} /> Tu pin
+              </Badge>
               <span className={styles.coords}>
                 {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
               </span>
@@ -263,10 +295,13 @@ export function GameScene({
             <span className={styles.status}>Toca el mapa para colocar tu pin.</span>
           )}
           <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
-            ✓ Confirmar y revelar
+            <span className={styles.btnIcon}>
+              <Icon icon={Check} size={18} />
+              Confirmar y revelar
+            </span>
           </Button>
           <Button variant="secondary" fullWidth onClick={onCloseMap}>
-            ← Volver a {hasStreetView ? 'Street View' : 'la imagen'}
+            Volver a {hasStreetView ? 'Street View' : 'la imagen'}
           </Button>
         </div>
       </section>

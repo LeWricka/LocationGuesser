@@ -18,6 +18,8 @@ function vote(
     guess_lat: 0,
     guess_lng: 0,
     distance_km: 0,
+    guess_number: null,
+    abs_error: null,
     left_app: false,
     elapsed_seconds: null,
     created_at: '2026-06-19T00:00:00.000Z',

@@ -1,4 +1,4 @@
--- 0025_notify_challenge_created — disparo de Web Push al crear un reto (PWA Fase 2).
+-- 0030_notify_challenge_created — disparo de Web Push al crear un reto (PWA Fase 2).
 -- Diseño (fuente de verdad): docs/estrategia/pwa-push.md §1.3.
 --
 -- Qué hace:
@@ -7,6 +7,11 @@
 --   · Así el aviso "Ana ha creado un reto" es consecuencia de la fila insertada,
 --     NO una acción del cliente: web/src/features/create y lib/challenges.ts NO
 --     cambian ni una línea (la feature queda casi-100% aditiva — §4 del diseño).
+--   · SOLO para RETOS (is_challenge = true). Desde 0022 la tabla `challenges`
+--     guarda también RECUERDOS (is_challenge = false): esos NO disparan aviso. El
+--     tipo de reto (challenge_kind 'location' | 'number', 0029) es indiferente —
+--     el aviso es "nuevo reto en {grupo}" y no depende de la mecánica; la Edge
+--     Function deriva el resto a partir de challenge_id.
 --
 -- ADITIVA Y A PRUEBA DE "NO CONFIGURADO":
 --   · Si la extensión pg_net no está, o no están puestos los GUC con la URL/token
@@ -43,6 +48,13 @@ declare
   fn_url text := current_setting('app.push_fn_url', true);
   fn_token text := current_setting('app.push_send_token', true);
 begin
+  -- Solo RETOS disparan aviso, nunca RECUERDOS (is_challenge=false, 0022). El
+  -- trigger ya filtra por WHEN, pero lo reforzamos aquí (defensa en profundidad:
+  -- si alguien recrea el trigger sin el WHEN, el recuerdo sigue sin avisar).
+  if not coalesce(new.is_challenge, true) then
+    return new;
+  end if;
+
   -- Sin URL/token configurados, no intentamos enviar (Fase 1 sin emisor): el reto
   -- se crea igual. Cuando el operador ponga los GUC, los avisos empiezan solos.
   if fn_url is null or fn_url = '' or fn_token is null or fn_token = '' then
@@ -76,4 +88,8 @@ $$;
 drop trigger if exists trg_notify_challenge_created on public.challenges;
 create trigger trg_notify_challenge_created
   after insert on public.challenges
-  for each row execute function public.notify_challenge_created();
+  for each row
+  -- SOLO retos: un RECUERDO (is_challenge=false, 0022) no genera aviso de "nuevo
+  -- reto". El WHEN evita incluso invocar la función para los recuerdos.
+  when (new.is_challenge is true)
+  execute function public.notify_challenge_created();

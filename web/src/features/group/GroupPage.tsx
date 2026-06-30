@@ -1,10 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import {
+  AlertTriangle,
+  Flag,
+  Gift,
+  Images,
+  Plus,
+  RotateCcw,
+  Settings,
+  Share2,
+  Trophy,
+} from 'lucide-react'
+import {
   Badge,
   BackHomeButton,
   Button,
   Card,
+  Icon,
   Input,
   Lightbox,
   Modal,
@@ -36,6 +48,7 @@ import type { LatLng } from '../../lib/geo'
 import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, splitByStatus, updateGroupPrizes } from '../../lib/groupData'
+import { tripShareUrl } from '../../lib/shareLinks'
 import { PRIZE_SLOTS, prizeForRow } from './prizes'
 import { ShareLeaderboardModal } from './ShareLeaderboardModal'
 import { InviteModal } from './InviteModal'
@@ -56,9 +69,13 @@ interface Props {
   onBack?: () => void
 }
 
-/** Enlace del grupo (#g=) para compartir en el chat. */
+/**
+ * Enlace LIMPIO del viaje para compartir (`…/v/<code>`). Genera previsualización
+ * OG (la sirve `web/api/share`) y es más fiable de pegar que el hash crudo. Los
+ * enlaces viejos `#g=` siguen funcionando (compatibilidad en lib/cleanRoute).
+ */
 function groupLink(groupId: string): string {
-  return `${location.origin}${location.pathname}#g=${encodeURIComponent(groupId)}`
+  return tripShareUrl(location.origin, groupId)
 }
 
 // Fecha legible en español para la cabecera de un reto cerrado (p.ej. "12 jun
@@ -308,13 +325,13 @@ export function GroupPage({ groupId, onBack }: Props) {
                 onClick={() => setSettingsOpen(true)}
                 aria-label="Ajustes del viaje"
               >
-                ⚙️ Ajustes
+                <Icon icon={Settings} size={16} /> Ajustes
               </Button>
             )}
             {/* Grupo archivado (solo-lectura): no se añaden retos. */}
             {isOwner && !isClosed && (
               <Button size="sm" onClick={goCreateChallenge}>
-                ➕ Añadir reto
+                <Icon icon={Plus} size={16} /> Añadir reto
               </Button>
             )}
           </Row>
@@ -325,7 +342,7 @@ export function GroupPage({ groupId, onBack }: Props) {
         {isClosed && (
           <div className={styles.closedBanner} role="status">
             <span className={styles.closedBannerIcon} aria-hidden="true">
-              🏁
+              <Icon icon={Flag} size={20} />
             </span>
             <p className={styles.closedBannerText}>
               <strong>Temporada cerrada</strong>
@@ -381,7 +398,7 @@ export function GroupPage({ groupId, onBack }: Props) {
               </p>
               {canManage && (
                 <Button size="sm" onClick={goCreateChallenge}>
-                  ➕ Añadir reto
+                  <Icon icon={Plus} size={16} /> Añadir reto
                 </Button>
               )}
             </Stack>
@@ -455,7 +472,7 @@ function ShareLeaderboardFab({ onShare }: { onShare: () => void }) {
       onClick={onShare}
       aria-label="Compartir clasificación"
     >
-      <span aria-hidden="true">📤</span>
+      <Icon icon={Share2} size={18} />
       <span className={styles.shareFabLabel}>Compartir</span>
     </button>
   )
@@ -521,7 +538,9 @@ function PhotoSection({ photos }: { photos: PhotoStripItem[] }) {
   if (photos.length === 0) return null
   return (
     <section>
-      <h2 className={styles.sectionTitle}>📸 Fotos del viaje</h2>
+      <h2 className={styles.sectionTitle}>
+        <Icon icon={Images} size={18} /> Fotos del viaje
+      </h2>
       <PhotoStrip
         photos={photos}
         onSelect={(id) => {
@@ -575,7 +594,9 @@ function Leaderboard({
   return (
     <section>
       <Row justify="between" align="center" gap={2}>
-        <h2 className={styles.sectionTitle}>🏆 Clasificación general</h2>
+        <h2 className={styles.sectionTitle}>
+          <Icon icon={Trophy} size={18} /> Clasificación general
+        </h2>
         {/* Edición de premios discreta: solo el dueño, junto al título. Invita a
             añadir si aún no hay; si los hay, edita. El miembro no ve nada. */}
         {isOwner && (
@@ -584,7 +605,7 @@ function Leaderboard({
             className={styles.editPrizesBtn}
             onClick={() => setEditingPrizes(true)}
           >
-            🎁 {hasPrizes ? 'Editar premios' : 'Añadir premios'}
+            <Icon icon={Gift} size={15} /> {hasPrizes ? 'Editar premios' : 'Añadir premios'}
           </button>
         )}
       </Row>
@@ -608,7 +629,7 @@ function Leaderboard({
           {/* Temporada cerrada: corona al ganador (1º) por encima del podio. */}
           {highlightWinner && entries[0] && (
             <p className={styles.winnerBanner}>
-              <span aria-hidden="true">🏆</span> Ganador de la temporada:{' '}
+              <Icon icon={Trophy} size={18} /> Ganador de la temporada:{' '}
               <strong>{entries[0].name}</strong>
             </p>
           )}
@@ -661,7 +682,7 @@ function Leaderboard({
                         </span>
                         {prize && (
                           <span className={styles.prizeChip}>
-                            <span aria-hidden="true">🎁</span> {prize}
+                            <Icon icon={Gift} size={14} /> {prize}
                           </span>
                         )}
                         <span className={styles.rankBar} aria-hidden="true">
@@ -755,7 +776,11 @@ function PrizesEditorModal({
     <Modal
       open
       onClose={busy ? undefined : onClose}
-      title="🎁 Premios del viaje"
+      title={
+        <>
+          <Icon icon={Gift} size={18} /> Premios del viaje
+        </>
+      }
       footer={
         <Row gap={2} justify="end">
           <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
@@ -813,7 +838,9 @@ function LiveSection({
   if (challenges.length === 0) return null
   return (
     <section>
-      <h2 className={styles.sectionTitle}>🔴 En vivo ahora</h2>
+      <h2 className={styles.sectionTitle}>
+        <span className={styles.liveDot} aria-hidden="true" /> En vivo ahora
+      </h2>
       <Stack gap={3}>
         {challenges.map((c) => (
           <LiveCard
@@ -890,7 +917,7 @@ function LiveCard({
                       title="Salió de la app durante la jugada"
                       aria-label="Salió de la app durante la jugada"
                     >
-                      ⚠️
+                      <Icon icon={AlertTriangle} size={14} />
                     </span>
                   )}
                 </span>
@@ -1018,7 +1045,7 @@ function ReplayChallengeButton({
 
   return (
     <Button variant="secondary" size="sm" loading={busy} onClick={() => void replay()}>
-      🔄 Volver a jugar
+      <Icon icon={RotateCcw} size={16} /> Volver a jugar
     </Button>
   )
 }
@@ -1151,7 +1178,7 @@ function PastCard({
                           title="Salió de la app durante la jugada"
                           aria-label="Salió de la app durante la jugada"
                         >
-                          ⚠️
+                          <Icon icon={AlertTriangle} size={14} />
                         </span>
                       )}
                     </span>

@@ -31,7 +31,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 // compartido entre la BD (webhook/cron) y esta función para que solo la BD la invoque.
 const VAPID_PUBLIC_KEY = Deno.env.get('VAPID_PUBLIC_KEY') ?? ''
 const VAPID_PRIVATE_KEY = Deno.env.get('VAPID_PRIVATE_KEY') ?? ''
-const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:icka69@gmail.com'
+const VAPID_SUBJECT = Deno.env.get('VAPID_SUBJECT') ?? 'mailto:Iker@540deg.com'
 const PUSH_SEND_TOKEN = Deno.env.get('PUSH_SEND_TOKEN') ?? ''
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

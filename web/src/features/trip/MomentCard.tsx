@@ -1,4 +1,5 @@
-import { Badge, Button, ChallengePhoto } from '../../ui'
+import { Target, User } from 'lucide-react'
+import { Badge, Button, ChallengePhoto, Icon } from '../../ui'
 import type { Moment } from '../../lib/trip'
 import styles from './MomentCard.module.css'
 
@@ -94,13 +95,17 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
             </span>
           ) : isReto ? (
             <span className={styles.chip}>
-              <Badge tone="accent">🎯 Reto</Badge>
+              <Badge tone="accent">
+                <Icon icon={Target} size={13} /> Reto
+              </Badge>
             </span>
           ) : null}
           <p className={styles.title}>{moment.title}</p>
           <div className={styles.meta}>
             {date && <span className={styles.date}>{date}</span>}
-            <span className={styles.social}>👤 {moment.guessedCount}</span>
+            <span className={styles.social}>
+              <Icon icon={User} size={14} /> {moment.guessedCount}
+            </span>
           </div>
         </div>
       </div>
