@@ -14,12 +14,14 @@
 //  - `ui/Modal` (vía LoginPopup) para la hoja de entrada, con transición fina.
 //  - `useMagicLink` (dentro de LoginPopup) para todo el wiring OTP, el mismo que
 //    usa LoginFlow (código de 6 dígitos; enlace del correo como respaldo).
-//  - `ui/HowItWorks` para los 3 pasos del bucle (no se duplica).
+//  - `ui/HowItWorksImmersive` para la sección "cómo funciona" inmersiva (satélite
+//    a sangre + hoja que crece + bucle animado del mapa). La variante compacta
+//    `ui/HowItWorks` se sigue usando en el dashboard/estado vacío.
 //  - `features/home/navigation.joinByCode` para el atajo "tengo un código de
 //    viaje" en la landing genérica (lleva a `#g=<código>`).
 
 import { useState } from 'react'
-import { Button, HowItWorks, Field, Input, Stack } from '../../ui'
+import { Button, HowItWorksImmersive, Field, Input, Stack } from '../../ui'
 import { joinByCode } from '../home/navigation'
 import { LoginPopup } from './LoginPopup'
 import heroImage from '../../assets/hero.png'
@@ -130,8 +132,9 @@ export function Landing({ groupName, redirectTo }: Props) {
           </details>
         )}
 
-        {/* Compacto: el bucle se entiende de un vistazo, debajo de la portada. */}
-        <HowItWorks compact />
+        {/* Sección inmersiva "cómo funciona": el bucle se vive de un vistazo
+            debajo de la portada. El CTA abre el mismo popup de entrada. */}
+        <HowItWorksImmersive ctaLabel="Empieza un viaje" onCta={() => setAuthOpen(true)} />
       </div>
 
       <LoginPopup

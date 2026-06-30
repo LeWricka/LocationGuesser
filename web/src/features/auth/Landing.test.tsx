@@ -25,14 +25,19 @@ afterEach(() => {
 describe('Landing', () => {
   test('la portada es visual: hero + CTA + cómo funciona, sin email a la vista', () => {
     render(<Landing />)
+    // El hero (h1) y la sección inmersiva (h2) comparten la frase ancla: hay
+    // dos headings con ese texto, uno por nivel.
     expect(
-      screen.getByRole('heading', {
+      screen.getAllByRole('heading', {
         name: /Comparte tus momentos de una forma diferente/i,
-      }),
-    ).toBeInTheDocument()
-    // Los 3 pasos reutilizados de HowItWorks.
-    expect(screen.getByRole('heading', { name: 'Cómo funciona' })).toBeInTheDocument()
-    // El CTA emotivo abre el popup; el email NO está a la vista de primeras.
+      }).length,
+    ).toBeGreaterThanOrEqual(1)
+    // La sección inmersiva "cómo funciona" (eyebrow + los 3 pasos del bucle).
+    expect(screen.getByText('Cómo funciona')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Comparte un momento' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Lo viven y adivinan' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Queda en el viaje' })).toBeInTheDocument()
+    // El CTA emotivo del hero abre el popup; el email NO está a la vista.
     expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Tu correo')).not.toBeInTheDocument()
   })

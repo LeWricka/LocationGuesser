@@ -76,7 +76,9 @@ test.describe('smoke', () => {
     //    correo ya NO está a la vista: aparece en un popup al pulsar el CTA
     //    (textos/roles reales de Landing.tsx). Damos margen porque al arrancar
     //    AuthProvider resuelve la sesión persistida (spinner) antes de pintar.
-    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ })).toBeVisible({
+    // La frase ancla aparece dos veces (hero h1 + sección "cómo funciona"); basta
+    // con que el hero sea visible, así que tomamos el primero.
+    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
       timeout: 20_000,
     })
     const openAuth = page.getByRole('button', { name: 'Empieza a compartir' })
