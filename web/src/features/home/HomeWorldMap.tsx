@@ -40,9 +40,6 @@ const WORLD_ZOOM = 2.6
 // para que los pines NO queden tapados (clave de la inmersión: el satélite y sus pines mandan).
 const FIT_MAX_ZOOM = 4.5
 const FIT_PADDING = { top: 120, bottom: 300, left: 56, right: 56 }
-// Entrada cinematográfica: arranca algo más lejos (mundo) y "aterriza" en el encuadre.
-const INTRO_START_ZOOM = 1.6
-const INTRO_DURATION = 1500
 
 // Estilo base mínimo: sin sprite/glyphs; el raster Esri se añade tras `load`.
 const BASE_STYLE: StyleSpecification = { version: 8, sources: {}, layers: [] }
@@ -118,7 +115,6 @@ export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }:
   const glRef = useRef<MapLibreModule | null>(null)
   const markersRef = useRef<MapLibreMarker[]>([])
   const readyRef = useRef(false)
-  const introDoneRef = useRef(false)
   // WebGL no disponible → globo evocado en CSS (sin intentar cargar maplibre).
   const [webgl] = useState(() => hasWebGL())
   // Un fallo de carga/creación ocurre en un callback async (fuera de render): lo
@@ -217,36 +213,6 @@ export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }:
     map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration })
   }, [])
 
-  // Entrada cinematográfica: del globo entero "aterriza" al encuadre. Una vez.
-  const introFlight = useCallback((): void => {
-    const map = mapRef.current
-    const gl = glRef.current
-    if (!map || !gl) return
-    if (prefersReducedMotion()) {
-      fitToTrips()
-      return
-    }
-    const pts: [number, number][] = []
-    for (const t of tripsRef.current) for (const p of t.points) pts.push([p.lng, p.lat])
-    map.jumpTo({ center: WORLD_CENTER, zoom: INTRO_START_ZOOM })
-    if (pts.length === 0) {
-      map.easeTo({ zoom: WORLD_ZOOM, duration: INTRO_DURATION, essential: true })
-      return
-    }
-    if (pts.length === 1) {
-      map.flyTo({ center: pts[0], zoom: 3.5, duration: INTRO_DURATION, essential: true })
-      return
-    }
-    const bounds = new gl.LngLatBounds(pts[0], pts[0])
-    for (const p of pts) bounds.extend(p)
-    map.fitBounds(bounds, {
-      padding: FIT_PADDING,
-      maxZoom: FIT_MAX_ZOOM,
-      duration: INTRO_DURATION,
-      essential: true,
-    })
-  }, [fitToTrips])
-
   // ── Montaje: crea el mapa una sola vez (import dinámico de maplibre + su CSS). ──
   useEffect(() => {
     if (!webgl) return
@@ -289,12 +255,10 @@ export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }:
           map.addLayer({ id: 'basemap', type: 'raster', source: 'basemap' })
           readyRef.current = true
           repaint()
-          if (!introDoneRef.current) {
-            introDoneRef.current = true
-            introFlight()
-          } else {
-            fitToTrips()
-          }
+          // Encuadre TRANQUILO a tus viajes (ease corto), sin salto: el satélite
+          // aparece y se asienta suave sobre el encuadre. Antes había un jumpTo que
+          // alejaba de golpe y luego volaba → "salto raro" al cargar.
+          fitToTrips()
         })
       } catch {
         // Import o creación del mapa falló → globo evocado (no rompemos la home).
@@ -311,12 +275,12 @@ export function HomeWorldMap({ trips, tripCount, totalKm, loading, onOpenTrip }:
       mapRef.current = null
       glRef.current = null
     }
-  }, [webgl, repaint, fitToTrips, introFlight])
+  }, [webgl, repaint, fitToTrips])
 
   // Repinta + reencuadra cuando cambian los datos (no recrea el mapa).
   useEffect(() => {
     repaint()
-    if (readyRef.current && introDoneRef.current) fitToTrips()
+    if (readyRef.current) fitToTrips()
   }, [trips, repaint, fitToTrips])
 
   const evoked = !webgl || failed
