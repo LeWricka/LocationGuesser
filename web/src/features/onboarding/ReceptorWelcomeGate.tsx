@@ -34,7 +34,7 @@ export function ReceptorWelcomeGate({ groupId, userId, children }: Props) {
   if (!show) return <>{children}</>
 
   return (
-    <OnboardingGate context="welcome" userId={userId} slideParams={{ tripName }}>
+    <OnboardingGate context="welcome" userId={userId} slideParams={{ tripName }} groupId={groupId}>
       {children}
     </OnboardingGate>
   )

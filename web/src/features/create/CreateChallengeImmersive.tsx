@@ -26,6 +26,7 @@ import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
 import { AlertTriangle } from 'lucide-react'
 import { Button, Icon, Spinner, useToast } from '../../ui'
+import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import styles from './CreateChallengeImmersive.module.css'
 
 interface Props {
@@ -87,6 +88,9 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
   const [stage, setStage] = useState<Stage>(0)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
+  // Reto recién creado: en vez de saltar directo a jugar, mostramos la hoja
+  // "comparte el enlace" para que el creador lo reparta EN CALIENTE (#330).
+  const [created, setCreated] = useState<ChallengeForPlay | null>(null)
 
   const [title, setTitle] = useState('')
   // Respuesta del reto (lat/lng oculto): de la foto (EXIF), del mapa o del GPS.
@@ -354,9 +358,13 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
         score_scale: PRECISION_OPTIONS[precisionIndex].value,
         location_source: locationSource ?? 'manual',
       })
-      // Microcelebración antes de volver al viaje (la maqueta: burst + confeti).
+      // Microcelebración (burst + confeti) y, al terminar, la hoja "comparte el
+      // enlace": el creador reparte el reto EN CALIENTE antes de ir a jugarlo (#330).
       setCelebrating(true)
-      window.setTimeout(() => onCreated(challenge), 1500)
+      window.setTimeout(() => {
+        setCelebrating(false)
+        setCreated(challenge)
+      }, 1500)
     } catch (err) {
       reportError(err, { area: 'create_challenge' })
       const msg = describeError(err)
@@ -717,6 +725,17 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
           </section>
         )}
       </ImmersiveSheet>
+
+      {/* Tras la celebración, hoja "comparte el enlace": el creador reparte el reto
+          en caliente (Web Share / copiar / WhatsApp) o salta a verlo/jugarlo. */}
+      {created && (
+        <ChallengeCreatedShare
+          groupId={groupId}
+          challengeId={created.id}
+          challengeTitle={created.title}
+          onPlay={() => onCreated(created)}
+        />
+      )}
 
       {/* MICROCELEBRACIÓN al lanzar: burst + confeti + "¡Reto lanzado!". */}
       {celebrating && (
