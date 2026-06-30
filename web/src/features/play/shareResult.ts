@@ -3,11 +3,15 @@
 // dependencias del DOM; la rasterización/compartir se reutiliza de la tarjeta de
 // clasificación (features/group/shareLeaderboard).
 
-// Enlace al reto concreto (#g=<grupo>&c=<reto>), mismo formato que el resto de la
-// app (challengeLink en GroupPage / navigation). El receptor abre justo este reto.
-export function buildChallengeLink(groupId: string, challengeId: string): string {
-  const base = `${location.origin}${location.pathname}`
-  return `${base}#g=${encodeURIComponent(groupId)}&c=${encodeURIComponent(challengeId)}`
+import { challengeShareUrl } from '../../lib/shareLinks'
+
+// Enlace LIMPIO al reto concreto (`…/j/<reto>`): genera la tarjeta OG al pegarlo y
+// es más fiable que el hash crudo. El receptor abre justo este reto (la función
+// serverless resuelve el grupo; el cliente lo resuelve por compatibilidad en
+// lib/cleanRoute). `groupId` ya no hace falta en la URL, pero se mantiene en la
+// firma para no tocar las llamadas existentes en PlayChallenge.
+export function buildChallengeLink(_groupId: string, challengeId: string): string {
+  return challengeShareUrl(location.origin, challengeId)
 }
 
 // Caption MÍNIMO: una línea de gancho + el enlace clicable (la imagen no lo es).

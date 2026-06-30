@@ -48,6 +48,7 @@ import type { LatLng } from '../../lib/geo'
 import { supabase } from '../../lib/supabase'
 import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, splitByStatus, updateGroupPrizes } from '../../lib/groupData'
+import { tripShareUrl } from '../../lib/shareLinks'
 import { PRIZE_SLOTS, prizeForRow } from './prizes'
 import { ShareLeaderboardModal } from './ShareLeaderboardModal'
 import { InviteModal } from './InviteModal'
@@ -68,9 +69,13 @@ interface Props {
   onBack?: () => void
 }
 
-/** Enlace del grupo (#g=) para compartir en el chat. */
+/**
+ * Enlace LIMPIO del viaje para compartir (`…/v/<code>`). Genera previsualización
+ * OG (la sirve `web/api/share`) y es más fiable de pegar que el hash crudo. Los
+ * enlaces viejos `#g=` siguen funcionando (compatibilidad en lib/cleanRoute).
+ */
 function groupLink(groupId: string): string {
-  return `${location.origin}${location.pathname}#g=${encodeURIComponent(groupId)}`
+  return tripShareUrl(location.origin, groupId)
 }
 
 // Fecha legible en español para la cabecera de un reto cerrado (p.ej. "12 jun
