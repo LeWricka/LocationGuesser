@@ -97,8 +97,35 @@
   background: var(--color-surface-hover);
 }
 
+/* Peligro: rojo sólido para acciones destructivas (borrar). Mismo lenguaje
+ * que primary (color sólido + sombra sutil), no un botón "alarmante". */
+.danger {
+  background-color: var(--color-danger);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-sm);
+}
+.danger:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--color-danger) 88%, black);
+}
+.danger:active:not(:disabled) {
+  background-color: color-mix(in srgb, var(--color-danger) 80%, black);
+  box-shadow: none;
+}
+
 .fullWidth {
   width: 100%;
+}
+
+/* Botón-icono circular: cuadrado de 44px (tap target), sin padding lateral. El
+ * color de variante (primary/secondary/ghost/danger) lo da la regla de variante;
+ * aquí solo fijamos la forma. */
+.iconButton {
+  width: var(--tap-target);
+  min-width: var(--tap-target);
+  height: var(--tap-target);
+  min-height: var(--tap-target);
+  padding: 0;
+  border-radius: var(--radius-full);
 }
 
 .label {

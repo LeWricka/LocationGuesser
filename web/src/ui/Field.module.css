@@ -10,6 +10,12 @@
   color: var(--color-text);
 }
 
+/* Asterisco de obligatorio: en rojo, separado de la etiqueta. */
+.required {
+  margin-left: var(--space-1);
+  color: var(--color-danger);
+}
+
 /* Etiqueta solo para lectores de pantalla (patrón visually-hidden). */
 .labelHidden {
   position: absolute;
@@ -29,8 +35,21 @@
   color: var(--color-text-muted);
 }
 
+/* Error: icono de aviso + mensaje concreto, en rojo. El icono refuerza el rol
+ * alert visualmente (no solo color, por daltonismo). Alineado al inicio para que
+ * en mensajes de dos líneas el icono quede a la altura de la primera. */
 .error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
   margin: 0;
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   color: var(--color-danger);
+}
+
+/* El icono no se encoge y se alinea con la altura de la línea de texto. */
+.errorIcon {
+  flex-shrink: 0;
+  margin-top: 1px;
 }
