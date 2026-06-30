@@ -357,6 +357,47 @@
   margin: 0 0 16px;
 }
 
+/* Pie de paso: "Atrás" discreto + CTA dominante. El "Atrás" siempre visible
+   garantiza poder volver a ajustar pasos previos sin perder lo introducido (#388). */
+.footer {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  margin-top: 4px;
+}
+.footer .cta {
+  flex: 1 1 auto;
+  margin-top: 0;
+}
+.back {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-border, rgba(24, 32, 43, 0.1));
+  border-radius: 16px;
+  padding: 0 16px;
+  background: #fff;
+  color: var(--ink-600);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  transition: background 0.18s ease;
+}
+.back:active {
+  background: #f3f5f7;
+}
+.back:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.back svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* botón primario */
 .cta {
   width: 100%;
@@ -700,6 +741,32 @@
   font-size: 12.5px;
   line-height: 1.4;
   margin-bottom: 14px;
+}
+.warnBody {
+  display: grid;
+  gap: 10px;
+}
+.warnActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* Atajos a "añadir pista" dentro del aviso: botón claro sobre el fondo ámbar para
+   que el usuario vuelva al paso correcto de un toque (#388). Heredamos el ámbar del
+   aviso (currentColor) para no introducir colores fuera de tokens. */
+.warnBtn {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 7px 13px;
+  background: #fff;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+.warnBtn:active {
+  opacity: 0.85;
 }
 
 /* ---------- microcelebración al lanzar --------------------------- */
