@@ -51,5 +51,5 @@
 /* El icono no se encoge y se alinea con la altura de la línea de texto. */
 .errorIcon {
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: 1px; /* design-lint-allow: ajuste óptico de 1px a la línea base */
 }

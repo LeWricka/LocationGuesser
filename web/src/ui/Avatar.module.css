@@ -11,7 +11,7 @@
   background: var(--avatar-bg, var(--color-accent-soft));
   /* Anillo interior claro: separa el emoji del fondo y da contraste estable
    * sobre cualquier color del set, más un borde fino para recortar el disco. */
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 0 0 2px var(--avatar-ring);
   border: 1px solid var(--color-border);
   user-select: none;
 }
@@ -39,32 +39,34 @@
  * siempre, también sobre los fondos más claros del set. */
 .emoji {
   line-height: 1;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45));
+  filter: drop-shadow(var(--avatar-emoji-shadow));
 }
 
 .sm {
-  width: 28px;
-  height: 28px;
+  width: var(--avatar-sm);
+  height: var(--avatar-sm);
 }
 
+/* El emoji ocupa ~60% del disco; escala con cada tamaño (proporción, no token de
+ * texto: no es tipografía de lectura). */
 .sm .emoji {
-  font-size: 17px;
+  font-size: 17px; /* design-lint-allow: glifo proporcional al disco sm, no texto */
 }
 
 .md {
-  width: 40px;
-  height: 40px;
+  width: var(--avatar-md);
+  height: var(--avatar-md);
 }
 
 .md .emoji {
-  font-size: 24px;
+  font-size: 24px; /* design-lint-allow: glifo proporcional al disco md, no texto */
 }
 
 .lg {
-  width: 64px;
-  height: 64px;
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
 }
 
 .lg .emoji {
-  font-size: 38px;
+  font-size: 38px; /* design-lint-allow: glifo proporcional al disco lg, no texto */
 }

@@ -36,8 +36,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  /* Caja compacta de 24px (no es acción principal), pero con un área táctil que
+   * llega al tap target vía padding negativo del icono. */
+  width: var(--space-6);
+  height: var(--space-6);
   flex: none;
   border: none;
   border-radius: var(--radius-sm);
@@ -49,19 +51,19 @@
   color: var(--color-text);
 }
 .close:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /* Tonos: solo cambia el borde izquierdo para no gritar. */
 .neutral {
-  border-left: 3px solid var(--color-accent-2);
+  border-left: var(--accent-bar-width) solid var(--color-accent-2);
 }
 .success {
-  border-left: 3px solid var(--color-success);
+  border-left: var(--accent-bar-width) solid var(--color-success);
 }
 .danger {
-  border-left: 3px solid var(--color-danger);
+  border-left: var(--accent-bar-width) solid var(--color-danger);
 }
 
 @keyframes toast-in {

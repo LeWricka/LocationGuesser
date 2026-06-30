@@ -83,21 +83,30 @@ img {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 /*
  * Contenedor de página: ancho cómodo de lectura, centrado en desktop.
- * Los pies de página/CTA respiran con el safe-area de iOS.
+ * El gutter lateral es un token (--space-gutter) para que crezca de forma
+ * consistente; los pies de página/CTA respiran con el safe-area de iOS.
  */
 .lg-page {
   width: 100%;
   max-width: var(--container-max);
   margin: 0 auto;
-  padding: var(--space-4);
+  padding: var(--space-gutter);
   padding-bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
   min-height: 100dvh;
+}
+
+/* En teléfono ancho el gutter respira más (estándar Polarsteps: margen lateral
+ * generoso). Solo cambia el token; todo lo que lo usa lo hereda. */
+@media (min-width: 480px) {
+  :root {
+    --space-gutter: var(--space-5);
+  }
 }
 
 /* ----------------------------------------------------------------------
