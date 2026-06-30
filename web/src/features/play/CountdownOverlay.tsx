@@ -10,10 +10,12 @@ interface Props {
   onDone: () => void
 }
 
-// Números de la cuenta atrás: 3 → 2 → 1, uno por segundo. Al consumir el 1 se
-// dispara onDone (entrada en juego); el reloj de la jugada arranca entonces.
+// Números de la cuenta atrás: 3 → 2 → 1. Cada número descansa ~1,3 s (más lento y
+// reposado que el segundo seco) para que la entrada en juego se sienta suave. Al
+// consumir el 1 se dispara onDone (entrada en juego); el reloj de la jugada arranca
+// entonces.
 const SEQUENCE = [3, 2, 1] as const
-const STEP_MS = 1000
+const STEP_MS = 1300
 
 // Overlay de cuenta atrás entre el inicio (idle) y el juego (playing). Visual-first:
 // la FOTO del reto llena el fondo (si la hay), con un velo oscuro para legibilidad;

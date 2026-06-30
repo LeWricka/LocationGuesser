@@ -32,15 +32,15 @@ describe('CountdownOverlay', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
     expect(onDone).not.toHaveBeenCalled()
 
-    act(() => void vi.advanceTimersByTime(1000))
+    act(() => void vi.advanceTimersByTime(1300))
     expect(screen.getByText('2')).toBeInTheDocument()
 
-    act(() => void vi.advanceTimersByTime(1000))
+    act(() => void vi.advanceTimersByTime(1300))
     expect(screen.getByText('1')).toBeInTheDocument()
     expect(onDone).not.toHaveBeenCalled()
 
     // Al consumir el 1 → entra en juego (onDone), una sola vez.
-    act(() => void vi.advanceTimersByTime(1000))
+    act(() => void vi.advanceTimersByTime(1300))
     expect(onDone).toHaveBeenCalledTimes(1)
   })
 
