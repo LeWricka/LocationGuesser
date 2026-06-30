@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Pencil, Target, Trash2 } from 'lucide-react'
+import { Pencil, Target, Trash2, User } from 'lucide-react'
 import { Badge, Button, ChallengePhoto, Icon, Modal, useToast } from '../../ui'
 import type { Moment } from '../../lib/trip'
 import type { LatLng } from '../../lib/geo'
@@ -386,7 +386,9 @@ export function MomentSheet({
                 </div>
               ) : isReto ? (
                 <div className={styles.photoBadge}>
-                  <Badge tone="accent">🎯 Reto</Badge>
+                  <Badge tone="accent">
+                    <Icon icon={Target} size={13} /> Reto
+                  </Badge>
                 </div>
               ) : null}
             </div>
@@ -547,7 +549,7 @@ export function MomentSheet({
               {isReto || isActive ? (
                 <p className={styles.social}>
                   <span className={styles.socialIcon} aria-hidden="true">
-                    👤
+                    <Icon icon={User} size={15} />
                   </span>
                   {moment.guessedCount}{' '}
                   {moment.guessedCount === 1 ? 'persona adivinó' : 'personas adivinaron'}
@@ -577,7 +579,9 @@ export function MomentSheet({
               {canEdit && isRecuerdo && promoting && (
                 <section className={styles.promote}>
                   <header className={styles.promoteHead}>
-                    <span className={styles.promoteTitle}>🎯 Convertir en reto</span>
+                    <span className={styles.promoteTitle}>
+                      <Icon icon={Target} size={15} /> Convertir en reto
+                    </span>
                     <span className={styles.promoteHint}>
                       Esconde el lugar y que adivinen dónde es, con cuenta atrás.
                     </span>

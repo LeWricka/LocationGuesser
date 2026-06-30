@@ -9,7 +9,7 @@ interface Props {
    * sitio para un control de "volver" que nunca deje la pantalla sin salida.
    */
   header?: ReactNode
-  /** Emoji/ícono grande de cabecera (p.ej. 📍, 📬). */
+  /** Icono grande de cabecera (un <Icon/> del kit). */
   icon?: ReactNode
   title: ReactNode
   /** Subtítulo/descripción bajo el título. */

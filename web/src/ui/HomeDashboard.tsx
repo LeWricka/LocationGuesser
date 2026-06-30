@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronUp, Plus } from 'lucide-react'
+import { ChevronUp, Crown, Plus } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { Icon } from './Icon'
 import { Button } from './Button'
@@ -232,7 +232,7 @@ function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }
           <LiveTag status={group.status} />
           {group.owned && (
             <span className={styles.tripOwned}>
-              <span aria-hidden="true">👑</span> Tuyo
+              <Icon icon={Crown} size={14} /> Tuyo
             </span>
           )}
           <h3 className={styles.tripName}>{group.name}</h3>

@@ -9,6 +9,7 @@ import type {
 } from 'maplibre-gl'
 import type { RoutePoint } from '../../lib/trip'
 import type { TripMapProps as Props } from './TripMap.types'
+import { HELP_MARKER_SVG, PIN_MARKER_SVG } from './pinMarkers'
 import './tripPins.css'
 import styles from './TripMapGlobe.module.css'
 
@@ -79,13 +80,13 @@ function pinElement(opts: { imageUrl: string | null; active: boolean }): HTMLDiv
   const el = document.createElement('div')
   if (opts.active) {
     el.className = 'lg-trip-pin lg-trip-pin--icon lg-trip-pin--active'
-    el.textContent = '❓'
+    el.innerHTML = HELP_MARKER_SVG
   } else if (opts.imageUrl) {
     el.className = 'lg-trip-pin'
     el.style.backgroundImage = `url('${opts.imageUrl.replace(/'/g, "\\'")}')`
   } else {
     el.className = 'lg-trip-pin lg-trip-pin--icon'
-    el.textContent = '📍'
+    el.innerHTML = PIN_MARKER_SVG
   }
   return el
 }

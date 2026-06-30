@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
+import { Crown } from 'lucide-react'
 import { Badge } from './Badge'
 import { Card } from './Card'
+import { Icon } from './Icon'
 import styles from './GroupCard.module.css'
 
 /**
@@ -72,7 +74,7 @@ export function GroupCard({ name, status, owned = false, meta, onClick, classNam
           )}
           {owned && (
             <Badge tone="accent">
-              <span aria-hidden="true">👑</span> Tuyo
+              <Icon icon={Crown} size={14} /> Tuyo
             </Badge>
           )}
         </div>

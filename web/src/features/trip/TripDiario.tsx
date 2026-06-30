@@ -1,5 +1,6 @@
 import { forwardRef } from 'react'
-import { EmptyState } from '../../ui'
+import { Map as MapIcon } from 'lucide-react'
+import { EmptyState, Icon } from '../../ui'
 import type { Moment, RoutePoint } from '../../lib/trip'
 import { TripMap } from './TripMap'
 import { MomentCard } from './MomentCard'
@@ -97,7 +98,7 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
         /* Sin momentos: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre). */
         <div className={styles.emptyDock}>
           <EmptyState
-            icon="🗺️"
+            icon={<Icon icon={MapIcon} size={32} />}
             title="Aún no hay momentos"
             description="Añade el primero y empieza a llenar el mapa."
             actionLabel={canCreate ? 'Añadir momento' : undefined}

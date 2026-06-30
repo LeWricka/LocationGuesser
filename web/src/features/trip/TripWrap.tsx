@@ -1,5 +1,5 @@
 import { useEffect, type CSSProperties } from 'react'
-import { Camera, Footprints, Target, Users, X } from 'lucide-react'
+import { Camera, Flag, Footprints, ImageOff, Target, Users, X } from 'lucide-react'
 import { Avatar, Icon } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
@@ -127,7 +127,7 @@ export function TripWrap({
         {/* Cabecera celebrativa: cinta de cierre + nombre + fechas. */}
         <header className={styles.head}>
           <span className={styles.flag} aria-hidden="true">
-            🏁
+            <Icon icon={Flag} size={36} />
           </span>
           <span className={styles.kicker}>Viaje cerrado</span>
           <h1 className={styles.title}>{tripName}</h1>
@@ -225,7 +225,9 @@ export function TripWrap({
                       {m.imageUrl ? (
                         <img src={m.imageUrl} alt="" loading="lazy" />
                       ) : (
-                        <span className={styles.tlThumbFallback}>🏔️</span>
+                        <span className={styles.tlThumbFallback}>
+                          <Icon icon={ImageOff} size={22} />
+                        </span>
                       )}
                     </span>
                     <div className={styles.tlBody}>
@@ -235,7 +237,7 @@ export function TripWrap({
                         <span className={styles.tlResult}>
                           {winner && winner.name ? (
                             <>
-                              <span aria-hidden="true">🎯</span> Ganó <b>{winner.name}</b>
+                              <Icon icon={Target} size={14} /> Ganó <b>{winner.name}</b>
                               {winner.guessedCount > 0 &&
                                 ` · ${winner.guessedCount} ${
                                   winner.guessedCount === 1 ? 'acierto' : 'aciertos'
@@ -243,7 +245,7 @@ export function TripWrap({
                             </>
                           ) : (
                             <>
-                              <span aria-hidden="true">🎯</span> Reto sin jugadas
+                              <Icon icon={Target} size={14} /> Reto sin jugadas
                             </>
                           )}
                         </span>

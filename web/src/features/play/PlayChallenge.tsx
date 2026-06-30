@@ -701,7 +701,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     result.points >= GREAT_SHOT ? styles.scoreEyebrowWin : ''
                   }`}
                 >
-                  {result.points >= GREAT_SHOT ? '🎉 ¡Gran tiro!' : 'Resultado'}
+                  {result.points >= GREAT_SHOT ? '¡Gran tiro!' : 'Resultado'}
                 </span>
                 {/* Anillo de acierto protagonista: % de la puntuación máxima, con
                     los puntos (count-up) gigantes en el centro. */}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Button, Modal, useToast } from '../../ui'
+import { MapPin, Target, Users } from 'lucide-react'
+import { Button, Icon, Modal, useToast } from '../../ui'
 import { track } from '../../lib/analytics'
 import { getGroupMembers } from '../../lib/membership'
 import styles from './InviteModal.module.css'
@@ -124,18 +125,24 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
       {/* Preview del grupo: tarjeta de marca con el nombre y la meta (personas /
           retos). Da contexto a quien invitas en vez de un enlace pelado. */}
       <div className={styles.preview}>
-        <span className={styles.eyebrow}>📍 Lugares</span>
+        <span className={styles.eyebrow}>
+          <Icon icon={MapPin} size={14} /> Lugares
+        </span>
         <p className={styles.groupName}>{groupName}</p>
         <p className={styles.meta}>
           {membersText && (
             <>
-              <span className={styles.metaItem}>👥 {membersText}</span>
+              <span className={styles.metaItem}>
+                <Icon icon={Users} size={14} /> {membersText}
+              </span>
               <span className={styles.dot} aria-hidden="true">
                 ·
               </span>
             </>
           )}
-          <span className={styles.metaItem}>🎯 {challengesLabel(challengeCount)}</span>
+          <span className={styles.metaItem}>
+            <Icon icon={Target} size={14} /> {challengesLabel(challengeCount)}
+          </span>
         </p>
         <p className={styles.tagline}>Vive los viajes de tus amigos. Y adivina dónde es.</p>
       </div>

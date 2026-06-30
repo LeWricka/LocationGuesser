@@ -6,7 +6,7 @@
 // Esc (= saltar). Móvil-first, usando el UI kit y los tokens (no hardcodea).
 
 import { useEffect, useRef, useState } from 'react'
-import { Button } from '../../ui'
+import { Button, Icon } from '../../ui'
 import type { OnboardingSlide } from './slides'
 import styles from './OnboardingSlideshow.module.css'
 
@@ -61,8 +61,8 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
         </button>
 
         <div className={styles.slide}>
-          <span className={styles.icon} aria-hidden="true">
-            {slide.icon}
+          <span className={styles.icon}>
+            <Icon icon={slide.icon} size={40} />
           </span>
           {/* Eyebrow editorial con el paso actual (p.ej. "Lugares · 1 de 3"):
               ubica al usuario en el recorrido sin robar peso al titular. */}

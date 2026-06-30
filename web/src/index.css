@@ -165,11 +165,17 @@ img {
   }
 }
 
-/* Pin emoji del marcador de Leaflet. */
+/* Pin (SVG lucide) del marcador de Leaflet. El color sale del token de marca y la
+ * sombra lo despega de la foto satélite para que se lea sobre cualquier fondo. */
 .lg-pin {
-  font-size: 26px;
-  line-height: 1;
-  text-align: center;
+  display: grid;
+  place-items: center;
+  line-height: 0;
+  color: var(--color-accent);
+}
+
+.lg-pin svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
 }
 
 /* El 🎯 de la respuesta "cae" al revelar: entra desde arriba con un rebote

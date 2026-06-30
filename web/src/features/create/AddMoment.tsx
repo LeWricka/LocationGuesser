@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { AlertTriangle, Check, Map as MapIcon, MapPin, Target, Zap } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
@@ -18,6 +19,7 @@ import {
   Button,
   Field,
   Input,
+  Icon,
   Row,
   Spinner,
   Stack,
@@ -478,24 +480,34 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             reto ON es la respuesta OCULTA a adivinar (cambia el lenguaje). */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            {isChallenge ? '🎯 Lugar a adivinar' : '📍 Sitio del recuerdo'}{' '}
+            {isChallenge ? (
+              <>
+                <Icon icon={Target} size={16} /> Lugar a adivinar
+              </>
+            ) : (
+              <>
+                <Icon icon={MapPin} size={16} /> Sitio del recuerdo
+              </>
+            )}{' '}
             <span className={styles.optional}>{isChallenge ? 'obligatorio' : 'opcional'}</span>
           </span>
           <Stack gap={3}>
             <Button variant="secondary" fullWidth loading={locating} onClick={useGps}>
-              📍 Mi ubicación
+              <Icon icon={MapPin} size={18} /> Mi ubicación
             </Button>
             <MapPicker value={place} flyTo={flyTo} center={SPAIN} zoom={5} onPick={pickPlace} />
             {place ? (
               <Row gap={2} align="center">
-                <Badge tone="accent">📍 Sitio marcado</Badge>
+                <Badge tone="accent">
+                  <Icon icon={MapPin} size={14} /> Sitio marcado
+                </Badge>
                 <span className={styles.coords}>
                   {place.lat.toFixed(5)}, {place.lng.toFixed(5)}
                 </span>
               </Row>
             ) : (
               <span className={styles.hint}>
-                👆 Toca el mapa para marcar dónde es. Sin lugar también vale.
+                Toca el mapa para marcar dónde es. Sin lugar también vale.
               </span>
             )}
             {isChallenge && (
@@ -512,7 +524,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             {(fieldProps) => (
               <Input
                 {...fieldProps}
-                placeholder="Atardecer en Santorini 🌅"
+                placeholder="Atardecer en Santorini"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
@@ -556,7 +568,15 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
           >
             <span className={styles.toggleText}>
               <span className={styles.toggleTitle}>
-                {isChallenge ? '✓ Es un reto' : '🎯 Convertirlo en reto'}
+                {isChallenge ? (
+                  <>
+                    <Icon icon={Check} size={16} /> Es un reto
+                  </>
+                ) : (
+                  <>
+                    <Icon icon={Target} size={16} /> Convertirlo en reto
+                  </>
+                )}
               </span>
               <span className={styles.toggleHint}>
                 Esconde el lugar y que adivinen dónde es, con cuenta atrás.
@@ -571,7 +591,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             <Stack gap={5} className={styles.challengeBody}>
               {!place && (
                 <Row gap={2} align="center" className={styles.warn}>
-                  <span aria-hidden>⚠️</span>
+                  <Icon icon={AlertTriangle} size={18} />
                   <span>Un reto necesita un lugar a adivinar. Márcalo en el mapa de arriba.</span>
                 </Row>
               )}
@@ -581,7 +601,11 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                   <Stack gap={2}>
                     <Row gap={2} className={styles.durationValue}>
                       <span className={styles.durationLabel}>{durationStop.label}</span>
-                      {isExpress && <span className={styles.expressPill}>⚡ Express</span>}
+                      {isExpress && (
+                        <span className={styles.expressPill}>
+                          <Icon icon={Zap} size={14} /> Express
+                        </span>
+                      )}
                     </Row>
                     <input
                       {...fieldProps}
@@ -634,7 +658,15 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                   aria-pressed={wantsStreetView}
                   onClick={toggleStreetView}
                 >
-                  {wantsStreetView ? '✓ Street View' : '🗺️ Añadir Street View'}
+                  {wantsStreetView ? (
+                    <>
+                      <Icon icon={Check} size={16} /> Street View
+                    </>
+                  ) : (
+                    <>
+                      <Icon icon={MapIcon} size={16} /> Añadir Street View
+                    </>
+                  )}
                 </Button>
                 {!place && <span className={styles.hint}>Marca antes el lugar en el mapa.</span>}
 
@@ -679,7 +711,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                           aria-pressed={allowMove}
                           onClick={() => setAllowMove((v) => !v)}
                         >
-                          {allowMove ? '✓ ' : ''}Permitir moverse
+                          {allowMove && <Icon icon={Check} size={14} />} Permitir moverse
                         </Button>
                         <span className={styles.hint}>
                           {allowMove ? 'Pueden avanzar por la calle.' : 'No pueden avanzar.'}
@@ -692,7 +724,7 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                           aria-pressed={allowRotate}
                           onClick={() => setAllowRotate((v) => !v)}
                         >
-                          {allowRotate ? '✓ ' : ''}Permitir mirar alrededor
+                          {allowRotate && <Icon icon={Check} size={14} />} Permitir mirar alrededor
                         </Button>
                         <span className={styles.hint}>
                           {allowRotate ? 'Pueden girar la cámara.' : 'Vista fija.'}
@@ -710,7 +742,15 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             muestra el estado (subiendo fotos n/N, guardando…) para que se vea qué
             pasa y no parezca colgado. */}
         <Button size="lg" fullWidth loading={busy} disabled={!canSave} onClick={() => void save()}>
-          {busy ? (status ?? 'Guardando…') : isChallenge ? '🎯 Crear reto' : 'Guardar recuerdo'}
+          {busy ? (
+            (status ?? 'Guardando…')
+          ) : isChallenge ? (
+            <>
+              <Icon icon={Target} size={18} /> Crear reto
+            </>
+          ) : (
+            'Guardar recuerdo'
+          )}
         </Button>
       </Stack>
     </main>

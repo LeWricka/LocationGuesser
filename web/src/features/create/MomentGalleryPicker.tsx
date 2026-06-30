@@ -1,5 +1,6 @@
 import type { ChangeEvent } from 'react'
-import { Spinner } from '../../ui'
+import { Camera, Star, Trash2 } from 'lucide-react'
+import { Icon, Spinner } from '../../ui'
 import styles from './MomentGalleryPicker.module.css'
 
 /** Una foto en preparación: el File a subir y su object URL para la miniatura. */
@@ -52,7 +53,7 @@ export function MomentGalleryPicker({
     return (
       <label className={styles.empty} aria-busy={loading || undefined}>
         <span className={styles.icon} aria-hidden>
-          {loading ? <Spinner size={28} /> : '📷'}
+          {loading ? <Spinner size={28} /> : <Icon icon={Camera} size={28} />}
           {!loading && <span className={styles.plus}>+</span>}
         </span>
         <span className={styles.emptyLabel}>{loading ? 'Leyendo…' : 'Sube fotos del día'}</span>
@@ -83,7 +84,11 @@ export function MomentGalleryPicker({
                   <Spinner size={20} />
                 </span>
               )}
-              {isCover && <span className={styles.coverBadge}>★ Portada</span>}
+              {isCover && (
+                <span className={styles.coverBadge}>
+                  <Icon icon={Star} size={14} fill="currentColor" /> Portada
+                </span>
+              )}
               <div className={styles.tileActions}>
                 {!isCover && (
                   <button
@@ -92,7 +97,7 @@ export function MomentGalleryPicker({
                     onClick={() => onMakeCover(photo.id)}
                     aria-label="Marcar como portada"
                   >
-                    <span aria-hidden>★</span>
+                    <Icon icon={Star} size={16} />
                   </button>
                 )}
                 <button
@@ -101,7 +106,7 @@ export function MomentGalleryPicker({
                   onClick={() => onRemove(photo.id)}
                   aria-label="Quitar foto"
                 >
-                  <span aria-hidden>🗑️</span>
+                  <Icon icon={Trash2} size={18} />
                 </button>
               </div>
             </li>

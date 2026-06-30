@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // import() dinámico dentro del efecto, para que quede en su propio chunk WebGL.
 import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
 import '../trip/tripPins.css'
+import { PIN_MARKER_SVG } from '../trip/pinMarkers'
 import type { WorldTrip } from './useWorldTrips'
 import styles from './HomeWorldMap.module.css'
 
@@ -82,7 +83,7 @@ function pinElement(opts: { imageUrl: string | null; lead: boolean }): HTMLDivEl
     el.style.backgroundImage = `url('${opts.imageUrl.replace(/'/g, "\\'")}')`
   } else {
     el.classList.add('lg-trip-pin--icon')
-    el.textContent = '📍'
+    el.innerHTML = PIN_MARKER_SVG
   }
   return el
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, ImagePlus, Plus, Target } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Flag, Globe, ImagePlus, Plus, Target } from 'lucide-react'
 import { EmptyState, Icon, useReducedMotion, useToast } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
@@ -382,7 +382,7 @@ export function TripPage({
       <main className={styles.center}>
         <EmptyState
           tone="danger"
-          icon="🌍"
+          icon={<Icon icon={Globe} size={32} />}
           title="No hemos podido cargar el viaje"
           description={error}
         />
@@ -443,7 +443,7 @@ export function TripPage({
           aria-label="Ver el resumen del viaje"
         >
           <span className={styles.wrapBannerText}>
-            <span aria-hidden="true">🏁</span> Viaje cerrado — Ver resumen
+            <Icon icon={Flag} size={16} /> Viaje cerrado — Ver resumen
           </span>
           <Icon icon={ChevronRight} size={16} />
         </button>

@@ -25,12 +25,44 @@
 }
 
 .sectionTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
   color: var(--color-text-muted);
   margin-bottom: var(--space-3);
+}
+
+/* Punto de estado "en vivo" (semáforo rojo) para el título de la sección de
+ * retos abiertos. Mismo lenguaje que el punto del Badge "en vivo": color de
+ * peligro con pulso leve; es información de estado, no decoración. */
+.liveDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  animation: liveDotPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes liveDotPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liveDot {
+    animation: none;
+  }
 }
 
 .empty,
@@ -118,8 +150,9 @@
   white-space: nowrap;
 }
 
-/* El 🎁 no debe encogerse cuando el texto se trunca. */
-.prizeChip > span {
+/* El icono del premio no debe encogerse cuando el texto se trunca. */
+.prizeChip > span,
+.prizeChip > svg {
   flex-shrink: 0;
 }
 
@@ -261,6 +294,12 @@
   margin-bottom: -4px;
 }
 
+/* El icono (SVG lucide) hereda el tamaño del font-size del contenedor (1em). */
+.crown svg {
+  width: 1em;
+  height: 1em;
+}
+
 /* Disco con el avatar; el fondo (gradiente del avatar) lo inyecta el componente.
    Anillo de puesto (oro/plata/bronce) alrededor. La 1ª plaza, mayor. */
 .podiumDisc {
@@ -341,6 +380,13 @@ img.podiumAvatar {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* El icono (Gift) acompaña al texto del premio; lo bajamos un pelo para alinearlo
+   con la línea base sin romper el truncado por ellipsis del contenedor. */
+.podiumPrize svg {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
 }
 
 /* Pedestal: tinte del color del puesto con su medalla; altura por plaza (1ª la
@@ -874,6 +920,10 @@ img.podiumAvatar {
   line-height: var(--line-height-tight);
   letter-spacing: var(--letter-spacing-tight);
   color: var(--color-text);
+}
+/* El trofeo (Icon) acompaña el texto del banner; lo centramos con la línea. */
+.winnerBanner svg {
+  vertical-align: -0.15em;
 }
 
 .winnerBanner strong {
