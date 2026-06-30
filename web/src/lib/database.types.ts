@@ -72,6 +72,16 @@ export interface Database {
           // Fin de temporada: null = grupo activo; con fecha = cerrado/archivado
           // (solo-lectura). Migración 0019.
           closed_at: string | null
+          // Datos del viaje (contenido editorial opcional, null = sin dato). Migración 0027.
+          // Rango de fechas de calendario (sin hora/zona): 'YYYY-MM-DD'.
+          starts_on: string | null
+          ends_on: string | null
+          // De qué va y con quién (texto libre). `companions` NO es membresía:
+          // es solo informativo (los miembros reales entran por el enlace).
+          description: string | null
+          companions: string | null
+          // Portada del viaje: path en Storage (como challenges.image_path).
+          cover_image_path: string | null
         }
         Insert: {
           id: string
@@ -80,6 +90,11 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           closed_at?: string | null
+          starts_on?: string | null
+          ends_on?: string | null
+          description?: string | null
+          companions?: string | null
+          cover_image_path?: string | null
         }
         Update: {
           id?: string
@@ -88,6 +103,11 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           closed_at?: string | null
+          starts_on?: string | null
+          ends_on?: string | null
+          description?: string | null
+          companions?: string | null
+          cover_image_path?: string | null
         }
         Relationships: []
       }

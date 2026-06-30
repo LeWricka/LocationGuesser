@@ -1,18 +1,541 @@
-.header {
-  margin-bottom: var(--space-2);
+/* Crear viaje · flujo inmersivo "MAPA A SANGRE + HOJA QUE CRECE".
+   Mapa decorativo (ruta + pines) de fondo; bottom sheet que sube y crece por
+   etapas (reutiliza ImmersiveSheet y su CSS hermano). Sistema Atelier
+   (paper/tinta/pizarra) vía tokens del UI kit; nada hardcodeado. */
+
+.root {
+  --float-bg: rgba(18, 26, 36, 0.42);
+  --float-line: rgba(255, 255, 255, 0.22);
+
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  background: var(--paper-2, #eef0f3);
+  isolation: isolate;
+  font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
+  color: var(--ink-900);
 }
 
-.title {
-  font-size: var(--font-size-xl);
+.serif {
+  font-family: 'Cormorant Garamond', Georgia, serif;
 }
 
-/* Texto introductorio: explica qué es un grupo en términos sociales. */
-.intro {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+/* ============ MAPA DECORATIVO A SANGRE (fondo) ============== */
+.map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 50% at 30% 22%, #e7ecf1 0%, transparent 70%),
+    radial-gradient(70% 60% at 78% 70%, #e3e8ee 0%, transparent 72%),
+    linear-gradient(160deg, #eef1f4 0%, #e3e7ec 55%, #d9dee4 100%);
+}
+.map svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.land {
+  fill: #dfe4ea;
+  stroke: #cdd4dc;
+  stroke-width: 0.8;
+}
+.route {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.2;
+  stroke-dasharray: 5 6;
+  stroke-linecap: round;
+  opacity: 0.5;
+  stroke-dashoffset: 240;
+  animation: drawRoute 2.6s ease forwards;
+}
+@keyframes drawRoute {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.mapPin {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--accent);
+  transform: rotate(-45deg) scale(0);
+  box-shadow: 0 2px 6px rgba(24, 32, 43, 0.3);
+  animation: dropPin 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+@keyframes dropPin {
+  to {
+    transform: rotate(-45deg) scale(1);
+  }
 }
 
-.status {
-  font-size: var(--font-size-sm);
-  color: var(--color-accent);
+/* viñeta para legibilidad del chrome claro */
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(
+    to bottom,
+    rgba(24, 32, 43, 0.25) 0%,
+    transparent 18%,
+    transparent 60%,
+    rgba(24, 32, 43, 0.12) 100%
+  );
+}
+
+/* ---- topbar flotante translúcido --------------------------------- */
+.top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 14px;
+  pointer-events: none;
+}
+.iconBtn {
+  pointer-events: auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--float-line);
+  background: var(--float-bg);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: #fff;
+}
+.iconBtn svg {
+  width: 20px;
+  height: 20px;
+}
+.topTitle {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--float-line);
+  background: var(--float-bg);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  color: #fff;
+}
+.topTitle b {
+  font-size: 14px;
+  font-weight: 600;
+  text-shadow: 0 1px 6px rgba(11, 16, 22, 0.6);
+}
+
+/* ============ ETAPAS (contenido de la hoja) ============== */
+.stage {
+  animation: stageIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes stageIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.h {
+  font-size: 30px;
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  margin: 8px 0 4px;
+}
+.sub {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-600);
+  margin: 0 0 16px;
+}
+
+/* ---- campos ----------------------------------------------------- */
+.field {
+  margin-bottom: 16px;
+}
+.label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 7px;
+  color: var(--ink-900);
+}
+.label span {
+  font-weight: 500;
+  color: var(--ink-400);
+}
+.input,
+.textarea {
+  width: 100%;
+  border: 1px solid var(--color-border, rgba(24, 32, 43, 0.1));
+  border-radius: 13px;
+  padding: 13px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  color: var(--ink-900);
+  background: #fafbfc;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.input:focus,
+.textarea:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--ink-400);
+}
+.nameInput {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 23px;
+  font-weight: 600;
+  padding: 14px 16px;
+}
+.textarea {
+  resize: none;
+  min-height: 78px;
+  line-height: 1.45;
+}
+.hint {
+  font-size: 11.5px;
+  color: var(--ink-400);
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+.warnHint {
+  font-size: 11.5px;
+  color: #8a5a1f;
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+
+/* fechas: salida / vuelta lado a lado */
+.dates {
+  display: flex;
+  gap: 10px;
+}
+.dateBox {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid var(--color-border, rgba(24, 32, 43, 0.1));
+  background: #fafbfc;
+  border-radius: 13px;
+  padding: 9px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.dateBox:focus-within {
+  border-color: var(--accent);
+  background: #fff;
+}
+.dateCap {
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  font-weight: 700;
+}
+.dateInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--ink-900);
+  width: 100%;
+  padding: 0;
+}
+/* el indicador nativo del date se atenúa para integrarse */
+.dateInput::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.55;
+}
+
+/* "con quién vas" con icono */
+.peopleField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--color-border, rgba(24, 32, 43, 0.1));
+  background: #fafbfc;
+  border-radius: 13px;
+  padding: 11px 14px;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.peopleField:focus-within {
+  border-color: var(--accent);
+  background: #fff;
+}
+.peopleIco {
+  flex: 0 0 auto;
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+.peopleInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--ink-900);
+}
+.peopleInput::placeholder {
+  color: var(--ink-400);
+}
+
+/* sección colapsable "más detalles" */
+.moreBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 12px;
+  background: transparent;
+  border: 1px dashed var(--color-border, rgba(24, 32, 43, 0.12));
+  border-radius: 12px;
+  color: var(--ink-600);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  margin-bottom: 12px;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+.moreBtn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.chev {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.3s ease;
+}
+.moreOpen .chev {
+  transform: rotate(180deg);
+}
+.more {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.35s ease;
+}
+.moreShow {
+  max-height: 420px;
+  opacity: 1;
+}
+
+/* ---- botón primario --------------------------------------------- */
+.cta {
+  width: 100%;
+  border: none;
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 15.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  font-family: inherit;
+  transition:
+    transform 0.18s ease,
+    background 0.2s ease;
+}
+.cta:active {
+  transform: scale(0.98);
+}
+.cta:hover {
+  background: var(--accent-deep);
+}
+.cta svg {
+  width: 18px;
+  height: 18px;
+}
+.cta:disabled {
+  background: #cdd4dc;
+  cursor: not-allowed;
+}
+
+/* ---- resumen ---------------------------------------------------- */
+.review {
+  border: 1px solid var(--color-border, rgba(24, 32, 43, 0.1));
+  border-radius: 18px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.reviewRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--color-border, rgba(24, 32, 43, 0.1));
+}
+.reviewRow:last-child {
+  border-bottom: none;
+}
+.rIco {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--accent-tint);
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+}
+.rTxt {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rTxt small {
+  display: block;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-400);
+  font-weight: 700;
+}
+.rTxt b {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+.reviewDesc {
+  font-weight: 500 !important;
+  line-height: 1.4;
+}
+
+/* ---- microcelebración al crear ---------------------------------- */
+.celebrate {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(11, 16, 22, 0.78);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeIn 0.4s ease;
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.celebrateCard {
+  text-align: center;
+  color: #fff;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 0 30px;
+}
+.burst {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  animation: pop 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both;
+}
+.burst svg {
+  width: 44px;
+  height: 44px;
+  stroke-width: 2;
+}
+@keyframes pop {
+  0% {
+    transform: scale(0.2);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.celebrateCard h3 {
+  font-size: 34px;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+.celebrateCard p {
+  font-size: 14px;
+  opacity: 0.85;
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.06s !important;
+  }
 }

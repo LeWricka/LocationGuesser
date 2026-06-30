@@ -112,3 +112,43 @@ export function CheckIcon({ size = 24, className }: IconProps) {
     </svg>
   )
 }
+
+// Calendario: las fechas del viaje (salida/vuelta).
+export function CalendarIcon({ size = 24, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 9.5h17M8 3v4M16 3v4" />
+    </svg>
+  )
+}
+
+// Gente: los acompañantes del viaje (dos siluetas).
+export function PeopleIcon({ size = 24, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <circle cx="9" cy="8.5" r="3.2" />
+      <path d="M3.5 19.5c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+      <path d="M16 6.2a3 3 0 0 1 0 5.6M17.5 19.5c0-2.6-1.4-4.4-3.4-5" />
+    </svg>
+  )
+}
+
+// Pin del viaje: identifica el viaje en el resumen.
+export function TripPinIcon({ size = 24, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M12 21c4-4.2 6.5-7.4 6.5-10.5a6.5 6.5 0 1 0-13 0C5.5 13.6 8 16.8 12 21Z" />
+      <circle cx="12" cy="10.5" r="2.4" />
+    </svg>
+  )
+}
+
+// Destello: la creación / "de qué va" / la microcelebración (sustituye al ✦).
+export function SparkIcon({ size = 24, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M12 3v18M3 12h18M6 6l12 12M18 6 6 18" />
+    </svg>
+  )
+}
