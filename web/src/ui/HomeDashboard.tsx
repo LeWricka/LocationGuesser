@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { Crown, MapPin, Play, Plus, Settings } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { Banner } from './Banner'
@@ -64,14 +63,17 @@ function sortTrips(list: HomeGroup[]): HomeGroup[] {
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
 // Portada-placeholder para viajes SIN foto: un degradado de dos tonos derivado del nombre
-// (mismo nombre → mismo color, estable) más la inicial grande, en vez de un gris vacío. El
-// tono se calcula con un hash simple del nombre y se expone como variables CSS de matiz.
-// Solo dos matices base (azul noche / verde Atelier) para no romper la paleta sobria.
-function placeholderHue(name: string): number {
+// (mismo nombre → mismo color, estable) más la inicial grande, en vez de un gris vacío.
+// En vez de un matiz HSL arbitrario (que se iba a morados/magentas fuera de paleta), el
+// nombre elige de forma determinista UNA de un set acotado de variantes ON-BRAND
+// (pizarra/tinta de escena/oro), definidas en el CSS como `.variantN`. Mismo nombre →
+// misma variante, estable.
+const PLACEHOLDER_VARIANTS = 5
+
+function placeholderVariant(name: string): number {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
-  // Rango cálido-frío contenido (180–320): azules, verdosos y violáceos sobrios.
-  return 180 + (Math.abs(hash) % 140)
+  return Math.abs(hash) % PLACEHOLDER_VARIANTS
 }
 
 /** Inicial visible del nombre del viaje (primera letra, en mayúscula). */
@@ -291,11 +293,13 @@ function TripCard({
           aria-hidden="true"
         />
       ) : (
-        // Sin portada todavía: placeholder digno (degradado derivado del nombre + inicial)
-        // en lugar de un gris vacío. La inicial es decorativa (el nombre ya va en el cuerpo).
+        // Sin portada todavía: placeholder digno (degradado on-brand derivado del nombre +
+        // inicial) en lugar de un gris vacío. La inicial es decorativa (el nombre ya va en
+        // el cuerpo). La variante (pizarra/tinta/oro) la elige el nombre, siempre on-brand.
         <span
-          className={styles.placeholder}
-          style={{ '--hue': placeholderHue(group.name) } as CSSProperties}
+          className={[styles.placeholder, styles[`variant${placeholderVariant(group.name)}`]].join(
+            ' ',
+          )}
           aria-hidden="true"
         >
           <span className={styles.placeholderInitial}>{tripInitial(group.name)}</span>
