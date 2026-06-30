@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ArrowRight, Hash, Lock, RotateCcw, TimerOff } from 'lucide-react'
+import { useVisualViewport } from '../../lib/useVisualViewport'
 import { CountdownOverlay } from './CountdownOverlay'
 import { RevealBurst } from './RevealBurst'
 import { NumberPad } from './NumberPad'
@@ -19,6 +20,7 @@ import { describeError } from '../../lib/errors'
 import { reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
+import { AppHeader } from '../../ui/AppHeader'
 import {
   Avatar,
   BackHomeButton,
@@ -102,6 +104,12 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
   const leftAppRef = useRef(false)
   const playStartAtRef = useRef<number | null>(null)
   const photoUrl = useSignedImage(challenge?.image_path ?? null)
+  // Alto visible real (visualViewport): cuando el chrome del navegador móvil recorta
+  // la pantalla, fijamos el contenedor inmersivo a ese alto en px (no a 100vh, que
+  // colapsa). Aquí el teclado del SISTEMA no se abre (input propio), pero la barra
+  // del navegador sí mueve el alto: con esto la hoja del número y la pregunta no se
+  // salen nunca.
+  const { height: visualHeight } = useVisualViewport()
 
   const guessNumber = parseGuess(guessRaw)
   const unit = challenge?.number_unit ?? null
@@ -379,10 +387,32 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
   if (!revealed) {
     const playing = phase === 'playing'
     const urgent = remaining != null && remaining <= 10
+    // Modelo de viewport: fijamos el alto del contenedor al alto VISIBLE real en px
+    // cuando lo conocemos (fallback a 100dvh en CSS). Así el chrome del navegador no
+    // colapsa el layout y la pregunta/hoja no se salen de pantalla.
+    const immersiveStyle = visualHeight != null ? { '--play-vh': `${visualHeight}px` } : undefined
     return (
       <>
-        <div className={styles.immersive}>
-          {/* Foto-hero (o degradado neutro si no hay foto). */}
+        <div className={styles.immersive} style={immersiveStyle as React.CSSProperties | undefined}>
+          {/* Cabecera flotante: atrás + cronómetro (si hay límite). */}
+          <AppHeader
+            variant="floating"
+            lead="back"
+            leadLabel={playing ? 'Salir (sigue el tiempo)' : backLabel}
+            onLead={playing ? goBackWhilePlaying : goBack}
+            action={
+              playing && remaining != null && challenge.guess_seconds != null ? (
+                <CountdownRing
+                  remaining={remaining}
+                  total={challenge.guess_seconds}
+                  urgent={urgent}
+                />
+              ) : undefined
+            }
+          />
+
+          {/* Escena-hero con la pregunta SIEMPRE visible anclada abajo. Alto mínimo
+              en px: no colapsa al reajustarse el viewport. */}
           <div className={styles.scene}>
             {photoUrl ? (
               <SceneImage src={photoUrl} alt={question} className={styles.sceneImg} />
@@ -390,34 +420,18 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               <div className={styles.sceneNeutral} aria-hidden />
             )}
             <div className={styles.sceneVeil} aria-hidden />
+            <div className={styles.questionWrap}>
+              <span className={styles.kindChip}>
+                <Icon icon={Hash} size={13} /> ¿Adivinas?
+              </span>
+              <p className={styles.question}>{question}</p>
+            </div>
           </div>
 
-          {/* Clúster superior: salir + (cronómetro si hay límite). */}
-          <div className={styles.topCluster}>
-            <BackHomeButton
-              onClick={playing ? goBackWhilePlaying : goBack}
-              label={playing ? 'Salir (sigue el tiempo)' : backLabel}
-            />
-            {playing && remaining != null && challenge.guess_seconds != null && (
-              <CountdownRing
-                remaining={remaining}
-                total={challenge.guess_seconds}
-                urgent={urgent}
-              />
-            )}
-          </div>
-
-          {/* Pregunta sobre la foto. */}
-          <div className={styles.questionWrap}>
-            <span className={styles.kindChip}>
-              <Icon icon={Hash} size={13} /> ¿Adivinas?
-            </span>
-            <p className={styles.question}>{question}</p>
-          </div>
-
-          {/* Hoja inferior: input grande + teclado + CTA (solo en juego). */}
+          {/* Hoja inferior, UNA columna: número grande + unidad ENCIMA del teclado,
+              luego el teclado propio y la acción anclada con safe-area. */}
           <section className={styles.sheet} aria-hidden={!playing}>
-            <label className={styles.fieldLabel}>Tu respuesta</label>
+            <span className={styles.fieldLabel}>Tu respuesta</span>
             <div className={styles.guessRow}>
               <span className={styles.guessNum}>{guessRaw || '0'}</span>
               {unit && <span className={styles.guessUnit}>{unit}</span>}
@@ -431,7 +445,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               onClick={lockNumber}
             >
               <span className={styles.btnIcon}>
-                <Icon icon={Lock} size={18} /> Bloquear mi número
+                <Icon icon={Lock} size={18} /> Bloquear mi respuesta
               </span>
             </Button>
           </section>

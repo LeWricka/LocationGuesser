@@ -35,6 +35,7 @@ import { describeError } from '../../lib/errors'
 import { reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
+import { useVisualViewport } from '../../lib/useVisualViewport'
 // Rasterización + compartir reutilizadas de la tarjeta de clasificación (import
 // READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
@@ -161,6 +162,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // URL firmada de la foto del reto (bucket privado). Hook al tope del componente
   // —no tras los early-return de carga— para no romper el orden de hooks.
   const photoUrl = useSignedImage(challenge?.image_path ?? null)
+  // Alto visible real para el modelo de viewport de la escena inmersiva: al abrir el
+  // mapa/teclado del navegador móvil, atamos el contenedor a este alto en px en vez
+  // de a 100vh (que colapsa y empuja la pregunta/escena fuera de pantalla).
+  const { height: visualHeight } = useVisualViewport()
 
   // Revelar: emite el voto vía la RPC `submit_vote` (autoridad de servidor) y usa
   // SU resultado (distancia, puntos y la respuesta real) para revelar. El cliente ya
@@ -622,6 +627,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         <GameScene
           title={challenge.title}
           scene={sceneData}
+          viewportHeight={visualHeight}
           sceneReady={playing}
           // En `playing` con límite mostramos el anillo; sin empezar/sin límite, null.
           remaining={playing && challenge.guess_seconds != null ? remaining : null}
