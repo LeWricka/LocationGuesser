@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Info } from 'lucide-react'
 // Tipos SOLO (import type → cero coste en bundle). El runtime entra por import()
 // dinámico dentro del efecto para que maplibre quede en un chunk aparte.
 import type {
@@ -16,11 +17,19 @@ import {
   SELECT_ZOOM,
   SINGLE_ZOOM,
 } from '../../lib/mapPresets'
+import { Icon } from '../../ui/Icon'
 import type { TripMapProps as Props } from './TripMap.types'
 import { activePinHtml, photoPinHtml } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapGlobe.module.css'
+
+// Crédito de los tiles (mismas cadenas del preset, decodificando &copy; a "©" porque lo
+// pintamos como TEXTO plano en nuestro propio popover, no como HTML). Cumple la atribución
+// de Esri sin depender del control de MapLibre (que en prod dejaba una banda, #363/#382).
+const MAP_CREDIT = [ESRI_SATELLITE.attribution, ESRI_REFERENCE_LABELS.attribution]
+  .join(' · ')
+  .replace(/&copy;/g, '©')
 
 // Basemap SATÉLITE + capa de ETIQUETAS (preset "diario", centralizado en
 // `mapPresets`): Esri World Imagery sin API key con los nombres de ciudad
@@ -174,6 +183,8 @@ export function TripMapGlobe({
   // RE-LANZAMOS en render para que el boundary caiga al mapa plano (red de seguridad).
   const [initError, setInitError] = useState<unknown>(null)
   if (initError) throw initError
+  // Crédito de tiles (Esri): plegado a un "ⓘ"; al tocar se despliega el texto.
+  const [creditOpen, setCreditOpen] = useState(false)
 
   // Props en refs: así las funciones de pintado (que el handler `load` invoca de
   // forma asíncrona) leen SIEMPRE el último valor, sin recrear el mapa ni arrastrar
@@ -350,19 +361,14 @@ export function TripMapGlobe({
           // un viaje tiene puntos muy dispersos, fitBounds clampa aquí y centra (raro en
           // un viaje real, casi siempre regional). El intro cinematográfico también clampa.
           minZoom: MIN_FILL_ZOOM,
-          // Desactivamos el control por defecto y lo añadimos instanciado a mano (abajo):
-          // pasarlo como opción-objeto NO entraba en modo compacto fiablemente en prod
-          // (se veía el texto completo de Esri como banda, no el "ⓘ").
+          // SIN control de atribución de MapLibre: su modo compacto no ocultaba el texto
+          // de Esri en prod (salía como banda, ver #363/#382). Sin control = imposible que
+          // aparezca la banda; el crédito lo damos con nuestro propio "ⓘ" (ver render).
           attributionControl: false,
           // Con reduced-motion no animamos el fade de tiles.
           fadeDuration: prefersReducedMotion() ? 0 : 300,
         })
         mapRef.current = map
-
-        // Atribución COLAPSADA de verdad: instanciar `AttributionControl` con
-        // `compact: true` es la forma documentada y fiable de obtener el "ⓘ" que expande
-        // al tocar (el control sí recibe la clase `maplibregl-compact` que estiliza el CSS).
-        map.addControl(new gl.AttributionControl({ compact: true }), 'bottom-right')
 
         // OJO: NO escuchamos `map.on('error')`. MapLibre lo dispara por fallos
         // transitorios (un tile Esri que da 404), que NO deben tumbar el globo. Solo
@@ -377,11 +383,12 @@ export function TripMapGlobe({
           applySky(map)
           // Raster Esri World Imagery (satélite) como capa de fondo (sin key). En
           // globo da el look "atlas vivo": el mundo real con la ruta y los pines encima.
+          // Sin `attribution` en las fuentes: no hay control de MapLibre que lo muestre
+          // (el crédito sale de nuestro "ⓘ"). Así nada puede regenerar la banda.
           map.addSource('basemap', {
             type: 'raster',
             tiles: [ESRI_SATELLITE.url],
             tileSize: 256,
-            attribution: ESRI_SATELLITE.attribution,
             maxzoom: ESRI_SATELLITE.maxNativeZoom,
           })
           map.addLayer({ id: 'basemap', type: 'raster', source: 'basemap' })
@@ -392,7 +399,6 @@ export function TripMapGlobe({
             type: 'raster',
             tiles: [ESRI_REFERENCE_LABELS.url],
             tileSize: 256,
-            attribution: ESRI_REFERENCE_LABELS.attribution,
             maxzoom: ESRI_REFERENCE_LABELS.maxNativeZoom,
           })
           map.addLayer({ id: 'labels', type: 'raster', source: 'labels' })
@@ -451,7 +457,26 @@ export function TripMapGlobe({
     }
   }, [selectedChallengeId, route])
 
-  return <div ref={containerRef} className={styles.map} />
+  return (
+    <div className={styles.root}>
+      <div ref={containerRef} className={styles.map} />
+      {/* Crédito propio (NO control de MapLibre): "ⓘ" discreto que despliega el texto de
+          Esri al tocar. `title` nativo + popover visible. Cumple la atribución sin banda. */}
+      <div className={styles.credit}>
+        {creditOpen && <span className={styles.creditText}>{MAP_CREDIT}</span>}
+        <button
+          type="button"
+          className={styles.creditButton}
+          title={MAP_CREDIT}
+          aria-label="Créditos del mapa"
+          aria-expanded={creditOpen}
+          onClick={() => setCreditOpen((v) => !v)}
+        >
+          <Icon icon={Info} size={14} />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 /**
