@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-lea
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { LatLng } from '../../lib/geo'
+import { CARTO_VOYAGER, ESRI_REFERENCE_LABELS, ESRI_SATELLITE } from '../../lib/mapPresets'
 import styles from './MapPicker.module.css'
 
 // Pin del marcador como SVG de lucide (MapPin) en vez de emoji: unifica el marker
@@ -18,23 +19,22 @@ const pinIcon = L.divIcon({
   iconAnchor: [15, 28],
 })
 
-// Capas base sin API key. Satélite (por defecto) = Esri World Imagery; el
-// callejero (CARTO Voyager) queda como alternativa. El usuario pidió SATÉLITE por
-// defecto: el gris del callejero es soso y la foto aérea hace el mapa vivo.
+// Capas base sin API key, centralizadas en `mapPresets`. Satélite (por defecto) =
+// Esri World Imagery; el callejero etiquetado (CARTO Voyager, el basemap del preset
+// "jugar") queda como alternativa. El satélite lleva además la capa de etiquetas
+// para situar el punto (igual que el diario); el callejero ya trae sus topónimos.
 type BaseLayer = 'street' | 'satellite'
 
 const LAYERS: Record<BaseLayer, { label: string; url: string; attribution: string }> = {
   satellite: {
     label: 'Satélite',
-    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-    attribution:
-      'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    url: ESRI_SATELLITE.url,
+    attribution: ESRI_SATELLITE.attribution,
   },
   street: {
     label: 'Mapa',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    url: CARTO_VOYAGER.url,
+    attribution: CARTO_VOYAGER.attribution,
   },
 }
 
@@ -114,6 +114,19 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
           keepBuffer={6}
           updateWhenZooming={false}
         />
+        {/* Etiquetas (nombres de ciudad) sobre el satélite: capa de referencia Esri
+            transparente, para situar el punto. El callejero ya trae sus topónimos. */}
+        {layer === 'satellite' && (
+          <TileLayer
+            key="esri-labels"
+            attribution={ESRI_REFERENCE_LABELS.attribution}
+            url={ESRI_REFERENCE_LABELS.url}
+            maxNativeZoom={ESRI_REFERENCE_LABELS.maxNativeZoom}
+            maxZoom={ESRI_REFERENCE_LABELS.maxZoom}
+            keepBuffer={6}
+            updateWhenZooming={false}
+          />
+        )}
         <ClickHandler onPick={onPick} />
         <Recenter flyTo={flyTo} />
         {value && <Marker position={[value.lat, value.lng]} icon={pinIcon} />}

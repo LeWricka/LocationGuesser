@@ -1,8 +1,12 @@
 /// <reference types="google.maps" />
 import { useEffect, useState } from 'react'
 import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
+import { MapPin } from 'lucide-react'
 import type { LatLng } from '../../lib/geo'
 import { avatarPinFromProfile, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
+import type { MapPreset } from '../../lib/mapPresets'
+import { Icon } from '../../ui'
+import styles from './PlayMap.module.css'
 
 // Vista inicial: el MUNDO entero. Empezando alejado, el
 // jugador va de lejos a cerca directo sin tener que alejar primero.
@@ -52,6 +56,44 @@ interface Props {
   meAvatar?: string | null
   /** Id del jugador: ancla el avatar por defecto cuando no hay avatar elegido. */
   meUserId: string
+  /**
+   * Lienzo del mapa (preset central de `mapPresets`):
+   *  - `jugar` (por defecto): callejero ETIQUETADO tipo GeoGuessr (roadmap de Google
+   *    con calles y nombres) para colocar el pin navegando — el mapa no es ciego.
+   *  - `diario`: satélite con etiquetas (hybrid), por si se quiere la foto aérea.
+   */
+  preset?: MapPreset
+  /**
+   * Pin de CENTRO FIJO (estilo GeoGuessr de una mano): en vez de tocar el mapa, el
+   * pin se queda clavado en el centro de la pantalla y el jugador MUEVE el mapa
+   * bajo él; al asentarse el arrastre, el voto = centro del mapa. Más preciso a una
+   * mano en móvil. Opt-in; sin esto, el comportamiento clásico (tocar para marcar).
+   */
+  fixedCenterPin?: boolean
+}
+
+// El preset elige el tipo de mapa de Google: `jugar` → callejero etiquetado
+// (roadmap, GeoGuessr); `diario` → satélite con etiquetas (hybrid).
+function mapTypeForPreset(preset: MapPreset): string {
+  return preset === 'jugar' ? 'roadmap' : 'hybrid'
+}
+
+/**
+ * Modo PIN DE CENTRO FIJO: el pin no se mueve; el jugador arrastra el mapa y el voto
+ * es el centro al asentarse el gesto. Escuchamos `idle` (Google lo dispara cuando el
+ * mapa deja de moverse) y reportamos el centro. No-op si está bloqueado (tras revelar).
+ */
+function CenterPinTracker({ locked, onPick }: { locked: boolean; onPick: (p: LatLng) => void }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!map || locked) return
+    const listener = map.addListener('idle', () => {
+      const c = map.getCenter()
+      if (c) onPick({ lat: c.lat(), lng: c.lng() })
+    })
+    return () => listener.remove()
+  }, [map, locked, onPick])
+  return null
 }
 
 // Icono del pin de la RESPUESTA (lucide Target): centrado en la coordenada exacta
@@ -165,37 +207,65 @@ function AnswerMarker({ answer }: { answer: LatLng }) {
   return <Marker position={answer} icon={answerIcon()} clickable={false} animation={animation} />
 }
 
-export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: Props) {
+export function PlayMap({
+  guess,
+  answer,
+  locked,
+  onPick,
+  meAvatar,
+  meUserId,
+  preset = 'jugar',
+  fixedCenterPin = false,
+}: Props) {
+  // En modo pin de centro fijo no se ve el pin-avatar (lo sustituye el pin clavado
+  // al centro de la pantalla); tampoco se marca tocando, sino moviendo el mapa.
+  const centerPinMode = fixedCenterPin && !answer
   return (
-    <Map
-      className="lg-map"
-      defaultCenter={WORLD}
-      defaultZoom={WORLD_ZOOM}
-      minZoom={2}
-      // Un dedo mueve el mapa en móvil (sin el banner "usa dos dedos"), igual que
-      // el worldCopyJump/arrastre fluido de antes.
-      gestureHandling="greedy"
-      // Basemap SATÉLITE con etiquetas (hybrid): coherente con el mapa del flujo de
-      // crear reto (Esri World Imagery por defecto) y con la app inmersiva — la foto
-      // aérea hace el mapa vivo y da más pistas que el gris del callejero, sin perder
-      // los topónimos. Sin mapId: usamos Marker clásico, no AdvancedMarker. Forzamos
-      // esquema claro para no seguir el modo oscuro del sistema.
-      mapTypeId="hybrid"
-      colorScheme="LIGHT"
-      disableDefaultUI
-      zoomControl
-      clickableIcons={false}
-      // Colocar/mover el pin tocando el mapa, solo mientras no esté bloqueado.
-      onClick={(e) => {
-        if (locked) return
-        const latLng = e.detail.latLng
-        if (latLng) onPick({ lat: latLng.lat, lng: latLng.lng })
-      }}
-    >
-      {guess && <Marker position={guess} icon={guessIcon(meAvatar, meUserId)} clickable={false} />}
-      {answer && <AnswerMarker answer={answer} />}
-      {guess && answer && <DrawnLine guess={guess} answer={answer} />}
-      {guess && answer && <FitToReveal guess={guess} answer={answer} />}
-    </Map>
+    <div className={styles.wrap}>
+      <Map
+        className="lg-map"
+        defaultCenter={WORLD}
+        defaultZoom={WORLD_ZOOM}
+        minZoom={2}
+        // Un dedo mueve el mapa en móvil (sin el banner "usa dos dedos"), igual que
+        // el worldCopyJump/arrastre fluido de antes.
+        gestureHandling="greedy"
+        // Tipo de mapa según el PRESET (mapPresets): `jugar` → callejero etiquetado
+        // tipo GeoGuessr (roadmap, calles y nombres para colocar el pin navegando);
+        // `diario` → satélite con etiquetas (hybrid). Sin mapId: Marker clásico, no
+        // AdvancedMarker. Forzamos esquema claro (no seguir el modo oscuro del SO).
+        mapTypeId={mapTypeForPreset(preset)}
+        colorScheme="LIGHT"
+        disableDefaultUI
+        zoomControl
+        clickableIcons={false}
+        // Colocar/mover el pin tocando el mapa, salvo en modo centro fijo (donde el
+        // voto es el centro del mapa) o tras bloquear (revelado).
+        onClick={(e) => {
+          if (locked || centerPinMode) return
+          const latLng = e.detail.latLng
+          if (latLng) onPick({ lat: latLng.lat, lng: latLng.lng })
+        }}
+      >
+        {/* En modo clásico, el pin-avatar clavado donde tocaste. En modo centro fijo
+            no se dibuja (lo sustituye el pin estático del overlay). */}
+        {guess && !centerPinMode && (
+          <Marker position={guess} icon={guessIcon(meAvatar, meUserId)} clickable={false} />
+        )}
+        {answer && <AnswerMarker answer={answer} />}
+        {guess && answer && <DrawnLine guess={guess} answer={answer} />}
+        {guess && answer && <FitToReveal guess={guess} answer={answer} />}
+        {centerPinMode && <CenterPinTracker locked={locked} onPick={onPick} />}
+      </Map>
+
+      {/* Pin de CENTRO FIJO: clavado en el centro de la pantalla mientras el jugador
+          mueve el mapa debajo. Decorativo (pointer-events:none) para no robar el
+          arrastre al mapa; el voto lo calcula `CenterPinTracker` con el centro. */}
+      {centerPinMode && (
+        <div className={styles.centerPin} aria-hidden="true">
+          <Icon icon={MapPin} size={36} />
+        </div>
+      )}
+    </div>
   )
 }

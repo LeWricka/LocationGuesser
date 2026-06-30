@@ -5,44 +5,34 @@ import 'leaflet/dist/leaflet.css'
 import { Layers } from 'lucide-react'
 import { Icon } from '../../ui'
 import type { RoutePoint } from '../../lib/trip'
+import {
+  CARTO_POSITRON,
+  ESRI_REFERENCE_LABELS,
+  ESRI_SATELLITE,
+  FIT_MAX_ZOOM,
+  SELECT_ZOOM,
+  SINGLE_ZOOM,
+} from '../../lib/mapPresets'
 import type { TripMapProps as Props } from './TripMap.types'
 import { HELP_MARKER_SVG, PIN_MARKER_SVG } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapLeaflet.module.css'
 
-// Satélite Esri World Imagery sin API key — BASEMAP POR DEFECTO (fase "nuevo
-// enfoque"): el mapamundi satélite es el héroe, da la inmersión "mundo real" y
-// hace que los recuerdos manden. Los pines-foto y la ruta en acento (tokens) son
-// el color de marca encima.
-const ESRI_URL =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-const ESRI_ATTRIBUTION =
-  'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
-
-// Basemap CLARO Carto Positron, papel gris minimalista sin API key — ahora capa
-// OPT-IN (toggle en el chrome) para quien prefiera el plano sobrio en vez del satélite.
-const POSITRON_URL = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-const POSITRON_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+// Capas de mapa centralizadas en `mapPresets`: el diario es el PRESET "diario"
+// (satélite Esri a sangre + etiquetas de ciudad superpuestas). El plano claro
+// (Positron) queda como capa OPT-IN del toggle para quien prefiera el papel sobrio.
 
 // Centro/zoom de arranque (el mundo) hasta que fitBounds encuadra los pines.
 const WORLD: L.LatLngExpression = [25, 0]
 const WORLD_ZOOM = 2
 
-// Encuadre de pines — MISMOS valores que el globo (`TripMapGlobe`) para que el
-// mapa se vea igual sea cual sea el motor:
-//  - SINGLE_ZOOM: un solo punto → zoom de ciudad.
-//  - FIT_MAX_ZOOM: techo al encuadrar varios (no acercarse de más con pines juntos).
-//  - FIT_PADDING: margen en px [top, right, bottom, left]; deja hueco al chrome
-//    (arriba) y al carrusel (abajo) sin tapar pines.
-const SINGLE_ZOOM = 11
-const FIT_MAX_ZOOM = 12
+// Encuadre de pines — MISMOS valores que el globo (`TripMapGlobe`), centralizados en
+// `mapPresets`, para que el mapa se vea igual sea cual sea el motor. FIT_PADDING en
+// px deja hueco al chrome (arriba) y al carrusel (abajo) sin tapar pines.
 // Leaflet acepta paddingTopLeft/paddingBottomRight para asimetría.
 const FIT_PAD_TOP_LEFT: L.PointTuple = [48, 88]
 const FIT_PAD_BOTTOM_RIGHT: L.PointTuple = [48, 220]
-// Zoom mínimo al volar a un pin seleccionado: ciudad.
-const SELECT_ZOOM = 11
 
 /**
  * Posición FLOTANTE del momento activo: nunca su coordenada real (spoiler), sino
@@ -214,20 +204,36 @@ export function TripMapLeaflet({
         {satellite ? (
           <TileLayer
             key="esri"
-            attribution={ESRI_ATTRIBUTION}
-            url={ESRI_URL}
-            maxNativeZoom={19}
-            maxZoom={20}
+            attribution={ESRI_SATELLITE.attribution}
+            url={ESRI_SATELLITE.url}
+            maxNativeZoom={ESRI_SATELLITE.maxNativeZoom}
+            maxZoom={ESRI_SATELLITE.maxZoom}
             keepBuffer={6}
             updateWhenZooming={false}
           />
         ) : (
           <TileLayer
             key="positron"
-            attribution={POSITRON_ATTRIBUTION}
-            url={POSITRON_URL}
-            maxNativeZoom={20}
-            maxZoom={20}
+            attribution={CARTO_POSITRON.attribution}
+            url={CARTO_POSITRON.url}
+            maxNativeZoom={CARTO_POSITRON.maxNativeZoom}
+            maxZoom={CARTO_POSITRON.maxZoom}
+            keepBuffer={6}
+            updateWhenZooming={false}
+          />
+        )}
+
+        {/* Etiquetas (nombres de ciudad / fronteras) sobre el satélite: capa de
+            REFERENCIA Esri transparente. Es lo que sitúa los recuerdos (preset
+            "diario"); sobre el plano claro (Positron) NO hace falta, ya trae sus
+            propios topónimos. */}
+        {satellite && (
+          <TileLayer
+            key="esri-labels"
+            attribution={ESRI_REFERENCE_LABELS.attribution}
+            url={ESRI_REFERENCE_LABELS.url}
+            maxNativeZoom={ESRI_REFERENCE_LABELS.maxNativeZoom}
+            maxZoom={ESRI_REFERENCE_LABELS.maxZoom}
             keepBuffer={6}
             updateWhenZooming={false}
           />

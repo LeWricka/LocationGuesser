@@ -8,39 +8,36 @@ import type {
   StyleSpecification,
 } from 'maplibre-gl'
 import type { RoutePoint } from '../../lib/trip'
+import {
+  ESRI_REFERENCE_LABELS,
+  ESRI_SATELLITE,
+  FIT_MAX_ZOOM,
+  SCENE_GLOBE,
+  SELECT_ZOOM,
+  SINGLE_ZOOM,
+} from '../../lib/mapPresets'
 import type { TripMapProps as Props } from './TripMap.types'
 import { HELP_MARKER_SVG, PIN_MARKER_SVG } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapGlobe.module.css'
 
-// Basemap SATÉLITE por defecto (fase "nuevo enfoque"): Esri World Imagery sin API
-// key. El gris claro resultaba soso; el satélite hace el globo "héroe" (atlas vivo,
-// mundo real) y los pines-foto + la ruta en acento (tokens) son el color encima.
-// tileSize 256 es lo que sirve Esri; va en globo.
-const SATELLITE_URL =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-const SATELLITE_ATTRIBUTION =
-  'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+// Basemap SATÉLITE + capa de ETIQUETAS (preset "diario", centralizado en
+// `mapPresets`): Esri World Imagery sin API key con los nombres de ciudad
+// superpuestos. El satélite hace el globo "héroe" (atlas vivo) y las etiquetas
+// sitúan los recuerdos. tileSize 256 es lo que sirve Esri; va en globo.
 
 // Centro/zoom del mundo hasta que fitBounds encuadra los pines (paridad con el plano).
 const WORLD_CENTER: [number, number] = [0, 25]
 const WORLD_ZOOM = 1.4
 
-// Encuadre de pines (compartido con el plano para que globo y fallback coincidan):
-//  - SINGLE_ZOOM: con un solo punto, zoom de CIUDAD (ni continente ni calle).
-//  - FIT_MAX_ZOOM: techo al encuadrar varios; evita acercarse de más si los pines
-//    están muy juntos. Por debajo de él, fitBounds elige el que enmarca todo.
-//  - FIT_PADDING: margen para que los pines no queden bajo el chrome ni el carrusel.
-//    Top mayor (chrome) y bottom mayor (carrusel) que los lados.
-const SINGLE_ZOOM = 11
-const FIT_MAX_ZOOM = 12
+// Encuadre de pines (centralizado en `mapPresets`, compartido con el plano para que
+// globo y fallback coincidan). FIT_PADDING deja hueco al chrome (arriba) y al
+// carrusel (abajo); top y bottom mayores que los lados.
 const FIT_PADDING = { top: 88, bottom: 220, left: 48, right: 48 }
 // Suelo de zoom para que el satélite llene el lienzo (sin esfera flotando en el espacio).
 // ~3.2 cubre el alto de un móvil en retrato con la proyección globo.
 const MIN_FILL_ZOOM = 3.2
-// Zoom mínimo al volar a un pin seleccionado: ciudad, sin re-encuadrar todo.
-const SELECT_ZOOM = 11
 
 // Entrada cinematográfica (Fase 2): arrancamos un punto MÁS lejos que WORLD_ZOOM
 // (vista de globo entero) y "aterrizamos" en el encuadre de la ruta. Duración corta
@@ -116,14 +113,14 @@ function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-// Atmósfera del globo (fase "nuevo enfoque"): con basemap SATÉLITE el azul noche
-// suave vuelve a encajar — el globo terráqueo se lee como una esfera en el espacio,
-// con un cielo oscuro y un halo atmosférico azulado en el borde. Son colores de
-// PAINT de MapLibre (no CSS), así que no pueden ser `var(--token)`; valores próximos
-// al acento pizarra para coherencia de marca.
+// Atmósfera del globo: con basemap SATÉLITE el azul noche encaja — el globo se lee
+// como una esfera en el espacio, con cielo oscuro y halo atmosférico azulado en el
+// borde. Son colores de PAINT de MapLibre (no CSS), así que no pueden ser
+// `var(--token)`; salen de `SCENE_GLOBE` (mapPresets), el único sitio con esos
+// valores de escena para no volver a hardcodear `#0d1722` en un componente.
 const GLOBE_SKY: SkySpecification = {
-  'sky-color': '#0d1722', // cielo: noche profunda (espacio tras el globo)
-  'horizon-color': '#21384e', // horizonte: pizarra profundo que ilumina el borde
+  'sky-color': SCENE_GLOBE.skyColor, // cielo: noche profunda (espacio tras el globo)
+  'horizon-color': SCENE_GLOBE.horizonColor, // horizonte: pizarra que ilumina el borde
   'sky-horizon-blend': 0.6,
   'atmosphere-blend': 0.7, // halo atmosférico marcado sobre el satélite
 }
@@ -148,7 +145,7 @@ function applySky(map: MapLibreMap): void {
     try {
       // Niebla atmosférica azul noche hacia el horizonte (refuerza la curvatura del
       // globo satélite). Opcional: si la versión la ignora o falla, da igual.
-      withSky.setFog({ color: '#152838', 'horizon-blend': 0.2 })
+      withSky.setFog({ color: SCENE_GLOBE.fogColor, 'horizon-blend': 0.2 })
     } catch {
       // No disponible/aceptada: ignorar.
     }
@@ -363,12 +360,23 @@ export function TripMapGlobe({
           // globo da el look "atlas vivo": el mundo real con la ruta y los pines encima.
           map.addSource('basemap', {
             type: 'raster',
-            tiles: [SATELLITE_URL],
+            tiles: [ESRI_SATELLITE.url],
             tileSize: 256,
-            attribution: SATELLITE_ATTRIBUTION,
-            maxzoom: 19,
+            attribution: ESRI_SATELLITE.attribution,
+            maxzoom: ESRI_SATELLITE.maxNativeZoom,
           })
           map.addLayer({ id: 'basemap', type: 'raster', source: 'basemap' })
+          // Etiquetas (nombres de ciudad / fronteras) sobre el satélite: capa de
+          // REFERENCIA Esri transparente (preset "diario"). Sitúa los recuerdos sin
+          // tapar la foto aérea; va ANTES de la ruta/pines para que queden encima.
+          map.addSource('labels', {
+            type: 'raster',
+            tiles: [ESRI_REFERENCE_LABELS.url],
+            tileSize: 256,
+            attribution: ESRI_REFERENCE_LABELS.attribution,
+            maxzoom: ESRI_REFERENCE_LABELS.maxNativeZoom,
+          })
+          map.addLayer({ id: 'labels', type: 'raster', source: 'labels' })
           readyRef.current = true
           repaint()
           // Entrada cinematográfica una sola vez; si no la hace, fitBounds normal.

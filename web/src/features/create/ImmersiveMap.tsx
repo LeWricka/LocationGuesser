@@ -3,14 +3,12 @@ import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-lea
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { LatLng } from '../../lib/geo'
+import { ESRI_REFERENCE_LABELS, ESRI_SATELLITE } from '../../lib/mapPresets'
 import { useReducedMotion } from '../../ui/motion'
 import styles from './CreateChallengeImmersive.module.css'
 
-// Satélite a sangre sin API key (Esri World Imagery), igual que MapPicker.
-const SATELLITE_URL =
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-const SATELLITE_ATTR =
-  'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community'
+// Satélite a sangre + etiquetas (preset "diario", centralizado en `mapPresets`):
+// la foto aérea con los nombres de ciudad para situar dónde marcas el punto.
 
 // Pin que CAE con rebote + halo: divIcon con la misma silueta del SVG de la
 // maqueta. La animación de caída vive en el CSS (`pinDrop`); el halo late.
@@ -79,10 +77,20 @@ export function ImmersiveMap({ value, flyTo, center, zoom, onPick }: Props) {
       className={styles.map}
     >
       <TileLayer
-        attribution={SATELLITE_ATTR}
-        url={SATELLITE_URL}
-        maxNativeZoom={19}
-        maxZoom={20}
+        attribution={ESRI_SATELLITE.attribution}
+        url={ESRI_SATELLITE.url}
+        maxNativeZoom={ESRI_SATELLITE.maxNativeZoom}
+        maxZoom={ESRI_SATELLITE.maxZoom}
+        keepBuffer={6}
+        updateWhenZooming={false}
+      />
+      {/* Etiquetas (nombres de ciudad) sobre el satélite: capa de referencia Esri
+          transparente, para situar el punto sin tapar la foto aérea. */}
+      <TileLayer
+        attribution={ESRI_REFERENCE_LABELS.attribution}
+        url={ESRI_REFERENCE_LABELS.url}
+        maxNativeZoom={ESRI_REFERENCE_LABELS.maxNativeZoom}
+        maxZoom={ESRI_REFERENCE_LABELS.maxZoom}
         keepBuffer={6}
         updateWhenZooming={false}
       />
