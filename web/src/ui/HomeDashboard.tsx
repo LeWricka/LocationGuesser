@@ -68,7 +68,7 @@ function parseDay(iso: string): { y: number; m: number; d: number } | null {
  * "desde 2 jun 2026"). Devuelve null si no hay fechas: la tarjeta omite la línea.
  * Fechas de CALENDARIO (sin hora): se formatean a mano para no depender del huso.
  */
-export function formatTripDates(startsOn?: string | null, endsOn?: string | null): string | null {
+function formatTripDates(startsOn?: string | null, endsOn?: string | null): string | null {
   const start = startsOn ? parseDay(startsOn) : null
   const end = endsOn ? parseDay(endsOn) : null
 
@@ -179,6 +179,7 @@ export function HomeDashboard({
             <TripCard
               key={group.id}
               group={group}
+              className={styles.rise}
               onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
             />
           ))}
@@ -206,7 +207,7 @@ function PinnedCard({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => voi
   const countdown = useCountdown(pinned.deadlineAt)
 
   return (
-    <section className={styles.pinned} aria-labelledby="home-pinned-title">
+    <section className={[styles.pinned, styles.rise].join(' ')} aria-labelledby="home-pinned-title">
       <p className={styles.pinLabel}>
         <Icon icon={Pin} size={13} /> Te toca jugar
       </p>
@@ -260,7 +261,15 @@ function PinnedCard({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => voi
 // Tarjeta-portada de un viaje del feed: la FOTO es la tarjeta. Velo inferior, nombre
 // serif sobre el velo, fechas + estado, corona si es tuyo y mini-cinta de mapa (CSS).
 // Tocar abre el viaje. La foto es decorativa (la etiqueta del botón da el nombre).
-function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }) {
+function TripCard({
+  group,
+  onClick,
+  className,
+}: {
+  group: HomeGroup
+  onClick?: () => void
+  className?: string
+}) {
   const isButton = typeof onClick === 'function'
   const dates = formatTripDates(group.startsOn, group.endsOn)
   const live = !group.closed && (group.status === 'live' || group.status === 'toplay')
@@ -268,7 +277,7 @@ function TripCard({ group, onClick }: { group: HomeGroup; onClick?: () => void }
   return (
     <button
       type="button"
-      className={styles.card}
+      className={[styles.card, className].filter(Boolean).join(' ')}
       onClick={onClick}
       disabled={!isButton}
       aria-label={`Abrir viaje ${group.name}`}

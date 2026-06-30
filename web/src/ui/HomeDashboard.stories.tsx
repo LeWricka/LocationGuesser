@@ -1,30 +1,42 @@
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { HomeDashboard } from './HomeDashboard'
-import type { HomeGroup } from './HomeDashboard'
+import type { HomeGroup, HomePinned } from './HomeDashboard'
 
 const groups: HomeGroup[] = [
-  { id: 'a', name: "Interrail '26", status: 'toplay', owned: true },
-  { id: 'b', name: 'Finde Lisboa', status: 'live' },
-  { id: 'c', name: 'Pirineos', status: 'idle' },
+  {
+    id: 'a',
+    name: 'Japón en primavera',
+    status: 'toplay',
+    owned: true,
+    startsOn: '2026-06-15',
+    endsOn: '2026-06-28',
+  },
+  {
+    id: 'b',
+    name: 'Costa Amalfitana',
+    status: 'live',
+    startsOn: '2026-06-02',
+    endsOn: '2026-06-09',
+  },
+  {
+    id: 'c',
+    name: 'Ruta por los Alpes',
+    status: 'idle',
+    owned: true,
+    closed: true,
+    startsOn: '2026-04-04',
+  },
 ]
 
-// El mapamundi real (HomeWorldMap) vive en features/home y depende de la capa de
-// mapa; en Storybook lo sustituimos por un marcador visual para encuadrar el layout.
-const worldMapPlaceholder = (
-  <div
-    style={{
-      aspectRatio: '1 / 1.18',
-      borderRadius: 'var(--radius-lg)',
-      background: 'var(--ink-900)',
-      display: 'grid',
-      placeItems: 'center',
-      color: '#fff',
-      fontFamily: 'var(--font-serif)',
-    }}
-  >
-    Mapamundi satélite
-  </div>
-)
+// Reto abierto fijado arriba ("Te toca jugar"): foto + cuenta atrás + CTA jugar.
+const pinned: HomePinned = {
+  groupId: 'a',
+  challengeId: 'ch1',
+  title: '¿Dónde tomó Marta esta foto?',
+  groupName: 'Japón en primavera',
+  deadlineAt: new Date(Date.now() + 14 * 60 * 60 * 1000).toISOString(),
+  coverUrl: null,
+}
 
 const meta = {
   title: 'Cuentas/HomeDashboard',
@@ -34,7 +46,7 @@ const meta = {
     userId: 'lewis-123',
     displayName: 'Lewis',
     groups,
-    worldMap: worldMapPlaceholder,
+    pinned,
   },
 } satisfies Meta<typeof HomeDashboard>
 
@@ -43,8 +55,11 @@ type Story = StoryObj<typeof meta>
 
 export const Completa: Story = {}
 
-export const SinMapa: Story = { args: { worldMap: undefined } }
+export const SinRetoFijado: Story = { args: { pinned: null } }
 
 export const UnViaje: Story = {
-  args: { groups: [{ id: 'a', name: "Interrail '26", status: 'live', owned: true }] },
+  args: {
+    pinned: null,
+    groups: [{ id: 'a', name: 'Japón en primavera', status: 'live', owned: true }],
+  },
 }

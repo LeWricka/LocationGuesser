@@ -2,15 +2,6 @@
    estado de error usa el EmptyState del kit. Aquí va solo la cabecera del hero de
    bienvenida (recién llegado, sin grupos). */
 
-/* Home INMERSIVA con viajes: el dashboard es un lienzo a pantalla completa (el globo a
-   sangre + la bandeja flotante). La página se fija al viewport y NO scrollea: el único
-   scroll es el interno de la bandeja desplegada. El globo rompe el padding de .lg-page con
-   su margen negativo, así que aquí solo bloqueamos el desbordamiento y el alto. */
-.immersive {
-  height: 100dvh;
-  overflow: hidden;
-}
-
 /* --- Hero de bienvenida (sin grupos) --- */
 .welcome {
   display: flex;

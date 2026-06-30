@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import type { MyGroup } from '../../lib/membership'
+import type { MyGroup, PendingChallenge } from '../../lib/membership'
 import type { Profile } from '../../lib/database.types'
 
 // --- Mocks de los contratos que consume la home -----------------------------
@@ -17,17 +17,16 @@ vi.mock('../../lib/session-context', () => ({
 }))
 
 const myGroupsMock = vi.fn<(userId: string) => Promise<MyGroup[]>>()
+const pendingChallengesMock = vi.fn<(userId: string) => Promise<PendingChallenge[]>>()
 vi.mock('../../lib/membership', () => ({
   myGroups: (userId: string) => myGroupsMock(userId),
+  pendingChallenges: (userId: string) => pendingChallengesMock(userId),
 }))
 
-// El mapamundi depende de la capa de mapa (MapLibre/Leaflet): lo stubbeamos para
-// aislar la home de la infra de mapa en el test unitario.
-vi.mock('./useWorldTrips', () => ({
-  useWorldTrips: () => ({ trips: [], totalKm: 0, loading: false }),
-}))
-vi.mock('./HomeWorldMap', () => ({
-  HomeWorldMap: () => <div data-testid="world-map" />,
+// Firmado de portadas: la home firma los paths a URL; lo stubbeamos para no tocar
+// Storage en el test unitario (devuelve null → la tarjeta cae al fondo de relleno).
+vi.mock('../../lib/storage', () => ({
+  signedImageUrl: vi.fn().mockResolvedValue(null),
 }))
 
 // supabase: solo un canal de realtime que no hace nada (la home se suscribe).
@@ -51,6 +50,7 @@ beforeEach(() => {
   sessionState.user = { id: 'u1' }
   sessionState.profile = { display_name: 'Lewis', avatar_url: null }
   myGroupsMock.mockResolvedValue([])
+  pendingChallengesMock.mockResolvedValue([])
 })
 
 describe('HomePage', () => {
@@ -68,7 +68,7 @@ describe('HomePage', () => {
     expect(screen.getByRole('button', { name: 'Unirme con un código' })).toBeInTheDocument()
   })
 
-  test('con grupos → dashboard de recuerdos con el viaje y el mapamundi', async () => {
+  test('con grupos → feed de portadas con el viaje, sin montar mapamundi', async () => {
     myGroupsMock.mockResolvedValue([
       {
         id: 'g1',
@@ -77,16 +77,21 @@ describe('HomePage', () => {
         isOwner: true,
         status: 'your-turn',
         createdAt: '2026-06-01T00:00:00Z',
+        closed: false,
+        startsOn: null,
+        endsOn: null,
+        coverImagePath: null,
       },
     ])
 
     render(<HomePage />)
 
-    // El viaje aparece como tarjeta (su botón abre el viaje) y el mapamundi se monta.
+    // El viaje aparece como tarjeta-portada (su botón abre el viaje).
     await waitFor(() =>
       expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument(),
     )
-    expect(screen.getByTestId('world-map')).toBeInTheDocument()
+    // La home B NO monta el mapamundi (no hay capa de mapa de héroe).
+    expect(screen.queryByTestId('world-map')).not.toBeInTheDocument()
     // SIN "cómo funciona" para el usuario recurrente (relato nuevo).
     expect(screen.queryByText('Cómo funciona')).not.toBeInTheDocument()
   })
