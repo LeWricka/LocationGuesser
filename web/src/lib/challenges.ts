@@ -21,8 +21,12 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // todos los lectores: jugar, lista del grupo, home y el RETURNING de crear/editar.
 // `score_scale` (0028) NO es spoiler (no revela la ubicación): es la precisión del
 // reto. Se sirve para que la previsualización/score local coincida con el servidor.
+// `challenge_kind` y los `number_*` (0029) tampoco son spoiler: describen el TIPO y la
+// PREGUNTA del reto de número (no la cifra). Se sirven al jugar para montar la mecánica.
+// La respuesta del número (`answer_number`) NO está aquí (vive oculta en
+// challenge_answers); `answer_number_src` tampoco (privilegio de columna revocado, 0029).
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, created_by, created_at'
+  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -296,7 +300,16 @@ export async function getAnswers(challengeIds: string[]): Promise<Map<string, La
     .select('challenge_id, lat, lng')
     .in('challenge_id', challengeIds)
   if (error) throw error
-  return new Map((data ?? []).map((a) => [a.challenge_id, { lat: a.lat, lng: a.lng }]))
+  // Solo respuestas de LUGAR (lat/lng presentes). Las de NÚMERO (0029) tienen lat/lng
+  // null y no aportan pin en el mapa: se filtran. El estrechado de tipo deja LatLng.
+  return new Map(
+    (data ?? [])
+      .filter(
+        (a): a is { challenge_id: string; lat: number; lng: number } =>
+          a.lat != null && a.lng != null,
+      )
+      .map((a) => [a.challenge_id, { lat: a.lat, lng: a.lng }]),
+  )
 }
 
 /**
@@ -313,7 +326,8 @@ export async function getAnswer(challengeId: string): Promise<LatLng | null> {
     .eq('challenge_id', challengeId)
     .maybeSingle()
   if (error) throw error
-  return data ? { lat: data.lat, lng: data.lng } : null
+  // Solo respuesta de LUGAR: una de NÚMERO (0029) tiene lat/lng null → sin pin.
+  return data && data.lat != null && data.lng != null ? { lat: data.lat, lng: data.lng } : null
 }
 
 /**

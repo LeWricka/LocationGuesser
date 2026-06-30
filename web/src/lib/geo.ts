@@ -45,6 +45,43 @@ export function scoreFor(km: number, scale: ScoreScale = DEFAULT_SCORE_SCALE): n
   return Math.max(0, Math.round(5000 * Math.exp(-km / decay)))
 }
 
+/**
+ * TOLERANCIA del reto de NÚMERO ("¿Cuánto?"): calibra cómo de estricto es el conteo
+ * del error de la cifra. Elige la "constante de caída" k de 5000·e^(−error_relativo/k).
+ * A menor k, la puntuación cae más rápido con el error (más estricto). Coincide 1:1
+ * con `challenges.number_tolerance` (BD) y con el CASE de la RPC `submit_number_vote`
+ * (migración 0029): hay que cambiar ambos a la vez.
+ */
+export type NumberTolerance = 'indulgente' | 'normal' | 'estricto'
+
+/** Constante de caída k por tolerancia. Debe replicar el CASE de submit_number_vote. */
+export const NUMBER_DECAY_K: Record<NumberTolerance, number> = {
+  indulgente: 0.5, // un error grande aún puntúa bastante
+  normal: 0.25, // equilibrado (default)
+  estricto: 0.1, // casi hay que clavar la cifra
+}
+
+/** Tolerancia por defecto: 'normal'. */
+export const DEFAULT_NUMBER_TOLERANCE: NumberTolerance = 'normal'
+
+/**
+ * Puntos del reto de NÚMERO a partir del error absoluto y la respuesta correcta.
+ * Replica EXACTO la RPC `submit_number_vote` (0029): el error se normaliza por la
+ * magnitud de la respuesta (error RELATIVO; ε=1 evita dividir por 0 si la respuesta
+ * es 0), así el scoring es invariante de escala (50 y 50.000 con el mismo % de error
+ * → mismos puntos). Fórmula: 5000·e^(−(absError/max(|answer|,1))/k). Para lectura
+ * local/tests; la autoridad de la puntuación es la RPC.
+ */
+export function scoreForNumber(
+  absError: number,
+  answer: number,
+  tolerance: NumberTolerance = DEFAULT_NUMBER_TOLERANCE,
+): number {
+  const k = NUMBER_DECAY_K[tolerance]
+  const relError = absError / Math.max(Math.abs(answer), 1)
+  return Math.max(0, Math.round(5000 * Math.exp(-relError / k)))
+}
+
 /** Formatea una distancia en km a texto legible (m / km). */
 export function fmtDist(km: number): string {
   if (km < 1) return `${Math.round(km * 1000)} m`

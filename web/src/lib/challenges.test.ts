@@ -95,6 +95,11 @@ const sampleChallenge: Challenge = {
   sv_lock_move: false,
   sv_lock_rotate: false,
   score_scale: 'mundo',
+  challenge_kind: 'location',
+  number_question: null,
+  number_unit: null,
+  number_decimals: 0,
+  number_tolerance: 'normal',
   created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
 }
