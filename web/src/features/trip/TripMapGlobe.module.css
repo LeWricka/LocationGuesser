@@ -4,8 +4,8 @@
  * cargan los tiles satélite (mismo criterio que el mapa plano: nada de flash gris).
  *
  * Los pines son HTML markers de MapLibre y reusan las clases GLOBALES `lg-trip-pin*`
- * que define el módulo del mapa plano (`TripMapLeaflet.module.css`, vía :global).
- * Por eso aquí no se redeclaran: el look del pin es ÚNICO y compartido.
+ * que define `tripPins.css`, compartido con el mapa plano. Por eso aquí no se
+ * redeclaran: el look del pin es ÚNICO y compartido entre motores.
  */
 .map {
   width: 100%;
@@ -13,4 +13,24 @@
   /* Fondo NOCHE mientras cargan los tiles satélite: que el flash inicial case con
    * el cielo oscuro del globo (GLOBE_SKY), no un papel claro. Tinta de marca. */
   background: var(--ink-900);
+}
+
+/* Atribución de Esri DISCRETA sobre el globo oscuro: obligatoria pero colapsada en
+   el botón "ⓘ" nativo de MapLibre (`attributionControl: { compact: true }`), aquí
+   solo translúcida y pequeña para que no sea una banda a sangre. Su DOM lo inyecta
+   MapLibre fuera de React → `:global` (no se puede acotar al module; el globo de
+   viaje y el del home comparten el mismo look discreto). */
+:global(.maplibregl-ctrl-attrib) {
+  background: rgba(8, 12, 18, 0.35);
+  border-radius: var(--radius-sm);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+:global(.maplibregl-ctrl-attrib),
+:global(.maplibregl-ctrl-attrib a) {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 9px;
+}
+:global(.maplibregl-ctrl-attrib-button) {
+  background-color: rgba(8, 12, 18, 0.4);
 }

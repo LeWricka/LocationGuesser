@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet'
+import {
+  AttributionControl,
+  MapContainer,
+  Marker,
+  Polyline,
+  TileLayer,
+  useMap,
+} from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Layers } from 'lucide-react'
@@ -14,7 +21,7 @@ import {
   SINGLE_ZOOM,
 } from '../../lib/mapPresets'
 import type { TripMapProps as Props } from './TripMap.types'
-import { HELP_MARKER_SVG, PIN_MARKER_SVG } from './pinMarkers'
+import { activePinHtml, photoPinHtml, PIN_SIZE, PIN_TAIL } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapLeaflet.module.css'
@@ -46,31 +53,30 @@ function floatingActivePos(route: RoutePoint[]): L.LatLngExpression {
   return [lat, lng]
 }
 
-// Pin-foto de un momento CERRADO: miniatura redonda con anillo blanco, clavada en
-// su lat/lng. Sin foto → disco con el pin lucide (MapPin). El color del anillo va
-// inline para que el token gobierne sin hardcodear (el module fija el resto).
-function closedPinIcon(point: RoutePoint): L.DivIcon {
-  const ring = 'var(--pin-ring-closed)'
-  const inner = point.imageUrl
-    ? `background-image:url('${point.imageUrl.replace(/'/g, "\\'")}')`
-    : ''
-  const klass = point.imageUrl ? 'lg-trip-pin' : 'lg-trip-pin lg-trip-pin--icon'
-  const body = point.imageUrl ? '' : PIN_MARKER_SVG
+// Ancla del divIcon en la PUNTA del pin (centro-x, base): el círculo va arriba y la
+// puntita apunta al lugar. El alto incluye el tallo bajo el círculo (PIN_TAIL).
+const PIN_ICON_SIZE: L.PointTuple = [PIN_SIZE, PIN_SIZE + PIN_TAIL]
+const PIN_ICON_ANCHOR: L.PointTuple = [PIN_SIZE / 2, PIN_SIZE + PIN_TAIL]
+
+// Pin-foto de un momento CERRADO (estilo Polarsteps): miniatura redonda con borde
+// blanco y puntita, clavada en su lat/lng. Sin foto → disco de acento con la inicial
+// del lugar (nunca un anillo vacío). El seleccionado lleva aro dorado (`featured`).
+function closedPinIcon(point: RoutePoint, featured: boolean): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: `<div class="${klass}" style="border-color:${ring};${inner}">${body}</div>`,
-    iconSize: [52, 52],
-    iconAnchor: [26, 26],
+    html: photoPinHtml({ imageUrl: point.imageUrl, title: point.title, featured }),
+    iconSize: PIN_ICON_SIZE,
+    iconAnchor: PIN_ICON_ANCHOR,
   })
 }
 
-// Pin del momento ACTIVO: anillo cálido pulsante + icono "?" (no clavado en su sitio).
+// Pin del momento ACTIVO: disco rojo pulsante + icono "?" (no clavado en su sitio).
 function activePinIcon(): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: `<div class="lg-trip-pin lg-trip-pin--icon lg-trip-pin--active">${HELP_MARKER_SVG}</div>`,
-    iconSize: [52, 52],
-    iconAnchor: [26, 26],
+    html: activePinHtml(),
+    iconSize: PIN_ICON_SIZE,
+    iconAnchor: PIN_ICON_ANCHOR,
   })
 }
 
@@ -198,7 +204,19 @@ export function TripMapLeaflet({
 
   return (
     <div className={styles.wrap}>
-      <MapContainer center={WORLD} zoom={WORLD_ZOOM} className={styles.map} worldCopyJump>
+      <MapContainer
+        center={WORLD}
+        zoom={WORLD_ZOOM}
+        className={styles.map}
+        worldCopyJump
+        attributionControl={false}
+      >
+        {/* Atribución (obligatoria) COLAPSADA: un botón "ⓘ" discreto en la esquina
+            que despliega los créditos al pasar/tocar; nada de banda de texto a
+            sangre. El glifo "ⓘ" es el prefix; el CSS oculta los créditos en reposo
+            y los revela en hover/focus (`.wrap :global(.leaflet-control-attribution)`). */}
+        <AttributionControl position="bottomright" prefix="ⓘ" />
+
         {/* Capa de fondo según el modo. `key` fuerza el remonte del TileLayer al
             alternar para que Leaflet cambie de juego de tiles sin estados raros. */}
         {satellite ? (
@@ -266,7 +284,7 @@ export function TripMapLeaflet({
           <Marker
             key={p.challengeId}
             position={[p.lat, p.lng]}
-            icon={closedPinIcon(p)}
+            icon={closedPinIcon(p, p.challengeId === selectedChallengeId)}
             eventHandlers={{ click: () => onSelectMoment(p.challengeId) }}
           />
         ))}

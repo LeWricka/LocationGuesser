@@ -1,14 +1,20 @@
 /*
- * Pin-foto del mapa de Viaje — look ÚNICO compartido por los dos motores de mapa
- * (globo MapLibre y fallback plano Leaflet). Lo importan ambos componentes para
- * que la miniatura redonda + anillo + pulso sean idénticos sea cual sea el motor.
+ * Pin-foto del mapa — look ÚNICO compartido por los motores de mapa (globo MapLibre,
+ * fallback plano Leaflet) y reutilizado por el globo de la home. Clases globales a
+ * propósito: en Leaflet los `divIcon` y en MapLibre los HTML markers se inyectan
+ * FUERA del árbol de React, así que un CSS module local no los alcanzaría. El color
+ * del borde lo gobiernan los tokens, nunca hardcodeado.
  *
- * Clases globales a propósito: en Leaflet los `divIcon` se inyectan FUERA del árbol
- * de React y en MapLibre los HTML markers también; las clases CSS-module locales no
- * los alcanzarían. El color del anillo lo gobiernan los tokens, nunca hardcodeado.
+ * Hay DOS estructuras de pin que conviven sobre la misma clase base `.lg-trip-pin`:
+ *  1) NUEVA (mapa de Viaje, estilo Polarsteps): `.lg-trip-pin > .lg-trip-pin__disc`.
+ *     El disco lleva la miniatura/borde y el contenedor pone la puntita inferior.
+ *  2) PLANA (globo de la home, `lg-home-pin`): la miniatura/borde van directamente
+ *     sobre `.lg-trip-pin` (sin disco hijo). Se conserva por compatibilidad.
+ * Las reglas nuevas se acotan con `:has(.lg-trip-pin__disc)` / `.lg-trip-pin__disc`
+ * para NO afectar a la estructura plana de la home.
  */
 
-/* Pin-foto: miniatura redonda con anillo; el anillo (color) lo fija el estado. */
+/* Base PLANA (compat home): miniatura redonda con anillo; el color lo fija el estado. */
 .lg-trip-pin {
   width: 52px;
   height: 52px;
@@ -16,16 +22,12 @@
   background-size: cover;
   background-position: center;
   background-color: var(--color-surface);
-  /* Sombra de pin (anillo de contacto + caída difusa): clavado físico sobre el
-     mapa, no una mancha plana (token del pase de craft). */
   box-shadow: var(--shadow-pin);
   cursor: pointer;
-  /* Anillo del estado: el cerrado es blanco; el activo lo sobreescribe abajo. */
   border: var(--pin-ring-width) solid var(--pin-ring-closed);
 }
 
-/* Pin sin foto: disco de ACENTO con un emoji claro centrado, para que destaque
-   sobre el basemap claro (un disco blanco con anillo blanco se perdería en el papel). */
+/* Variante PLANA sin foto (compat home): disco de acento con un glifo claro. */
 .lg-trip-pin--icon {
   display: flex;
   align-items: center;
@@ -36,17 +38,85 @@
   color: var(--color-on-accent);
 }
 
-/* Pin del momento ACTIVO: disco rojo (🔴 en juego) con anillo claro + halo que
-   respira (reusa lg-pulse-glow). El rojo lo separa de los pines-foto cerrados y
-   lo ata a la livePill/timeline del chrome. */
-.lg-trip-pin--active {
+/* ── NUEVO pin de Viaje (estilo Polarsteps): círculo + puntita inferior ── */
+
+/* Contenedor: el motor ancla el marcador en la PUNTA (centro-x, base), de modo que
+   el pin apunta al lugar. Como el disco hijo lleva borde/fondo, el contenedor se
+   "desnuda" (sin borde/fondo/sombra propios) y solo aporta caja + puntita + sombra. */
+.lg-trip-pin:has(.lg-trip-pin__disc) {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  border-radius: 0;
+  filter: drop-shadow(0 4px 8px rgba(24, 32, 43, 0.32));
+}
+
+/* Puntita: rombo del color del borde que asoma bajo el disco para clavar el pin. */
+.lg-trip-pin:has(.lg-trip-pin__disc)::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -3px;
+  width: 12px;
+  height: 12px;
+  transform: translateX(-50%) rotate(45deg);
+  background: var(--pin-ring-closed);
+  border-radius: 2px;
+}
+
+/* Disco: la miniatura redonda con el borde de estado. Por encima de la puntita. */
+.lg-trip-pin__disc {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: var(--radius-full, 999px);
+  background-size: cover;
+  background-position: center;
+  background-color: var(--color-surface);
+  border: var(--pin-ring-width) solid var(--pin-ring-closed);
+  /* Anillo de contacto fino sobre el borde: clavado físico, no mancha plana. */
+  box-shadow: inset 0 0 0 0.5px rgba(24, 32, 43, 0.12);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Destacado (seleccionado): aro DORADO en vez de blanco, para que salte sin agrandar. */
+.lg-trip-pin--featured .lg-trip-pin__disc {
+  border-color: var(--medal-gold);
+}
+.lg-trip-pin--featured::after {
+  background: var(--medal-gold);
+}
+
+/* Sin foto: disco de ACENTO con la inicial/glifo en claro (destaca sobre cualquier
+   basemap; un disco blanco con anillo blanco se perdería en el papel claro). */
+.lg-trip-pin--empty .lg-trip-pin__disc {
+  background-color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+.lg-trip-pin__initial {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+/* Momento ACTIVO: disco rojo (en juego) con "?" + halo que respira (lg-pulse-glow).
+   El rojo lo separa de los pines-foto cerrados y lo ata a la livePill del chrome. */
+.lg-trip-pin--active .lg-trip-pin__disc {
   background-color: var(--color-danger);
-  border-color: var(--pin-ring-closed);
+  color: var(--color-on-accent);
   animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lg-trip-pin--active {
+  .lg-trip-pin--active .lg-trip-pin__disc {
     animation: none;
   }
 }

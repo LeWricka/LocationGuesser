@@ -66,3 +66,42 @@
     transform: none;
   }
 }
+
+/* Atribución COLAPSADA (obligatoria pero discreta): en reposo es solo el botón "ⓘ"
+   (el prefix), una pastilla diminuta del chrome; al pasar/tocar despliega los
+   créditos completos. Nada de banda de texto a sangre bajo el mapa. Su DOM lo
+   inyecta Leaflet fuera del scope del module → `:global`, acotado bajo `.wrap` para
+   no tocar otros mapas. La técnica es truncar el ancho a la "ⓘ" y abrirlo en
+   hover/focus (Leaflet pinta prefix + créditos como texto plano, no en spans
+   separables, así que colapsamos el contenedor entero). */
+.wrap :global(.leaflet-control-attribution) {
+  margin: 0 var(--space-2) var(--space-2) 0;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  box-shadow: var(--ring-contact);
+  color: var(--color-text-faint);
+  font-size: 11px;
+  line-height: 1.6;
+  /* En reposo el ancho apenas cubre la "ⓘ"; el resto se trunca (botón discreto). */
+  max-width: 1.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  opacity: 0.85;
+  transition:
+    max-width var(--transition-base),
+    opacity var(--transition-fast);
+}
+
+.wrap :global(.leaflet-control-attribution:hover),
+.wrap :global(.leaflet-control-attribution:focus-within) {
+  max-width: calc(100% - var(--space-4));
+  opacity: 1;
+}
+
+.wrap :global(.leaflet-control-attribution a) {
+  color: var(--color-text-muted);
+}

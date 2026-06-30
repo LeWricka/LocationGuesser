@@ -17,7 +17,7 @@ import {
   SINGLE_ZOOM,
 } from '../../lib/mapPresets'
 import type { TripMapProps as Props } from './TripMap.types'
-import { HELP_MARKER_SVG, PIN_MARKER_SVG } from './pinMarkers'
+import { activePinHtml, photoPinHtml } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapGlobe.module.css'
@@ -73,22 +73,22 @@ function floatingActivePos(route: RoutePoint[]): [number, number] {
   return [lng, lat]
 }
 
-/** Crea el elemento HTML de un pin-foto (cerrado o activo). Reusa las clases del
- * plano (`lg-trip-pin*`) para que el look —miniatura redonda + anillo + pulso— sea
- * idéntico; el color del anillo lo gobiernan los tokens, no se hardcodea. */
-function pinElement(opts: { imageUrl: string | null; active: boolean }): HTMLDivElement {
-  const el = document.createElement('div')
-  if (opts.active) {
-    el.className = 'lg-trip-pin lg-trip-pin--icon lg-trip-pin--active'
-    el.innerHTML = HELP_MARKER_SVG
-  } else if (opts.imageUrl) {
-    el.className = 'lg-trip-pin'
-    el.style.backgroundImage = `url('${opts.imageUrl.replace(/'/g, "\\'")}')`
-  } else {
-    el.className = 'lg-trip-pin lg-trip-pin--icon'
-    el.innerHTML = PIN_MARKER_SVG
-  }
-  return el
+/** Crea el wrapper HTML de un pin-foto (cerrado o activo) para el Marker de MapLibre.
+ * Reusa el markup compartido (`pinMarkers`) y las clases del plano (`lg-trip-pin*`)
+ * para que el look —miniatura redonda + borde + puntita + pulso— sea idéntico en
+ * ambos motores; el color del borde lo gobiernan los tokens, no se hardcodea. */
+function pinElement(opts: {
+  imageUrl: string | null
+  title?: string | null
+  active: boolean
+  featured?: boolean
+}): HTMLDivElement {
+  const wrapper = document.createElement('div')
+  wrapper.innerHTML = opts.active
+    ? activePinHtml()
+    : photoPinHtml({ imageUrl: opts.imageUrl, title: opts.title, featured: opts.featured })
+  // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como elemento del Marker.
+  return wrapper.firstElementChild as HTMLDivElement
 }
 
 /**
@@ -204,11 +204,20 @@ export function TripMapGlobe({
     for (const m of markersRef.current) m.remove()
     markersRef.current = []
 
-    // Pines de cerrados, clavados en su lat/lng real.
+    // Pines de cerrados, clavados en su lat/lng real. `anchor: 'bottom'` ancla la
+    // PUNTA del pin a la coordenada (el círculo queda arriba), igual que el plano.
+    const selected = selectedRef.current
     for (const p of pts) {
-      const el = pinElement({ imageUrl: p.imageUrl, active: false })
+      const el = pinElement({
+        imageUrl: p.imageUrl,
+        title: p.title,
+        active: false,
+        featured: p.challengeId === selected,
+      })
       el.addEventListener('click', () => onSelectRef.current(p.challengeId))
-      markersRef.current.push(new gl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map))
+      markersRef.current.push(
+        new gl.Marker({ element: el, anchor: 'bottom' }).setLngLat([p.lng, p.lat]).addTo(map),
+      )
     }
 
     // Pin del momento activo: FLOTANDO sobre el centroide (nunca su sitio real).
@@ -216,7 +225,9 @@ export function TripMapGlobe({
       const el = pinElement({ imageUrl: null, active: true })
       el.addEventListener('click', () => onSelectRef.current(active.challengeId))
       markersRef.current.push(
-        new gl.Marker({ element: el }).setLngLat(floatingActivePos(pts)).addTo(map),
+        new gl.Marker({ element: el, anchor: 'bottom' })
+          .setLngLat(floatingActivePos(pts))
+          .addTo(map),
       )
     }
 
