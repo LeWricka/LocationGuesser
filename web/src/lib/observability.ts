@@ -2,15 +2,21 @@
 // que `analytics.ts`: el resto del código importa `reportError` desde aquí, nada
 // del SDK directo fuera de esta lib.
 //
+// CARGA DIFERIDA (perf): `@sentry/react` se importaba de forma estática y entraba
+// en el bundle inicial. Ahora se carga con `import()` dinámico tras el montaje
+// (Vite lo separa en su propio chunk) y mientras tanto setUser/reportError se
+// ENCOLAN y se reproducen al cargar. Así la captura de errores sigue intacta sin
+// lastrar el camino crítico de la landing.
+//
 // Idempotente y a prueba de "no inicializado": todo lo público pasa por el guard
-// `enabled`, así llamar a reportError/setUser antes de init (o en tests, o sin
-// DSN) es un no-op seguro en vez de petar.
+// `armed`, así llamar a reportError/setUser antes de cargar (o en tests, o sin
+// DSN) es seguro.
 //
 // El DSN de Sentry es público (va en el cliente, como la publishable key de
 // Supabase y el token de Mixpanel). Sin `VITE_SENTRY_DSN` la observabilidad
 // queda DESACTIVADA (no-op), así la app arranca igual en local sin configurar.
 
-import * as Sentry from '@sentry/react'
+type SentryApi = typeof import('@sentry/react')
 
 const dsn = import.meta.env.VITE_SENTRY_DSN
 
@@ -19,19 +25,28 @@ const dsn = import.meta.env.VITE_SENTRY_DSN
 const disabledByEnv = import.meta.env.VITE_ANALYTICS_DISABLED === 'true'
 const isTest = import.meta.env.MODE === 'test'
 
-// Estado de inicialización: solo arrancamos una vez y solo entonces las funciones
-// públicas hacen algo real.
-let enabled = false
+// `armed` = activa (DSN presente, no test, no desactivada) y hemos pedido cargar
+// el SDK. `sentry` = la API ya cargada e inicializada (null hasta entonces).
+let armed = false
+let sentry: SentryApi | null = null
 
-/**
- * Inicializa Sentry una sola vez (idempotente). No-op si no hay DSN, en tests
- * (MODE === 'test') o si VITE_ANALYTICS_DISABLED === 'true'. Llamar desde
- * main.tsx antes de montar la app.
- */
-export function initObservability(): void {
-  if (enabled) return
-  if (!dsn || isTest || disabledByEnv) return
+// Cola de operaciones pendientes hasta que el SDK cargue (setUser, captura). Se
+// reproducen en orden al estar listo, así no se pierde ningún error temprano.
+const queue: ((s: SentryApi) => void)[] = []
 
+function enqueue(op: (s: SentryApi) => void): void {
+  if (sentry) {
+    op(sentry)
+    return
+  }
+  if (armed) queue.push(op)
+  // Si no está armado (sin DSN / test / desactivado), es un no-op silencioso.
+}
+
+// Carga e inicializa el SDK real una sola vez; al estar listo, vacía la cola.
+async function loadSentry(): Promise<void> {
+  if (sentry) return
+  const Sentry = await import('@sentry/react')
   Sentry.init({
     dsn,
     environment: import.meta.env.MODE,
@@ -40,30 +55,43 @@ export function initObservability(): void {
     // No activamos Session Replay de Sentry: ya tenemos el de Mixpanel. Con la
     // captura de errores basta para el dashboard.
   })
-  enabled = true
+  sentry = Sentry
+  for (const op of queue.splice(0)) op(Sentry)
 }
 
 /**
- * Asocia los errores al usuario autenticado (id estable de Supabase Auth). No-op
- * si la observabilidad no está activa. Engancharlo donde se identifica a Mixpanel.
+ * Activa la observabilidad (idempotente). No-op si no hay DSN, en tests
+ * (MODE === 'test') o si VITE_ANALYTICS_DISABLED === 'true'. Llamar desde
+ * main.tsx: NO carga el SDK de inmediato, lo difiere con `import()` dinámico
+ * para no lastrar el camino crítico. Hasta entonces, setUser/reportError se
+ * encolan (no se pierde nada).
+ */
+export function initObservability(): void {
+  if (armed) return
+  if (!dsn || isTest || disabledByEnv) return
+  armed = true
+  void loadSentry()
+}
+
+/**
+ * Asocia los errores al usuario autenticado (id estable de Supabase Auth). Se
+ * encola si el SDK aún no cargó. No-op si la observabilidad no está activa.
+ * Engancharlo donde se identifica a Mixpanel.
  */
 export function setObservabilityUser(id: string): void {
-  if (!enabled) return
-  Sentry.setUser({ id })
+  enqueue((s) => s.setUser({ id }))
 }
 
-/** Limpia el usuario asociado (logout). No-op si no está activa. */
+/** Limpia el usuario asociado (logout). Se encola si el SDK aún no cargó. No-op si no está activa. */
 export function clearObservabilityUser(): void {
-  if (!enabled) return
-  Sentry.setUser(null)
+  enqueue((s) => s.setUser(null))
 }
 
 /**
- * Captura manual de un error con contexto opcional (área, ids…). No-op si la
- * observabilidad no está activa. Útil en `catch` donde queremos registrar el
- * fallo aunque la UI lo maneje con un toast.
+ * Captura manual de un error con contexto opcional (área, ids…). Se encola si el
+ * SDK aún no cargó. No-op si la observabilidad no está activa. Útil en `catch`
+ * donde queremos registrar el fallo aunque la UI lo maneje con un toast.
  */
 export function reportError(error: unknown, context?: Record<string, unknown>): void {
-  if (!enabled) return
-  Sentry.captureException(error, context ? { extra: context } : undefined)
+  enqueue((s) => s.captureException(error, context ? { extra: context } : undefined))
 }

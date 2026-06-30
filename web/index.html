@@ -24,6 +24,20 @@
       content="Comparte tus viajes de una forma diferente: una foto, y los tuyos adivinan en el mapa dónde es."
     />
 
+    <!-- Pistas de conexión temprana a los terceros del camino crítico: abre el
+         handshake (DNS + TCP + TLS) en paralelo con el parseo del HTML, así la
+         primera petición a cada host llega más rápido.
+         - server.arcgisonline.com → tiles del globo de la home (preconnect).
+         - *.supabase.co → datos/realtime/storage; el proyecto vive en un subdominio
+           concreto, así que preconnect directo a él.
+         - maps.googleapis.com / maps.gstatic.com → SDK de Maps/Street View; solo se
+           usa en jugar/crear/viaje, no en la landing, por eso dns-prefetch (más
+           barato) en vez de preconnect. -->
+    <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
+    <link rel="preconnect" href="https://ykquigyjvgxisgdxryxr.supabase.co" crossorigin />
+    <link rel="dns-prefetch" href="https://maps.googleapis.com" />
+    <link rel="dns-prefetch" href="https://maps.gstatic.com" />
+
     <!-- Precarga del peso de display más usado (Cormorant 500) para que los
          titulares no parpadeen al entrar (font-display: swap cubre el resto). -->
     <link rel="preload" href="/fonts/cormorant-500.woff2" as="font" type="font/woff2" crossorigin />

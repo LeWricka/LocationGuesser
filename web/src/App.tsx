@@ -15,15 +15,8 @@
 //       #admin  → AdminPage (SOLO admin; un no-admin cae a la home)
 //       raíz    → HomePage
 
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Settings } from 'lucide-react'
-import { CreateGroup } from './features/create/CreateGroup'
-import { AddMoment } from './features/create/AddMoment'
-import { CreateChallengeFlow } from './features/create/CreateChallengeFlow'
-import { PlayChallenge } from './features/play/PlayChallenge'
-import { TripPage } from './features/trip/TripPage'
-import { HomePage } from './features/home/HomePage'
-import { AdminPage } from './features/admin'
 import { isAdminEmail } from './lib/admin'
 import {
   Landing,
@@ -36,16 +29,46 @@ import { OnboardingGate, ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
+import { GoogleMapsProvider } from './lib/GoogleMapsProvider'
 import { setNextDestination, takeNextDestination } from './lib/auth'
 import { getGroup } from './lib/groupData'
 import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
 import { Icon, Spinner, Stack, withViewTransition } from './ui'
 import styles from './App.module.css'
 
+// CODE-SPLITTING POR RUTA (perf): las pantallas pesadas (mapas Leaflet/Google,
+// flujos de crear/jugar) se cargan con React.lazy → Vite las separa en chunks que
+// solo se descargan al navegar a ellas. El bundle inicial deja de arrastrar
+// features + Leaflet; la landing (Landing/HomePage, importadas estáticas arriba)
+// solo carga lo suyo. El fallback de <Suspense> es el spinner de arranque.
+const CreateGroup = lazy(() =>
+  import('./features/create/CreateGroup').then((m) => ({ default: m.CreateGroup })),
+)
+const AddMoment = lazy(() =>
+  import('./features/create/AddMoment').then((m) => ({ default: m.AddMoment })),
+)
+const CreateChallengeFlow = lazy(() =>
+  import('./features/create/CreateChallengeFlow').then((m) => ({ default: m.CreateChallengeFlow })),
+)
+const PlayChallenge = lazy(() =>
+  import('./features/play/PlayChallenge').then((m) => ({ default: m.PlayChallenge })),
+)
+const TripPage = lazy(() =>
+  import('./features/trip/TripPage').then((m) => ({ default: m.TripPage })),
+)
+const HomePage = lazy(() =>
+  import('./features/home/HomePage').then((m) => ({ default: m.HomePage })),
+)
+const AdminPage = lazy(() => import('./features/admin').then((m) => ({ default: m.AdminPage })))
+
 function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      {/* Suspense de raíz: mientras un chunk de ruta (lazy) se descarga, pinta el
+          spinner de arranque en vez de dejar la pantalla en blanco. */}
+      <Suspense fallback={<BootScreen />}>
+        <AppRoutes />
+      </Suspense>
     </AuthProvider>
   )
 }
@@ -183,7 +206,9 @@ function LoggedIn({
     return (
       <ReceptorWelcomeGate groupId={route.group} userId={user?.id}>
         <OnboardingGate context="challenge" userId={user?.id}>
-          <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+          <GoogleMapsProvider>
+            <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+          </GoogleMapsProvider>
         </OnboardingGate>
       </ReceptorWelcomeGate>
     )
@@ -197,20 +222,22 @@ function LoggedIn({
     if (route.groupAddMoment) {
       return (
         <OnboardingGate context="add-moment" userId={user?.id}>
-          <AddMoment
-            groupId={groupId}
-            onBack={() => {
-              location.hash = groupHash(groupId)
-            }}
-            onCreated={() => {
-              location.hash = groupHash(groupId)
-            }}
-            // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
-            // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
-            onAddChallenge={(momentId) => {
-              location.hash = addChallengeHash(groupId, momentId)
-            }}
-          />
+          <GoogleMapsProvider>
+            <AddMoment
+              groupId={groupId}
+              onBack={() => {
+                location.hash = groupHash(groupId)
+              }}
+              onCreated={() => {
+                location.hash = groupHash(groupId)
+              }}
+              // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
+              // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
+              onAddChallenge={(momentId) => {
+                location.hash = addChallengeHash(groupId, momentId)
+              }}
+            />
+          </GoogleMapsProvider>
         </OnboardingGate>
       )
     }
@@ -220,17 +247,19 @@ function LoggedIn({
     if (route.groupAddChallenge) {
       return (
         <OnboardingGate context="create-challenge" userId={user?.id}>
-          <CreateChallengeFlow
-            groupId={groupId}
-            // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
-            fromMomentId={route.groupChallengeFrom}
-            onBack={() => {
-              location.hash = groupHash(groupId)
-            }}
-            onCreated={(challenge) => {
-              location.hash = groupHash(groupId, challenge.id)
-            }}
-          />
+          <GoogleMapsProvider>
+            <CreateChallengeFlow
+              groupId={groupId}
+              // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
+              fromMomentId={route.groupChallengeFrom}
+              onBack={() => {
+                location.hash = groupHash(groupId)
+              }}
+              onCreated={(challenge) => {
+                location.hash = groupHash(groupId, challenge.id)
+              }}
+            />
+          </GoogleMapsProvider>
         </OnboardingGate>
       )
     }
@@ -242,26 +271,31 @@ function LoggedIn({
     return (
       <ReceptorWelcomeGate groupId={groupId} userId={user?.id}>
         <OnboardingGate context="group" userId={user?.id}>
-          <TripPage
-            groupId={groupId}
-            // Sección inicial: "Marcador" si el enlace lo pide (legado v=clasico /
-            // v=marcador), si no "Diario".
-            initialSection={route.groupView === 'marcador' ? 'marcador' : 'diario'}
-            // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
-            onPlayChallenge={(challengeId) => {
-              location.hash = groupHash(groupId, challengeId)
-            }}
-            // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
-            // un momento sin reto por defecto (el reto es una capa opcional con toggle).
-            onAddMoment={() => {
-              location.hash = addMomentHash(groupId)
-            }}
-            // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
-            onAddChallenge={() => {
-              location.hash = addChallengeHash(groupId)
-            }}
-            onBack={() => goHome()}
-          />
+          {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos
+              con Google Maps) y EditChallenge (preview Street View); por eso el
+              viaje necesita el provider de Maps. */}
+          <GoogleMapsProvider>
+            <TripPage
+              groupId={groupId}
+              // Sección inicial: "Marcador" si el enlace lo pide (legado v=clasico /
+              // v=marcador), si no "Diario".
+              initialSection={route.groupView === 'marcador' ? 'marcador' : 'diario'}
+              // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
+              onPlayChallenge={(challengeId) => {
+                location.hash = groupHash(groupId, challengeId)
+              }}
+              // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
+              // un momento sin reto por defecto (el reto es una capa opcional con toggle).
+              onAddMoment={() => {
+                location.hash = addMomentHash(groupId)
+              }}
+              // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
+              onAddChallenge={() => {
+                location.hash = addChallengeHash(groupId)
+              }}
+              onBack={() => goHome()}
+            />
+          </GoogleMapsProvider>
         </OnboardingGate>
       </ReceptorWelcomeGate>
     )

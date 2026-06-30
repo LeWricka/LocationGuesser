@@ -3,11 +3,19 @@
 // fuera de esta lib. El token es público (como la publishable key de Supabase),
 // con fallback embebido para que funcione sin configurar env en local.
 //
+// CARGA DIFERIDA (perf): `mixpanel-browser` pesa ~413 KB y antes se importaba de
+// forma estática + init síncrono en el arranque, lastrando el camino crítico de
+// la landing. Ahora el SDK se carga con `import()` dinámico (Vite lo separa en su
+// propio chunk) tras `requestIdleCallback`/primera interacción, y mientras tanto
+// `track`/`identify`/`reset` se ENCOLAN y se reproducen al cargar. Así no se
+// pierde ningún evento y el bundle inicial no incluye Mixpanel.
+//
 // Idempotente y a prueba de "no inicializado": todo lo público pasa por el guard
-// `enabled`, así llamar a track/identify antes de init (o en tests) es un no-op
-// seguro en vez de petar.
+// `armed`, así llamar a track/identify antes de cargar (o en tests) es seguro.
 
-import mixpanel from 'mixpanel-browser'
+// Tipo mínimo del SDK que usamos (el módulo real se carga perezosamente). Evita
+// arrastrar `mixpanel-browser` al grafo estático del bundle.
+type MixpanelClient = typeof import('mixpanel-browser').default
 
 // Token público de Mixpanel (proyecto EU). Va en el bundle del cliente por
 // diseño; el env permite sobreescribirlo por entorno sin tocar código.
@@ -20,9 +28,24 @@ const token = import.meta.env.VITE_MIXPANEL_TOKEN ?? FALLBACK_TOKEN
 const disabledByEnv = import.meta.env.VITE_ANALYTICS_DISABLED === 'true'
 const isTest = import.meta.env.MODE === 'test'
 
-// Estado de inicialización: solo arrancamos una vez y solo entonces `track` etc.
-// hacen algo real.
-let enabled = false
+// `armed` = la analítica está activa (token presente, no test, no desactivada) y
+// hemos pedido cargar el SDK. `mp` = la instancia ya cargada e inicializada (null
+// hasta entonces). Mientras `armed && !mp`, las llamadas se encolan.
+let armed = false
+let mp: MixpanelClient | null = null
+
+// Cola de operaciones pendientes hasta que el SDK cargue. Se reproducen en orden
+// al estar listo, así no se pierde ningún evento emitido durante el arranque.
+const queue: ((m: MixpanelClient) => void)[] = []
+
+function enqueue(op: (m: MixpanelClient) => void): void {
+  if (mp) {
+    op(mp)
+    return
+  }
+  if (armed) queue.push(op)
+  // Si no está armado (sin token / test / desactivado), es un no-op silencioso.
+}
 
 // ── Catálogo de eventos ──────────────────────────────────────────────────────
 // Nombres en snake_case. Tipar la unión obliga a usar nombres válidos en todo el
@@ -99,15 +122,20 @@ export interface AnalyticsIdentity {
   avatar?: string | null
 }
 
-/**
- * Inicializa Mixpanel una sola vez (idempotente). No-op si no hay token, en
- * tests (MODE === 'test') o si VITE_ANALYTICS_DISABLED === 'true'. Llamar desde
- * main.tsx antes de montar la app.
- */
-export function initAnalytics(): void {
-  if (enabled) return
-  if (!token || isTest || disabledByEnv) return
+// Programa una callback para cuando el navegador esté ocioso, con respaldo en
+// setTimeout (Safari no soporta requestIdleCallback). Sacamos la carga del SDK
+// del camino crítico del arranque.
+function whenIdle(cb: () => void): void {
+  const ric = (window as typeof window & { requestIdleCallback?: (cb: () => void) => void })
+    .requestIdleCallback
+  if (typeof ric === 'function') ric(cb)
+  else setTimeout(cb, 1)
+}
 
+// Carga e inicializa el SDK real una sola vez; al estar listo, vacía la cola.
+async function loadMixpanel(): Promise<void> {
+  if (mp) return
+  const mixpanel = (await import('mixpanel-browser')).default
   mixpanel.init(token, {
     api_host: 'https://api-eu.mixpanel.com',
     autocapture: true,
@@ -120,35 +148,51 @@ export function initAnalytics(): void {
     record_mask_text_selector: 'input[type=email], input[type=password], [data-sensitive]',
     record_block_selector: '',
   })
-  enabled = true
+  mp = mixpanel
+  // Reproduce, en orden, todo lo que se encoló mientras cargaba.
+  for (const op of queue.splice(0)) op(mixpanel)
 }
 
 /**
- * Registra un evento del producto. Tipado: solo nombres del catálogo. No-op si
- * la analítica no está activa (no inicializada, tests o desactivada).
+ * Activa la analítica (idempotente). No-op si no hay token, en tests
+ * (MODE === 'test') o si VITE_ANALYTICS_DISABLED === 'true'. Llamar desde
+ * main.tsx en el arranque: NO carga el SDK de inmediato, lo difiere a
+ * `requestIdleCallback` (fallback setTimeout) para no lastrar el camino crítico.
+ * Hasta entonces, track/identify/reset se encolan (no se pierde nada).
+ */
+export function initAnalytics(): void {
+  if (armed) return
+  if (!token || isTest || disabledByEnv) return
+  armed = true
+  whenIdle(() => void loadMixpanel())
+}
+
+/**
+ * Registra un evento del producto. Tipado: solo nombres del catálogo. Si el SDK
+ * aún no cargó, se encola y se emite al estar listo. No-op si la analítica no
+ * está activa (sin token, tests o desactivada).
  */
 export function track(event: AnalyticsEvent, props?: Record<string, unknown>): void {
-  if (!enabled) return
-  mixpanel.track(event, props)
+  enqueue((m) => m.track(event, props))
 }
 
 /**
  * Asocia los eventos al usuario autenticado y rellena su perfil en Mixpanel.
- * Idempotente: reidentificar con el mismo id no duplica. No-op si la analítica
- * no está activa.
+ * Idempotente: reidentificar con el mismo id no duplica. Se encola si el SDK aún
+ * no cargó. No-op si la analítica no está activa.
  */
 export function identifyUser({ id, email, name, avatar }: AnalyticsIdentity): void {
-  if (!enabled) return
-  mixpanel.identify(id)
-  mixpanel.people.set({
-    $email: email ?? undefined,
-    $name: name ?? undefined,
-    avatar: avatar ?? undefined,
+  enqueue((m) => {
+    m.identify(id)
+    m.people.set({
+      $email: email ?? undefined,
+      $name: name ?? undefined,
+      avatar: avatar ?? undefined,
+    })
   })
 }
 
-/** Desvincula la identidad (logout). No-op si la analítica no está activa. */
+/** Desvincula la identidad (logout). Se encola si el SDK aún no cargó. No-op si la analítica no está activa. */
 export function resetAnalytics(): void {
-  if (!enabled) return
-  mixpanel.reset()
+  enqueue((m) => m.reset())
 }
