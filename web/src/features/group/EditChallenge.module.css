@@ -1,0 +1,16 @@
+/* Editar reto: formulario en hoja de papel (lg-page), con el sistema de diseño.
+   Solo las dos utilidades de texto que el form necesita; el resto del layout lo
+   resuelven Stack/Row/Field y los componentes del UI kit. */
+
+/* Coordenadas y notas auxiliares: texto pequeño, atenuado, cifras tabulares. */
+.coords {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Estado de búsqueda/guardado: en acento, junto a un spinner. */
+.status {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+}
