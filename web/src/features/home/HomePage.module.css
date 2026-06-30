@@ -1,7 +1,9 @@
 /* El dashboard del usuario recurrente lo resuelve HomeDashboard (UI kit, patrón globo +
    hoja) y el estado de error usa el EmptyState del kit. Aquí va solo el chrome del estado
    de bienvenida (recién llegado, sin viajes) compuesto sobre el mismo patrón globo + hoja:
-   la marca del overlay, el FAB "+" y el contenedor del hero dentro de la hoja. */
+   la marca del overlay y el contenedor del hero dentro de la hoja. Sin FAB: el CTA primario
+   "Crear viaje" vive en la hoja, así que el FAB sería redundante (y taparía la 3ª tarjeta
+   de "cómo funciona"). El FAB solo aparece en el dashboard con viajes. */
 
 /* Marca en el overlay sobre el globo: tinta de escena clara. */
 .brand {
@@ -10,43 +12,9 @@
   color: var(--scene-ink);
 }
 
-/* FAB "+" constante (crear viaje), igual que en el dashboard. */
-.fab {
-  width: 56px;
-  height: 56px;
-  border-radius: var(--radius-full);
-  border: none;
-  background: var(--gradient-accent);
-  color: var(--color-on-accent);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  box-shadow: var(--shadow-lg);
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-.fab:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
-}
-.fab:active {
-  transform: scale(0.95);
-}
-.fab:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 3px;
-}
-
 /* Hero de bienvenida dentro de la hoja: columna de lectura centrada. */
 .welcome {
   max-width: 460px;
   margin: 0 auto;
   padding-top: var(--space-2);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .fab {
-    transition: none;
-  }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Plus } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import {
   Card,
   EmptyState,
@@ -193,21 +193,13 @@ export function HomePage() {
       ) : (
         // Recién llegado: mismo patrón globo + hoja. El globo arranca con pines DEMO
         // curados (aún no hay viajes) y la hoja lleva el hero de bienvenida (qué es +
-        // cómo funciona + crear/unirse). El FAB "+" ya está disponible desde el inicio.
+        // cómo funciona + crear/unirse). SIN FAB "+": aquí el CTA primario ya es "Crear
+        // viaje" dentro de la hoja, así que el FAB sería redundante y, peor, tapa la 3ª
+        // tarjeta de "cómo funciona". El FAB vuelve en el dashboard, donde sí aporta.
         <GlobeSheet
           pins={HOME_DEMO_PINS}
           onOpenPin={onCreateGroup}
           sheetLabel="Bienvenida"
-          fab={
-            <button
-              type="button"
-              className={styles.fab}
-              onClick={onCreateGroup}
-              aria-label="Empezar un viaje nuevo"
-            >
-              <Icon icon={Plus} size={26} />
-            </button>
-          }
           overlay={
             <span className={styles.brand}>
               <Logo variant="wordmark" size={20} monochrome />
