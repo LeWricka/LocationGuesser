@@ -16,6 +16,7 @@
 //       raíz    → HomePage
 
 import { useEffect, useState } from 'react'
+import { Settings } from 'lucide-react'
 import { CreateGroup } from './features/create/CreateGroup'
 import { AddMoment } from './features/create/AddMoment'
 import { CreateChallengeImmersive } from './features/create/CreateChallengeImmersive'
@@ -45,7 +46,7 @@ import {
   addMomentHash,
   addChallengeHash,
 } from './lib/route'
-import { Spinner, Stack, withViewTransition } from './ui'
+import { Icon, Spinner, Stack, withViewTransition } from './ui'
 import styles from './App.module.css'
 
 function App() {
@@ -309,7 +310,7 @@ function LoggedIn({
 function AdminLink() {
   return (
     <a className={styles.adminLink} href="#admin" aria-label="Abrir administración">
-      ⚙︎ Admin
+      <Icon icon={Settings} size={18} /> Admin
     </a>
   )
 }

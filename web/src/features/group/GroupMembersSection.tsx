@@ -7,7 +7,8 @@ import {
   type GroupMemberInfo,
 } from '../../lib/membership'
 import { track } from '../../lib/analytics'
-import { Avatar, Badge, Button, Card, Modal, Row, Skeleton, Stack, useToast } from '../../ui'
+import { Crown, Users } from 'lucide-react'
+import { Avatar, Badge, Button, Card, Icon, Modal, Row, Skeleton, Stack, useToast } from '../../ui'
 import styles from './GroupPage.module.css'
 
 interface Props {
@@ -84,7 +85,9 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
       {members === null ? (
         <>
           <Row justify="between" align="center" gap={2}>
-            <h2 className={styles.sectionTitle}>👥 Miembros</h2>
+            <h2 className={styles.sectionTitle}>
+              <Icon icon={Users} size={18} /> Miembros
+            </h2>
             {meId && (
               <button type="button" className={styles.editPrizesBtn} onClick={() => void leave()}>
                 Salir del viaje
@@ -110,7 +113,9 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
               <summary> para no entrar/salir del colapso al pulsarlo. */}
           <details className={styles.membersDetails}>
             <summary className={styles.membersSummary}>
-              <span className={styles.sectionTitle}>👥 Miembros ({members.length})</span>
+              <span className={styles.sectionTitle}>
+                <Icon icon={Users} size={18} /> Miembros ({members.length})
+              </span>
               <span className={styles.membersChevron} aria-hidden="true">
                 ▼
               </span>
@@ -131,7 +136,9 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
                       </span>
                       <Row gap={2} align="center">
                         {m.isOwner ? (
-                          <Badge tone="accent">👑 Dueño</Badge>
+                          <Badge tone="accent">
+                            <Icon icon={Crown} size={14} /> Dueño
+                          </Badge>
                         ) : (
                           <Badge tone="neutral">Miembro</Badge>
                         )}
@@ -165,7 +172,7 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
             className={styles.editPrizesBtn}
             onClick={() => setTransferring(true)}
           >
-            👑 Transferir propiedad
+            <Icon icon={Crown} size={15} /> Transferir propiedad
           </button>
         </Row>
       )}
@@ -230,7 +237,11 @@ function TransferOwnershipModal({
     <Modal
       open
       onClose={busy ? undefined : onClose}
-      title="👑 Transferir propiedad"
+      title={
+        <>
+          <Icon icon={Crown} size={18} /> Transferir propiedad
+        </>
+      }
       footer={
         <Row gap={2} justify="end">
           <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>

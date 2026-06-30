@@ -24,7 +24,8 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
-import { Button, Spinner, useToast } from '../../ui'
+import { AlertTriangle } from 'lucide-react'
+import { Button, Icon, Spinner, useToast } from '../../ui'
 import styles from './CreateChallengeImmersive.module.css'
 
 interface Props {
@@ -647,7 +648,7 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
 
             {!mediaValid && (
               <div className={styles.warning}>
-                <span aria-hidden>⚠️</span>
+                <Icon icon={AlertTriangle} size={18} />
                 <span>
                   Falta la pista: vuelve atrás y añade una foto o un Street View. Sin ninguna no se
                   puede lanzar el reto.

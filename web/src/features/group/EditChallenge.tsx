@@ -8,11 +8,13 @@ import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { uploadImage } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { track } from '../../lib/analytics'
+import { Lock, MapPin, Zap } from 'lucide-react'
 import {
   Badge,
   Button,
   ChallengePhoto,
   Field,
+  Icon,
   Input,
   Row,
   Spinner,
@@ -270,7 +272,9 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
           {() =>
             locationLocked ? (
               <Row gap={2} className={styles.coords}>
-                <Badge tone="neutral">🔒 Ubicación fija</Badge>
+                <Badge tone="neutral">
+                  <Icon icon={Lock} size={14} /> Ubicación fija
+                </Badge>
                 <span>
                   {locationReady ? `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}` : 'Cargando…'}
                 </span>
@@ -279,7 +283,9 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
               <Stack gap={3}>
                 <MapPicker value={point} flyTo={flyTo} center={SPAIN} zoom={5} onPick={pickPoint} />
                 <Row gap={2}>
-                  <Badge tone="accent">📍 Punto marcado</Badge>
+                  <Badge tone="accent">
+                    <Icon icon={MapPin} size={14} /> Punto marcado
+                  </Badge>
                   <span className={styles.coords}>
                     {point.lat.toFixed(5)}, {point.lng.toFixed(5)}
                   </span>
@@ -365,7 +371,9 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
                     {durationIndex === null ? 'Sin cambios' : stop.label}
                   </span>
                   {durationIndex !== null && isExpress && (
-                    <span className={styles.expressPill}>⚡ Express</span>
+                    <span className={styles.expressPill}>
+                      <Icon icon={Zap} size={13} /> Express
+                    </span>
                   )}
                 </Row>
                 <input

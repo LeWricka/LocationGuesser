@@ -82,6 +82,38 @@ export function avatarPinFromProfile(avatarUrl: string | null, userId: string): 
   return avatarPinSvg(emoji, bg)
 }
 
+/**
+ * Pin de la RESPUESTA real (la diana del reto) como data-URI para `icon.url` de
+ * un Marker clásico de Google Maps. Antes era el emoji 🎯 servido como `label`;
+ * ahora es el glifo `Target` de lucide dibujado a mano (mismo trazo y color de
+ * marca que el resto del set de iconos), centrado dentro de un teardrop como el
+ * de los avatares. Autocontenido (sin assets externos ni AdvancedMarker).
+ */
+export function targetPinSvg(): string {
+  const tipX = CX
+  const tipY = PIN_SIZE.height
+  const path =
+    `M ${tipX} ${tipY} ` +
+    `C ${CX - R * 0.55} ${CY + R * 0.9}, ${CX - R} ${CY + R * 0.6}, ${CX - R} ${CY} ` +
+    `A ${R} ${R} 0 1 1 ${CX + R} ${CY} ` +
+    `C ${CX + R} ${CY + R * 0.6}, ${CX + R * 0.55} ${CY + R * 0.9}, ${tipX} ${tipY} Z`
+
+  // El glifo Target: tres círculos concéntricos centrados en la burbuja (CX, CY).
+  const target =
+    `<circle cx="${CX}" cy="${CY}" r="10" fill="none" stroke="#ffffff" stroke-width="2.5"/>` +
+    `<circle cx="${CX}" cy="${CY}" r="6" fill="none" stroke="#ffffff" stroke-width="2.5"/>` +
+    `<circle cx="${CX}" cy="${CY}" r="2" fill="#ffffff"/>`
+
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_SIZE.width}" height="${PIN_SIZE.height}" ` +
+    `viewBox="0 0 ${PIN_SIZE.width} ${PIN_SIZE.height}">` +
+    `<path d="${path}" fill="#b23a36" stroke="#ffffff" stroke-width="2"/>` +
+    target +
+    `</svg>`
+
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
 // Escapa los caracteres XML peligrosos del contenido inyectado (emoji y color).
 function escapeXml(value: string): string {
   return value

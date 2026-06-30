@@ -1,5 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { BackHomeButton, Badge, Card, EmptyState, Row, Skeleton, Stack } from '../../ui'
+import {
+  AlertTriangle,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  FolderOpen,
+  Map as MapIcon,
+  Target,
+  User,
+  Users,
+  Vote,
+} from 'lucide-react'
+import { BackHomeButton, Badge, Card, EmptyState, Icon, Row, Skeleton, Stack } from '../../ui'
 import {
   getAdminAnalytics,
   getAdminGroupChallenges,
@@ -72,7 +84,12 @@ export function AdminPage({ onBack }: Props) {
 
         {error ? (
           <Card>
-            <EmptyState icon="⚠️" tone="danger" title="Algo falló" description={error} />
+            <EmptyState
+              icon={<Icon icon={AlertTriangle} size={32} />}
+              tone="danger"
+              title="Algo falló"
+              description={error}
+            />
           </Card>
         ) : (
           <>
@@ -90,7 +107,9 @@ export function AdminPage({ onBack }: Props) {
 function AnalyticsSection({ analytics }: { analytics: AdminAnalytics | null }) {
   return (
     <section>
-      <h2 className={styles.sectionTitle}>📊 Resumen global</h2>
+      <h2 className={styles.sectionTitle}>
+        <Icon icon={BarChart3} size={18} /> Resumen global
+      </h2>
       {!analytics ? (
         <MetricsSkeleton />
       ) : (
@@ -179,7 +198,9 @@ function MetricsSkeleton() {
 function GroupsSection({ groups }: { groups: AdminGroup[] | null }) {
   return (
     <section>
-      <h2 className={styles.sectionTitle}>🗂️ Grupos</h2>
+      <h2 className={styles.sectionTitle}>
+        <Icon icon={FolderOpen} size={18} /> Grupos
+      </h2>
       {!groups ? (
         <div role="status" aria-label="Cargando grupos">
           <Stack gap={3}>
@@ -197,7 +218,7 @@ function GroupsSection({ groups }: { groups: AdminGroup[] | null }) {
       ) : groups.length === 0 ? (
         <Card>
           <EmptyState
-            icon="🗺️"
+            icon={<Icon icon={MapIcon} size={32} />}
             title="Aún no hay grupos"
             description="Cuando se cree un grupo real, aparecerá aquí."
           />
@@ -262,13 +283,21 @@ function GroupRow({ group }: { group: AdminGroup }) {
         </div>
         <Row gap={2} align="center">
           <span className={styles.counters}>
-            <span title="Miembros">👥 {fmtInt(group.member_count)}</span>
-            <span title="Retos">🎯 {fmtInt(group.challenge_count)}</span>
-            <span title="Votos">🗳️ {fmtInt(group.vote_count)}</span>
-            <span title="Participantes">🙋 {fmtInt(group.participant_count)}</span>
+            <span title="Miembros">
+              <Icon icon={Users} size={14} /> {fmtInt(group.member_count)}
+            </span>
+            <span title="Retos">
+              <Icon icon={Target} size={14} /> {fmtInt(group.challenge_count)}
+            </span>
+            <span title="Votos">
+              <Icon icon={Vote} size={14} /> {fmtInt(group.vote_count)}
+            </span>
+            <span title="Participantes">
+              <Icon icon={User} size={14} /> {fmtInt(group.participant_count)}
+            </span>
           </span>
-          <span className={styles.chevron} aria-hidden="true">
-            {open ? '▲' : '▼'}
+          <span className={styles.chevron}>
+            <Icon icon={open ? ChevronUp : ChevronDown} size={18} />
           </span>
         </Row>
       </button>

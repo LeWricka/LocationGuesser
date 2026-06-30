@@ -1,5 +1,6 @@
 import type { ChangeEvent } from 'react'
-import { Spinner } from '../../ui'
+import { Camera, Repeat, Trash2 } from 'lucide-react'
+import { Icon, Spinner } from '../../ui'
 import styles from './PhotoDropzone.module.css'
 
 interface Props {
@@ -40,7 +41,7 @@ export function PhotoDropzone({ preview, loading = false, onPick, onClear, label
         )}
         <div className={styles.actions}>
           <label className={styles.change}>
-            <span aria-hidden>🔁</span>
+            <Icon icon={Repeat} size={16} />
             <span>Cambiar</span>
             <input
               type="file"
@@ -58,7 +59,7 @@ export function PhotoDropzone({ preview, loading = false, onPick, onClear, label
             disabled={loading}
             aria-label="Quitar foto"
           >
-            <span aria-hidden>🗑️</span>
+            <Icon icon={Trash2} size={18} />
           </button>
         </div>
       </div>
@@ -71,7 +72,7 @@ export function PhotoDropzone({ preview, loading = false, onPick, onClear, label
   return (
     <label className={styles.empty} aria-busy={loading || undefined}>
       <span className={styles.icon} aria-hidden>
-        {loading ? <Spinner size={28} /> : '📷'}
+        {loading ? <Spinner size={28} /> : <Icon icon={Camera} size={28} />}
         {!loading && <span className={styles.plus}>+</span>}
       </span>
       <span className={styles.emptyLabel}>{loading ? 'Leyendo…' : (label ?? 'Añadir foto')}</span>

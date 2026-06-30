@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Spinner, useToast } from '../../ui'
+import { ImageOff, Plus, Star, Trash2 } from 'lucide-react'
+import { Icon, Spinner, useToast } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
 import {
   addMomentImages,
@@ -136,7 +137,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
             <img className={styles.photo} src={initialCoverUrl} alt="" />
           ) : (
             <span className={styles.placeholder} aria-hidden>
-              🏔️
+              <Icon icon={ImageOff} size={40} />
             </span>
           )}
         </div>
@@ -150,7 +151,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
         {images.length === 0 ? (
           <li className={styles.slide}>
             <span className={styles.placeholder} aria-hidden>
-              🏔️
+              <Icon icon={ImageOff} size={40} />
             </span>
           </li>
         ) : (
@@ -167,10 +168,14 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
                 </button>
               ) : (
                 <span className={styles.placeholder} aria-hidden>
-                  🏔️
+                  <Icon icon={ImageOff} size={40} />
                 </span>
               )}
-              {i === 0 && <span className={styles.coverBadge}>★ Portada</span>}
+              {i === 0 && (
+                <span className={styles.coverBadge}>
+                  <Icon icon={Star} size={13} fill="currentColor" /> Portada
+                </span>
+              )}
               {canEdit && (
                 <div className={styles.slideActions}>
                   {i !== 0 && (
@@ -181,7 +186,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
                       onClick={() => void handleCover(img.id)}
                       aria-label="Marcar como portada"
                     >
-                      <span aria-hidden>★</span>
+                      <Icon icon={Star} size={16} />
                     </button>
                   )}
                   <button
@@ -191,7 +196,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
                     onClick={() => void handleRemove(img.id)}
                     aria-label="Quitar foto"
                   >
-                    <span aria-hidden>🗑️</span>
+                    <Icon icon={Trash2} size={16} />
                   </button>
                 </div>
               )}
@@ -212,7 +217,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
       {/* Añadir más fotos (solo dueño). El input acepta selección múltiple. */}
       {canEdit && (
         <label className={styles.addRow} aria-busy={busy || undefined}>
-          {busy ? <Spinner size={16} /> : <span aria-hidden>＋</span>}
+          {busy ? <Spinner size={16} /> : <Icon icon={Plus} size={20} />}
           <span>{busy ? 'Subiendo…' : 'Añadir más fotos'}</span>
           <input
             type="file"

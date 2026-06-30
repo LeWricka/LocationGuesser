@@ -3,9 +3,9 @@ import type { SceneMedium } from '../features/play/sceneMedium'
 // Dificultad de un reto = cuánta información ven los participantes. Es la
 // combinatoria de los dos medios que el play ya soporta (foto y/o Street View):
 //
-//   🟢 Fácil   → foto + Street View  (más pistas: imagen + panorama explorable)
-//   🟡 Medio   → solo Street View    (exploran el panorama, sin foto)
-//   🔴 Difícil → solo foto           (una foto y a ojo, sin explorar)
+//   Fácil   → foto + Street View  (más pistas: imagen + panorama explorable)
+//   Medio   → solo Street View    (exploran el panorama, sin foto)
+//   Difícil → solo foto           (una foto y a ojo, sin explorar)
 //
 // NO hay cambio de modelo de datos: la dificultad se DERIVA de qué medios tiene
 // el reto (sv_pano_id y/o image_path). Esta lib es la fuente de verdad de esa
@@ -13,11 +13,13 @@ import type { SceneMedium } from '../features/play/sceneMedium'
 
 export type Difficulty = 'facil' | 'medio' | 'dificil'
 
-/** Etiqueta de presentación de cada dificultad (emoji + nombre). */
+// Etiqueta de presentación de cada dificultad. Sin emoji de estado: si en algún
+// momento se pinta en la UI, el punto de color (verde/ámbar/rojo) lo aporta un
+// dot por token, no un emoji en el texto.
 export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
-  facil: '🟢 Fácil',
-  medio: '🟡 Medio',
-  dificil: '🔴 Difícil',
+  facil: 'Fácil',
+  medio: 'Medio',
+  dificil: 'Difícil',
 }
 
 /** Frase de qué verán los participantes en cada dificultad. */

@@ -1,7 +1,9 @@
 import type { FormEvent } from 'react'
+import { Hand } from 'lucide-react'
 import { AuthScreen } from './AuthScreen'
 import { Button } from './Button'
 import { Field } from './Field'
+import { Icon } from './Icon'
 import { Input } from './Input'
 import { Stack } from './Stack'
 
@@ -35,7 +37,7 @@ export function ProfileStep({
   return (
     <AuthScreen
       className={className}
-      icon="👋"
+      icon={<Icon icon={Hand} size={40} />}
       title="¿Con qué nombre juegas?"
       subtitle="Así te verán tus amigos en los rankings. Puedes cambiarlo luego."
     >

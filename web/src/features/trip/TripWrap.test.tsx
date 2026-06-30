@@ -90,7 +90,7 @@ describe('TripWrap', () => {
       entry({ userId: 'u2', name: 'Beto', points: 200 }),
       entry({ userId: 'u3', name: 'Caro', points: 100 }),
     ]
-    render(
+    const { container } = render(
       <TripWrap
         tripName="Ruta"
         moments={[moment({})]}
@@ -101,11 +101,12 @@ describe('TripWrap', () => {
         onClose={() => {}}
       />,
     )
-    // El podio (markup compartido) muestra a los tres y la corona del 1º.
+    // El podio (markup compartido) muestra a los tres y la corona del 1º (icono
+    // lucide, ya no emoji: lo localizamos por la clase que añade lucide al SVG).
     expect(screen.getByText('Ana')).toBeInTheDocument()
     expect(screen.getByText('Beto')).toBeInTheDocument()
     expect(screen.getByText('Caro')).toBeInTheDocument()
-    expect(screen.getByText('👑')).toBeInTheDocument()
+    expect(container.querySelector('.lucide-crown')).toBeInTheDocument()
   })
 
   test('el mapa aparece solo si hay ruta', () => {

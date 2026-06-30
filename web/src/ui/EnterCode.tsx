@@ -1,8 +1,10 @@
 import type { ChangeEvent, FormEvent } from 'react'
+import { Mail } from 'lucide-react'
 import { AuthScreen } from './AuthScreen'
 import { BackHomeButton } from './BackHomeButton'
 import { Button } from './Button'
 import { Field } from './Field'
+import { Icon } from './Icon'
 import { Input } from './Input'
 import { Row } from './Row'
 import { Stack } from './Stack'
@@ -61,7 +63,7 @@ export function EnterCode({
   return (
     <AuthScreen
       className={className}
-      icon="📬"
+      icon={<Icon icon={Mail} size={40} />}
       title="Mira tu correo"
       header={onChangeEmail && <BackHomeButton onClick={onChangeEmail} label="Cambiar correo" />}
       subtitle={

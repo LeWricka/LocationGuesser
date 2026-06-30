@@ -9,12 +9,25 @@ import { avatarPinFromProfile, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
 const WORLD: google.maps.LatLngLiteral = { lat: 25, lng: 0 }
 const WORLD_ZOOM = 2
 
-// Los pines son emoji renderizados como `label` del Marker clásico. Usamos el
-// Marker clásico (no AdvancedMarker) a propósito: NO requiere `mapId`, así no
-// hace falta crear nada en Google Cloud. El icono es un PNG transparente de 1px
-// (data URI) para que el glifo por defecto no se vea; el emoji va en el label.
-const TRANSPARENT_PX =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+// El pin de la respuesta es el icono `Target` de lucide (mismo set que el resto
+// de la app, sin el "tell" de prototipo del emoji). Usamos el Marker clásico (no
+// AdvancedMarker) a propósito: NO requiere `mapId`, así no hace falta crear nada
+// en Google Cloud. El glifo va como `icon.url` (data-URI SVG), igual que el pin
+// del propio jugador (avatarPin): así heredan el mismo enfoque y conservan la
+// animación DROP nativa del Marker.
+const ANSWER_PIN_SIZE = 34
+
+// Target de lucide como data-URI SVG. El color sale del token `--accent` en
+// runtime (Google necesita un literal; no hardcodeamos el color en el repo).
+function answerPinUri(color: string): string {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${ANSWER_PIN_SIZE}" height="${ANSWER_PIN_SIZE}" ` +
+    `viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.25" ` +
+    'stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/>' +
+    '<circle cx="12" cy="12" r="2"/></svg>'
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
+}
 
 const respectsMotion = () =>
   typeof window !== 'undefined' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -41,20 +54,14 @@ interface Props {
   meUserId: string
 }
 
-// Icono emoji para el Marker clásico: el emoji va como `label` centrado sobre un
-// icono transparente. `labelOrigin` lo coloca en la "punta" del pin (abajo).
-function emojiIcon(): google.maps.Icon {
+// Icono del pin de la RESPUESTA (lucide Target): centrado en la coordenada exacta
+// del objetivo. El color sale de `--accent` en runtime.
+function answerIcon(): google.maps.Icon {
   return {
-    url: TRANSPARENT_PX,
-    size: new google.maps.Size(30, 30),
-    scaledSize: new google.maps.Size(30, 30),
-    anchor: new google.maps.Point(15, 28),
-    labelOrigin: new google.maps.Point(15, 14),
+    url: answerPinUri(accentColor()),
+    scaledSize: new google.maps.Size(ANSWER_PIN_SIZE, ANSWER_PIN_SIZE),
+    anchor: new google.maps.Point(ANSWER_PIN_SIZE / 2, ANSWER_PIN_SIZE / 2),
   }
-}
-
-function emojiLabel(emoji: string): google.maps.MarkerLabel {
-  return { text: emoji, fontSize: '26px', className: 'lg-pin' }
 }
 
 // Icono del pin del PROPIO jugador: la burbuja de su avatar (teardrop con su
@@ -155,15 +162,7 @@ function AnswerMarker({ answer }: { answer: LatLng }) {
     const t = setTimeout(() => setAnimation(null), 800)
     return () => clearTimeout(t)
   }, [animation])
-  return (
-    <Marker
-      position={answer}
-      icon={emojiIcon()}
-      label={emojiLabel('🎯')}
-      clickable={false}
-      animation={animation}
-    />
-  )
+  return <Marker position={answer} icon={answerIcon()} clickable={false} animation={animation} />
 }
 
 export function PlayMap({ guess, answer, locked, onPick, meAvatar, meUserId }: Props) {

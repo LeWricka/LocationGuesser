@@ -1,4 +1,6 @@
+import { Camera, Heart, Map as MapIcon } from 'lucide-react'
 import { Card } from './Card'
+import { Icon } from './Icon'
 import styles from './HowItWorks.module.css'
 
 interface Props {
@@ -13,17 +15,17 @@ interface Props {
 // icono ya es el guiño visual).
 const STEPS = [
   {
-    icon: '📷',
+    icon: Camera,
     title: 'Comparte un momento',
     body: 'Una foto y/o Street View del sitio donde estuviste.',
   },
   {
-    icon: '🗺️',
+    icon: MapIcon,
     title: 'Lo viven contigo',
     body: 'Los tuyos lo descubren y, de paso, adivinan dónde es.',
   },
   {
-    icon: '💛',
+    icon: Heart,
     title: 'Guardáis el recuerdo',
     body: 'Cada momento queda en el viaje. Gana quien más se acerca.',
   },
@@ -47,8 +49,8 @@ export function HowItWorks({ compact = false, className }: Props) {
         {STEPS.map((step, i) => (
           <li key={step.title} className={styles.item}>
             <Card padding={compact ? 'sm' : 'md'} className={styles.step}>
-              <span className={styles.icon} aria-hidden="true">
-                {step.icon}
+              <span className={styles.icon}>
+                <Icon icon={step.icon} size={28} />
               </span>
               <div className={styles.stepText}>
                 <h3 className={styles.stepTitle}>

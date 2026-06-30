@@ -3,7 +3,18 @@
 // `lib/profile` y `lib/auth`; UI del kit.
 
 import { useState } from 'react'
-import { AuthScreen, Avatar, BackHomeButton, Button, Field, Input, Stack, useToast } from '../../ui'
+import { Check, Wrench } from 'lucide-react'
+import {
+  AuthScreen,
+  Avatar,
+  BackHomeButton,
+  Button,
+  Field,
+  Icon,
+  Input,
+  Stack,
+  useToast,
+} from '../../ui'
 import { upsertProfile } from '../../lib/profile'
 import { signOut } from '../../lib/auth'
 import { PushNotificationsControl } from './PushNotificationsControl'
@@ -114,7 +125,7 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
         <Stack gap={3} align="center">
           {onOpenAdmin && (
             <Button variant="secondary" size="sm" onClick={onOpenAdmin}>
-              🛠️ Vista de administración
+              <Icon icon={Wrench} size={16} /> Vista de administración
             </Button>
           )}
           <Button variant="ghost" size="sm" onClick={handleSignOut}>
@@ -190,7 +201,13 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
           </fieldset>
 
           <Button type="submit" size="lg" fullWidth loading={loading} disabled={uploading}>
-            {saved ? 'Guardado ✓' : 'Guardar'}
+            {saved ? (
+              <>
+                Guardado <Icon icon={Check} size={16} />
+              </>
+            ) : (
+              'Guardar'
+            )}
           </Button>
 
           {/* Avisos del grupo (PWA): control aparte del guardado del perfil. Solo

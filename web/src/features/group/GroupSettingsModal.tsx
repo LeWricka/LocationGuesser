@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { closeGroup, deleteGroup, reopenGroup, updateGroupName } from '../../lib/groupData'
 import { track } from '../../lib/analytics'
-import { Button, Field, Input, Modal, Row, Stack, useToast } from '../../ui'
+import { Flag, LockOpen, Settings } from 'lucide-react'
+import { Button, Field, Icon, Input, Modal, Row, Stack, useToast } from '../../ui'
 import styles from './GroupPage.module.css'
 
 interface Props {
@@ -109,7 +110,11 @@ export function GroupSettingsModal({
     <Modal
       open
       onClose={busy ? undefined : onClose}
-      title="⚙️ Ajustes del viaje"
+      title={
+        <>
+          <Icon icon={Settings} size={18} /> Ajustes del viaje
+        </>
+      }
       footer={
         confirmingDelete ? (
           <Row gap={2} justify="end">
@@ -209,11 +214,11 @@ export function GroupSettingsModal({
                 loading={busy}
                 onClick={() => void reopenSeason()}
               >
-                🔓 Reabrir temporada
+                <Icon icon={LockOpen} size={16} /> Reabrir temporada
               </Button>
             ) : (
               <Button variant="secondary" size="sm" onClick={() => setConfirmingClose(true)}>
-                🏁 Cerrar temporada…
+                <Icon icon={Flag} size={16} /> Cerrar temporada…
               </Button>
             )}
           </div>

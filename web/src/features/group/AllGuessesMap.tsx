@@ -2,16 +2,17 @@
 import { useEffect } from 'react'
 import { Map, Marker, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
-import { avatarPinFromProfile, PIN_SIZE, PIN_ANCHOR, PIN_LABEL_ORIGIN } from '../../lib/avatarPin'
+import {
+  avatarPinFromProfile,
+  targetPinSvg,
+  PIN_SIZE,
+  PIN_ANCHOR,
+  PIN_LABEL_ORIGIN,
+} from '../../lib/avatarPin'
 
 // Vista por defecto (el MUNDO) hasta que fitBounds encuadra los puntos.
 const WORLD: google.maps.LatLngLiteral = { lat: 25, lng: 0 }
 const WORLD_ZOOM = 2
-
-// El pin 🎯 de la respuesta real reusa el patrón del Marker clásico de PlayMap:
-// icono transparente de 1px + emoji como `label` (sin AdvancedMarker → sin mapId).
-const TRANSPARENT_PX =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
 
 export interface GuessMarker extends LatLng {
   userId: string
@@ -25,14 +26,13 @@ interface Props {
   guesses: GuessMarker[]
 }
 
-// Icono 🎯 de la respuesta (emoji centrado sobre el icono transparente).
+// Icono de la respuesta (diana): SVG de lucide Target en un teardrop, como pin
+// autocontenido (mismo tamaño/ancla que los pines de avatar para que encajen).
 function answerIcon(): google.maps.Icon {
   return {
-    url: TRANSPARENT_PX,
-    size: new google.maps.Size(30, 30),
-    scaledSize: new google.maps.Size(30, 30),
-    anchor: new google.maps.Point(15, 28),
-    labelOrigin: new google.maps.Point(15, 14),
+    url: targetPinSvg(),
+    scaledSize: new google.maps.Size(PIN_SIZE.width, PIN_SIZE.height),
+    anchor: new google.maps.Point(PIN_ANCHOR.x, PIN_ANCHOR.y),
   }
 }
 
@@ -49,11 +49,6 @@ function guessIcon(avatar: string | null, userId: string): google.maps.Icon {
 
 function nameLabel(name: string): google.maps.MarkerLabel {
   return { text: name, fontSize: '12px', fontWeight: '600' }
-}
-
-// Label de la respuesta: el emoji 🎯 grande, centrado sobre el icono transparente.
-function answerLabel(): google.maps.MarkerLabel {
-  return { text: '🎯', fontSize: '26px', className: 'lg-pin' }
 }
 
 // Encuadra la respuesta + todos los votos. El bloque del revelado entra con
@@ -90,7 +85,7 @@ function FitToAll({ answer, guesses }: Props) {
 /**
  * Mapa resumen de un reto cerrado (Google Maps, mismo motor que PlayMap): la
  * burbuja de avatar de CADA jugador que votó (con su nombre como label) y la
- * respuesta real 🎯. Encuadra todos los puntos. Sin AdvancedMarker → sin mapId.
+ * respuesta real (diana). Encuadra todos los puntos. Sin AdvancedMarker → sin mapId.
  */
 export function AllGuessesMap({ answer, guesses }: Props) {
   return (
@@ -104,7 +99,7 @@ export function AllGuessesMap({ answer, guesses }: Props) {
       zoomControl
       clickableIcons={false}
     >
-      <Marker position={answer} icon={answerIcon()} label={answerLabel()} clickable={false} />
+      <Marker position={answer} icon={answerIcon()} clickable={false} />
       {guesses.map((g) => (
         <Marker
           key={g.userId}

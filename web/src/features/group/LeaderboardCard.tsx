@@ -1,7 +1,9 @@
 import { forwardRef } from 'react'
 import type { CSSProperties } from 'react'
+import { Gift, MapPin } from 'lucide-react'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
+import { Icon } from '../../ui'
 import { prizeForRow } from './prizes'
 import { Podium, type PodiumClasses } from './Podium'
 import styles from './LeaderboardCard.module.css'
@@ -98,7 +100,7 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
     <div ref={ref} className={styles.card}>
       <div className={styles.brand}>
         <span className={styles.logoMark} aria-hidden="true">
-          📍
+          <Icon icon={MapPin} size={42} />
         </span>
         <div className={styles.brandText}>
           <span className={styles.brandName}>Lugares</span>
@@ -151,7 +153,11 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
                     <div className={styles.mid}>
                       <div className={styles.nameRow}>
                         <span className={styles.name}>{entry.name}</span>
-                        {prize && <span className={styles.prize}>🎁 {prize}</span>}
+                        {prize && (
+                          <span className={styles.prize}>
+                            <Icon icon={Gift} size={20} /> {prize}
+                          </span>
+                        )}
                       </div>
                       <span className={styles.bar} aria-hidden="true">
                         <i className={rankClass} style={{ width: `${width}%` } as CSSProperties} />
@@ -168,7 +174,9 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
 
       {prizesText && (
         <div className={styles.prizesBox}>
-          <span className={styles.prizesLabel}>🎁 En juego</span>
+          <span className={styles.prizesLabel}>
+            <Icon icon={Gift} size={22} /> En juego
+          </span>
           <span className={styles.prizesValue}>{prizesText}</span>
         </div>
       )}
