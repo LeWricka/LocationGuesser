@@ -531,6 +531,35 @@ describe('updateChallenge', () => {
     await updateChallenge('c1', { imagePath: null })
     expect(calls.update).toHaveBeenCalledWith('challenges', { image_path: null })
   })
+
+  test('la ESCENA (Street View) se puede añadir AUNQUE el reto tenga votos', async () => {
+    // Con votos, la ubicación está bloqueada; la escena (sv_*) SÍ se permite porque
+    // no toca lat/lng (no revela ni altera la respuesta ni los puntos).
+    results['votes'] = { error: null, count: 5 }
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await updateChallenge('c1', { scene: { svPanoId: 'NEW_PANO', svHeading: 90, svPitch: -5 } })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      sv_pano_id: 'NEW_PANO',
+      sv_heading: 90,
+      sv_pitch: -5,
+    })
+    // No comprueba votos ni toca lat/lng: la escena no es la respuesta.
+    const patch = calls.update.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(patch).not.toHaveProperty('lat')
+    expect(patch).not.toHaveProperty('lng')
+  })
+
+  test('scene null quita el Street View sin tocar la respuesta', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await updateChallenge('c1', { scene: null })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      sv_pano_id: null,
+      sv_heading: null,
+      sv_pitch: null,
+    })
+    const patch = calls.update.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(patch).not.toHaveProperty('lat')
+  })
 })
 
 describe('updateMoment', () => {

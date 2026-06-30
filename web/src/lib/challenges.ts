@@ -481,6 +481,18 @@ export interface UpdateChallengeInput {
     /** Candado de GIRO del SV (true = bloqueado). Default false (permitido). #187. */
     svLockRotate?: boolean
   }
+  /**
+   * Escena de Street View (panorama + POV), SIN tocar la respuesta (`lat`/`lng`).
+   * A diferencia de `location`, se puede editar SIEMPRE — también con votos — porque
+   * añadir/cambiar/quitar el paseo no revela ni altera la coordenada oculta ni los
+   * puntos ya calculados. `null` quita el Street View del reto. Permite que un reto
+   * solo-foto gane (o pierda) su paseo aunque ya tenga jugadas.
+   */
+  scene?: {
+    svPanoId: string
+    svHeading?: number
+    svPitch?: number
+  } | null
 }
 
 /**
@@ -517,6 +529,13 @@ export async function updateChallenge(
     patch.sv_pitch = input.location.svPitch ?? null
     patch.sv_lock_move = input.location.svLockMove ?? false
     patch.sv_lock_rotate = input.location.svLockRotate ?? false
+  } else if (input.scene !== undefined) {
+    // Escena de Street View SIN tocar lat/lng: no es la respuesta, así que no hay
+    // regla de votos. Como no escribimos lat/lng, el trigger `sync_challenge_answer`
+    // no se dispara y la respuesta oculta queda intacta. `null` quita el paseo.
+    patch.sv_pano_id = input.scene?.svPanoId ?? null
+    patch.sv_heading = input.scene?.svHeading ?? null
+    patch.sv_pitch = input.scene?.svPitch ?? null
   }
 
   const { data, error } = await supabase
