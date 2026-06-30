@@ -203,6 +203,9 @@ export function MomentSheet({
       await updateChallengeDescription(moment.challengeId, description)
       setEditing(false)
       toast.show('Descripción guardada', { tone: 'success' })
+      // Refresca el viaje tras guardar: sin esto, al reabrir el momento se releía
+      // el dato CACHEADO (sin la descripción nueva) y parecía que no se guardaba.
+      onEdited?.()
     } catch (err) {
       toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
