@@ -350,11 +350,19 @@ export function TripMapGlobe({
           // un viaje tiene puntos muy dispersos, fitBounds clampa aquí y centra (raro en
           // un viaje real, casi siempre regional). El intro cinematográfico también clampa.
           minZoom: MIN_FILL_ZOOM,
-          attributionControl: { compact: true },
+          // Desactivamos el control por defecto y lo añadimos instanciado a mano (abajo):
+          // pasarlo como opción-objeto NO entraba en modo compacto fiablemente en prod
+          // (se veía el texto completo de Esri como banda, no el "ⓘ").
+          attributionControl: false,
           // Con reduced-motion no animamos el fade de tiles.
           fadeDuration: prefersReducedMotion() ? 0 : 300,
         })
         mapRef.current = map
+
+        // Atribución COLAPSADA de verdad: instanciar `AttributionControl` con
+        // `compact: true` es la forma documentada y fiable de obtener el "ⓘ" que expande
+        // al tocar (el control sí recibe la clase `maplibregl-compact` que estiliza el CSS).
+        map.addControl(new gl.AttributionControl({ compact: true }), 'bottom-right')
 
         // OJO: NO escuchamos `map.on('error')`. MapLibre lo dispara por fallos
         // transitorios (un tile Esri que da 404), que NO deben tumbar el globo. Solo

@@ -15,16 +15,26 @@
   background: var(--ink-900);
 }
 
-/* Atribución de Esri DISCRETA sobre el globo oscuro: obligatoria pero colapsada en
-   el botón "ⓘ" nativo de MapLibre (`attributionControl: { compact: true }`), aquí
-   solo translúcida y pequeña para que no sea una banda a sangre. Su DOM lo inyecta
-   MapLibre fuera de React → `:global` (no se puede acotar al module; el globo de
-   viaje y el del home comparten el mismo look discreto). */
-:global(.maplibregl-ctrl-attrib) {
+/* Atribución de Esri COLAPSADA y discreta sobre el globo oscuro: obligatoria pero
+   reducida al "ⓘ" nativo de MapLibre. El control se instancia con `compact: true`
+   (`new AttributionControl({ compact: true })`), así que SÍ recibe la clase
+   `maplibregl-compact`; el texto largo de Esri queda oculto por defecto y solo
+   aparece al tocar (clase `maplibregl-compact-show`). Su DOM lo inyecta MapLibre
+   fuera de React → `:global`. */
+:global(.maplibregl-ctrl-attrib.maplibregl-compact) {
+  min-height: 24px;
   background: rgba(8, 12, 18, 0.35);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
+}
+/* Colapsada: el texto se oculta y solo queda el botón "ⓘ". */
+:global(.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner) {
+  display: none;
+}
+/* Abierta (al tocar el "ⓘ"): se muestra el texto, discreto y translúcido. */
+:global(.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner) {
+  display: block;
 }
 :global(.maplibregl-ctrl-attrib),
 :global(.maplibregl-ctrl-attrib a) {
