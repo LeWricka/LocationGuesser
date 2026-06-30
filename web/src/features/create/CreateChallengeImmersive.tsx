@@ -97,11 +97,15 @@ const PRECISION_OPTIONS: { value: ScoreScale; label: string; review: string }[] 
 ]
 const DEFAULT_PRECISION_INDEX = 0 // mundo
 
-// Etapas de la hoja: 0=marcar (baja) · 1=foto · 2=detalles · 3=resumen.
+// Etapas de la hoja: 0=lugar (mapa + Street View) · 1=foto · 2=detalles · 3=resumen.
 type Stage = 0 | 1 | 2 | 3
 const TOTAL_STAGES = 4
-// Alturas (px) de la hoja por etapa: baja al marcar, crece con el contenido.
-const STAGE_HEIGHTS: Record<Stage, number> = { 0: 140, 1: 360, 2: 470, 3: 380 }
+// Alturas (px) de la hoja por etapa: baja al marcar (hoja mínima sobre el mapa) y
+// crece con el contenido. La etapa de lugar crece cuando ya hay punto (aparece el
+// Street View junto a la selección) y más aún con la previa de SV montada.
+const STAGE_HEIGHTS: Record<Stage, number> = { 0: 140, 1: 360, 2: 430, 3: 380 }
+const STAGE0_WITH_POINT = 300
+const STAGE0_WITH_PANO = 520
 
 export function CreateChallengeImmersive({
   groupId,
@@ -127,6 +131,9 @@ export function CreateChallengeImmersive({
     prefill?.point ? 'manual' : null,
   )
   const [flyTo, setFlyTo] = useState<LatLng | null>(prefill?.point ?? null)
+  // El usuario ya exploró el mapa (zoom/arrastre): ocultamos la guía central para
+  // que no se confunda con un pin ya puesto (#388).
+  const [mapInteracted, setMapInteracted] = useState(false)
   const [locating, setLocating] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -309,13 +316,13 @@ export function CreateChallengeImmersive({
     )
   }
 
-  // Gating de avance por etapa (también gobierna el arrastre del asa). En foto
-  // bloqueamos mientras se lee el EXIF; en detalles, mientras una búsqueda de
-  // Street View esté en curso o pendiente de confirmar (no avanzar a medias).
+  // Gating de avance por etapa (también gobierna el arrastre del asa). En lugar
+  // hace falta un punto y no avanzar con una búsqueda de Street View a medias (el
+  // SV vive junto al punto, #388); en foto bloqueamos mientras se lee el EXIF.
   const canAdvanceFromStage: Record<Stage, boolean> = {
-    0: point != null && !locating,
+    0: point != null && !locating && !checkingPano && !svPrompt,
     1: !readingExif,
-    2: !checkingPano && !svPrompt,
+    2: true,
     3: false,
   }
 
@@ -327,25 +334,47 @@ export function CreateChallengeImmersive({
     !svPrompt &&
     !checkingPano
 
+  // Altura de la hoja: la etapa de lugar crece al haber punto (aparece el bloque de
+  // Street View) y más cuando la previa de SV está montada (ocupa alto). El resto de
+  // etapas usan su altura fija.
+  const sheetHeight =
+    stage === 0
+      ? pano
+        ? STAGE0_WITH_PANO
+        : point != null
+          ? STAGE0_WITH_POINT
+          : STAGE_HEIGHTS[0]
+      : STAGE_HEIGHTS[stage]
+
   function goStage(n: Stage) {
     setStage(n)
   }
 
   function advance() {
     // En vez de un botón muerto, explicamos por qué no se avanza (como en foto).
-    if (stage === 1 && !canAdvanceFromStage[1]) {
-      toast.show('Analizando foto…', { tone: 'neutral' })
+    if (stage === 0 && point != null && !canAdvanceFromStage[0]) {
+      toast.show('Buscando Street View…', { tone: 'neutral' })
       return
     }
-    if (stage === 2 && !canAdvanceFromStage[2]) {
-      toast.show('Buscando Street View…', { tone: 'neutral' })
+    if (stage === 1 && !canAdvanceFromStage[1]) {
+      toast.show('Analizando foto…', { tone: 'neutral' })
       return
     }
     if (stage < 3 && canAdvanceFromStage[stage]) goStage((stage + 1) as Stage)
   }
 
+  // Retroceder un paso SIN perder lo introducido (el estado vive en el padre): el
+  // botón "Atrás" y el arrastre del asa hacia abajo comparten esta ruta (#388).
   function retreat() {
     if (stage > 0) goStage((stage - 1) as Stage)
+  }
+
+  // Atrás del topbar: si estamos en un paso intermedio, retrocede uno; solo sale
+  // del flujo desde el primer paso. Así la flecha "<" siempre permite volver a
+  // añadir/ajustar la pista en vez de tirar todo el reto (#388).
+  function topBack() {
+    if (stage > 0) retreat()
+    else onBack()
   }
 
   async function save() {
@@ -446,13 +475,21 @@ export function CreateChallengeImmersive({
   return (
     <div className={styles.root}>
       {/* MAPA SATÉLITE A SANGRE: el protagonista. */}
-      <ImmersiveMap value={point} flyTo={flyTo} center={SPAIN} zoom={5} onPick={pickPoint} />
+      <ImmersiveMap
+        value={point}
+        flyTo={flyTo}
+        center={SPAIN}
+        zoom={5}
+        onPick={pickPoint}
+        onInteract={() => setMapInteracted(true)}
+      />
 
       {/* Viñeta para legibilidad del chrome claro sobre el satélite. */}
       <div className={styles.vignette} aria-hidden />
 
-      {/* Hint "toca el mapa" antes de marcar. */}
-      {point == null && (
+      {/* Guía "toca el mapa" antes de marcar. Desaparece al colocar el punto O al
+          empezar a explorar (zoom/arrastre): no es un pin, es una ayuda (#388). */}
+      {point == null && !mapInteracted && (
         <div className={styles.tapHint} aria-hidden>
           <span className={styles.tapRing}>
             <TargetIcon size={28} />
@@ -471,7 +508,12 @@ export function CreateChallengeImmersive({
 
       {/* Topbar flotante translúcido: atrás · título · mi ubicación. */}
       <div className={styles.top}>
-        <button type="button" className={styles.iconBtn} aria-label="Atrás" onClick={onBack}>
+        <button
+          type="button"
+          className={styles.iconBtn}
+          aria-label={stage > 0 ? 'Volver al paso anterior' : 'Salir'}
+          onClick={topBack}
+        >
           <BackArrow />
         </button>
         <div className={styles.topTitle}>
@@ -493,12 +535,12 @@ export function CreateChallengeImmersive({
       <ImmersiveSheet
         stage={stage}
         total={TOTAL_STAGES}
-        height={STAGE_HEIGHTS[stage]}
+        height={sheetHeight}
         canAdvance={canAdvanceFromStage[stage]}
         onAdvance={advance}
         onRetreat={retreat}
       >
-        {/* ETAPA 0 — marcar (hoja baja). */}
+        {/* ETAPA 0 — lugar: marcar el punto Y, junto a él, el Street View (#388). */}
         {stage === 0 && (
           <section className={styles.stage}>
             <div className={styles.mark}>
@@ -507,9 +549,76 @@ export function CreateChallengeImmersive({
               </span>
               <div className={styles.markTxt}>
                 <b>¿Dónde estás?</b>
-                <span>Toca el mapa para soltar tu pin. Nadie lo verá.</span>
+                <span>
+                  {point == null
+                    ? 'Toca el mapa para soltar tu pin. Nadie lo verá.'
+                    : 'Ajusta el pin si hace falta. Nadie verá tu sitio.'}
+                </span>
               </div>
             </div>
+
+            {/* Street View JUNTO al punto: una vez marcado, se ofrece añadirlo aquí
+                mismo, sin saltar a otro paso (#388). Reutiliza findPanorama / la
+                previa StreetViewPreview; sin foto el SV es la escena (punto exacto),
+                con foto es contexto a ≤50 m que se confirma. */}
+            {point != null && (
+              <>
+                <button
+                  type="button"
+                  className={`${styles.toggleRow} ${wantsStreetView ? styles.toggleOn : ''}`}
+                  aria-pressed={wantsStreetView}
+                  onClick={toggleStreetView}
+                >
+                  <span className={styles.tIco}>
+                    <PanoramaIcon size={20} />
+                  </span>
+                  <span className={styles.tTxt}>
+                    <b>Añadir Street View</b>
+                    <span>Pista extra: pasean por tu calle</span>
+                  </span>
+                  <span className={styles.switch} aria-hidden />
+                </button>
+
+                {checkingPano && (
+                  <div className={styles.statusRow}>
+                    <Spinner size={16} />
+                    <span>Buscando Street View…</span>
+                  </div>
+                )}
+
+                {/* SV cercano a la foto: pedimos confirmar antes de adoptarlo. */}
+                {svPrompt && (
+                  <div className={styles.svPrompt}>
+                    <span>
+                      Encontramos Street View a {svPrompt.distanceMeters} m de tu foto. ¿Lo
+                      añadimos?
+                    </span>
+                    <div className={styles.svPromptActions}>
+                      <Button size="sm" onClick={acceptSv}>
+                        Sí, usarlo
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={rejectSv}>
+                        No, gracias
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {pano && (
+                  <StreetViewPreview
+                    panoId={pano.panoId}
+                    heading={pov.heading}
+                    pitch={pov.pitch}
+                    onPovChange={setPov}
+                  />
+                )}
+
+                <button className={styles.cta} type="button" onClick={advance}>
+                  Siguiente: la foto
+                  <ArrowRight />
+                </button>
+              </>
+            )}
           </section>
         )}
 
@@ -536,10 +645,16 @@ export function CreateChallengeImmersive({
               Quitamos los datos de localización de la foto: no delatan tu sitio.
             </p>
 
-            <button className={styles.cta} type="button" onClick={advance}>
-              Siguiente: los detalles
-              <ArrowRight />
-            </button>
+            <div className={styles.footer}>
+              <button className={styles.back} type="button" onClick={retreat}>
+                <BackArrow />
+                Atrás
+              </button>
+              <button className={styles.cta} type="button" onClick={advance}>
+                Siguiente: los detalles
+                <ArrowRight />
+              </button>
+            </div>
           </section>
         )}
 
@@ -567,56 +682,6 @@ export function CreateChallengeImmersive({
                 onChange={(e) => setTitle(e.target.value)}
               />
             </div>
-
-            <button
-              type="button"
-              className={`${styles.toggleRow} ${wantsStreetView ? styles.toggleOn : ''}`}
-              aria-pressed={wantsStreetView}
-              disabled={!point}
-              onClick={toggleStreetView}
-            >
-              <span className={styles.tIco}>
-                <PanoramaIcon size={20} />
-              </span>
-              <span className={styles.tTxt}>
-                <b>Dejar explorar en Street View</b>
-                <span>Pista extra: pasean por tu calle</span>
-              </span>
-              <span className={styles.switch} aria-hidden />
-            </button>
-
-            {checkingPano && (
-              <div className={styles.statusRow}>
-                <Spinner size={16} />
-                <span>Buscando Street View…</span>
-              </div>
-            )}
-
-            {/* SV cercano a la foto: pedimos confirmar antes de adoptarlo. */}
-            {svPrompt && (
-              <div className={styles.svPrompt}>
-                <span>
-                  Encontramos Street View a {svPrompt.distanceMeters} m de tu foto. ¿Lo añadimos?
-                </span>
-                <div className={styles.svPromptActions}>
-                  <Button size="sm" onClick={acceptSv}>
-                    Sí, usarlo
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={rejectSv}>
-                    No, gracias
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {pano && (
-              <StreetViewPreview
-                panoId={pano.panoId}
-                heading={pov.heading}
-                pitch={pov.pitch}
-                onPovChange={setPov}
-              />
-            )}
 
             <div className={styles.field}>
               <label className={styles.label}>
@@ -676,10 +741,16 @@ export function CreateChallengeImmersive({
               <p className={styles.segHint}>¿Hay que acertar el país, la ciudad o la calle?</p>
             </div>
 
-            <button className={styles.cta} type="button" onClick={advance}>
-              Revisar y lanzar
-              <ArrowRight />
-            </button>
+            <div className={styles.footer}>
+              <button className={styles.back} type="button" onClick={retreat}>
+                <BackArrow />
+                Atrás
+              </button>
+              <button className={styles.cta} type="button" onClick={advance}>
+                Revisar y lanzar
+                <ArrowRight />
+              </button>
+            </div>
           </section>
         )}
 
@@ -735,10 +806,19 @@ export function CreateChallengeImmersive({
             {!mediaValid && (
               <div className={styles.warning}>
                 <Icon icon={AlertTriangle} size={18} />
-                <span>
-                  Falta la pista: vuelve atrás y añade una foto o un Street View. Sin ninguna no se
-                  puede lanzar el reto.
-                </span>
+                <div className={styles.warnBody}>
+                  <span>Falta la pista: un reto necesita al menos una foto o un Street View.</span>
+                  <div className={styles.warnActions}>
+                    {/* Atajos a donde se añade cada pista: la foto vive en el paso 1;
+                        el Street View, junto al punto en el paso de lugar (#388). */}
+                    <button type="button" className={styles.warnBtn} onClick={() => goStage(1)}>
+                      Añadir foto
+                    </button>
+                    <button type="button" className={styles.warnBtn} onClick={() => goStage(0)}>
+                      Añadir Street View
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -758,15 +838,21 @@ export function CreateChallengeImmersive({
               </div>
             )}
 
-            <button
-              className={styles.cta}
-              type="button"
-              disabled={!readyToCreate || busy}
-              onClick={() => void save()}
-            >
-              {busy ? <Spinner size={18} /> : <Rocket />}
-              Lanzar reto al grupo
-            </button>
+            <div className={styles.footer}>
+              <button className={styles.back} type="button" onClick={retreat} disabled={busy}>
+                <BackArrow />
+                Atrás
+              </button>
+              <button
+                className={styles.cta}
+                type="button"
+                disabled={!readyToCreate || busy}
+                onClick={() => void save()}
+              >
+                {busy ? <Spinner size={18} /> : <Rocket />}
+                Lanzar reto al grupo
+              </button>
+            </div>
           </section>
         )}
       </ImmersiveSheet>

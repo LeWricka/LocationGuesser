@@ -34,12 +34,32 @@ interface Props {
   zoom: number
   /** Toca el mapa → marca el punto. */
   onPick: (p: LatLng) => void
+  /**
+   * El usuario empezó a interactuar con el mapa (zoom o arrastre). Sirve para que
+   * el padre oculte la pista "toca el mapa" en cuanto se navega (no es un pin
+   * puesto, sino una guía que estorba al explorar).
+   */
+  onInteract?: () => void
 }
 
-function ClickHandler({ onPick }: { onPick: (p: LatLng) => void }) {
+function ClickHandler({
+  onPick,
+  onInteract,
+}: {
+  onPick: (p: LatLng) => void
+  onInteract?: () => void
+}) {
   useMapEvents({
     click(e) {
       onPick({ lat: e.latlng.lat, lng: e.latlng.lng })
+    },
+    // Cualquier exploración (arrastrar o hacer zoom) cuenta como interacción:
+    // ocultamos la guía central para que no parezca una respuesta ya puesta.
+    dragstart() {
+      onInteract?.()
+    },
+    zoomstart() {
+      onInteract?.()
     },
   })
   return null
@@ -66,7 +86,7 @@ function FlyTo({ flyTo, reduced }: { flyTo: LatLng | null; reduced: boolean }) {
 // punto. Reutiliza el satélite sin key de MapPicker; sin selector de capas (el
 // satélite es el protagonista). Los controles de zoom de Leaflet se ocultan por
 // CSS para no competir con el chrome flotante.
-export function ImmersiveMap({ value, flyTo, center, zoom, onPick }: Props) {
+export function ImmersiveMap({ value, flyTo, center, zoom, onPick, onInteract }: Props) {
   const reduced = useReducedMotion()
   return (
     <MapContainer
@@ -94,7 +114,7 @@ export function ImmersiveMap({ value, flyTo, center, zoom, onPick }: Props) {
         keepBuffer={6}
         updateWhenZooming={false}
       />
-      <ClickHandler onPick={onPick} />
+      <ClickHandler onPick={onPick} onInteract={onInteract} />
       <FlyTo flyTo={flyTo} reduced={reduced} />
       {value && <Marker position={[value.lat, value.lng]} icon={fallingPin} />}
     </MapContainer>
