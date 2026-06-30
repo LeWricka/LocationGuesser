@@ -55,13 +55,21 @@
 }
 
 /* Carrusel horizontal de momentos con scroll-snap (igual patrón que antes). Altura
-   fija de tarjeta: ahora flota, no la dicta el flujo vertical de la página. */
+   fija de tarjeta: ahora flota, no la dicta el flujo vertical de la página.
+   Reserva a la derecha la huella del FAB "＋" (fijo abajo-derecha): su inset
+   (--space-4) + el diámetro del botón (56px) + un respiro (--space-3). Así la tarjeta
+   centrada/última y su acción ("Adivina →", anclada abajo-derecha) no caen bajo el
+   FAB. Se aplica como padding visual (la pista no llega hasta el botón) y como
+   scroll-padding (corre el centro de snap a la izquierda sin mover el FAB, que sigue
+   fijo y accesible). */
 .carousel {
+  --fab-clearance: calc(var(--space-4) + 56px + var(--space-3));
   display: flex;
   gap: var(--space-3);
-  padding: var(--space-1) var(--space-4) 0;
+  padding: var(--space-1) var(--fab-clearance) 0 var(--space-4);
   overflow-x: auto;
   scroll-snap-type: x mandatory;
+  scroll-padding-right: var(--fab-clearance);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   /* deja respirar el swipe horizontal de página que gestiona TripPage en los bordes;
