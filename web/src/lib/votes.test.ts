@@ -8,35 +8,47 @@ const calls = {
   from: vi.fn(),
   select: vi.fn(),
   eq: vi.fn(),
+  in: vi.fn(),
   delete: vi.fn(),
   rpc: vi.fn(),
 }
+// Resultado por tabla: getVotesWithNames consulta `votes` y luego `profiles`, así
+// que distinguimos qué devuelve cada una en una misma prueba (`byTable`). Las demás
+// pruebas usan `result` (resultado único) como antes.
+const byTable: Record<string, { data: unknown; error: unknown }> = {}
 let result: { data: unknown; error: unknown } = { data: null, error: null }
 let rpcResult: { data: unknown; error: unknown } = { data: null, error: null }
 
-const builder = {
-  select: (...args: unknown[]) => {
+function builderFor(table: string) {
+  const resolved = () => byTable[table] ?? result
+  const b: Record<string, unknown> = {}
+  b.select = (...args: unknown[]) => {
     calls.select(...args)
-    return builder
-  },
-  eq: (...args: unknown[]) => {
+    return b
+  }
+  b.eq = (...args: unknown[]) => {
     calls.eq(...args)
-    return builder
-  },
-  delete: (...args: unknown[]) => {
+    return b
+  }
+  b.in = (...args: unknown[]) => {
+    calls.in(...args)
+    return b
+  }
+  b.delete = (...args: unknown[]) => {
     calls.delete(...args)
-    return builder
-  },
-  single: () => Promise.resolve(result),
-  maybeSingle: () => Promise.resolve(result),
-  then: (resolve: (r: typeof result) => unknown) => resolve(result),
+    return b
+  }
+  b.single = () => Promise.resolve(resolved())
+  b.maybeSingle = () => Promise.resolve(resolved())
+  b.then = (resolve: (r: { data: unknown; error: unknown }) => unknown) => resolve(resolved())
+  return b
 }
 
 vi.mock('./supabase', () => ({
   supabase: {
     from: (table: string) => {
       calls.from(table)
-      return builder
+      return builderFor(table)
     },
     rpc: (name: string, args: unknown) => {
       calls.rpc(name, args)
@@ -45,7 +57,14 @@ vi.mock('./supabase', () => ({
   },
 }))
 
-import { submitVote, getExistingVote, getVotes, deleteMyVote } from './votes'
+import {
+  submitVote,
+  submitNumberVote,
+  getExistingVote,
+  getVotes,
+  getVotesWithNames,
+  deleteMyVote,
+} from './votes'
 
 const sampleVote: Vote = {
   id: 'v1',
@@ -67,6 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   result = { data: null, error: null }
   rpcResult = { data: null, error: null }
+  for (const k of Object.keys(byTable)) delete byTable[k]
 })
 
 describe('submitVote', () => {
@@ -147,6 +167,92 @@ describe('submitVote', () => {
     await expect(submitVote({ challengeId: 'c1', guessLat: 0, guessLng: 0 })).rejects.toThrow(
       /no devolvió/,
     )
+  })
+})
+
+describe('submitNumberVote', () => {
+  test('llama a la RPC submit_number_vote con la cifra (no calcula puntos en cliente)', async () => {
+    rpcResult = {
+      data: [{ abs_error: 12.5, rel_error: 0.148, points: 1980, answer_number: 84.5 }],
+      error: null,
+    }
+    const out = await submitNumberVote({ challengeId: 'n1', guess: 72 })
+    expect(calls.rpc).toHaveBeenCalledWith('submit_number_vote', {
+      p_challenge_id: 'n1',
+      p_guess: 72,
+      p_left_app: false,
+      p_elapsed_seconds: null,
+    })
+    expect(out).toEqual({ absError: 12.5, relError: 0.148, points: 1980, answerNumber: 84.5 })
+  })
+
+  test('voto de timeout: manda guess null y no recibe cifra', async () => {
+    rpcResult = {
+      data: [{ abs_error: null, rel_error: null, points: 0, answer_number: null }],
+      error: null,
+    }
+    const out = await submitNumberVote({ challengeId: 'n1', guess: null })
+    expect(calls.rpc).toHaveBeenCalledWith('submit_number_vote', {
+      p_challenge_id: 'n1',
+      p_guess: null,
+      p_left_app: false,
+      p_elapsed_seconds: null,
+    })
+    expect(out).toEqual({ absError: null, relError: null, points: 0, answerNumber: null })
+  })
+
+  test('propaga leftApp y elapsedSeconds a la RPC', async () => {
+    rpcResult = {
+      data: [{ abs_error: 0, rel_error: 0, points: 5000, answer_number: 100 }],
+      error: null,
+    }
+    await submitNumberVote({ challengeId: 'n1', guess: 100, leftApp: true, elapsedSeconds: 9 })
+    expect(calls.rpc).toHaveBeenCalledWith('submit_number_vote', {
+      p_challenge_id: 'n1',
+      p_guess: 100,
+      p_left_app: true,
+      p_elapsed_seconds: 9,
+    })
+  })
+
+  test('propaga el error de la RPC', async () => {
+    rpcResult = { data: null, error: new Error('boom') }
+    await expect(submitNumberVote({ challengeId: 'n1', guess: 1 })).rejects.toThrow('boom')
+  })
+})
+
+describe('getVotesWithNames', () => {
+  test('une votos con display_name/avatar del perfil', async () => {
+    byTable['votes'] = {
+      data: [{ ...sampleVote, user_id: 'u-ana' }],
+      error: null,
+    }
+    byTable['profiles'] = {
+      data: [{ id: 'u-ana', display_name: 'Ana', avatar_url: 'emoji:🦊' }],
+      error: null,
+    }
+    const out = await getVotesWithNames('c1')
+    expect(calls.from).toHaveBeenCalledWith('votes')
+    expect(calls.from).toHaveBeenCalledWith('profiles')
+    expect(calls.in).toHaveBeenCalledWith('id', ['u-ana'])
+    expect(out).toHaveLength(1)
+    expect(out[0].display_name).toBe('Ana')
+    expect(out[0].avatar).toBe('emoji:🦊')
+  })
+
+  test('sin votos no consulta perfiles y devuelve []', async () => {
+    byTable['votes'] = { data: [], error: null }
+    const out = await getVotesWithNames('c1')
+    expect(out).toEqual([])
+    expect(calls.from).not.toHaveBeenCalledWith('profiles')
+  })
+
+  test('perfil ausente cae a guion / sin avatar', async () => {
+    byTable['votes'] = { data: [{ ...sampleVote, user_id: 'u-x' }], error: null }
+    byTable['profiles'] = { data: [], error: null }
+    const out = await getVotesWithNames('c1')
+    expect(out[0].display_name).toBe('—')
+    expect(out[0].avatar).toBeNull()
   })
 })
 

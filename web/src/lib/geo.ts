@@ -88,3 +88,29 @@ export function fmtDist(km: number): string {
   if (km < 100) return `${km.toFixed(1)} km`
   return `${Math.round(km)} km`
 }
+
+/**
+ * Formatea una cifra del reto de NÚMERO ("¿Cuánto?") en formato es-ES (coma
+ * decimal, punto de millares) con los decimales fijos del reto (0–4). La unidad,
+ * si la hay, se añade tras un espacio (p. ej. "84,50 €"). Sin unidad → solo la
+ * cifra. Lo usa el revelado, el marcador y la lectura en vivo de crear.
+ */
+export function fmtNumber(value: number, decimals = 0, unit?: string | null): string {
+  const n = value.toLocaleString('es-ES', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+  return unit ? `${n} ${unit}` : n
+}
+
+/**
+ * Error relativo con signo (porcentaje) frente a la respuesta del reto de número:
+ * positivo si la adivinanza se pasó, negativo si se quedó corta. Para el marcador
+ * ("+42 %", "−15 %"). ε=1 en el divisor evita dividir por 0 (igual que el scoring).
+ */
+export function signedRelErrorPct(guess: number, answer: number): string {
+  const rel = (guess - answer) / Math.max(Math.abs(answer), 1)
+  const pct = Math.round(rel * 100)
+  const sign = pct > 0 ? '+' : pct < 0 ? '−' : ''
+  return `${sign}${Math.abs(pct)} %`
+}

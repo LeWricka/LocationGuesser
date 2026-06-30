@@ -14,6 +14,7 @@ import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { GameScene, type GameSceneData } from './GameScene'
 import { CountdownOverlay } from './CountdownOverlay'
 import { sceneMedium } from './sceneMedium'
+import { PlayNumberChallenge } from './PlayNumberChallenge'
 import { ResultCard } from './ResultCard'
 import { RevealBurst } from './RevealBurst'
 import { remainingSeconds } from './resumeState'
@@ -273,6 +274,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         const c = await getChallenge(challengeId)
         if (cancelled) return
         setChallenge(c)
+
+        // Reto de NÚMERO ("¿Cuánto?"): lo juega PlayNumberChallenge (rama propia, sin
+        // mapa). NO corremos aquí la lógica de lugar (voto previo de lat/lng, etc.); el
+        // componente de número rehace su carga con `preloaded`. El reto de LUGAR sigue
+        // exactamente igual debajo. (#323)
+        if (c.challenge_kind === 'number') return
 
         // ¿Ya votó este usuario? → directo a su resultado (no se re-vota, ni
         // aunque el reto siga en vivo). La identidad es la sesión.
@@ -534,6 +541,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         </Stack>
       </main>
     )
+  }
+
+  // Reto de NÚMERO ("¿Cuánto?"): rama propia (sin mapa). En cuanto se conoce el tipo
+  // lo delegamos en PlayNumberChallenge con el reto ya cargado (preloaded), evitando
+  // un segundo fetch. El reto de LUGAR sigue intacto en todo lo de abajo. (#323)
+  if (challenge && challenge.challenge_kind === 'number') {
+    return <PlayNumberChallenge challengeId={challengeId} groupId={groupId} preloaded={challenge} />
   }
 
   if (phase === 'loading' || !challenge) {

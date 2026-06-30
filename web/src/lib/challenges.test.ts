@@ -64,10 +64,12 @@ vi.mock('./supabase', () => ({
 
 import {
   createChallenge,
+  createNumberChallenge,
   createMoment,
   promoteToChallenge,
   getChallenge,
   getAnswer,
+  getNumberAnswer,
   getAnswers,
   countVotes,
   updateChallenge,
@@ -205,6 +207,91 @@ describe('createChallenge', () => {
       unknown
     >
     expect(insertArg.score_scale).toBe('ciudad')
+  })
+})
+
+describe('createNumberChallenge', () => {
+  const numberChallenge: Challenge = {
+    ...sampleChallenge,
+    id: 'n1',
+    title: 'La porra de la cena',
+    challenge_kind: 'number',
+    number_question: '¿Cuánto creéis que nos costó?',
+    number_unit: '€',
+    number_decimals: 2,
+    number_tolerance: 'estricto',
+    sv_pano_id: null,
+  }
+
+  test('escribe la cifra en answer_number_src (NUNCA en una columna legible) y los number_*', async () => {
+    results['challenges'] = { data: numberChallenge, error: null }
+    const out = await createNumberChallenge({
+      title: 'La porra de la cena',
+      question: '¿Cuánto creéis que nos costó?',
+      answerNumber: 84.5,
+      decimals: 2,
+      unit: '€',
+      tolerance: 'estricto',
+      createdBy: 'u',
+      groupId: 'g1',
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    // La cifra correcta entra por answer_number_src (spoiler, write-only).
+    expect(insertArg.answer_number_src).toBe(84.5)
+    expect(insertArg.challenge_kind).toBe('number')
+    expect(insertArg.number_question).toBe('¿Cuánto creéis que nos costó?')
+    expect(insertArg.number_unit).toBe('€')
+    expect(insertArg.number_decimals).toBe(2)
+    expect(insertArg.number_tolerance).toBe('estricto')
+    // No hay lat/lng en un reto de número (no se setea la respuesta de lugar).
+    expect('lat' in insertArg).toBe(false)
+    expect('lng' in insertArg).toBe(false)
+    // El cliente NO escribe challenge_answers: lo hace el trigger 0029.
+    const wroteAnswer =
+      calls.upsert.mock.calls.some((c) => c[0] === 'challenge_answers') ||
+      calls.insert.mock.calls.some((c) => c[0] === 'challenge_answers')
+    expect(wroteAnswer).toBe(false)
+    // El RETURNING no expone la cifra (CHALLENGE_COLUMNS_NO_ANSWER, sin answer_number_src).
+    const selectArg = calls.select.mock.calls.find((c) => c[0] === 'challenges')?.[1] as string
+    expect(selectArg).not.toMatch(/answer_number/)
+    expect(out.challenge).toEqual(numberChallenge)
+  })
+
+  test('unidad vacía/espacios → null; decimales y tolerancia por defecto', async () => {
+    results['challenges'] = { data: numberChallenge, error: null }
+    await createNumberChallenge({
+      title: 'x',
+      question: '¿Cuántos?',
+      answerNumber: 10,
+      unit: '   ',
+      createdBy: 'u',
+      groupId: 'g1',
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.number_unit).toBeNull()
+    expect(insertArg.number_decimals).toBe(0)
+    expect(insertArg.number_tolerance).toBe('normal')
+  })
+})
+
+describe('getNumberAnswer', () => {
+  test('lee answer_number de challenge_answers (RLS decide si la sirve)', async () => {
+    results['challenge_answers'] = { data: { answer_number: 84.5 }, error: null }
+    const out = await getNumberAnswer('n1')
+    expect(calls.from).toHaveBeenCalledWith('challenge_answers')
+    expect(calls.eq).toHaveBeenCalledWith('challenge_answers', 'challenge_id', 'n1')
+    expect(out).toBe(84.5)
+  })
+
+  test('devuelve null si el usuario aún no tiene derecho (sin fila)', async () => {
+    results['challenge_answers'] = { data: null, error: null }
+    expect(await getNumberAnswer('n1')).toBeNull()
   })
 })
 
