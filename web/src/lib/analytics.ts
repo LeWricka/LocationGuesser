@@ -62,6 +62,9 @@ export type AnalyticsEvent =
   | 'member_kicked'
   | 'member_left'
   | 'ownership_transferred'
+  // Co-dueños (#307): un dueño promueve/degrada a un miembro. Props: group_id, role
+  // ('owner' = hecho co-dueño, 'member' = degradado).
+  | 'member_role_changed'
   // Invitación al grupo con preview (#155, OP2/I4). Props: surface
   // ('shared'|'copied'|'downloaded'), group_id. `invite_shared` = se abrió la
   // hoja de compartir del SO; `group_link_copied` = fallback de copiar enlace.

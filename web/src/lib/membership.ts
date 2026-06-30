@@ -78,7 +78,10 @@ export interface GroupMemberInfo {
   userId: string
   name: string
   role: string // 'owner' | 'member'
+  /** Es dueño: creador del grupo o co-dueño (role==='owner'). Ve la insignia "Dueño". */
   isOwner: boolean
+  /** Es el creador raíz (groups.created_by): no se le puede degradar (#307). */
+  isCreator: boolean
 }
 
 /**
@@ -111,12 +114,14 @@ export async function getGroupMembers(groupId: string): Promise<GroupMemberInfo[
 
   return rows
     .map((row) => {
-      const isOwner = row.user_id === ownerId || row.role === 'owner'
+      const isCreator = row.user_id === ownerId
+      const isOwner = isCreator || row.role === 'owner'
       return {
         userId: row.user_id,
         name: nameById.get(row.user_id) ?? '—',
         role: row.role,
         isOwner,
+        isCreator,
       }
     })
     .sort((a, b) => Number(b.isOwner) - Number(a.isOwner) || a.name.localeCompare(b.name))
@@ -158,6 +163,28 @@ export async function kickMember(groupId: string, userId: string): Promise<void>
   const { error } = await supabase
     .from('group_members')
     .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+/**
+ * Cambiar el rol de un miembro: 'owner' (co-dueño) o 'member'. Lo usa la gestión
+ * de co-dueños (#307): un owner promueve a un miembro a co-dueño o lo degrada.
+ *
+ * La RLS `group_members_update_owner` (migración 0026) permite el UPDATE a
+ * cualquier owner (creador raíz o co-dueño) e impide degradar al creador raíz.
+ * No comprobamos permisos en cliente; un no-owner recibiría 0 filas. La UI esconde
+ * la acción a los no-dueños y al propio creador del grupo.
+ */
+export async function setMemberRole(
+  groupId: string,
+  userId: string,
+  role: 'owner' | 'member',
+): Promise<void> {
+  const { error } = await supabase
+    .from('group_members')
+    .update({ role })
     .eq('group_id', groupId)
     .eq('user_id', userId)
   if (error) throw error
