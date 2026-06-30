@@ -16,7 +16,12 @@
 // tiene su propio `tsconfig.sw.json` con la lib `webworker`. Por eso `self` es un
 // ServiceWorkerGlobalScope y existen `clients`, `registration`, etc.
 
-import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
+import {
+  cleanupOutdatedCaches,
+  createHandlerBoundToURL,
+  precacheAndRoute,
+} from 'workbox-precaching'
+import { NavigationRoute, registerRoute } from 'workbox-routing'
 
 declare let self: ServiceWorkerGlobalScope
 
@@ -25,6 +30,20 @@ precacheAndRoute(self.__WB_MANIFEST)
 // Borra precachés de despliegues anteriores (equivale al `cleanupOutdatedCaches`
 // del SW autogenerado): un deploy nuevo no queda servido desde caché obsoleta.
 cleanupOutdatedCaches()
+
+// SPA navigation fallback: toda navegación se sirve con el index.html precacheado
+// (la app es un SPA con rutas en el cliente). En modo generateSW esto lo hacía el
+// plugin con `navigateFallback`; en injectManifest lo registramos nosotros.
+//
+// DENYLIST (= el navigateFallbackDenylist del modo generateSW): NO interceptar las
+// funciones serverless de previsualización (`/api/*`) ni las rutas limpias `/v/*` y
+// `/j/*`. Esas las sirve Vercel (la función `share` con las metas OG); si el fallback
+// las capturara, devolvería el index.html cacheado y se perdería la tarjeta OG.
+registerRoute(
+  new NavigationRoute(createHandlerBoundToURL('index.html'), {
+    denylist: [/^\/api\//, /^\/v\//, /^\/j\//],
+  }),
+)
 
 // autoUpdate: el SW nuevo activa y toma el control en cuanto está listo, sin pedir
 // nada al usuario. Equivale a `skipWaiting` + `clientsClaim` de la config previa.

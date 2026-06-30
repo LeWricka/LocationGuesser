@@ -34,11 +34,10 @@ export default defineConfig({
       filename: 'sw.ts',
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
-        // El SW NO debe interceptar las funciones serverless de previsualización
-        // (`/api/*`) ni las rutas limpias `/v/*` y `/j/*`: esas las sirve Vercel
-        // (la función `share` con las metas OG). Si el navigateFallback las
-        // capturara, serviría el index.html cacheado y se perdería la tarjeta OG.
-        navigateFallbackDenylist: [/^\/api\//, /^\/v\//, /^\/j\//],
+        // OJO: en injectManifest el SPA navigation fallback (y su denylist para
+        // `/api/*`, `/v/*`, `/j/*`, que protege las metas OG de Vercel) se registra
+        // en el propio SW (`src/sw.ts`), NO aquí: `navigateFallbackDenylist` solo es
+        // válido en modo generateSW.
       },
       // En desarrollo NO activamos el SW: evita cachés agresivas mientras se
       // programa y mantiene el dev server limpio (el SW solo en build/prod).
