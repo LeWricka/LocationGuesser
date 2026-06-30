@@ -3,7 +3,7 @@ import styles from './Logo.module.css'
 type Variant = 'mark' | 'wordmark'
 
 interface Props {
-  /** `mark` = solo símbolo; `wordmark` = símbolo + texto "Lugares". */
+  /** `mark` = solo símbolo; `wordmark` = símbolo + texto "Tabide". */
   variant?: Variant
   /**
    * Lado del símbolo en px (en `wordmark` también marca la escala del texto,
@@ -16,7 +16,7 @@ interface Props {
    * wordmark en tinta.
    */
   monochrome?: boolean
-  /** Texto accesible. Por defecto "Lugares". */
+  /** Texto accesible. Por defecto "Tabide". */
   title?: string
   className?: string
 }
@@ -48,7 +48,7 @@ function Mark({ title }: { title: string }) {
 }
 
 /**
- * Logo de "Lugares". Reutilizable y agnóstico de contexto: hereda el color del
+ * Logo de "Tabide". Reutilizable y agnóstico de contexto: hereda el color del
  * padre (token de acento por defecto). No se cabea aún en pantallas — es la
  * pieza de marca que App/Home/Landing podrán componer.
  */
@@ -56,7 +56,7 @@ export function Logo({
   variant = 'wordmark',
   size = 28,
   monochrome = false,
-  title = 'Lugares',
+  title = 'Tabide',
   className,
 }: Props) {
   const classes = [styles.root, monochrome && styles.monochrome, className]
@@ -67,7 +67,7 @@ export function Logo({
   return (
     <span className={classes} style={{ fontSize: size }}>
       <Mark title={title} />
-      {variant === 'wordmark' && <span className={styles.wordmark}>Lugares</span>}
+      {variant === 'wordmark' && <span className={styles.wordmark}>Tabide</span>}
     </span>
   )
 }

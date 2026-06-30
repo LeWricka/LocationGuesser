@@ -97,7 +97,7 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       setSharing(true)
       try {
-        await navigator.share({ title: 'Lugares', text, url: link })
+        await navigator.share({ title: 'Tabide', text, url: link })
         track('invite_shared', { surface: 'shared', group_id: groupId })
         onClose()
         return
@@ -144,7 +144,7 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
           retos). Da contexto a quien invitas en vez de un enlace pelado. */}
       <div className={styles.preview}>
         <span className={styles.eyebrow}>
-          <Icon icon={MapPin} size={14} /> Lugares
+          <Icon icon={MapPin} size={14} /> Tabide
         </span>
         <p className={styles.groupName}>{groupName}</p>
         <p className={styles.meta}>

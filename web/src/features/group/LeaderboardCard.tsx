@@ -103,7 +103,7 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
           <Icon icon={MapPin} size={42} />
         </span>
         <div className={styles.brandText}>
-          <span className={styles.brandName}>Lugares</span>
+          <span className={styles.brandName}>Tabide</span>
           <span className={styles.brandTag}>Vive los viajes de los tuyos</span>
         </div>
       </div>

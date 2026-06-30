@@ -24,7 +24,7 @@ export function ReceptorWelcomeGate({ groupId, userId, children }: Props) {
 
   // Para un receptor, la bienvenida HACE de intro del viaje: damos por visto el
   // tutorial genérico `group` para no encadenar dos slideshows ("te invitan" y
-  // luego "qué es Lugares"). La parte de cómo jugar (`challenge`) sí se mantiene
+  // luego "qué es Tabide"). La parte de cómo jugar (`challenge`) sí se mantiene
   // aparte, porque es accionable y complementa el "por qué".
   useEffect(() => {
     if (show) markOnboardingSeen('group', userId)

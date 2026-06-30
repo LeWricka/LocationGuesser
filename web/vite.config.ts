@@ -45,8 +45,8 @@ export default defineConfig({
         enabled: false,
       },
       manifest: {
-        name: 'Lugares',
-        short_name: 'Lugares',
+        name: 'Tabide',
+        short_name: 'Tabide',
         description:
           'Comparte tus viajes de una forma diferente: una foto, y los tuyos adivinan dónde es.',
         lang: 'es',
