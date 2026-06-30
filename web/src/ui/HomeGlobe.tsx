@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 // import() dinámico dentro del efecto, para que quede en su propio chunk WebGL.
 import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
 import { MAP_PRESETS, SCENE_GLOBE } from '../lib/mapPresets'
-import { PIN_MARKER_SVG } from '../features/trip/pinMarkers'
+import { photoPinHtml } from '../features/trip/pinMarkers'
 import '../features/trip/tripPins.css'
 import styles from './HomeGlobe.module.css'
 
@@ -80,17 +80,17 @@ function hasWebGL(): boolean {
   }
 }
 
-/** Pin-foto (reusa las clases globales `lg-trip-pin*` del mapa de viaje: look idéntico). */
+/** Pin-foto del globo de la home: el MISMO markup que el mapa de viaje
+ * (`photoPinHtml`: círculo con foto + puntita inferior; sin foto = disco de acento con
+ * la inicial del lugar). Le añadimos `lg-home-pin` para compactarlo y `lg-home-pin--lead`
+ * para el anillo cálido pulsante del pin "lead". El borde/look lo gobiernan los tokens. */
 function pinElement(pin: GlobePin): HTMLDivElement {
-  const el = document.createElement('div')
-  el.className = 'lg-trip-pin lg-home-pin'
+  const wrapper = document.createElement('div')
+  wrapper.innerHTML = photoPinHtml({ imageUrl: pin.imageUrl, title: pin.title })
+  // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como elemento del Marker.
+  const el = wrapper.firstElementChild as HTMLDivElement
+  el.classList.add('lg-home-pin')
   if (pin.lead) el.classList.add('lg-home-pin--lead')
-  if (pin.imageUrl) {
-    el.style.backgroundImage = `url('${pin.imageUrl.replace(/'/g, "\\'")}')`
-  } else {
-    el.classList.add('lg-trip-pin--icon')
-    el.innerHTML = PIN_MARKER_SVG
-  }
   return el
 }
 

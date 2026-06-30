@@ -45,22 +45,33 @@
  * (lg-trip-pin de tripPins.css); aquí solo ajustamos tamaño y el "lead" cálido.
  * ============================================================ */
 
-/* Pin de la home: algo más compacto que el del viaje (caben varios). */
+/* Pin de la home: MISMO markup que el viaje (círculo + puntita), solo algo más
+   compacto (caben varios). El borde/fondo van en el disco hijo (estructura nueva). */
 :global(.lg-home-pin) {
   width: 42px;
   height: 42px;
+}
+:global(.lg-home-pin .lg-trip-pin__disc) {
   border-width: 2.5px;
 }
 
-/* Pin "lead" del grupo: anillo cálido + halo pulsante (acento ORO de "lo vivo"). */
-:global(.lg-home-pin--lead) {
+/* Pin "lead" del grupo: anillo cálido + halo pulsante (acento ORO de "lo vivo"). El
+   borde/sombra del estado viven en el disco; el halo pulsante lo pone el wrapper. */
+:global(.lg-home-pin--lead .lg-trip-pin__disc) {
   border-color: var(--route-gold);
   box-shadow:
     0 4px 14px -3px rgba(0, 0, 0, 0.55),
     0 0 0 4px rgba(217, 178, 90, 0.28),
     0 0 18px 2px rgba(217, 178, 90, 0.4);
 }
+/* La puntita inferior del pin "lead", también en oro (coherencia con el aro). */
 :global(.lg-home-pin--lead)::after {
+  background: var(--route-gold);
+}
+/* Halo pulsante alrededor del disco. Lo dibuja el `::before` del wrapper (el disco
+   recorta su overflow y clavaría el halo; el `::after` del wrapper ya es la puntita).
+   Cubre el área del disco (que es `inset: 0` del wrapper) y crece sin recortarse. */
+:global(.lg-home-pin--lead)::before {
   content: '';
   position: absolute;
   inset: -3px;
@@ -91,7 +102,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :global(.lg-home-pin--lead)::after,
+  :global(.lg-home-pin--lead)::before,
   :global(.lg-home-globe-breathe) {
     animation: none;
   }
