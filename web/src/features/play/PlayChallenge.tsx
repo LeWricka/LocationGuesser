@@ -275,7 +275,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         if (cancelled) return
         setChallenge(c)
 
-        // Reto de NÚMERO ("¿Cuánto?"): lo juega PlayNumberChallenge (rama propia, sin
+        // Reto de NÚMERO ("¿Adivinas?"): lo juega PlayNumberChallenge (rama propia, sin
         // mapa). NO corremos aquí la lógica de lugar (voto previo de lat/lng, etc.); el
         // componente de número rehace su carga con `preloaded`. El reto de LUGAR sigue
         // exactamente igual debajo. (#323)
@@ -543,7 +543,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     )
   }
 
-  // Reto de NÚMERO ("¿Cuánto?"): rama propia (sin mapa). En cuanto se conoce el tipo
+  // Reto de NÚMERO ("¿Adivinas?"): rama propia (sin mapa). En cuanto se conoce el tipo
   // lo delegamos en PlayNumberChallenge con el reto ya cargado (preloaded), evitando
   // un segundo fetch. El reto de LUGAR sigue intacto en todo lo de abajo. (#323)
   if (challenge && challenge.challenge_kind === 'number') {

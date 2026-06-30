@@ -72,7 +72,7 @@ function parseGuess(raw: string): number | null {
   return Number.isFinite(value) ? value : null
 }
 
-// JUGAR un reto de NÚMERO ("¿Cuánto?", #323). HERMANO de PlayChallenge pero SIN
+// JUGAR un reto de NÚMERO ("¿Adivinas?", #323). HERMANO de PlayChallenge pero SIN
 // mapa: foto + pregunta + teclado numérico propio; al bloquear el número llama a la
 // RPC `submit_number_vote` (autoridad de servidor). La cifra correcta NO viaja al
 // cliente hasta votar (vive en challenge_answers, RLS). Mismo lenguaje de fases,
@@ -410,7 +410,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
           {/* Pregunta sobre la foto. */}
           <div className={styles.questionWrap}>
             <span className={styles.kindChip}>
-              <Icon icon={Hash} size={13} /> ¿Cuánto?
+              <Icon icon={Hash} size={13} /> ¿Adivinas?
             </span>
             <p className={styles.question}>{question}</p>
           </div>

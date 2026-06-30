@@ -82,7 +82,7 @@ function parseAnswer(raw: string): { value: number; decimals: number } | null {
   return { value, decimals: Math.min(decPart.length, 4) }
 }
 
-// Reto de NÚMERO ("¿Cuánto?", #323): pregunta + cifra oculta + unidad + estrictez.
+// Reto de NÚMERO ("¿Adivinas?", #323): pregunta + cifra oculta + unidad + estrictez.
 // Sin mapa ni Street View. Mismo lenguaje visual que el flujo de lugar (foto-hero +
 // hoja que crece por etapas), pero la "respuesta" es una cifra que se queda oculta
 // (answer_number_src) hasta que el grupo vota.
@@ -237,7 +237,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
             <BackArrow />
           </button>
           <span className={styles.kindChip}>
-            <Icon icon={Hash} size={13} /> ¿Cuánto?
+            <Icon icon={Hash} size={13} /> ¿Adivinas?
           </span>
           <div className={styles.topTitle}>
             {groupName ? <small>Viaje · {groupName}</small> : <small>Nuevo reto</small>}

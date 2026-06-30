@@ -8,14 +8,15 @@ interface Props {
   groupName?: string | null
   /** Cancela y vuelve atrás sin elegir. */
   onBack: () => void
-  /** Elige el tipo de reto: location (¿Dónde es?) o number (¿Cuánto?). */
+  /** Elige el tipo de reto: location (¿Dónde?) o number (¿Adivinas?). */
   onPick: (kind: ChallengeKind) => void
 }
 
 // Selector de TIPO a la ENTRADA de crear reto (issue #323). Dos caminos, no dos
-// flujos en la misma hoja: location (¿Dónde es?, flujo de mapa intacto) y number
-// (¿Cuánto?, adivinar una cifra). Visual-first: dos tarjetas grandes con icono
-// lucide, sin emojis de chrome. El elegido entra en su asistente propio.
+// flujos en la misma hoja: location (¿Dónde?, flujo de mapa intacto) y number
+// (¿Adivinas?, adivinar una cifra; la pregunta concreta la pone el creador, por
+// eso la etiqueta del TIPO es genérica). Visual-first: dos tarjetas grandes con
+// icono lucide, sin emojis de chrome. El elegido entra en su asistente propio.
 export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) {
   return (
     <div className={styles.root}>
@@ -43,13 +44,13 @@ export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) 
             type="button"
             className={styles.option}
             onClick={() => onPick('location')}
-            aria-label="Crear reto ¿Dónde es?: adivinar el lugar en el mapa"
+            aria-label="Crear reto ¿Dónde?: adivinar el lugar en el mapa"
           >
             <span className={`${styles.optIco} ${styles.optIcoLocation}`}>
               <Icon icon={MapPin} size={28} />
             </span>
             <span className={styles.optTxt}>
-              <b>¿Dónde es?</b>
+              <b>¿Dónde?</b>
               <span>Comparte un sitio; adivinan dónde es en el mapa.</span>
             </span>
             <ArrowRight />
@@ -59,13 +60,13 @@ export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) 
             type="button"
             className={styles.option}
             onClick={() => onPick('number')}
-            aria-label="Crear reto ¿Cuánto?: adivinar una cifra"
+            aria-label="Crear reto ¿Adivinas?: adivinar una cifra"
           >
             <span className={`${styles.optIco} ${styles.optIcoNumber}`}>
               <Icon icon={Hash} size={28} />
             </span>
             <span className={styles.optTxt}>
-              <b>¿Cuánto?</b>
+              <b>¿Adivinas?</b>
               <span>Lanza una pregunta de cifra; adivinan el número.</span>
             </span>
             <ArrowRight />

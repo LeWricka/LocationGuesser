@@ -13,8 +13,8 @@ interface Props {
   onCreated: (challenge: ChallengeForPlay) => void
 }
 
-// Entrada de "crear reto" (#323): primero el selector de TIPO (¿Dónde es? /
-// ¿Cuánto?), luego el asistente propio de cada tipo. Mantiene el flujo de lugar
+// Entrada de "crear reto" (#323): primero el selector de TIPO (¿Dónde? /
+// ¿Adivinas?), luego el asistente propio de cada tipo. Mantiene el flujo de lugar
 // (CreateChallengeImmersive) intacto; el de número (CreateNumberChallenge) es su
 // hermano sin mapa. Atrás desde un asistente vuelve al selector, no sale del todo.
 export function CreateChallengeFlow({ groupId, groupName, onBack, onCreated }: Props) {
