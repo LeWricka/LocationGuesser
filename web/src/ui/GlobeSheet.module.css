@@ -68,16 +68,18 @@
   transform: translateY(calc((var(--space-8) + var(--space-6)) * -1));
   z-index: 1;
   pointer-events: none;
-  /* Fundido LIMPIO globo→hoja: mantenemos la noche de escena (`--scene-bg`) mientras el
-     globo aún manda y resolvemos a la superficie de la hoja al final. Pasar de noche a
-     blanco directamente generaba una banda gris muerta a media altura; encadenando
-     `--scene-bg` (con alfa) hasta cerca del pie y rematando en `--surface`, la transición
-     es oscuro→papel sin gris sucio intermedio. Tokens de escena/superficie, no blancos. */
+  /* ÚNICA fuente de fundido globo→hoja (el globo ya NO re-oscurece su borde inferior y la
+     sombra de la hoja se acota para no sumarse). La franja se mantiene transparente la
+     mayor parte de su alto —deja ver el globo a sangre, sin velo oscuro añadido— y solo en
+     el último tramo resuelve a la superficie de la hoja, justo donde nace el canto blanco.
+     Así no hay gris muerto a media altura (el problema venía de cruzar noche→blanco por un
+     punto medio gris): el globo manda arriba y la hoja remata abajo en un fundido corto y
+     controlado. Tokens de superficie, no blancos. */
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    color-mix(in srgb, var(--scene-bg) 60%, transparent) 46%,
-    color-mix(in srgb, var(--scene-bg) 22%, var(--surface)) 78%,
+    transparent 74%,
+    color-mix(in srgb, var(--surface) 50%, transparent) 90%,
     var(--surface) 100%
   );
   transition: top var(--duration-slow) var(--ease-emphasized);
@@ -96,7 +98,13 @@
   flex-direction: column;
   background: var(--surface);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  box-shadow: var(--shadow-sheet);
+  /* Sombra hacia arriba CORTA, no la global `--shadow-sheet`: esa proyecta 36px de blur a
+     10px de offset y manchaba el globo por encima del canto, sumándose a la costura (la
+     banda gris). Aquí el canto de la hoja lo define una sombra apretada y discreta que no
+     invade la zona de fundido; el globo→hoja lo resuelve EN EXCLUSIVA `.seam`. */
+  box-shadow:
+    0 -2px 6px -2px color-mix(in srgb, var(--ink-900) 12%, transparent),
+    0 -1px 2px -1px color-mix(in srgb, var(--ink-900) 8%, transparent);
   transition: top var(--duration-slow) var(--ease-emphasized);
   /* No deja que el contenido se salga por las esquinas redondeadas de arriba. */
   overflow: hidden;
@@ -138,7 +146,10 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; /* el scroll de la hoja no arrastra al globo/página */
-  padding: 0 var(--space-4) calc(var(--space-8) + env(safe-area-inset-bottom));
+  /* Holgura inferior generosa: el FAB "+" flota abajo-derecha (56px + su offset), así que
+     el contenido necesita despejar SU altura para que el botón no se encime a la última
+     tarjeta ni a su icono de ubicación. `--space-8 + --space-6` deja aire bajo el FAB. */
+  padding: 0 var(--space-4) calc(var(--space-8) + var(--space-6) + env(safe-area-inset-bottom));
   /* Oculta la barra de scroll del SO sin perder el scroll: en Android/WebKit el track gris
      + thumb de esta capa scrollable asomaba como una franja/"||" gris pegada al borde
      derecho del globo (lo reportó el dueño en su móvil 1080×2400; headless no pinta

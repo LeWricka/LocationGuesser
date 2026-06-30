@@ -14,6 +14,9 @@
   flex: none;
   width: 1em;
   height: 1em;
+  /* El arte ya respira dentro del viewBox; `visible` evita que el SVG recorte el punto
+     superior de la constelación si algún contenedor lo apura. */
+  overflow: visible;
 }
 
 .wordmark {

@@ -6,14 +6,15 @@
   text-align: center;
 }
 
-/* Saludo pequeño sobre el titular, como eyebrow editorial. */
+/* Saludo pequeño sobre el titular, como eyebrow editorial. Un escalón más de aire bajo el
+   eyebrow ("Hola, Lewis") para que no se pegue al H1 en viewport compacto. */
 .eyebrow {
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 
 /* Titular del producto: tipografía grande con jerarquía por tamaño. */

@@ -28,7 +28,8 @@
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-2);
+  /* Un escalón más de aire bajo el eyebrow para que no se pegue al titular en compacto. */
+  margin-bottom: var(--space-3);
 }
 
 /* Frase ancla en serif (la voz editorial), peso medio que respira. */
