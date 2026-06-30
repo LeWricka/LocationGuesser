@@ -49,7 +49,7 @@ export function LoginScreen({
     <AuthScreen
       className={className}
       icon={<Icon icon={MapPin} size={40} />}
-      title={joining ? 'Únete para jugar este reto' : 'Entra a Lugares'}
+      title={joining ? 'Únete para jugar este reto' : 'Entra a Tabide'}
       subtitle={
         joining ? (
           <>

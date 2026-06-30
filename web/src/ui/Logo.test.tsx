@@ -3,15 +3,15 @@ import { render, screen } from '@testing-library/react'
 import { Logo } from './Logo'
 
 describe('Logo', () => {
-  test('por defecto pinta el wordmark "Lugares"', () => {
+  test('por defecto pinta el wordmark "Tabide"', () => {
     render(<Logo />)
-    expect(screen.getByText('Lugares')).toBeInTheDocument()
+    expect(screen.getByText('Tabide')).toBeInTheDocument()
   })
 
   test('variante mark no pinta el texto, solo el símbolo', () => {
-    render(<Logo variant="mark" title="Lugares" />)
-    expect(screen.queryByText('Lugares')).not.toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Lugares' })).toBeInTheDocument()
+    render(<Logo variant="mark" title="Tabide" />)
+    expect(screen.queryByText('Tabide')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Tabide' })).toBeInTheDocument()
   })
 
   test('el tamaño se aplica como font-size en px (escala todo en em)', () => {

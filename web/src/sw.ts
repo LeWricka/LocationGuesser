@@ -67,7 +67,7 @@ interface PushPayload {
   tag?: string
 }
 
-const FALLBACK_TITLE = 'Lugares'
+const FALLBACK_TITLE = 'Tabide'
 const FALLBACK_BODY = 'Tienes novedades en tu viaje.'
 
 self.addEventListener('push', (event) => {

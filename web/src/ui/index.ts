@@ -45,5 +45,5 @@ export { ProfileStep } from './ProfileStep'
 export { EmptyState } from './EmptyState'
 export { SkeletonCard } from './SkeletonCard'
 
-// Marca: logo de "Lugares" (símbolo + wordmark serif).
+// Marca: logo de "Tabide" (símbolo + wordmark serif).
 export { Logo } from './Logo'

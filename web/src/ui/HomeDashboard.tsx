@@ -93,7 +93,7 @@ export function HomeDashboard({
       {/* Topbar flotante: marca + acceso a perfil, en pastillas papel translúcidas. */}
       <div className={styles.topbar}>
         <span className={styles.brand}>
-          <b>Lugares</b>
+          <b>Tabide</b>
           <i>tu mundo</i>
         </span>
         <button
