@@ -34,6 +34,16 @@
   overflow-wrap: anywhere;
 }
 
+/* A quién llega el reto: tu grupo del viaje. Voz serif, peso medio: es el mensaje. */
+.audience {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
 .tagline {
   margin: var(--space-1) 0 0;
   font-size: var(--font-size-sm);
@@ -41,9 +51,7 @@
   color: var(--color-text-muted);
 }
 
-.hint {
-  margin: var(--space-4) 0 0;
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-normal);
-  color: var(--color-text-faint);
+/* Retorno al viaje, separado del preview para respirar. */
+.backToTrip {
+  margin-top: var(--space-4);
 }

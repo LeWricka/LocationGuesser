@@ -1,13 +1,9 @@
 /* AÑADIR RECUERDO — estilo Atelier (Kinfolk · Pizarra): papel, hairlines, serif
    en el titular, acento pizarra sobrio y micro-interacciones contenidas. */
 
-/* Presentación tipo móvil: la pantalla de crear "sube" al entrar y, al guardar,
-   "baja" para descartarse (clase .leaving) antes de volver al viaje. */
+/* Presentación tipo móvil: la pantalla de crear "sube" al entrar. */
 .screen {
   animation: lg-create-rise 320ms var(--ease-emphasized) both;
-}
-.screen.leaving {
-  animation: lg-create-fall 240ms var(--ease-emphasized) both;
 }
 @keyframes lg-create-rise {
   from {
@@ -19,19 +15,8 @@
     opacity: 1;
   }
 }
-@keyframes lg-create-fall {
-  from {
-    transform: translateY(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateY(24px);
-    opacity: 0;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .screen,
-  .screen.leaving {
+  .screen {
     animation: none;
   }
 }
@@ -149,205 +134,56 @@
   box-shadow: 0 0 0 3px var(--color-accent-glow-soft);
 }
 
-/* ── Tarjeta del toggle "Convertirlo en reto" ───────────────────────────────
-   Apagada: hoja sobria. Encendida: el borde se tiñe de acento (señal viva de
-   que el momento llevará juego). */
-.challengeCard {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-  transition:
-    border-color var(--transition-base),
-    box-shadow var(--transition-base);
+/* ── Estado "Recuerdo guardado" ──────────────────────────────────────────────
+   Tras guardar, una pantalla de confirmación centrada: portada, título y dos
+   caminos (Añadir reto / Volver al viaje). El orden correcto del rediseño. */
+.savedWrap {
+  align-items: center;
+  text-align: center;
+  padding-top: var(--space-4);
 }
 
-.challengeCard[data-on] {
-  border-color: var(--color-accent);
+/* Portada del recuerdo guardado (o un check si no hubo foto). */
+.savedCover {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
   box-shadow: var(--shadow-md);
 }
-
-/* La fila del toggle es un switch grande y táctil: texto + interruptor. */
-.toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-4);
-  border: none;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-  border-radius: var(--radius-md);
-}
-
-.toggle:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-
-.toggleText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.toggleTitle {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text);
-}
-
-.toggleHint {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  line-height: var(--line-height-normal);
-}
-
-/* Interruptor: pista + perilla que se desliza al acento. */
-.switch {
-  position: relative;
-  flex: 0 0 auto;
-  width: 52px;
-  height: 30px;
-  border-radius: var(--radius-full);
-  background: var(--color-surface-hover);
-  border: 1px solid var(--color-border-strong);
-  transition:
-    background var(--transition-base),
-    border-color var(--transition-base);
-}
-
-.challengeCard[data-on] .switch {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-.knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-base);
-}
-
-.challengeCard[data-on] .knob {
-  transform: translateX(22px);
-}
-
-/* Cuerpo de ajustes del reto: aparece bajo el toggle con un hairline superior y
-   una entrada suave. */
-.challengeBody {
-  padding: 0 var(--space-4) var(--space-4);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-4);
-  animation: revealSettings var(--duration-base) var(--ease-emphasized);
-}
-
-@keyframes revealSettings {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Aviso (falta el lugar para el reto): tono atención, no destructivo. */
-.warn {
-  padding: var(--space-3);
-  border: 1px solid var(--color-warning);
-  border-radius: var(--radius-sm);
-  background: var(--color-warning-soft);
-  font-size: var(--font-size-sm);
-  color: var(--color-text);
-}
-
-/* Estado (subiendo/guardando) y búsqueda de SV. */
-.status {
-  font-size: var(--font-size-sm);
-  color: var(--color-accent);
-}
-
-/* Aviso de Street View cercano. */
-.svPrompt {
-  padding: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-hover);
-  font-size: var(--font-size-sm);
-}
-
-/* Duración elegida, destacada sobre el slider. */
-.durationValue {
-  align-items: baseline;
-}
-
-.durationLabel {
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-black);
-  color: var(--color-text);
-  font-variant-numeric: tabular-nums;
-}
-
-.expressPill {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-full);
+.savedCover[data-empty] {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
   background: var(--color-accent-soft);
   color: var(--color-accent);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
 }
 
-.durationSlider {
-  width: 100%;
-  accent-color: var(--color-accent);
-  cursor: pointer;
+.savedHeading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-.durationScale {
-  font-size: var(--font-size-xs);
+/* Descripción del recuerdo guardado: medida de lectura (prose) para que no se
+   desborde en pantallas anchas. */
+.savedDesc {
+  margin: 0;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
   color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
 }
 
-/* Opciones avanzadas de Street View (candados): plegadas por defecto. */
-.advanced {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-hover);
+.savedActions {
+  width: 100%;
+  max-width: 360px;
+  margin-top: var(--space-3);
 }
 
-.advancedSummary {
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text);
-  cursor: pointer;
-}
-
-.advancedBody {
-  padding: 0 var(--space-3) var(--space-3);
-}
-
-/* Respeta reduced-motion: sin entrada animada de los ajustes. */
 @media (prefers-reduced-motion: reduce) {
-  .challengeBody {
-    animation: none;
-  }
-  .switch,
-  .knob,
-  .challengeCard,
   .textarea {
     transition: none;
   }

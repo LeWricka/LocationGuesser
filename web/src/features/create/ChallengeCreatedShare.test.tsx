@@ -24,6 +24,7 @@ function renderShare(onPlay = vi.fn()) {
       <ToastProvider>
         <ChallengeCreatedShare
           groupId="g1"
+          groupName="Lisboa"
           challengeId="reto-1"
           challengeTitle="¿Dónde desayuné?"
           onPlay={onPlay}
@@ -37,22 +38,23 @@ function renderShare(onPlay = vi.fn()) {
 describe('ChallengeCreatedShare', () => {
   beforeEach(() => {
     trackMock.mockClear()
-    // Forzamos el fallback de copiar: sin Web Share API, "Compartir" copia.
+    // Forzamos el fallback de copiar: sin Web Share API, "Compartir enlace" copia.
     Object.assign(navigator, {
       share: undefined,
       clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
     })
   })
 
-  test('muestra el nombre del reto y el copy de compartir', () => {
+  test('dice qué se comparte (nombre del reto) y a quién (el grupo del viaje)', () => {
     renderShare()
     expect(screen.getByText('¿Dónde desayuné?')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /compartir/i })).toBeInTheDocument()
+    expect(screen.getByText(/tu grupo de lisboa ya puede jugar/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /compartir enlace/i })).toBeInTheDocument()
   })
 
   test('copiar pone el ENLACE del reto (/j/<code>) en el portapapeles', async () => {
     renderShare()
-    await userEvent.click(screen.getByRole('button', { name: /^compartir$/i }))
+    await userEvent.click(screen.getByRole('button', { name: /compartir enlace/i }))
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
     const copied = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0][0]
     expect(copied).toContain('/j/reto-1')

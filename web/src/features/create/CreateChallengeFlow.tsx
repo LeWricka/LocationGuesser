@@ -1,24 +1,91 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { CreateChallengeKindPicker } from './CreateChallengeKindPicker'
-import { CreateChallengeImmersive } from './CreateChallengeImmersive'
+import { CreateChallengeImmersive, type ChallengePrefill } from './CreateChallengeImmersive'
 import { CreateNumberChallenge } from './CreateNumberChallenge'
-import type { ChallengeForPlay, ChallengeKind } from '../../lib/challenges'
+import { getChallenge, type ChallengeForPlay, type ChallengeKind } from '../../lib/challenges'
+import { signedImageUrl } from '../../lib/storage'
+import { reportError } from '../../lib/observability'
+import { Spinner } from '../../ui'
+import flow from './CreateChallengeFlow.module.css'
 
 interface Props {
   groupId: string
   groupName?: string | null
+  /**
+   * Si el reto NACE de un recuerdo, su id. El reto pre-rellena la foto y el lugar
+   * del recuerdo (uno de los dos orígenes que convergen en el mismo formulario).
+   * Sin este id, el reto empieza vacío (origen FAB "Reto").
+   */
+  fromMomentId?: string
   /** Sale del flujo de crear (cancelar / atrás desde el selector). */
   onBack: () => void
   /** Reto creado (de cualquier tipo): el viaje vuelve a la lista y ofrece su enlace. */
   onCreated: (challenge: ChallengeForPlay) => void
 }
 
-// Entrada de "crear reto" (#323): primero el selector de TIPO (¿Dónde? /
-// ¿Adivinas?), luego el asistente propio de cada tipo. Mantiene el flujo de lugar
-// (CreateChallengeImmersive) intacto; el de número (CreateNumberChallenge) es su
-// hermano sin mapa. Atrás desde un asistente vuelve al selector, no sale del todo.
-export function CreateChallengeFlow({ groupId, groupName, onBack, onCreated }: Props) {
+// Entrada de "crear reto": el reto es una entidad de primera clase con DOS orígenes
+// que convergen en el MISMO formulario:
+//  (a) desde un recuerdo (`fromMomentId`) → va directo al asistente de ¿Dónde? con
+//      la foto y el lugar del recuerdo PRE-RELLENADOS.
+//  (b) desde el FAB "Reto" (sin id) → primero el selector de TIPO (¿Dónde? /
+//      ¿Adivinas?), luego el asistente propio de cada tipo, empezando vacío.
+// Atrás desde un asistente vuelve al selector (origen FAB) o sale (origen recuerdo).
+export function CreateChallengeFlow({
+  groupId,
+  groupName,
+  fromMomentId,
+  onBack,
+  onCreated,
+}: Props) {
   const [kind, setKind] = useState<ChallengeKind | null>(null)
+  // Pre-relleno cargado desde el recuerdo de origen (foto + lugar). `undefined`
+  // mientras carga; `null` si no aplica o falló (el formulario empieza vacío).
+  const [prefill, setPrefill] = useState<ChallengePrefill | null | undefined>(
+    fromMomentId ? undefined : null,
+  )
+
+  // Origen recuerdo: cargamos su foto y lugar y entramos directos a ¿Dónde?. Un
+  // recuerdo se convierte en reto de UBICACIÓN (su lugar pasa a ser la respuesta).
+  useEffect(() => {
+    if (!fromMomentId) return
+    let alive = true
+    void (async () => {
+      try {
+        const moment = await getChallenge(fromMomentId)
+        const photoUrl = moment.image_path ? await signedImageUrl(moment.image_path) : null
+        if (!alive) return
+        setPrefill({
+          point:
+            moment.place_lat != null && moment.place_lng != null
+              ? { lat: moment.place_lat, lng: moment.place_lng }
+              : null,
+          imagePath: moment.image_path ?? null,
+          photoUrl: photoUrl ?? null,
+          title: moment.title ?? '',
+        })
+        setKind('location')
+      } catch (err) {
+        reportError(err, { area: 'create_challenge_prefill' })
+        // Si no podemos cargar el recuerdo, no bloqueamos: el reto empieza vacío.
+        if (!alive) return
+        setPrefill(null)
+        setKind('location')
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [fromMomentId])
+
+  // Cargando el recuerdo de origen: un spinner breve antes de abrir el asistente.
+  if (fromMomentId && prefill === undefined) {
+    return (
+      <div className={flow.loading} role="status">
+        <Spinner size={28} />
+        <span>Preparando el reto…</span>
+      </div>
+    )
+  }
 
   if (kind == null) {
     return <CreateChallengeKindPicker groupName={groupName} onBack={onBack} onPick={setKind} />
@@ -39,7 +106,9 @@ export function CreateChallengeFlow({ groupId, groupName, onBack, onCreated }: P
     <CreateChallengeImmersive
       groupId={groupId}
       groupName={groupName}
-      onBack={() => setKind(null)}
+      prefill={prefill ?? undefined}
+      // Origen recuerdo (sin selector): atrás sale del flujo. Origen FAB: vuelve al selector.
+      onBack={fromMomentId ? onBack : () => setKind(null)}
       onCreated={onCreated}
     />
   )

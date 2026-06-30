@@ -1,31 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Check, Map as MapIcon, MapPin, Target, Zap } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, MapPin, Target } from 'lucide-react'
 import { MapPicker } from './MapPicker'
-import { StreetViewPreview } from './StreetViewPreview'
 import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
-import type { LatLng, ScoreScale } from '../../lib/geo'
-import { createMoment, promoteToChallenge, type ChallengeForPlay } from '../../lib/challenges'
+import type { LatLng } from '../../lib/geo'
+import { createMoment, type ChallengeForPlay } from '../../lib/challenges'
 import { addMomentImages } from '../../lib/momentImages'
-import { deadlineFromMinutes } from '../../lib/time'
-import { findPanorama, findPanoramaNear, type PanoramaMatch } from '../../lib/streetview'
 import { uploadImage } from '../../lib/storage'
 import { readGpsFromExif } from '../../lib/exif'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
-import {
-  Badge,
-  Button,
-  Field,
-  Input,
-  Icon,
-  Row,
-  Spinner,
-  Stack,
-  useReducedMotion,
-  useToast,
-} from '../../ui'
+import { AppHeader, Badge, Button, Field, Input, Icon, Row, Stack, useToast } from '../../ui'
 import styles from './AddMoment.module.css'
 
 interface Props {
@@ -33,49 +19,17 @@ interface Props {
   groupId: string
   /** Vuelve atrás sin guardar (cancelar). */
   onBack: () => void
-  /** Recuerdo (o reto) creado: el llamador vuelve al viaje y refresca. */
+  /** Recuerdo creado: el llamador vuelve al viaje y refresca. */
   onCreated: (challenge: ChallengeForPlay) => void
+  /**
+   * "Añadir reto" desde el recuerdo recién guardado: lleva al formulario de reto
+   * pre-rellenado con la foto y el lugar del recuerdo (uno de los dos orígenes que
+   * convergen). El llamador resuelve la navegación (ruta `&from=<momentId>`).
+   */
+  onAddChallenge: (momentId: string) => void
 }
 
 const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
-
-// Radio (m) en el que buscamos Street View cerca del lugar cuando hay foto.
-const SV_NEAR_RADIUS = 50
-
-// Duración del reto (cuando se activa el toggle): paradas de express a largas.
-// Mismo conjunto que el asistente de reto clásico para coherencia.
-const DURATION_STOPS: { minutes: number; label: string }[] = [
-  { minutes: 5, label: '5 min' },
-  { minutes: 10, label: '10 min' },
-  { minutes: 15, label: '15 min' },
-  { minutes: 30, label: '30 min' },
-  { minutes: 60, label: '1 h' },
-  { minutes: 120, label: '2 h' },
-  { minutes: 240, label: '4 h' },
-  { minutes: 480, label: '8 h' },
-  { minutes: 720, label: '12 h' },
-  { minutes: 1440, label: '24 h' },
-  { minutes: 2880, label: '48 h' },
-]
-const DEFAULT_DURATION_INDEX = DURATION_STOPS.findIndex((s) => s.minutes === 240)
-const EXPRESS_MAX_MINUTES = 15
-
-// Tiempo por jugada en segundos; null = sin límite. Default: 1 min.
-const GUESS_OPTIONS: { value: number | null; label: string }[] = [
-  { value: 60, label: '1 min' },
-  { value: 120, label: '2 min' },
-  { value: 180, label: '3 min' },
-  { value: null, label: 'Sin límite' },
-]
-
-// PRECISIÓN del reto: calibra cómo de estricto es el conteo de distancia (0028).
-// 'mundo' (default) = scoring de siempre; cuanto más acotado, más estricto.
-const PRECISION_OPTIONS: { value: ScoreScale; label: string }[] = [
-  { value: 'mundo', label: 'Mundo' },
-  { value: 'pais', label: 'País' },
-  { value: 'ciudad', label: 'Ciudad' },
-  { value: 'barrio', label: 'Barrio' },
-]
 
 // Fecha de hoy en formato `yyyy-mm-dd` (zona local), para el valor por defecto del
 // input date. La usamos también como "centinela": si el usuario no cambia la fecha,
@@ -87,20 +41,19 @@ function todayIso(): string {
 }
 
 /**
- * AÑADIR RECUERDO — el flujo CLAVE de la separación contenido/reto
- * (flujos-viaje-po.md §1.3 y §2.B). El camino feliz es ligero: una foto y/o un
- * lugar y una descripción → se guarda como RECUERDO (sin juego) en pocos toques.
+ * AÑADIR RECUERDO — el camino feliz, limpio (rediseño Oleada 3). Un recuerdo es
+ * SOLO foto + lugar + texto: se acabó el toggle "convertirlo en reto" (mezclaba dos
+ * intenciones en una pantalla). El reto es ahora una entidad de primera clase con su
+ * propio formulario; desde aquí se llega DESPUÉS de guardar, con "Añadir reto".
  *
- * El RETO es una capa OPCIONAL bajo un toggle (apagado por defecto): al activarlo
- * aparecen los ajustes de juego (plazo, tiempo por jugada, candados de Street
- * View). Al guardar con el toggle ON, creamos el recuerdo y lo promocionamos a
- * reto (`createMoment` + `promoteToChallenge`): un solo camino de datos, sin
- * duplicar la lógica del asistente de reto clásico.
+ * Tras guardar, la pantalla muestra el estado "Recuerdo guardado" con dos caminos:
+ * "Añadir reto" (pre-rellena foto y lugar) y "Listo, volver al viaje". Así el orden
+ * es el correcto: primero el recuerdo; luego —si quieres— el reto.
  *
- * El lugar del recuerdo es VISIBLE (`place_*`); al promocionar pasa a ser la
- * respuesta OCULTA a adivinar (`lat`/`lng`).
+ * El lugar del recuerdo es VISIBLE (`place_*`); si más tarde se promociona a reto,
+ * pasa a ser la respuesta a adivinar.
  */
-export function AddMoment({ groupId, onBack, onCreated }: Props) {
+export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(todayIso)
@@ -112,40 +65,19 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
 
   // GALERÍA del recuerdo: varias fotos del móvil, la 1ª es la portada. Cada una
   // se sube SIN EXIF al guardar. `previewUrl` es un object URL que revocamos al
-  // quitar/desmontar para no fugar memoria. Un RETO usa solo la portada.
+  // quitar/desmontar para no fugar memoria.
   const [photos, setPhotos] = useState<DraftPhoto[]>([])
   const [readingExif, setReadingExif] = useState(false)
 
-  // ── Capa de RETO (opcional) ────────────────────────────────────────────────
-  const [isChallenge, setIsChallenge] = useState(false)
-  const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
-  const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
-  // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
-  const [scoreScale, setScoreScale] = useState<ScoreScale>('mundo')
-  // Street View del reto (opcional). Con foto es contexto cercano; sin foto, ES la
-  // escena. Candados de exploración: ambos permitidos por defecto.
-  const [wantsStreetView, setWantsStreetView] = useState(false)
-  const [pano, setPano] = useState<PanoramaMatch | null>(null)
-  const [checkingPano, setCheckingPano] = useState(false)
-  const [svPrompt, setSvPrompt] = useState<{ pano: PanoramaMatch; distanceMeters: number } | null>(
-    null,
-  )
-  const [pov, setPov] = useState({ heading: 0, pitch: 0 })
-  const [allowMove, setAllowMove] = useState(true)
-  const [allowRotate, setAllowRotate] = useState(true)
-
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
-  // Salida tipo móvil: al guardar, la pantalla se desliza hacia abajo antes de volver.
-  const [leaving, setLeaving] = useState(false)
-  const reducedMotion = useReducedMotion()
+  // Recuerdo recién guardado: dispara el estado "Recuerdo guardado" (dos acciones).
+  const [saved, setSaved] = useState<ChallengeForPlay | null>(null)
+  // URL de la portada para enseñarla en el estado "guardado" (object URL ya creado).
+  const savedCoverUrl = photos[0]?.previewUrl ?? null
+
   const toast = useToast()
   const { user } = useSession()
-
-  // Token para descartar búsquedas de panorama obsoletas (si se mueve el pin
-  // mientras una búsqueda está en curso, ignoramos la vieja).
-  const panoSearchToken = useRef(0)
-  const hasPhoto = photos.length > 0
 
   // Revoca TODOS los object URLs de la galería al desmontar (no fugar memoria).
   useEffect(() => {
@@ -234,96 +166,9 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
     )
   }
 
-  // Buscar Street View (solo con el toggle de reto ON y un lugar fijado):
-  //  · Con foto: contexto a ≤50 m → si cae cerca, pedimos confirmar.
-  //  · Sin foto: el SV ES la escena → exigimos cobertura en el punto exacto.
-  useEffect(() => {
-    if (!place || !wantsStreetView || !isChallenge) return
-    const token = ++panoSearchToken.current
-    void (async () => {
-      setSvPrompt(null)
-      setPano(null)
-      setCheckingPano(true)
-      try {
-        if (hasPhoto) {
-          const near = await findPanoramaNear(place.lat, place.lng, SV_NEAR_RADIUS)
-          if (token !== panoSearchToken.current) return
-          if (!near) {
-            toast.show('No hay Street View cerca de la foto. El reto irá solo con la foto.', {
-              tone: 'neutral',
-            })
-            return
-          }
-          setSvPrompt({ pano: near, distanceMeters: near.distanceMeters })
-        } else {
-          const match = await findPanorama(place.lat, place.lng)
-          if (token !== panoSearchToken.current) return
-          if (!match) {
-            toast.show('Aquí no hay Street View; mueve el pin a un punto con cobertura.', {
-              tone: 'danger',
-            })
-            return
-          }
-          setPano(match)
-          setPov({ heading: 0, pitch: 0 })
-        }
-      } finally {
-        if (token === panoSearchToken.current) setCheckingPano(false)
-      }
-    })()
-    // toast es estable (contexto). Reaccionamos al lugar, al toggle de SV/reto y a
-    // si hay foto (cambia el criterio: cercano vs. exacto).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [place, wantsStreetView, isChallenge, hasPhoto])
-
-  function acceptSv() {
-    if (!svPrompt) return
-    setPano(svPrompt.pano)
-    setPov({ heading: 0, pitch: 0 })
-    setSvPrompt(null)
-  }
-
-  function rejectSv() {
-    setSvPrompt(null)
-    setPano(null)
-  }
-
-  function toggleStreetView() {
-    setWantsStreetView((on) => {
-      const next = !on
-      if (!next) {
-        setPano(null)
-        setSvPrompt(null)
-        setAllowMove(true)
-        setAllowRotate(true)
-      }
-      return next
-    })
-  }
-
-  // Al apagar el toggle de reto, limpiamos toda la capa de juego (vuelve a ser un
-  // recuerdo puro): así no arrastramos un panorama o candados invisibles.
-  function toggleIsChallenge() {
-    setIsChallenge((on) => {
-      const next = !on
-      if (!next) {
-        setWantsStreetView(false)
-        setPano(null)
-        setSvPrompt(null)
-        setAllowMove(true)
-        setAllowRotate(true)
-      }
-      return next
-    })
-  }
-
-  // Reglas de guardado:
-  //  · Recuerdo: con título basta (foto y lugar son opcionales). Es lo barato.
-  //  · Reto: además exige LUGAR (la respuesta a adivinar) y nada pendiente de SV.
+  // Un recuerdo se guarda con título (foto y lugar son opcionales). Es lo barato.
   const titleValid = title.trim().length > 0
-  const canSaveMemory = titleValid && !locating && !readingExif
-  const canSaveChallenge = canSaveMemory && place != null && !svPrompt && !checkingPano
-  const canSave = isChallenge ? canSaveChallenge : canSaveMemory
+  const canSave = titleValid && !locating && !readingExif
 
   // Texto del recuerdo: si el usuario eligió una fecha distinta de hoy, la
   // anteponemos a la descripción (no hay columna de fecha en el modelo; el orden
@@ -350,31 +195,23 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
       toast.show('Ponle un título al recuerdo.', { tone: 'danger' })
       return
     }
-    if (isChallenge && !place) {
-      toast.show('Un reto necesita un lugar a adivinar. Márcalo en el mapa.', { tone: 'danger' })
-      return
-    }
 
     setBusy(true)
     try {
       // Fotos opcionales: subida comprimida y SIN EXIF, en ORDEN (la 1ª es la
-      // portada). Para un RETO solo subimos la portada (se queda con una sola
-      // foto, la que se adivina). Las paths conservan el orden de la galería.
-      const uploadList = isChallenge ? photos.slice(0, 1) : photos
+      // portada). Las paths conservan el orden de la galería.
       const paths: string[] = []
-      for (let i = 0; i < uploadList.length; i++) {
+      for (let i = 0; i < photos.length; i++) {
         setStatus(
-          uploadList.length > 1
-            ? `Subiendo fotos… (${i + 1}/${uploadList.length})`
-            : 'Subiendo la foto…',
+          photos.length > 1 ? `Subiendo fotos… (${i + 1}/${photos.length})` : 'Subiendo la foto…',
         )
-        paths.push(await uploadImage(uploadList[i].file))
+        paths.push(await uploadImage(photos[i].file))
       }
       // La portada espeja `image_path` (lo lee la tarjeta del viaje y el mapamundi).
       const coverPath = paths[0]
 
-      setStatus(isChallenge ? 'Creando el reto…' : 'Guardando el recuerdo…')
-      // 1) Siempre nace como RECUERDO (la unidad mínima). El lugar es VISIBLE.
+      setStatus('Guardando el recuerdo…')
+      // Nace como RECUERDO (la unidad mínima). El lugar es VISIBLE.
       const { challenge } = await createMoment({
         title: title.trim(),
         createdBy: user.id,
@@ -383,58 +220,29 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
         placeLat: place?.lat ?? null,
         placeLng: place?.lng ?? null,
         imagePath: coverPath ?? null,
-        svPanoId: isChallenge ? (pano?.panoId ?? null) : null,
-        svHeading: isChallenge && pano ? pov.heading : null,
-        svPitch: isChallenge && pano ? pov.pitch : null,
       })
 
-      // 1b) Galería del recuerdo: registramos TODAS las fotos en `moment_images`
-      // con su orden. Solo para recuerdo (un reto se queda con su foto única, ya
-      // en `image_path`). `image_path` ya quedó espejado por `createMoment`.
-      if (!isChallenge && paths.length > 0) {
+      // Galería del recuerdo: registramos TODAS las fotos en `moment_images` con su
+      // orden. `image_path` ya quedó espejado por `createMoment`.
+      if (paths.length > 0) {
         await addMomentImages(challenge.id, paths)
-      }
-
-      // 2) Si el toggle de reto está ON, lo promocionamos: el lugar VISIBLE pasa a
-      // ser la respuesta OCULTA, con plazo, cronómetro y candados de Street View.
-      let result = challenge
-      if (isChallenge && place) {
-        result = await promoteToChallenge(challenge.id, {
-          lat: place.lat,
-          lng: place.lng,
-          deadlineAt: deadlineFromMinutes(DURATION_STOPS[durationIndex].minutes),
-          guessSeconds,
-          svPanoId: pano?.panoId ?? null,
-          svHeading: pano ? pov.heading : null,
-          svPitch: pano ? pov.pitch : null,
-          // El toggle es "permitir"; el candado es lo contrario (lock = !allow).
-          svLockMove: pano ? !allowMove : false,
-          svLockRotate: pano ? !allowRotate : false,
-          photoIsHint: true,
-          scoreScale,
-        })
       }
 
       setStatus(null)
       track('moment_created', {
         group_id: groupId,
-        challenge_id: result.id,
+        challenge_id: challenge.id,
         has_photo: paths.length > 0,
         photo_count: paths.length,
         has_place: place != null,
-        promoted_to_challenge: isChallenge,
-        score_scale: isChallenge ? scoreScale : null,
+        promoted_to_challenge: false,
+        score_scale: null,
       })
-      // Efecto móvil al guardar: vibración corta + la pantalla se desliza hacia abajo
-      // (como descartar una hoja nativa) y luego volvemos al viaje. Sin animación con
-      // reduced-motion: navegamos directos.
-      if (reducedMotion) {
-        onCreated(result)
-      } else {
-        navigator.vibrate?.(30)
-        setLeaving(true)
-        window.setTimeout(() => onCreated(result), 260)
-      }
+      // Efecto móvil al guardar: vibración corta. En vez de salir directos al viaje,
+      // mostramos el estado "Recuerdo guardado" con "Añadir reto" / "Volver al viaje".
+      navigator.vibrate?.(30)
+      setBusy(false)
+      setSaved(challenge)
     } catch (err) {
       reportError(err, { area: 'add_moment' })
       const msg = describeError(err)
@@ -450,30 +258,56 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
     }
   }
 
-  const durationStop = DURATION_STOPS[durationIndex]
-  const isExpress = durationStop.minutes <= EXPRESS_MAX_MINUTES
+  // ESTADO "Recuerdo guardado": dos caminos claros. "Añadir reto" lleva al
+  // formulario de reto pre-rellenado con la foto y el lugar; "Listo" vuelve al viaje.
+  if (saved) {
+    return (
+      <main className={`lg-page ${styles.screen}`}>
+        <AppHeader title="Recuerdo guardado" />
+        <Stack gap={5} className={styles.savedWrap}>
+          {savedCoverUrl ? (
+            <img className={styles.savedCover} src={savedCoverUrl} alt="" aria-hidden />
+          ) : (
+            <div className={styles.savedCover} data-empty aria-hidden>
+              <Icon icon={Check} size={32} />
+            </div>
+          )}
+          <div className={styles.savedHeading}>
+            <span className={styles.eyebrow}>
+              <Icon icon={Check} size={14} /> Guardado en el viaje
+            </span>
+            <h1 className={styles.title}>{saved.title.trim() || 'Recuerdo'}</h1>
+            {description.trim() && (
+              <p className={`prose ${styles.savedDesc}`}>{description.trim()}</p>
+            )}
+          </div>
+          <Stack gap={3} className={styles.savedActions}>
+            <Button size="lg" fullWidth onClick={() => onAddChallenge(saved.id)}>
+              <Icon icon={Target} size={18} /> Añadir reto
+            </Button>
+            <Button variant="secondary" size="lg" fullWidth onClick={() => onCreated(saved)}>
+              Listo, volver al viaje
+            </Button>
+          </Stack>
+        </Stack>
+      </main>
+    )
+  }
 
   return (
-    <main className={`lg-page ${styles.screen}${leaving ? ` ${styles.leaving}` : ''}`}>
+    <main className={`lg-page ${styles.screen}`}>
+      <AppHeader lead="back" onLead={onBack} leadLabel="Volver" title="Nuevo recuerdo" />
       <Stack gap={5} className="lg-stagger">
-        <header className={styles.header}>
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            ← Volver
-          </Button>
-          <div className={styles.heading}>
-            <span className={styles.eyebrow}>Tu viaje</span>
-            <h1 className={styles.title}>Añadir un recuerdo</h1>
-            <p className={styles.lede}>
-              Una foto, un sitio, unas palabras. Lo compartes y los tuyos lo viven contigo.
-            </p>
-          </div>
-        </header>
+        <div className={styles.heading}>
+          <p className={styles.lede}>
+            Una foto, un sitio, unas palabras. Lo compartes y los tuyos lo viven contigo.
+          </p>
+        </div>
 
-        {/* FOTOS — galería del recuerdo (la 1ª es la portada). Un reto usa solo la
-            portada (se queda con una foto, la que se adivina). */}
+        {/* FOTOS — galería del recuerdo (la 1ª es la portada). */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            {isChallenge ? 'Foto' : 'Fotos'} <span className={styles.optional}>opcional</span>
+            Fotos <span className={styles.optional}>opcional</span>
           </span>
           <MomentGalleryPicker
             photos={photos}
@@ -482,27 +316,13 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
             onRemove={onRemovePhoto}
             onMakeCover={onMakeCover}
           />
-          {isChallenge && photos.length > 1 && (
-            <span className={styles.hint}>
-              Un reto usa solo la portada (la 1ª). Las demás no se guardan.
-            </span>
-          )}
         </section>
 
-        {/* LUGAR — mapa satélite. En recuerdo es el sitio VISIBLE; con el toggle de
-            reto ON es la respuesta OCULTA a adivinar (cambia el lenguaje). */}
+        {/* LUGAR — mapa satélite. En un recuerdo es el sitio VISIBLE. */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            {isChallenge ? (
-              <>
-                <Icon icon={Target} size={16} /> Lugar a adivinar
-              </>
-            ) : (
-              <>
-                <Icon icon={MapPin} size={16} /> Sitio del recuerdo
-              </>
-            )}{' '}
-            <span className={styles.optional}>{isChallenge ? 'obligatorio' : 'opcional'}</span>
+            <Icon icon={MapPin} size={16} /> Sitio del recuerdo{' '}
+            <span className={styles.optional}>opcional</span>
           </span>
           <Stack gap={3}>
             <Button variant="secondary" fullWidth loading={locating} onClick={useGps}>
@@ -523,17 +343,12 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
                 Toca el mapa para marcar dónde es. Sin lugar también vale.
               </span>
             )}
-            {isChallenge && (
-              <span className={styles.hint}>
-                Este será el sitio oculto que los jugadores deberán adivinar.
-              </span>
-            )}
           </Stack>
         </section>
 
-        {/* DESCRIPCIÓN + FECHA */}
+        {/* TÍTULO + DESCRIPCIÓN + FECHA */}
         <section className={styles.block}>
-          <Field label="Título" hint="Cómo lo recordarás de un vistazo.">
+          <Field label="Título" hint="Cómo lo recordarás de un vistazo." required>
             {(fieldProps) => (
               <Input
                 {...fieldProps}
@@ -570,222 +385,14 @@ export function AddMoment({ groupId, onBack, onCreated }: Props) {
           </Field>
         </section>
 
-        {/* TOGGLE — convertir en reto. Apagado por defecto. */}
-        <section className={styles.challengeCard} data-on={isChallenge || undefined}>
-          <button
-            type="button"
-            className={styles.toggle}
-            role="switch"
-            aria-checked={isChallenge}
-            onClick={toggleIsChallenge}
-          >
-            <span className={styles.toggleText}>
-              <span className={styles.toggleTitle}>
-                {isChallenge ? (
-                  <>
-                    <Icon icon={Check} size={16} /> Es un reto
-                  </>
-                ) : (
-                  <>
-                    <Icon icon={Target} size={16} /> Convertirlo en reto
-                  </>
-                )}
-              </span>
-              <span className={styles.toggleHint}>
-                Esconde el lugar y que adivinen dónde es, con cuenta atrás.
-              </span>
-            </span>
-            <span className={styles.switch} aria-hidden>
-              <span className={styles.knob} />
-            </span>
-          </button>
-
-          {isChallenge && (
-            <Stack gap={5} className={styles.challengeBody}>
-              {!place && (
-                <Row gap={2} align="center" className={styles.warn}>
-                  <Icon icon={AlertTriangle} size={18} />
-                  <span>Un reto necesita un lugar a adivinar. Márcalo en el mapa de arriba.</span>
-                </Row>
-              )}
-
-              <Field label="Duración">
-                {(fieldProps) => (
-                  <Stack gap={2}>
-                    <Row gap={2} className={styles.durationValue}>
-                      <span className={styles.durationLabel}>{durationStop.label}</span>
-                      {isExpress && (
-                        <span className={styles.expressPill}>
-                          <Icon icon={Zap} size={14} /> Express
-                        </span>
-                      )}
-                    </Row>
-                    <input
-                      {...fieldProps}
-                      type="range"
-                      className={styles.durationSlider}
-                      min={0}
-                      max={DURATION_STOPS.length - 1}
-                      step={1}
-                      value={durationIndex}
-                      onChange={(e) => setDurationIndex(Number(e.target.value))}
-                      aria-label="Duración del reto"
-                      aria-valuetext={durationStop.label}
-                    />
-                    <Row gap={2} justify="between" className={styles.durationScale}>
-                      <span>{DURATION_STOPS[0].label}</span>
-                      <span>{DURATION_STOPS[DURATION_STOPS.length - 1].label}</span>
-                    </Row>
-                  </Stack>
-                )}
-              </Field>
-
-              <Field label="Tiempo por jugada">
-                {() => (
-                  <Row gap={2} wrap>
-                    {GUESS_OPTIONS.map((opt) => (
-                      <Button
-                        key={opt.label}
-                        variant={guessSeconds === opt.value ? 'primary' : 'secondary'}
-                        size="sm"
-                        aria-pressed={guessSeconds === opt.value}
-                        onClick={() => setGuessSeconds(opt.value)}
-                      >
-                        {opt.label}
-                      </Button>
-                    ))}
-                  </Row>
-                )}
-              </Field>
-
-              <Field
-                label="Precisión"
-                hint="¿Hay que acertar el país, la ciudad o la calle? Cuanto más acotado, más estricto se puntúa."
-              >
-                {() => (
-                  <Row gap={2} wrap>
-                    {PRECISION_OPTIONS.map((opt) => (
-                      <Button
-                        key={opt.value}
-                        variant={scoreScale === opt.value ? 'primary' : 'secondary'}
-                        size="sm"
-                        aria-pressed={scoreScale === opt.value}
-                        onClick={() => setScoreScale(opt.value)}
-                      >
-                        {opt.label}
-                      </Button>
-                    ))}
-                  </Row>
-                )}
-              </Field>
-
-              {/* Street View opcional (solo con lugar fijado). */}
-              <Stack gap={3}>
-                <span className={styles.blockLabel}>
-                  Street View <span className={styles.optional}>opcional</span>
-                </span>
-                <span className={styles.hint}>Deja que exploren tu calle en 360°.</span>
-                <Button
-                  variant={wantsStreetView ? 'primary' : 'secondary'}
-                  fullWidth
-                  disabled={!place}
-                  aria-pressed={wantsStreetView}
-                  onClick={toggleStreetView}
-                >
-                  {wantsStreetView ? (
-                    <>
-                      <Icon icon={Check} size={16} /> Street View
-                    </>
-                  ) : (
-                    <>
-                      <Icon icon={MapIcon} size={16} /> Añadir Street View
-                    </>
-                  )}
-                </Button>
-                {!place && <span className={styles.hint}>Marca antes el lugar en el mapa.</span>}
-
-                {checkingPano && (
-                  <Row gap={2} className={styles.status}>
-                    <Spinner size={16} />
-                    <span>Buscando Street View…</span>
-                  </Row>
-                )}
-
-                {svPrompt && (
-                  <Stack gap={2} className={styles.svPrompt}>
-                    <span>Street View a {svPrompt.distanceMeters} m del lugar. ¿Lo usamos?</span>
-                    <Row gap={2} wrap>
-                      <Button size="sm" onClick={acceptSv}>
-                        Sí, usarlo
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={rejectSv}>
-                        No
-                      </Button>
-                    </Row>
-                  </Stack>
-                )}
-
-                {pano && (
-                  <StreetViewPreview
-                    panoId={pano.panoId}
-                    heading={pov.heading}
-                    pitch={pov.pitch}
-                    onPovChange={setPov}
-                  />
-                )}
-
-                {pano && (
-                  <details className={styles.advanced}>
-                    <summary className={styles.advancedSummary}>Opciones avanzadas</summary>
-                    <Stack gap={3} className={styles.advancedBody}>
-                      <Row gap={2} align="center" wrap>
-                        <Button
-                          variant={allowMove ? 'primary' : 'secondary'}
-                          size="sm"
-                          aria-pressed={allowMove}
-                          onClick={() => setAllowMove((v) => !v)}
-                        >
-                          {allowMove && <Icon icon={Check} size={14} />} Permitir moverse
-                        </Button>
-                        <span className={styles.hint}>
-                          {allowMove ? 'Pueden avanzar por la calle.' : 'No pueden avanzar.'}
-                        </span>
-                      </Row>
-                      <Row gap={2} align="center" wrap>
-                        <Button
-                          variant={allowRotate ? 'primary' : 'secondary'}
-                          size="sm"
-                          aria-pressed={allowRotate}
-                          onClick={() => setAllowRotate((v) => !v)}
-                        >
-                          {allowRotate && <Icon icon={Check} size={14} />} Permitir mirar alrededor
-                        </Button>
-                        <span className={styles.hint}>
-                          {allowRotate ? 'Pueden girar la cámara.' : 'Vista fija.'}
-                        </span>
-                      </Row>
-                    </Stack>
-                  </details>
-                )}
-              </Stack>
-            </Stack>
-          )}
-        </section>
-
-        {/* CTA — el verbo cambia con el toggle. Mientras guarda, el PROPIO botón
-            muestra el estado (subiendo fotos n/N, guardando…) para que se vea qué
-            pasa y no parezca colgado. */}
+        {/* CTA — guardar el recuerdo. Mientras guarda, el botón muestra el estado
+            (subiendo fotos n/N, guardando…) para que no parezca colgado. */}
         <Button size="lg" fullWidth loading={busy} disabled={!canSave} onClick={() => void save()}>
-          {busy ? (
-            (status ?? 'Guardando…')
-          ) : isChallenge ? (
-            <>
-              <Icon icon={Target} size={18} /> Crear reto
-            </>
-          ) : (
-            'Guardar recuerdo'
-          )}
+          {busy ? (status ?? 'Guardando…') : 'Guardar recuerdo'}
         </Button>
+        {!titleValid && !busy && (
+          <span className={styles.hint}>Falta el título del recuerdo para poder guardarlo.</span>
+        )}
       </Stack>
     </main>
   )

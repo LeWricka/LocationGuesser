@@ -4,7 +4,7 @@ import { createGroup } from '../../lib/groupData'
 import { joinGroupAsOwner } from '../../lib/membership'
 import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
-import { Spinner, useToast } from '../../ui'
+import { AppHeader, Spinner, useToast } from '../../ui'
 import { CalendarIcon, PeopleIcon, SparkIcon, TripPinIcon } from './CreateIcons'
 import { ImmersiveSheet } from './ImmersiveSheet'
 import { formatTripDates } from './tripDates'
@@ -14,11 +14,14 @@ interface Props {
   onBack: () => void
 }
 
-// Etapas de la hoja: 0=el viaje (nombre/fechas/detalles) · 1=tu gente · 2=resumen.
-type Stage = 0 | 1 | 2
-const TOTAL_STAGES = 3
-// Alturas (px) de la hoja por etapa: crece con el contenido (como crear-reto).
-const STAGE_HEIGHTS: Record<Stage, number> = { 0: 540, 1: 360, 2: 470 }
+// Etapas de la hoja: 0=el viaje (nombre · fechas · gente, una sola vez) · 1=resumen.
+// El campo de acompañantes vive SOLO en la etapa 0 (antes estaba duplicado en una
+// etapa "tu gente" aparte). NO se pide carátula al crear: la portada es opcional y
+// se añade después desde el viaje.
+type Stage = 0 | 1
+const TOTAL_STAGES = 2
+// Alturas (px) de la hoja por etapa: amplia para que respire (no encajada).
+const STAGE_HEIGHTS: Record<Stage, number> = { 0: 560, 1: 480 }
 
 // Crear un viaje (flujo grupo-primero). El viaje es el contenedor social del
 // plan: lo creas, los invitas y lo viven contigo. No se crea ningún reto aquí;
@@ -51,8 +54,7 @@ export function CreateGroup({ onBack }: Props) {
   // Gating de avance por etapa. Solo el nombre bloquea; el resto es opcional.
   const canAdvanceFromStage: Record<Stage, boolean> = {
     0: nameOk,
-    1: true,
-    2: false,
+    1: false,
   }
 
   function goStage(n: Stage) {
@@ -61,10 +63,10 @@ export function CreateGroup({ onBack }: Props) {
 
   function advance() {
     if (stage === 0 && !nameOk) {
-      toast.show('Ponle un nombre al viaje para seguir.', { tone: 'neutral' })
+      toast.show('Falta el nombre del viaje para seguir.', { tone: 'neutral' })
       return
     }
-    if (stage < 2 && canAdvanceFromStage[stage]) goStage((stage + 1) as Stage)
+    if (stage < 1 && canAdvanceFromStage[stage]) goStage((stage + 1) as Stage)
   }
 
   function retreat() {
@@ -151,17 +153,14 @@ export function CreateGroup({ onBack }: Props) {
       {/* Viñeta para legibilidad del chrome claro sobre el mapa. */}
       <div className={styles.vignette} aria-hidden />
 
-      {/* Topbar flotante translúcido: atrás · título. */}
-      <div className={styles.top}>
-        <button type="button" className={styles.iconBtn} aria-label="Atrás" onClick={onBack}>
-          <BackArrow />
-        </button>
-        <div className={styles.topTitle}>
-          <b>Nuevo viaje</b>
-        </div>
-        {/* Hueco simétrico para centrar el título. */}
-        <span className={styles.iconBtn} aria-hidden />
-      </div>
+      {/* Cabecera ÚNICA (variante flotante sobre la escena): atrás funcional + título. */}
+      <AppHeader
+        variant="floating"
+        lead="back"
+        onLead={onBack}
+        leadLabel="Volver"
+        title="Nuevo viaje"
+      />
 
       {/* BOTTOM SHEET que sube y crece por etapas. */}
       <ImmersiveSheet
@@ -172,15 +171,16 @@ export function CreateGroup({ onBack }: Props) {
         onAdvance={advance}
         onRetreat={retreat}
       >
-        {/* ETAPA 0 — el viaje. */}
+        {/* ETAPA 0 — el viaje: nombre · fechas · gente (todo en una hoja que respira;
+            el campo de acompañantes vive solo aquí, sin duplicar). */}
         {stage === 0 && (
           <section className={styles.stage}>
             <div className={styles.eyebrow}>
-              <i className={styles.dot} /> Paso 1 de 3 · El viaje
+              <i className={styles.dot} /> Paso 1 de 2 · El viaje
             </div>
             <h1 className={`${styles.h} ${styles.serif}`}>Empieza el viaje</h1>
             <p className={styles.sub}>
-              Dale un nombre y, si quieres, di cuándo es. Lo demás puede esperar.
+              Dale un nombre y, si quieres, di cuándo es y con quién. Lo demás puede esperar.
             </p>
 
             <div className={styles.field}>
@@ -239,14 +239,37 @@ export function CreateGroup({ onBack }: Props) {
               )}
             </div>
 
-            {/* Más detalles (opcional, colapsado). */}
+            {/* ¿Con quién vas? — el ÚNICO campo de acompañantes (antes duplicado). */}
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="cg-people">
+                ¿Con quién vas? <span>· opcional</span>
+              </label>
+              <div className={styles.peopleField}>
+                <span className={styles.peopleIco}>
+                  <PeopleIcon size={20} />
+                </span>
+                <input
+                  id="cg-people"
+                  className={styles.peopleInput}
+                  type="text"
+                  placeholder="Marta, Diego y yo"
+                  value={companions}
+                  onChange={(e) => setCompanions(e.target.value)}
+                />
+              </div>
+              <p className={styles.hint}>
+                Solo para recordarlo. A los tuyos los invitas luego con el enlace del viaje.
+              </p>
+            </div>
+
+            {/* Descripción (opcional, colapsada para que la hoja respire). */}
             <button
               type="button"
               className={`${styles.moreBtn} ${moreOpen ? styles.moreOpen : ''}`}
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen((v) => !v)}
             >
-              <span>Añadir descripción y acompañantes</span>
+              <span>Añadir una descripción</span>
               <Chevron />
             </button>
             <div className={`${styles.more} ${moreOpen ? styles.moreShow : ''}`}>
@@ -262,77 +285,21 @@ export function CreateGroup({ onBack }: Props) {
                   onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="cg-people">
-                  ¿Con quién vas? <span>· opcional</span>
-                </label>
-                <input
-                  id="cg-people"
-                  className={styles.input}
-                  type="text"
-                  placeholder="Marta, Diego y yo"
-                  value={companions}
-                  onChange={(e) => setCompanions(e.target.value)}
-                />
-                <p className={styles.hint}>
-                  Solo para recordarlo. A los tuyos los invitas luego con el enlace del viaje.
-                </p>
-              </div>
             </div>
 
             <button className={styles.cta} type="button" disabled={!nameOk} onClick={advance}>
-              Siguiente: tu gente
-              <ArrowRight />
-            </button>
-          </section>
-        )}
-
-        {/* ETAPA 1 — tu gente (acompañantes). */}
-        {stage === 1 && (
-          <section className={styles.stage}>
-            <div className={styles.eyebrow}>
-              <i className={styles.dot} /> Paso 2 de 3 · Tu gente
-            </div>
-            <h1 className={`${styles.h} ${styles.serif}`}>Tu gente</h1>
-            <p className={styles.sub}>
-              Nadie viaja solo. Anota con quién vas; a los tuyos los invitas luego con el enlace.
-            </p>
-
-            <div className={styles.field}>
-              <label className={styles.label} htmlFor="cg-people-2">
-                ¿Con quién vas? <span>· opcional</span>
-              </label>
-              <div className={styles.peopleField}>
-                <span className={styles.peopleIco}>
-                  <PeopleIcon size={20} />
-                </span>
-                <input
-                  id="cg-people-2"
-                  className={styles.peopleInput}
-                  type="text"
-                  placeholder="Marta, Diego y yo"
-                  value={companions}
-                  onChange={(e) => setCompanions(e.target.value)}
-                />
-              </div>
-              <p className={styles.hint}>
-                Es solo un recordatorio del viaje. Para que jueguen de verdad, comparte el enlace
-                del viaje cuando lo crees.
-              </p>
-            </div>
-
-            <button className={styles.cta} type="button" onClick={advance}>
               Revisar y crear
               <ArrowRight />
             </button>
+            {!nameOk && <p className={styles.warnHint}>Falta el nombre del viaje.</p>}
           </section>
         )}
 
-        {/* ETAPA 2 — resumen + crear. */}
-        {stage === 2 && (
+        {/* ETAPA 1 — resumen + crear. */}
+        {stage === 1 && (
           <section className={styles.stage}>
             <div className={styles.eyebrow}>
-              <i className={styles.dot} /> Paso 3 de 3 · Listo
+              <i className={styles.dot} /> Paso 2 de 2 · Listo
             </div>
             <h1 className={`${styles.h} ${styles.serif}`}>Así queda</h1>
             <p className={styles.sub}>Revísalo. Podrás cambiarlo todo más tarde desde el viaje.</p>
@@ -411,15 +378,7 @@ export function CreateGroup({ onBack }: Props) {
   )
 }
 
-// --- Iconos puntuales del chrome flotante / navegación ---
-
-function BackArrow() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  )
-}
+// --- Iconos puntuales del chrome / navegación ---
 
 function ArrowRight() {
   return (
