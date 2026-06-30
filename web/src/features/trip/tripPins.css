@@ -18,7 +18,7 @@
 .lg-trip-pin {
   width: 52px;
   height: 52px;
-  border-radius: var(--radius-full, 999px);
+  border-radius: var(--radius-full);
   background-size: cover;
   background-position: center;
   background-color: var(--color-surface);
@@ -32,7 +32,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: var(--font-size-lg);
   line-height: 1;
   background-color: var(--color-accent);
   color: var(--color-on-accent);
@@ -51,6 +51,7 @@
   background: none;
   box-shadow: none;
   border-radius: 0;
+  /* design-lint-allow: filter drop-shadow exige color literal (tono tinta del pin) */
   filter: drop-shadow(0 4px 8px rgba(24, 32, 43, 0.32));
 }
 
@@ -64,21 +65,22 @@
   height: 12px;
   transform: translateX(-50%) rotate(45deg);
   background: var(--pin-ring-closed);
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 /* Disco: la miniatura redonda con el borde de estado. Por encima de la puntita. */
 .lg-trip-pin__disc {
   position: absolute;
   inset: 0;
+  /* design-lint-allow: capa local del pin (disco sobre la puntita) */
   z-index: 1;
-  border-radius: var(--radius-full, 999px);
+  border-radius: var(--radius-full);
   background-size: cover;
   background-position: center;
   background-color: var(--color-surface);
   border: var(--pin-ring-width) solid var(--pin-ring-closed);
   /* Anillo de contacto fino sobre el borde: clavado físico, no mancha plana. */
-  box-shadow: inset 0 0 0 0.5px rgba(24, 32, 43, 0.12);
+  box-shadow: inset 0 0 0 0.5px var(--hairline);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -101,7 +103,7 @@
 }
 .lg-trip-pin__initial {
   font-family: var(--font-serif);
-  font-size: 20px;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
   line-height: 1;
   letter-spacing: 0.01em;

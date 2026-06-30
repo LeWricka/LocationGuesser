@@ -10,12 +10,12 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   /* Sombra de "objeto físico" sobre el satélite: caída difusa marcada para que la
-     tarjeta se despegue de un satélite oscuro y abigarrado (donde la sombra del
-     token se pierde). Un hairline claro (border) le da un canto que captura luz
+     tarjeta se despegue de un satélite oscuro y abigarrado (token calibrado para la
+     tarjeta-foto del carrusel). Un hairline de escena le da un canto que captura luz
      sobre cualquier fondo y la hace legible siempre. */
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: var(--ocean-900);
+  box-shadow: var(--shadow-photo-card);
+  border: 1px solid var(--scene-hairline);
+  background: var(--color-bg);
   /* Anillo de selección (se enciende en .selected); transición suave del borde.
      La sombra y un leve lift hacia el usuario completan el "enfoque" con un muelle
      suave (emphasized): la tarjeta centrada salta un punto hacia delante. */
@@ -48,6 +48,7 @@
   background: var(--color-accent);
   opacity: 0.85;
   pointer-events: none;
+  /* design-lint-allow: capa local de la tarjeta (filete sobre la foto) */
   z-index: 1;
 }
 
@@ -56,9 +57,10 @@
   position: absolute;
   top: var(--space-3);
   right: var(--space-3);
+  /* design-lint-allow: capa local de la tarjeta (chrome flotante sobre la foto) */
   z-index: 1;
-  width: 36px;
-  height: 36px;
+  width: var(--tap-target-sm);
+  height: var(--tap-target-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -124,9 +126,10 @@
   position: absolute;
   top: var(--space-3);
   left: var(--space-3);
+  /* design-lint-allow: capa local de la tarjeta (chrome flotante sobre la foto) */
   z-index: 1;
-  width: 36px;
-  height: 36px;
+  width: var(--tap-target-sm);
+  height: var(--tap-target-sm);
   display: flex;
   align-items: center;
   justify-content: center;

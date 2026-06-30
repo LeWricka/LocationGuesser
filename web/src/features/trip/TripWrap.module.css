@@ -19,6 +19,7 @@
   position: absolute;
   top: calc(env(safe-area-inset-top) + var(--space-3));
   right: var(--space-3);
+  /* design-lint-allow: capa local del recap (X flotante sobre el scroll) */
   z-index: 2;
   display: grid;
   place-items: center;

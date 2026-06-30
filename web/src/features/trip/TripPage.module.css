@@ -43,6 +43,7 @@
    Overlay absoluto en la franja superior: NO ocupa hueco (el contenido llena la
    pantalla por debajo y se desliza). El propio AppHeader aporta safe-area y velo. */
 .header {
+  /* design-lint-allow: capa local de la página (chrome flotante sobre el panel) */
   z-index: 5;
 }
 /* Título del viaje a dos líneas dentro de la ranura central del AppHeader: nombre
@@ -108,6 +109,7 @@
   top: calc(env(safe-area-inset-top) + var(--tap-target) + var(--space-3));
   left: 0;
   right: 0;
+  /* design-lint-allow: capa local de la página (tabs flotantes sobre el panel) */
   z-index: 5;
   display: flex;
   justify-content: center;
@@ -173,6 +175,7 @@
   top: 0;
   left: 0;
   right: 0;
+  /* design-lint-allow: capa local de la página (esqueleto de cabecera) */
   z-index: 5;
   display: flex;
   align-items: center;
@@ -183,6 +186,7 @@
   content: '';
   position: absolute;
   inset: 0;
+  /* design-lint-allow: capa local (velo detrás del esqueleto) */
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(to bottom, var(--color-bg) 38%, transparent);
@@ -296,7 +300,7 @@
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-xl);
-  color: #fff;
+  color: var(--color-on-accent);
   background: var(--color-accent);
   border: none;
   border-radius: var(--radius-full);
@@ -372,6 +376,7 @@
   left: var(--space-4);
   right: var(--space-4);
   top: calc(env(safe-area-inset-top) + 4.5rem);
+  /* design-lint-allow: capa local de la página (cinta flotante bajo la cabecera) */
   z-index: 3;
   display: flex;
   align-items: center;
@@ -385,7 +390,7 @@
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-full);
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
   box-shadow: var(--shadow-lg);
   animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
   transition: transform var(--transition-fast);

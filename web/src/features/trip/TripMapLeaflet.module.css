@@ -27,6 +27,7 @@
   position: absolute;
   right: var(--space-3);
   top: calc(env(safe-area-inset-top) + 72px);
+  /* design-lint-allow: capa local del mapa (chrome flotante sobre el lienzo) */
   z-index: 2;
   width: 40px;
   height: 40px;
@@ -83,6 +84,7 @@
   backdrop-filter: var(--map-chrome-blur);
   box-shadow: var(--ring-contact);
   color: var(--color-text-faint);
+  /* design-lint-allow: micro-atribución de Leaflet, por debajo de la escala xs */
   font-size: 11px;
   line-height: 1.6;
   /* En reposo el ancho apenas cubre la "ⓘ"; el resto se trunca (botón discreto). */

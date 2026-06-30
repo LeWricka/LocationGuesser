@@ -8,7 +8,8 @@
 .overlay {
   position: fixed;
   inset: 0;
-  z-index: var(--z-overlay, 1000);
+  /* Piso de modal: la hoja flota sobre todo el chrome del viaje. */
+  z-index: var(--z-modal);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -48,6 +49,7 @@
   top: 0;
   left: 0;
   right: 0;
+  /* design-lint-allow: capa local dentro del panel (sobre velo y foto, bajo nada global) */
   z-index: 6;
   display: flex;
   justify-content: center;
@@ -62,14 +64,14 @@
 .handle {
   width: 40px;
   height: 5px;
-  border-radius: var(--radius-full, 999px);
-  /* Sobre la foto: asa clara semitransparente con caída para legibilidad. */
-  background: rgba(246, 247, 249, 0.7);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  border-radius: var(--radius-full);
+  /* Sobre la foto: asa de tinta clara de escena (chrome flotante, no glass). */
+  background: var(--scene-ink-soft);
+  box-shadow: var(--scene-shadow);
   transition: background-color var(--transition-fast);
 }
 .handleZone:active .handle {
-  background: rgba(246, 247, 249, 0.95);
+  background: var(--scene-ink);
 }
 @media (prefers-reduced-motion: reduce) {
   .handle {
@@ -123,20 +125,23 @@
   animation: lg-kenburns 22s ease-in-out infinite alternate;
 }
 
-/* Velo de legibilidad sobre la foto: oscurece arriba (chips) y abajo (info). */
+/* Velo de legibilidad sobre la foto: oscurece arriba (chips) y abajo (info).
+   Tinta de escena (un solo token de velo) en vez de negros arbitrarios: el chrome
+   flota sobre la foto sin glass. La foto manda; el velo solo asegura lectura. */
 .hero::after {
   content: '';
   position: absolute;
   inset: 0;
+  /* design-lint-allow: capa local del hero (velo bajo el chrome flotante) */
   z-index: 1;
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    rgba(24, 32, 43, 0.32) 0%,
+    var(--scene-veil) 0%,
     transparent 22%,
-    transparent 44%,
-    rgba(20, 26, 35, 0.55) 78%,
-    rgba(16, 22, 30, 0.82) 100%
+    transparent 46%,
+    var(--scene-veil) 82%,
+    var(--scene-bg) 100%
   );
 }
 
@@ -149,30 +154,30 @@
   }
 }
 
-/* Cerrar: chip flotante translúcido arriba-izquierda. */
+/* Cerrar: disco de chrome claro flotante arriba-izquierda (tinta de escena sobre
+   un velo de legibilidad, no un glass oscuro). Disco ≥44px (touch target). */
 .heroClose {
   position: absolute;
   top: var(--space-5);
   left: var(--space-4);
+  /* design-lint-allow: capa local del hero (chrome flotante sobre la foto) */
   z-index: 5;
-  width: 40px;
-  height: 40px;
+  width: var(--tap-target);
+  height: var(--tap-target);
   display: grid;
   place-items: center;
-  border: 0;
+  border: 1px solid var(--scene-hairline);
   border-radius: var(--radius-full);
-  color: #f6f7f9;
-  background: rgba(24, 32, 43, 0.42);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  color: var(--scene-ink);
+  background: var(--scene-veil);
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
 .heroClose:hover {
-  background: rgba(24, 32, 43, 0.62);
+  background: var(--scene-bg);
 }
 .heroClose:focus-visible {
-  outline: 2px solid #f6f7f9;
+  outline: 2px solid var(--scene-ink);
   outline-offset: 2px;
 }
 
@@ -181,39 +186,41 @@
   position: absolute;
   top: var(--space-5);
   right: var(--space-4);
+  /* design-lint-allow: capa local del hero (chrome flotante sobre la foto) */
   z-index: 5;
 }
 
-/* Sello dorado "Reto": pastilla cálida con relieve, sobre la foto. */
+/* Sello dorado "Reto": pastilla de oro SÓLIDA (sin gradiente ni glow cálido; el oro
+   marca "lo vivo"/reto, coherente con la ruta del mapa). Quietud editorial. */
 .seal {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 6px 12px 6px 10px;
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2);
   border-radius: var(--radius-full);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
-  color: var(--ink-900, #18202b);
-  background: linear-gradient(135deg, #d9bd7e, var(--medal-gold, #c9a24b));
-  box-shadow:
-    0 4px 14px rgba(169, 134, 67, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  color: var(--medal-on-gold);
+  background: var(--medal-gold);
+  box-shadow: var(--scene-shadow);
 }
 
-/* Chip de lugar (país) sobre la foto: estilo "place-chip" de la maqueta A. */
+/* Chip de lugar (país) sobre la foto: pastilla de chrome claro flotante, mismo
+   lenguaje que la bandera/expandir del carrusel (no glass oscuro). */
 .placeChip {
   position: absolute;
   bottom: var(--space-7);
   left: 50%;
   transform: translateX(-50%);
+  /* design-lint-allow: capa local del hero (chrome flotante sobre la foto) */
   z-index: 3;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: var(--space-1);
   max-width: calc(100% - 2 * var(--space-5));
-  padding: 5px 11px;
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-full);
   white-space: nowrap;
   overflow: hidden;
@@ -221,14 +228,14 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-wide);
-  color: var(--ink-900, #18202b);
-  background: rgba(246, 247, 249, 0.94);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3);
+  color: var(--ink-900);
+  background: var(--map-chrome-bg);
+  backdrop-filter: var(--map-chrome-blur);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
 }
 .placeChip svg {
-  color: var(--accent, #34506b);
+  color: var(--accent);
   flex: 0 0 auto;
 }
 
@@ -238,6 +245,7 @@
   left: 0;
   right: 0;
   bottom: 0;
+  /* design-lint-allow: capa local del hero (info editorial sobre la foto) */
   z-index: 3;
   padding: var(--space-7) var(--space-5) var(--space-5);
 }
@@ -246,22 +254,23 @@
   margin: 0 0 var(--space-2);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.22em;
+  letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
-  color: rgba(246, 247, 249, 0.86);
+  color: var(--scene-ink-soft);
 }
 
-/* Título serif GRANDE (injerto C): la voz editorial sobre la foto. */
+/* Título serif GRANDE (injerto C): la voz editorial sobre la foto. El tamaño es un
+   clamp fluido de portada inmersiva (no hay rol .t-hero en tokens todavía). */
 .title {
   margin: 0;
   font-family: var(--font-serif);
   font-weight: var(--font-weight-bold);
+  /* design-lint-allow: portada inmersiva fluida; sin rol .t-hero en tokens aún */
   font-size: clamp(2.5rem, 12vw, 3.5rem);
-  line-height: 0.96;
+  line-height: var(--line-height-tight);
   letter-spacing: var(--letter-spacing-tight);
   text-wrap: balance;
-  color: #f6f7f9;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, 0.4);
+  color: var(--scene-ink);
 }
 
 /* Filete dorado bajo el título (detalle editorial de C). */
@@ -270,7 +279,7 @@
   width: 46px;
   height: 2px;
   margin: var(--space-4) 0 var(--space-3);
-  background: var(--medal-gold, #c9a24b);
+  background: var(--medal-gold);
 }
 
 .meta {
@@ -280,7 +289,7 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   font-size: var(--font-size-sm);
-  color: rgba(246, 247, 249, 0.82);
+  color: var(--scene-ink-soft);
 }
 
 /* Bandera + país de la meta-línea (nombre ya en MAYÚSCULAS de la util). */
@@ -301,6 +310,7 @@
    arriba) hace que la foto se DISUELVA dentro del papel en vez de cortarse. */
 .article {
   position: relative;
+  /* design-lint-allow: capa local (el papel monta sobre la base de la foto) */
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -335,7 +345,7 @@
   margin: 0 0 var(--space-3);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.22em;
+  letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
   color: var(--color-text-muted);
   white-space: nowrap;
@@ -357,7 +367,7 @@
 .description {
   margin: 0;
   font-size: var(--font-size-md);
-  line-height: 1.62;
+  line-height: var(--line-height-normal);
   color: var(--color-text);
   white-space: pre-wrap;
 }
@@ -369,7 +379,7 @@
   line-height: 0.78;
   float: left;
   padding: 0.06em 0.12em 0 0;
-  color: var(--accent-deep, #2a4256);
+  color: var(--accent-deep);
 }
 .descEditBtn,
 .descAdd {
@@ -405,7 +415,7 @@
   padding: var(--space-3);
   font-family: inherit;
   font-size: var(--font-size-md);
-  line-height: 1.55;
+  line-height: var(--line-height-normal);
   color: var(--color-text);
   background: var(--color-bg);
   border: 1px solid var(--color-border);

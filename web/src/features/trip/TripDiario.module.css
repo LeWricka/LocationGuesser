@@ -23,6 +23,7 @@
      Con isolation + z-index 0 el mapa queda como una capa propia por DEBAJO del
      dock. Mismo arreglo que el mapa inmersivo de crear-reto. */
   isolation: isolate;
+  /* design-lint-allow: capa local del diario (mapa aislado bajo el dock) */
   z-index: 0;
 }
 .map > :global(*) {
@@ -39,6 +40,7 @@
   left: 0;
   right: 0;
   bottom: 0;
+  /* design-lint-allow: capa local del diario (dock flotante sobre el mapa) */
   z-index: 2;
   display: flex;
   flex-direction: column;
@@ -102,6 +104,7 @@
   left: 50%;
   bottom: var(--space-6);
   transform: translateX(-50%);
+  /* design-lint-allow: capa local del diario (tarjeta vacía sobre el mapa) */
   z-index: 2;
   width: min(92%, 420px);
   padding: var(--space-4);

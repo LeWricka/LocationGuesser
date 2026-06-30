@@ -21,10 +21,10 @@
   place-items: center;
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-full) var(--radius-full) 2px var(--radius-full);
+  border-radius: var(--radius-full) var(--radius-full) var(--radius-xs) var(--radius-full);
   transform: rotate(45deg);
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
   box-shadow: var(--shadow-md);
 }
 /* El glifo va derecho dentro del pin girado. */
