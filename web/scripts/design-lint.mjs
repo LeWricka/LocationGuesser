@@ -62,10 +62,13 @@ function walk(dir, exts, out = []) {
 
 const rel = (f) => relative(webRoot, f).split('\\').join('/')
 
-// Tests, stories y fixtures: el emoji y los colores ahi son datos de prueba, no
-// UI de produccion. Se excluyen de TODAS las reglas.
+// Tests, stories, fixtures y la galeria de desarrollo: el emoji y los colores ahi
+// son datos de prueba/andamiaje dev (no entra en el build de produccion), no UI
+// real. Se excluyen de TODAS las reglas.
 const isTestLike = (path) =>
-  /\.(test|spec|stories)\.[tj]sx?$/.test(path) || path.includes('/__tests__/')
+  /\.(test|spec|stories)\.[tj]sx?$/.test(path) ||
+  path.includes('/__tests__/') ||
+  path.includes('/gallery/')
 
 // --- huellas -----------------------------------------------------------------
 
