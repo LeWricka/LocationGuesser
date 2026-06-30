@@ -16,6 +16,7 @@ import {
   BackHomeButton,
   Button,
   Card,
+  EmptyState,
   Icon,
   Input,
   Lightbox,
@@ -143,7 +144,7 @@ export function GroupPage({ groupId, onBack, embedded = false }: Props) {
       setChallenges(c)
       setVotes(v)
     } catch {
-      setError('No hemos podido cargar el viaje. Reintenta en un momento.')
+      setError('Reintenta en un momento.')
     }
   }, [groupId])
 
@@ -301,7 +302,14 @@ export function GroupPage({ groupId, onBack, embedded = false }: Props) {
     return (
       <PageRoot embedded={embedded}>
         <Card>
-          <p className={styles.error}>{error}</p>
+          <EmptyState
+            tone="danger"
+            icon={<Icon icon={AlertTriangle} size={32} />}
+            title="No hemos podido cargar el viaje"
+            description={error}
+            actionLabel="Reintentar"
+            onAction={() => void refresh()}
+          />
         </Card>
       </PageRoot>
     )
@@ -404,18 +412,17 @@ export function GroupPage({ groupId, onBack, embedded = false }: Props) {
           </>
         ) : (
           <Card>
-            <Stack gap={3} align="start">
-              <p className={styles.empty}>
-                {canManage
-                  ? 'Aún no hay retos — añade el primero.'
-                  : 'Aún no hay retos en este viaje.'}
-              </p>
-              {canManage && (
-                <Button size="sm" onClick={goCreateChallenge}>
-                  <Icon icon={Plus} size={16} /> Añadir reto
-                </Button>
-              )}
-            </Stack>
+            <EmptyState
+              icon={<Icon icon={Flag} size={32} />}
+              title={canManage ? 'Aún no hay retos' : 'Aún no hay retos en este viaje'}
+              description={
+                canManage
+                  ? 'Añade el primero: una foto o un Street View y que el grupo adivine.'
+                  : 'Cuando alguien comparta un reto, aparecerá aquí.'
+              }
+              actionLabel={canManage ? 'Añadir reto' : undefined}
+              onAction={canManage ? goCreateChallenge : undefined}
+            />
           </Card>
         )}
 
@@ -658,7 +665,11 @@ function Leaderboard({
       )}
       {entries.length === 0 ? (
         <Card>
-          <p className={styles.empty}>Aún no hay puntos. Jugad un reto para abrir la tabla.</p>
+          <EmptyState
+            icon={<Icon icon={Trophy} size={32} />}
+            title="Aún no hay puntos"
+            description="Jugad un reto para abrir la clasificación."
+          />
         </Card>
       ) : (
         <Stack gap={4}>
