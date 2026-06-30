@@ -6,23 +6,110 @@ import { CHALLENGE_COLUMNS_NO_ANSWER, type ChallengeForPlay } from './challenges
  * código); `prizes` son los premios por posición (1º/2º/3º/último) que se marcan
  * en la clasificación general (null si el dueño no ha definido ninguno).
  * `closed_at` marca el fin de temporada: null = activo; con fecha = archivado
- * (la página pasa a solo-lectura y muestra el podio final). */
+ * (la página pasa a solo-lectura y muestra el podio final).
+ * Los campos del viaje (0027) son contenido editorial opcional: fechas, de qué va,
+ * con quién y portada. Todos null cuando el creador no los rellenó. */
 export interface GroupInfo {
   id: string
   name: string | null
   prizes: GroupPrizes | null
   closed_at: string | null
+  starts_on: string | null
+  ends_on: string | null
+  description: string | null
+  companions: string | null
+  cover_image_path: string | null
 }
 
-/** Lee el grupo (id + nombre + premios + cierre) para la página, o null si no existe. */
+/** Lee el grupo (id + nombre + premios + cierre + datos del viaje) para la página,
+ * o null si no existe. */
 export async function getGroup(groupId: string): Promise<GroupInfo | null> {
   const { data, error } = await supabase
     .from('groups')
-    .select('id, name, prizes, closed_at')
+    .select(
+      'id, name, prizes, closed_at, starts_on, ends_on, description, companions, cover_image_path',
+    )
     .eq('id', groupId)
     .maybeSingle()
   if (error) throw error
   return data
+}
+
+/** Datos del viaje que el creador rellena al arrancar (todos opcionales salvo el
+ * nombre, que va aparte). Fechas en 'YYYY-MM-DD'; `companions` es texto libre
+ * informativo (no membresía). */
+export interface NewTripData {
+  name: string
+  startsOn?: string | null
+  endsOn?: string | null
+  description?: string | null
+  companions?: string | null
+  coverImagePath?: string | null
+}
+
+/** Fila lista para insertar en `groups`. Pública para testear `buildGroupInsert`
+ * sin tocar Supabase. */
+export interface GroupInsertRow {
+  id: string
+  name: string | null
+  created_by: string
+  starts_on: string | null
+  ends_on: string | null
+  description: string | null
+  companions: string | null
+  cover_image_path: string | null
+}
+
+/** Recorta un texto opcional; vacío o solo espacios → null (no guardamos cadenas
+ * vacías, que ensucian la cabecera y el resumen). */
+function cleanText(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+/**
+ * Construye la fila a insertar en `groups` a partir de los datos del viaje.
+ * Función pura (sin Supabase): recorta los textos, normaliza vacíos a null y, si
+ * el rango de fechas viene al revés (fin antes que inicio), lo intercambia para
+ * no guardar un rango imposible. Fácil de testear.
+ */
+export function buildGroupInsert(
+  groupId: string,
+  userId: string,
+  trip: NewTripData,
+): GroupInsertRow {
+  let starts = cleanText(trip.startsOn)
+  let ends = cleanText(trip.endsOn)
+  // Rango invertido (fin < inicio) → lo enderezamos: el usuario tocó las fechas
+  // en otro orden, pero el viaje siempre va de la más temprana a la más tardía.
+  if (starts && ends && ends < starts) {
+    ;[starts, ends] = [ends, starts]
+  }
+  return {
+    id: groupId,
+    name: cleanText(trip.name),
+    created_by: userId,
+    starts_on: starts,
+    ends_on: ends,
+    description: cleanText(trip.description),
+    companions: cleanText(trip.companions),
+    cover_image_path: cleanText(trip.coverImagePath),
+  }
+}
+
+/**
+ * Crea el viaje (grupo) con el nombre y los datos opcionales. El creador queda
+ * como dueño vía `created_by` (lo exige el RLS de groups). Devuelve el id del
+ * grupo creado. La membresía 'owner' la añade el llamante (joinGroupAsOwner),
+ * como en el flujo original.
+ */
+export async function createGroup(
+  groupId: string,
+  userId: string,
+  trip: NewTripData,
+): Promise<void> {
+  const { error } = await supabase.from('groups').insert(buildGroupInsert(groupId, userId, trip))
+  if (error) throw new Error(error.message)
 }
 
 /**
