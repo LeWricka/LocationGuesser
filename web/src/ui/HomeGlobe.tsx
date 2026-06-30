@@ -208,10 +208,18 @@ export function HomeGlobe({ pins, onOpenPin, relaxed = false, className }: Props
           center: WORLD_CENTER,
           zoom: WORLD_ZOOM,
           minZoom: MIN_ZOOM,
-          attributionControl: { compact: true },
+          // Desactivamos el control por defecto y lo añadimos instanciado a mano (abajo):
+          // pasarlo como opción-objeto NO entraba en modo compacto fiablemente en prod
+          // (se veía el texto completo de Esri como banda, no el "ⓘ").
+          attributionControl: false,
           fadeDuration: prefersReducedMotion() ? 0 : 300,
         })
         mapRef.current = map
+
+        // Atribución COLAPSADA de verdad: instanciar `AttributionControl` con
+        // `compact: true` es la forma documentada y fiable de obtener el "ⓘ" que expande
+        // al tocar (el control sí recibe la clase `maplibregl-compact` que estiliza el CSS).
+        map.addControl(new gl.AttributionControl({ compact: true }), 'bottom-right')
 
         map.on('load', () => {
           if (disposed) return
