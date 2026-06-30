@@ -95,18 +95,18 @@
   min-width: var(--tap-target);
   min-height: var(--tap-target);
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--scene-hairline);
   border-radius: var(--radius-full);
-  background: rgba(0, 0, 0, 0.4);
-  color: var(--color-on-photo);
+  background: var(--scene-veil);
+  color: var(--scene-ink);
   font-size: var(--font-size-md);
   cursor: pointer;
 }
 
 .action:hover,
 .action:focus-visible {
-  background: rgba(0, 0, 0, 0.6);
-  border-color: var(--color-on-photo);
+  background: var(--scene-bg);
+  border-color: var(--scene-ink);
 }
 
 .action:disabled {
