@@ -26,6 +26,11 @@ export default defineConfig({
         clientsClaim: true,
         skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        // El SW NO debe interceptar las funciones serverless de previsualización
+        // (`/api/*`) ni las rutas limpias `/v/*` y `/j/*`: esas las sirve Vercel
+        // (la función `share` con las metas OG). Si el navigateFallback las
+        // capturara, serviría el index.html cacheado y se perdería la tarjeta OG.
+        navigateFallbackDenylist: [/^\/api\//, /^\/v\//, /^\/j\//],
       },
       // En desarrollo NO activamos el SW: evita cachés agresivas mientras se
       // programa y mantiene el dev server limpio (el SW solo en build/prod).
