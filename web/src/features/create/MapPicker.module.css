@@ -70,29 +70,29 @@
   outline-offset: 2px;
 }
 
-/* Atribución de Esri/Leaflet: obligatoria, pero por defecto sale como una CAJA
-   blanca grande pegada a la esquina que rompe la foto satélite. La compactamos a
-   una pastilla diminuta y translúcida (chrome Atelier), tinta suave y muy poco
-   intrusiva, separada del borde para respetar el radio del mapa. Es `:global`
-   porque el control lo pinta Leaflet fuera del scope del CSS module; lo acotamos
-   bajo `.wrap` para no afectar a otros mapas. */
+/* Atribución de Esri/Leaflet COLAPSADA (obligatoria pero discreta): en reposo es
+   solo el botón "ⓘ" (el prefix), una pastilla diminuta del chrome Atelier; al
+   pasar/tocar despliega los créditos completos. Nada de banda "Leaflet | Tiles ©
+   Esri…" a sangre bajo el mapa. Es `:global` porque el control lo pinta Leaflet
+   fuera del scope del CSS module; lo acotamos bajo `.wrap` para no tocar otros
+   mapas. Mismo patrón que los mapas del viaje (`TripMapLeaflet`). */
 .wrap :global(.leaflet-control-attribution) {
   margin: 0 var(--space-2) var(--space-2) 0;
-  padding: 2px var(--space-2);
+  padding: 1px var(--space-2);
   border-radius: var(--radius-full);
   background: var(--map-chrome-bg);
   -webkit-backdrop-filter: var(--map-chrome-blur);
   backdrop-filter: var(--map-chrome-blur);
   box-shadow: var(--ring-contact);
   color: var(--color-text-faint);
-  font-size: 10px;
-  line-height: 1.5;
-  /* Truncada: aparece completa al pasar/tocar; en reposo no roba foco visual. */
-  max-width: 52%;
+  font-size: 11px;
+  line-height: 1.6;
+  /* En reposo el ancho apenas cubre la "ⓘ"; el resto se trunca (botón discreto). */
+  max-width: 1.9em;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-  opacity: 0.72;
+  text-overflow: clip;
+  opacity: 0.85;
   transition:
     max-width var(--transition-base),
     opacity var(--transition-fast);

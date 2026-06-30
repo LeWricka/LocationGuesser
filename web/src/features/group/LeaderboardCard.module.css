@@ -280,17 +280,19 @@ img.podiumAvatar {
   font-size: 50px;
 }
 
+/* Premio del podio: texto a varias líneas (no se trunca con elipsis), para que el
+   premio entero quepa en el póster aunque sea largo. */
 .podiumPrize {
   max-width: 100%;
   font-size: 22px;
   font-weight: var(--font-weight-semibold);
   color: var(--color-accent);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.25;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
 }
-/* Icono (Gift) alineado con la línea base del texto del premio, sin romper el
-   truncado por ellipsis del contenedor. */
+/* Icono (Gift) alineado con la línea base del texto del premio. */
 .podiumPrize svg {
   width: 1em;
   height: 1em;
@@ -320,9 +322,13 @@ img.podiumAvatar {
   height: 96px;
 }
 
+/* Medalla de línea sobre el pedestal: el font-size fija su lado (el SVG escala a
+   1em). En el póster 1080px va grande para leerse en la captura. */
 .pedestalMedal {
-  font-size: 44px;
+  font-size: 52px;
   line-height: 1;
+  width: 1em;
+  height: 1em;
 }
 
 /* Tinte del pedestal: versión tenue del color de la medalla, OPACA (mezcla con
@@ -383,6 +389,20 @@ img.podiumAvatar {
   line-height: 1;
 }
 
+/* Disco neutro para la medalla de LÍNEA del top-3 (caso sin podio): la medalla ya
+   trae su color por token, así que el disco va tenue para no competir. */
+.medalLine {
+  background-color: var(--card-tint-accent);
+  border: 1px solid var(--card-border);
+}
+
+/* La medalla de línea (SVG) escala a su font-size (1em). */
+.listMedal {
+  font-size: 48px;
+  width: 1em;
+  height: 1em;
+}
+
 /* Disco de puesto: medallas con su color; resto en acento pizarra tenue. El
    número de puesto (>3) hereda el color del texto del disco. */
 .gold {
@@ -429,16 +449,15 @@ img.podiumAvatar {
 }
 
 .prize {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
   font-size: 22px;
   font-weight: var(--font-weight-semibold);
   color: var(--color-accent);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
   max-width: 320px;
 }
-/* Icono (Gift) alineado con el texto del premio sin romper el ellipsis. */
+/* Icono (Gift) alineado con el texto del premio. */
 .prize svg {
   vertical-align: -0.15em;
 }

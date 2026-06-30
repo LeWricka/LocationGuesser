@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
+import {
+  AttributionControl,
+  MapContainer,
+  Marker,
+  TileLayer,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { LatLng } from '../../lib/geo'
@@ -101,7 +108,13 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
         center={[center.lat, center.lng]}
         zoom={zoom}
         className={`lg-map ${styles.map}`}
+        attributionControl={false}
       >
+        {/* Atribución (obligatoria) COLAPSADA: un botón "ⓘ" discreto en la esquina
+            en vez de la banda "Leaflet | Tiles © Esri…" a sangre. El glifo "ⓘ" es el
+            prefix; el CSS oculta los créditos en reposo y los revela en hover/focus
+            (mismo patrón que los mapas del viaje). */}
+        <AttributionControl position="bottomright" prefix="ⓘ" />
         {/* keepBuffer + updateWhenZooming reducen el parpadeo gris al hacer
             zoom (mismo motivo que en PlayMap). Sin `subdomains` porque la capa
             satélite (Esri) no usa el placeholder {s}. */}

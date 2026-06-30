@@ -61,6 +61,7 @@ import { GroupSettingsModal } from './GroupSettingsModal'
 import { AllGuessesMap } from './AllGuessesMap'
 import { Podium, type PodiumClasses } from './Podium'
 import { parseAvatar } from '../../lib/avatar'
+import { Medal } from '../../ui/Medal'
 import styles from './GroupPage.module.css'
 
 interface Props {
@@ -829,9 +830,12 @@ function PrizesEditorModal({
     >
       <Stack gap={3}>
         <p className={styles.empty}>Opcionales. Se marcan en la fila de cada puesto.</p>
-        {PRIZE_SLOTS.map(({ key, label }, i) => (
+        {PRIZE_SLOTS.map(({ key, label, rank }, i) => (
           <label key={key} className={styles.prizeField}>
-            <span className={styles.prizeFieldLabel}>{label}</span>
+            <span className={styles.prizeFieldLabel}>
+              {rank ? <Medal rank={rank} size={18} /> : <Icon icon={Flag} size={16} />}
+              {label}
+            </span>
             <Input
               value={draft[key] ?? ''}
               onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}

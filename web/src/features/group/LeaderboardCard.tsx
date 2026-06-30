@@ -1,9 +1,10 @@
 import { forwardRef } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { Gift, MapPin } from 'lucide-react'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import { Icon } from '../../ui'
+import { Medal } from '../../ui/Medal'
 import { prizeForRow } from './prizes'
 import { Podium, type PodiumClasses } from './Podium'
 import styles from './LeaderboardCard.module.css'
@@ -19,22 +20,22 @@ interface Props {
   photoDataUrl: string | null
 }
 
-// Medalla por puesto: oro/plata/bronce y luego el número del puesto.
-function medalFor(index: number): string {
-  if (index === 0) return '🥇'
-  if (index === 1) return '🥈'
-  if (index === 2) return '🥉'
+// Medalla por puesto: medalla de línea (SVG) para el top-3, número para el resto.
+// Devuelve un nodo (no string) porque la medalla es un componente, no un emoji.
+function medalFor(index: number): ReactNode {
+  if (index <= 2) return <Medal rank={(index + 1) as 1 | 2 | 3} className={styles.listMedal} />
   return `${index + 1}`
 }
 
 // Línea de premios "en juego" para el pie de la tarjeta (mismo orden que el chat).
+// Sin emojis: cada premio se etiqueta con su puesto en texto (1º/2º/3º/Último).
 function prizesLine(prizes: GroupPrizes | null): string | null {
   if (!prizes) return null
   const parts: string[] = []
-  if (prizes.first?.trim()) parts.push(`🥇 ${prizes.first.trim()}`)
-  if (prizes.second?.trim()) parts.push(`🥈 ${prizes.second.trim()}`)
-  if (prizes.third?.trim()) parts.push(`🥉 ${prizes.third.trim()}`)
-  if (prizes.last?.trim()) parts.push(`🏁 ${prizes.last.trim()}`)
+  if (prizes.first?.trim()) parts.push(`1º ${prizes.first.trim()}`)
+  if (prizes.second?.trim()) parts.push(`2º ${prizes.second.trim()}`)
+  if (prizes.third?.trim()) parts.push(`3º ${prizes.third.trim()}`)
+  if (prizes.last?.trim()) parts.push(`Último ${prizes.last.trim()}`)
   return parts.length > 0 ? parts.join('  ·  ') : null
 }
 
@@ -147,9 +148,14 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
                 const width = top > 0 ? Math.max(8, Math.round((entry.points / top) * 100)) : 0
                 const prize = prizeForRow(prizes, i, entries.length)
                 const rankClass = rankClassOf(styles, i)
+                // El top-3 (caso sin podio) lleva medalla de línea sobre disco
+                // neutro; del 4º en adelante, el número sobre el disco de color.
+                const isMedal = i <= 2
                 return (
                   <li key={entry.userId} className={`${styles.row} ${i < 3 ? styles.topRow : ''}`}>
-                    <span className={`${styles.medal} ${rankClass}`}>{medalFor(i)}</span>
+                    <span className={`${styles.medal} ${isMedal ? styles.medalLine : rankClass}`}>
+                      {medalFor(i)}
+                    </span>
                     <div className={styles.mid}>
                       <div className={styles.nameRow}>
                         <span className={styles.name}>{entry.name}</span>

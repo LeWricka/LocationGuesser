@@ -259,7 +259,7 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
 
       setStatus('Guardando los cambios…')
       const updated = await updateChallenge(challenge.id, {
-        title: title.trim() || '¿Dónde estoy? 🌍',
+        title: title.trim() || '¿Dónde estoy?',
         guessSeconds,
         photoIsHint,
         ...(imagePath !== undefined ? { imagePath } : {}),
@@ -303,11 +303,11 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
       <AppHeader title="Editar reto" lead="back" onLead={onBack} leadLabel="Volver" />
 
       <Stack gap={4}>
-        <Field label="Título del reto" hint="Si lo dejas vacío usamos «¿Dónde estoy? 🌍».">
+        <Field label="Título del reto" hint="Si lo dejas vacío usamos «¿Dónde estoy?».">
           {(fieldProps) => (
             <Input
               {...fieldProps}
-              placeholder="¿Dónde estoy? 🌍"
+              placeholder="¿Dónde estoy?"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />

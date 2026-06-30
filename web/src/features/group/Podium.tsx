@@ -4,7 +4,11 @@ import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import { parseAvatar } from '../../lib/avatar'
 import { Icon } from '../../ui'
+import { Medal } from '../../ui/Medal'
 import { prizeForRow } from './prizes'
+
+// Puesto del podio (1, 2 o 3) a partir del índice 0-based del top-3.
+type PodiumRank = 1 | 2 | 3
 
 // Mapa de clases CSS que cada contexto inyecta. Compartimos el MARKUP del podio
 // (mismo orden 2-1-3, disco con avatar, pedestales) pero NO la escala: la tarjeta
@@ -37,14 +41,6 @@ interface Props {
   /** Total de jugadores: lo necesita prizeForRow para resolver el premio "último". */
   totalEntries: number
   classes: PodiumClasses
-}
-
-// Medalla por puesto: oro/plata/bronce (el número solo aparece de 4º en adelante,
-// que va en lista, no en el podio).
-function medalFor(index: number): string {
-  if (index === 0) return '🥇'
-  if (index === 1) return '🥈'
-  return '🥉'
 }
 
 // Clase de color del puesto (oro/plata/bronce) para disco y pedestal.
@@ -104,9 +100,10 @@ function PodiumColumn({
         </span>
       )}
       <span className={`${classes.pedestal} ${rankClass}`}>
-        <span className={classes.pedestalMedal} aria-hidden="true">
-          {medalFor(index)}
-        </span>
+        {/* Medalla de línea (SVG, color por token --medal-*); reemplaza al emoji.
+            La clase `pedestalMedal` fija el tamaño (1em vía su font-size) para que
+            escale igual en pantalla y en el póster 1080px. */}
+        <Medal rank={(index + 1) as PodiumRank} className={classes.pedestalMedal} />
       </span>
     </div>
   )
