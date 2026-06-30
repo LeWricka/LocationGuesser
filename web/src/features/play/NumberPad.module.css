@@ -3,24 +3,26 @@
 .pad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+  gap: var(--space-2);
 }
 .key {
   display: grid;
   place-items: center;
-  padding: 14px 0;
-  min-height: 52px;
-  font-size: 24px;
-  font-weight: 600;
+  padding: var(--space-3) 0;
+  /* Tecla cómoda al pulgar: por encima del objetivo táctil mínimo. */
+  min-height: var(--tap-target);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--ink-900);
   cursor: pointer;
   font-family: inherit;
+  font-variant-numeric: tabular-nums;
   transition:
-    background 0.12s ease,
-    transform 0.1s ease;
+    background var(--transition-fast),
+    transform var(--transition-fast);
   user-select: none;
 }
 .key:active {
@@ -28,8 +30,8 @@
   transform: scale(0.96);
 }
 .key:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: var(--focus-ring-offset);
 }
 .key:disabled {
   opacity: 0.5;

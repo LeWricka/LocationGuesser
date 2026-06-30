@@ -57,11 +57,12 @@
   background: linear-gradient(160deg, var(--color-surface) 0%, var(--color-bg) 100%);
 }
 
-/* Velo oscuro: la foto puede ser clara; garantiza contraste para los números. */
+/* Velo oscuro: la foto puede ser clara; garantiza contraste para los números.
+   Velo de escena (token), igual que el resto del chrome sobre foto. */
 .scrim {
   position: absolute;
   inset: 0;
-  background: rgb(2 10 16 / 0.55);
+  background: var(--scene-veil);
 }
 
 /* Número gigante centrado. Serif de revista (Atelier) para el 3·2·1. Tabular para
@@ -70,13 +71,14 @@
 .number {
   position: relative;
   font-family: var(--font-serif);
+  /* design-lint-allow: titular gigante fluido del 3·2·1; no hay token de este tamaño */
   font-size: clamp(7rem, 40vw, 16rem);
   font-weight: var(--font-weight-semibold);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   letter-spacing: var(--letter-spacing-tighter);
-  color: var(--color-on-photo);
-  text-shadow: 0 8px 40px rgb(0 0 0 / 0.45);
+  color: var(--scene-ink);
+  text-shadow: 0 8px 40px var(--scene-veil);
   /* Entrada LARGA y SUAVE en cada cambio de dígito (sin rebote): el número entra algo
      grande y difuminado y asienta con un ease suave hasta su tamaño, manteniéndose
      nítido y presente durante todo el descanso. La cuenta respira en vez de saltar. */

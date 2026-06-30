@@ -1,23 +1,25 @@
-/* Jugar reto de NÚMERO ("¿Cuánto?", #323). Foto + pregunta arriba; número grande
-   con unidad ENCIMA del teclado en UNA sola columna; acción anclada con safe-area.
-   Tokens del kit + tokens de escena (--scene-*); sin colores sueltos. */
+/* Jugar reto de NÚMERO ("¿Cuánto?", #323). Foto-first: la foto es la escena a
+   sangre y la pregunta flota sobre ella con velo de legibilidad; el número grande
+   con unidad va ENCIMA del teclado en UNA columna; acción anclada con safe-area.
+   Todo sale de tokens del kit + tokens de escena (--scene-*); sin valores sueltos. */
 
 .status {
   color: var(--ink-600);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .inlineIcon {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 .btnIcon {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: var(--space-2);
 }
 
 /* ── Fase JUGAR: pantalla completa con modelo de viewport correcto ──
@@ -65,41 +67,48 @@
     180deg,
     var(--scene-veil) 0%,
     transparent 30%,
-    transparent 55%,
+    transparent 50%,
     var(--scene-veil) 100%
   );
 }
 
-/* Pregunta sobre la foto, anclada abajo de la escena (siempre visible). */
+/* Pregunta sobre la foto, anclada abajo de la escena (siempre visible). Aire
+   generoso: respeta el gutter de página y deja respirar el chip + el titular. */
 .questionWrap {
   position: absolute;
-  z-index: 2;
-  left: 18px;
-  right: 18px;
-  bottom: 16px;
+  z-index: var(--z-header);
+  left: var(--space-gutter);
+  right: var(--space-gutter);
+  bottom: var(--space-5);
   display: grid;
-  gap: 8px;
+  gap: var(--space-3);
   justify-items: start;
 }
 .kindChip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border-radius: 999px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
   border: 1px solid var(--scene-hairline);
   background: var(--accent);
   color: var(--color-on-accent);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
 }
+/* La pregunta es el protagonista: titular serif grande sobre la foto. */
 .question {
   margin: 0;
   color: var(--scene-ink);
-  font-size: 24px;
-  line-height: 1.18;
-  font-weight: 600;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
   text-shadow: 0 1px 10px var(--scene-veil);
+  text-wrap: balance;
 }
 
 /* Hoja inferior: número grande (con unidad encima del teclado) + teclado + CTA, en
@@ -107,16 +116,17 @@
 .sheet {
   flex-shrink: 0;
   background: var(--color-surface);
-  border-radius: 22px 22px 0 0;
-  box-shadow: 0 -10px 40px var(--scene-veil);
-  padding: 16px 18px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sheet);
+  padding: var(--space-4) var(--space-5) calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
   display: grid;
-  gap: 12px;
+  gap: var(--space-3);
 }
 .fieldLabel {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   color: var(--ink-600);
   text-align: center;
@@ -126,22 +136,22 @@
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   border-bottom: 2px solid var(--accent);
-  padding: 6px 8px 12px;
+  padding: var(--space-2) var(--space-2) var(--space-3);
   min-height: 60px;
 }
 .guessNum {
-  font-size: 44px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-black);
+  letter-spacing: var(--letter-spacing-tighter);
   line-height: 1;
   color: var(--ink-900);
   font-variant-numeric: tabular-nums;
 }
 .guessUnit {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
   color: var(--accent);
 }
 .caret {
@@ -160,8 +170,8 @@
 .startBody {
   text-align: center;
   color: var(--ink-600);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
 }
 .startIcon {
   color: var(--accent);
@@ -171,7 +181,7 @@
 .revealHead {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: var(--radius-lg, 18px);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -195,90 +205,105 @@
 }
 .revealInner {
   position: relative;
-  z-index: 1;
+  z-index: var(--z-base);
   text-align: center;
   color: var(--scene-ink);
   display: grid;
-  gap: 2px;
-  padding: 16px;
+  gap: var(--space-1);
+  padding: var(--space-4);
 }
 .revealLabel {
-  font-size: 12px;
-  letter-spacing: 0.18em;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   color: var(--scene-ink-soft);
 }
+/* La cifra revelada es el dato héroe: serif grande sobre la foto. */
 .revealNum {
-  font-size: 46px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
   text-shadow: 0 2px 12px var(--scene-veil);
 }
 
 /* Bloque de puntuación (reutiliza el lenguaje del reto de lugar). */
 .scoreReveal {
   position: relative;
+  text-align: center;
 }
 .scoreEyebrow {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.6px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
   color: var(--ink-600);
 }
 .scoreEyebrowWin {
   color: var(--accent);
+  font-weight: var(--font-weight-black);
 }
 .ringPoints {
-  font-size: 40px;
-  font-weight: 700;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-black);
   color: var(--ink-900);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-tighter);
 }
 .ringUnit {
-  font-size: 12px;
-  color: var(--ink-600);
-  font-weight: 600;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--ink-400);
+  font-weight: var(--font-weight-semibold);
+  margin-top: var(--space-1);
 }
 .scoreText {
   display: grid;
-  gap: 3px;
+  gap: var(--space-1);
   justify-items: center;
   text-align: center;
 }
 .scoreLabel {
-  font-size: 15px;
+  font-size: var(--font-size-md);
   color: var(--ink-900);
 }
 .resultErr {
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--ink-600);
 }
 .rank {
-  margin-top: 4px;
-  font-size: 12px;
-  font-weight: 700;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
   color: var(--accent);
+  font-variant-numeric: tabular-nums;
 }
 
 .leftAppNotice {
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: center;
+  gap: var(--space-2);
   margin: 0;
-  font-size: 12.5px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  font-size: var(--font-size-sm);
   color: var(--color-warning);
 }
 
 /* ── Marcador del reto ── */
 .board {
   display: grid;
-  gap: 8px;
+  gap: var(--space-2);
 }
 .boardTitle {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   color: var(--ink-600);
 }
@@ -290,10 +315,10 @@
 }
 .boardRow {
   display: grid;
-  grid-template-columns: 24px 1fr auto auto;
-  gap: 10px;
+  grid-template-columns: var(--space-5) 1fr auto auto;
+  gap: var(--space-3);
   align-items: center;
-  padding: 10px 8px;
+  padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--color-border);
 }
 .boardRow:last-child {
@@ -301,27 +326,28 @@
 }
 .boardRowTop {
   background: var(--accent-tint);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   border-bottom: 0;
 }
 .boardRowMe .whoName {
-  font-weight: 800;
+  font-weight: var(--font-weight-bold);
 }
 .rk {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--ink-400);
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 .who {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 .whoName {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--ink-900);
   white-space: nowrap;
   overflow: hidden;
@@ -332,14 +358,14 @@
   color: var(--color-warning);
 }
 .said {
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--ink-600);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .pt {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
