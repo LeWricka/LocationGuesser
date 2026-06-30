@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { CreateGroup } from './features/create/CreateGroup'
 import { AddMoment } from './features/create/AddMoment'
-import { CreateChallengeImmersive } from './features/create/CreateChallengeImmersive'
+import { CreateChallengeFlow } from './features/create/CreateChallengeFlow'
 import { PlayChallenge } from './features/play/PlayChallenge'
 import { GroupPage } from './features/group/GroupPage'
 import { TripPage } from './features/trip/TripPage'
@@ -222,7 +222,7 @@ function LoggedIn({
     if (route.groupAddChallenge) {
       return (
         <OnboardingGate context="create-challenge" userId={user?.id}>
-          <CreateChallengeImmersive
+          <CreateChallengeFlow
             groupId={groupId}
             onBack={() => {
               location.hash = groupHash(groupId)

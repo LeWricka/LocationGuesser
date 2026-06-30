@@ -1,0 +1,49 @@
+/* Teclado numérico en pantalla del reto de número (#323). Rejilla 3×4, teclas
+   grandes táctiles. Tokens del kit; sin emojis de chrome (el ⌫ es icono lucide). */
+.pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.key {
+  display: grid;
+  place-items: center;
+  padding: 14px 0;
+  min-height: 52px;
+  font-size: 24px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--ink-900);
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background 0.12s ease,
+    transform 0.1s ease;
+  user-select: none;
+}
+.key:active {
+  background: var(--color-surface-hover);
+  transform: scale(0.96);
+}
+.key:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.key:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.keyDim {
+  color: var(--ink-600);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .key {
+    transition-duration: 0.001ms;
+  }
+  .key:active {
+    transform: none;
+  }
+}

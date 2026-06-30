@@ -3,6 +3,8 @@ import {
   haversine,
   scoreFor,
   fmtDist,
+  fmtNumber,
+  signedRelErrorPct,
   SCORE_DECAY_KM,
   DEFAULT_SCORE_SCALE,
   scoreForNumber,
@@ -130,5 +132,22 @@ describe('scoreForNumber', () => {
   test('nunca negativo: un error enorme tiende a 0', () => {
     expect(scoreForNumber(1_000_000, 100, 'estricto')).toBe(0)
     expect(scoreForNumber(1_000_000, 100, 'estricto')).toBeGreaterThanOrEqual(0)
+  })
+
+  test('fmtNumber: es-ES con decimales fijos y unidad', () => {
+    expect(fmtNumber(84.5, 2, '€')).toBe('84,50 €')
+    // Coma decimal y separador de millares es-ES (punto) a partir de 5 cifras.
+    expect(fmtNumber(12345, 0, 'km')).toBe('12.345 km')
+    expect(fmtNumber(72, 0)).toBe('72')
+    expect(fmtNumber(72, 0, null)).toBe('72')
+  })
+
+  test('signedRelErrorPct: signo + valor frente a la respuesta', () => {
+    // 120 sobre 100 → +20 %
+    expect(signedRelErrorPct(120, 100)).toBe('+20 %')
+    // 82 sobre 100 → −18 %
+    expect(signedRelErrorPct(82, 100)).toBe('−18 %')
+    // clavarlo → 0 % sin signo
+    expect(signedRelErrorPct(100, 100)).toBe('0 %')
   })
 })

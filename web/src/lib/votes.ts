@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import { describeError } from './errors'
 import type { Vote } from './database.types'
+import type { VoteWithName } from './leaderboard'
 
 export interface SubmitVoteInput {
   challengeId: string
@@ -143,6 +144,32 @@ export async function getVotes(challengeId: string): Promise<Vote[]> {
   const { data, error } = await supabase.from('votes').select().eq('challenge_id', challengeId)
   if (error) throw error
   return data ?? []
+}
+
+/**
+ * Votos de un reto con el display_name y avatar del votante, para el MARCADOR del
+ * revelado (issue #323). Mismo patrón de dos consultas que `getGroupVotes` (votos +
+ * perfiles), porque `votes.user_id` referencia `auth.users`, no `public.profiles`,
+ * y no hay relación que embeber. Si falta el perfil, cae a un guion / sin avatar.
+ */
+export async function getVotesWithNames(challengeId: string): Promise<VoteWithName[]> {
+  const votes = await getVotes(challengeId)
+  if (votes.length === 0) return []
+  const ids = [...new Set(votes.map((v) => v.user_id))]
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url')
+    .in('id', ids)
+  if (error) throw error
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
+  return votes.map((vote) => {
+    const profile = profileById.get(vote.user_id)
+    return {
+      ...vote,
+      display_name: profile?.display_name ?? '—',
+      avatar: profile?.avatar_url ?? null,
+    }
+  })
 }
 
 /**

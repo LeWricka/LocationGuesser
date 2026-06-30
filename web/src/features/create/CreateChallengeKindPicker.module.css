@@ -1,0 +1,179 @@
+/* Selector de TIPO de reto (¿Dónde es? / ¿Cuánto?) a la entrada de crear (#323).
+   Misma estética que el flujo inmersivo pero sobre papel del kit (no satélite):
+   dos tarjetas grandes, tokens del UI kit, sin colores hardcodeados. */
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--ink-900);
+  font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
+  overflow: hidden;
+}
+
+/* Topbar: atrás · título centrado. */
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 14px;
+  flex: 0 0 auto;
+}
+.iconBtn,
+.iconBtnGhost {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+.iconBtn {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  color: var(--ink-900);
+}
+.iconBtn svg {
+  width: 20px;
+  height: 20px;
+}
+.iconBtnGhost {
+  border: none;
+  background: transparent;
+}
+.topTitle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.topTitle b {
+  font-size: 15px;
+  font-weight: 700;
+}
+.topTitle small {
+  font-size: 11px;
+  color: var(--ink-600);
+}
+
+/* Cuerpo centrado verticalmente. */
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  padding: 8px 22px calc(env(safe-area-inset-bottom, 0px) + 28px);
+  max-width: 520px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.lede {
+  display: grid;
+  gap: 6px;
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.h {
+  font-size: 32px;
+  line-height: 1.05;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  margin: 0;
+}
+.sub {
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--ink-600);
+  margin: 0;
+}
+
+.options {
+  display: grid;
+  gap: 14px;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  width: 100%;
+  padding: 18px 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--ink-900);
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.option:hover {
+  border-color: var(--accent);
+  box-shadow: 0 8px 24px -16px rgba(24, 32, 43, 0.35);
+}
+.option:active {
+  transform: scale(0.99);
+}
+.option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.optIco {
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+}
+.optIcoLocation {
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+/* El tipo número se distingue con un tinte dorado/cálido para diferenciarlo del
+   azul de lugar (mismo lenguaje que el chip "número" del marcador). */
+.optIcoNumber {
+  background: rgba(169, 134, 67, 0.14);
+  color: #8a6d34;
+}
+.optTxt {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.optTxt b {
+  font-size: 18px;
+  font-weight: 700;
+}
+.optTxt span {
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink-600);
+}
+.optArrow {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--ink-400);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    transition-duration: 0.001ms !important;
+  }
+}

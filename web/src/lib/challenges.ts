@@ -1,7 +1,16 @@
 import { supabase } from './supabase'
 import type { Challenge, Database } from './database.types'
-import { DEFAULT_SCORE_SCALE, type LatLng, type ScoreScale } from './geo'
+import {
+  DEFAULT_NUMBER_TOLERANCE,
+  DEFAULT_SCORE_SCALE,
+  type LatLng,
+  type NumberTolerance,
+  type ScoreScale,
+} from './geo'
 import { deadlineFromNow } from './time'
+
+/** Tipo de reto: lugar (¿Dónde es?, histórico) o número (¿Cuánto?, adivinar una cifra). 0029. */
+export type ChallengeKind = 'location' | 'number'
 
 type ChallengeUpdate = Database['public']['Tables']['challenges']['Update']
 
@@ -127,6 +136,81 @@ export async function createChallenge(
   // con la fila que ya había creado el trigger y caía en el camino UPDATE
   // (solo-dueño)—. El trigger es la única fuente de la respuesta.
 
+  return { challenge: data, groupId }
+}
+
+/**
+ * Datos para crear un reto de NÚMERO ("¿Cuánto?", 0029). HERMANO de
+ * `NewChallengeInput` pero SIN ubicación: la respuesta es una cifra
+ * (`answerNumber`), no un lat/lng. La pregunta, la unidad, los decimales y la
+ * estrictez son metadatos VISIBLES; la cifra correcta es SPOILER.
+ */
+export interface NewNumberChallengeInput {
+  title: string
+  /** Pregunta visible al jugar (p. ej. "¿Cuánto creéis que nos costó?"). */
+  question: string
+  /**
+   * Cifra correcta (SPOILER). Va a `answer_number_src`: se ESCRIBE pero NO se lee
+   * (privilegio de SELECT revocado). El trigger la copia a
+   * `challenge_answers.answer_number`; nunca viaja al cliente antes de votar.
+   */
+  answerNumber: number
+  /** uuid del usuario de la sesión (`user.id`). Queda como `created_by` del reto. */
+  createdBy: string
+  /** Grupo al que pertenece el reto (siempre existe ya: flujo grupo-primero). */
+  groupId: string
+  /** Unidad a mostrar (€/km/kg/%/min u "otra", ≤8 car). Opcional: sin unidad si null/''. */
+  unit?: string | null
+  /** Decimales a mostrar (0–4); se infiere de cómo se escribe la respuesta. Default 0. */
+  decimals?: number
+  /** Estrictez del conteo del error relativo. Default 'normal'. */
+  tolerance?: NumberTolerance
+  /** Path en Storage de la imagen del reto (foto opcional, sin EXIF). */
+  imagePath?: string
+  /** Plazo del reto en ISO absoluto; por defecto, 24 h desde ahora. */
+  deadlineAt?: string
+  /** Segundos por jugada; null = sin límite. */
+  guessSeconds?: number | null
+}
+
+/**
+ * Crea un reto de NÚMERO ("¿Cuánto?"): `challenge_kind = 'number'`, sin ubicación.
+ * La cifra correcta entra por `answer_number_src` (privilegio de SELECT revocado);
+ * el trigger `sync_challenge_answer` (0029) la espeja a `challenge_answers.answer_number`
+ * en la misma transacción. Por eso NO escribimos `challenge_answers` desde el cliente:
+ * el trigger es la única fuente, igual que en el reto de lugar (evita el 42501 de RLS).
+ *
+ * La cifra NO viaja al cliente: el RETURNING usa `CHALLENGE_COLUMNS_NO_ANSWER`, que no
+ * incluye `answer_number_src` (revocada) ni `answer_number` (vive en challenge_answers).
+ */
+export async function createNumberChallenge(
+  input: NewNumberChallengeInput,
+): Promise<{ challenge: ChallengeForPlay; groupId: string }> {
+  const groupId = input.groupId
+  const { data, error } = await supabase
+    .from('challenges')
+    .insert({
+      group_id: groupId,
+      title: input.title,
+      challenge_kind: 'number',
+      number_question: input.question,
+      number_unit: input.unit?.trim() ? input.unit.trim() : null,
+      number_decimals: input.decimals ?? 0,
+      number_tolerance: input.tolerance ?? DEFAULT_NUMBER_TOLERANCE,
+      // La cifra correcta (SPOILER): entra por answer_number_src; el trigger la
+      // copia a challenge_answers.answer_number. Nunca legible desde challenges.
+      answer_number_src: input.answerNumber,
+      image_path: input.imagePath ?? null,
+      photo_is_hint: true,
+      guess_seconds: input.guessSeconds ?? null,
+      deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
+      created_by: input.createdBy,
+    })
+    // RETURNING sin la respuesta (answer_number_src revocada; answer_number vive en
+    // challenge_answers). El trigger espeja la respuesta en la misma transacción.
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .single<ChallengeForPlay>()
+  if (error) throw error
   return { challenge: data, groupId }
 }
 
@@ -328,6 +412,24 @@ export async function getAnswer(challengeId: string): Promise<LatLng | null> {
   if (error) throw error
   // Solo respuesta de LUGAR: una de NÚMERO (0029) tiene lat/lng null → sin pin.
   return data && data.lat != null && data.lng != null ? { lat: data.lat, lng: data.lng } : null
+}
+
+/**
+ * Respuesta (cifra) de un reto de NÚMERO ("¿Cuánto?"), o null si el usuario aún no
+ * tiene derecho a verla. HERMANA de `getAnswer`: la misma RLS de `challenge_answers`
+ * (0010/0029) solo la sirve si el reto está cerrado o el usuario ya votó. Se usa al
+ * RECARGAR un reto de número ya jugado para volver a pintar el revelado (el revelado
+ * inmediato tras votar usa la RPC `submit_number_vote`). `maybeSingle`: sin derecho/
+ * sin fila → null.
+ */
+export async function getNumberAnswer(challengeId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('challenge_answers')
+    .select('answer_number')
+    .eq('challenge_id', challengeId)
+    .maybeSingle()
+  if (error) throw error
+  return data?.answer_number ?? null
 }
 
 /**

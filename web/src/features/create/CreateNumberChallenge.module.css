@@ -1,0 +1,233 @@
+/* Crear reto de NÚMERO ("¿Cuánto?", #323). Mismo lenguaje que el flujo inmersivo
+   de lugar (foto-hero + hoja que crece por etapas) pero SIN mapa: la "respuesta"
+   es una cifra que queda oculta. Reutiliza la hoja de CreateChallengeImmersive
+   (clases `sheet.*`); aquí solo el hero y lo específico del número. */
+
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  background: #0b1016;
+  isolation: isolate;
+  font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
+  color: var(--ink-900);
+}
+
+/* ── Foto-hero ── */
+.hero {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 0;
+}
+.heroImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+/* Sin foto: degradado neutro de la marca (cálido, distinto del satélite del lugar). */
+.heroNeutral {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(150deg, #34506b 0%, #233646 55%, #18202b 100%);
+}
+.heroVeil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.42) 0%,
+    rgba(0, 0, 0, 0.12) 28%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+.heroTop {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.iconBtn {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(18, 26, 36, 0.42);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: #fff;
+}
+.iconBtn svg {
+  width: 20px;
+  height: 20px;
+}
+.kindChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(169, 134, 67, 0.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.topTitle {
+  margin-left: auto;
+  text-align: right;
+}
+.topTitle small {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  text-shadow: 0 1px 6px rgba(11, 16, 22, 0.6);
+}
+
+/* La pregunta montada sobre la foto, justo encima de la hoja. */
+.heroQuestion {
+  position: relative;
+  z-index: 2;
+  /* Deja sitio para la hoja más alta (430px) + respiro. */
+  margin-bottom: 446px;
+}
+.heroAsk {
+  margin: 0;
+  color: #fff;
+  font-size: 24px;
+  line-height: 1.18;
+  font-weight: 600;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Respuesta numérica ── */
+.lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #8a6d34;
+  font-weight: 700;
+}
+.lock svg {
+  width: 11px;
+  height: 11px;
+}
+.answerRow {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+}
+.numInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 13px;
+  padding: 12px 14px;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-family: inherit;
+  color: var(--ink-900);
+  background: #fafbfc;
+  outline: none;
+  transition:
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+.numInput:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+.numInput[aria-invalid='true'] {
+  border-color: #c0563a;
+}
+.unitTag {
+  flex: 0 0 auto;
+  width: 64px;
+  border: 1px solid rgba(169, 134, 67, 0.6);
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: rgba(169, 134, 67, 0.1);
+  color: #8a6d34;
+  font-size: 22px;
+  font-weight: 600;
+}
+.errHint {
+  margin: 7px 0 0;
+  font-size: 12px;
+  color: #c0563a;
+}
+
+/* ── Unidad: pills ── */
+.unitPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.pill {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 8px 15px;
+  background: #fff;
+  color: var(--ink-600);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.16s ease;
+}
+.pill:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.pillOn {
+  background: #8a6d34;
+  border-color: #8a6d34;
+  color: #fff;
+}
+.pillGhost {
+  border-style: dashed;
+  color: var(--ink-400);
+}
+.pillGhost.pillOn {
+  border-style: solid;
+  color: #fff;
+}
+.customUnit {
+  margin-top: 8px;
+}
+
+/* Lectura en vivo de la estrictez. */
+.scaleRead {
+  margin: 9px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-600);
+}
+.scaleRead b {
+  color: var(--ink-900);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.06s !important;
+  }
+}
