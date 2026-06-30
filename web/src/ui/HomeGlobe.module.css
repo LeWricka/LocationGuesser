@@ -9,6 +9,22 @@
   overflow: hidden;
 }
 
+/* Veladura de INTEGRACIÓN (no banda, no canto duro): el globo nunca llena su rectángulo
+   —a su alrededor queda cielo oscuro—, así que fundimos los cantos del lienzo WebGL con
+   el fondo de escena (vignette radial) y degradamos el borde inferior hacia la escena
+   para que enlace con la hoja que sube, sin franja negra muerta. Estilo Polarsteps: el
+   globo flota e integra. Tokens de escena; no captura gestos (la recoge el lienzo). */
+.globe::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(125% 82% at 50% 40%, transparent 58%, var(--scene-bg) 100%),
+    linear-gradient(to bottom, transparent 62%, var(--scene-bg) 100%);
+}
+
 .map {
   position: absolute;
   inset: 0;
@@ -108,13 +124,26 @@
   }
 }
 
-/* Atribución de Esri DISCRETA sobre el globo: obligatoria pero discreta (translúcida,
-   pequeña, pegada a la esquina). Su DOM lo inyecta MapLibre fuera de React → :global. */
-:global(.maplibregl-ctrl-attrib) {
+/* Atribución de Esri COLAPSADA y discreta (igual que el globo de viaje): el motor monta
+   el control con `compact: true`, pero el texto largo de Esri ("Tiles © Esri | Labels ©
+   Esri — Source…") seguía leyéndose como una banda/"subtítulo" feo entre el globo y la
+   hoja. Lo forzamos a un único "ⓘ" translúcido pegado a la esquina; el texto SOLO aparece
+   al tocar (clase `maplibregl-compact-show` que añade MapLibre). Cumple la atribución sin
+   verse como subtítulo. Su DOM lo inyecta MapLibre fuera de React → :global. */
+:global(.maplibregl-ctrl-attrib.maplibregl-compact) {
+  min-height: 24px;
   background: rgba(8, 12, 18, 0.35) !important;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
+}
+/* Colapsada: el texto se oculta y solo queda el botón "ⓘ". */
+:global(.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-inner) {
+  display: none;
+}
+/* Abierta (al tocar el "ⓘ"): se muestra el texto, discreto y translúcido. */
+:global(.maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner) {
+  display: block;
 }
 :global(.maplibregl-ctrl-attrib),
 :global(.maplibregl-ctrl-attrib a) {
