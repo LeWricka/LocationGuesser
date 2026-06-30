@@ -81,7 +81,7 @@ test.describe('smoke', () => {
     await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
       timeout: 20_000,
     })
-    const openAuth = page.getByRole('button', { name: 'Empieza a compartir' })
+    const openAuth = page.getByRole('button', { name: 'Empieza', exact: true })
     await expect(openAuth).toBeVisible()
 
     // 4. El CTA abre el popup de entrada con el campo de correo (flujo OTP).
