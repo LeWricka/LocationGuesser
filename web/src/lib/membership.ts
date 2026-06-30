@@ -21,6 +21,13 @@ export interface MyGroup {
   status: GroupStatus
   /** Fecha de creación del viaje (ISO), para ordenar por más reciente en la home. */
   createdAt: string
+  /** Temporada cerrada/archivada (groups.closed_at != null): chip "Cerrado". */
+  closed: boolean
+  /** Rango de fechas de calendario del viaje ('YYYY-MM-DD'), o null si no se fijó. */
+  startsOn: string | null
+  endsOn: string | null
+  /** Portada propia del viaje (path en Storage), o null → cae a la portada derivada. */
+  coverImagePath: string | null
 }
 
 /** Reto abierto que aún no he votado, para la sección "🔔 Te toca jugar". */
@@ -243,6 +250,10 @@ interface MembershipRow {
     name: string | null
     created_by: string | null
     created_at: string | null
+    closed_at: string | null
+    starts_on: string | null
+    ends_on: string | null
+    cover_image_path: string | null
   } | null
 }
 
@@ -257,7 +268,9 @@ interface MembershipRow {
 export async function myGroups(userId: string): Promise<MyGroup[]> {
   const { data, error } = await supabase
     .from('group_members')
-    .select('group_id, role, groups ( id, name, created_by, created_at )')
+    .select(
+      'group_id, role, groups ( id, name, created_by, created_at, closed_at, starts_on, ends_on, cover_image_path )',
+    )
     .eq('user_id', userId)
   if (error) throw error
   const rows = (data ?? []) as unknown as MembershipRow[]
@@ -287,6 +300,10 @@ export async function myGroups(userId: string): Promise<MyGroup[]> {
       isOwner: row.groups?.created_by === userId || row.role === 'owner',
       status,
       createdAt: row.groups?.created_at ?? '',
+      closed: row.groups?.closed_at != null,
+      startsOn: row.groups?.starts_on ?? null,
+      endsOn: row.groups?.ends_on ?? null,
+      coverImagePath: row.groups?.cover_image_path ?? null,
     }
   })
 }

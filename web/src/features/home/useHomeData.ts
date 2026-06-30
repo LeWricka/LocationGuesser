@@ -3,17 +3,35 @@
 // aquí solo orquestamos helpers de lib/ y traducimos tipos; no hay lógica de datos
 // nueva (esa vive en lib/).
 //
-// Fase "nuevo enfoque": el home vende recuerdos + compartir. Ya NO calculamos "tus
-// números" ni la sección "te toca jugar" (eso vivía en el dashboard viejo); el estado
-// "en juego"/"te toca" baja al indicador de cada tarjeta de viaje vía group.status.
+// Maqueta B "diario visual": un FEED de portadas + el reto abierto FIJADO arriba
+// ("Te toca jugar"). Por eso aquí, además de la lista de viajes, resolvemos el reto
+// pendiente MÁS URGENTE (pendingChallenges ya viene ordenado por deadline) con su
+// foto firmada, para alimentar la tarjeta destacada de la home.
 
 import { useCallback, useEffect, useState } from 'react'
 import type { HomeGroup } from '../../ui'
-import { myGroups } from '../../lib/membership'
+import { myGroups, pendingChallenges } from '../../lib/membership'
 import type { MyGroup } from '../../lib/membership'
+import { signedImageUrl } from '../../lib/storage'
+
+/** Reto abierto más urgente, ya firmado, para la tarjeta fijada "Te toca jugar". */
+export interface PinnedChallenge {
+  groupId: string
+  challengeId: string
+  /** Título del reto (p.ej. "¿Dónde tomé esta foto?"). */
+  title: string
+  /** Nombre del viaje al que pertenece el reto (subtítulo de la tarjeta). */
+  groupName: string | null
+  /** Plazo absoluto (ISO) para la cuenta atrás, o null (reto sin plazo). */
+  deadlineAt: string | null
+  /** Foto del reto firmada, o null (cae a un fondo de papel). */
+  coverUrl: string | null
+}
 
 interface HomeData {
   groups: HomeGroup[]
+  /** Reto fijado arriba, o null si no hay ninguno pendiente que me toque jugar. */
+  pinned: PinnedChallenge | null
 }
 
 interface State {
@@ -22,7 +40,7 @@ interface State {
   data: HomeData
 }
 
-const EMPTY: HomeData = { groups: [] }
+const EMPTY: HomeData = { groups: [], pinned: null }
 
 // El estado de membresía es 'live' | 'your-turn' | 'idle'; el GroupCard del kit
 // usa 'live' | 'toplay' | 'idle'. Solo cambia el nombre del caso "te toca".
@@ -37,12 +55,49 @@ function toHomeGroup(group: MyGroup): HomeGroup {
     status: toUiStatus(group.status),
     owned: group.isOwner,
     createdAt: group.createdAt,
+    closed: group.closed,
+    startsOn: group.startsOn,
+    endsOn: group.endsOn,
+    // La portada propia del viaje se firma en HomePage (junto a la derivada del
+    // mapa, que es el fallback): aquí solo arrastramos el path.
+    coverPath: group.coverImagePath,
+  }
+}
+
+/** Firma el path de una foto a URL; null si no hay path o si falla (no rompe la home). */
+async function signOrNull(imagePath: string | null | undefined): Promise<string | null> {
+  if (!imagePath) return null
+  try {
+    return await signedImageUrl(imagePath)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Resuelve el reto fijado: el pendiente MÁS URGENTE (primero de la lista, que ya
+ * viene ordenada por deadline). Firma su foto. Sin pendientes → null (no se fija
+ * nada arriba; la home muestra solo el feed).
+ */
+async function loadPinned(userId: string): Promise<PinnedChallenge | null> {
+  const pending = await pendingChallenges(userId)
+  const top = pending[0]
+  if (!top) return null
+  return {
+    groupId: top.groupId,
+    challengeId: top.challenge.id,
+    title: top.challenge.title,
+    groupName: top.groupName,
+    deadlineAt: top.challenge.deadline_at,
+    coverUrl: await signOrNull(top.challenge.image_path),
   }
 }
 
 async function loadHomeData(userId: string): Promise<HomeData> {
-  const groups = await myGroups(userId)
-  return { groups: groups.map(toHomeGroup) }
+  // En paralelo: la lista de viajes y el reto fijado (ambos derivan de la
+  // membresía; se resuelven a la vez para no encadenar latencias).
+  const [groups, pinned] = await Promise.all([myGroups(userId), loadPinned(userId)])
+  return { groups: groups.map(toHomeGroup), pinned }
 }
 
 /**

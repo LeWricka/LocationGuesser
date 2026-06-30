@@ -2,7 +2,7 @@ import { describe, test, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HomeDashboard } from './HomeDashboard'
-import type { HomeGroup } from './HomeDashboard'
+import type { HomeGroup, HomePinned } from './HomeDashboard'
 
 const groups: HomeGroup[] = [
   { id: 'a', name: "Interrail '26", status: 'toplay', owned: true },
@@ -10,18 +10,25 @@ const groups: HomeGroup[] = [
   { id: 'c', name: 'Pirineos', status: 'idle' },
 ]
 
+const pinned: HomePinned = {
+  groupId: 'a',
+  challengeId: 'ch1',
+  title: '¿Dónde tomé esta foto?',
+  groupName: 'Japón',
+  deadlineAt: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+  coverUrl: null,
+}
+
 describe('HomeDashboard', () => {
-  test('separa tus viajes del resto y no muestra el lema de marketing', () => {
+  test('el feed lista los viajes y no muestra el lema de marketing', () => {
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
-    // Dos secciones: los que posees vs donde participas.
+    // Un solo feed editorial "Tus viajes" (maqueta B); el lema de marketing baja de aquí.
     expect(screen.getByRole('heading', { name: 'Tus viajes' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Donde participas' })).toBeInTheDocument()
-    // El lema de marketing baja de la home logueada.
     expect(screen.queryByText(/Guarda tus recuerdos/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Los lugares que viviste/)).not.toBeInTheDocument()
   })
 
-  test('lista los viajes como tarjetas que abren el viaje', async () => {
+  test('cada viaje es una tarjeta-portada que abre el viaje', async () => {
     const onOpenGroup = vi.fn()
     render(
       <HomeDashboard userId="u1" displayName="Lewis" groups={groups} onOpenGroup={onOpenGroup} />,
@@ -30,11 +37,11 @@ describe('HomeDashboard', () => {
     expect(onOpenGroup).toHaveBeenCalledWith('a')
   })
 
-  test('marca "en juego"/"te toca" en los viajes con reto abierto', () => {
+  test('marca "En curso"/"Te toca" en los viajes con reto abierto', () => {
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
-    // 'toplay' → "Te toca"; 'live' → "En juego"; 'idle' → sin indicador.
+    // 'toplay' → "Te toca"; 'live' → "En curso"; 'idle' → sin indicador.
     expect(screen.getByText('Te toca')).toBeInTheDocument()
-    expect(screen.getByText('En juego')).toBeInTheDocument()
+    expect(screen.getByText('En curso')).toBeInTheDocument()
   })
 
   test('NO muestra "cómo funciona" ni el panel de números', () => {
@@ -43,7 +50,7 @@ describe('HomeDashboard', () => {
     expect(screen.queryByText(/Tus números/i)).not.toBeInTheDocument()
   })
 
-  test('CTAs de empezar un viaje y unirme', async () => {
+  test('CTA de empezar un viaje y de unirme', async () => {
     const onCreateGroup = vi.fn()
     const onJoinGroup = vi.fn()
     render(
@@ -55,22 +62,39 @@ describe('HomeDashboard', () => {
         onJoinGroup={onJoinGroup}
       />,
     )
-    await userEvent.click(screen.getByRole('button', { name: /Empezar un viaje/ }))
-    await userEvent.click(screen.getByRole('button', { name: 'Unirme' }))
+    await userEvent.click(screen.getByRole('button', { name: /Empieza un viaje/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Unirme a un viaje con un código/ }))
     expect(onCreateGroup).toHaveBeenCalled()
     expect(onJoinGroup).toHaveBeenCalled()
   })
 
-  test('renderiza el mapamundi inyectado', () => {
+  test('NO monta un mapamundi a sangre (no hay héroe de mapa)', () => {
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    // La home B no acepta ni renderiza un mapamundi: solo el feed de portadas.
+    expect(screen.queryByTestId('world')).not.toBeInTheDocument()
+  })
+
+  test('el reto fijado "Te toca jugar" muestra título y CTA de jugar', async () => {
+    const onPlayPinned = vi.fn()
     render(
       <HomeDashboard
         userId="u1"
         displayName="Lewis"
         groups={groups}
-        worldMap={<div data-testid="world">mapa</div>}
+        pinned={pinned}
+        onPlayPinned={onPlayPinned}
       />,
     )
-    expect(screen.getByTestId('world')).toBeInTheDocument()
+    expect(screen.getByText('Te toca jugar')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '¿Dónde tomé esta foto?' })).toBeInTheDocument()
+    // La tarjeta fijada es el botón de jugar (su título lo etiqueta).
+    await userEvent.click(screen.getByRole('button', { name: '¿Dónde tomé esta foto?' }))
+    expect(onPlayPinned).toHaveBeenCalled()
+  })
+
+  test('sin reto fijado no se pinta la tarjeta destacada', () => {
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} pinned={null} />)
+    expect(screen.queryByText('Te toca jugar')).not.toBeInTheDocument()
   })
 
   test('el avatar abre el perfil', async () => {
