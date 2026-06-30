@@ -68,6 +68,61 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
   }
 }
 
+export interface SubmitNumberVoteInput {
+  challengeId: string
+  // null en un voto de timeout: jugó pero no respondió → 0 puntos, sin cifra.
+  guess: number | null
+  // El jugador cambió de pestaña/app durante la jugada (anti-trampa). Opcional.
+  leftApp?: boolean
+  // Segundos que tardó el jugador en votar (cliente). Opcional/null.
+  elapsedSeconds?: number | null
+}
+
+/**
+ * Resultado del voto de NÚMERO, calculado y devuelto por el SERVIDOR (RPC
+ * `submit_number_vote`). El cliente NO calcula los puntos ni conoce la cifra antes de
+ * votar: la RPC valida membresía + reto abierto, calcula el error relativo y los
+ * puntos contra la respuesta oculta (server-side) y revela la cifra al instante. 0029.
+ */
+export interface SubmitNumberVoteResultClient {
+  /** Error absoluto |cifra − respuesta|; null en un voto de timeout. */
+  absError: number | null
+  /** Error relativo (absError / max(|respuesta|, 1)); null en timeout. */
+  relError: number | null
+  /** Puntos otorgados por el servidor (0 en timeout). */
+  points: number
+  /** La cifra correcta para el revelado; null en un voto de timeout. */
+  answerNumber: number | null
+}
+
+/**
+ * Emite el voto de un reto de NÚMERO ("¿Cuánto?") vía la RPC `submit_number_vote`
+ * (autoridad de servidor). HERMANA de `submitVote`: el cliente solo manda su cifra
+ * (o null si se le acabó el tiempo). El servidor valida membresía/estado, puntúa por
+ * error relativo con la fórmula oficial (no se puede falsear), hace el upsert
+ * idempotente por (challenge_id, user_id) y devuelve el revelado. Listo para la UI
+ * (que llega en otra fase).
+ */
+export async function submitNumberVote(
+  input: SubmitNumberVoteInput,
+): Promise<SubmitNumberVoteResultClient> {
+  const { data, error } = await supabase.rpc('submit_number_vote', {
+    p_challenge_id: input.challengeId,
+    p_guess: input.guess,
+    p_left_app: input.leftApp ?? false,
+    p_elapsed_seconds: input.elapsedSeconds ?? null,
+  })
+  if (error) throw new Error(describeError(error))
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row) throw new Error('La RPC submit_number_vote no devolvió resultado')
+  return {
+    absError: row.abs_error,
+    relError: row.rel_error,
+    points: row.points,
+    answerNumber: row.answer_number,
+  }
+}
+
 /**
  * Voto previo de un usuario en un reto, o null si aún no ha jugado.
  * `maybeSingle` para que "no hay fila" no sea un error.

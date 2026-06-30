@@ -55,6 +55,8 @@ const sampleVote: Vote = {
   guess_lat: 40,
   guess_lng: -3,
   distance_km: 12.3,
+  guess_number: null,
+  abs_error: null,
   points: 4900,
   left_app: false,
   elapsed_seconds: null,
