@@ -122,7 +122,8 @@
   border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
-/* Campo del editor (en el modal): etiqueta del puesto (🥇 1º…) sobre el Input. */
+/* Campo del editor (en el modal): etiqueta del puesto (medalla + «1º»…) sobre el
+   Input. */
 .prizeField {
   display: flex;
   flex-direction: column;
@@ -130,6 +131,9 @@
 }
 
 .prizeFieldLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
@@ -137,10 +141,12 @@
 
 /* Píldora del premio en la fila de la clasificación: etiqueta de acento discreta
  * junto al nombre. Marca qué se lleva ese puesto sin robar protagonismo a los
- * puntos. Trunca con elipsis si el texto es largo (no rompe el grid en móvil). */
+ * puntos. El texto ENVUELVE (antes se truncaba a "Invita a las c…"): el premio se
+ * lee entero aunque sea largo, sin desbordar el grid (max-width + min-width:0). */
 .prizeChip {
   align-self: flex-start;
   max-width: 100%;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
@@ -151,14 +157,11 @@
   background: var(--color-accent-soft);
   border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
   padding: 2px var(--space-2);
-  border-radius: var(--radius-full);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-radius: var(--radius-md);
+  overflow-wrap: anywhere;
 }
 
-/* El icono del premio no debe encogerse cuando el texto se trunca. */
-.prizeChip > span,
+/* El icono del premio no se encoge aunque el texto envuelva. */
 .prizeChip > svg {
   flex-shrink: 0;
 }
@@ -379,17 +382,25 @@ img.podiumAvatar {
   color: var(--color-accent);
 }
 
+/* Premio del podio: texto a varias líneas (no se trunca con elipsis). Antes
+   `nowrap` cortaba premios largos a "Elige el próx…"; ahora envuelve hasta 2
+   líneas y se equilibra para que quepa entero sin desbordar la columna. */
 .podiumPrize {
   max-width: 100%;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   color: var(--color-accent);
-  white-space: nowrap;
+  line-height: 1.25;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 /* El icono (Gift) acompaña al texto del premio; lo bajamos un pelo para alinearlo
-   con la línea base sin romper el truncado por ellipsis del contenedor. */
+   con la línea base del texto que ahora puede envolver. */
 .podiumPrize svg {
   width: 1em;
   height: 1em;
@@ -419,9 +430,13 @@ img.podiumAvatar {
   height: 34px;
 }
 
+/* Medalla de línea sobre el pedestal: el font-size fija su lado (el SVG escala a
+   1em) y `line-height: 1` la centra sin holgura vertical. */
 .pedestalMedal {
-  font-size: 22px;
+  font-size: 26px;
   line-height: 1;
+  width: 1em;
+  height: 1em;
 }
 
 /* Pedestal: tinte tenue del color de la medalla (derivado del token vía
