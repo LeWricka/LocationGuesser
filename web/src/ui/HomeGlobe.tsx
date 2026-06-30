@@ -29,6 +29,14 @@ interface Props {
   /** Tocar un pin → abre su destino (un viaje). */
   onOpenPin?: (targetId: string) => void
   /**
+   * Encuadre del globo:
+   *  - `'pins'` (por defecto): encuadra los pines (fitBounds), capado a zoom bajo para no
+   *    aplanar la proyección. Para la home logueada con viajes reales.
+   *  - `'world'`: vista MUNDO fija, sin fit. Para la landing, donde los pines son
+   *    DECORATIVOS: garantiza el globo héroe esférico pase lo que pase con los pines.
+   */
+  framing?: 'pins' | 'world'
+  /**
    * La hoja está extendida (cubre casi todo el globo): relajamos el render WebGL
    * (pausamos el repaint continuo) para no malgastar batería con el globo tapado.
    */
@@ -43,14 +51,17 @@ const { base: SATELLITE, labels: LABELS } = MAP_PRESETS.diario
 const WORLD_CENTER: [number, number] = [10, 25]
 const WORLD_ZOOM = 1.6
 const MIN_ZOOM = 0.8
-// Techo al encuadrar varios pines: deliberadamente BAJO. La proyección globo de MapLibre
-// solo se "ve" esférica a zoom bajo; al pasar de ~3 se aplana en un mapa 2D (el bug que
-// reportó el dueño en la deslogueada, donde los pines demo agrupados en Iberia/Italia
-// forzaban un fit cercano que aplanaba el globo). Capamos en 2.6 para que SIEMPRE se lea
-// como globo héroe, agrupados o no.
-const FIT_MAX_ZOOM = 2.6
+// Tope DURO de zoom del globo. La proyección globo de MapLibre solo se "ve" esférica a
+// zoom bajo; al pasar de ~3 se aplana en un mapa 2D (el bug que reportó el dueño en la
+// deslogueada, donde los pines demo agrupados en Iberia/Italia forzaban un fit cercano
+// que aplanaba el globo). Lo capamos en el PROPIO mapa (`maxZoom`), así NINGÚN camino
+// —fit, easeTo, gesto del usuario o pines reales agrupados— puede aplanar la esfera.
+const GLOBE_MAX_ZOOM = 2.4
+// Techo al encuadrar varios pines: por debajo del tope duro, para que el fit deje aire y
+// no toque el límite donde la curvatura se desvanece.
+const FIT_MAX_ZOOM = 2.2
 // Un solo pin: acercamos algo más, pero sin perder la curvatura del globo.
-const SINGLE_ZOOM = 2.4
+const SINGLE_ZOOM = 2.2
 // Padding asimétrico: deja aire arriba (marca/ajustes flotantes) y abajo (asa de la
 // hoja que sube sobre el globo), para que los pines no queden tapados.
 const FIT_PADDING = { top: 72, bottom: 120, left: 48, right: 48 }
@@ -133,7 +144,13 @@ function applySky(map: MapLibreMap): void {
  * propio scroll (separación de gestos, no pelean). Si no hay WebGL o el mapa revienta,
  * cae a un globo evocado en CSS que mantiene el héroe visual sin romper la home.
  */
-export function HomeGlobe({ pins, onOpenPin, relaxed = false, className }: Props) {
+export function HomeGlobe({
+  pins,
+  onOpenPin,
+  framing = 'pins',
+  relaxed = false,
+  className,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const glRef = useRef<MapLibreModule | null>(null)
@@ -147,9 +164,11 @@ export function HomeGlobe({ pins, onOpenPin, relaxed = false, className }: Props
   // Props en refs: el handler `load` (async) lee siempre el último valor sin recrear.
   const pinsRef = useRef(pins)
   const onOpenRef = useRef(onOpenPin)
+  const framingRef = useRef(framing)
   useEffect(() => {
     pinsRef.current = pins
     onOpenRef.current = onOpenPin
+    framingRef.current = framing
   })
 
   // Repinta los marcadores (pines-foto) desde las refs.
@@ -171,8 +190,10 @@ export function HomeGlobe({ pins, onOpenPin, relaxed = false, className }: Props
     }
   }, [])
 
-  // Encuadra todos los pines (sin pines, queda el mundo entero).
+  // Encuadra todos los pines (sin pines, queda el mundo entero). En modo `'world'`
+  // (landing decorativa) NO encuadra: deja la vista mundo de arranque, siempre esférica.
   const fitToPins = useCallback(() => {
+    if (framingRef.current === 'world') return
     const map = mapRef.current
     const gl = glRef.current
     if (!map || !gl) return
@@ -208,6 +229,9 @@ export function HomeGlobe({ pins, onOpenPin, relaxed = false, className }: Props
           center: WORLD_CENTER,
           zoom: WORLD_ZOOM,
           minZoom: MIN_ZOOM,
+          // Tope DURO: ni el fit ni un gesto del usuario pueden pasar de aquí, así la
+          // esfera nunca se aplana (ver GLOBE_MAX_ZOOM).
+          maxZoom: GLOBE_MAX_ZOOM,
           // Desactivamos el control por defecto y lo añadimos instanciado a mano (abajo):
           // pasarlo como opción-objeto NO entraba en modo compacto fiablemente en prod
           // (se veía el texto completo de Esri como banda, no el "ⓘ").

@@ -55,6 +55,9 @@ export function Landing({ groupName, redirectTo }: Props) {
     <main className={styles.page}>
       <GlobeSheet
         pins={HOME_DEMO_PINS}
+        // Pines DECORATIVOS: vista mundo fija (sin fit) → el globo héroe se ve SIEMPRE
+        // esférico, nunca aplanado por un encuadre cercano de pines agrupados.
+        framing="world"
         // Tocar un pin demo en la landing = invitar a empezar (no hay viaje real).
         onOpenPin={() => setAuthOpen(true)}
         sheetLabel="Empieza a compartir"
