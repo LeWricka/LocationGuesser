@@ -20,6 +20,7 @@
     "e2e:seed-user": "node scripts/e2e-seed-user.mjs",
     "gallery": "GALLERY=1 vite --port 5188",
     "gallery:shots": "playwright test -c playwright.gallery.config.ts",
+    "a11y": "playwright test -c playwright.a11y.config.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
@@ -40,6 +41,7 @@
     "react-leaflet": "^5.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.0",
     "@storybook/react-vite": "^10.4.6",
