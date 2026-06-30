@@ -180,19 +180,45 @@
   transform: scale(1.05);
 }
 
-/* Placeholder de portada (viaje SIN foto): degradado de dos tonos derivado del nombre
-   (--hue lo fija el componente) + inicial grande translúcida. Sustituye al gris vacío;
-   el texto blanco del cuerpo sigue leyendo AA sobre el tono oscuro y el velo al pie. */
+/* Placeholder de portada (viaje SIN foto): degradado de dos tonos ON-BRAND + inicial
+   grande translúcida. Sustituye al gris vacío. La variante (pizarra/tinta de escena/oro
+   sobrio) la elige el nombre en el componente vía `.variantN`; todas se construyen con
+   tokens de marca (acento, tinta, escena, oro) y son lo bastante oscuras para que el
+   texto blanco del cuerpo + el velo al pie sigan leyendo AA. */
 .placeholder {
   position: absolute;
   inset: 0;
   z-index: -2;
   display: grid;
   place-items: center;
+  /* Fallback on-brand por si faltara la variante. */
+  background-image: linear-gradient(150deg, var(--accent) 0%, var(--scene-bg) 100%);
+}
+
+/* Pizarra profunda (acento → noche de escena). */
+.variant0 {
+  background-image: linear-gradient(150deg, var(--accent-deep) 0%, var(--scene-bg) 100%);
+}
+/* Pizarra (acento → acento profundo): el más "marca". */
+.variant1 {
+  background-image: linear-gradient(150deg, var(--accent) 0%, var(--accent-deep) 100%);
+}
+/* Tinta (titular → noche): el más sobrio y oscuro. */
+.variant2 {
+  background-image: linear-gradient(150deg, var(--ink-900) 0%, var(--scene-bg) 100%);
+}
+/* Noche con remate de acento (invierte la dirección del frío). */
+.variant3 {
+  background-image: linear-gradient(150deg, var(--scene-bg) 0%, var(--accent) 100%);
+}
+/* Oro sobrio: remate cálido de oro de medalla SOBRE noche (toque, no relleno). El oro
+   queda en una esquina y la masa sigue siendo escena oscura → on-brand y legible. */
+.variant4 {
   background-image: linear-gradient(
     150deg,
-    hsl(var(--hue, 210) 32% 32%) 0%,
-    hsl(calc(var(--hue, 210) + 24) 38% 18%) 100%
+    var(--medal-gold) 0%,
+    var(--accent-deep) 60%,
+    var(--scene-bg) 100%
   );
 }
 .placeholderInitial {

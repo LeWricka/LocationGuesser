@@ -68,11 +68,16 @@
   transform: translateY(calc((var(--space-8) + var(--space-6)) * -1));
   z-index: 1;
   pointer-events: none;
+  /* Fundido LIMPIO globo→hoja: mantenemos la noche de escena (`--scene-bg`) mientras el
+     globo aún manda y resolvemos a la superficie de la hoja al final. Pasar de noche a
+     blanco directamente generaba una banda gris muerta a media altura; encadenando
+     `--scene-bg` (con alfa) hasta cerca del pie y rematando en `--surface`, la transición
+     es oscuro→papel sin gris sucio intermedio. Tokens de escena/superficie, no blancos. */
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    rgba(255, 255, 255, 0.12) 32%,
-    rgba(255, 255, 255, 0.45) 62%,
+    color-mix(in srgb, var(--scene-bg) 60%, transparent) 46%,
+    color-mix(in srgb, var(--scene-bg) 22%, var(--surface)) 78%,
     var(--surface) 100%
   );
   transition: top var(--duration-slow) var(--ease-emphasized);
