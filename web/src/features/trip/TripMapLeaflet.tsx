@@ -7,6 +7,7 @@ import { Icon } from '../../ui'
 import type { RoutePoint } from '../../lib/trip'
 import type { TripMapProps as Props } from './TripMap.types'
 import { HELP_MARKER_SVG, PIN_MARKER_SVG } from './pinMarkers'
+import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapLeaflet.module.css'
 
@@ -161,6 +162,7 @@ export function TripMapLeaflet({
   route,
   activeMoment,
   selectedChallengeId,
+  playing = false,
   onSelectMoment,
 }: Props) {
   // Capa de fondo: SATÉLITE (Esri) por defecto (fase "nuevo enfoque"); el plano
@@ -173,8 +175,28 @@ export function TripMapLeaflet({
     [activeMoment, route],
   )
 
-  // Línea continua que cose los momentos cerrados en orden.
+  // Línea ORO que cose los momentos cerrados en orden cronológico.
   const closedLine = useMemo<L.LatLngExpression[]>(() => route.map((p) => [p.lat, p.lng]), [route])
+
+  // DIBUJADO POR ETAPAS en play: el tramo recorrido (hasta el momento seleccionado,
+  // inclusive) va en oro sólido; el pendiente queda en oro tenue y discontinuo, como
+  // si la ruta se trazara a medida que el "avión" avanza. En reposo NO partimos: la
+  // ruta entera se ve sólida. (Lógica pura compartida con el globo en `routeDraw`.)
+  const drawnCount = useMemo<number>(
+    () => drawnRouteCount(route, selectedChallengeId, playing),
+    [playing, selectedChallengeId, route],
+  )
+
+  // Tramo recorrido (oro sólido) y pendiente (oro tenue discontinuo). Compartimos el
+  // vértice de corte para que las dos líneas se toquen sin hueco.
+  const drawnLine = useMemo<L.LatLngExpression[]>(
+    () => closedLine.slice(0, Math.max(drawnCount, 0)),
+    [closedLine, drawnCount],
+  )
+  const pendingLine = useMemo<L.LatLngExpression[]>(
+    () => (drawnCount < closedLine.length ? closedLine.slice(Math.max(drawnCount - 1, 0)) : []),
+    [closedLine, drawnCount],
+  )
 
   // Tramo discontinuo del último cerrado a la posición flotante del activo (aún
   // "no clavado"): la ruta no termina en su sitio real, solo apunta hacia él.
@@ -211,19 +233,25 @@ export function TripMapLeaflet({
           />
         )}
 
-        {/* Ruta continua entre cerrados (token --route-line). */}
-        {closedLine.length >= 2 && (
+        {/* Tramo RECORRIDO en oro sólido (token --route-gold). En reposo es la ruta
+            entera; en play crece hasta el momento seleccionado. */}
+        {drawnLine.length >= 2 && (
+          <Polyline positions={drawnLine} pathOptions={{ color: 'var(--route-gold)', weight: 3 }} />
+        )}
+
+        {/* Tramo PENDIENTE en oro tenue y discontinuo (solo durante el dibujado). */}
+        {pendingLine.length >= 2 && (
           <Polyline
-            positions={closedLine}
-            pathOptions={{ color: 'var(--route-line)', weight: 3 }}
+            positions={pendingLine}
+            pathOptions={{ color: 'var(--route-gold-soft)', weight: 3, dashArray: '4 8' }}
           />
         )}
 
-        {/* Tramo discontinuo hacia el activo flotante (token --route-line-dash). */}
+        {/* Tramo discontinuo hacia el activo flotante (oro tenue). */}
         {dashLine && (
           <Polyline
             positions={dashLine}
-            pathOptions={{ color: 'var(--route-line-dash)', weight: 3, dashArray: '6 8' }}
+            pathOptions={{ color: 'var(--route-gold-soft)', weight: 3, dashArray: '6 8' }}
           />
         )}
 

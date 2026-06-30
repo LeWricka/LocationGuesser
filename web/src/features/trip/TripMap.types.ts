@@ -13,5 +13,13 @@ export interface TripMapProps {
   activeMoment: Moment | null
   /** Momento seleccionado en el carrusel; el mapa hace pan/zoom suave a su pin. */
   selectedChallengeId: string | null
+  /**
+   * ¿Se está reproduciendo el recorrido? En play la ruta se DIBUJA por etapas: el
+   * tramo recorrido (hasta el momento seleccionado) va en oro sólido y el pendiente
+   * en oro tenue/discontinuo, como en la maqueta. En reposo la ruta se ve entera en
+   * oro. Ausente/false = reposo. (Con prefers-reduced-motion no hay play, así que el
+   * dibujado por etapas tampoco aplica: se ve la ruta completa.)
+   */
+  playing?: boolean
   onSelectMoment: (challengeId: string) => void
 }
