@@ -16,6 +16,14 @@
 .map {
   position: absolute;
   inset: 0;
+  /* Aísla el contexto de apilado del mapa: Leaflet/MapLibre asignan z-index altos
+     (200-700) a sus paneles internos. Como `.track` de TripPage crea contexto por
+     su transform, esos paneles competían en el mismo contexto que el `.dock`
+     (z-index 2) y lo tapaban (el dock de momentos desaparecía bajo el mapa).
+     Con isolation + z-index 0 el mapa queda como una capa propia por DEBAJO del
+     dock. Mismo arreglo que el mapa inmersivo de crear-reto. */
+  isolation: isolate;
+  z-index: 0;
 }
 .map > :global(*) {
   position: absolute;
