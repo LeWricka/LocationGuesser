@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 // Imagen OG dinámica (1200×630) de un viaje/reto, generada en el EDGE de Vercel
 // con `@vercel/og` (Satori + resvg-wasm: sin dependencias nativas). Compone la
 // PORTADA real del viaje/reto + un sello "Lugares" + el título en serif + una
