@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Design lint (guardarrailes visuales)
+        run: npm run design-lint
+
       - name: Type check
         run: npm run type-check
 

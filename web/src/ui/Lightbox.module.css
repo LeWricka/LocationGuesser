@@ -118,7 +118,9 @@
 .img {
   display: block;
   max-width: 100%;
-  max-height: calc(100vh - 2 * var(--space-4));
+  max-height: calc(
+    100vh - 2 * var(--space-4)
+  ); /* design-lint-allow: max-height calc, no alto de contenedor */
   object-fit: contain;
   transition: transform var(--transition-base);
 }
