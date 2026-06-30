@@ -9,6 +9,7 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  /* design-lint-allow: capa local del confeti sobre el anillo (no es un piso global) */
   z-index: 1;
 }
 
@@ -31,6 +32,7 @@
   left: var(--x);
   width: 7px;
   height: 11px;
+  /* design-lint-allow: esquina mínima de una pieza de confeti 7×11px, no es UI */
   border-radius: 2px;
   background: var(--color-accent);
   opacity: 0;
