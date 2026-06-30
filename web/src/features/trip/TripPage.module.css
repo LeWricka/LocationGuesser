@@ -24,157 +24,168 @@
   padding: var(--space-5);
 }
 
-/* ---- Cabecera FLOTANTE sobre el mapa a pantalla completa ----
-   Overlay absoluto en la franja superior del viewport: NO ocupa hueco en el flujo
-   (el mapa llena la pantalla por debajo). Lleva un scrim en degradado para legibilidad
-   y respeta el notch con safe-area-inset-top. Es consciente de la sección activa:
-   en DIARIO (mapa satélite) scrim oscuro + texto blanco; en RETOS (papel claro)
-   un velo de papel + tinta para que no quede ilegible. */
-.overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-4) var(--space-5);
-  pointer-events: none; /* el scrim no captura toques; los controles lo reactivan */
+/* ---- Tokens de escena por sección ----
+   La cabecera (AppHeader floating) y los tabs usan los tokens `--scene-*` para
+   leer sobre el fondo. En DIARIO (mapa satélite) valen los de fábrica (tinta clara
+   + velo oscuro). En MARCADOR (papel) los reescribimos a papel/tinta oscura para
+   que el mismo chrome flotante lea sobre fondo claro sin hardcodear colores. */
+.sceneDiario {
+  /* tokens de escena por defecto (definidos en tokens.css) */
 }
-.overlay::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  transition: background var(--duration-slow) var(--ease-emphasized);
-}
-.overlay > * {
-  pointer-events: auto;
-}
-/* DIARIO: sobre satélite → velo oscuro + texto blanco. */
-.overlayDark::before {
-  background: linear-gradient(to bottom, rgba(24, 32, 43, 0.62), rgba(24, 32, 43, 0));
-}
-/* RETOS: sobre papel claro → velo de papel + tinta. */
-.overlayLight::before {
-  background: linear-gradient(to bottom, var(--color-bg) 38%, transparent);
+.scenePaper {
+  --scene-ink: var(--color-text);
+  --scene-veil: transparent;
+  --scene-surface: var(--color-surface);
+  --scene-hairline: var(--color-border);
 }
 
-.iconPill {
-  flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
+/* ---- Cabecera FLOTANTE (AppHeader) ----
+   Overlay absoluto en la franja superior: NO ocupa hueco (el contenido llena la
+   pantalla por debajo y se desliza). El propio AppHeader aporta safe-area y velo. */
+.header {
+  z-index: 5;
+}
+/* Título del viaje a dos líneas dentro de la ranura central del AppHeader: nombre
+   (display, serif) + meta (miembros, en versalitas). Hereda la tinta de escena. */
+.headerTitle {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-lg);
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition:
-    background-color var(--transition-fast),
-    transform var(--transition-fast) var(--ease-emphasized);
-}
-.iconPill:hover {
-  background: var(--color-surface-hover);
-}
-.iconPill:active {
-  transform: scale(0.92);
-}
-.titleBlock {
-  flex: 1;
   min-width: 0;
-  text-align: center;
 }
 .tripName {
   display: block;
+  max-width: 100%;
   font-family: var(--font-display);
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  line-height: 1;
+  line-height: 1.05;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .tripMeta {
   display: block;
+  max-width: 100%;
   font-size: var(--font-size-xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-top: 2px;
+  opacity: 0.82;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Color del texto del título según la sección (legibilidad sobre cada fondo). */
-.overlayDark .tripName {
-  color: #fff;
-  text-shadow: 0 1px 8px rgba(24, 32, 43, 0.45);
-}
-.overlayDark .tripMeta {
-  color: rgba(255, 255, 255, 0.82);
-  text-shadow: 0 1px 6px rgba(24, 32, 43, 0.4);
-}
-.overlayLight .tripName {
-  color: var(--color-text);
-}
-.overlayLight .tripMeta {
-  color: var(--color-text-faint);
-}
 
-/* pager de 2 puntos: tocar para ir; el activo se alarga en pastilla. */
-.pager {
-  flex: 0 0 auto;
+/* Botón ⋯ (acción derecha del AppHeader): mismo tap target que el control de
+   volver; hereda la tinta de escena. */
+.menuButton {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1);
-}
-.pagerDot {
-  appearance: none;
-  border: 0;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
   padding: 0;
-  margin: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--scene-surface);
+  color: inherit;
   cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+.menuButton:hover {
+  background: color-mix(in srgb, var(--scene-surface) 70%, white);
+}
+.menuButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---- Tab Diario · Marcador ----
+   El control segmentado flota bajo la cabecera, centrado. Se le da una pastilla de
+   superficie de escena para que se lea sobre el mapa o el papel sin hardcodear. */
+.tabs {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--tap-target) + var(--space-3));
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-4);
+  pointer-events: none;
+}
+.tabs > * {
+  pointer-events: auto;
+}
+
+/* ---- Menú ⋯ (contenido de la hoja inferior) ---- */
+.menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-2);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+  color: var(--color-text);
   background: transparent;
-  display: inline-grid;
+  border: 0;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+.menuItem:hover {
+  background: var(--color-surface-hover);
+}
+.menuItem:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.menuItemDanger {
+  color: var(--color-danger);
+}
+.menuItemIcon {
+  display: grid;
   place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
   border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
 }
-.pagerDot:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 3px;
+.menuItemDanger .menuItemIcon {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
 }
-.blip {
-  display: block;
-  width: 9px;
-  height: 9px;
-  border-radius: var(--radius-full);
-  /* El punto inactivo va en acento tenue (no gris): telegrafía que hay una 2ª
-     sección hermana navegable, no es decoración muerta. */
-  background: var(--color-accent);
-  opacity: 0.4;
-  transition:
-    width var(--duration-slow) var(--ease-emphasized),
-    background-color var(--duration-base),
-    opacity var(--duration-base);
+
+/* ---- Esqueleto de carga: overlay simple (no es el AppHeader) ----
+   Solo lo usa el estado de carga para insinuar la cabecera con tres pastillas. */
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-4) var(--space-5);
 }
-.pagerActive .blip {
-  width: 24px;
-  background: var(--color-accent);
-  opacity: 1;
-}
-/* Sobre el mapa satélite (DIARIO) el acento no contrasta: el pager va en blanco. */
-.overlayDark .blip {
-  background: #fff;
-}
-.overlayDark .pagerActive .blip {
-  background: #fff;
+.overlayLight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--color-bg) 38%, transparent);
 }
 
 /* ---- Viewport + pista deslizable ---- */
@@ -215,66 +226,11 @@
   overflow: hidden;
 }
 
-/* Panel Retos: la cabecera flota por encima, así que su contenido necesita un
-   padding-top que lo deje pasar por debajo del overlay sin quedar tapado. */
-.panelRetos {
-  padding-top: calc(env(safe-area-inset-top) + var(--space-8));
-}
-
-/* ---- Edge-peek: zona táctil ancha + sliver de la página vecina que asoma ----
-   Más ancha (46px) para que el dedo la encuentre a una mano, y con un "sliver"
-   (banda de papel translúcido pegada al borde) que insinúa que hay otra página
-   detrás: no es solo una flecha, es el canto del panel hermano asomando. */
-.peek {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 46px;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  appearance: none;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  cursor: pointer;
-}
-.peekRight {
-  right: 0;
-  justify-content: flex-end;
-}
-.peekLeft {
-  left: 0;
-  justify-content: flex-start;
-}
-/* Sin sliver lateral: solo el botón "›/‹" basta para ir a la otra sección (la
-   "barra" del borde distraía). La zona .peek queda como área táctil invisible. */
-.peek:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -2px;
-}
-/* La flecha va en una pastilla de acento tenue para que se LEA como acción tocable
-   (antes era un glifo suelto fácil de pasar por alto). */
-.nudge {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 56px;
-  margin: 0 var(--space-1);
-  border-radius: var(--radius-full);
-  background: var(--color-accent-soft);
-  box-shadow: var(--shadow-sm);
-  font-size: 1.5rem;
-  font-weight: var(--font-weight-bold);
-  line-height: 1;
-  color: var(--color-accent);
-}
-.nudgeR {
-  animation: lg-nudge-r 2.6s ease-in-out infinite;
-}
-.nudgeL {
-  animation: lg-nudge-l 2.6s ease-in-out infinite;
+/* Panel Marcador (la GroupPage incrustada): la cabecera + los tabs flotan por
+   encima, así que su contenido necesita un padding-top que lo deje pasar por debajo
+   sin quedar tapado (cabecera + altura del control segmentado). */
+.panelMarcador {
+  padding-top: calc(env(safe-area-inset-top) + var(--tap-target) + var(--space-8));
 }
 
 /* ---- Esqueleto de carga ---- */
@@ -475,21 +431,8 @@
   .fabItem:active {
     transform: none;
   }
-  .blip {
+  .menuButton {
     transition: none;
-  }
-  .overlay::before {
-    transition: none;
-  }
-  .nudgeR,
-  .nudgeL {
-    animation: none;
-  }
-  .iconPill {
-    transition: none;
-  }
-  .iconPill:active {
-    transform: none;
   }
   .wrapBanner {
     animation: none;

@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, ChevronRight, Flag, Globe, ImagePlus, Plus, Share2, Target } from 'lucide-react'
+import {
+  Flag,
+  Globe,
+  ImagePlus,
+  ListOrdered,
+  MoreHorizontal,
+  Plus,
+  Settings,
+  Share2,
+  Target,
+  Trash2,
+} from 'lucide-react'
 import { EmptyState, Icon, useReducedMotion, useToast } from '../../ui'
+import { AppHeader } from '../../ui/AppHeader'
+import { BottomSheet } from '../../ui/BottomSheet'
+import { SegmentedControl } from '../../ui/SegmentedControl'
 import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
@@ -8,30 +22,39 @@ import { tripShareUrl } from '../../lib/shareLinks'
 import type { Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
+import { GroupSettingsModal } from '../group/GroupSettingsModal'
+import { GroupPage } from '../group/GroupPage'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
-import { TripRetos } from './TripRetos'
 import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import styles from './TripPage.module.css'
 
+/** Las dos secciones del viaje. El orden importa: Diario a la izquierda. */
+type Section = 'diario' | 'marcador'
+const SECTIONS: Section[] = ['diario', 'marcador']
+
+const SECTION_OPTIONS = [
+  { value: 'diario' as const, label: 'Diario' },
+  { value: 'marcador' as const, label: 'Marcador' },
+]
+
 interface Props {
   groupId: string
+  /**
+   * Sección inicial al abrir el viaje. Por defecto "Diario"; los enlaces antiguos
+   * a la GroupPage clásica (`#g=…&v=clasico`) entran ya en "Marcador".
+   */
+  initialSection?: Section
   /** Lanza el flujo de adivinar de un momento (reto). Lo cablea App al router. */
   onPlayChallenge: (challengeId: string) => void
   /** Abre el flujo de añadir momento (recuerdo: foto, lugar y texto). */
   onAddMoment: () => void
   /** Abre el asistente de crear reto (clásico) del grupo. */
   onAddChallenge: () => void
-  /** Salta a la GroupPage clásica (marcador completo, todos los retos, ajustes…). */
-  onOpenClassic: () => void
   /** Vuelve a la home. */
   onBack: () => void
 }
-
-/** Las dos páginas hermanas del viaje. El orden importa: Diario a la izquierda. */
-type Section = 'diario' | 'retos'
-const SECTIONS: Section[] = ['diario', 'retos']
 
 /**
  * Construye la línea "Tú, Amaia y N más" a partir de los nombres del grupo,
@@ -53,42 +76,35 @@ function membersLine(names: string[], myName: string | null): string {
 const PLAYBACK_INTERVAL_MS = 1100
 
 /**
- * Pantalla "Viaje" a PANTALLA COMPLETA en DOS SECCIONES hermanas: DIARIO (mapa
- * satélite + momentos) ↔ RETOS (hub de juego con clasificación). La cabecera no es
- * una barra: FLOTA por encima del mapa (overlay con scrim, consciente de la sección
- * para la legibilidad) y lleva volver, marca del viaje y el pager de dos puntos.
- * Navegación por el botón de borde (‹/›), el pager y el teclado (sin swipe, que
- * chocaba con el carrusel). `role=tablist`/`aria-selected` y foco visible.
+ * UNA vista por viaje (modelo de navegación, oleada 1): el viaje tiene DOS
+ * secciones con un tab — DIARIO (mapa satélite + momentos) y MARCADOR (el marcador
+ * completo + retos + miembros, que reutiliza `GroupPage` en modo incrustado). Ya no
+ * hay una segunda pantalla "clásica" suelta: los enlaces viejos `#g=…&v=clasico`
+ * aterrizan en la pestaña Marcador (compatibilidad).
+ *
+ * Un solo chrome: la cabecera es el `AppHeader` (atrás · nombre del viaje · ⋯). El
+ * menú ⋯ tiene contenido FIJO (Invitar · Marcador · Ajustes · Cerrar viaje · Borrar)
+ * y el FAB "＋" es el ÚNICO punto de crear (Recuerdo / Reto).
  *
  * La lógica de selección carrusel↔mapa y de reproducción del recorrido vive aquí
  * (es transversal a la sección Diario) y se delega a TripDiario por props.
  */
 export function TripPage({
   groupId,
+  initialSection = 'diario',
   onPlayChallenge,
   onAddMoment,
   onAddChallenge,
-  onOpenClassic,
   onBack,
 }: Props) {
   const { user, profile } = useSession()
-  const {
-    group,
-    moments,
-    route,
-    leaderboard,
-    recentResults,
-    recentTitle,
-    winnersByChallenge,
-    loading,
-    error,
-    refresh,
-  } = useTripData(groupId)
+  const { group, moments, route, leaderboard, winnersByChallenge, loading, error, refresh } =
+    useTripData(groupId)
   const reducedMotion = useReducedMotion()
   const toast = useToast()
 
-  // Página activa (diario|retos). Gobierna el desplazamiento de la pista.
-  const [section, setSection] = useState<Section>('diario')
+  // Sección activa (diario|marcador). Gobierna el desplazamiento de la pista.
+  const [section, setSection] = useState<Section>(initialSection)
   // Momento abierto en la hoja de detalle (null = cerrada).
   const [openMoment, setOpenMoment] = useState<Moment | null>(null)
   // Reto en edición a pantalla completa (null = no editando). Editar un reto toca su
@@ -115,10 +131,13 @@ export function TripPage({
   const [fabOpen, setFabOpen] = useState(false)
   const fabWrapRef = useRef<HTMLDivElement>(null)
 
-  // Invitar al viaje: hoja de compartir (reusa InviteModal). El botón vive en la
-  // cabecera flotante para que compartir sea SIEMPRE visible (P0: hoy estaba
-  // escondido en la GroupPage clásica).
+  // Menú ⋯ de la cabecera (hoja inferior con acciones fijas del viaje).
+  const [menuOpen, setMenuOpen] = useState(false)
+  // Invitar al viaje: hoja de compartir (reusa InviteModal). Cuelga del menú ⋯ y
+  // es SIEMPRE accesible (P0): cualquier miembro puede repartir el enlace.
   const [inviting, setInviting] = useState(false)
+  // Ajustes del viaje (renombrar / cerrar temporada / borrar): solo dueño.
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   // Recap de cierre: el viaje está cerrado (closed_at) → ofrecemos el "wrap".
   const isClosed = group?.closed_at != null
@@ -166,8 +185,6 @@ export function TripPage({
   }, [groupId, user])
 
   const activeMoment = useMemo(() => moments.find((m) => m.status === 'active') ?? null, [moments])
-  const liveCount = useMemo(() => moments.filter((m) => m.status === 'active').length, [moments])
-  const playedCount = useMemo(() => moments.filter((m) => m.status === 'closed').length, [moments])
   // Nº de RETOS (no recuerdos) para el preview de la hoja de invitar.
   const challengeCount = useMemo(() => moments.filter((m) => m.isChallenge).length, [moments])
 
@@ -337,23 +354,6 @@ export function TripPage({
     }
   }, [fabOpen])
 
-  // --- Navegación entre secciones (botón "›"/"‹" + pager + teclado) ----------
-  // SIN swipe horizontal de página: chocaba con el scroll del carrusel de fotos del
-  // Diario (ambos gestos horizontales). Se navega solo con el botón de borde, los dos
-  // puntos del pager y el teclado.
-  const trackRef = useRef<HTMLDivElement>(null)
-
-  // Teclado en el pager: flechas mueven de página. Home/End van a los extremos.
-  const onPagerKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowRight') {
-      setSection('retos')
-      e.preventDefault()
-    } else if (e.key === 'ArrowLeft') {
-      setSection('diario')
-      e.preventDefault()
-    }
-  }
-
   // Editor de reto a pantalla completa: toma la pantalla mientras está abierto.
   // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa
   // reflejan los cambios). Reutiliza el editor completo de la GroupPage clásica.
@@ -378,7 +378,7 @@ export function TripPage({
           <span className={`${styles.skelPill} ${styles.skelTitle} lg-shimmer-surface`} />
           <span className={`${styles.skelPill} ${styles.skelIcon} lg-shimmer-surface`} />
         </header>
-        <div className={`${styles.panel} ${styles.panelRetos}`}>
+        <div className={`${styles.panel} ${styles.panelMarcador}`}>
           <span className={`${styles.skelHero} lg-shimmer-surface`} />
           <span className={`${styles.skelCard} lg-shimmer-surface`} />
         </div>
@@ -400,58 +400,50 @@ export function TripPage({
   }
 
   const activeIndex = SECTIONS.indexOf(section)
+  const onDiario = section === 'diario'
 
   return (
-    <div className={styles.screen}>
-      {/* Cabecera FLOTANTE sobre el mapa a pantalla completa: pastilla de volver,
-          marca del viaje (nombre + miembros) y el pager de dos puntos. Es consciente
-          de la sección activa para la legibilidad: en DIARIO va sobre el mapa satélite
-          (scrim oscuro + texto blanco) y en RETOS sobre papel claro (fondo papel +
-          tinta). Quitamos la fila "Diario/Retos": los dos puntos ya marcan la sección. */}
-      <header
-        className={`${styles.overlay} ${section === 'diario' ? styles.overlayDark : styles.overlayLight}`}
-      >
-        <button type="button" className={styles.iconPill} onClick={onBack} aria-label="Volver">
-          <Icon icon={ArrowLeft} />
-        </button>
-
-        <div className={styles.titleBlock}>
-          <span className={styles.tripName}>{title}</span>
-          {subtitle && <span className={styles.tripMeta}>{subtitle}</span>}
-        </div>
-
-        {/* Compartir/Invitar SIEMPRE visible (P0): abre la hoja de invitar de ESE
-            viaje (reusa InviteModal). Cualquier miembro puede repartir el enlace. */}
-        <button
-          type="button"
-          className={styles.iconPill}
-          onClick={() => setInviting(true)}
-          aria-label="Invitar al viaje"
-        >
-          <Icon icon={Share2} />
-        </button>
-
-        <div
-          className={styles.pager}
-          role="tablist"
-          aria-label="Páginas del viaje"
-          onKeyDown={onPagerKeyDown}
-        >
-          {SECTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              role="tab"
-              aria-selected={section === s}
-              aria-label={s === 'diario' ? 'Diario' : 'Retos'}
-              className={`${styles.pagerDot} ${section === s ? styles.pagerActive : ''}`}
-              onClick={() => setSection(s)}
-            >
-              <span className={styles.blip} />
-            </button>
-          ))}
-        </div>
-      </header>
+    <div className={`${styles.screen} ${onDiario ? styles.sceneDiario : styles.scenePaper}`}>
+      {/* Cabecera ÚNICA del producto (AppHeader floating): atrás · nombre del viaje
+          · menú ⋯. Flota SIEMPRE sobre el contenido (overlay absoluto, layout estable
+          entre secciones). Sobre el mapa satélite (Diario) lee con tinta clara + velo;
+          sobre papel (Marcador) ajustamos los tokens de escena para que lea oscuro. El
+          patrón de cabecera flotante hecho a mano se retira. */}
+      <AppHeader
+        variant="floating"
+        className={styles.header}
+        lead="back"
+        leadLabel="Volver"
+        onLead={onBack}
+        title={
+          <span className={styles.headerTitle}>
+            <span className={styles.tripName}>{title}</span>
+            {subtitle && <span className={styles.tripMeta}>{subtitle}</span>}
+          </span>
+        }
+        action={
+          <button
+            type="button"
+            className={styles.menuButton}
+            onClick={() => setMenuOpen(true)}
+            aria-label="Más opciones del viaje"
+            aria-haspopup="dialog"
+          >
+            <Icon icon={MoreHorizontal} size={22} />
+          </button>
+        }
+      />
+      {/* Tab Diario · Marcador: el control segmentado conmuta de sección. Flota bajo
+          la cabecera, centrado, sobre cada fondo (mapa o papel). */}
+      <div className={styles.tabs}>
+        <SegmentedControl
+          options={SECTION_OPTIONS}
+          value={section}
+          onChange={setSection}
+          label="Secciones del viaje"
+          fullWidth={false}
+        />
+      </div>
 
       {/* Cinta de cierre: con el viaje cerrado, ofrece abrir el recap a pantalla
           completa. Flota bajo la cabecera para no robar sitio al mapa/contenido. */}
@@ -465,17 +457,12 @@ export function TripPage({
           <span className={styles.wrapBannerText}>
             <Icon icon={Flag} size={16} /> Viaje cerrado — Ver resumen
           </span>
-          <Icon icon={ChevronRight} size={16} />
         </button>
       )}
 
-      {/* Pista deslizable: dos paneles hermanos (Diario / Retos). */}
+      {/* Pista deslizable: dos paneles hermanos (Diario / Marcador). */}
       <div className={styles.viewport}>
-        <div
-          ref={trackRef}
-          className={styles.track}
-          style={{ transform: `translateX(-${activeIndex * 50}%)` }}
-        >
+        <div className={styles.track} style={{ transform: `translateX(-${activeIndex * 50}%)` }}>
           <section
             className={`${styles.panel} ${styles.panelBleed}`}
             role="tabpanel"
@@ -499,57 +486,23 @@ export function TripPage({
             />
           </section>
 
+          {/* MARCADOR: el marcador completo + retos + miembros, reutilizando la
+              GroupPage en modo INCRUSTADO (sin su chrome propio: el viaje aporta
+              cabecera, ⋯ y FAB). Es la pestaña del viaje, no una pantalla suelta. */}
           <section
-            className={`${styles.panel} ${styles.panelRetos}`}
+            className={`${styles.panel} ${styles.panelMarcador}`}
             role="tabpanel"
-            aria-label="Retos"
-            aria-hidden={section !== 'retos'}
+            aria-label="Marcador"
+            aria-hidden={section !== 'marcador'}
           >
-            <TripRetos
-              activeMoment={activeMoment}
-              activeGuessedCount={activeMoment?.guessedCount ?? 0}
-              recentResults={recentResults}
-              recentTitle={recentTitle}
-              leaderboard={leaderboard}
-              meId={user?.id}
-              playedCount={playedCount}
-              liveCount={liveCount}
-              onPlay={onPlayChallenge}
-              onOpenClassic={onOpenClassic}
-            />
+            <GroupPage groupId={groupId} embedded onBack={onBack} />
           </section>
         </div>
-
-        {/* Edge-peek: insinúa la página vecina con una flecha que late. */}
-        {section === 'diario' && (
-          <button
-            type="button"
-            className={`${styles.peek} ${styles.peekRight}`}
-            onClick={() => setSection('retos')}
-            aria-label="Ir a Retos"
-          >
-            <span className={`${styles.nudge} ${styles.nudgeR}`} aria-hidden="true">
-              ›
-            </span>
-          </button>
-        )}
-        {section === 'retos' && (
-          <button
-            type="button"
-            className={`${styles.peek} ${styles.peekLeft}`}
-            onClick={() => setSection('diario')}
-            aria-label="Ir a Diario"
-          >
-            <span className={`${styles.nudge} ${styles.nudgeL}`} aria-hidden="true">
-              ‹
-            </span>
-          </button>
-        )}
       </div>
 
       {/* FAB "＋" flotante con menú de dos acciones: Momento (recuerdo) o Reto (a
-          adivinar). Solo el dueño y siempre disponible (fijo abajo), salvo con el
-          recap abierto (es una pantalla de cierre, no de creación). */}
+          adivinar). ÚNICO punto de crear del viaje. Solo el dueño y siempre disponible
+          (fijo abajo), salvo con el recap abierto (es una pantalla de cierre). */}
       {canCreate && !wrapOpen && (
         <div className={styles.fabWrap} ref={fabWrapRef}>
           {fabOpen && (
@@ -597,6 +550,90 @@ export function TripPage({
         </div>
       )}
 
+      {/* Menú ⋯ del viaje: hoja inferior con contenido FIJO. Invitar · Marcador ·
+          Ajustes · Cerrar viaje · Borrar. Ajustes/Cerrar/Borrar viven dentro del
+          modal de ajustes (solo dueño); aquí enlazamos a él. */}
+      <BottomSheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title="Opciones del viaje"
+        ariaLabel="Opciones del viaje"
+      >
+        <nav className={styles.menu} aria-label="Opciones del viaje">
+          <button
+            type="button"
+            className={styles.menuItem}
+            onClick={() => {
+              setMenuOpen(false)
+              setInviting(true)
+            }}
+          >
+            <span className={styles.menuItemIcon}>
+              <Icon icon={Share2} size={18} />
+            </span>
+            Invitar
+          </button>
+          <button
+            type="button"
+            className={styles.menuItem}
+            onClick={() => {
+              setMenuOpen(false)
+              setSection('marcador')
+            }}
+          >
+            <span className={styles.menuItemIcon}>
+              <Icon icon={ListOrdered} size={18} />
+            </span>
+            Marcador
+          </button>
+          {/* Ajustes (renombrar), Cerrar/Reabrir temporada y Borrar son del dueño y
+              viven en el modal de ajustes; los miembros no ven estas tres acciones. */}
+          {canCreate && (
+            <>
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false)
+                  setSettingsOpen(true)
+                }}
+              >
+                <span className={styles.menuItemIcon}>
+                  <Icon icon={Settings} size={18} />
+                </span>
+                Ajustes
+              </button>
+              <button
+                type="button"
+                className={styles.menuItem}
+                onClick={() => {
+                  setMenuOpen(false)
+                  setSettingsOpen(true)
+                }}
+              >
+                <span className={styles.menuItemIcon}>
+                  <Icon icon={Flag} size={18} />
+                </span>
+                {isClosed ? 'Reabrir viaje' : 'Cerrar viaje'}
+              </button>
+              <button
+                type="button"
+                className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                onClick={() => {
+                  setMenuOpen(false)
+                  setSettingsOpen(true)
+                }}
+              >
+                <span className={styles.menuItemIcon}>
+                  <Icon icon={Trash2} size={18} />
+                </span>
+                Borrar viaje
+              </button>
+            </>
+          )}
+        </nav>
+      </BottomSheet>
+
       {/* Hoja de detalle del momento: descripción editable + (en un recuerdo del
           dueño) "Convertir en reto". Al promover, refrescamos el viaje para que el
           momento aparezca ya como reto en el mapa y el carrusel. */}
@@ -614,6 +651,26 @@ export function TripPage({
         onEditChallenge={(challengeId) => void openChallengeEditor(challengeId)}
         onDeleted={() => void refresh()}
       />
+
+      {/* Ajustes del viaje (solo dueño): renombrar, cerrar/reabrir temporada y borrar.
+          Reutiliza el modal de la GroupPage; al cambiar algo refrescamos el viaje. */}
+      {canCreate && settingsOpen && (
+        <GroupSettingsModal
+          groupId={groupId}
+          currentName={group?.name ?? null}
+          isClosed={isClosed}
+          onClose={() => setSettingsOpen(false)}
+          onRenamed={() => {
+            setSettingsOpen(false)
+            void refresh()
+          }}
+          onSeasonChanged={() => {
+            setSettingsOpen(false)
+            void refresh()
+          }}
+          onDeleted={onBack}
+        />
+      )}
 
       {/* Recap de cierre a pantalla completa: solo con el viaje cerrado y abierto
           (por el banner o auto-mostrado la primera vez). Reúne mapa, stats, podio

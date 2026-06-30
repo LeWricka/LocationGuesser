@@ -21,7 +21,6 @@ import { CreateGroup } from './features/create/CreateGroup'
 import { AddMoment } from './features/create/AddMoment'
 import { CreateChallengeFlow } from './features/create/CreateChallengeFlow'
 import { PlayChallenge } from './features/play/PlayChallenge'
-import { GroupPage } from './features/group/GroupPage'
 import { TripPage } from './features/trip/TripPage'
 import { HomePage } from './features/home/HomePage'
 import { AdminPage } from './features/admin'
@@ -39,13 +38,7 @@ import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
 import { setNextDestination, takeNextDestination } from './lib/auth'
 import { getGroup } from './lib/groupData'
-import {
-  parseHash,
-  groupHash,
-  classicGroupHash,
-  addMomentHash,
-  addChallengeHash,
-} from './lib/route'
+import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
 import { Icon, Spinner, Stack, withViewTransition } from './ui'
 import styles from './App.module.css'
 
@@ -234,28 +227,19 @@ function LoggedIn({
         </OnboardingGate>
       )
     }
-    // Por defecto, un grupo abre la pantalla "Viaje" (diario visual). `v=clasico`
-    // es el escape a la GroupPage de siempre (marcador, ajustes, fin de temporada),
-    // accesible desde el botón "⋯" del viaje, así que NO se pierde nada de ella.
-    if (route.groupView === 'clasico') {
-      return (
-        <ReceptorWelcomeGate groupId={groupId} userId={user?.id}>
-          <OnboardingGate context="group" userId={user?.id}>
-            <GroupPage
-              groupId={groupId}
-              onBack={() => {
-                location.hash = groupHash(groupId)
-              }}
-            />
-          </OnboardingGate>
-        </ReceptorWelcomeGate>
-      )
-    }
+    // UNA vista por viaje: el grupo SIEMPRE abre la pantalla "Viaje", que tiene dos
+    // secciones con un tab (Diario · Marcador). El marcador completo + gestión ya no
+    // es una pantalla suelta: es la pestaña "Marcador" del propio viaje (GroupPage
+    // incrustada). Los enlaces viejos `#g=…&v=clasico` aterrizan en esa pestaña
+    // (`groupView === 'marcador'`), así que no se rompe nada.
     return (
       <ReceptorWelcomeGate groupId={groupId} userId={user?.id}>
         <OnboardingGate context="group" userId={user?.id}>
           <TripPage
             groupId={groupId}
+            // Sección inicial: "Marcador" si el enlace lo pide (legado v=clasico /
+            // v=marcador), si no "Diario".
+            initialSection={route.groupView === 'marcador' ? 'marcador' : 'diario'}
             // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
             onPlayChallenge={(challengeId) => {
               location.hash = groupHash(groupId, challengeId)
@@ -265,13 +249,9 @@ function LoggedIn({
             onAddMoment={() => {
               location.hash = addMomentHash(groupId)
             }}
-            // "Reto" (menú del FAB "＋"): al asistente de reto clásico (#g=…&v=clasico&add=1).
+            // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
             onAddChallenge={() => {
               location.hash = addChallengeHash(groupId)
-            }}
-            // Acceso al marcador completo y ajustes, desde el pie de la sección Retos.
-            onOpenClassic={() => {
-              location.hash = classicGroupHash(groupId)
             }}
             onBack={() => goHome()}
           />

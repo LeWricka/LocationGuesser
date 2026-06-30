@@ -1,3 +1,10 @@
+/* Raíz incrustada: la página del grupo como pestaña "Marcador" del viaje. No
+   lleva el chrome de `lg-page` (ancho de lectura, min-height, safe-area): el panel
+   del viaje ya aporta scroll, padding y safe-area inferior. Solo ocupa el ancho. */
+.embeddedRoot {
+  width: 100%;
+}
+
 /* Cabecera: nombre/código a la izquierda, acciones a la derecha; envuelven en
    móvil cuando no caben en una línea. */
 .header {

@@ -3,9 +3,10 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 
-// El botón de compartir vive en la cabecera del viaje y abre el InviteModal de
-// ESE viaje (#330). Mockeamos las piezas pesadas (datos, mapa, hojas) y el propio
-// InviteModal por un stub ligero: así el test verifica SOLO la conexión botón→modal.
+// Invitar al viaje vive ahora en el menú ⋯ de la cabecera (oleada 1: una vista por
+// viaje, cabecera única). El test verifica SOLO la conexión ⋯ → "Invitar" → modal.
+// Mockeamos las piezas pesadas (datos, mapa, hojas, marcador incrustado) y el propio
+// InviteModal por un stub ligero.
 vi.mock('./useTripData', () => ({
   useTripData: () => ({
     group: { id: 'g1', name: 'Japón 2026', closed_at: null, prizes: null },
@@ -22,10 +23,13 @@ vi.mock('./useTripData', () => ({
 }))
 
 vi.mock('./TripDiario', () => ({ TripDiario: () => <div data-testid="diario" /> }))
-vi.mock('./TripRetos', () => ({ TripRetos: () => <div data-testid="retos" /> }))
 vi.mock('./TripWrap', () => ({ TripWrap: () => <div data-testid="wrap" /> }))
 vi.mock('./MomentSheet', () => ({ MomentSheet: () => null }))
 vi.mock('../group/EditChallenge', () => ({ EditChallenge: () => null }))
+vi.mock('../group/GroupSettingsModal', () => ({ GroupSettingsModal: () => null }))
+// El marcador es la GroupPage incrustada; en este test solo verificamos la cabecera,
+// así que la sustituimos por un stub para no arrastrar sus fetches a Supabase.
+vi.mock('../group/GroupPage', () => ({ GroupPage: () => <div data-testid="marcador" /> }))
 
 vi.mock('../../lib/membership', () => ({
   isMember: async () => true,
@@ -59,7 +63,6 @@ function renderTrip() {
           onPlayChallenge={vi.fn()}
           onAddMoment={vi.fn()}
           onAddChallenge={vi.fn()}
-          onOpenClassic={vi.fn()}
           onBack={vi.fn()}
         />
       </ToastProvider>
@@ -67,7 +70,7 @@ function renderTrip() {
   )
 }
 
-describe('TripPage — compartir visible (#330)', () => {
+describe('TripPage — invitar desde el menú ⋯', () => {
   beforeEach(() => {
     // matchMedia (useReducedMotion) no existe en jsdom por defecto.
     vi.stubGlobal('matchMedia', (query: string) => ({
@@ -82,10 +85,12 @@ describe('TripPage — compartir visible (#330)', () => {
     }))
   })
 
-  test('el botón "Invitar al viaje" abre el InviteModal con el enlace /v/<code>', async () => {
+  test('⋯ → "Invitar" abre el InviteModal con el enlace /v/<code>', async () => {
     renderTrip()
     expect(screen.queryByTestId('invite-modal')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /invitar al viaje/i }))
+    // Abrir el menú ⋯ de la cabecera y, dentro, pulsar "Invitar".
+    await userEvent.click(screen.getByRole('button', { name: /más opciones del viaje/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^invitar$/i }))
     const modal = await screen.findByTestId('invite-modal')
     expect(modal).toHaveTextContent('/v/g1')
   })

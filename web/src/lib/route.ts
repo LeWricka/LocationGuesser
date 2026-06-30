@@ -16,16 +16,16 @@ export interface Route {
   group?: string
   challenge?: string
   /**
-   * Sub-vista dentro de un grupo (`#g=…&v=…`). Por defecto el grupo abre la
-   * pantalla "Viaje" (diario visual); `v=clasico` es el escape a la GroupPage de
-   * siempre (marcador, ajustes, fin de temporada). No afecta a los deep links de
-   * reto (`#c`), que siguen yendo directos a jugar.
+   * Sección inicial dentro del viaje (`#g=…&v=…`). Por defecto el viaje abre en
+   * "Diario"; `v=marcador` (y el legado `v=clasico`) hace que el viaje arranque en
+   * la pestaña "Marcador". Antes el marcador era una pantalla aparte (GroupPage);
+   * ahora es la segunda sección del propio viaje, así que la ruta solo decide en
+   * qué pestaña aterrizar. No afecta a los deep links de reto (`#c`).
    */
-  groupView?: 'clasico'
+  groupView?: 'marcador'
   /**
-   * Intención de abrir directamente "Añadir momento" al entrar a la GroupPage
-   * clásica (`#g=…&v=clasico&add=1`). Lo usa el asistente de reto clásico cuando
-   * se entra por la vista clásica.
+   * Intención de abrir directamente "Añadir momento" al entrar al viaje
+   * (`#g=…&v=marcador&add=1`). Lo usa el asistente de reto clásico.
    */
   groupAdd?: boolean
   /**
@@ -77,9 +77,11 @@ export function parseHash(hash: string = window.location.hash): Route {
   const challenge = params.get('c')?.trim()
   if (challenge) route.challenge = challenge
 
-  // Sub-vista del grupo: solo reconocemos `clasico` (la GroupPage de siempre);
-  // cualquier otro valor se ignora y el grupo abre la pantalla "Viaje".
-  if (params.get('v')?.trim() === 'clasico') route.groupView = 'clasico'
+  // Sección inicial del viaje: `marcador` (canónico) o `clasico` (legado de los
+  // enlaces de la GroupPage de antes) abren el viaje en la pestaña "Marcador".
+  // Cualquier otro valor se ignora y el viaje abre en "Diario".
+  const v = params.get('v')?.trim()
+  if (v === 'marcador' || v === 'clasico') route.groupView = 'marcador'
 
   // Intención de abrir "Añadir momento" directo (solo junto a la vista clásica).
   if (params.get('add')?.trim() === '1') route.groupAdd = true
@@ -102,7 +104,20 @@ export function groupHash(groupId: string, challengeId?: string): string {
   return `#${params.toString()}`
 }
 
-/** Hash de la GroupPage clásica de un grupo (`#g=…&v=clasico`). */
+/**
+ * Hash que abre un viaje directamente en la pestaña "Marcador" (`#g=…&v=marcador`).
+ * El marcador ya no es una pantalla aparte: es la segunda sección del viaje.
+ */
+export function marcadorGroupHash(groupId: string): string {
+  return `#g=${encodeURIComponent(groupId)}&v=marcador`
+}
+
+/**
+ * Alias de compatibilidad del antiguo enlace a la GroupPage clásica
+ * (`#g=…&v=clasico`). `parseHash` sigue reconociendo `v=clasico` y lo trata como
+ * "abrir en la pestaña Marcador", así que los enlaces viejos no se rompen. Para
+ * destinos nuevos, usar `marcadorGroupHash`.
+ */
 export function classicGroupHash(groupId: string): string {
   return `#g=${encodeURIComponent(groupId)}&v=clasico`
 }
