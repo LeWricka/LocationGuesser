@@ -114,6 +114,19 @@ describe('parseHash', () => {
       groupAddChallenge: true,
     })
   })
+
+  test('add=reto&from=<id> marca el reto que nace de un recuerdo', () => {
+    expect(parseHash('#g=abc123&add=reto&from=m-1')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      groupAddChallenge: true,
+      groupChallengeFrom: 'm-1',
+    })
+  })
+
+  test('from sin add=reto se ignora (solo aplica al crear reto)', () => {
+    expect(parseHash('#g=abc123&from=m-1')).toEqual({ view: 'home', group: 'abc123' })
+  })
 })
 
 describe('groupHash', () => {
@@ -151,5 +164,12 @@ describe('marcadorGroupHash / classicGroupHash / addMomentHash', () => {
     const r = parseHash(addChallengeHash('abc123'))
     expect(r.group).toBe('abc123')
     expect(r.groupAddChallenge).toBe(true)
+  })
+
+  test('addChallengeHash con momento de origen añade &from', () => {
+    expect(addChallengeHash('abc123', 'm-1')).toBe('#g=abc123&add=reto&from=m-1')
+    const r = parseHash(addChallengeHash('abc123', 'm-1'))
+    expect(r.groupAddChallenge).toBe(true)
+    expect(r.groupChallengeFrom).toBe('m-1')
   })
 })

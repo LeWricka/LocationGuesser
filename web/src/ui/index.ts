@@ -21,6 +21,18 @@ export type { ToastApi, ToastOptions, ToastTone } from './toast-context'
 export { withViewTransition, useReducedMotion } from './motion'
 export { Icon } from './Icon'
 
+// Fundamentos del rediseño (Oleada 0): cabecera única, hoja inferior formal,
+// control segmentado, número+unidad, chip y banner. Antes existían pero no se
+// exportaban; los flujos de crear (Oleada 3) los consumen desde aquí.
+export { AppHeader } from './AppHeader'
+export { BottomSheet } from './BottomSheet'
+export { SegmentedControl } from './SegmentedControl'
+export type { SegmentedOption } from './SegmentedControl'
+export { UnitInput } from './UnitInput'
+export type { Unit } from './UnitInput'
+export { Chip } from './Chip'
+export { Banner } from './Banner'
+
 // Pantallas y piezas de "Cuentas + Home" (presentacionales; las cablean #3/#4/#5).
 export { Avatar } from './Avatar'
 export { GroupCard } from './GroupCard'

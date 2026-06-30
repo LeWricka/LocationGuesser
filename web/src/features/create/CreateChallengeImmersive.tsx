@@ -29,11 +29,30 @@ import { Button, Icon, Spinner, useToast } from '../../ui'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import styles from './CreateChallengeImmersive.module.css'
 
+/**
+ * Pre-relleno del reto cuando NACE de un recuerdo (uno de los dos orígenes): el
+ * lugar y la foto del recuerdo se traen ya puestos. `imagePath` es la foto YA
+ * SUBIDA del recuerdo: si está, NO se vuelve a subir (se reutiliza tal cual); su
+ * vista previa es `photoUrl` (URL firmada). Desde el FAB "Reto" no se pasa nada.
+ */
+export interface ChallengePrefill {
+  /** Lugar del recuerdo → respuesta oculta del reto (o null si el recuerdo no tenía). */
+  point: LatLng | null
+  /** Path en Storage de la foto del recuerdo, ya subida (se reutiliza, no se re-sube). */
+  imagePath: string | null
+  /** URL firmada de la foto del recuerdo para la vista previa (o null). */
+  photoUrl: string | null
+  /** Título del recuerdo, como propuesta de nombre del reto. */
+  title: string
+}
+
 interface Props {
   /** Grupo (el viaje) al que se añade el reto. Ya existe (flujo grupo-primero). */
   groupId: string
   /** Nombre del viaje para la píldora de cabecera (contexto). */
   groupName?: string | null
+  /** Pre-relleno cuando el reto nace de un recuerdo (foto + lugar). */
+  prefill?: ChallengePrefill
   /** Sale del flujo sin crear (cancelar). */
   onBack: () => void
   /** Reto creado: el viaje vuelve a la lista y ofrece su enlace. */
@@ -84,22 +103,36 @@ const TOTAL_STAGES = 4
 // Alturas (px) de la hoja por etapa: baja al marcar, crece con el contenido.
 const STAGE_HEIGHTS: Record<Stage, number> = { 0: 140, 1: 360, 2: 470, 3: 380 }
 
-export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated }: Props) {
-  const [stage, setStage] = useState<Stage>(0)
+export function CreateChallengeImmersive({
+  groupId,
+  groupName,
+  prefill,
+  onBack,
+  onCreated,
+}: Props) {
+  // Origen recuerdo: si trae lugar, arrancamos ya con el pin puesto (saltamos la
+  // etapa de "marca el mapa", que pasa a ser 1 = foto). Origen FAB: empieza en 0.
+  const [stage, setStage] = useState<Stage>(prefill?.point ? 1 : 0)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
   // Reto recién creado: en vez de saltar directo a jugar, mostramos la hoja
   // "comparte el enlace" para que el creador lo reparta EN CALIENTE (#330).
   const [created, setCreated] = useState<ChallengeForPlay | null>(null)
 
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(prefill?.title ?? '')
   // Respuesta del reto (lat/lng oculto): de la foto (EXIF), del mapa o del GPS.
-  const [point, setPoint] = useState<LatLng | null>(null)
-  const [locationSource, setLocationSource] = useState<LocationSource | null>(null)
-  const [flyTo, setFlyTo] = useState<LatLng | null>(null)
+  // Del recuerdo de origen viene ya el lugar (su `place_*`).
+  const [point, setPoint] = useState<LatLng | null>(prefill?.point ?? null)
+  const [locationSource, setLocationSource] = useState<LocationSource | null>(
+    prefill?.point ? 'manual' : null,
+  )
+  const [flyTo, setFlyTo] = useState<LatLng | null>(prefill?.point ?? null)
   const [locating, setLocating] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Foto YA SUBIDA del recuerdo de origen (path en Storage): si está, la
+  // reutilizamos al crear el reto en vez de re-subir. La vista previa es su URL firmada.
+  const [prefilledImagePath] = useState<string | null>(prefill?.imagePath ?? null)
 
   // ¿Incluir Street View? Toggle explícito; al activarlo buscamos panorama cerca.
   const [wantsStreetView, setWantsStreetView] = useState(false)
@@ -115,7 +148,9 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
   const [precisionIndex, setPrecisionIndex] = useState(DEFAULT_PRECISION_INDEX)
 
   const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  // Vista previa: una nueva foto elegida (object URL) o, del recuerdo de origen, su
+  // URL firmada. Si el usuario elige otra foto, `pickPhoto` sustituye el preview.
+  const [photoPreview, setPhotoPreview] = useState<string | null>(prefill?.photoUrl ?? null)
   const [readingExif, setReadingExif] = useState(false)
 
   const toast = useToast()
@@ -124,22 +159,28 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
   // Token para descartar respuestas de búsquedas de panorama obsoletas.
   const panoSearchToken = useRef(0)
 
-  const hasPhoto = Boolean(photoFile)
+  // Hay foto si el usuario eligió una nueva O si reutilizamos la del recuerdo de
+  // origen (ya subida). Mientras no se quite el preview, la del recuerdo cuenta.
+  const reusesPrefilledPhoto =
+    prefilledImagePath != null && photoFile == null && photoPreview != null
+  const hasPhoto = Boolean(photoFile) || reusesPrefilledPhoto
   const hasStreetView = Boolean(pano)
   const realDifficulty: Difficulty | null = difficultyFromMedia({ hasPhoto, hasStreetView })
   const mediaValid = isValidMedia({ hasPhoto, hasStreetView })
   const guessSeconds = GUESS_OPTIONS[guessIndex].value
 
-  // Limpia el object URL de la foto al desmontar (no fugar memoria).
+  // Limpia el object URL de la foto al desmontar (no fugar memoria). Solo revocamos
+  // los `blob:` que creamos nosotros; la URL firmada del recuerdo de origen (https)
+  // no es revocable.
   useEffect(() => {
     return () => {
-      if (photoPreview) URL.revokeObjectURL(photoPreview)
+      if (photoPreview?.startsWith('blob:')) URL.revokeObjectURL(photoPreview)
     }
   }, [photoPreview])
 
   function pickPhoto(file: File | null) {
     setPhotoPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
       return file ? URL.createObjectURL(file) : null
     })
     setPhotoFile(file)
@@ -325,8 +366,12 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
     try {
       let imagePath: string | undefined
       if (photoFile) {
+        // Foto nueva elegida: la subimos (comprimida + sin EXIF).
         setStatus('Subiendo la foto…')
         imagePath = await uploadImage(photoFile)
+      } else if (reusesPrefilledPhoto && prefilledImagePath) {
+        // Foto del recuerdo de origen: ya está subida; la reutilizamos tal cual.
+        imagePath = prefilledImagePath
       }
 
       setStatus('Lanzando el reto…')
@@ -731,6 +776,7 @@ export function CreateChallengeImmersive({ groupId, groupName, onBack, onCreated
       {created && (
         <ChallengeCreatedShare
           groupId={groupId}
+          groupName={groupName}
           challengeId={created.id}
           challengeTitle={created.title}
           onPlay={() => onCreated(created)}

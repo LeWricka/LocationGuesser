@@ -41,6 +41,13 @@ export interface Route {
    * del viaje. Sustituye al asistente clásico de 3 pasos (`&v=clasico&add=1`).
    */
   groupAddChallenge?: boolean
+  /**
+   * Origen del reto cuando NACE de un recuerdo (`#g=…&add=reto&from=<momentId>`):
+   * el reto pre-rellena la foto y el lugar de ese recuerdo (los dos orígenes que
+   * convergen). Sin `from`, el reto empieza vacío (FAB "Reto"). Solo se lee junto
+   * a `add=reto`.
+   */
+  groupChallengeFrom?: string
 }
 
 // Hashes atómicos (sin pares clave=valor) que mapean a vistas de la app.
@@ -92,7 +99,13 @@ export function parseHash(hash: string = window.location.hash): Route {
   if (params.get('add')?.trim() === 'recuerdo') route.groupAddMoment = true
 
   // Flujo INMERSIVO de crear reto (`#g=…&add=reto`): la entrada del FAB "Reto".
-  if (params.get('add')?.trim() === 'reto') route.groupAddChallenge = true
+  if (params.get('add')?.trim() === 'reto') {
+    route.groupAddChallenge = true
+    // Origen del reto: si nace de un recuerdo, `from` trae su id para pre-rellenar
+    // foto y lugar. Solo tiene sentido junto a `add=reto`.
+    const from = params.get('from')?.trim()
+    if (from) route.groupChallengeFrom = from
+  }
 
   return route
 }
@@ -134,8 +147,10 @@ export function addMomentHash(groupId: string): string {
 /**
  * Hash del flujo INMERSIVO de crear reto (`#g=…&add=reto`). Es la entrada del FAB
  * "Reto" del viaje: abre el mapa satélite a sangre + la hoja que crece por etapas,
- * en vez del asistente clásico de 3 pasos (que se retiró).
+ * en vez del asistente clásico de 3 pasos (que se retiró). Con `fromMomentId`, el
+ * reto NACE de un recuerdo y pre-rellena su foto y lugar (`&from=<id>`).
  */
-export function addChallengeHash(groupId: string): string {
-  return `#g=${encodeURIComponent(groupId)}&add=reto`
+export function addChallengeHash(groupId: string, fromMomentId?: string): string {
+  const base = `#g=${encodeURIComponent(groupId)}&add=reto`
+  return fromMomentId ? `${base}&from=${encodeURIComponent(fromMomentId)}` : base
 }

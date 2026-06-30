@@ -205,6 +205,11 @@ function LoggedIn({
             onCreated={() => {
               location.hash = groupHash(groupId)
             }}
+            // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
+            // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
+            onAddChallenge={(momentId) => {
+              location.hash = addChallengeHash(groupId, momentId)
+            }}
           />
         </OnboardingGate>
       )
@@ -217,6 +222,8 @@ function LoggedIn({
         <OnboardingGate context="create-challenge" userId={user?.id}>
           <CreateChallengeFlow
             groupId={groupId}
+            // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
+            fromMomentId={route.groupChallengeFrom}
             onBack={() => {
               location.hash = groupHash(groupId)
             }}

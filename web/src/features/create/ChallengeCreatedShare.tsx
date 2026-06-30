@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MessageCircle, Target } from 'lucide-react'
+import { ArrowRight, MessageCircle, Share2, Target } from 'lucide-react'
 import { Button, Icon, Modal, useToast } from '../../ui'
 import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
@@ -9,20 +9,28 @@ import styles from './ChallengeCreatedShare.module.css'
 interface Props {
   /** Grupo (el viaje) del reto recién creado: para los eventos de compartir. */
   groupId: string
-  /** Id del reto recién lanzado: es el `code` del enlace LIMPIO (`…/j/<code>`). */
+  /** Nombre del viaje, para decir A QUIÉN llega ("Tu grupo de …"). */
+  groupName?: string | null
+  /** Id del reto recién creado: es el `code` del enlace LIMPIO (`…/j/<code>`). */
   challengeId: string
   /** Nombre del reto, para el preview de la hoja. */
   challengeTitle: string
-  /** El creador pasa de compartir y va a ver/jugar el reto (acción secundaria). */
+  /** Vuelve al viaje (el reto ya aparece en su sitio). Cierra el bucle de crear. */
   onPlay: () => void
 }
 
-// Hoja "Reto lanzado — comparte el enlace" (#330): tras CREAR un reto, ANTES de
-// mandar a jugar, le damos al creador el enlace del reto LISTO para repartir EN
-// CALIENTE. Camino feliz: Web Share API (hoja del SO); fallbacks: copiar el
-// mensaje + enlace o `wa.me` con todo prerellenado. Reusa shareLinks (mismo copy
-// y rutas limpias que la tarjeta OG) y el lenguaje de la hoja de invitar al viaje.
-export function ChallengeCreatedShare({ groupId, challengeId, challengeTitle, onPlay }: Props) {
+// Hoja de COMPARTIR — el destino común de los flujos de crear reto (#330, rediseño
+// Oleada 3). Tras crear, dice QUÉ se comparte (el reto, con su nombre) y A QUIÉN
+// llega ("Tu grupo de … ya puede jugar"), ofrece "Compartir enlace" (Web Share del
+// SO; fallback a copiar o WhatsApp) y "Ver el reto en el viaje" (retorno claro: el
+// reto aparece ya en su sitio). Reusa shareLinks (mismo copy y rutas que la OG).
+export function ChallengeCreatedShare({
+  groupId,
+  groupName,
+  challengeId,
+  challengeTitle,
+  onPlay,
+}: Props) {
   const { profile } = useSession()
   const [sharing, setSharing] = useState(false)
   const toast = useToast()
@@ -33,6 +41,10 @@ export function ChallengeCreatedShare({ groupId, challengeId, challengeTitle, on
   // Texto + enlace para los fallbacks (Web Share lleva la url aparte; aquí la
   // concatenamos para que el mensaje pegado quede completo y clicable).
   const textWithLink = `${text}\n${link}`
+
+  // A quién llega el reto: el viaje. Con nombre, "Tu grupo de Lisboa"; sin él, genérico.
+  const trip = groupName?.trim()
+  const audience = trip ? `Tu grupo de ${trip} ya puede jugar` : 'Tu grupo ya puede jugar'
 
   async function copyLink() {
     try {
@@ -71,36 +83,35 @@ export function ChallengeCreatedShare({ groupId, challengeId, challengeTitle, on
     <Modal
       open
       onClose={onPlay}
-      title="¡Reto lanzado! Comparte el enlace"
+      title="¡Reto creado!"
       footer={
         <>
-          <Button variant="ghost" onClick={onPlay}>
-            Ver el reto
-          </Button>
           <Button variant="ghost" onClick={shareWhatsApp}>
             <Icon icon={MessageCircle} size={16} /> WhatsApp
           </Button>
           <Button onClick={() => void share()} loading={sharing}>
-            Compartir
+            <Icon icon={Share2} size={16} /> Compartir enlace
           </Button>
         </>
       }
     >
-      {/* Preview del reto: tarjeta de marca con el nombre. Da contexto a quien lo
-          reparte en vez de un enlace pelado (mismo lenguaje que invitar al viaje). */}
+      {/* QUÉ se comparte: el reto, con su nombre (tarjeta de marca, no un enlace
+          pelado). A QUIÉN llega: tu grupo del viaje. */}
       <div className={styles.preview}>
         <span className={styles.eyebrow}>
           <Icon icon={Target} size={14} /> Reto
         </span>
         <p className={styles.title}>{challengeTitle.trim() || 'Reto sin nombre'}</p>
+        <p className={styles.audience}>{audience}</p>
         <p className={styles.tagline}>
-          ¿Adivinan dónde es? Clava el punto antes de la cuenta atrás.
+          Lo verán todos los del viaje. Comparte el enlace para avisarles.
         </p>
       </div>
 
-      <p className={styles.hint}>
-        Pásalo en caliente al chat del grupo. Quien lo abra entra directo a jugar.
-      </p>
+      {/* Retorno claro al viaje: el reto ya está en su sitio (cierra el bucle). */}
+      <Button variant="secondary" fullWidth className={styles.backToTrip} onClick={onPlay}>
+        Ver el reto en el viaje <Icon icon={ArrowRight} size={16} />
+      </Button>
     </Modal>
   )
 }
