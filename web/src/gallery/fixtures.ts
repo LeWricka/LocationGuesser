@@ -1,0 +1,303 @@
+// Datos sembrados, FIJOS y deterministas para la galería (sin login ni red). Un
+// único "mundo" de prueba: un viaje con varios momentos (recuerdo, reto en juego,
+// retos cerrados, reto de número), varios miembros y sus votos. Las pantallas
+// reales leen esto a través del cliente Supabase falso (fakeSupabase.ts), así que
+// no hay que tocar nada de features/**.
+//
+// Por qué fijo: el objetivo es la CAPTURA determinista (mismos píxeles en cada
+// corrida). No usamos Date.now() ni datos aleatorios: el "ahora" de la galería es
+// GALLERY_NOW y los plazos se calculan relativos a él.
+
+import type { Challenge, GroupPrizes, Profile, Vote } from '../lib/database.types'
+
+// Mundo VACÍO: algunos casos (home recién llegada) necesitan que "mis grupos" no
+// devuelva nada. Es un flag de módulo que el cliente falso consulta antes de servir
+// group_members; lo activa el caso correspondiente ANTES de montar la pantalla.
+let emptyWorld = false
+export function setEmptyWorld(value: boolean): void {
+  emptyWorld = value
+}
+export function isEmptyWorld(): boolean {
+  return emptyWorld
+}
+
+// "Ahora" congelado de la galería. Todas las fechas relativas (plazos, "hace X")
+// se derivan de aquí para que la cuenta atrás y los "hace N días" no cambien entre
+// capturas. El runtime también congela Date a este instante (ver freezeTime).
+export const GALLERY_NOW = new Date('2026-06-15T10:00:00.000Z')
+
+function isoFromNow(deltaMs: number): string {
+  return new Date(GALLERY_NOW.getTime() + deltaMs).toISOString()
+}
+
+const HOUR = 60 * 60 * 1000
+const DAY = 24 * HOUR
+
+// ── Identidad "yo" (la sesión simulada) y compañeros de viaje ────────────────
+export const ME_ID = 'user-lewis-0000'
+export const GROUP_ID = 'viaje-japon'
+
+export const ME: Profile = {
+  id: ME_ID,
+  display_name: 'Lewis',
+  avatar_url: null,
+  created_at: isoFromNow(-30 * DAY),
+}
+
+interface GalleryMember {
+  userId: string
+  name: string
+  avatar: string | null
+  role: 'owner' | 'member'
+}
+
+export const MEMBERS: GalleryMember[] = [
+  { userId: ME_ID, name: 'Lewis', avatar: null, role: 'owner' },
+  { userId: 'user-marta-0001', name: 'Marta', avatar: null, role: 'member' },
+  { userId: 'user-iker-0002', name: 'Iker', avatar: null, role: 'member' },
+  { userId: 'user-noa-0003', name: 'Noa', avatar: null, role: 'member' },
+]
+
+export const PROFILES: Profile[] = MEMBERS.map((m) => ({
+  id: m.userId,
+  display_name: m.name,
+  avatar_url: m.avatar,
+  created_at: isoFromNow(-30 * DAY),
+}))
+
+// ── El viaje (grupo) ──────────────────────────────────────────────────────────
+const PRIZES: GroupPrizes = {
+  first: 'Elige el próximo destino',
+  last: 'Invita a las cañas',
+}
+
+export interface GalleryGroupRow {
+  id: string
+  name: string | null
+  prizes: GroupPrizes | null
+  created_by: string | null
+  created_at: string
+  closed_at: string | null
+  starts_on: string | null
+  ends_on: string | null
+  description: string | null
+  companions: string | null
+  cover_image_path: string | null
+}
+
+export const GROUP: GalleryGroupRow = {
+  id: GROUP_ID,
+  name: 'Japón en primavera',
+  prizes: PRIZES,
+  created_by: ME_ID,
+  created_at: isoFromNow(-12 * DAY),
+  closed_at: null,
+  starts_on: '2026-06-04',
+  ends_on: '2026-06-18',
+  description: 'Dos semanas entre templos, ramen y trenes bala.',
+  companions: 'Marta, Iker y Noa',
+  cover_image_path: 'cover-japon.jpg',
+}
+
+// ── Retos / momentos del viaje ────────────────────────────────────────────────
+// Un reto vive en `challenges`. ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>,
+// pero la fila completa lleva lat/lng (la respuesta oculta); el cliente falso ya
+// las recorta al servir CHALLENGE_COLUMNS_NO_ANSWER, igual que PostgREST en prod.
+type ChallengeRow = Challenge
+
+function baseChallenge(
+  over: Partial<ChallengeRow> & Pick<ChallengeRow, 'id' | 'title'>,
+): ChallengeRow {
+  return {
+    group_id: GROUP_ID,
+    description: null,
+    is_challenge: true,
+    lat: 35.0116,
+    lng: 135.7681,
+    place_lat: null,
+    place_lng: null,
+    image_path: null,
+    sv_pano_id: null,
+    sv_heading: null,
+    sv_pitch: null,
+    guess_seconds: 30,
+    deadline_at: null,
+    photo_is_hint: true,
+    sv_lock_move: false,
+    sv_lock_rotate: false,
+    score_scale: 'mundo',
+    challenge_kind: 'location',
+    number_question: null,
+    number_unit: null,
+    number_decimals: 0,
+    number_tolerance: 'normal',
+    created_by: ME_ID,
+    created_at: isoFromNow(-5 * DAY),
+    ...over,
+  }
+}
+
+// Reto EN JUEGO (deadline futura): el que toca jugar.
+export const CH_ACTIVE = 'ch-active-fushimi'
+// Reto CERRADO de lugar (deadline pasada): muestra respuesta y resultados.
+export const CH_CLOSED = 'ch-closed-arashiyama'
+// Recuerdo puro (sin juego): foto + lugar visible, sin plazo.
+export const CH_MEMORY = 'ch-memory-ramen'
+// Reto de NÚMERO cerrado: ¿cuánto costó?
+export const CH_NUMBER = 'ch-number-shinkansen'
+
+export const CHALLENGES: ChallengeRow[] = [
+  baseChallenge({
+    id: CH_ACTIVE,
+    title: '¿Dónde tomó Marta esta foto?',
+    description: 'Mil torii naranjas subiendo la montaña.',
+    image_path: 'photo-fushimi.jpg',
+    place_lat: null,
+    place_lng: null,
+    lat: 34.9671,
+    lng: 135.7727,
+    deadline_at: isoFromNow(14 * HOUR),
+    created_by: 'user-marta-0001',
+    created_at: isoFromNow(-10 * HOUR),
+    guess_seconds: 30,
+  }),
+  baseChallenge({
+    id: CH_CLOSED,
+    title: 'El bosque de bambú',
+    description: 'Caminamos al amanecer para encontrarlo vacío.',
+    image_path: 'photo-arashiyama.jpg',
+    place_lat: 35.0095,
+    place_lng: 135.6716,
+    lat: 35.0095,
+    lng: 135.6716,
+    deadline_at: isoFromNow(-2 * DAY),
+    created_by: ME_ID,
+    created_at: isoFromNow(-3 * DAY),
+  }),
+  baseChallenge({
+    id: CH_NUMBER,
+    title: '¿Cuánto costó el billete de tren bala?',
+    challenge_kind: 'number',
+    number_question: '¿Cuánto costó el billete de Tokio a Kioto?',
+    number_unit: '€',
+    number_decimals: 0,
+    number_tolerance: 'normal',
+    image_path: 'photo-shinkansen.jpg',
+    deadline_at: isoFromNow(-1 * DAY),
+    created_by: 'user-iker-0002',
+    created_at: isoFromNow(-1 * DAY - 6 * HOUR),
+    guess_seconds: 20,
+  }),
+  baseChallenge({
+    id: CH_MEMORY,
+    title: 'El mejor ramen del viaje',
+    description: 'Una barra de ocho asientos perdida en un callejón.',
+    is_challenge: false,
+    image_path: 'photo-ramen.jpg',
+    place_lat: 35.0036,
+    place_lng: 135.7788,
+    lat: 35.0036,
+    lng: 135.7788,
+    deadline_at: null,
+    created_by: 'user-noa-0003',
+    created_at: isoFromNow(-4 * DAY),
+  }),
+]
+
+// Respuestas (lat/lng) de los retos CERRADOS: solo se sirven para los cerrados
+// (anti-spoiler), igual que la RLS de challenge_answers en prod.
+export const ANSWERS: Record<string, { lat: number; lng: number }> = {
+  [CH_CLOSED]: { lat: 35.0095, lng: 135.6716 },
+}
+export const NUMBER_ANSWERS: Record<string, number> = {
+  [CH_NUMBER]: 285,
+}
+
+// ── Votos: alimentan clasificación, resultados y "guessedCount" ──────────────
+function vote(
+  over: Partial<Vote> & Pick<Vote, 'id' | 'challenge_id' | 'user_id' | 'points'>,
+): Vote {
+  return {
+    group_id: GROUP_ID,
+    guess_lat: null,
+    guess_lng: null,
+    distance_km: null,
+    guess_number: null,
+    abs_error: null,
+    left_app: false,
+    elapsed_seconds: 18,
+    created_at: isoFromNow(-2 * DAY + HOUR),
+    ...over,
+  }
+}
+
+export const VOTES: Vote[] = [
+  // Reto cerrado de lugar: tres jugadores con distintas distancias.
+  vote({
+    id: 'v1',
+    challenge_id: CH_CLOSED,
+    user_id: ME_ID,
+    points: 4200,
+    distance_km: 8,
+    guess_lat: 35.02,
+    guess_lng: 135.69,
+  }),
+  vote({
+    id: 'v2',
+    challenge_id: CH_CLOSED,
+    user_id: 'user-marta-0001',
+    points: 4880,
+    distance_km: 1.2,
+    guess_lat: 35.01,
+    guess_lng: 135.67,
+  }),
+  vote({
+    id: 'v3',
+    challenge_id: CH_CLOSED,
+    user_id: 'user-noa-0003',
+    points: 3100,
+    distance_km: 42,
+    guess_lat: 35.3,
+    guess_lng: 135.5,
+  }),
+  // Reto de número cerrado.
+  vote({
+    id: 'v4',
+    challenge_id: CH_NUMBER,
+    user_id: ME_ID,
+    points: 4600,
+    guess_number: 300,
+    abs_error: 15,
+  }),
+  vote({
+    id: 'v5',
+    challenge_id: CH_NUMBER,
+    user_id: 'user-iker-0002',
+    points: 5000,
+    guess_number: 285,
+    abs_error: 0,
+  }),
+  vote({
+    id: 'v6',
+    challenge_id: CH_NUMBER,
+    user_id: 'user-marta-0001',
+    points: 2400,
+    guess_number: 180,
+    abs_error: 105,
+  }),
+]
+
+// Nombre/avatar por usuario, para componer VoteWithName sin segunda consulta.
+export const NAME_BY_USER = new Map(
+  MEMBERS.map((m) => [m.userId, { name: m.name, avatar: m.avatar }]),
+)
+
+// Fotos: el cliente falso firma cada image_path a un data-URI SVG con el título,
+// así no hay red ni bucket. Mapa path → etiqueta visible de la foto.
+export const PHOTO_LABELS: Record<string, string> = {
+  'cover-japon.jpg': 'Kioto',
+  'photo-fushimi.jpg': 'Fushimi Inari',
+  'photo-arashiyama.jpg': 'Arashiyama',
+  'photo-shinkansen.jpg': 'Shinkansen',
+  'photo-ramen.jpg': 'Ramen',
+}
