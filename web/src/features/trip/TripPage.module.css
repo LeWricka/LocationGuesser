@@ -191,7 +191,12 @@
   transition: transform var(--duration-slower) var(--ease-emphasized);
 }
 .panel {
-  width: 50%;
+  /* Bloqueado a media pista (50% de un track al 200% = ancho de viewport). `flex:
+     0 0 50%` impide crecer/encoger y `min-width: 0` evita que el ancho mínimo de
+     contenido (título serif largo, tarjetas) ensanche el panel y descuadre la
+     pista: sin esto el translateX se pasaba y Retos asomaba sobre Momentos. */
+  flex: 0 0 50%;
+  min-width: 0;
   height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
