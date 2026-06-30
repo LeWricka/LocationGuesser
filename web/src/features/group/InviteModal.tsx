@@ -19,7 +19,7 @@ interface Props {
 // Mensaje de invitación: gancho + nombre del grupo + enlace clicable. Una sola
 // línea para que se vea limpio pegado en WhatsApp.
 function buildInviteText(groupName: string, link: string): string {
-  return `Únete a ${groupName} en LocationGuesser 👉 ${link}`
+  return `Únete a ${groupName} en Lugares 👉 ${link}`
 }
 
 // Texto "N retos" / "Aún sin retos" para la línea de meta del preview.
@@ -88,7 +88,7 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
     if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       setSharing(true)
       try {
-        await navigator.share({ title: 'LocationGuesser', text })
+        await navigator.share({ title: 'Lugares', text })
         track('invite_shared', { surface: 'shared', group_id: groupId })
         onClose()
         return
@@ -124,7 +124,7 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
       {/* Preview del grupo: tarjeta de marca con el nombre y la meta (personas /
           retos). Da contexto a quien invitas en vez de un enlace pelado. */}
       <div className={styles.preview}>
-        <span className={styles.eyebrow}>📍 LocationGuesser</span>
+        <span className={styles.eyebrow}>📍 Lugares</span>
         <p className={styles.groupName}>{groupName}</p>
         <p className={styles.meta}>
           {membersText && (

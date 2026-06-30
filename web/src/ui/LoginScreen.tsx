@@ -47,7 +47,7 @@ export function LoginScreen({
     <AuthScreen
       className={className}
       icon="📍"
-      title={joining ? 'Únete para jugar este reto' : 'Entra a LocationGuesser'}
+      title={joining ? 'Únete para jugar este reto' : 'Entra a Lugares'}
       subtitle={
         joining ? (
           <>

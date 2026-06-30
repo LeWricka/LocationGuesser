@@ -101,7 +101,7 @@ export const LeaderboardCard = forwardRef<HTMLDivElement, Props>(function Leader
           📍
         </span>
         <div className={styles.brandText}>
-          <span className={styles.brandName}>LocationGuesser</span>
+          <span className={styles.brandName}>Lugares</span>
           <span className={styles.brandTag}>Vive los viajes de los tuyos</span>
         </div>
       </div>
