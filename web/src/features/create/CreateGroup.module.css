@@ -4,14 +4,17 @@
    (paper/tinta/pizarra) vía tokens del UI kit; nada hardcodeado. */
 
 .root {
-  --float-bg: rgba(18, 26, 36, 0.42);
-  --float-line: rgba(255, 255, 255, 0.22);
+  --float-bg: var(--scene-surface);
+  --float-line: var(--scene-hairline);
 
   position: fixed;
   inset: 0;
   z-index: 1000;
   overflow: hidden;
-  background: var(--paper-2, #eef0f3);
+  /* Escena a sangre (no papel): el fondo es un lienzo oscuro tipo satélite/globo
+     que el backdrop llena de pared a pared. Así el espacio superior es escena viva
+     en cualquier alto, nunca una franja de papel muerta. */
+  background: var(--scene-bg);
   isolation: isolate;
   font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
   color: var(--ink-900);
@@ -21,16 +24,23 @@
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
 
-/* ============ MAPA DECORATIVO A SANGRE (fondo) ============== */
+/* ============ BACKDROP DE ESCENA A SANGRE (héroe superior) ==============
+   Lienzo satélite/globo evocado que LLENA todo el alto disponible (100dvh,
+   no altura fija): a sangre con `inset: 0`, por debajo del chrome y la hoja.
+   Antes era una ilustración pálida sobre papel que en pantallas altas dejaba
+   un desierto gris entre la cabecera y la hoja; ahora es escena viva de pared
+   a pared, con relieve de continentes, ruta punteada y pines que caen. */
 .map {
   position: absolute;
   inset: 0;
   z-index: 0;
   overflow: hidden;
+  /* Atmósfera noche evocada SOLO con tokens de escena: un halo de superficie
+     translúcida (océano iluminado) y un velo en los cantos, sobre el fondo de
+     escena oscuro. Los continentes y la ruta los dibuja el SVG encima. */
   background:
-    radial-gradient(60% 50% at 30% 22%, #e7ecf1 0%, transparent 70%),
-    radial-gradient(70% 60% at 78% 70%, #e3e8ee 0%, transparent 72%),
-    linear-gradient(160deg, #eef1f4 0%, #e3e7ec 55%, #d9dee4 100%);
+    radial-gradient(58% 56% at 50% 42%, var(--scene-surface) 0%, transparent 64%),
+    radial-gradient(120% 80% at 50% 14%, transparent 58%, var(--scene-veil) 100%), var(--scene-bg);
 }
 .map svg {
   position: absolute;
@@ -39,8 +49,8 @@
   height: 100%;
 }
 .land {
-  fill: #dfe4ea;
-  stroke: #cdd4dc;
+  fill: var(--scene-surface);
+  stroke: var(--scene-hairline);
   stroke-width: 0.8;
 }
 .route {
@@ -49,7 +59,7 @@
   stroke-width: 2.2;
   stroke-dasharray: 5 6;
   stroke-linecap: round;
-  opacity: 0.5;
+  opacity: 0.75;
   stroke-dashoffset: 240;
   animation: drawRoute 2.6s ease forwards;
 }
@@ -65,7 +75,7 @@
   border-radius: 50% 50% 50% 0;
   background: var(--accent);
   transform: rotate(-45deg) scale(0);
-  box-shadow: 0 2px 6px rgba(24, 32, 43, 0.3);
+  box-shadow: var(--scene-shadow);
   animation: dropPin 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
 }
 @keyframes dropPin {
@@ -74,19 +84,24 @@
   }
 }
 
-/* viñeta para legibilidad del chrome claro */
+/* Veladura de INTEGRACIÓN (no banda, no canto duro): funde los cantos del lienzo
+   con el fondo de escena y degrada el borde inferior hacia la escena para coser
+   backdrop y hoja sin franja muerta intermedia (mismo espíritu que el globo de la
+   home). Más velo arriba para que el chrome flotante claro se lea. */
 .vignette {
   position: absolute;
   inset: 0;
   pointer-events: none;
   z-index: 2;
-  background: linear-gradient(
-    to bottom,
-    rgba(24, 32, 43, 0.25) 0%,
-    transparent 18%,
-    transparent 60%,
-    rgba(24, 32, 43, 0.12) 100%
-  );
+  background:
+    radial-gradient(125% 82% at 50% 38%, transparent 56%, var(--scene-bg) 100%),
+    linear-gradient(
+      to bottom,
+      var(--scene-veil) 0%,
+      transparent 24%,
+      transparent 58%,
+      var(--scene-bg) 100%
+    );
 }
 
 /* ---- topbar flotante translúcido --------------------------------- */
