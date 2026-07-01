@@ -20,7 +20,7 @@ import {
 import { Icon } from '../../ui/Icon'
 import { MapSkeleton } from '../../ui/MapSkeleton'
 import type { TripMapProps as Props } from './TripMap.types'
-import { activePinHtml, photoPinHtml } from './pinMarkers'
+import { buildActivePinElement, buildPinElement } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapGlobe.module.css'
@@ -83,22 +83,21 @@ function floatingActivePos(route: RoutePoint[]): [number, number] {
   return [lng, lat]
 }
 
-/** Crea el wrapper HTML de un pin-foto (cerrado o activo) para el Marker de MapLibre.
- * Reusa el markup compartido (`pinMarkers`) y las clases del plano (`lg-trip-pin*`)
- * para que el look —miniatura redonda + borde + puntita + pulso— sea idéntico en
- * ambos motores; el color del borde lo gobiernan los tokens, no se hardcodea. */
+/** Crea el ELEMENTO DOM de un pin-foto (cerrado o activo) para el Marker de MapLibre.
+ * Reusa los builders compartidos (`pinMarkers`) y las clases del plano (`lg-trip-pin*`)
+ * para que el look —miniatura redonda + borde + puntita + pulso— sea idéntico en ambos
+ * motores; el color del borde lo gobiernan los tokens, no se hardcodea. El pin CERRADO
+ * pasa por `buildPinElement`, que precarga la foto y solo la sube si carga de verdad
+ * (una URL firmada caducada/404 cae a la inicial en vez de dejar un recuadro oscuro). */
 function pinElement(opts: {
   imageUrl: string | null
   title?: string | null
   active: boolean
   featured?: boolean
 }): HTMLDivElement {
-  const wrapper = document.createElement('div')
-  wrapper.innerHTML = opts.active
-    ? activePinHtml()
-    : photoPinHtml({ imageUrl: opts.imageUrl, title: opts.title, featured: opts.featured })
-  // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como elemento del Marker.
-  return wrapper.firstElementChild as HTMLDivElement
+  return opts.active
+    ? buildActivePinElement()
+    : buildPinElement({ imageUrl: opts.imageUrl, title: opts.title, featured: opts.featured })
 }
 
 /**

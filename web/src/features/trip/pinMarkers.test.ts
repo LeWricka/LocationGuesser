@@ -1,10 +1,17 @@
 import { describe, test, expect, afterEach, vi } from 'vitest'
-import { buildHomePinElement, isUsablePinImage, photoPinHtml, PIN_MARKER_SVG } from './pinMarkers'
+import {
+  buildActivePinElement,
+  buildHomePinElement,
+  buildPinElement,
+  isUsablePinImage,
+  photoPinHtml,
+  PIN_MARKER_SVG,
+} from './pinMarkers'
 
-// Estos tests cazan la clase de bug del pin del globo de la home: contenido
-// "garabateado" dentro del pin (markup/imagen rota en vez de foto o inicial) y
-// fallbacks que no caen limpio a la inicial. Son deterministas (DOM de jsdom) y no
-// dependen de que nadie mire capturas.
+// Estos tests cazan la clase de bug del pin (globo de la home Y mapa de Viaje):
+// contenido "garabateado" o recuadro oscuro dentro del pin (markup/imagen rota o
+// caducada en vez de foto o inicial) y fallbacks que no caen limpio a la inicial. Son
+// deterministas (DOM de jsdom) y no dependen de que nadie mire capturas.
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -56,11 +63,21 @@ describe('isUsablePinImage', () => {
 })
 
 describe('photoPinHtml', () => {
-  test('con foto: incrusta la URL como background-image, sin texto', () => {
+  test('con foto USABLE: incrusta la URL como background-image, sin texto', () => {
     const html = photoPinHtml({ imageUrl: 'https://cdn/x.jpg', title: 'Kioto' })
     expect(html).toContain("background-image:url('https://cdn/x.jpg')")
     expect(html).toContain('lg-trip-pin__disc')
     expect(html).not.toContain('lg-trip-pin__initial')
+  })
+
+  test('con imageUrl NO usable (svg+xml): NO lo clava, cae a la inicial', () => {
+    // Regresión: `photoPinHtml` ya no confía en cualquier `imageUrl` truthy; pasa por
+    // `isUsablePinImage`, así que un svg+xml con texto NUNCA entra como background-image.
+    const svg = 'data:image/svg+xml;utf8,<svg><text>Kioto</text></svg>'
+    const html = photoPinHtml({ imageUrl: svg, title: 'Kioto' })
+    expect(html).not.toContain('background-image')
+    expect(html).toContain('lg-trip-pin--empty')
+    expect(html).toContain('<span class="lg-trip-pin__initial">K</span>')
   })
 
   test('sin foto: cae a la inicial del lugar (una letra), no un anillo vacío', () => {
@@ -187,5 +204,84 @@ describe('buildHomePinElement', () => {
     const initials = el.querySelectorAll('.lg-trip-pin__initial')
     expect(initials).toHaveLength(1)
     expect(initials[0].textContent).toBe('F') // una sola letra, no el título entero
+  })
+
+  test('la home usa el builder compartido (variante home)', () => {
+    const el = buildHomePinElement({ title: 'Oslo', imageUrl: null })
+    expect(el.classList.contains('lg-home-pin')).toBe(true)
+    expect(el.classList.contains('lg-trip-pin')).toBe(true)
+  })
+})
+
+// GUARDARRAÍL de la RAÍZ del bug: el mapa de Viaje (Leaflet + MapLibre) construye AHORA
+// sus pines por el MISMO `buildPinElement`, no por `photoPinHtml` a pelo. Estos tests
+// congelan que el pin del VIAJE tiene la misma red de seguridad: nunca clava una foto
+// que no ha cargado (una URL firmada de Storage caducada/404 → recuadro oscuro), sino
+// que arranca y se queda en la inicial hasta que la imagen precarga de verdad.
+describe('buildPinElement (mapa de Viaje + home, camino único)', () => {
+  test('arranca en el fallback (disco de acento + inicial), NO clava la foto de golpe', () => {
+    // Sin precarga, el pin de un momento situado con foto está en estado "vacío": si la
+    // URL firmada estuviera caducada, se vería la inicial limpia, no un recuadro oscuro.
+    const el = buildPinElement({ title: 'Kioto', imageUrl: 'https://cdn/foto.jpg' })
+    expect(el.classList.contains('lg-trip-pin--empty')).toBe(true)
+    const disc = el.querySelector<HTMLElement>('.lg-trip-pin__disc')
+    expect(disc?.querySelector('.lg-trip-pin__initial')?.textContent).toBe('K')
+    expect(disc?.style.backgroundImage ?? '').toBe('')
+    // NO es un pin de la home: sin la clase de la variante home.
+    expect(el.classList.contains('lg-home-pin')).toBe(false)
+  })
+
+  test('foto OK: al PRECARGAR bien sube a la miniatura y limpia la inicial', () => {
+    const created: FakeImage[] = []
+    class FakeImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      set src(_v: string) {
+        created.push(this)
+      }
+    }
+    vi.stubGlobal('Image', FakeImage as unknown as typeof Image)
+
+    const el = buildPinElement({ title: 'Roma', imageUrl: 'https://cdn/foto.jpg' })
+    expect(el.classList.contains('lg-trip-pin--empty')).toBe(true) // fallback de entrada
+    created[0]?.onload?.() // la imagen precargó
+    expect(el.classList.contains('lg-trip-pin--empty')).toBe(false)
+    const disc = el.querySelector<HTMLElement>('.lg-trip-pin__disc')
+    expect(disc?.style.backgroundImage).toContain('https://cdn/foto.jpg')
+    expect(disc?.querySelector('.lg-trip-pin__initial')).toBeNull()
+  })
+
+  test('URL firmada CADUCADA/404 (onerror): se queda en la inicial, NO recuadro oscuro', () => {
+    // Este es EXACTAMENTE el bug de datos reales: la portada existe pero su URL firmada
+    // ha caducado/404ea. `background-image` no dispara onerror; la precarga sí, y deja
+    // el pin en la inicial limpia en vez de un disco de fondo vacío (recuadro oscuro).
+    class FakeImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      set src(_v: string) {
+        this.onerror?.()
+      }
+    }
+    vi.stubGlobal('Image', FakeImage as unknown as typeof Image)
+
+    const el = buildPinElement({ title: 'Barcelona', imageUrl: 'https://cdn/caducada.jpg' })
+    expect(el.classList.contains('lg-trip-pin--empty')).toBe(true)
+    const disc = el.querySelector<HTMLElement>('.lg-trip-pin__disc')
+    expect(disc?.querySelector('.lg-trip-pin__initial')?.textContent).toBe('B')
+    expect(disc?.style.backgroundImage ?? '').toBe('')
+  })
+
+  test('featured (seleccionado en el mapa): aro dorado, sin foto de golpe', () => {
+    const el = buildPinElement({ title: 'Nápoles', imageUrl: 'https://cdn/x.jpg', featured: true })
+    expect(el.classList.contains('lg-trip-pin--featured')).toBe(true)
+  })
+})
+
+describe('buildActivePinElement (momento en juego)', () => {
+  test('disco rojo pulsante con "?", sin foto ni inicial', () => {
+    const el = buildActivePinElement()
+    expect(el.classList.contains('lg-trip-pin--active')).toBe(true)
+    expect(el.querySelector('.lg-trip-pin__disc')?.innerHTML).toContain('<svg')
+    expect(el.querySelector('.lg-trip-pin__initial')).toBeNull()
   })
 })
