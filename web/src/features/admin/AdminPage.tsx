@@ -74,12 +74,12 @@ export function AdminPage({ onBack }: Props) {
     })
 
   return (
-    <main className="lg-page">
+    <main className="lg-page lg-rise">
       <Stack gap={6}>
         <BackHomeButton onClick={goBack} />
         <header>
-          <h1 className={styles.title}>Administración</h1>
-          <p className={styles.subtitle}>Métricas y grupos (solo lectura).</p>
+          <h1 className={`t-display ${styles.title}`}>Administración</h1>
+          <p className={`t-caption ${styles.subtitle}`}>Métricas y grupos (solo lectura).</p>
         </header>
 
         {error ? (
@@ -107,8 +107,8 @@ export function AdminPage({ onBack }: Props) {
 function AnalyticsSection({ analytics }: { analytics: AdminAnalytics | null }) {
   return (
     <section>
-      <h2 className={styles.sectionTitle}>
-        <Icon icon={BarChart3} size={18} /> Resumen global
+      <h2 className={`t-label ${styles.sectionTitle}`}>
+        <Icon icon={BarChart3} size={16} /> Resumen global
       </h2>
       {!analytics ? (
         <MetricsSkeleton />
@@ -171,7 +171,7 @@ function Metric({ label, value, hint }: { label: string; value: string; hint?: s
     <Card padding="md">
       <Stack gap={1}>
         <span className={styles.metricValue}>{value}</span>
-        <span className={styles.metricLabel}>{label}</span>
+        <span className={`t-label ${styles.metricLabel}`}>{label}</span>
         {hint && <span className={styles.metricHint}>{hint}</span>}
       </Stack>
     </Card>
@@ -198,8 +198,8 @@ function MetricsSkeleton() {
 function GroupsSection({ groups }: { groups: AdminGroup[] | null }) {
   return (
     <section>
-      <h2 className={styles.sectionTitle}>
-        <Icon icon={FolderOpen} size={18} /> Grupos
+      <h2 className={`t-label ${styles.sectionTitle}`}>
+        <Icon icon={FolderOpen} size={16} /> Grupos
       </h2>
       {!groups ? (
         <div role="status" aria-label="Cargando grupos">
@@ -318,7 +318,7 @@ function GroupRow({ group }: { group: AdminGroup }) {
               <GroupStats group={group} />
               {challenges && challenges.length > 0 ? (
                 <Stack gap={3}>
-                  <h3 className={styles.blockTitle}>Retos</h3>
+                  <h3 className={`t-title ${styles.blockTitle}`}>Retos</h3>
                   {challenges.map((c) => (
                     <ChallengeRow key={c.challenge_id} challenge={c} />
                   ))}
@@ -374,7 +374,7 @@ function GroupStats({ group }: { group: AdminGroup }) {
 function StatGroup({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div>
-      <h4 className={styles.statGroupTitle}>{title}</h4>
+      <h4 className={`t-label ${styles.statGroupTitle}`}>{title}</h4>
       <dl className={styles.challengeMetrics}>{children}</dl>
     </div>
   )
@@ -407,8 +407,8 @@ function ChallengeRow({ challenge }: { challenge: AdminGroupChallenge }) {
             <Badge tone="accent">{fmtKind(challenge.kind)}</Badge>
           </span>
         </div>
-        <span className={styles.chevron} aria-hidden="true">
-          {open ? '▲' : '▼'}
+        <span className={styles.chevron}>
+          <Icon icon={open ? ChevronUp : ChevronDown} size={16} />
         </span>
       </button>
 
