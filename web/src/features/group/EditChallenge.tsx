@@ -81,6 +81,9 @@ const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
 //    reto solo-foto puede ganar un paseo después de haberse jugado.
 export function EditChallenge({ challenge, onBack, onSaved }: Props) {
   const [title, setTitle] = useState(challenge.title)
+  // Descripción del día (texto editorial). La columna admite null → arrancamos en '' para
+  // mantener el textarea siempre controlado; al guardar, '' se traduce a null (sin texto).
+  const [description, setDescription] = useState(challenge.description ?? '')
   // Guardamos los segmentos como string ('' = sin límite / sin cambios) y los
   // decodificamos al guardar.
   const [guessValue, setGuessValue] = useState<string>(
@@ -260,6 +263,8 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
       setStatus('Guardando los cambios…')
       const updated = await updateChallenge(challenge.id, {
         title: title.trim() || '¿Dónde estoy?',
+        // '' se guarda como null (estado "sin texto"); updateChallenge escribe el valor tal cual.
+        description: description.trim() || null,
         guessSeconds,
         photoIsHint,
         ...(imagePath !== undefined ? { imagePath } : {}),
@@ -310,6 +315,19 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
               placeholder="¿Dónde estoy?"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+            />
+          )}
+        </Field>
+
+        <Field label="Descripción del día" hint="Lo que viviste ahí (opcional).">
+          {(fieldProps) => (
+            <textarea
+              {...fieldProps}
+              className={styles.textarea}
+              placeholder="Llegamos justo a tiempo para ver el sol caer sobre el mar…"
+              rows={3}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
             />
           )}
         </Field>
