@@ -66,9 +66,24 @@ function installGoogleMapsMock(page: Page, svAvailable: boolean) {
       }
     }
     const StreetViewPreference = { NEAREST: 'nearest', BEST: 'best' }
+    // Panorama interactivo: StreetViewPreview lo monta cuando el creador ACEPTA el
+    // Street View (sin foto, el SV es la escena y se muestra la previa). El mock es
+    // inerte pero con la forma que consume el componente (addListener → remove, getPov)
+    // para que la previa monte sin lanzar y el flujo no reviente (#453).
+    const StreetViewPanorama = class {
+      addListener() {
+        return { remove() {} }
+      }
+      getPov() {
+        return { heading: 0, pitch: 0 }
+      }
+      setPov() {}
+      setPano() {}
+    }
     const maps: Record<string, unknown> = {
       StreetViewService,
       StreetViewPreference,
+      StreetViewPanorama,
       // El flujo de crear construye estos en runtime para los marcadores del mapa.
       Size: class {},
       Point: class {},
@@ -95,7 +110,7 @@ function installGoogleMapsMock(page: Page, svAvailable: boolean) {
       // (el mapa de crear es Leaflet, no Google Maps, así que no se usa nada de ahí).
       importLibrary: (name: string) => {
         if (name === 'streetView')
-          return Promise.resolve({ StreetViewService, StreetViewPreference })
+          return Promise.resolve({ StreetViewService, StreetViewPreference, StreetViewPanorama })
         return Promise.resolve({})
       },
     }

@@ -93,10 +93,17 @@ async function runCreateFlow(page: Page, opts: { toggleStreetView: boolean }): P
   await expect(map).toBeVisible()
   await map.click({ position: { x: 180, y: 200 } })
 
-  // Al marcar, aparece el bloque de Street View junto al punto (mismo paso).
-  await expect(page.getByRole('button', { name: 'Añadir Street View' })).toBeVisible({
-    timeout: 15_000,
-  })
+  // Al marcar, aparece el bloque de Street View junto al punto (mismo paso) Y AHÍ SE
+  // QUEDA: marcar NO debe auto-avanzar a la foto (regresión #453 — antes saltaba a la
+  // etapa "foto" tras 620 ms y el toggle solo parpadeaba, inalcanzable). Esperamos
+  // más que esa ventana y comprobamos que el toggle SIGUE visible en el viewport y que
+  // NO hemos saltado a la foto todavía.
+  const svToggle = page.getByRole('button', { name: 'Añadir Street View' })
+  await expect(svToggle).toBeVisible({ timeout: 15_000 })
+  await page.waitForTimeout(900)
+  await expect(svToggle).toBeVisible()
+  await expect(svToggle).toBeInViewport()
+  await expect(page.getByRole('heading', { name: 'Enseña tu momento' })).toBeHidden()
 
   if (opts.toggleStreetView) {
     // Activar Street View dispara la búsqueda. Con la Maps API negada (mock), la
@@ -138,10 +145,13 @@ async function runCreateFlow(page: Page, opts: { toggleStreetView: boolean }): P
   // (#330): el reto YA está creado (el INSERT respondió 201). Su aparición, con el
   // título del reto, es la señal de éxito del bucle.
   await expect(page.getByText('¡Reto lanzado!')).toBeVisible({ timeout: 15_000 })
-  await expect(page.getByRole('heading', { name: '¡Reto creado!' })).toBeVisible({
+  const shareDialog = page.getByRole('dialog')
+  await expect(shareDialog.getByRole('heading', { name: '¡Reto creado!' })).toBeVisible({
     timeout: 15_000,
   })
-  await expect(page.getByText('¿Dónde desayuné hoy?')).toBeVisible()
+  // El título aparece en la hoja de resumen (detrás) Y en el diálogo de compartir; lo
+  // asertamos DENTRO del diálogo (la señal de éxito es la tarjeta de compartir).
+  await expect(shareDialog.getByText('¿Dónde desayuné hoy?')).toBeVisible()
 
   // "Ver el reto en el viaje" navega al deep link del reto recién creado (#g=…&c=…).
   await page.getByRole('button', { name: /Ver el reto en el viaje/ }).click()
@@ -172,5 +182,43 @@ test.describe('crear reto (hermético)', () => {
     await runCreateFlow(page, { toggleStreetView: true })
 
     expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
+  })
+
+  // Regresión #453 EN MÓVIL: el dueño soltó el pin en un reto de lugar y "Añadir
+  // Street View" NO aparecía. La causa era el auto-avance de etapa al marcar (saltaba
+  // a "foto", donde no hay SV). En un viewport de teléfono comprobamos que, tras
+  // soltar el pin, el toggle está VISIBLE y dentro del viewport (por encima del
+  // pliegue), que se puede ACTIVAR y que seguimos en la etapa de lugar.
+  test('reto de lugar en móvil: soltar el pin muestra «Añadir Street View» accesible', async ({
+    page,
+  }) => {
+    // Teléfono típico (iPhone-ish): el bug era invisible en el viewport alto del CI.
+    await page.setViewportSize({ width: 390, height: 667 })
+    await primeHermeticCreate(page, { streetViewAvailable: true })
+
+    await openCreateFromTrip(page)
+    await page.getByRole('button', { name: /Crear reto ¿Dónde\?/ }).click()
+    await expect(page.getByText('marca dónde estás')).toBeVisible({ timeout: 20_000 })
+
+    const map = page.locator('.leaflet-container')
+    await expect(map).toBeVisible()
+    await map.click({ position: { x: 180, y: 200 } })
+
+    // Tras marcar, el toggle aparece y SE QUEDA (no parpadea ni auto-avanza): esperamos
+    // más que la vieja ventana de 620 ms.
+    const svToggle = page.getByRole('button', { name: 'Añadir Street View' })
+    await expect(svToggle).toBeVisible({ timeout: 15_000 })
+    await page.waitForTimeout(900)
+    await expect(svToggle).toBeVisible()
+    // Accesible = dentro del viewport del teléfono (por encima del pliegue de la hoja).
+    await expect(svToggle).toBeInViewport()
+    // Seguimos en la etapa de lugar: NO hemos saltado a la foto.
+    await expect(page.getByRole('heading', { name: 'Enseña tu momento' })).toBeHidden()
+
+    // Y se puede activar: con Maps disponible, monta la previa (findPanorama devuelve
+    // el panorama mockeado). El toggle queda marcado (aria-pressed).
+    await tapSheetButton(page, 'Añadir Street View')
+    await expect(svToggle).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByText('Buscando Street View…')).toBeHidden({ timeout: 15_000 })
   })
 })
