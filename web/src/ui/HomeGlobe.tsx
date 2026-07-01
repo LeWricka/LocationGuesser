@@ -239,8 +239,14 @@ export function HomeGlobe({
       const el = pinElement(pin)
       el.title = pin.title
       el.addEventListener('click', () => onOpenRef.current?.(pin.targetId))
+      // Ancla `'bottom'` (igual que el mapa de viaje, TripMapGlobe): la PUNTA del pin se
+      // clava en la coordenada y el disco crece hacia arriba. Con el ancla por defecto
+      // (`'center'`) el disco quedaba centrado en la coordenada y su mitad inferior + la
+      // puntita caían por debajo, de modo que un pin cerca del borde inferior del globo
+      // salía CORTADO (el globo recorta su overflow); anclar por la punta lo sube dentro
+      // del encuadre y hace coherente el clavado con el resto de la app.
       markersRef.current.push(
-        new gl.Marker({ element: el }).setLngLat([pin.lng, pin.lat]).addTo(map),
+        new gl.Marker({ element: el, anchor: 'bottom' }).setLngLat([pin.lng, pin.lat]).addTo(map),
       )
     }
   }, [])

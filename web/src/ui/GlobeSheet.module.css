@@ -85,6 +85,27 @@
   transition: top var(--duration-slow) var(--ease-emphasized);
 }
 
+/* FALDÓN de papel: rectángulo de superficie SIN esquinas anclado al mismo `top` que la
+   hoja y bajando la banda del radio superior. La hoja se apoya con esquinas redondeadas
+   sobre la escena OSCURA (`--scene-bg` del shell + globo): los triángulos que quedan FUERA
+   del arco del radio dejaban asomar el negro (el bug de "huecos en negro detrás de los
+   bordes redondeados"). Este faldón —justo detrás de la hoja (z-index 1, entre globo z-0
+   y hoja z-2)— rellena esos triángulos con PAPEL, así el recorte del radio muestra la
+   superficie de la hoja, nunca la escena. Como la hoja (opaca, z-2) tapa TODO el faldón
+   salvo los triángulos de esquina, el faldón no crea ningún canto visible: solo sella las
+   esquinas. Su alto solo necesita cubrir el arco del radio superior (`--radius-xl`); un
+   pelín más de holgura absorbe el antialiasing del borde. */
+.skirt {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(var(--radius-xl) + var(--space-1));
+  background: var(--surface);
+  z-index: 1;
+  pointer-events: none;
+  transition: top var(--duration-slow) var(--ease-emphasized);
+}
+
 /* HOJA BLANCA: ocupa del `top` (inline, según la posición) hasta el fondo del visor.
    Sube/baja con el asa; su contenido scrollea dentro. Sombra HACIA ARRIBA (sube desde
    abajo). El radio superior la despega del globo. */
@@ -172,7 +193,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sheet {
+  .sheet,
+  .skirt {
     transition: none;
   }
 }
