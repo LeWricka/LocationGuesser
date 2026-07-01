@@ -25,7 +25,7 @@ import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
 import { AlertTriangle } from 'lucide-react'
-import { Button, Icon, Spinner, useToast } from '../../ui'
+import { AppHeader, Button, Icon, Spinner, useToast } from '../../ui'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import styles from './CreateChallengeImmersive.module.css'
 
@@ -506,30 +506,27 @@ export function CreateChallengeImmersive({
         </div>
       )}
 
-      {/* Topbar flotante translúcido: atrás · título · mi ubicación. */}
-      <div className={styles.top}>
-        <button
-          type="button"
-          className={styles.iconBtn}
-          aria-label={stage > 0 ? 'Volver al paso anterior' : 'Salir'}
-          onClick={topBack}
-        >
-          <BackArrow />
-        </button>
-        <div className={styles.topTitle}>
-          <b>Nuevo reto</b>
-          {groupName ? <small>Viaje · {groupName}</small> : null}
-        </div>
-        <button
-          type="button"
-          className={styles.iconBtn}
-          aria-label="Usar mi ubicación actual"
-          onClick={useGps}
-          disabled={locating}
-        >
-          {locating ? <Spinner size={18} /> : <CrosshairIcon size={20} />}
-        </button>
-      </div>
+      {/* Cabecera ÚNICA (variante flotante sobre la escena satélite): mismo título
+          serif y back-disco que el resto del flujo de crear. El back retrocede de
+          paso (o sale en el primero); "mi ubicación" va en la ranura de acción. */}
+      <AppHeader
+        variant="floating"
+        lead="back"
+        onLead={topBack}
+        leadLabel={stage > 0 ? 'Volver al paso anterior' : 'Salir'}
+        title="Nuevo reto"
+        action={
+          <button
+            type="button"
+            className={styles.gpsBtn}
+            aria-label="Usar mi ubicación actual"
+            onClick={useGps}
+            disabled={locating}
+          >
+            {locating ? <Spinner size={18} /> : <CrosshairIcon size={20} />}
+          </button>
+        }
+      />
 
       {/* BOTTOM SHEET que sube y crece por etapas. */}
       <ImmersiveSheet

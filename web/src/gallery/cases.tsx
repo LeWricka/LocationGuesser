@@ -19,7 +19,7 @@ import { AddMoment } from '../features/create/AddMoment'
 import { CreateChallengeFlow } from '../features/create/CreateChallengeFlow'
 import { EditChallenge } from '../features/group/EditChallenge'
 import { ResultCard } from '../features/play/ResultCard'
-import { HomeDashboard, type HomeGroup, type HomePinned } from '../ui'
+import { HomeDashboard, LoginScreen, type HomeGroup, type HomePinned } from '../ui'
 import type { GlobePin } from '../ui'
 import type { ChallengeForPlay } from '../lib/challenges'
 import {
@@ -208,6 +208,12 @@ export const cases: GalleryCase[] = [
         onCreated={noop}
       />
     ),
+  },
+  {
+    id: 'login',
+    title: 'Login (entrar a Tabide)',
+    section: 'Entrar',
+    render: () => <LoginScreen email="" onEmailChange={noop} />,
   },
   {
     id: 'jugar-ubicacion',

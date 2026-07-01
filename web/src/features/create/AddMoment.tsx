@@ -262,9 +262,11 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
   // formulario de reto pre-rellenado con la foto y el lugar; "Listo" vuelve al viaje.
   if (saved) {
     return (
-      <main className={`lg-page ${styles.screen}`}>
+      <main className={styles.screen}>
+        {/* Cabecera ÚNICA del producto (variante papel), a sangre sobre el papel
+            con su hairline; el cuerpo lleva el gutter, no la cabecera. */}
         <AppHeader title="Recuerdo guardado" />
-        <Stack gap={5} className={styles.savedWrap}>
+        <Stack gap={5} className={`${styles.body} ${styles.savedWrap}`}>
           {savedCoverUrl ? (
             <img className={styles.savedCover} src={savedCoverUrl} alt="" aria-hidden />
           ) : (
@@ -295,9 +297,12 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
   }
 
   return (
-    <main className={`lg-page ${styles.screen}`}>
+    <main className={styles.screen}>
+      {/* Cabecera ÚNICA del producto (variante papel), a sangre con su hairline.
+          El gutter lo lleva el cuerpo, para que la cabecera no flote como una
+          barra blanca recortada distinta al papel. */}
       <AppHeader lead="back" onLead={onBack} leadLabel="Volver" title="Nuevo recuerdo" />
-      <Stack gap={5} className="lg-stagger">
+      <Stack gap={5} className={`${styles.body} lg-stagger`}>
         <div className={styles.heading}>
           <p className={styles.lede}>
             Una foto, un sitio, unas palabras. Lo compartes y los tuyos lo viven contigo.
