@@ -5,7 +5,7 @@ import { MapPin } from 'lucide-react'
 import type { LatLng } from '../../lib/geo'
 import { avatarPinFromProfile, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
 import type { MapPreset } from '../../lib/mapPresets'
-import { Icon } from '../../ui'
+import { Icon, MapSkeleton } from '../../ui'
 import styles from './PlayMap.module.css'
 
 // Vista inicial: el MUNDO entero. Empezando alejado, el
@@ -220,6 +220,13 @@ export function PlayMap({
   // En modo pin de centro fijo no se ve el pin-avatar (lo sustituye el pin clavado
   // al centro de la pantalla); tampoco se marca tocando, sino moviendo el mapa.
   const centerPinMode = fixedCenterPin && !answer
+
+  // Estado de carga: mientras el SDK de Google no ha pintado sus teselas, el lienzo
+  // se ve oscuro ("parece roto"). Tapamos el hueco con `MapSkeleton` hasta el primer
+  // `onTilesLoaded` (teselas visibles cargadas); luego se funde y se desmonta.
+  const [mapReady, setMapReady] = useState(false)
+  const [skeletonGone, setSkeletonGone] = useState(false)
+
   return (
     <div className={styles.wrap}>
       <Map
@@ -227,6 +234,8 @@ export function PlayMap({
         defaultCenter={WORLD}
         defaultZoom={WORLD_ZOOM}
         minZoom={2}
+        // `onTilesLoaded` = teselas visibles cargadas → ocultar el skeleton.
+        onTilesLoaded={() => setMapReady(true)}
         // Un dedo mueve el mapa en móvil (sin el banner "usa dos dedos"), igual que
         // el worldCopyJump/arrastre fluido de antes.
         gestureHandling="greedy"
@@ -257,6 +266,12 @@ export function PlayMap({
         {guess && answer && <FitToReveal guess={guess} answer={answer} />}
         {centerPinMode && <CenterPinTracker locked={locked} onPick={onPick} />}
       </Map>
+
+      {/* Estado de carga: tapa el lienzo hasta que Google pinta sus teselas
+          (`onTilesLoaded`); luego se funde y se desmonta. Evita el "parece roto". */}
+      {!skeletonGone && (
+        <MapSkeleton hidden={mapReady} onFadeOutEnd={() => setSkeletonGone(true)} />
+      )}
 
       {/* Pin de CENTRO FIJO: clavado en el centro de la pantalla mientras el jugador
           mueve el mapa debajo. Decorativo (pointer-events:none) para no robar el

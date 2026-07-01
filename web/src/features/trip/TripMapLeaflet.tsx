@@ -10,7 +10,7 @@ import {
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { Layers } from 'lucide-react'
-import { Icon } from '../../ui'
+import { Icon, MapSkeleton } from '../../ui'
 import type { RoutePoint } from '../../lib/trip'
 import {
   CARTO_POSITRON,
@@ -166,6 +166,13 @@ export function TripMapLeaflet({
   // No persiste: cada visita arranca en satélite, el estado de reposo del atlas.
   const [satellite, setSatellite] = useState(true)
 
+  // Estado de carga: mientras la capa base no ha cargado sus teselas, Leaflet deja
+  // el lienzo oscuro con, a veces, un pin suelto ("parece roto"). Tapamos ese hueco
+  // con `MapSkeleton` hasta el evento `load` de la capa base (todas las teselas
+  // visibles cargadas); entonces se funde y se desmonta.
+  const [mapReady, setMapReady] = useState(false)
+  const [skeletonGone, setSkeletonGone] = useState(false)
+
   const activePos = useMemo<L.LatLngExpression | null>(
     () => (activeMoment ? floatingActivePos(route) : null),
     [activeMoment, route],
@@ -228,6 +235,9 @@ export function TripMapLeaflet({
             maxZoom={ESRI_SATELLITE.maxZoom}
             keepBuffer={6}
             updateWhenZooming={false}
+            // `load` = todas las teselas visibles de la capa base cargadas → ocultar
+            // el skeleton (el lienzo ya muestra el satélite, no el hueco oscuro).
+            eventHandlers={{ load: () => setMapReady(true) }}
           />
         ) : (
           <TileLayer
@@ -238,6 +248,7 @@ export function TripMapLeaflet({
             maxZoom={CARTO_POSITRON.maxZoom}
             keepBuffer={6}
             updateWhenZooming={false}
+            eventHandlers={{ load: () => setMapReady(true) }}
           />
         )}
 
@@ -306,6 +317,12 @@ export function TripMapLeaflet({
           activePos={activePos}
         />
       </MapContainer>
+
+      {/* Estado de carga: tapa el lienzo hasta que la capa base carga sus teselas
+          (evento `load`); luego se funde y se desmonta. Evita el "parece roto". */}
+      {!skeletonGone && (
+        <MapSkeleton hidden={mapReady} onFadeOutEnd={() => setSkeletonGone(true)} />
+      )}
 
       {/* Toggle de capa: pastilla clara del chrome (estilo Atelier). Alterna entre
           el satélite (Esri) por defecto y el plano claro (Positron) opt-in. */}
