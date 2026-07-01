@@ -7,10 +7,12 @@ import { defineConfig, devices } from '@playwright/test'
 // dobles, (3) es HERMÉTICO: cada spec bloquea toda red externa (tiles/SDK/CDN), así que
 // el chequeo es 100% determinista y offline.
 //
-// Cubre dos specs (issue #396 accesibilidad + #415 integridad de esquina):
+// Cubre tres specs (issue #396 accesibilidad + #415 integridad de esquina + #417 gesto):
 //  - gallery-a11y: axe a viewport representativo + no-overflow horizontal a 320px.
 //  - gallery-corner-integrity: la hoja (GlobeSheet) no deja asomar la escena oscura por
 //    sus esquinas redondeadas (muestreo de píxel en los triángulos de esquina).
+//  - gallery-sheet-scroll-expand: el gesto de scroll sobre la hoja dirige su expansión
+//    (scroll arriba la agranda, scroll abajo la recoge) — cableado del nested scroll.
 //
 // El viewport de cada comprobación lo fija el propio spec, por eso aquí solo dejamos la
 // base de Desktop Chrome.
@@ -20,7 +22,7 @@ const baseURL = `http://localhost:${PORT}`
 
 export default defineConfig({
   testDir: 'e2e',
-  testMatch: /gallery-(a11y|corner-integrity)\.spec\.ts/,
+  testMatch: /gallery-(a11y|corner-integrity|sheet-scroll-expand)\.spec\.ts/,
   fullyParallel: false,
   reporter: 'list',
   // Un único spec recorre todos los casos × comprobaciones; subimos el límite por

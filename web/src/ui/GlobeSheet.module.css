@@ -194,7 +194,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sheet,
-  .skirt {
+  .skirt,
+  .seam {
     transition: none;
   }
 }

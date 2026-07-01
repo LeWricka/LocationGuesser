@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { ReactNode } from 'react'
 import { HomeGlobe } from './HomeGlobe'
 import type { GlobePin } from './HomeGlobe'
+import { useSheetScrollExpand } from './useSheetScrollExpand'
 import styles from './GlobeSheet.module.css'
 
 interface Props {
@@ -38,11 +39,16 @@ const RAISED = 0.12 // hoja subida: el globo queda como una cinta fina arriba
  * Shell del patrón GLOBO + HOJA (referencia Polarsteps): globo héroe a sangre arriba y
  * una HOJA BLANCA que sube debajo con el contenido legible. El globo da el wow; la hoja
  * la legibilidad. Separación de gestos (decisión cerrada): el globo vive en su zona y
- * gestiona paneo/zoom; la hoja es una CAPA DE SCROLL propia con asa — arrastrar el asa
- * la sube/baja y NO mueve el globo. Se mantiene el FAB "+" (sin barra de pestañas).
+ * gestiona paneo/zoom; la hoja es una CAPA DE SCROLL propia.
  *
- * La hoja tiene dos posiciones (recogida/subida) que el asa alterna por toque o arrastre.
- * Con la hoja subida relajamos el render del globo (queda tapado). 100dvh + safe-area.
+ * La expansión de la hoja la DIRIGE EL GESTO DE SCROLL (referencia Apple Maps / Polarsteps),
+ * no solo el asa: con la hoja recogida y el contenido en el tope, un swipe/scroll hacia
+ * arriba agranda la hoja (PEEK→RAISED) siguiendo el dedo; una vez subida, el gesto pasa a
+ * scrollear el contenido. A la inversa, con el contenido en el tope y la hoja subida, un
+ * swipe hacia abajo la recoge (RAISED→PEEK). El asa se mantiene como afordancia visual y
+ * sigue funcionando (arrastre/toque), pero ya no es obligatoria. Toda la coordinación de
+ * "nested scroll" vive en `useSheetScrollExpand`. Con la hoja subida relajamos el render
+ * del globo (queda tapado). 100dvh + safe-area.
  */
 export function GlobeSheet({
   pins,
@@ -53,44 +59,14 @@ export function GlobeSheet({
   fab,
   sheetLabel,
 }: Props) {
-  // Posición de la hoja como fracción del alto del visor (top de la hoja). Arranca recogida.
-  const [topFrac, setTopFrac] = useState(PEEK)
-  // Arrastre activo del asa: durante el drag seguimos el dedo; al soltar, enganchamos.
-  const dragStart = useRef<{ y: number; frac: number } | null>(null)
-  const [dragging, setDragging] = useState(false)
-
-  const raised = topFrac <= (PEEK + RAISED) / 2
-
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      dragStart.current = { y: e.clientY, frac: topFrac }
-      setDragging(true)
-      e.currentTarget.setPointerCapture?.(e.pointerId)
-    },
-    [topFrac],
-  )
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const start = dragStart.current
-    if (!start || typeof window === 'undefined') return
-    // El asa arrastra la hoja: el delta del dedo (px) se traduce a fracción del visor.
-    const deltaFrac = (e.clientY - start.y) / window.innerHeight
-    const next = Math.min(PEEK, Math.max(RAISED, start.frac + deltaFrac))
-    setTopFrac(next)
-  }, [])
-
-  const endDrag = useCallback(() => {
-    if (!dragStart.current) return
-    dragStart.current = null
-    setDragging(false)
-    // Engancha a la posición más cercana (recogida o subida).
-    setTopFrac((frac) => (frac <= (PEEK + RAISED) / 2 ? RAISED : PEEK))
-  }, [])
-
-  // Toque simple en el asa (sin arrastre real): alterna entre recogida y subida.
-  const toggle = useCallback(() => {
-    setTopFrac((frac) => (frac > (PEEK + RAISED) / 2 ? RAISED : PEEK))
-  }, [])
+  // El scroll interno de la hoja: el hook engancha aquí los gestos (touch/wheel) para que
+  // dirijan la expansión de la hoja mientras el contenido está en el tope.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const { topFrac, dragging, raised, handleProps, toggle } = useSheetScrollExpand({
+    peek: PEEK,
+    raised: RAISED,
+    scrollRef,
+  })
 
   return (
     <div className={styles.shell}>
@@ -144,15 +120,14 @@ export function GlobeSheet({
           aria-label={raised ? 'Bajar la hoja' : 'Subir la hoja'}
           aria-expanded={raised}
           onClick={toggle}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endDrag}
-          onPointerCancel={endDrag}
+          {...handleProps}
         >
           <span className={styles.grab} aria-hidden="true" />
         </button>
 
-        <div className={styles.scroll}>{children}</div>
+        <div ref={scrollRef} className={styles.scroll}>
+          {children}
+        </div>
       </section>
 
       {fab && <div className={styles.fab}>{fab}</div>}
