@@ -268,45 +268,21 @@
   display: flex;
   gap: 10px;
 }
+/* Columna salida/vuelta: rótulo encima del DatePicker del kit (que trae su
+   propia superficie con look de Input). */
 .dateBox {
   flex: 1 1 0;
   min-width: 0;
-  border: 1px solid var(--color-border, rgba(24, 32, 43, 0.1));
-  background: #fafbfc;
-  border-radius: 13px;
-  padding: 9px 12px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  transition:
-    border-color 0.2s ease,
-    background 0.2s ease;
-}
-.dateBox:focus-within {
-  border-color: var(--accent);
-  background: #fff;
+  gap: var(--space-2);
 }
 .dateCap {
-  font-size: 10.5px;
+  font-size: var(--font-size-xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-600);
   font-weight: 700;
-}
-.dateInput {
-  border: none;
-  background: transparent;
-  outline: none;
-  font-family: inherit;
-  font-size: 15px;
-  color: var(--ink-900);
-  width: 100%;
-  padding: 0;
-}
-/* el indicador nativo del date se atenúa para integrarse */
-.dateInput::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.55;
 }
 
 /* "con quién vas" con icono */

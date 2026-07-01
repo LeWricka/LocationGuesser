@@ -4,7 +4,7 @@ import { createGroup } from '../../lib/groupData'
 import { joinGroupAsOwner } from '../../lib/membership'
 import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
-import { AppHeader, Spinner, useToast } from '../../ui'
+import { AppHeader, DatePicker, Spinner, useToast } from '../../ui'
 import { CalendarIcon, PeopleIcon, SparkIcon, TripPinIcon } from './CreateIcons'
 import { ImmersiveSheet } from './ImmersiveSheet'
 import { formatTripDates } from './tripDates'
@@ -236,24 +236,22 @@ export function CreateGroup({ onBack }: Props) {
               <div className={styles.dates}>
                 <div className={styles.dateBox}>
                   <span className={styles.dateCap}>Salida</span>
-                  <input
-                    className={styles.dateInput}
-                    type="date"
+                  <DatePicker
                     aria-label="Fecha de salida"
+                    placeholder="Elige día"
                     value={startsOn}
                     max={endsOn || undefined}
-                    onChange={(e) => setStartsOn(e.target.value)}
+                    onChange={(v) => setStartsOn(v ?? '')}
                   />
                 </div>
                 <div className={styles.dateBox}>
                   <span className={styles.dateCap}>Vuelta</span>
-                  <input
-                    className={styles.dateInput}
-                    type="date"
+                  <DatePicker
                     aria-label="Fecha de vuelta"
+                    placeholder="Elige día"
                     value={endsOn}
                     min={startsOn || undefined}
-                    onChange={(e) => setEndsOn(e.target.value)}
+                    onChange={(v) => setEndsOn(v ?? '')}
                   />
                 </div>
               </div>
