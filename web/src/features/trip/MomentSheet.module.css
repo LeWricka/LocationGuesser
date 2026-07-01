@@ -38,8 +38,27 @@
   box-shadow: var(--shadow-sheet);
   /* Sube desde abajo con la curva enfatizada (decelera al final). */
   animation: lg-sheet-rise var(--duration-slower) var(--ease-emphasized) both;
+  /* Asentamiento del arrastre: al soltar por debajo del umbral, el transform
+     vuelve a 0 con esta transición (muelle sutil). Durante el arrastre se anula
+     (clase .dragging) para seguir el dedo 1:1. */
+  transition: transform var(--motion-duration-base) var(--motion-ease-spring);
   /* La foto a sangre llega al borde redondeado: recortamos el desborde. */
   overflow: hidden;
+}
+
+/* Arrastrando: sin transición, el transform inline sigue el dedo al milímetro. */
+.dragging {
+  transition: none;
+}
+
+/* SALIDA: la hoja cae fuera del viewport. Si venía de un arrastre, la transición
+   continúa desde donde esté el dedo (inercia); si se cierra por botón/overlay,
+   cae desde su sitio. La curva de salida acelera al desaparecer (§6). */
+.closing {
+  transform: translateY(100%);
+  transition: transform var(--motion-duration-base) var(--motion-ease-exit);
+  /* Anula la animación de entrada para que no pelee con el transform de salida. */
+  animation: none;
 }
 
 /* Zona de gesto del asa: ancha para agarrar fácil con el pulgar. Va SOBRE la foto
@@ -114,15 +133,15 @@
   background: linear-gradient(160deg, var(--color-surface-hover), var(--color-bg));
 }
 
-/* La foto en sí: anulamos el aspect-ratio del marco y la fijamos a la caja. */
+/* La foto en sí: anulamos el aspect-ratio del marco y la fijamos a la caja. La foto
+   se muestra ESTÁTICA (protagonista): sin ken-burns en bucle — el sistema prohíbe
+   la decoración animada permanente (§6: solo entrada o feedback). */
 .heroImg {
   width: 100%;
   height: 100%;
   border: 0;
   border-radius: 0;
   aspect-ratio: auto;
-  /* Ken Burns sutil: deriva lenta de escala/posición. Se anula bajo reduced-motion. */
-  animation: lg-kenburns 22s ease-in-out infinite alternate;
 }
 
 /* Velo de legibilidad sobre la foto: oscurece arriba (chips) y abajo (info).
@@ -143,15 +162,6 @@
     var(--scene-veil) 82%,
     var(--scene-bg) 100%
   );
-}
-
-@keyframes lg-kenburns {
-  from {
-    transform: scale(1.04);
-  }
-  to {
-    transform: scale(1.14) translate(2%, -1.5%);
-  }
 }
 
 /* Cerrar: disco de chrome claro flotante arriba-izquierda (tinta de escena sobre
@@ -628,13 +638,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ownerAction,
-  .heroClose {
+  .heroClose,
+  .panel {
     transition: none;
-  }
-  /* Ken Burns OFF: la foto se queda quieta (la maqueta lo exige). */
-  .heroImg {
-    animation: none;
-    transform: none;
   }
 }
 

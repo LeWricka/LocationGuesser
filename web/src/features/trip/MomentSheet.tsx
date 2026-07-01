@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, MapPin, Pencil, Target, Trash2, User } from 'lucide-react'
-import { Badge, Button, ChallengePhoto, Icon, Modal, useToast } from '../../ui'
+import { Badge, Button, ChallengePhoto, Icon, Modal, useReducedMotion, useToast } from '../../ui'
 import type { Moment } from '../../lib/trip'
 import type { LatLng } from '../../lib/geo'
 import {
@@ -80,6 +80,12 @@ function formatMomentDate(value: string): string | null {
 // la hoja vuelve a su sitio (gesto cancelado).
 const DRAG_CLOSE_PX = 110
 
+// Duración (ms) de la animación de SALIDA de la hoja: espejo del token
+// `--motion-duration-base` (200ms) que usa el CSS. Tras este tiempo desmontamos
+// (llamamos a onClose). Se mantiene en sync con el token a mano porque no hay una
+// vía barata de leer un custom property desde JS sin tocar el DOM del panel.
+const EXIT_MS = 200
+
 // Duración del reto al convertir: mismas paradas que el asistente de "Añadir
 // recuerdo" para coherencia. El plazo se calcula relativo a AHORA al guardar.
 const DURATION_STOPS: { minutes: number; label: string }[] = [
@@ -131,6 +137,16 @@ export function MomentSheet({
   // Desplazamiento vertical en curso del gesto de arrastre (0 = en su sitio).
   const [dragY, setDragY] = useState(0)
   const dragStart = useRef<number | null>(null)
+  // ¿La hoja está ejecutando su animación de SALIDA? Mientras cae hacia abajo
+  // ignoramos gestos nuevos y esperamos al fin de la transición para llamar a
+  // onClose: la hoja sale animada (continuidad), nunca desaparece de golpe.
+  const [closing, setClosing] = useState(false)
+  // ¿El dedo está arrastrando ahora mismo? Mientras arrastra el transform es 1:1
+  // (sin transición); al soltar, la transición del panel anima el asentamiento.
+  const [dragging, setDragging] = useState(false)
+  const closeTimer = useRef<number | null>(null)
+  // Con menos movimiento: la salida no se anima (cierre inmediato, aceptable).
+  const reducedMotion = useReducedMotion()
 
   // Descripción del día: estado LOCAL sembrado del momento. El panel se remonta por
   // `key` al cambiar de momento (ver más abajo), así que el estado inicial siempre
@@ -164,12 +180,28 @@ export function MomentSheet({
   const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
   const [promoteBusy, setPromoteBusy] = useState(false)
 
-  // Cierra reseteando el arrastre, para que la próxima apertura entre limpia
-  // (el panel además se remonta por `key`, ver más abajo).
+  // Cierra la hoja CON ANIMACIÓN DE SALIDA (continuidad de movimiento, §6): en vez
+  // de desaparecer de golpe, marca `closing` para que el panel caiga hacia abajo
+  // (transición de `transform` con `--motion-ease-exit`) y, al terminar, llama a
+  // onClose (el padre pone moment=null → desmonta). Con menos movimiento cierra al
+  // instante. Idempotente: un segundo disparo mientras cae no reencola nada.
   const close = () => {
-    setDragY(0)
-    onClose()
+    if (closing) return
+    if (reducedMotion) {
+      setDragY(0)
+      onClose()
+      return
+    }
+    setClosing(true)
+    closeTimer.current = window.setTimeout(onClose, EXIT_MS)
   }
+
+  // Si el momento desaparece (padre desmonta) limpiamos el temporizador pendiente.
+  useEffect(() => {
+    return () => {
+      if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
+    }
+  }, [])
 
   // Cerrar con Escape mientras la hoja está abierta.
   useEffect(() => {
@@ -325,10 +357,14 @@ export function MomentSheet({
   // Eyebrow editorial sobre la foto: el tipo de momento (en juego / reto / recuerdo).
   const eyebrow = isActive ? 'En juego' : isReto ? 'Un reto para el grupo' : 'Recuerdo'
 
-  // Arrastre desde el asa: seguimos el dedo solo hacia abajo; al soltar, si pasó
-  // el umbral cerramos, si no la hoja vuelve a su sitio.
+  // Arrastre desde el asa: seguimos el dedo solo hacia abajo (transform 1:1, sin
+  // transición mientras se arrastra); al soltar, si pasó el umbral la hoja CAE hasta
+  // salir (deja el `closing` que transiciona el transform desde donde está el dedo
+  // hasta fuera del viewport — inercia), si no vuelve a su sitio con muelle.
   const onPointerDown = (e: React.PointerEvent) => {
+    if (closing) return
     dragStart.current = e.clientY
+    setDragging(true)
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const onPointerMove = (e: React.PointerEvent) => {
@@ -339,9 +375,16 @@ export function MomentSheet({
     if (dragStart.current === null) return
     const shouldClose = dragY > DRAG_CLOSE_PX
     dragStart.current = null
+    setDragging(false)
     if (shouldClose) close()
     else setDragY(0)
   }
+
+  // Estilo del panel: mientras se arrastra seguimos el dedo (1:1, sin transición);
+  // al soltar por debajo del umbral, el transform vuelve a 0 con transición-muelle
+  // (clase `.settling`). Mientras `closing`, NO fijamos transform inline: deja que
+  // la clase `.closing` lo lleve a `translateY(100%)` continuando desde donde esté.
+  const panelStyle = !closing && dragY ? { transform: `translateY(${dragY}px)` } : undefined
 
   // ¿Hay un sub-formulario abierto (editar datos o convertir en reto)? En ese caso
   // la vista entra en "modo edición": el foco es el formulario y se atenúa el resto.
@@ -353,13 +396,20 @@ export function MomentSheet({
         // Remontar al cambiar de momento garantiza arrastre/scroll a cero.
         key={moment.challengeId}
         ref={panelRef}
-        className={styles.panel}
+        className={`${styles.panel} ${dragging ? styles.dragging : ''} ${
+          closing ? styles.closing : ''
+        }`}
         role="dialog"
         aria-modal="true"
         aria-label={moment.title}
-        style={dragY ? { transform: `translateY(${dragY}px)` } : undefined}
+        style={panelStyle}
         // El panel no propaga el click al overlay (que cierra).
         onClick={(e) => e.stopPropagation()}
+        // Fin de la caída de salida → desmontar. El temporizador de `close` es el
+        // respaldo si la transición no llega a emitirse.
+        onTransitionEnd={(e) => {
+          if (closing && e.propertyName === 'transform') onClose()
+        }}
       >
         {/* Asa de arrastre: zona de gesto para cerrar tirando hacia abajo. */}
         <div
