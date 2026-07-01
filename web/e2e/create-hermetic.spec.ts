@@ -1,5 +1,11 @@
 import { type ConsoleMessage, type Page, type Request } from '@playwright/test'
-import { test, expect, primeHermeticCreate, HERMETIC_GROUP_ID } from './helpers/hermetic'
+import {
+  test,
+  expect,
+  primeHermeticCreate,
+  HERMETIC_GROUP_ID,
+  HERMETIC_CHALLENGE_ID,
+} from './helpers/hermetic'
 
 // E2E HERMÉTICO del bucle de crear reto (#443). Mockea sesión + Supabase + Google
 // Maps, así que corre SIEMPRE (local y CI) sin secretos ni escribir en BD, y es
@@ -160,13 +166,36 @@ async function runCreateFlow(page: Page, opts: { toggleStreetView: boolean }): P
   })
 }
 
+// Comprueba el TRASPASO crear → jugar: abre el deep link del reto recién creado y
+// verifica que PlayChallenge monta en estado JUGABLE (overlay «Empezar»). No jugamos
+// la partida (el mapa de Google y su `idle` no son deterministas en un mock); solo
+// asertamos que el reto que se creó es ALCANZABLE y arranca la partida — que es donde
+// más duele que se rompa el bucle. El deep link ya está en el hash tras runCreateFlow.
+async function assertCreatedChallengeIsPlayable(page: Page): Promise<void> {
+  // Cargamos el deep link ya presente en el hash. El overlay «Empezar» (Modal) tapa la
+  // escena, así que el mapa/Street View NO se montan aún: llegar aquí no depende de
+  // Google Maps. Si getChallenge/getExistingVote fallaran, no habría overlay.
+  await expect(page.getByRole('heading', { name: '¿Listo para jugar?' })).toBeVisible({
+    timeout: 20_000,
+  })
+  await expect(page.getByRole('button', { name: 'Empezar' })).toBeVisible()
+  // El hash apunta al reto concreto que creamos (no a otro): confirma que el deep link
+  // que ofrece la tarjeta de compartir lleva de verdad a ESTE reto.
+  await expect
+    .poll(() => page.evaluate(() => location.hash))
+    .toContain(`c=${HERMETIC_CHALLENGE_ID}`)
+}
+
 test.describe('crear reto (hermético)', () => {
-  test('camino feliz: punto + foto → lanzar → deep link, sin errores', async ({ page }) => {
+  test('camino feliz: punto + foto → lanzar → deep link jugable, sin errores', async ({ page }) => {
     const errors = trackErrors(page)
     await primeHermeticCreate(page, { streetViewAvailable: true })
 
     await openCreateFromTrip(page)
     await runCreateFlow(page, { toggleStreetView: false })
+    // El bucle no acaba al crear: el reto tiene que quedar JUGABLE. Seguimos el deep
+    // link y comprobamos que PlayChallenge arranca (overlay «Empezar»).
+    await assertCreatedChallengeIsPlayable(page)
 
     expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
   })

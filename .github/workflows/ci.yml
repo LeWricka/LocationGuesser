@@ -76,6 +76,44 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
           VITE_ANALYTICS_DISABLED: 'true'
 
+  create:
+    name: Crear reto E2E (hermético)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # E2E HERMÉTICO del bucle de crear reto (#443/#456). Su config propia
+      # (playwright.hermetic.config.ts) corre contra el BUILD de prod servido por
+      # `vite preview` (sin StrictMode, como el usuario real). Los specs mockean
+      # sesión + Supabase (REST/Storage) + Google Maps, así que NO hace login ni red
+      # externa ni escribe en BD: bastan los placeholders VITE_* públicos. Caza las
+      # regresiones del journey de crear (p.ej. #455: al soltar el pin, «Añadir Street
+      # View» se volvía inalcanzable) que los unit tests no ven.
+      - name: Crear reto (spec hermético)
+        run: npm run e2e:create
+        env:
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
+          VITE_GOOGLE_MAPS_API_KEY: placeholder-maps-key
+          VITE_ANALYTICS_DISABLED: 'true'
+
   a11y:
     name: Accesibilidad + viewports + integridad de esquina (hermético)
     runs-on: ubuntu-latest
