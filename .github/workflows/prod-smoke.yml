@@ -1,0 +1,104 @@
+name: Smoke logueado (post-deploy)
+
+# Smoke LOGUEADO contra PRODUCCIÓN (#458). Recorre el bucle real con una cuenta de
+# test para cazar los bugs que solo se ven logueado + con Google Maps/BD reales (el
+# punto ciego que los E2E herméticos no ven).
+#
+# NO corre en cada PR (pegaría a prod + BD real). Se dispara:
+#   - manualmente (workflow_dispatch), y
+#   - POST-DEPLOY: al COMPLETARSE con éxito el workflow "CI" en `main` (proxy del
+#     deploy; Vercel redespliega en cada merge a main). Damos margen para que el
+#     deploy de Vercel termine antes de pegar a prod.
+#
+# SKIP LIMPIO SIN SECRETS: si no están E2E_USER_EMAIL/PASSWORD (+ VITE_SUPABASE_*),
+# el job NO falla: se salta con un aviso. Así el pipeline no se rompe hasta que el
+# dueño configure la cuenta de test y los secrets (ver docs/operativa.md).
+
+on:
+  workflow_dispatch: {}
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+    branches: [main]
+
+# Un solo smoke a la vez: evita dos corridas pisándose contra la misma cuenta de test.
+concurrency:
+  group: prod-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke-logueado:
+    name: Smoke logueado en prod
+    runs-on: ubuntu-latest
+    # En el disparo post-deploy, solo si la CI que lo disparó fue verde (no tiene
+    # sentido probar prod si el build/test falló). El disparo manual no trae este
+    # contexto, así que se permite siempre.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    defaults:
+      run:
+        working-directory: web
+    env:
+      # Los secrets se copian a env aquí para poder detectar su AUSENCIA en un step y
+      # saltar limpio. GitHub NO permite leer secrets directamente en `if:`.
+      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      E2E_TRIP_ID: ${{ secrets.E2E_TRIP_ID }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      # Analítica off para no ensuciar Mixpanel con las corridas del smoke.
+      VITE_ANALYTICS_DISABLED: 'true'
+    steps:
+      - name: Comprobar secrets (skip limpio si faltan)
+        id: guard
+        run: |
+          if [ -n "$E2E_USER_EMAIL" ] && [ -n "$E2E_USER_PASSWORD" ] \
+            && [ -n "$VITE_SUPABASE_URL" ] && [ -n "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Secrets presentes: se ejecuta el smoke logueado."
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Smoke logueado omitido::Faltan secrets (E2E_USER_EMAIL/PASSWORD y/o VITE_SUPABASE_*). Configúralos para activarlo (ver docs/operativa.md)."
+          fi
+
+      - name: Checkout
+        if: steps.guard.outputs.run == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: steps.guard.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        if: steps.guard.outputs.run == 'true'
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        if: steps.guard.outputs.run == 'true'
+        run: npx playwright install --with-deps chromium
+
+      # Espera prudente a que Vercel termine de redesplegar tras el merge a main. Solo
+      # en el disparo post-deploy; en el manual el deploy ya está en su sitio.
+      - name: Esperar al deploy de Vercel
+        if: steps.guard.outputs.run == 'true' && github.event_name == 'workflow_run'
+        run: sleep 90
+
+      - name: Smoke logueado en prod (www.tabide.app)
+        if: steps.guard.outputs.run == 'true'
+        run: npm run e2e:prod-logged
+
+      - name: Subir artefactos de Playwright si falla
+        if: ${{ failure() && steps.guard.outputs.run == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-prod-smoke
+          path: |
+            web/test-results
+            web/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
