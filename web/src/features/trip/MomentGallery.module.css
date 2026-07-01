@@ -114,6 +114,52 @@
   cursor: progress;
 }
 
+/* Confirmar en peligro: el tinte de aviso destaca el toque destructivo sobre el
+   chrome de escena, sin salir del lenguaje de discos flotantes. */
+.actionDanger {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+.actionDanger:hover,
+.actionDanger:focus-visible {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--scene-ink);
+}
+
+/* Fila de confirmación en línea (segundo toque para quitar): sustituye a la tira
+   de acciones. Va arriba, con una etiqueta y confirmar/cancelar; disco ≥44px. */
+.confirmRemove {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  left: var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--scene-hairline);
+  border-radius: var(--radius-full);
+  background: var(--scene-veil);
+}
+
+.confirmText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--scene-ink);
+}
+
+.confirmActions {
+  display: flex;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
 /* Indicador de posición: puntos bajo el carrusel. */
 .dots {
   display: flex;

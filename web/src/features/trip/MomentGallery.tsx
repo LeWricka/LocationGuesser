@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ImageOff, Plus, Star, Trash2 } from 'lucide-react'
+import { Check, ImageOff, Plus, Star, Trash2, X } from 'lucide-react'
 import { Icon, Spinner, useToast } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
 import {
@@ -45,6 +45,10 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
   const [active, setActive] = useState(0)
   // Índice de la foto abierta en el lightbox; null = cerrado.
   const [lightboxAt, setLightboxAt] = useState<number | null>(null)
+  // Foto en confirmación de borrado (id) o null. Quitar es destructivo, así que
+  // pedimos un segundo toque EN LÍNEA (sin abrir un modal pesado): la papelera
+  // arma el estado y la tira de acciones cambia a confirmar/cancelar.
+  const [confirmingRemove, setConfirmingRemove] = useState<string | null>(null)
   const toast = useToast()
   const trackRef = useRef<HTMLUListElement>(null)
 
@@ -124,6 +128,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
       toast.show(`No se pudo quitar: ${describeError(err)}`, { tone: 'danger' })
     } finally {
       setBusy(false)
+      setConfirmingRemove(null)
     }
   }
 
@@ -176,30 +181,64 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
                   <Icon icon={Star} size={13} fill="currentColor" /> Portada
                 </span>
               )}
-              {canEdit && (
-                <div className={styles.slideActions}>
-                  {i !== 0 && (
+              {canEdit &&
+                (confirmingRemove === img.id ? (
+                  // Confirmación en línea del borrado: dos toques para una acción
+                  // destructiva. Si la foto es la portada (i === 0), avisamos de que
+                  // se promoverá la siguiente (lo hace la capa de datos al quitarla).
+                  <div
+                    className={styles.confirmRemove}
+                    role="group"
+                    aria-label="Confirmar quitar foto"
+                  >
+                    <span className={styles.confirmText}>
+                      {i === 0 ? '¿Quitar la portada?' : '¿Quitar foto?'}
+                    </span>
+                    <div className={styles.confirmActions}>
+                      <button
+                        type="button"
+                        className={`${styles.action} ${styles.actionDanger}`}
+                        disabled={busy}
+                        onClick={() => void handleRemove(img.id)}
+                        aria-label="Confirmar quitar foto"
+                      >
+                        <Icon icon={Check} size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.action}
+                        disabled={busy}
+                        onClick={() => setConfirmingRemove(null)}
+                        aria-label="Cancelar"
+                      >
+                        <Icon icon={X} size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.slideActions}>
+                    {i !== 0 && (
+                      <button
+                        type="button"
+                        className={styles.action}
+                        disabled={busy}
+                        onClick={() => void handleCover(img.id)}
+                        aria-label="Marcar como portada"
+                      >
+                        <Icon icon={Star} size={16} />
+                      </button>
+                    )}
                     <button
                       type="button"
                       className={styles.action}
                       disabled={busy}
-                      onClick={() => void handleCover(img.id)}
-                      aria-label="Marcar como portada"
+                      onClick={() => setConfirmingRemove(img.id)}
+                      aria-label="Quitar foto"
                     >
-                      <Icon icon={Star} size={16} />
+                      <Icon icon={Trash2} size={16} />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className={styles.action}
-                    disabled={busy}
-                    onClick={() => void handleRemove(img.id)}
-                    aria-label="Quitar foto"
-                  >
-                    <Icon icon={Trash2} size={16} />
-                  </button>
-                </div>
-              )}
+                  </div>
+                ))}
             </li>
           ))
         )}
