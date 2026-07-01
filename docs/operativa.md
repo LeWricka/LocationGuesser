@@ -227,6 +227,107 @@ Workflow: [`.github/workflows/db-migrate.yml`](../.github/workflows/db-migrate.y
 
 ---
 
+## 7. Smoke logueado post-deploy en prod (cuenta de test) — issue #458
+
+Los E2E de CI son **herméticos** (mockean sesión, Supabase y Google Maps): cazan
+regresiones de lógica, pero por diseño **no ven** los bugs que solo aparecen
+**logueado + con Google Maps/BD reales** (el punto ciego de esta semana: el bloque
+"Añadir Street View" que no se veía en local). El **smoke logueado** cubre ese hueco:
+un navegador real contra `https://www.tabide.app` con una **cuenta de test** que
+recorre home logueada → abrir un viaje → crear reto → soltar pin → comprobar que
+**"Añadir Street View" es visible**.
+
+- **Spec:** [`web/e2e/prod-logged-smoke.spec.ts`](../web/e2e/prod-logged-smoke.spec.ts) ·
+  **config:** [`web/playwright.prod.config.ts`](../web/playwright.prod.config.ts) ·
+  **workflow:** [`.github/workflows/prod-smoke.yml`](../.github/workflows/prod-smoke.yml).
+- **Auth:** reutiliza el mecanismo existente (`e2e/global-setup.ts`): login por
+  **password** con el cliente de Supabase en Node (`signInWithPassword`) → inyecta la
+  sesión en `localStorage` (storageState) → el navegador arranca logueado, **sin magic
+  link**. Determinista y sin clic en email.
+- **No destructivo:** aborta **antes de persistir** — no sube foto, no nombra, no lanza
+  el reto → **no escribe ningún reto**. Solo puede tocar el auto-join al abrir el viaje
+  de test (idempotente: el usuario ya es miembro). **No crea viajes.**
+- **Cuándo corre:** disparo **manual** (`workflow_dispatch`) y **post-deploy** (al
+  completarse la CI en `main`; espera 90 s para dar tiempo al redeploy de Vercel).
+  **NO** corre en cada PR.
+- **Skip limpio sin secrets:** si faltan los secrets, el job **no falla**, se salta con
+  un aviso. El pipeline normal no se rompe hasta que actives la cuenta de test.
+
+### 7.1 Crear el usuario de test en Supabase (una vez)
+
+Usa un **correo desechable** dedicado (no tu correo real). Dos vías:
+
+**A — con el script del repo** (crea el usuario ya confirmado; recomendado). Requiere
+la **service_role key** (SECRETA — Dashboard Supabase → Project Settings → API →
+`service_role`). Lánzalo **en local**, nunca en el repo ni en un secret que se loguee:
+
+```bash
+cd web
+SUPABASE_SERVICE_ROLE_KEY='<service_role>' \
+VITE_SUPABASE_URL='https://ykquigyjvgxisgdxryxr.supabase.co' \
+E2E_USER_EMAIL='e2e-smoke@<desechable>' \
+E2E_USER_PASSWORD='<contraseña larga aleatoria>' \
+npm run e2e:seed-user
+```
+
+El script crea (o actualiza) el usuario con **email ya confirmado** (`email_confirm:
+true`), así que puede loguear por password y **crear viajes** sin validar correo.
+
+**B — a mano en el dashboard:** Authentication → Users → **Add user** → email + password
+→ marca **Auto Confirm User** (o luego "Confirm email"). Sin confirmar, no podrá crear.
+
+> ⚠️ La **service_role key** omite RLS: es como la contraseña de la BD. **Nunca** la
+> pongas en git, en `web/`, ni como secret de este smoke (el smoke NO la necesita —
+> solo la usa el `e2e:seed-user`, que corres en local). NO la compartas jamás.
+
+### 7.2 Crear el viaje de test dedicado (una vez) y coger su id
+
+Para que el smoke sea **no destructivo**, apúntalo a un **viaje de test dedicado** que
+ya exista (así no crea nada). Logueado como el usuario de test en
+`https://www.tabide.app`, crea un viaje (p.ej. "smoke e2e — no tocar") y coge su **id**
+del hash de la URL (`…/#g=<ESTE_ID>`). Ese id va en el secret `E2E_TRIP_ID`.
+
+(Si no configuras `E2E_TRIP_ID`, el smoke abre la primera tarjeta de "Tus viajes"; y si
+el usuario no tiene ninguna, salta las partes que necesitan un viaje. Dedicar uno es lo
+recomendado para que sea estable y no toque viajes reales.)
+
+### 7.3 GitHub Actions secrets a añadir
+
+En **GitHub → repo `LeWricka/LocationGuesser` → Settings → Secrets and variables →
+Actions → New repository secret**:
+
+| Secret | Qué es | De dónde sale |
+|--------|--------|---------------|
+| `E2E_USER_EMAIL` | Correo del usuario de test (desechable) | El que usaste en §7.1 |
+| `E2E_USER_PASSWORD` | Su contraseña | La que usaste en §7.1 |
+| `E2E_TRIP_ID` | Id del viaje de test dedicado | Del hash `#g=<id>` (§7.2). Opcional pero recomendado |
+| `VITE_SUPABASE_URL` | URL del proyecto Supabase (**pública**) | `https://ykquigyjvgxisgdxryxr.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Publishable key de Supabase (**pública**) | Dashboard Supabase → API |
+
+> Las dos `VITE_SUPABASE_*` son **públicas** (ya viajan en el bundle del front); están
+> como secrets solo para no hardcodearlas en el YAML. **NO** añadas la `service_role`
+> ni la contraseña de la BD: el smoke no las usa.
+
+### 7.4 Lanzar el smoke manualmente
+
+- **En GitHub:** Actions → **"Smoke logueado (post-deploy)"** → **Run workflow** (rama
+  `main`). Si faltan secrets, el job termina en verde con un aviso de "omitido".
+- **En local** (con `web/.env.local` cargando `VITE_SUPABASE_*` y exportando
+  `E2E_USER_*`/`E2E_TRIP_ID`):
+
+  ```bash
+  cd web
+  export E2E_USER_EMAIL='e2e-smoke@<desechable>'
+  export E2E_USER_PASSWORD='<contraseña>'
+  export E2E_TRIP_ID='<id del viaje de test>'   # opcional
+  npm run e2e:prod-logged
+  ```
+
+  Apunta a `https://www.tabide.app` por defecto; override con `E2E_BASE_URL` para un
+  deploy de preview.
+
+---
+
 ## Email transaccional (magic link de login)
 
 El login es **passwordless por magic link**: Supabase Auth manda el email. El

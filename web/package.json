@@ -18,6 +18,7 @@
     "e2e": "playwright test",
     "e2e:create": "playwright test -c playwright.hermetic.config.ts",
     "e2e:prod": "E2E_BASE_URL=https://locationguesser-sage.vercel.app playwright test",
+    "e2e:prod-logged": "playwright test -c playwright.prod.config.ts",
     "e2e:seed-user": "node scripts/e2e-seed-user.mjs",
     "gallery": "GALLERY=1 vite --port 5188",
     "gallery:shots": "playwright test -c playwright.gallery.config.ts",
