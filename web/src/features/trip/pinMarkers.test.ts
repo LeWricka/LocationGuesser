@@ -23,6 +23,15 @@ describe('isUsablePinImage', () => {
     expect(isUsablePinImage('data:image/webp,xxxx')).toBe(true)
   })
 
+  test('acepta rutas relativas / same-origin (assets empaquetados por Vite)', () => {
+    // Regresión #444: `import lisboa from './assets/lisboa.webp'` → en build es una ruta
+    // root-relative SIN esquema http(s); es un fichero de imagen real y debe pintarse.
+    expect(isUsablePinImage('/assets/lisboa-x.webp')).toBe(true)
+    expect(isUsablePinImage('./foo.jpg')).toBe(true)
+    expect(isUsablePinImage('../shared/skyline.png')).toBe(true)
+    expect(isUsablePinImage('assets/coliseo-abc123.webp')).toBe(true)
+  })
+
   test('RECHAZA vacíos, nulos y espacios', () => {
     expect(isUsablePinImage(null)).toBe(false)
     expect(isUsablePinImage(undefined)).toBe(false)
