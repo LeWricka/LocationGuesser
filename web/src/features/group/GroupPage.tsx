@@ -626,9 +626,6 @@ function Leaderboard({
 }) {
   const [editingPrizes, setEditingPrizes] = useState(false)
   const hasPrizes = PRIZE_SLOTS.some(({ key }) => (prizes?.[key]?.trim() ?? '') !== '')
-  // Barra relativa al líder: el primero llena al 100% y el resto en proporción a
-  // sus puntos. Visualiza la distancia en la tabla sin números extra.
-  const top = entries[0]?.points ?? 0
   // Con 3+ jugadores el top-3 va en PODIO (mismo visual que la tarjeta para
   // compartir); el 4º en adelante sigue en lista. Con menos, todos en lista.
   const hasPodium = entries.length >= 3
@@ -694,7 +691,6 @@ function Leaderboard({
                 {listEntries.map((entry, j) => {
                   const i = listStartIndex + j
                   const isMe = meId != null && entry.userId === meId
-                  const width = top > 0 ? Math.max(6, Math.round((entry.points / top) * 100)) : 0
                   const prize = prizeForRow(prizes, i, entries.length)
                   const avatar = parseAvatar(entry.avatar, entry.userId)
                   return (
@@ -727,17 +723,23 @@ function Leaderboard({
                           {entry.name}
                           {isMe && <span className={styles.youTag}>Tú</span>}
                         </span>
+                        {/* Premio del puesto: es un DATO descriptivo (qué se lleva),
+                            no una acción. Se etiqueta como "Premio" y va bajo el
+                            nombre en tinta suave, para que no se confunda con un botón
+                            (hallazgo del test: la pastilla parecía pulsable). */}
                         {prize && (
-                          <span className={styles.prizeChip}>
-                            <Icon icon={Gift} size={14} /> {prize}
+                          <span className={styles.rankPrize}>
+                            <Icon icon={Gift} size={13} />
+                            <span className={styles.rankPrizeLabel}>Premio</span>
+                            <span className={styles.rankPrizeText}>{prize}</span>
                           </span>
                         )}
-                        <span className={styles.rankBar} aria-hidden="true">
-                          <i style={{ width: `${width}%` } as CSSProperties} />
-                        </span>
                       </div>
                       <span className={styles.rankPoints}>
-                        {entry.points.toLocaleString('es-ES')}
+                        <span className={styles.rankPointsValue}>
+                          {entry.points.toLocaleString('es-ES')}
+                        </span>
+                        <span className={styles.rankPointsUnit}>pts</span>
                       </span>
                     </li>
                   )

@@ -146,33 +146,6 @@
   color: var(--color-text);
 }
 
-/* Píldora del premio en la fila de la clasificación: etiqueta de acento discreta
- * junto al nombre. Marca qué se lleva ese puesto sin robar protagonismo a los
- * puntos. El texto ENVUELVE (antes se truncaba a "Invita a las c…"): el premio se
- * lee entero aunque sea largo, sin desbordar el grid (max-width + min-width:0). */
-.prizeChip {
-  align-self: flex-start;
-  max-width: 100%;
-  min-width: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  line-height: 1.3;
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-md);
-  overflow-wrap: anywhere;
-}
-
-/* El icono del premio no se encoge aunque el texto envuelva. */
-.prizeChip > svg {
-  flex-shrink: 0;
-}
-
 /* --- Clasificación general --- */
 
 .ranking {
@@ -182,10 +155,10 @@
 
 .rankRow {
   display: grid;
-  grid-template-columns: 32px 36px 1fr auto;
+  grid-template-columns: 28px 36px 1fr auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-4);
   border-bottom: 1px solid var(--color-border);
   /* Entrada escalonada de cada puesto al pintar la tabla. El retardo lo fija el
    * índice como variable inline (--i) desde el TSX. */
@@ -224,12 +197,12 @@
  * encima, SIN glow ni halo pulsante. El resto, número en tinta suave sobre
  * accent-tint. La jerarquía la marca el color del disco + el tamaño, no un brillo. */
 .medal {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--radius-full);
   display: grid;
   place-items: center;
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-black);
   font-variant-numeric: tabular-nums;
 }
@@ -475,12 +448,14 @@ img.podiumAvatar {
   box-shadow: none;
 }
 
-/* Centro de la fila: nombre + barra de progreso relativa al líder. */
+/* Centro de la fila: nombre + (si lo hay) el premio de ese puesto. Aire mínimo
+   entre líneas para que la fila lea de un vistazo (nombre arriba, premio como
+   pie de dato). */
 .rankMid {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 /* Nombre en la fila de ranking: serif editorial, coherente con el podio. */
@@ -512,52 +487,74 @@ img.podiumAvatar {
   flex-shrink: 0;
 }
 
-/* Barra de ranking: pista de hairline que se rellena en acento pizarra (sólido,
- * sin glow). Se "dibuja" de izquierda a derecha al pintar la tabla (scaleX), en
- * sincronía con la entrada escalonada de su fila. */
-.rankBar {
-  display: block;
-  height: 6px;
-  border-radius: var(--radius-full);
-  background: var(--color-border);
-  overflow: hidden;
-}
-.rankBar i {
-  display: block;
-  height: 100%;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
-  transform-origin: left center;
-  transition: width var(--duration-slower) var(--ease-emphasized);
-  animation: lg-bar-grow 700ms var(--ease-emphasized) both;
-  animation-delay: calc(var(--i, 0) * var(--stagger-step) + 120ms);
+/* Premio del puesto en la fila: DATO descriptivo (qué se lleva), no un botón.
+   Pie de dato bajo el nombre en tinta suave, con un icono de regalo y la
+   etiqueta "Premio" que deja claro que es un galardón, no una acción pulsable.
+   Sin fondo ni borde de pastilla (antes parecía un botón en mitad de la fila). */
+.rankPrize {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-snug);
 }
 
-@keyframes lg-bar-grow {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
-.rankPoints {
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-black);
-  color: var(--color-text);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: var(--letter-spacing-tight);
-}
-.rankMe .rankPoints {
+/* El icono del regalo no se encoge y se alinea con la primera línea del texto. */
+.rankPrize > svg {
+  flex-shrink: 0;
+  align-self: center;
   color: var(--color-accent);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .rankBar i {
-    transition: none;
-    animation: none;
-  }
+/* Eyebrow "Premio": versalita tenue que nombra el dato (patrón de etiqueta del
+   sistema); separa el galardón de un CTA. */
+.rankPrizeLabel {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* Texto del premio: ocupa el resto de la línea y envuelve por palabras (nada de
+   truncar a "Invita a las c…"). NO usamos `anywhere`: eso partía el texto letra a
+   letra cuando la caja se estrechaba. */
+.rankPrizeText {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+/* Puntos: el ÚNICO número dominante por persona (jerarquía del test). Valor
+   grande en tabular + unidad "pts" pequeña que no compite; alineados a la base. */
+.rankPoints {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  color: var(--color-text);
+}
+.rankPointsValue {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-black);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-tight);
+  line-height: 1;
+}
+.rankPointsUnit {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.rankMe .rankPoints,
+.rankMe .rankPointsValue {
+  color: var(--color-accent);
 }
 
 /* --- Tarjetas de reto --- */
