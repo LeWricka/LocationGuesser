@@ -67,6 +67,7 @@ export function MomentTimeline({ moments, selectedId, onSelect, playing, onToggl
                 type="button"
                 className={[
                   styles.mark,
+                  'lg-press',
                   isSelected ? styles.selected : '',
                   isActive ? styles.active : '',
                 ]
