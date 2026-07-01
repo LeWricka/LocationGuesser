@@ -28,9 +28,13 @@ interface Props {
 // assets externos (coherente con /public/favicon.svg).
 function Mark({ title }: { title: string }) {
   return (
+    // viewBox con 2u de margen alrededor del arte (`-2 -2 36 36`): el punto superior de la
+    // constelación (cy 5.3, r 1.6 → tope en y 3.7) quedaba a ras del borde y se veía
+    // medio clipado pegado al overlay. El margen le da caja/aire sin cambiar la escala
+    // (el símbolo sigue ocupando 1em); ningún satélite toca ya el canto.
     <svg
       className={styles.mark}
-      viewBox="0 0 32 32"
+      viewBox="-2 -2 36 36"
       role="img"
       aria-label={title}
       xmlns="http://www.w3.org/2000/svg"
