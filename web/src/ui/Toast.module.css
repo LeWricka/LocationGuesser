@@ -24,7 +24,7 @@
   box-shadow: var(--shadow-lg);
   /* Re-activa los clics: el contenedor los desactiva para no tapar la UI. */
   pointer-events: auto;
-  animation: toast-in var(--transition-base) var(--ease-emphasized);
+  animation: toast-in var(--motion-transition-base);
 }
 
 .message {

@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import styles from './SegmentedControl.module.css'
 
 export interface SegmentedOption<T extends string> {
@@ -40,6 +40,18 @@ export function SegmentedControl<T extends string>({
     .filter(Boolean)
     .join(' ')
 
+  // Índice seleccionado → posición del thumb deslizante. Si el valor no está en
+  // las opciones (transitorio), se ancla en 0 para no salir de la pista.
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((o) => o.value === value),
+  )
+  // El CSS lee --count/--index para dimensionar y desplazar el thumb (ver módulo).
+  const thumbStyle = {
+    '--count': options.length,
+    '--index': selectedIndex,
+  } as CSSProperties
+
   // Mueve la selección con flechas (envuelve por los extremos), patrón de radios.
   function onKeyDown(e: React.KeyboardEvent, index: number) {
     const last = options.length - 1
@@ -54,6 +66,10 @@ export function SegmentedControl<T extends string>({
 
   return (
     <div className={classes} role="radiogroup" aria-label={label}>
+      {/* Pastilla de acento que se desliza al segmento activo (decorativa). */}
+      {options.length > 0 && (
+        <span className={styles.thumb} style={thumbStyle} aria-hidden="true" />
+      )}
       {options.map((option, index) => {
         const selected = option.value === value
         return (

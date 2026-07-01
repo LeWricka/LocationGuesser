@@ -123,7 +123,94 @@ design-lint). Definición completa en `tokens.css`.
 
 ---
 
-## 6. Uso de las primitivas (`web/src/ui`)
+## 6. Movimiento
+
+**Nivel de movimiento (decisión del dueño): "micro-interacciones finas".**
+Transiciones suaves, entradas coreografiadas (rise/pop + stagger), feedback al
+tocar (press-state), gestos pulidos. Moderno y vivo **pero sin glows ni
+gradientes de marca**: se conserva la *quietud* del sistema. La regla dura:
+
+> **Toda animación es ENTRADA (un solo ciclo) o FEEDBACK (al tocar). Nunca
+> decoración en bucle.** Nada de halos pulsando en `infinite`, nada ornamental
+> permanente.
+
+Y **siempre** se respeta `prefers-reduced-motion: reduce` (todo se desactiva o
+salta a su estado final).
+
+### Tokens de motion (`tokens.css`, namespace `--motion-*`)
+
+Única fuente de verdad de duraciones y curvas. Nadie escribe un tiempo suelto en
+un `transition`/`animation` (lo bloquea design-lint, regla `motion`).
+
+| Token | Valor | Uso |
+|-------|-------|-----|
+| `--motion-duration-fast` | 120ms | micro-feedback (press, hover, color) |
+| `--motion-duration-base` | 200ms | transiciones de UI, hojas, thumb |
+| `--motion-duration-slow` | 320ms | entradas (`lg-rise`/`lg-pop`) |
+| `--motion-duration-slower` | 480ms | entradas con muelle, stagger |
+| `--motion-ease-standard` | `cubic-bezier(.4,0,.2,1)` | entradas/salidas sin overshoot |
+| `--motion-ease-emphasized` | `cubic-bezier(.2,.8,.2,1)` | transición con carácter (por defecto) |
+| `--motion-ease-exit` | `cubic-bezier(.4,0,1,1)` | salidas (acelera al desaparecer) |
+| `--motion-ease-spring` | `cubic-bezier(.34,1.56,.64,1)` | muelle con overshoot (pops, con tino) |
+| `--motion-stagger-step` | 70ms | retraso incremental por índice |
+| `--motion-press-scale` | 0.98 | escala del press-state |
+| `--motion-transition-fast` / `-base` | duración + curva | pares listos para `transition: <prop> var(--motion-transition-*)` |
+
+Los nombres antiguos (`--duration-*`, `--ease-*`, `--transition-*`) siguen vivos
+como **alias** que apuntan aquí; migran a `--motion-*` cuando cada pantalla se
+restilice.
+
+### Utilidades (`index.css`)
+
+- **Entrada:** `lg-rise` (sube y aparece), `lg-pop` (escala con muelle),
+  `lg-rise-pop` (sube + escala + overshoot, para héroes/CTAs).
+- **Stagger:** `lg-stagger` en el padre → cada hijo directo entra con retraso
+  incremental (`--motion-stagger-step`), hasta ~10 hijos. Para listas, rankings y
+  secuencias de bloques.
+- **Press-state:** `lg-press` → cualquier elemento pulsable "cede" al tocar
+  (`transform: scale(var(--motion-press-scale))`) con la curva estándar. Es el
+  mismo tacto que los botones, reutilizable en tarjetas clicables, chips o celdas.
+
+Todas se anulan bajo `prefers-reduced-motion`.
+
+### Primitivas con micro-interacción (propagan a toda la app)
+
+- **`Button`** — press-state: la superficie escala hacia dentro al tocar
+  (`--motion-press-scale`) y suelta su sombra; hover con lift sutil. Un gesto, sin
+  bucle.
+- **`SegmentedControl`** — el seleccionado ya no pinta su propio fondo: hay un
+  **thumb** único en acento que **se desliza** entre segmentos (transición de
+  `transform` con `--motion-transition-base`). Congelado bajo reduced-motion.
+- **`Modal` / `BottomSheet` / `Toast`** — entrada con las duraciones/curvas de
+  token (`--motion-duration-base` + curva estándar/emphasized); nada anima en bucle.
+
+### Guardarraíl `motion` (design-lint)
+
+Bloquea recaídas nuevas de forma determinista:
+
+- **Duración cruda:** un tiempo literal (`250ms`, `0.3s`) en un
+  `transition`/`animation`/`*-duration` → usa `var(--motion-duration-*)` (o un par
+  `--motion-transition-*`). No marca `cubic-bezier` ni el `var(--…)` con token.
+- **Bucle prohibido:** `infinite` en un `animation` → recuérdalo: entrada o
+  feedback, nunca decoración. Los bucles legítimos y acotados (spinner, shimmer de
+  carga) se justifican con `/* design-lint-allow: motivo */`.
+
+La deuda existente (transiciones crudas y bucles ambientales repartidos por la
+app) queda **congelada en el baseline**; solo fallan las recaídas nuevas.
+
+### Qué queda para la oleada de aplicación (Fase 2)
+
+- Migrar los `transition`/`animation` crudos de `features/**` al namespace
+  `--motion-*` pantalla a pantalla (hoy congelados en el baseline).
+- Revisar los bucles `infinite` ambientales (ken-burns, drift, pings) contra la
+  regla "entrada o feedback": retirar los decorativos, justificar (o acotar) los
+  que sean feedback real.
+- Aplicar `lg-press` a las superficies pulsables de features (tarjetas, celdas de
+  lista) para un tacto uniforme.
+
+---
+
+## 7. Uso de las primitivas (`web/src/ui`)
 
 Importar desde el barril `../ui`. Props de interfaz siempre `Props`. Consumen
 tokens; no hardcodean valores.
@@ -146,14 +233,16 @@ tokens; no hardcodean valores.
 
 ---
 
-## 7. Guardarraíles (design-lint)
+## 8. Guardarraíles (design-lint)
 
 `web/scripts/design-lint.mjs` enforça el sistema en CI de forma **determinista**.
 Falla solo con **recaídas nuevas** (la deuda existente se congela en
 `design-lint-baseline.json`). Reglas: `color` (literal fuera de tokens), `vh`
 (`100vh`), `emoji` (usar lucide), `overlap` (`width:200%`), **`radius`** (px crudo
 en border-radius), **`zindex`** (z-index numérico fuera de `--z-*`), **`fontsize`**
-(px/rem crudo en font-size fuera de tokens/roles).
+(px/rem crudo en font-size fuera de tokens/roles), **`motion`** (duración cruda
+en `transition`/`animation` fuera de `--motion-*`, y `animation … infinite` = el
+bucle prohibido).
 
 Para silenciar una excepción legítima: `/* design-lint-allow: motivo */` en la
 misma línea o la anterior (el motivo es obligatorio). Al arreglar deuda a
@@ -162,7 +251,7 @@ baseline para tapar una recaída.
 
 ---
 
-## 8. Fase 2 — trabajo pendiente (anotado, no hecho aquí)
+## 9. Fase 2 — trabajo pendiente (anotado, no hecho aquí)
 
 Esta es la Fase 1 (cimientos del sistema). Pendiente de aplicar/limpiar:
 

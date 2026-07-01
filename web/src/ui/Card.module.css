@@ -7,9 +7,9 @@
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   transition:
-    box-shadow var(--transition-base),
-    border-color var(--transition-base),
-    transform var(--transition-base) var(--ease-emphasized);
+    box-shadow var(--motion-transition-base),
+    border-color var(--motion-transition-base),
+    transform var(--motion-transition-base);
 }
 
 .raised {

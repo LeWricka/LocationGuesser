@@ -15,19 +15,20 @@
   user-select: none;
   letter-spacing: var(--letter-spacing-tight);
   transition:
-    background-color var(--transition-fast),
-    border-color var(--transition-fast),
-    box-shadow var(--transition-base),
-    transform var(--transition-fast) var(--ease-emphasized);
+    background-color var(--motion-transition-fast),
+    border-color var(--motion-transition-fast),
+    box-shadow var(--motion-transition-base),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .button:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 
+/* Press-state: la superficie "cede" al tocar (escala hacia dentro con el token
+ * compartido) y suelta su sombra. Feedback táctil, un solo gesto, sin bucle. */
 .button:active:not(:disabled) {
-  transform: translateY(1px);
-  transition-duration: 60ms;
+  transform: scale(var(--motion-press-scale));
 }
 
 .button:focus-visible {

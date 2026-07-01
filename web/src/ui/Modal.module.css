@@ -7,7 +7,7 @@
   /* Desenfoque del fondo: el diálogo se separa del resto de la app. */
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: overlay-in var(--transition-base) ease;
+  animation: overlay-in var(--motion-duration-base) var(--motion-ease-standard);
   /* Móvil: hoja inferior (bottom sheet) anclada abajo. El panel se ajusta al
      contenido (no full-screen), así los botones del footer quedan JUSTO bajo el
      texto y al alcance del pulgar, en vez de pegados al fondo con un hueco. */
@@ -28,7 +28,7 @@
   border-radius: var(--radius-xl) var(--radius-xl) var(--space-0) var(--space-0);
   box-shadow: var(--shadow-sheet);
   outline: none;
-  animation: slide-up var(--transition-base) var(--ease-emphasized);
+  animation: slide-up var(--motion-transition-base);
 }
 
 .header {

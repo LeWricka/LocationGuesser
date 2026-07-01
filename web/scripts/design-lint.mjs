@@ -46,6 +46,21 @@
 //              fijo para exportar imagen y usan px a proposito → su deuda queda
 //              CONGELADA en el baseline (no se exige refactor), pero recaidas en UI
 //              interactiva nueva SI fallan.
+//  8 motion  — dos sub-reglas sobre el MOVIMIENTO, cimiento del sistema:
+//              (a) DURACION CRUDA: un tiempo literal (120ms / 0.3s) en una
+//                  declaracion transition / animation / *-duration en vez de
+//                  var(--motion-*). Las duraciones y curvas son tokens
+//                  (`--motion-duration-*`, `--motion-ease-*`); un tiempo suelto
+//                  descoordina el ritmo del producto y esquiva la calibracion en
+//                  un solo sitio. NO marca cubic-bezier (no lleva unidad de
+//                  tiempo) ni el `var(--…)` con token.
+//              (b) BUCLE PROHIBIDO: `infinite` en una declaracion animation. La
+//                  decision del dueno es que toda animacion es ENTRADA (un ciclo)
+//                  o FEEDBACK (al tocar), NUNCA decoracion en bucle. Los bucles
+//                  legitimos y acotados (spinner de carga, shimmer) llevan
+//                  `design-lint-allow: <motivo>` y quedan justificados; la deuda de
+//                  bucles ambientales existente queda CONGELADA en el baseline.
+//              Ambas se evaluan solo en CSS (donde vive el motion del kit).
 //
 // Por que NO hay regla de spacing (margin/padding crudos): se evaluo y tiene mala
 // relacion senal/ruido sin trocear por selector — las mismas tarjetas rasterizadas
@@ -172,6 +187,15 @@ const ZINDEX_RE = /\bz-index\s*:\s*-?\d+\b/i
 const FONTSIZE_PROP_RE = /\bfont-size\s*:/i
 const FONTSIZE_RAW_RE = /\bfont-size\s*:\s*[^;]*\b\d*\.?\d+(px|rem)\b/i
 
+// Motion. (a) Duracion cruda: la linea declara transition/animation/*-duration
+// Y contiene un tiempo literal (ms o s). Marcamos por linea (los shorthands
+// multivalor de transition/animation viven en una sola linea en este repo tras
+// Prettier). Un tiempo dentro de `var(--motion-…)` no aparece literal → no marca.
+const MOTION_PROP_RE = /\b(transition|animation)(-duration)?\s*:/i
+const TIME_LITERAL_RE = /\b\d*\.?\d+m?s\b/i
+// (b) Bucle: `infinite` en una animation (shorthand o animation-iteration-count).
+const MOTION_INFINITE_RE = /\banimation(-iteration-count)?\s*:[^;]*\binfinite\b/i
+
 function lintCssCode(path, code) {
   const out = []
   const isTokens = path === TOKENS_FILE
@@ -200,6 +224,18 @@ function lintCssCode(path, code) {
       out.push({
         ruleId: 'fontsize',
         msg: 'font-size en px/rem; usa var(--font-size-*) o un rol .t-*',
+      })
+    }
+    if (MOTION_PROP_RE.test(code) && TIME_LITERAL_RE.test(code)) {
+      out.push({
+        ruleId: 'motion',
+        msg: 'duracion cruda en transition/animation; usa var(--motion-duration-*)',
+      })
+    }
+    if (MOTION_INFINITE_RE.test(code)) {
+      out.push({
+        ruleId: 'motion',
+        msg: 'animation infinite (bucle prohibido); entrada/feedback, no decoracion',
       })
     }
   }

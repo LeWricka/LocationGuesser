@@ -421,21 +421,63 @@
   --avatar-emoji-shadow: 0 1px 1px rgba(0, 0, 0, 0.45); /* sombra para leer el emoji */
 
   /* ----------------------------------------------------------------------
-   * Animación / Motion (respeta reduced-motion).
+   * Animación / Motion — CIMIENTO del sistema (Fase 1).
+   *
+   * Decisión del dueño: "micro-interacciones finas". Transiciones suaves,
+   * entradas coreografiadas (rise/pop + stagger), feedback al tocar
+   * (press-state). Moderno y vivo, PERO sin glows ni gradientes de marca: toda
+   * animación es ENTRADA (un solo ciclo) o FEEDBACK (al tocar), NUNCA decoración
+   * en bucle infinito. Todo respeta `prefers-reduced-motion` (ver index.css).
+   *
+   * Namespace canónico `--motion-*` = la única fuente de verdad de duraciones y
+   * curvas. NADIE escribe `200ms`/`0.3s` sueltos en un transition/animation (lo
+   * enforça la regla `motion` de design-lint). Los nombres antiguos
+   * (`--duration-*`, `--ease-*`, `--transition-*`) se conservan como ALIAS que
+   * apuntan aquí, para no tocar features en vuelo; migran a `--motion-*` cuando
+   * cada pantalla se restilice.
    * -------------------------------------------------------------------- */
-  --duration-fast: 120ms;
-  --duration-base: 200ms;
-  --duration-slow: 320ms;
-  --duration-slower: 480ms;
 
-  --ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Duraciones. fast = micro-feedback (press/hover); base = transiciones de UI y
+   * hojas; slow/slower = entradas coreografiadas (rise/pop, stagger). */
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-slow: 320ms;
+  --motion-duration-slower: 480ms;
 
-  --transition-fast: var(--duration-fast) var(--ease-emphasized);
-  --transition-base: var(--duration-base) var(--ease-emphasized);
+  /* Curvas (cubic-bezier modernas):
+   *  - standard:   entradas/salidas de UI, "material" contenido (sin overshoot).
+   *  - emphasized: transición con carácter (sale rápido, asienta suave). Default.
+   *  - exit:       salidas (acelera al desaparecer, sin rebote).
+   *  - spring:     muelle con overshoot para pops/celebraciones (usar con tino). */
+  --motion-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  --stagger-step: 70ms; /* paso de entrada escalonada */
+  /* Paso base del stagger (retraso incremental por índice en una secuencia). */
+  --motion-stagger-step: 70ms;
+
+  /* Press-state: escala al tocar (feedback táctil sobrio y reutilizable). */
+  --motion-press-scale: 0.98;
+
+  /* Pares duración+curva listos para `transition: <prop> var(--motion-*)`. */
+  --motion-transition-fast: var(--motion-duration-fast) var(--motion-ease-emphasized);
+  --motion-transition-base: var(--motion-duration-base) var(--motion-ease-emphasized);
+
+  /* --- Alias históricos (repuntados al namespace canónico) --------------- */
+  --duration-fast: var(--motion-duration-fast);
+  --duration-base: var(--motion-duration-base);
+  --duration-slow: var(--motion-duration-slow);
+  --duration-slower: var(--motion-duration-slower);
+
+  --ease-emphasized: var(--motion-ease-emphasized);
+  --ease-spring: var(--motion-ease-spring);
+  --ease-smooth: var(--motion-ease-standard);
+
+  --transition-fast: var(--motion-transition-fast);
+  --transition-base: var(--motion-transition-base);
+
+  --stagger-step: var(--motion-stagger-step); /* paso de entrada escalonada */
 
   /* Duraciones del fondo "vivo" del estilo viejo: ya no se usan (el fondo es
    * quieto), pero se conservan los nombres por si algún keyframe legacy las cita. */
