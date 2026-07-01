@@ -59,6 +59,27 @@ describe('findPanorama', () => {
     const out = await findPanorama(0, 0)
     expect(out).toBeNull()
   })
+
+  test('degrada a null si la búsqueda se CUELGA (Maps API negada por dominio)', async () => {
+    // Simula el fallo reportado en prod: la Maps JS API se niega en el navegador y
+    // getPanorama nunca resuelve ni rechaza. Sin el timeout, findPanorama colgaría
+    // para siempre y atascaría el flujo de crear. Con él, degrada a "sin SV".
+    vi.useFakeTimers()
+    getPanorama.mockReturnValue(new Promise(() => {})) // jamás se asienta
+    const pending = findPanorama(0, 0)
+    // El await interno de importLibrary/getPanorama es un microtask; dejamos que
+    // corra antes de disparar el temporizador del timeout.
+    await vi.advanceTimersByTimeAsync(8000)
+    await expect(pending).resolves.toBeNull()
+    vi.useRealTimers()
+  })
+
+  test('degrada a null si el SDK de Google no está cargado (global ausente)', async () => {
+    // @ts-expect-error: simulamos que el SDK nunca se cargó (dominio bloqueado).
+    delete globalThis.google
+    const out = await findPanorama(0, 0)
+    expect(out).toBeNull()
+  })
 })
 
 describe('findPanoramaNear', () => {

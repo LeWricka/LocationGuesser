@@ -42,6 +42,9 @@ const isLocal = !process.env.E2E_BASE_URL
 
 export default defineConfig({
   testDir: 'e2e',
+  // El E2E hermético de crear reto corre con su PROPIA config (build de prod +
+  // preview, sin StrictMode): ver playwright.hermetic.config.ts y `npm run e2e:create`.
+  testIgnore: /create-hermetic\.spec\.ts/,
   // global-setup genera el storageState autenticado SOLO si hay E2E_USER_*. Sin
   // credenciales no hace nada y la suite autenticada se salta (guard en sus specs).
   globalSetup: './e2e/global-setup.ts',
