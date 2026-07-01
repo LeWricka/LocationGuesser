@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { onAuthStateChange } from './auth'
+import { onAuthStateChange, isVerifiedUser } from './auth'
 import { getProfile } from './profile'
 import type { Profile } from './database.types'
 import { SessionContext, type SessionState } from './session-context'
@@ -66,9 +66,13 @@ export function AuthProvider({ children }: Props) {
     }
   }, [loadProfile])
 
+  // ¿Cuenta permanente con email validado? Gatea "crear" en la UI (issue #438).
+  // Se deriva del user y cambia solo con él (onAuthStateChange repinta al validar).
+  const verified = isVerifiedUser(user)
+
   const value = useMemo<SessionState>(
-    () => ({ session, user, profile, loading, refreshProfile }),
-    [session, user, profile, loading, refreshProfile],
+    () => ({ session, user, profile, loading, verified, refreshProfile }),
+    [session, user, profile, loading, verified, refreshProfile],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

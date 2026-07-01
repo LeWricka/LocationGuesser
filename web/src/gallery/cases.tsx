@@ -10,6 +10,8 @@
 
 import type { ReactNode } from 'react'
 import { Landing } from '../features/auth/Landing'
+import { LoginPopup } from '../features/auth/LoginPopup'
+import { CreateGate } from '../features/auth/CreateGate'
 import { HomePage } from '../features/home/HomePage'
 import { TripPage } from '../features/trip/TripPage'
 import { PlayChallenge } from '../features/play/PlayChallenge'
@@ -300,9 +302,28 @@ export const cases: GalleryCase[] = [
   },
   {
     id: 'login',
-    title: 'Login (entrar a Tabide)',
+    title: 'Login (recuperación por código)',
     section: 'Entrar',
     render: () => <LoginScreen email="" onEmailChange={noop} />,
+  },
+  {
+    id: 'entrada-nombre-email',
+    title: 'Entrada (nombre + email, sin espera)',
+    section: 'Entrar',
+    // El Modal portala a <body>; dejamos contenido mínimo en #root (como
+    // 'editar-viaje') para que la captura y el a11y tengan lienzo bajo el diálogo.
+    render: () => (
+      <div className="lg-page">
+        <h1>Tabide</h1>
+        <LoginPopup open onClose={noop} />
+      </div>
+    ),
+  },
+  {
+    id: 'gate-valida-correo',
+    title: 'Valida tu correo (gate de crear)',
+    section: 'Entrar',
+    render: () => <CreateGate email="lewis@ejemplo.com" onBack={noop} />,
   },
   {
     id: 'jugar-ubicacion',

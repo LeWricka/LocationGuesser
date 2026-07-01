@@ -40,6 +40,9 @@ export function AuthProvider({ children }: Props) {
       user: fakeUser,
       profile: ME,
       loading: false,
+      // Usuario permanente validado en la galería: las pantallas logueadas (crear
+      // viaje incluido) se pintan sin toparse con el gate de "valida tu correo".
+      verified: true,
       refreshProfile: async () => {},
     }),
     [],

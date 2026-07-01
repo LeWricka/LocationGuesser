@@ -51,6 +51,7 @@ const session: SessionState = {
   user: { id: 'u-me' } as User,
   profile: { display_name: 'Iker' } as SessionState['profile'],
   loading: false,
+  verified: true,
   refreshProfile: async () => {},
 }
 

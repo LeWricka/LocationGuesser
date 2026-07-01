@@ -17,7 +17,8 @@
 .note {
   margin: 0;
   text-align: center;
-  color: var(--color-text-faint);
+  /* Texto de ayuda con sentido (no decorativo) → tinta AA (--ink-600), no faint. */
+  color: var(--color-text-muted);
   font-size: var(--font-size-xs);
 }
 

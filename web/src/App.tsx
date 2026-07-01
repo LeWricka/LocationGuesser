@@ -3,14 +3,14 @@
 // basado en sesión. Cada feature vive en su carpeta; App solo decide qué pantalla
 // pintar según { sesión, perfil, hash }.
 //
-// Flujos (cuentas-y-home.md §2.2):
+// Flujos (cuentas-y-home.md §2.2; entrada de baja fricción #438):
 //  - loading                  → spinner de arranque
-//  - sin sesión               → LoginFlow (con groupName si la URL trae #g)
-//  - sesión sin nombre elegido → ProfileGate (paso de perfil del 1er login)
+//  - sin sesión               → Landing (CTA → LoginPopup: nombre+email → dentro al instante)
+//  - sesión sin nombre elegido → ProfileGate (raro: el nombre se captura al entrar)
 //  - sesión OK                → router por hash:
-//       #g=&c=  → PlayChallenge (auto-join)
-//       #g=     → GroupPage     (auto-join)
-//       #nuevo  → CreateGroup
+//       #g=&c=  → PlayChallenge (auto-join)          [permitido con email pendiente]
+//       #g=     → GroupPage     (auto-join)          [permitido con email pendiente]
+//       #nuevo  → CreateGroup si el email está VALIDADO; si no, CreateGate ("valida tu correo")
 //       #perfil → ProfileEditScreen
 //       #admin  → AdminPage (SOLO admin; un no-admin cae a la home)
 //       raíz    → HomePage
@@ -22,6 +22,7 @@ import {
   Landing,
   ProfileGate,
   ProfileEditScreen,
+  CreateGate,
   useDeepLinkJoin,
   needsProfileStep,
 } from './features/auth'
@@ -174,7 +175,7 @@ function LoggedIn({
   route: ReturnType<typeof parseHash>
   adminRoute: boolean
 }) {
-  const { user, profile, refreshProfile } = useSession()
+  const { user, profile, verified, refreshProfile } = useSession()
   const joinIfGroup = useDeepLinkJoin(user?.id)
 
   // Al volver del email: si guardamos un destino (#g…), lo restauramos (auto-join
@@ -301,6 +302,12 @@ function LoggedIn({
     )
   }
   if (route.view === 'new') {
+    // Crear viaje EXIGE email validado (issue #438): un usuario con email pendiente
+    // (anónimo recién entrado) ve el gate "valida tu correo" en vez del asistente.
+    // La RLS (groups_insert_owner) es el candado real; esto es la cara amable.
+    if (!verified) {
+      return <CreateGate email={user?.email} onBack={() => goHome()} />
+    }
     return (
       <OnboardingGate context="create-trip" userId={user?.id}>
         <CreateGroup onBack={() => goHome()} />
