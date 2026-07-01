@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CSSProperties, ReactNode } from 'react'
+import { useVisualViewport } from '../lib/useVisualViewport'
 import styles from './BottomSheet.module.css'
 
 interface Props {
@@ -16,42 +17,18 @@ interface Props {
   children: ReactNode
 }
 
-// Mide el alto del teclado del sistema vía VisualViewport. Implementado dentro
-// del componente (defensivo): el hook compartido `lib/useVisualViewport` puede no
-// existir aún en este worktree, y la API puede faltar (degradamos a 0 = sin
-// reajuste). Es la raíz del bug de "la hoja queda tapada por el teclado": cuando
-// el teclado sube, el viewport visual se encoge y subimos la hoja esa distancia.
-function useKeyboardInset(active: boolean): number {
-  const [inset, setInset] = useState(0)
-  useEffect(() => {
-    const vv = typeof window !== 'undefined' ? window.visualViewport : undefined
-    // Inactiva o sin API: no nos suscribimos. No reseteamos a 0 aquí (eso
-    // dispararía un render en cascada); el inset arranca en 0 y la hoja se
-    // desmonta al cerrarse, así que no hay estado "sucio" que limpiar.
-    if (!active || !vv) return
-    function update() {
-      if (!vv) return
-      // Hueco entre el layout viewport y el visual = alto del teclado (aprox.).
-      const gap = window.innerHeight - vv.height - vv.offsetTop
-      setInset(gap > 0 ? gap : 0)
-    }
-    update()
-    vv.addEventListener('resize', update)
-    vv.addEventListener('scroll', update)
-    return () => {
-      vv.removeEventListener('resize', update)
-      vv.removeEventListener('scroll', update)
-    }
-  }, [active])
-  return inset
-}
-
 // Hoja inferior formal y reutilizable: asa (grab), scrim, cierre y reajuste al
-// teclado. La diferencia con <Modal> es el gesto de arrastre del asa y el inset
-// de teclado; comparten el piso de capas (--z-overlay) y el portal a <body>.
+// teclado. La diferencia con <Modal> es el gesto de arrastre del asa; comparten
+// el piso de capas (--z-overlay), el portal a <body> y la conciencia del teclado
+// vía `useVisualViewport`.
 export function BottomSheet({ open, onClose, title, footer, ariaLabel, children }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
-  const keyboardInset = useKeyboardInset(open)
+  // Conciencia del teclado (raíz del bug "la hoja queda tapada por el teclado"):
+  // cuando el teclado del sistema recorta el viewport visible, empujamos la hoja
+  // por encima (`offsetBottom`) y acotamos su alto al alto visible, para que el
+  // pie de acciones quede visible sin scroll en lugar de tapado. El hook solo
+  // corre mientras la hoja está montada (devolvemos null al cerrarse).
+  const { keyboardOpen, height: visibleHeight, offsetBottom } = useVisualViewport()
   // Desplazamiento del arrastre del asa hacia abajo (px). Se resetea al soltar.
   const [dragY, setDragY] = useState(0)
   const dragStart = useRef<number | null>(null)
@@ -92,11 +69,16 @@ export function BottomSheet({ open, onClose, title, footer, ariaLabel, children 
   }
 
   const labelledBy = title ? 'bottomsheet-title' : undefined
-  // El inset del teclado sube la hoja; el arrastre la baja. Ambos vía transform.
-  const panelStyle = {
+  // Con teclado: subimos la hoja `offsetBottom` px (lo que el teclado se come) y
+  // acotamos su alto al alto visible; su borde inferior —donde vive el footer—
+  // cae justo sobre el teclado y el body scrollea dentro. El arrastre del asa la
+  // baja (transform). Sin teclado no fijamos alto: manda el CSS (--sheet-max-height).
+  const keyboardAdjust = keyboardOpen && visibleHeight != null
+  const panelStyle: CSSProperties = {
     transform: `translateY(${dragY}px)`,
-    marginBottom: keyboardInset ? `${keyboardInset}px` : undefined,
-  } as CSSProperties
+    marginBottom: keyboardAdjust ? `${offsetBottom}px` : undefined,
+    maxHeight: keyboardAdjust ? `${visibleHeight}px` : undefined,
+  }
 
   return createPortal(
     <div className={styles.scrim} onClick={onClose}>
