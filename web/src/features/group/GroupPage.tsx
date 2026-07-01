@@ -1170,7 +1170,11 @@ function PastCard({
 
   return (
     <Card padding="none">
-      <button className={styles.disclosure} onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+      <button
+        className={[styles.disclosure, 'lg-press'].join(' ')}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
         {/* Miniatura de la foto a la izquierda (si la hay); título en el centro;
             fecha a la derecha. Mantiene el desplegable. */}
         {imageUrl && (

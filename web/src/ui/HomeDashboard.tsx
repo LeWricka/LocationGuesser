@@ -217,7 +217,11 @@ export function HomeDashboard({
           ))}
 
           {/* Cierre del feed: empezar un viaje (estado de crecimiento). */}
-          <button type="button" className={styles.newCard} onClick={onCreateGroup}>
+          <button
+            type="button"
+            className={[styles.newCard, 'lg-press'].join(' ')}
+            onClick={onCreateGroup}
+          >
             <span className={styles.newIcon} aria-hidden="true">
               <Icon icon={Plus} size={22} />
             </span>
@@ -281,7 +285,7 @@ function TripCard({
   return (
     <button
       type="button"
-      className={[styles.card, className].filter(Boolean).join(' ')}
+      className={[styles.card, 'lg-press', className].filter(Boolean).join(' ')}
       onClick={onClick}
       disabled={!isButton}
       aria-label={`Abrir viaje ${group.name}`}
