@@ -18,6 +18,7 @@ import {
   SINGLE_ZOOM,
 } from '../../lib/mapPresets'
 import { Icon } from '../../ui/Icon'
+import { MapSkeleton } from '../../ui/MapSkeleton'
 import type { TripMapProps as Props } from './TripMap.types'
 import { activePinHtml, photoPinHtml } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
@@ -185,6 +186,13 @@ export function TripMapGlobe({
   if (initError) throw initError
   // Crédito de tiles (Esri): plegado a un "ⓘ"; al tocar se despliega el texto.
   const [creditOpen, setCreditOpen] = useState(false)
+  // Estado de carga: mientras el satélite no ha PINTADO sus teselas, el lienzo se
+  // ve casi negro con, a veces, un pin suelto ("parece roto"). Tapamos ese hueco
+  // con `MapSkeleton` (fondo de escena + textura + spinner) hasta el primer `idle`
+  // de MapLibre (todas las teselas del encuadre cargadas y sin transiciones). Al
+  // llegar, lo marcamos oculto y se funde; `skeletonGone` lo desmonta al terminar.
+  const [mapReady, setMapReady] = useState(false)
+  const [skeletonGone, setSkeletonGone] = useState(false)
 
   // Props en refs: así las funciones de pintado (que el handler `load` invoca de
   // forma asíncrona) leen SIEMPRE el último valor, sin recrear el mapa ni arrastrar
@@ -403,6 +411,12 @@ export function TripMapGlobe({
           })
           map.addLayer({ id: 'labels', type: 'raster', source: 'labels' })
           readyRef.current = true
+          // Mapa "listo" para OCULTAR el skeleton: el primer `idle` tras añadir el
+          // raster = teselas del encuadre cargadas y sin transiciones en curso. Es
+          // el momento en que el lienzo ya muestra el satélite, no el hueco negro.
+          map.once('idle', () => {
+            if (!disposed) setMapReady(true)
+          })
           repaint()
           // Entrada cinematográfica una sola vez; si no la hace, fitBounds normal.
           if (!introDoneRef.current) {
@@ -460,6 +474,11 @@ export function TripMapGlobe({
   return (
     <div className={styles.root}>
       <div ref={containerRef} className={styles.map} />
+      {/* Estado de carga: tapa el lienzo hasta que el satélite pinta sus teselas
+          (primer `idle`); luego se funde y se desmonta. Evita el "parece roto". */}
+      {!skeletonGone && (
+        <MapSkeleton hidden={mapReady} onFadeOutEnd={() => setSkeletonGone(true)} />
+      )}
       {/* Crédito propio (NO control de MapLibre): "ⓘ" discreto que despliega el texto de
           Esri al tocar. `title` nativo + popover visible. Cumple la atribución sin banda. */}
       <div className={styles.credit}>

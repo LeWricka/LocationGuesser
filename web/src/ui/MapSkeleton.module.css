@@ -1,0 +1,53 @@
+/*
+ * Estado de carga de los mapas: cubre TODO el contenedor mientras cargan las
+ * teselas. Fondo de escena (nunca un negro liso) + una textura de puntos MUY
+ * sutil y QUIETA (nada anima de fondo, principio de "quietud" del sistema) + un
+ * spinner discreto centrado. Al marcarse `hidden`, se funde con los tokens
+ * `--motion-*` y el padre lo desmonta al terminar.
+ */
+.root {
+  position: absolute;
+  inset: 0;
+  z-index: 1; /* design-lint-allow: capa de carga sobre el lienzo del mapa (mismo criterio que .credit del globo) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Fondo de escena: casa con el cielo del globo y con el satélite oscuro
+     mientras aparecen las teselas, en vez del negro "roto". */
+  background-color: var(--scene-bg);
+  /* Textura de puntos tenue sobre el fondo (dos halos radiales + una malla de
+     puntos), todo ESTÁTICO: da materia al vacío sin animar nada. Los colores
+     salen de los tokens de escena (hairline/surface), no se hardcodean. */
+  background-image:
+    radial-gradient(circle at 30% 22%, var(--scene-surface), transparent 42%),
+    radial-gradient(circle at 76% 82%, var(--scene-surface), transparent 46%),
+    radial-gradient(var(--scene-hairline) 1px, transparent 1px);
+  background-size:
+    100% 100%,
+    100% 100%,
+    22px 22px;
+
+  opacity: 1;
+  /* Fundido de entrada/salida con el par de motion (duración + curva). */
+  transition: opacity var(--motion-transition-base);
+  pointer-events: none; /* no roba gestos al mapa que hay debajo */
+}
+
+/* Salida: se desvanece; el padre desmonta al acabar la transición de opacity. */
+.hidden {
+  opacity: 0;
+}
+
+/* El spinner hereda la tinta clara de escena (currentColor del propio nodo). */
+.spinner {
+  color: var(--scene-ink-soft);
+}
+
+/* Menos movimiento: sin fundido (aparece/desaparece de golpe). El spinner ya
+   ralentiza su giro por su cuenta bajo esta preferencia. */
+@media (prefers-reduced-motion: reduce) {
+  .root {
+    transition: none;
+  }
+}

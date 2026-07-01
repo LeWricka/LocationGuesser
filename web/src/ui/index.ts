@@ -61,5 +61,9 @@ export { ProfileStep } from './ProfileStep'
 export { EmptyState } from './EmptyState'
 export { SkeletonCard } from './SkeletonCard'
 
+// Estado de carga de los mapas: cubre el lienzo mientras cargan las teselas
+// (globo del viaje, plano de fallback y mapa de jugar) — issue #433.
+export { MapSkeleton } from './MapSkeleton'
+
 // Marca: logo de "Tabide" (símbolo + wordmark serif).
 export { Logo } from './Logo'
