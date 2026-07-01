@@ -7,7 +7,7 @@
   background: var(--color-scrim);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  animation: scrim-in var(--transition-base) ease;
+  animation: scrim-in var(--motion-duration-base) var(--motion-ease-standard);
 }
 
 .panel {
@@ -23,7 +23,7 @@
   outline: none;
   /* safe-area: no quedar bajo el notch/gestos del sistema en el borde inferior. */
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  animation: sheet-up var(--transition-base) var(--ease-emphasized);
+  animation: sheet-up var(--motion-transition-base);
   touch-action: none;
 }
 

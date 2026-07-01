@@ -363,6 +363,21 @@ img {
   }
 }
 
+/*
+ * Press-state reutilizable: feedback táctil al tocar (escala hacia dentro). Es
+ * FEEDBACK, no decoración — solo actúa mientras el dedo/ratón está pulsando. La
+ * escala sale del token (`--motion-press-scale`) para calibrarla en un sitio; la
+ * transición usa la curva estándar y la duración corta. Cualquier elemento
+ * pulsable (tarjeta clicable, chip, celda de lista) puede añadir `.lg-press`
+ * para heredar el mismo tacto que los botones sin reinventarlo. Se anula bajo
+ * prefers-reduced-motion (bloque al final del fichero). */
+.lg-press {
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.lg-press:active {
+  transform: scale(var(--motion-press-scale));
+}
+
 /* Aplica la entrada base a un elemento. */
 .lg-rise {
   animation: lg-rise var(--duration-slow) var(--ease-emphasized) both;
@@ -523,6 +538,15 @@ img {
   .lg-photo-in,
   .lg-stagger > * {
     animation: none;
+  }
+
+  /* El press-state se desactiva: sin escala al tocar (ni transición). El estado
+   * final es el elemento en reposo. */
+  .lg-press {
+    transition: none;
+  }
+  .lg-press:active {
+    transform: none;
   }
 
   /* El dinamismo del viaje se reduce a estado final estático: las barras quedan a

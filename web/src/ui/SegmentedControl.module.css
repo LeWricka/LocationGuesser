@@ -1,4 +1,5 @@
 .group {
+  position: relative;
   display: inline-flex;
   /* Marco de pista: hairline alrededor, segmentos pegados sin huecos. */
   padding: var(--space-1);
@@ -13,7 +14,34 @@
   width: 100%;
 }
 
+/*
+ * Thumb deslizante: una sola pastilla en acento que se MUEVE al segmento
+ * seleccionado (en vez de que cada segmento pinte su propio fondo). Se posiciona
+ * por --count/--index (los fija el TSX como inline-style):
+ *   ancho = (pista útil − huecos entre segmentos) / count
+ *   x     = (ancho del thumb + un hueco) · index
+ * Vive bajo los labels; los segmentos son transparentes y el texto va encima.
+ * Transición SOLO de transform → desliza suave entre posiciones (un gesto, nunca
+ * un bucle). Se congela bajo prefers-reduced-motion (salta a su sitio).
+ */
+.thumb {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  /* Ancho de un segmento: pista útil (100% − padding a ambos lados − huecos
+   * entre los `count` segmentos) repartida entre count. */
+  width: calc((100% - 2 * var(--space-1) - (var(--count) - 1) * var(--space-1)) / var(--count));
+  height: calc(100% - 2 * var(--space-1));
+  border-radius: calc(var(--radius-sm) - var(--space-1));
+  background: var(--color-accent);
+  /* Avanza (su propio ancho + un hueco) por cada posición hasta el índice. */
+  transform: translateX(calc(var(--index) * (100% + var(--space-1))));
+  transition: transform var(--motion-transition-base);
+  pointer-events: none;
+}
+
 .segment {
+  position: relative;
   flex: 1;
   min-height: var(--tap-target);
   padding: var(--space-2) var(--space-3);
@@ -27,9 +55,8 @@
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    color var(--transition-fast);
+  /* Solo transiciona el color: el "fondo" seleccionado lo aporta el thumb. */
+  transition: color var(--motion-transition-fast);
 }
 
 .segment:hover:not(.selected) {
@@ -41,14 +68,22 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Seleccionado: pastilla en acento sólido (el "en juego"). */
+/* Seleccionado: tinta blanca sobre acento. El thumb deslizante es lo VISIBLE al
+ * cambiar (recorre los segmentos), pero el segmento activo lleva TAMBIÉN su propio
+ * fondo de acento: sin él, la comprobación de contraste (axe) mide el texto blanco
+ * contra la pista clara —el thumb es un hermano posicionado que su heurística de
+ * solapamiento no siempre atribuye— y lo marca como fallo AA. Con el fondo propio,
+ * el contraste real (blanco sobre acento, ~8.4:1, AAA) es explícito y determinista.
+ * Mismo color que el thumb → sin doble capa visible; el deslizamiento se sigue
+ * percibiendo al atravesar los segmentos intermedios (transparentes). */
 .selected {
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .segment {
+  .segment,
+  .thumb {
     transition: none;
   }
 }
