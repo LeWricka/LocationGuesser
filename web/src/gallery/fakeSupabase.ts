@@ -258,6 +258,14 @@ const fakeAuth = {
   verifyOtp() {
     return Promise.resolve({ data: {}, error: null })
   },
+  // Entrada de baja fricción (#438): no-ops para que la galería no rompa si un caso
+  // toca la entrada (nombre+email → sesión anónima → enlazar email) o el reenvío.
+  signInAnonymously() {
+    return Promise.resolve({ data: {}, error: null })
+  },
+  updateUser() {
+    return Promise.resolve({ data: {}, error: null })
+  },
 }
 
 function fakeChannel() {

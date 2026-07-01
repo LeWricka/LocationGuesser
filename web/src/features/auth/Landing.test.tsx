@@ -2,20 +2,21 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-// auth.ts importa ./supabase (lanza sin env). Mockeamos los helpers de OTP.
-const signIn = vi.fn<(email: string, displayName?: string, redirectTo?: string) => Promise<void>>(
-  async () => {},
-)
+// auth.ts importa ./supabase (lanza sin env). El popup usa la ENTRADA de baja
+// fricción (enterWithNameAndEmail); mockeamos esa función.
+const enter = vi.fn<
+  (name: string, email: string, redirectTo?: string) => Promise<{ kind: 'entered' }>
+>(async () => ({ kind: 'entered' }))
 vi.mock('../../lib/auth', () => ({
-  sendEmailOtp: (email: string, displayName?: string, redirectTo?: string) =>
-    signIn(email, displayName, redirectTo),
-  verifyEmailOtp: vi.fn(async () => {}),
+  enterWithNameAndEmail: (name: string, email: string, redirectTo?: string) =>
+    enter(name, email, redirectTo),
 }))
 
 import { Landing } from './Landing'
 
 beforeEach(() => {
-  signIn.mockClear()
+  enter.mockClear()
+  enter.mockResolvedValue({ kind: 'entered' })
 })
 
 afterEach(() => {
@@ -42,45 +43,50 @@ describe('Landing', () => {
     expect(screen.queryByLabelText('Tu correo')).not.toBeInTheDocument()
   })
 
-  test('el CTA abre el popup con el campo de correo', async () => {
+  test('el CTA abre el popup con los campos de nombre y correo (sin código)', async () => {
     render(<Landing />)
     await userEvent.click(screen.getByRole('button', { name: 'Empieza' }))
+    expect(screen.getByLabelText('Tu nombre')).toBeInTheDocument()
     expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Enviarme el código' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument()
+    // La entrada es al instante: no hay paso de código.
+    expect(screen.queryByLabelText(/código/i)).not.toBeInTheDocument()
   })
 
   test('en el deep-link "¿Ya tienes cuenta? Entra" abre el mismo popup', async () => {
-    // Login y registro son el mismo flujo OTP: en la variante de invitación el enlace
-    // "Entra" abre el mismo popup que el CTA primario.
+    // Login y registro son el mismo flujo de entrada: en la variante de invitación
+    // el enlace "Entra" abre el mismo popup que el CTA primario.
     render(<Landing groupName="Finde Lisboa" />)
     await userEvent.click(screen.getByRole('button', { name: /Ya tienes cuenta/i }))
     expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
   })
 
-  test('email inválido no llama a Supabase y muestra error', async () => {
+  test('email inválido no entra y muestra error', async () => {
     render(<Landing />)
     await userEvent.click(screen.getByRole('button', { name: 'Empieza' }))
+    await userEvent.type(screen.getByLabelText('Tu nombre'), 'Lewis')
     await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
-    expect(signIn).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(enter).not.toHaveBeenCalled()
     expect(screen.getByRole('alert')).toHaveTextContent('correo válido')
   })
 
-  test('email válido envía el código y pasa al paso del código', async () => {
+  test('nombre + email válidos entran al instante', async () => {
     render(<Landing />)
     await userEvent.click(screen.getByRole('button', { name: 'Empieza' }))
+    await userEvent.type(screen.getByLabelText('Tu nombre'), 'Lewis')
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
-    expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, undefined)
-    expect(await screen.findByLabelText('Código de 6 dígitos')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(enter).toHaveBeenCalledWith('Lewis', 'lewis@ej.com', undefined)
   })
 
-  test('pasa el redirectTo al enviar el código', async () => {
+  test('pasa el redirectTo al entrar', async () => {
     render(<Landing redirectTo="https://app.example/#g=abc" />)
     await userEvent.click(screen.getByRole('button', { name: 'Empieza' }))
+    await userEvent.type(screen.getByLabelText('Tu nombre'), 'Lewis')
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el código' }))
-    expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined, 'https://app.example/#g=abc')
+    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
+    expect(enter).toHaveBeenCalledWith('Lewis', 'lewis@ej.com', 'https://app.example/#g=abc')
   })
 
   test('con groupName adapta el copy del hero y el CTA a unirse al viaje', async () => {

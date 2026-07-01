@@ -84,8 +84,11 @@ test.describe('smoke', () => {
     const openAuth = page.getByRole('button', { name: 'Empieza', exact: true })
     await expect(openAuth).toBeVisible()
 
-    // 4. El CTA abre el popup de entrada con el campo de correo (flujo OTP).
+    // 4. El CTA abre la hoja de ENTRADA de baja fricción (#438): nombre + correo,
+    //    sin paso de código. No pulsamos "Entrar" (tocaría Supabase): el smoke se
+    //    queda en la puerta, comprobando que el nuevo formulario monta bien.
     await openAuth.click()
+    await expect(page.getByRole('textbox', { name: 'Tu nombre' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
 
     // 5. Higiene: ningún error PROPIO de consola/JS/petición (terceros tolerados).

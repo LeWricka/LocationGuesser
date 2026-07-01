@@ -251,3 +251,27 @@ email integrado de Supabase está limitado (~2/hora) → se usa **SMTP propio**.
   (pestaña API Keys). (3) El remitente debe estar **verificado** en Brevo.
 - **Config de redirect (URL Configuration):** Site URL + Redirect URLs
   (`https://locationguesser-sage.vercel.app/**`, `http://localhost:5173/**`).
+
+### Entrada de baja fricción (nombre + email, validación diferida) — issue #438
+
+Modelo de entrada: **nombre + email → dentro al instante**, sin esperar código. Bajo
+el capó se crea una sesión **anónima** (`signInAnonymously`) y se le **enlaza el email**
+(`updateUser({email})`), que dispara el correo de validación. Ver/jugar/unirse va con el
+email **pendiente**; **crear viaje** exige el email **validado**.
+
+Prerrequisitos de PROD (los activa el dueño en el dashboard; el código ya está listo):
+
+1. **Activar "Anonymous sign-ins":** Supabase → Authentication → Sign In / Providers →
+   **Allow anonymous sign-ins = ON**. Sin esto, la entrada de baja fricción no puede
+   crear la sesión anónima y `enterWithNameAndEmail` fallará.
+2. **Plantilla "Confirm signup" / "Change Email Address":** al enlazar el email a un
+   anónimo, Supabase manda el correo de **cambio/confirmación de email**. Revisar que la
+   plantilla (Authentication → Email Templates) tenga copy claro ("valida tu correo") y el
+   enlace `{{ .ConfirmationURL }}`. El mismo SMTP propio (arriba) la envía.
+3. **RLS (migración `0032_crear_exige_no_anonimo.sql`):** endurece `groups_insert_owner`
+   para exigir `is_anonymous = false` — un anónimo NO puede crear viajes a nivel de BD
+   (el gate del cliente es solo la cara amable). La aplica el pipeline `db-migrate` al
+   mergear (no a mano). No rompe a los usuarios ya registrados (su JWT no es anónimo).
+4. **Caso email ya registrado:** si en la entrada el correo ya pertenece a una cuenta, NO
+   se enlaza a un anónimo (fallaría con `email_exists`); en su lugar se manda un **magic
+   link de recuperación** (mismo flujo OTP/passwordless) para recuperar la cuenta original.

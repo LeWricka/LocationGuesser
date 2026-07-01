@@ -15,6 +15,12 @@ export interface SessionState {
   profile: Profile | null
   /** true durante el arranque (resolviendo la sesión persistida) o al recargar el perfil. */
   loading: boolean
+  /**
+   * ¿Cuenta PERMANENTE con email VALIDADO? (issue #438). Gatea "crear viaje" en la
+   * UI: un anónimo con email pendiente ve/juega/se une, pero NO crea hasta validar.
+   * Solo para la UI; la seguridad real la impone la RLS `groups_insert_owner`.
+   */
+  verified: boolean
   /** Vuelve a leer el perfil de BD (tras editar display_name/avatar en el onboarding o la home). */
   refreshProfile: () => Promise<void>
 }

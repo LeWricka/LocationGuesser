@@ -1,23 +1,17 @@
-// Popup de entrada passwordless (login/registro = el mismo flujo OTP).
+// Hoja de ENTRADA de baja fricción (issue #438): nombre + email → DENTRO al
+// instante, sin esperar ni pegar código. Sustituye al flujo email→código como
+// entrada principal. La validación del correo es DIFERIDA: entras ya (sesión
+// anónima con email pendiente) y validas luego pulsando el enlace del correo (lo
+// exige "crear viaje", no ver/jugar/unirse).
 //
-// La landing es ahora una portada VISUAL con alma: el campo de email no está a la
-// vista. Aparece aquí, en un Modal/hoja inferior elegante, al pulsar el CTA. El
-// objetivo es que la entrada se sienta fina y cálida, no un formulario frío de
-// primeras.
-//
-// Reutiliza el hook `useMagicLink` (la misma máquina de estados que LoginFlow y la
-// que usaba la landing antes): no se cambia la lógica de auth. Política del hito:
-// passwordless puro (cuentas-y-home.md §1.2 y §2) — código de 6 dígitos como vía
-// principal, con el enlace del correo como respaldo.
-//
-// Por qué NO el `EnterCode` del kit aquí: `EnterCode` monta una pantalla completa
-// (AuthScreen a 100svh, tarjeta centrada). Dentro del cuerpo de un Modal quedaría
-// descolocado. Así que el paso "código" se renderiza compacto, en la propia hoja,
-// con el mismo wiring (verify/resend/reset). El `EnterCode` de pantalla completa
-// sigue vivo para el flujo de login con sesión (LoginFlow).
+// La landing es una portada VISUAL: el formulario no está a la vista, aparece aquí
+// en un Modal/hoja inferior al pulsar el CTA. Reutiliza el hook `useEnter` (la
+// máquina de estados de la entrada). El flujo OTP/magic link (useMagicLink,
+// LoginFlow, EnterCode) NO desaparece: es la vía de RECUPERACIÓN, que este mismo
+// popup dispara cuando el email ya pertenece a una cuenta (estado 'recover').
 
 import { Button, Field, Input, Modal, Stack } from '../../ui'
-import { useMagicLink } from './useMagicLink'
+import { useEnter } from './useEnter'
 import styles from './LoginPopup.module.css'
 
 interface Props {
@@ -33,36 +27,22 @@ interface Props {
 }
 
 export function LoginPopup({ open, onClose, joining = false, redirectTo }: Props) {
-  const {
-    step,
-    email,
-    setEmail,
-    code,
-    setCode,
-    loading,
-    resending,
-    verifying,
-    error,
-    submit,
-    resend,
-    verify,
-    reset,
-  } = useMagicLink({ redirectTo })
+  const { step, name, setName, email, setEmail, loading, error, submit, reset } = useEnter({
+    redirectTo,
+  })
 
-  // El título de la hoja "canta" en serif (lo pone el Modal). El cuerpo cambia
-  // entre pedir el correo y meter el código, sin cerrar la hoja: la transición es
-  // dentro del mismo popup, más suave que saltar de pantalla.
-  const onEmail = step === 'email'
-
-  const title = onEmail
+  // El título "canta" en serif (lo pone el Modal). Cambia entre el formulario de
+  // entrada y el aviso de recuperación (email ya registrado).
+  const onForm = step === 'form'
+  const title = onForm
     ? joining
       ? 'Entra y vive el viaje'
       : 'Empieza a compartir'
-    : 'Mira tu correo'
+    : 'Revisa tu correo'
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
-      {onEmail ? (
+      {onForm ? (
         <form
           className={styles.form}
           noValidate
@@ -73,9 +53,25 @@ export function LoginPopup({ open, onClose, joining = false, redirectTo }: Props
         >
           <Stack gap={4}>
             <p className={styles.lead}>
-              Sin contraseñas. Te mandamos un código al correo para{' '}
-              <strong>entrar o crear tu cuenta</strong>; es el mismo paso para ambos.
+              Sin contraseñas. Pon tu nombre y tu correo y <strong>entra al momento</strong>. Te
+              mandaremos un enlace para validar el correo.
             </p>
+            <Field label="Tu nombre">
+              {(fieldProps) => (
+                <Input
+                  {...fieldProps}
+                  type="text"
+                  name="display_name"
+                  autoComplete="nickname"
+                  placeholder="Lewis"
+                  maxLength={40}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={loading}
+                  autoFocus
+                />
+              )}
+            </Field>
             <Field label="Tu correo" error={error}>
               {(fieldProps) => (
                 <Input
@@ -88,73 +84,31 @@ export function LoginPopup({ open, onClose, joining = false, redirectTo }: Props
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={loading}
-                  // El usuario abrió la hoja para teclear su correo: foco directo.
-                  autoFocus
                 />
               )}
             </Field>
             <Button type="submit" size="lg" fullWidth loading={loading}>
-              Enviarme el código
+              {joining ? 'Únete al viaje' : 'Entrar'}
             </Button>
-            <p className={styles.note}>Llega en segundos. Revisa spam si tarda.</p>
+            <p className={styles.note}>Entras al instante; validas el correo cuando quieras.</p>
           </Stack>
         </form>
       ) : (
-        <form
-          className={styles.form}
-          noValidate
-          onSubmit={(event) => {
-            event.preventDefault()
-            void verify()
-          }}
-        >
+        // Estado 'recover': el email ya era de una cuenta. NO lo enlazamos a un anónimo
+        // nuevo: mandamos un enlace para recuperar la cuenta original (no se pierde nada).
+        <div className={styles.form}>
           <Stack gap={4}>
             <p className={styles.lead}>
-              Mandamos un correo a <strong className={styles.email}>{email}</strong>. Escribe el
-              código o pulsa el enlace del correo para entrar.
+              Ese correo ya tiene una cuenta. Te hemos mandado un enlace a{' '}
+              <strong className={styles.email}>{email}</strong> para recuperarla: ábrelo y entrarás
+              con tu cuenta de siempre.
             </p>
-            <Field label="Código de 6 dígitos" error={error}>
-              {(fieldProps) => (
-                <Input
-                  {...fieldProps}
-                  type="text"
-                  name="otp"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="\d{6}"
-                  maxLength={6}
-                  placeholder="123456"
-                  className={styles.code}
-                  value={code}
-                  // Solo dígitos y como mucho 6: evita pegar espacios/guiones.
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  disabled={verifying}
-                  autoFocus
-                />
-              )}
-            </Field>
-            <Button type="submit" size="lg" fullWidth loading={verifying}>
-              Entrar
+            <p className={styles.note}>Llega en segundos. Revisa spam si tarda.</p>
+            <Button type="button" variant="secondary" size="lg" fullWidth onClick={reset}>
+              Usar otro correo
             </Button>
-            <div className={styles.codeFooter}>
-              <span className={styles.note}>¿No te llega?</span>
-              <div className={styles.codeActions}>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => void resend()}
-                  loading={resending}
-                >
-                  Reenviar
-                </Button>
-                <Button type="button" variant="ghost" size="sm" onClick={reset}>
-                  Cambiar correo
-                </Button>
-              </div>
-            </div>
           </Stack>
-        </form>
+        </div>
       )}
     </Modal>
   )
