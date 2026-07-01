@@ -14,13 +14,17 @@
 //  - `features/home/GlobeSheet` (+ HomeGlobe) para el patrón globo + hoja, con el preset
 //    de mapa `diario` (satélite + etiquetas) y los pines-foto del mapa de viaje.
 //  - `ui/Modal` (vía LoginPopup) para la hoja de entrada, con todo el wiring OTP.
-//  - `ui/HowItWorksImmersive` para la sección "cómo funciona" dentro de la hoja.
+//  - `LandingShowcase` para ENSEÑAR un viaje de ejemplo (diario + reto + marcador) dentro
+//    de la hoja: el visitante ve el producto en acción antes de entrar (issue #452;
+//    validación jul-2026: "ver el producto antes de entrar es clave", el eslogan solo es
+//    vago). Sustituye a `HowItWorksImmersive`, que solo lo contaba con placeholders.
 //  - `features/home/navigation.joinByCode` para el atajo "tengo un código de viaje".
 
 import { useState } from 'react'
-import { Button, GlobeSheet, HowItWorksImmersive, Field, Input, Logo, Stack } from '../../ui'
+import { Button, GlobeSheet, Field, Input, Logo, Stack } from '../../ui'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { joinByCode } from '../home/navigation'
+import { LandingShowcase } from './LandingShowcase'
 import { LoginPopup } from './LoginPopup'
 import styles from './Landing.module.css'
 
@@ -139,13 +143,11 @@ export function Landing({ groupName, redirectTo }: Props) {
           )}
         </div>
 
-        {/* Sección inmersiva "cómo funciona": el bucle se vive de un vistazo, dentro de la
-            hoja (scrolleable). El CTA abre el mismo popup de entrada. */}
-        <HowItWorksImmersive
-          className={styles.how}
-          ctaLabel="Empieza un viaje"
-          onCta={() => setAuthOpen(true)}
-        />
+        {/* Showcase de un VIAJE DE EJEMPLO (diario + reto + marcador): el visitante ve el
+            producto en acción de un vistazo, dentro de la hoja (scrolleable). No lo
+            mostramos en el flujo de invitación (ya vienen a un viaje concreto): ahí el hero
+            + CTA bastan y el showcase distraería del "únete a <grupo>". */}
+        {!joining && <LandingShowcase className={styles.how} onStart={() => setAuthOpen(true)} />}
       </GlobeSheet>
 
       <LoginPopup
