@@ -23,6 +23,14 @@ function projectRef(): string {
 
 const FAKE_USER_ID = '00000000-0000-0000-0000-0000000000e2'
 export const HERMETIC_GROUP_ID = '11111111-1111-1111-1111-111111111111'
+// Id del reto que "crea" el flujo (lo devuelve el INSERT) y que luego se puede ABRIR
+// por su deep link (#g=…&c=…) para comprobar el traspaso crear → jugar. Lo compartimos
+// entre el INSERT (POST) y la lectura por id (GET .single) para que el mismo reto que
+// se crea sea el que se abre.
+export const HERMETIC_CHALLENGE_ID = 'hermetic-challenge-1'
+// Título del reto hermético: lo teclea el spec al crear y lo asertan los tests en la
+// tarjeta de compartir. Una sola fuente para que INSERT y assert no se descuadren.
+export const HERMETIC_CHALLENGE_TITLE = '¿Dónde desayuné hoy?'
 
 // Sesión de Supabase mínima pero con la forma que espera `@supabase/supabase-js`:
 // un access_token JWT-shaped, expiración lejana y el user con id. AuthProvider la
@@ -87,8 +95,37 @@ function installGoogleMapsMock(page: Page, svAvailable: boolean) {
       // El flujo de crear construye estos en runtime para los marcadores del mapa.
       Size: class {},
       Point: class {},
-      Marker: class {},
-      Map: class {},
+      Marker: class {
+        addListener() {
+          return { remove() {} }
+        }
+        setMap() {}
+        setPosition() {}
+        setIcon() {}
+        setAnimation() {}
+      },
+      // `Map`: al ABRIR un reto para jugar, <APIProvider> monta el <Map> de la hoja de
+      // adivinar (react-google-maps hace `new google.maps.Map(el, opts)` y luego le
+      // llama setters/addListener). NO jugamos aquí (el overlay «Empezar» tapa la
+      // escena), pero el <Map> se monta igual, así que damos una instancia inerte
+      // COMPLETA: cualquier método desconocido cae en un no-op vía Proxy, y los que
+      // devuelven algo (getCenter/getBounds/addListener) devuelven formas válidas.
+      Map: class {
+        constructor() {
+          return new Proxy(this, {
+            get(target, prop) {
+              if (prop in target) return (target as Record<string, unknown>)[prop as string]
+              if (prop === 'addListener') return () => ({ remove() {} })
+              if (prop === 'getCenter') return () => ({ lat: () => 0, lng: () => 0 })
+              if (prop === 'getBounds') return () => null
+              if (prop === 'getZoom') return () => 2
+              // Cualquier otro método (setCenter, setZoom, setOptions, panTo, fitBounds…)
+              // es un no-op: el mapa no tiene que hacer nada real en el test.
+              return () => {}
+            },
+          })
+        }
+      },
       LatLngBounds: class {
         extend() {
           return this
@@ -101,6 +138,18 @@ function installGoogleMapsMock(page: Page, svAvailable: boolean) {
         }
       },
       Animation: { DROP: 1, BOUNCE: 2 },
+      // `google.maps.event`: <APIProvider> (react-google-maps) engancha/limpia
+      // listeners del SDK al montar/desmontar (addListener / clearInstanceListeners).
+      // Sin esto, montar el proveedor al ABRIR un reto para jugar reventaba en el
+      // error boundary. Devolvemos un listener inerte con `.remove()`.
+      event: {
+        addListener: () => ({ remove() {} }),
+        addListenerOnce: () => ({ remove() {} }),
+        removeListener: () => {},
+        clearInstanceListeners: () => {},
+        clearListeners: () => {},
+        trigger: () => {},
+      },
       // <APIProvider> lee Settings.getInstance() al marcar el SDK como cargado
       // (control de App Check / experience ids). Devolvemos un singleton inerte.
       Settings: { getInstance: () => ({ experienceIds: [], fetchAppCheckToken: null }) },
@@ -132,6 +181,39 @@ const GROUP_ROW = {
   cover_image_path: null,
   created_by: FAKE_USER_ID,
   created_at: '2026-06-01T00:00:00.000Z',
+}
+
+// Fila del reto CREADO. La devuelve el INSERT (RETURNING, sin lat/lng) y también la
+// lectura por id (getChallenge, `.single()`) al ABRIR su deep link para jugar. Una
+// sola fuente: así el reto que se crea es exactamente el que se puede abrir después.
+const CHALLENGE_ROW = {
+  id: HERMETIC_CHALLENGE_ID,
+  group_id: HERMETIC_GROUP_ID,
+  title: HERMETIC_CHALLENGE_TITLE,
+  description: null,
+  is_challenge: true,
+  place_lat: null,
+  place_lng: null,
+  image_path: 'images/hermetic.jpg',
+  sv_pano_id: null,
+  sv_heading: null,
+  sv_pitch: null,
+  sv_lock_move: false,
+  sv_lock_rotate: false,
+  guess_seconds: 30,
+  // Deadline lejano: el reto está ABIERTO, así que abrirlo lleva al overlay «Empezar»
+  // (fase idle), no a "cerrado". No jugamos aquí (el mapa de Google no es determinista);
+  // solo comprobamos que el reto creado es alcanzable y jugable.
+  deadline_at: '2999-12-31T23:59:59.999Z',
+  photo_is_hint: true,
+  score_scale: 'mundo',
+  challenge_kind: 'location',
+  number_question: null,
+  number_unit: null,
+  number_decimals: 0,
+  number_tolerance: 'normal',
+  created_by: FAKE_USER_ID,
+  created_at: '2026-06-28T10:00:00.000Z',
 }
 
 // Responde según el Accept: PostgREST con `.single()`/`.maybeSingle()` pide
@@ -181,8 +263,15 @@ async function mockSupabase(page: Page) {
       ])
     }
 
-    // Retos del grupo: aún ninguno (diario vacío). Vale para lista y myGroups.
+    // Lectura de retos (GET). Dos formas:
+    //  - Por id con `.single()` (getChallenge al ABRIR el deep link para jugar): pide
+    //    un OBJETO (Accept vnd.pgrst.object) → devolvemos la fila del reto creado, así
+    //    el reto que se creó es el que se abre.
+    //  - Lista del diario (grupo/myGroups): devolvemos [] (diario vacío antes de crear).
     if (url.includes('/rest/v1/challenges') && method !== 'POST') {
+      const wantsObject = (route.request().headers()['accept'] ?? '').includes('vnd.pgrst.object')
+      const byId = /\bid=eq\./.test(url)
+      if (wantsObject || byId) return respond(route, 200, [CHALLENGE_ROW], CHALLENGE_ROW)
       return respond(route, 200, [])
     }
 
@@ -203,33 +292,7 @@ async function mockSupabase(page: Page) {
     // INSERT del reto: devolvemos la fila creada (RETURNING sin lat/lng). Es la
     // pieza CLAVE: si esto responde 201, el flujo celebra y navega al deep link.
     if (url.includes('/rest/v1/challenges') && method === 'POST') {
-      const row = {
-        id: 'hermetic-challenge-1',
-        group_id: HERMETIC_GROUP_ID,
-        title: '¿Dónde desayuné hoy?',
-        description: null,
-        is_challenge: true,
-        place_lat: null,
-        place_lng: null,
-        image_path: 'images/hermetic.jpg',
-        sv_pano_id: null,
-        sv_heading: null,
-        sv_pitch: null,
-        sv_lock_move: false,
-        sv_lock_rotate: false,
-        guess_seconds: 30,
-        deadline_at: '2999-12-31T23:59:59.999Z',
-        photo_is_hint: true,
-        score_scale: 'mundo',
-        challenge_kind: 'location',
-        number_question: null,
-        number_unit: null,
-        number_decimals: 0,
-        number_tolerance: 'normal',
-        created_by: FAKE_USER_ID,
-        created_at: '2026-06-28T10:00:00.000Z',
-      }
-      return respond(route, 201, [row], row)
+      return respond(route, 201, [CHALLENGE_ROW], CHALLENGE_ROW)
     }
 
     // Cualquier otra REST (RPC incidental, realtime handshake): vacío OK.
