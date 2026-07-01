@@ -99,7 +99,9 @@
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
-  color: var(--gold);
+  /* tinta secundaria (AA) en vez del ocre: el ocre sobre el banner verde no
+     alcanza 4.5:1 para texto pequeño y axe lo marcaba como violación seria */
+  color: var(--ink-600);
 }
 .pinnedTitle {
   display: block;
@@ -137,7 +139,8 @@
 }
 .feedCount {
   font-size: var(--font-size-sm);
-  color: var(--color-text-faint);
+  /* meta (ink-600, AA): el faint (ink-400) no alcanza el contraste WCAG AA */
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
 

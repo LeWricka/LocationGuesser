@@ -1,16 +1,7 @@
 {
-  "axe": [
-    "crear-viaje :: color-contrast :: ._dateBox_g8wqb_271:nth-child(1) > ._dateCap_g8wqb_289",
-    "crear-viaje :: color-contrast :: ._dateBox_g8wqb_271:nth-child(2) > ._dateCap_g8wqb_289",
-    "crear-viaje :: color-contrast :: ._field_g8wqb_204:nth-child(4) > ._hint_g8wqb_253",
-    "crear-viaje :: color-contrast :: ._field_g8wqb_204:nth-child(5) > ._hint_g8wqb_253",
-    "crear-viaje :: color-contrast :: ._field_g8wqb_204:nth-child(5) > label > span",
-    "crear-viaje :: color-contrast :: ._field_g8wqb_204:nth-child(6) > ._hint_g8wqb_253",
-    "crear-viaje :: color-contrast :: label[for=\"cg-people\"] > span",
-    "home-con-datos :: color-contrast :: ._feedCount_b06ss_138",
-    "home-con-datos :: color-contrast :: ._pinnedLabel_b06ss_96",
-    "home-dashboard-lleno :: color-contrast :: ._feedCount_b06ss_138",
-    "home-dashboard-lleno :: color-contrast :: ._pinnedLabel_b06ss_96"
-  ],
-  "overflow": ["editar-reto", "tarjeta-resultado"]
+  "axe": [],
+  "overflow": [
+    "editar-reto",
+    "tarjeta-resultado"
+  ]
 }
