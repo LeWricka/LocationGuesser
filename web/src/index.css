@@ -454,7 +454,6 @@ img {
  *    entrar. El ancho final lo fija un inline-style; la animación solo lo revela.
  *  - lg-nudge-r / lg-nudge-l: la flecha del edge-peek "empuja" hacia su lado para
  *    telegrafiar el gesto de swipe (sutil, en bucle).
- *  - lg-ken-burns: deriva/zoom lentísimo de una foto de fondo (ambiente, no acción).
  *  - lg-count-tick: micro-rebote del número de la cuenta atrás al cambiar de seg.
  * Todo se desactiva bajo prefers-reduced-motion (bloque al final del fichero).
  * -------------------------------------------------------------------- */
@@ -491,15 +490,6 @@ img {
   }
 }
 
-@keyframes lg-ken-burns {
-  0% {
-    transform: scale(1.06) translate(0, 0);
-  }
-  100% {
-    transform: scale(1.14) translate(-1.5%, -1.5%);
-  }
-}
-
 @keyframes lg-count-tick {
   0% {
     transform: scale(1);
@@ -515,11 +505,6 @@ img {
 /* La barra crece al entrar; el ancho final lo da --bar-w (inline-style). */
 .lg-bar-grow {
   animation: lg-bar-grow var(--duration-slower) var(--ease-emphasized) both;
-}
-
-/* Foto de fondo con ken-burns ambiental (lentísimo, en bucle, alterna ida/vuelta). */
-.lg-ken-burns {
-  animation: lg-ken-burns 18s ease-in-out infinite alternate;
 }
 
 /* Micro-rebote al cambiar el segundo de la cuenta atrás (la clave la cambia React). */
@@ -550,12 +535,11 @@ img {
   }
 
   /* El dinamismo del viaje se reduce a estado final estático: las barras quedan a
-     su ancho (--bar-w), el ken-burns se congela, la flecha y el tick no se mueven. */
+     su ancho (--bar-w), el tick no se mueve. */
   .lg-bar-grow {
     animation: none;
     width: var(--bar-w, 100%);
   }
-  .lg-ken-burns,
   .lg-count-tick {
     animation: none;
   }

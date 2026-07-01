@@ -1,9 +1,11 @@
 /* "Cómo funciona" inmersiva (issue #299). Dirección ganadora del panel:
  * satélite/mapa CSS a sangre como héroe (gradientes, 0 KB) + una hoja que crece
- * por encima + el bucle animado del mapa. Todo con tokens "Atelier"; no se
- * hardcodean colores/espaciados salvo gradientes del satélite (textura
- * generativa que no existe como token). El movimiento se desactiva entero con
- * prefers-reduced-motion. */
+ * por encima + la SECUENCIA de entrada del mapa (una sola pasada: cae el pin,
+ * se dibuja la línea, salta la distancia). El satélite es un fondo QUIETO y los
+ * pines no laten en bucle: el sistema reserva el movimiento a entradas y feedback,
+ * nunca decoración permanente. Todo con tokens "Atelier"; no se hardcodean
+ * colores/espaciados salvo gradientes del satélite (textura generativa que no
+ * existe como token). El movimiento se desactiva entero con prefers-reduced-motion. */
 
 .root {
   position: relative;
@@ -25,10 +27,12 @@
   overflow: hidden;
 }
 
+/* Satélite QUIETO (antes derivaba con `drift 26s infinite`, decoración en bucle
+ * que el sistema prohíbe). El inset negativo deja algo de "sobre-tamaño" por si
+ * en el futuro se quisiera un paralaje de entrada; hoy es un fondo estático. */
 .sat {
   position: absolute;
   inset: -6%;
-  animation: drift 26s ease-in-out infinite alternate;
 }
 
 .satLand {
@@ -466,8 +470,11 @@
 .revealed .pinA {
   animation: drop 0.9s cubic-bezier(0.3, 1.4, 0.5, 1) 0.15s forwards;
 }
+/* El anillo del pin de respuesta pulsa como parte de la ENTRADA: tres pasadas
+ * (antes `infinite`, decoración permanente que el sistema prohíbe) y para. */
 .revealed .pinRing {
-  animation: ping 1.6s ease-out 0.9s infinite;
+  /* design-lint-allow: coreografia de entrada del demo (tiempos a medida, no tokens); acotada a 3 pasadas, no bucle */
+  animation: ping 1.6s ease-out 0.9s 3;
 }
 .revealed .line line {
   animation: draw 0.7s ease-out 0.95s forwards;
@@ -475,18 +482,7 @@
 .revealed .dist {
   animation: pop 0.55s cubic-bezier(0.3, 1.5, 0.5, 1) 1.5s forwards;
 }
-.revealed .pinQ {
-  animation: bob 3.4s ease-in-out 0.4s infinite;
-}
 
-@keyframes drift {
-  from {
-    transform: scale(1.04) translate(-1.5%, -1%);
-  }
-  to {
-    transform: scale(1.1) translate(2%, 1.5%);
-  }
-}
 @keyframes drop {
   0% {
     opacity: 0;
@@ -533,15 +529,6 @@
     transform: translate(-50%, -50%) scale(1);
   }
 }
-@keyframes bob {
-  0%,
-  100% {
-    transform: translate(-50%, -100%);
-  }
-  50% {
-    transform: translate(-50%, -116%);
-  }
-}
 
 /* Desktop: la columna respira; la hoja monta un poco más. */
 @media (min-width: 600px) {
@@ -552,8 +539,6 @@
 
 /* Menos movimiento: todo visible y estático (el JS además no observa nada). */
 @media (prefers-reduced-motion: reduce) {
-  .sat,
-  .pinQ,
   .pinRing {
     animation: none !important;
   }

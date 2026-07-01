@@ -18,8 +18,9 @@
   color: var(--color-accent);
 }
 
-/* Globo de marca sobre fondo con halo de acento. El pin "respira": un halo
- * radial que late suavemente da sensación de app viva al abrir (sin distraer). */
+/* Globo de marca sobre fondo con halo de acento QUIETO. El pin entra con `lg-pop`
+ * (una pasada); el halo es una capa estática detrás, sin latido en bucle: el
+ * sistema reserva el movimiento a entradas y feedback (nada decorativo permanente). */
 .mark {
   position: relative;
   display: inline-flex;
@@ -32,8 +33,10 @@
   background: radial-gradient(circle at center, var(--color-accent-soft), transparent 70%);
 }
 
-/* Halo que late detrás del pin (efecto "señal de mapa"). Pseudo-elemento para
- * no chocar con la animación de entrada `lg-pop` del propio icono. */
+/* Halo estático detrás del pin (efecto "señal de mapa"). Antes latía en bucle
+ * (`mark-breathe infinite`), decoración que el sistema prohíbe; ahora es una capa
+ * quieta que solo da profundidad al globo. Pseudo-elemento para no chocar con la
+ * entrada `lg-pop` del propio icono. */
 .mark::after {
   content: '';
   position: absolute;
@@ -41,25 +44,6 @@
   border-radius: var(--radius-full);
   background: radial-gradient(circle at center, var(--color-accent-soft), transparent 65%);
   z-index: -1;
-  animation: mark-breathe 3.6s var(--ease-smooth) infinite;
-}
-
-@keyframes mark-breathe {
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.18);
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .mark::after {
-    animation: none;
-  }
 }
 
 .title {
