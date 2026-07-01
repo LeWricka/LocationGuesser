@@ -208,6 +208,40 @@ describe('createChallenge', () => {
     >
     expect(insertArg.score_scale).toBe('ciudad')
   })
+
+  test('SOLO FOTO (sin Street View): sv_pano_id/heading/pitch quedan a null', async () => {
+    // El camino que SIEMPRE debe funcionar aunque Street View no cargue: un reto
+    // con foto y sin panorama. Sin svPanoId, los sv_* van a null y se inserta igual.
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await createChallenge({
+      title: 'Solo foto',
+      lat: 1,
+      lng: 2,
+      createdBy: 'u',
+      groupId: 'g1',
+      imagePath: 'grupo/foto.jpg',
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.sv_pano_id).toBeNull()
+    expect(insertArg.sv_heading).toBeNull()
+    expect(insertArg.sv_pitch).toBeNull()
+    expect(insertArg.image_path).toBe('grupo/foto.jpg')
+  })
+
+  test('propaga el error de permiso (RLS 42501) para que la UI lo muestre', async () => {
+    // Si el INSERT choca con la RLS (p.ej. no-miembro), createChallenge NO lo traga:
+    // lanza para que `save()` muestre el toast de error en vez de fingir éxito.
+    results['challenges'] = {
+      data: null,
+      error: { code: '42501', message: 'new row violates row-level security policy' },
+    }
+    await expect(
+      createChallenge({ title: 'x', lat: 1, lng: 2, createdBy: 'u', groupId: 'g1' }),
+    ).rejects.toMatchObject({ code: '42501' })
+  })
 })
 
 describe('createNumberChallenge', () => {
