@@ -114,6 +114,19 @@ export function GlobeSheet({
         aria-hidden="true"
       />
 
+      {/* FALDÓN de papel: rectángulo de superficie (SIN esquinas) anclado al mismo `top`
+          que la hoja, justo detrás de ella (z-index 1, entre globo y hoja). La hoja tiene
+          esquinas superiores redondeadas apoyadas sobre la escena OSCURA del globo: los
+          triángulos que quedan FUERA del arco del radio dejaban asomar el negro de la
+          escena. Este faldón pone PAPEL en esos triángulos, así el recorte del radio nunca
+          muestra la escena, solo la superficie de la hoja. Alto = la banda del radio (poco):
+          la costura sigue sellando el fundido globo→hoja por encima. */}
+      <div
+        className={styles.skirt}
+        style={{ top: `${topFrac * 100}dvh`, transition: dragging ? 'none' : undefined }}
+        aria-hidden="true"
+      />
+
       {/* HOJA BLANCA: capa de scroll propia con asa. Sube/baja con el asa; su contenido
           scrollea dentro. El transform la coloca según topFrac; sin transición durante
           el arrastre (sigue al dedo) y suave al soltar (engancha). */}
