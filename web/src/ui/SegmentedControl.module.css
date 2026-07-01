@@ -1,12 +1,20 @@
+/*
+ * Control segmentado — "pastilla" moderna (estilo iOS/Polarsteps sobre papel).
+ *
+ * La pista es una PASTILLA de fondo tenue (sin borde duro): un hueco hundido en
+ * el papel. Sobre ella se desliza un THUMB de superficie blanca elevada (sombra
+ * muy sutil, no glow) que marca la opción activa. El texto del segmento activo va
+ * en tinta llena; el resto, en tinta apagada. Nada de dos cajas de acento planas.
+ */
 .group {
   position: relative;
   display: inline-flex;
-  /* Marco de pista: hairline alrededor, segmentos pegados sin huecos. */
   padding: var(--space-1);
   gap: var(--space-1);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
+  /* Pastilla: fondo tenue hundido + hairline suavísimo (no borde marcado). */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-hover);
 }
 
 .fullWidth {
@@ -15,12 +23,13 @@
 }
 
 /*
- * Thumb deslizante: una sola pastilla en acento que se MUEVE al segmento
- * seleccionado (en vez de que cada segmento pinte su propio fondo). Se posiciona
- * por --count/--index (los fija el TSX como inline-style):
+ * Thumb deslizante: pastilla de SUPERFICIE (blanca) elevada que se MUEVE al
+ * segmento activo (en vez de que cada segmento pinte su propio fondo). Se
+ * posiciona por --count/--index (los fija el TSX como inline-style):
  *   ancho = (pista útil − huecos entre segmentos) / count
  *   x     = (ancho del thumb + un hueco) · index
  * Vive bajo los labels; los segmentos son transparentes y el texto va encima.
+ * Superficie blanca + sombra sutil + hairline de contacto = "papel elevado".
  * Transición SOLO de transform → desliza suave entre posiciones (un gesto, nunca
  * un bucle). Se congela bajo prefers-reduced-motion (salta a su sitio).
  */
@@ -32,8 +41,9 @@
    * entre los `count` segmentos) repartida entre count. */
   width: calc((100% - 2 * var(--space-1) - (var(--count) - 1) * var(--space-1)) / var(--count));
   height: calc(100% - 2 * var(--space-1));
-  border-radius: calc(var(--radius-sm) - var(--space-1));
-  background: var(--color-accent);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm), var(--ring-contact);
   /* Avanza (su propio ancho + un hueco) por cada posición hasta el índice. */
   transform: translateX(calc(var(--index) * (100% + var(--space-1))));
   transition: transform var(--motion-transition-base);
@@ -43,15 +53,16 @@
 .segment {
   position: relative;
   flex: 1;
-  min-height: var(--tap-target);
-  padding: var(--space-2) var(--space-3);
+  min-height: var(--tap-target-sm);
+  padding: var(--space-2) var(--space-4);
   border: none;
-  border-radius: calc(var(--radius-sm) - var(--space-1));
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--color-text-muted);
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
@@ -68,17 +79,18 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Seleccionado: tinta blanca sobre acento. El thumb deslizante es lo VISIBLE al
- * cambiar (recorre los segmentos), pero el segmento activo lleva TAMBIÉN su propio
- * fondo de acento: sin él, la comprobación de contraste (axe) mide el texto blanco
- * contra la pista clara —el thumb es un hermano posicionado que su heurística de
- * solapamiento no siempre atribuye— y lo marca como fallo AA. Con el fondo propio,
- * el contraste real (blanco sobre acento, ~8.4:1, AAA) es explícito y determinista.
- * Mismo color que el thumb → sin doble capa visible; el deslizamiento se sigue
- * percibiendo al atravesar los segmentos intermedios (transparentes). */
+/* Seleccionado: tinta llena sobre el thumb blanco. El thumb deslizante es lo
+ * VISIBLE al cambiar (recorre los segmentos), pero el segmento activo lleva
+ * TAMBIÉN su propio fondo de superficie: sin él, la comprobación de contraste
+ * (axe) mide el texto contra la pista tenue —el thumb es un hermano posicionado
+ * que su heurística de solapamiento no siempre atribuye— y podría fallar. Con el
+ * fondo propio (mismo blanco que el thumb) el contraste real (tinta sobre
+ * superficie, ~14:1, AAA) es explícito y determinista, y no hay doble capa
+ * visible; el deslizamiento se sigue percibiendo al atravesar los segmentos
+ * intermedios (transparentes). */
 .selected {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 @media (prefers-reduced-motion: reduce) {
