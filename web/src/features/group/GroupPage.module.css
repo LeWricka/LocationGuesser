@@ -421,26 +421,29 @@ img.podiumAvatar {
 }
 
 /* Pedestal: tinte del color del puesto con su medalla; altura por plaza (1ª la
-   más alta) para leer el podio de un vistazo. */
+   más alta) para leer el podio de un vistazo. Es una tarjeta CERRADA (borde y
+   esquinas en las CUATRO caras): antes el borde inferior abierto sobre papel sin
+   suelo hacía que se leyera "a medio dibujar / cortada por abajo". La medalla se
+   centra con holgura arriba y abajo para que nunca roce el filo. */
 .pedestal {
   position: relative;
   width: 100%;
   margin-top: var(--space-1);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-radius: var(--radius-md);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: var(--space-2);
+  padding-block: var(--space-3);
 }
 
 .placeFirst .pedestal {
-  height: 64px;
+  height: 72px;
 }
 .placeSecond .pedestal {
-  height: 46px;
+  height: 60px;
 }
 .placeThird .pedestal {
-  height: 34px;
+  height: 52px;
 }
 
 /* Medalla de línea sobre el pedestal: el font-size fija su lado (el SVG escala a
@@ -454,23 +457,21 @@ img.podiumAvatar {
 }
 
 /* Pedestal: tinte tenue del color de la medalla (derivado del token vía
- * color-mix sobre papel, sin rgbas cálidos sueltos) + filete del color. */
+ * color-mix sobre papel, sin rgbas cálidos sueltos) + filete del color en las
+ * cuatro caras (tarjeta cerrada, no bloque abierto por abajo). */
 .pedestal.podiumGold {
   background-color: color-mix(in srgb, var(--medal-gold) 16%, transparent);
   border: 1px solid var(--medal-gold);
-  border-bottom: none;
   box-shadow: none;
 }
 .pedestal.podiumSilver {
   background-color: color-mix(in srgb, var(--medal-silver) 16%, transparent);
   border: 1px solid var(--medal-silver);
-  border-bottom: none;
   box-shadow: none;
 }
 .pedestal.podiumBronze {
   background-color: color-mix(in srgb, var(--medal-bronze) 16%, transparent);
   border: 1px solid var(--medal-bronze);
-  border-bottom: none;
   box-shadow: none;
 }
 
