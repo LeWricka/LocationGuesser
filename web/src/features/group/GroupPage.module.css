@@ -974,3 +974,142 @@ img.podiumAvatar {
   font-weight: var(--font-weight-semibold);
   color: var(--color-accent);
 }
+
+/* --- Ajustes del viaje: editar datos (fechas / descripción) ----------------- */
+
+/* Los dos inputs de fecha reparten el ancho a partes iguales; envuelven en
+   pantallas muy estrechas para no comprimir el selector nativo. */
+.tripDates {
+  flex-wrap: wrap;
+}
+.tripDates > * {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+/* Descripción del viaje: mismo look de campo del kit (Input) pero multilinea.
+   Reproduce el estilo del Input para que textarea y date/text combinen. */
+.tripTextarea {
+  width: 100%;
+  min-height: calc(var(--tap-target) * 2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  resize: vertical;
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+.tripTextarea::placeholder {
+  color: var(--color-text-faint);
+}
+.tripTextarea:hover {
+  border-color: var(--color-border-strong);
+}
+.tripTextarea:focus {
+  outline: none;
+  background: var(--color-surface);
+  border-color: var(--color-focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus-ring) 22%, transparent);
+}
+
+/* --- Ajustes del viaje: portada elegida de las fotos del viaje --------------- */
+
+/* Fila de carga de la rejilla de portada. */
+.coverLoading {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* Ayuda breve sobre cómo funciona la portada. */
+.coverHint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* Vacío digno cuando el viaje aún no tiene fotos: icono + texto centrados con
+   aire, en tinta tenue (no un error). */
+.coverEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+.coverEmpty p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+/* Rejilla de miniaturas cuadradas de las fotos del viaje. auto-fill con un mínimo
+   generoso: 3 columnas holgadas en móvil, sin desbordar a 320px. */
+.coverGrid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+  gap: var(--space-2);
+}
+
+/* Miniatura pulsable: cuadrada (aspect-ratio), foto de fondo, hairline. Press-state
+   compartido (lg-press en el TSX vía clase global) — aquí solo forma + selección. */
+.coverThumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-hover);
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+.coverThumb:hover {
+  border-color: var(--color-border-strong);
+}
+.coverThumb:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus-ring) 40%, transparent);
+}
+
+/* Foto elegida de portada: anillo de acento pizarra sólido (el dato "en juego"). */
+.coverThumbOn {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+.coverThumbOn:hover {
+  border-color: var(--color-accent);
+}
+
+/* Marca de selección: disco de acento con el check en tinta clara, esquina
+   superior derecha, sobre la foto. */
+.coverCheck {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-xs);
+}
