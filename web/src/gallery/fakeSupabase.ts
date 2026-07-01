@@ -206,12 +206,17 @@ function fakeRpc(name: string, args?: Row): Promise<QueryResult<unknown>> {
 // así las imágenes se pintan sin red ni bucket. ──────────────────────────────
 function photoDataUri(path: string): string {
   const label = PHOTO_LABELS[path] ?? path
+  // La etiqueta de la foto stub representa el SUJETO de la imagen (una foto real no
+  // lleva texto). La colocamos en el TERCIO SUPERIOR, no en el centro: así no cae en
+  // la franja del pie donde el overlay pinta el nombre del lugar y la pregunta, y las
+  // capturas de la galería reflejan la maqueta real (el texto del overlay se lee sin
+  // un rótulo fantasma detrás).
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000">
     <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#2f4a63"/><stop offset="1" stop-color="#16222e"/>
     </linearGradient></defs>
     <rect width="800" height="1000" fill="url(#g)"/>
-    <text x="400" y="510" fill="#f6f7f9" font-family="Georgia, serif" font-size="56" text-anchor="middle">${label}</text>
+    <text x="400" y="300" fill="#f6f7f9" font-family="Georgia, serif" font-size="52" text-anchor="middle" opacity="0.72">${label}</text>
   </svg>`
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
