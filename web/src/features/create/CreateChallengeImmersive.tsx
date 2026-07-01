@@ -219,11 +219,10 @@ export function CreateChallengeImmersive({
     setPoint(p)
     setFlyTo(p)
     if (locationSource == null) setLocationSource('manual')
-    // Al marcar por primera vez, la hoja sube y crece a "foto".
-    if (stage === 0) {
-      // Damos un respiro a la caída del pin antes de subir la hoja.
-      window.setTimeout(() => setStage(1), 620)
-    }
+    // NO auto-avanzar de etapa: el Street View vive en la etapa de lugar, junto al
+    // punto (#388). Antes esto saltaba a "foto" tras 620 ms, así que el bloque
+    // «Añadir Street View» solo parpadeaba y quedaba inalcanzable (#453). La hoja
+    // crece en el sitio (STAGE0_WITH_POINT) y el usuario avanza con el CTA.
   }
 
   // Buscar Street View al activarlo o al mover el punto con SV activo. Con foto:
@@ -553,6 +552,16 @@ export function CreateChallengeImmersive({
                 </span>
               </div>
             </div>
+
+            {/* Antes de marcar, adelantamos qué se desbloquea al soltar el pin: la
+                foto y el Street View viven aquí mismo. Evita que el usuario crea que
+                no hay Street View por no verlo hasta marcar (#453). */}
+            {point == null && (
+              <p className={styles.markHint}>
+                <PanoramaIcon size={15} />
+                Al marcar podrás añadir una foto y Street View.
+              </p>
+            )}
 
             {/* Street View JUNTO al punto: una vez marcado, se ofrece añadirlo aquí
                 mismo, sin saltar a otro paso (#388). Reutiliza findPanorama / la

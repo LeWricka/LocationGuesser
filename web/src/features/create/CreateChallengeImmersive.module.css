@@ -454,6 +454,22 @@
   color: var(--ink-600);
 }
 
+/* Adelanto de lo que se desbloquea al marcar (foto + Street View). Fila discreta
+   con el mismo icono del SV para anclar visualmente la promesa (#453). */
+.markHint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-600);
+}
+.markHint svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
 /* ---------- ETAPA 1: foto ---------------------------------------- */
 .exif {
   display: flex;
