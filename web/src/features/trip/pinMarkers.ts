@@ -77,3 +77,68 @@ export function photoPinHtml({ imageUrl, title, featured = false }: PhotoPinOpti
 export function activePinHtml(): string {
   return `<div class="lg-trip-pin lg-trip-pin--active"><span class="lg-trip-pin__disc">${HELP_MARKER_SVG}</span></div>`
 }
+
+/** ¿Es una URL de imagen USABLE como fondo de pin? Solo aceptamos esquemas que un
+ * navegador pinta de verdad como imagen (http/https/blob, o un data-URI de imagen
+ * de RÁSTER —jpeg/png/webp/gif/avif—). Rechazamos vacíos, espacios y —clave para el
+ * bug del pin "garabateado"— los `data:image/svg+xml` con TEXTO dentro: un SVG con
+ * `<text>` metido en un disco de 42px se pinta como un rótulo minúsculo ilegible en
+ * vez de una miniatura. Ante cualquier duda devolvemos false → el pin cae limpio a
+ * la inicial del lugar (nunca contenido garabateado). */
+export function isUsablePinImage(url: string | null | undefined): url is string {
+  if (typeof url !== 'string') return false
+  const src = url.trim()
+  if (src.length === 0) return false
+  // data-URI: solo imágenes de ráster; NADA de svg+xml (puede llevar texto/markup).
+  if (src.startsWith('data:')) return /^data:image\/(jpeg|jpg|png|webp|gif|avif)[;,]/i.test(src)
+  // Esquemas que pintan una imagen de red/objeto real.
+  return /^(https?:|blob:)/i.test(src)
+}
+
+/** Opciones del pin-foto del globo de la home (subconjunto de GlobePin que consume
+ * el DOM del pin). Definido aquí para que el builder sea testeable sin arrastrar el
+ * módulo de MapLibre (HomeGlobe). */
+export interface HomePinInput {
+  title: string
+  imageUrl: string | null
+  /** Marca el pin "lead" del grupo (aro cálido). */
+  lead?: boolean
+}
+
+/**
+ * Construye el ELEMENTO DOM de un pin-foto del globo de la home a partir de su input.
+ * Compartido por HomeGlobe (lo clava en el Marker de MapLibre) y por los tests.
+ *
+ * RED DE SEGURIDAD anti-garabato: arranca SIEMPRE en el estado sin foto (disco de
+ * acento + inicial del lugar), que es el fallback visible. Solo sube a la miniatura
+ * si (a) la URL es una imagen usable (`isUsablePinImage`: nada de svg+xml con texto
+ * ni esquemas raros) y (b) esa imagen PRECARGA bien (`Image().onload`). Un
+ * `background-image` no dispara `onerror`, así que sin esta precarga un asset
+ * ausente/expirado dejaría el disco vacío; con ella, el estado por defecto es la
+ * inicial y la foto es un upgrade que solo ocurre si carga de verdad.
+ */
+export function buildHomePinElement(pin: HomePinInput): HTMLDivElement {
+  const wrapper = document.createElement('div')
+  // Markup base sin foto (disco de acento + inicial): es el fallback visible de entrada.
+  wrapper.innerHTML = photoPinHtml({ imageUrl: null, title: pin.title })
+  // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como elemento del Marker.
+  const el = wrapper.firstElementChild as HTMLDivElement
+  el.classList.add('lg-home-pin')
+  if (pin.lead) el.classList.add('lg-home-pin--lead')
+
+  if (isUsablePinImage(pin.imageUrl)) {
+    const disc = el.querySelector<HTMLElement>('.lg-trip-pin__disc')
+    const src = pin.imageUrl
+    const img = new Image()
+    img.onload = () => {
+      if (!disc) return
+      // Carga OK: quita el estado "vacío" (disco de acento + inicial) y clava la foto.
+      el.classList.remove('lg-trip-pin--empty')
+      disc.replaceChildren()
+      disc.style.backgroundImage = `url('${escapeUrl(src)}')`
+    }
+    // onerror: no hacemos nada → se queda el disco de acento con la inicial (fallback).
+    img.src = src
+  }
+  return el
+}

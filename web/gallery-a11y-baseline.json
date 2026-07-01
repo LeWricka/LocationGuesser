@@ -1,7 +1,4 @@
 {
   "axe": [],
-  "overflow": [
-    "editar-reto",
-    "tarjeta-resultado"
-  ]
+  "overflow": ["editar-reto", "tarjeta-resultado"]
 }

@@ -5,7 +5,7 @@ import { Info } from 'lucide-react'
 import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
 import { MAP_PRESETS, SCENE_GLOBE } from '../lib/mapPresets'
 import { Icon } from './Icon'
-import { photoPinHtml } from '../features/trip/pinMarkers'
+import { buildHomePinElement } from '../features/trip/pinMarkers'
 import '../features/trip/tripPins.css'
 import styles from './HomeGlobe.module.css'
 
@@ -72,9 +72,30 @@ const GLOBE_MAX_ZOOM = 2.4
 const FIT_MAX_ZOOM = 2.2
 // Un solo pin: acercamos algo más, pero sin perder la curvatura del globo.
 const SINGLE_ZOOM = 2.2
-// Padding asimétrico: deja aire arriba (marca/ajustes flotantes) y abajo (asa de la
-// hoja que sube sobre el globo), para que los pines no queden tapados.
-const FIT_PADDING = { top: 72, bottom: 120, left: 48, right: 48 }
+// Alto/ancho aproximado del pin de la home (disco + puntita + aro "lead") en px. El
+// marcador se ancla por la PUNTA (base) y el disco crece HACIA ARRIBA, así que el fit
+// necesita reservar ~este alto por ENCIMA de cada coordenada para que ningún disco quede
+// cortado por el canto del lienzo o tapado por el chrome flotante. El aro "lead" y su
+// pulso de bienvenida sobresalen un poco más: redondeamos al alza.
+const PIN_HEIGHT = 56
+const PIN_HALF_WIDTH = 28
+// Padding asimétrico del fit, ya con el TAMAÑO DEL PIN reservado (el fit encuadra las
+// COORDENADAS, no las cajas de los pines; sin este colchón el disco del pin más alto o el
+// de los laterales se sale del encuadre y el lienzo lo recorta). Deja además aire arriba
+// (marca/ajustes flotantes) y ABAJO extra para que el asa de la hoja que sube sobre el
+// globo nunca tape el pin más bajo.
+const FIT_PADDING = {
+  top: 72 + PIN_HEIGHT,
+  bottom: 120 + PIN_HEIGHT,
+  left: 48 + PIN_HALF_WIDTH,
+  right: 48 + PIN_HALF_WIDTH,
+}
+// Span MÍNIMO del encuadre (grados). Cuando todos los pines caen casi en el mismo punto
+// (varios momentos de una misma ciudad: "Finde Madrid"), sus bounds son minúsculos y el
+// fit intentaría un zoom muy cercano —capado a FIT_MAX_ZOOM, con los discos apilados en
+// una columna ilegible—. Ensanchamos los bounds a este mínimo alrededor de su centro para
+// que el encuadre deje aire y los pines cercanos se separen en vez de amontonarse.
+const MIN_FIT_SPAN_DEG = 1.2
 
 // Deriva del globo en reposo (grados de longitud por segundo): lento y aspiracional,
 // como una Tierra que gira sola. Tan suave que no marea ni distrae de los pines, pero da
@@ -107,42 +128,6 @@ function hasWebGL(): boolean {
   } catch {
     return false
   }
-}
-
-/** Pin-foto del globo de la home: el MISMO markup que el mapa de viaje
- * (`photoPinHtml`: círculo con foto + puntita inferior; sin foto = disco de acento con
- * la inicial del lugar). Le añadimos `lg-home-pin` para compactarlo y `lg-home-pin--lead`
- * para el anillo cálido pulsante del pin "lead". El borde/look lo gobiernan los tokens.
- *
- * Carga con RED DE SEGURIDAD: el `photoPinHtml` clava la foto vía `background-image`, que
- * NO dispara `onerror`. Para no quedarnos con un disco roto si una imagen falla (asset
- * ausente, red caída), arrancamos con el pin SIN foto (disco de acento con inicial) y solo
- * lo cambiamos a la miniatura cuando la imagen ha PRECARGADO bien. Así el fallback es el
- * estado por defecto y la foto un upgrade que solo ocurre si carga de verdad. */
-function pinElement(pin: GlobePin): HTMLDivElement {
-  const wrapper = document.createElement('div')
-  // Markup base sin foto (disco de acento + inicial): es el fallback visible de entrada.
-  wrapper.innerHTML = photoPinHtml({ imageUrl: null, title: pin.title })
-  // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como elemento del Marker.
-  const el = wrapper.firstElementChild as HTMLDivElement
-  el.classList.add('lg-home-pin')
-  if (pin.lead) el.classList.add('lg-home-pin--lead')
-
-  if (pin.imageUrl) {
-    const disc = el.querySelector<HTMLElement>('.lg-trip-pin__disc')
-    const src = pin.imageUrl
-    const img = new Image()
-    img.onload = () => {
-      if (!disc) return
-      // Carga OK: quita el estado "vacío" (disco de acento + inicial) y clava la foto.
-      el.classList.remove('lg-trip-pin--empty')
-      disc.replaceChildren()
-      disc.style.backgroundImage = `url('${src.replace(/'/g, "\\'")}')`
-    }
-    // onerror: no hacemos nada → se queda el disco de acento con la inicial (fallback).
-    img.src = src
-  }
-  return el
 }
 
 // Aplica atmósfera/cielo NOCHE al globo (colores de escena tokenizados en mapPresets;
@@ -236,7 +221,7 @@ export function HomeGlobe({
     markersRef.current = []
 
     for (const pin of pinsRef.current) {
-      const el = pinElement(pin)
+      const el = buildHomePinElement(pin)
       el.title = pin.title
       el.addEventListener('click', () => onOpenRef.current?.(pin.targetId))
       // Ancla `'bottom'` (igual que el mapa de viaje, TripMapGlobe): la PUNTA del pin se
@@ -265,8 +250,32 @@ export function HomeGlobe({
       map.easeTo({ center: pts[0], zoom: SINGLE_ZOOM, duration })
       return
     }
-    const bounds = new gl.LngLatBounds(pts[0], pts[0])
-    for (const p of pts) bounds.extend(p)
+    // Extensión real de los pines.
+    let minLng = pts[0][0]
+    let maxLng = pts[0][0]
+    let minLat = pts[0][1]
+    let maxLat = pts[0][1]
+    for (const [lng, lat] of pts) {
+      if (lng < minLng) minLng = lng
+      if (lng > maxLng) maxLng = lng
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+    }
+    // Ensancha los bounds hasta un span mínimo alrededor de su centro: si todos los pines
+    // caen casi en el mismo punto (una sola ciudad), evita el zoom "de aguja" que los
+    // apilaría en columna; con el span mínimo el fit deja aire y los pines se separan.
+    const midLng = (minLng + maxLng) / 2
+    const midLat = (minLat + maxLat) / 2
+    const half = MIN_FIT_SPAN_DEG / 2
+    if (maxLng - minLng < MIN_FIT_SPAN_DEG) {
+      minLng = midLng - half
+      maxLng = midLng + half
+    }
+    if (maxLat - minLat < MIN_FIT_SPAN_DEG) {
+      minLat = midLat - half
+      maxLat = midLat + half
+    }
+    const bounds = new gl.LngLatBounds([minLng, minLat], [maxLng, maxLat])
     map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration })
   }, [])
 

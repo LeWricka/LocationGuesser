@@ -111,6 +111,63 @@ const dashboardPinned: HomePinned = {
   coverUrl: null,
 }
 
+// Escenario del BUG del globo (issue #442): varios pines de un mismo viaje que caen
+// CERCA (Madrid) —reproduce el amontonamiento— más un pin con imagen ROTA, otro con
+// un data:svg (el patrón exacto del garabato) y otro SIN foto —reproduce el contenido
+// "garabateado" del pin—. El pin "lead" lleva el aro cálido. Bajo el stub de maplibre
+// los marcadores se clavan (apilados, sin proyección real): sirve para verificar que
+// NINGÚN pin muestra texto/markup dentro (siempre foto o inicial limpia). El
+// amontonamiento POSICIONAL real solo se ve con mapa real (lo valida el dueño en prod);
+// aquí lo cazan de forma determinista los unit tests del pin (pinMarkers.test.ts).
+const crowdedGroups: HomeGroup[] = [
+  {
+    id: 'viaje-madrid',
+    name: 'Finde Madrid',
+    status: 'idle',
+    owned: true,
+    closed: true,
+    startsOn: '2026-05-30',
+    endsOn: '2026-06-01',
+  },
+]
+const crowdedPins: GlobePin[] = [
+  {
+    id: 'c-roto',
+    lat: 40.4168,
+    lng: -3.7038,
+    title: 'Finde Madrid · Plaza Mayor',
+    imageUrl: 'https://cdn.invalido/foto-que-no-existe.jpg',
+    targetId: 'viaje-madrid',
+  },
+  {
+    id: 'c-sinfoto',
+    lat: 40.4155,
+    lng: -3.7074,
+    title: 'Finde Madrid · Retiro',
+    imageUrl: null,
+    targetId: 'viaje-madrid',
+  },
+  {
+    id: 'c-svg',
+    lat: 40.418,
+    lng: -3.702,
+    title: 'Finde Madrid · Gran Vía',
+    imageUrl:
+      'data:image/svg+xml;utf8,' +
+      encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg"><text>Gran Vía</text></svg>'),
+    targetId: 'viaje-madrid',
+  },
+  {
+    id: 'c-lead',
+    lat: 40.4145,
+    lng: -3.705,
+    title: 'Finde Madrid · Sol',
+    imageUrl: null,
+    targetId: 'viaje-madrid',
+    lead: true,
+  },
+]
+
 export const cases: GalleryCase[] = [
   {
     id: 'landing-generica',
@@ -139,6 +196,23 @@ export const cases: GalleryCase[] = [
         onCreateGroup={noop}
         onOpenGroup={noop}
         onPlayPinned={noop}
+      />
+    ),
+  },
+  {
+    id: 'home-globo-pines-cercanos',
+    title: 'Home logueada · globo con pines cercanos (imagen rota / sin foto / lead)',
+    section: 'Home',
+    render: () => (
+      <HomeDashboard
+        userId={ME_ID}
+        displayName="Lewis"
+        groups={crowdedGroups}
+        pins={crowdedPins}
+        pinned={null}
+        onOpenProfile={noop}
+        onCreateGroup={noop}
+        onOpenGroup={noop}
       />
     ),
   },
