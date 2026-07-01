@@ -300,4 +300,39 @@ export const PHOTO_LABELS: Record<string, string> = {
   'photo-arashiyama.jpg': 'Arashiyama',
   'photo-shinkansen.jpg': 'Shinkansen',
   'photo-ramen.jpg': 'Ramen',
+  'photo-ramen-2.jpg': 'La barra',
+  'photo-ramen-3.jpg': 'El caldo',
 }
+
+// Galería del recuerdo del ramen: varias fotos ordenadas por sort_order (la de 0
+// es la portada). Sirve para capturar MomentGallery con controles de dueño.
+export interface MomentImageRow {
+  id: string
+  challenge_id: string
+  image_path: string
+  sort_order: number
+  created_at: string
+}
+export const MOMENT_IMAGES: MomentImageRow[] = [
+  {
+    id: 'mi-ramen-1',
+    challenge_id: CH_MEMORY,
+    image_path: 'photo-ramen.jpg',
+    sort_order: 0,
+    created_at: isoFromNow(-4 * DAY),
+  },
+  {
+    id: 'mi-ramen-2',
+    challenge_id: CH_MEMORY,
+    image_path: 'photo-ramen-2.jpg',
+    sort_order: 1,
+    created_at: isoFromNow(-4 * DAY),
+  },
+  {
+    id: 'mi-ramen-3',
+    challenge_id: CH_MEMORY,
+    image_path: 'photo-ramen-3.jpg',
+    sort_order: 2,
+    created_at: isoFromNow(-4 * DAY),
+  },
+]

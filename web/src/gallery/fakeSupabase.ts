@@ -17,6 +17,7 @@ import {
   isEmptyWorld,
   ME_ID,
   MEMBERS,
+  MOMENT_IMAGES,
   NAME_BY_USER,
   NUMBER_ANSWERS,
   PHOTO_LABELS,
@@ -73,9 +74,9 @@ function rowsFor(table: string): Row[] {
         answer_number: NUMBER_ANSWERS[c.id] ?? null,
       }))
     case 'moment_images':
-      // Galería de fotos del momento: la portada ya viaja en challenges.image_path,
-      // así que para la galería basta con que no haya extras (lista vacía).
-      return []
+      // Galería de fotos del momento: filas sembradas (varias para el recuerdo del
+      // ramen). El filtro por challenge_id lo aplica el builder (eq).
+      return MOMENT_IMAGES as unknown as Row[]
     default:
       return []
   }

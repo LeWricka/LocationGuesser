@@ -18,6 +18,7 @@ import { CreateGroup } from '../features/create/CreateGroup'
 import { AddMoment } from '../features/create/AddMoment'
 import { CreateChallengeFlow } from '../features/create/CreateChallengeFlow'
 import { EditChallenge } from '../features/group/EditChallenge'
+import { MomentGallery } from '../features/trip/MomentGallery'
 import { ResultCard } from '../features/play/ResultCard'
 import { HomeDashboard, LoginScreen, type HomeGroup, type HomePinned } from '../ui'
 import type { GlobePin } from '../ui'
@@ -26,6 +27,7 @@ import {
   CHALLENGES,
   CH_ACTIVE,
   CH_CLOSED,
+  CH_MEMORY,
   CH_NUMBER,
   GALLERY_NOW,
   GROUP,
@@ -180,6 +182,18 @@ export const cases: GalleryCase[] = [
         onAddChallenge={noop}
         onBack={noop}
       />
+    ),
+  },
+  {
+    id: 'galeria-recuerdo-editar',
+    title: 'Galería del recuerdo (dueño: portada / añadir / quitar)',
+    section: 'Viaje',
+    render: () => (
+      <div
+        style={{ maxWidth: 520, margin: '0 auto', padding: 24, background: 'var(--color-surface)' }}
+      >
+        <MomentGallery challengeId={CH_MEMORY} initialCoverUrl={null} canEdit onChanged={noop} />
+      </div>
     ),
   },
   {
