@@ -24,20 +24,22 @@ afterEach(() => {
 })
 
 describe('Landing', () => {
-  test('la portada es visual: hero + CTA + cómo funciona, sin email a la vista', () => {
+  test('la portada es visual: hero + showcase del producto + CTA, sin email a la vista', () => {
     render(<Landing />)
-    // El hero (h1) y la sección inmersiva (h2) comparten la frase ancla: hay
-    // dos headings con ese texto, uno por nivel.
+    // El hero lleva la frase ancla.
     expect(
-      screen.getAllByRole('heading', {
+      screen.getByRole('heading', {
         name: /Comparte tus momentos de una forma diferente/i,
-      }).length,
-    ).toBeGreaterThanOrEqual(1)
-    // La sección inmersiva "cómo funciona" (eyebrow + los 3 pasos del bucle).
-    expect(screen.getByText('Cómo funciona')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Comparte un momento' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Lo viven y adivinan' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Queda en el viaje' })).toBeInTheDocument()
+      }),
+    ).toBeInTheDocument()
+    // El showcase ENSEÑA un viaje de ejemplo: diario + reto + marcador (issue #452).
+    expect(
+      screen.getByRole('heading', { name: /La vuelta al mundo de los García/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '¿Adivinas dónde es?' })).toBeInTheDocument()
+    expect(screen.getByText('¿Dónde tomó Marta esta foto?')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Gana quien más se acerca' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Así funciona Tabide' })).toBeInTheDocument()
     // El CTA del hero abre el popup; el email NO está a la vista.
     expect(screen.getByRole('button', { name: 'Empieza' })).toBeInTheDocument()
     expect(screen.queryByLabelText('Tu correo')).not.toBeInTheDocument()
