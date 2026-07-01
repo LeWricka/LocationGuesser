@@ -25,6 +25,12 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
   animation: sheet-up var(--motion-transition-base);
   touch-action: none;
+  /* Reajuste suave al abrir/cerrar el teclado (max-height/margin-bottom en línea
+     desde JS). El transform NO se transiciona: el arrastre del asa debe seguir al
+     dedo al instante. */
+  transition:
+    max-height var(--motion-transition-base),
+    margin-bottom var(--motion-transition-base);
 }
 
 .grabZone {
@@ -116,5 +122,8 @@
   .scrim,
   .panel {
     animation: none;
+  }
+  .panel {
+    transition: none;
   }
 }

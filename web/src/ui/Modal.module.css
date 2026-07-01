@@ -29,6 +29,12 @@
   box-shadow: var(--shadow-sheet);
   outline: none;
   animation: slide-up var(--motion-transition-base);
+  /* Reajuste suave al abrir/cerrar el teclado: el alto y el desplazamiento por
+     encima del teclado (max-height/margin-bottom en línea desde JS) transicionan
+     con los tokens de motion en vez de saltar de golpe. */
+  transition:
+    max-height var(--motion-transition-base),
+    margin-bottom var(--motion-transition-base);
 }
 
 .header {
@@ -128,5 +134,8 @@
   .overlay,
   .panel {
     animation: none;
+  }
+  .panel {
+    transition: none;
   }
 }
