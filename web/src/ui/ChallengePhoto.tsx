@@ -85,7 +85,14 @@ export function ChallengePhoto({
           <Icon icon={ImageOff} size={40} />
         </span>
       )}
-      {caption && <span className={styles.caption}>{caption}</span>}
+      {caption && (
+        <span className={styles.caption}>
+          {/* Texto en un hijo que hace el line-clamp SIN padding propio: el padding va
+              en el contenedor (.caption), así el recorte a 2 líneas es exacto y no
+              deja asomar media 3ª línea (quirk del line-clamp con padding). */}
+          <span className={styles.captionText}>{caption}</span>
+        </span>
+      )}
     </>
   )
 

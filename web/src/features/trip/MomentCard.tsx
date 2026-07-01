@@ -50,6 +50,10 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
   // izquierdo para diferenciarlo de un vistazo del contenido de juego.
   const isRecuerdo = !isReto && !isActive
   const date = formatMomentDate(moment.date)
+  // Nombre del lugar resuelto (país), si ya lo conocemos. Va como EYEBROW sobre la
+  // pregunta, en su propio renglón dentro del mismo bloque de texto: así el nombre
+  // del lugar y la pregunta jamás se solapan (bug nº1 del test de diseño).
+  const placeName = moment.country?.name ?? null
 
   return (
     <article
@@ -100,6 +104,10 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
               </Badge>
             </span>
           ) : null}
+          {/* Nombre del lugar como EYEBROW (versalita) sobre la pregunta. Solo si ya
+              lo conocemos; si no, la pregunta manda sola. Un único bloque apilado
+              (eyebrow + título) sobre el velo del pie: nunca dos textos sueltos. */}
+          {placeName && <p className={styles.place}>{placeName}</p>}
           <p className={styles.title}>{moment.title}</p>
           <div className={styles.meta}>
             {date && <span className={styles.date}>{date}</span>}
