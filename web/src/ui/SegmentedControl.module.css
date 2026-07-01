@@ -68,8 +68,16 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-/* Seleccionado: tinta sobre acento (el fondo lo pone el thumb que se desliza). */
+/* Seleccionado: tinta blanca sobre acento. El thumb deslizante es lo VISIBLE al
+ * cambiar (recorre los segmentos), pero el segmento activo lleva TAMBIÉN su propio
+ * fondo de acento: sin él, la comprobación de contraste (axe) mide el texto blanco
+ * contra la pista clara —el thumb es un hermano posicionado que su heurística de
+ * solapamiento no siempre atribuye— y lo marca como fallo AA. Con el fondo propio,
+ * el contraste real (blanco sobre acento, ~8.4:1, AAA) es explícito y determinista.
+ * Mismo color que el thumb → sin doble capa visible; el deslizamiento se sigue
+ * percibiendo al atravesar los segmentos intermedios (transparentes). */
 .selected {
+  background: var(--color-accent);
   color: var(--color-on-accent);
 }
 
