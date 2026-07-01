@@ -78,19 +78,25 @@ export function activePinHtml(): string {
   return `<div class="lg-trip-pin lg-trip-pin--active"><span class="lg-trip-pin__disc">${HELP_MARKER_SVG}</span></div>`
 }
 
-/** ¿Es una URL de imagen USABLE como fondo de pin? Solo aceptamos esquemas que un
- * navegador pinta de verdad como imagen (http/https/blob, o un data-URI de imagen
- * de RÁSTER —jpeg/png/webp/gif/avif—). Rechazamos vacíos, espacios y —clave para el
- * bug del pin "garabateado"— los `data:image/svg+xml` con TEXTO dentro: un SVG con
- * `<text>` metido en un disco de 42px se pinta como un rótulo minúsculo ilegible en
- * vez de una miniatura. Ante cualquier duda devolvemos false → el pin cae limpio a
- * la inicial del lugar (nunca contenido garabateado). */
+/** ¿Es una URL de imagen USABLE como fondo de pin? Aceptamos lo que un navegador
+ * pinta de verdad como imagen: (a) esquemas de red/objeto (http/https/blob), (b) un
+ * data-URI de imagen de RÁSTER —jpeg/png/webp/gif/avif—, y (c) rutas RELATIVAS /
+ * same-origin (`/…`, `./…`, `../…`, `assets/…`): los assets que Vite empaqueta
+ * (`import lisboa from './assets/lisboa.webp'` → `/assets/lisboa-HASH.webp`) son
+ * ficheros de imagen reales servidos desde el propio origen y deben pintarse.
+ * Rechazamos vacíos, espacios y —clave para el bug del pin "garabateado"— los
+ * `data:image/svg+xml` con TEXTO dentro: un SVG con `<text>` metido en un disco de
+ * 42px se pinta como un rótulo minúsculo ilegible en vez de una miniatura. También
+ * rechazamos esquemas peligrosos (`javascript:`, etc.). Ante cualquier duda
+ * devolvemos false → el pin cae limpio a la inicial del lugar. */
 export function isUsablePinImage(url: string | null | undefined): url is string {
   if (typeof url !== 'string') return false
   const src = url.trim()
   if (src.length === 0) return false
   // data-URI: solo imágenes de ráster; NADA de svg+xml (puede llevar texto/markup).
   if (src.startsWith('data:')) return /^data:image\/(jpeg|jpg|png|webp|gif|avif)[;,]/i.test(src)
+  // Rutas relativas / same-origin de los assets empaquetados por Vite (imagen real).
+  if (/^(\.\.?\/|\/|assets\/)/.test(src)) return true
   // Esquemas que pintan una imagen de red/objeto real.
   return /^(https?:|blob:)/i.test(src)
 }
