@@ -82,6 +82,12 @@ export type AnalyticsEvent =
   | 'challenge_deleted'
   | 'group_renamed'
   | 'group_deleted'
+  // Edición de los datos del viaje desde Ajustes (#428): fechas/descripción/
+  // acompañantes. Props: group_id, has_dates, has_description, has_companions.
+  | 'group_trip_edited'
+  // Portada del viaje elegida entre las fotos ya subidas a sus momentos (#428).
+  // Props: group_id, cleared (true = se quitó la portada, vuelve a la derivada).
+  | 'group_cover_set'
   | 'member_kicked'
   | 'member_left'
   | 'ownership_transferred'

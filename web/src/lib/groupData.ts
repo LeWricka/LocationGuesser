@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { signedImageUrl } from './storage'
 import type { Challenge, GroupPrizes } from './database.types'
 import { CHALLENGE_COLUMNS_NO_ANSWER, type ChallengeForPlay } from './challenges'
 
@@ -175,6 +176,131 @@ export async function updateGroupName(groupId: string, name: string): Promise<vo
     .update({ name: trimmed || null })
     .eq('id', groupId)
   if (error) throw error
+}
+
+/** Datos editables del viaje (fechas, de qué va y con quién) que el dueño ajusta
+ * desde Ajustes. Todos opcionales: vacío → null (no guardamos cadenas vacías, que
+ * ensucian la cabecera y el resumen). Las fechas van en 'YYYY-MM-DD'. */
+export interface TripDataUpdate {
+  startsOn: string | null
+  endsOn: string | null
+  description: string | null
+  companions: string | null
+}
+
+/** Normaliza los datos del viaje antes de guardar: recorta los textos, pasa los
+ * vacíos a null y endereza el rango de fechas si viene invertido (fin < inicio),
+ * igual que `buildGroupInsert` al crear. Función pura: fácil de testear. */
+export function normalizeTripData(trip: TripDataUpdate): {
+  starts_on: string | null
+  ends_on: string | null
+  description: string | null
+  companions: string | null
+} {
+  let starts = cleanText(trip.startsOn)
+  let ends = cleanText(trip.endsOn)
+  if (starts && ends && ends < starts) {
+    ;[starts, ends] = [ends, starts]
+  }
+  return {
+    starts_on: starts,
+    ends_on: ends,
+    description: cleanText(trip.description),
+    companions: cleanText(trip.companions),
+  }
+}
+
+/**
+ * Actualiza los datos editoriales del viaje (fechas, descripción, acompañantes).
+ * Solo el dueño lo consigue: el RLS `groups_update_owner` restringe el UPDATE a
+ * `created_by = auth.uid()`, así que un miembro recibe 0 filas; no comprobamos rol
+ * en cliente. `normalizeTripData` recorta, pasa vacíos a null y endereza el rango.
+ */
+export async function updateGroupTripData(groupId: string, trip: TripDataUpdate): Promise<void> {
+  const { error } = await supabase.from('groups').update(normalizeTripData(trip)).eq('id', groupId)
+  if (error) throw error
+}
+
+/**
+ * Fija (o quita) la portada del viaje. `imagePath` es un path de Storage de una
+ * foto YA subida a un momento del viaje; `null` quita la portada (la home vuelve a
+ * su portada derivada). Solo el dueño (RLS `groups_update_owner`). No comprobamos
+ * rol en cliente; un miembro recibiría 0 filas.
+ */
+export async function updateGroupCover(groupId: string, imagePath: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('groups')
+    .update({ cover_image_path: imagePath })
+    .eq('id', groupId)
+  if (error) throw error
+}
+
+/** Una foto del viaje candidata a portada: su `path` en Storage + la URL firmada
+ * para pintar la miniatura. */
+export interface TripPhoto {
+  imagePath: string
+  url: string
+}
+
+/**
+ * Reúne TODAS las fotos del viaje candidatas a portada, con su path y URL firmada,
+ * de la más reciente a la más antigua. Junta dos fuentes sin duplicar paths:
+ *  - la portada de cada momento (`challenges.image_path`), y
+ *  - el resto de la galería de cada momento (`moment_images.image_path`).
+ * El bucket es privado, así que cada path se firma (las que no firmen se descartan:
+ * la rejilla nunca muestra un hueco roto). Vacío si el viaje aún no tiene fotos.
+ */
+export async function listTripPhotos(groupId: string): Promise<TripPhoto[]> {
+  // Portadas de los momentos: challenges.image_path (más reciente primero). De paso
+  // nos da los ids de reto para pedir su galería (moment_images) en un solo lote.
+  const { data: challenges, error: chError } = await supabase
+    .from('challenges')
+    .select('id, image_path, created_at')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false })
+  if (chError) throw chError
+
+  const rows = challenges ?? []
+  const challengeIds = rows.map((c) => c.id)
+
+  // Galería completa de esos momentos (fotos extra más allá de la portada).
+  let gallery: { image_path: string; sort_order: number }[] = []
+  if (challengeIds.length > 0) {
+    const { data: images, error: imgError } = await supabase
+      .from('moment_images')
+      .select('image_path, sort_order')
+      .in('challenge_id', challengeIds)
+      .order('sort_order', { ascending: true })
+    if (imgError) throw imgError
+    gallery = images ?? []
+  }
+
+  // Orden de candidatas: primero las portadas de los momentos (ya DESC por fecha) y
+  // luego el resto de la galería. Dedupe por path (la portada también está en la
+  // galería) conservando la primera aparición.
+  const seen = new Set<string>()
+  const paths: string[] = []
+  for (const c of rows) {
+    if (c.image_path && !seen.has(c.image_path)) {
+      seen.add(c.image_path)
+      paths.push(c.image_path)
+    }
+  }
+  for (const img of gallery) {
+    if (img.image_path && !seen.has(img.image_path)) {
+      seen.add(img.image_path)
+      paths.push(img.image_path)
+    }
+  }
+
+  // Firmamos en paralelo (tolerante a fallo: un path que no firme se descarta).
+  const signed = await Promise.all(
+    paths.map(async (imagePath) => {
+      const url = await signedImageUrl(imagePath)
+      return url ? { imagePath, url } : null
+    }),
+  )
+  return signed.filter((p): p is TripPhoto => p !== null)
 }
 
 /**

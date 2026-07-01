@@ -13,6 +13,8 @@ vi.mock('./supabase', () => ({
     from: vi.fn(() => ({ update: updateSpy, delete: deleteSpy, insert: insertSpy })),
   },
 }))
+// groupData importa signedImageUrl (para listTripPhotos); no lo ejercitamos aquí.
+vi.mock('./storage', () => ({ signedImageUrl: vi.fn(() => Promise.resolve(null)) }))
 
 import {
   buildGroupInsert,
@@ -20,9 +22,12 @@ import {
   deleteGroup,
   isLive,
   normalizePrizes,
+  normalizeTripData,
   splitByStatus,
+  updateGroupCover,
   updateGroupName,
   updateGroupPrizes,
+  updateGroupTripData,
 } from './groupData'
 
 const now = new Date('2026-06-19T12:00:00.000Z')
@@ -101,6 +106,67 @@ describe('updateGroupName', () => {
     updateSpy.mockClear()
     await updateGroupName('ABC', '   ')
     expect(updateSpy).toHaveBeenCalledWith({ name: null })
+  })
+})
+
+describe('normalizeTripData', () => {
+  test('recorta textos y pasa vacíos a null', () => {
+    expect(
+      normalizeTripData({
+        startsOn: '2026-06-04',
+        endsOn: '2026-06-18',
+        description: '  templos y ramen ',
+        companions: '   ',
+      }),
+    ).toEqual({
+      starts_on: '2026-06-04',
+      ends_on: '2026-06-18',
+      description: 'templos y ramen',
+      companions: null,
+    })
+  })
+
+  test('rango invertido (vuelta antes de la salida) se endereza', () => {
+    const row = normalizeTripData({
+      startsOn: '2026-06-18',
+      endsOn: '2026-06-04',
+      description: null,
+      companions: null,
+    })
+    expect(row.starts_on).toBe('2026-06-04')
+    expect(row.ends_on).toBe('2026-06-18')
+  })
+})
+
+describe('updateGroupTripData', () => {
+  test('guarda las fechas/descripción/acompañantes normalizados', async () => {
+    updateSpy.mockClear()
+    await updateGroupTripData('ABC', {
+      startsOn: '2026-06-04',
+      endsOn: '2026-06-18',
+      description: '  de qué va ',
+      companions: 'Marta',
+    })
+    expect(updateSpy).toHaveBeenCalledWith({
+      starts_on: '2026-06-04',
+      ends_on: '2026-06-18',
+      description: 'de qué va',
+      companions: 'Marta',
+    })
+  })
+})
+
+describe('updateGroupCover', () => {
+  test('fija la portada con el path dado', async () => {
+    updateSpy.mockClear()
+    await updateGroupCover('ABC', 'foto-1.jpg')
+    expect(updateSpy).toHaveBeenCalledWith({ cover_image_path: 'foto-1.jpg' })
+  })
+
+  test('null quita la portada (vuelve a la derivada)', async () => {
+    updateSpy.mockClear()
+    await updateGroupCover('ABC', null)
+    expect(updateSpy).toHaveBeenCalledWith({ cover_image_path: null })
   })
 })
 

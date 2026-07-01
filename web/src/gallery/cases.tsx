@@ -19,6 +19,7 @@ import { AddMoment } from '../features/create/AddMoment'
 import { CreateChallengeFlow } from '../features/create/CreateChallengeFlow'
 import { EditChallenge } from '../features/group/EditChallenge'
 import { MomentGallery } from '../features/trip/MomentGallery'
+import { GroupSettingsModal } from '../features/group/GroupSettingsModal'
 import { ResultCard } from '../features/play/ResultCard'
 import { HomeDashboard, LoginScreen, type HomeGroup, type HomePinned } from '../ui'
 import type { GlobePin } from '../ui'
@@ -253,6 +254,27 @@ export const cases: GalleryCase[] = [
     section: 'Editar',
     render: () => (
       <EditChallenge challenge={challengeForPlay(CH_CLOSED)} onBack={noop} onSaved={noop} />
+    ),
+  },
+  {
+    id: 'editar-viaje',
+    title: 'Editar viaje (datos + portada)',
+    section: 'Editar',
+    // El Modal portala a <body>; dejamos un fondo mínimo en #root para que la
+    // captura (y el a11y) tengan lienzo bajo el diálogo, como en el viaje real.
+    render: () => (
+      <div className="lg-page">
+        <h1>{GROUP.name}</h1>
+        <GroupSettingsModal
+          groupId={GROUP_ID}
+          currentName={GROUP.name}
+          isClosed={false}
+          onClose={noop}
+          onRenamed={noop}
+          onSeasonChanged={noop}
+          onDeleted={noop}
+        />
+      </div>
     ),
   },
   {
