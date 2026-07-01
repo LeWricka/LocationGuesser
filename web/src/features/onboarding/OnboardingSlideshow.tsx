@@ -62,17 +62,19 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
 
         <div className={styles.slide}>
           <span className={styles.icon}>
-            <Icon icon={slide.icon} size={40} />
+            <Icon icon={slide.icon} size={30} strokeWidth={1.5} />
           </span>
-          {/* Eyebrow editorial con el paso actual (p.ej. "Tabide · 1 de 3"):
-              ubica al usuario en el recorrido sin robar peso al titular. */}
-          <span className={styles.eyebrow}>
-            Tabide · {index + 1} de {slides.length}
-          </span>
-          <h2 id="lg-onboarding-title" className={styles.title}>
-            {slide.title}
-          </h2>
-          <p className={styles.body}>{slide.body}</p>
+          <div className={styles.heading}>
+            {/* Eyebrow editorial con el paso actual (p.ej. "Tabide · 1 de 3"):
+                ubica al usuario en el recorrido sin robar peso al titular. */}
+            <span className={`t-label ${styles.eyebrow}`}>
+              Tabide · {index + 1} de {slides.length}
+            </span>
+            <h2 id="lg-onboarding-title" className={`t-section ${styles.title}`}>
+              {slide.title}
+            </h2>
+          </div>
+          <p className={`t-body ${styles.body}`}>{slide.body}</p>
         </div>
 
         <div className={styles.dots} aria-hidden="true">
