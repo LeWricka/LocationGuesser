@@ -11,7 +11,18 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
-import { AppHeader, Badge, Button, Field, Input, Icon, Row, Stack, useToast } from '../../ui'
+import {
+  AppHeader,
+  Badge,
+  Button,
+  DatePicker,
+  Field,
+  Input,
+  Icon,
+  Row,
+  Stack,
+  useToast,
+} from '../../ui'
 import styles from './AddMoment.module.css'
 
 interface Props {
@@ -379,12 +390,12 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
 
           <Field label="Fecha">
             {(fieldProps) => (
-              <Input
+              <DatePicker
                 {...fieldProps}
-                type="date"
                 value={date}
                 max={todayIso()}
-                onChange={(e) => setDate(e.target.value)}
+                placeholder="Elige el día"
+                onChange={(v) => setDate(v ?? '')}
               />
             )}
           </Field>

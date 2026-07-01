@@ -12,7 +12,18 @@ import {
 } from '../../lib/groupData'
 import { track } from '../../lib/analytics'
 import { Check, Flag, Image as ImageIcon, LockOpen, Settings } from 'lucide-react'
-import { Button, Field, Icon, Input, Modal, Row, Spinner, Stack, useToast } from '../../ui'
+import {
+  Button,
+  DatePicker,
+  Field,
+  Icon,
+  Input,
+  Modal,
+  Row,
+  Spinner,
+  Stack,
+  useToast,
+} from '../../ui'
 import styles from './GroupPage.module.css'
 
 interface Props {
@@ -308,20 +319,20 @@ export function GroupSettingsModal({
           >
             {(fieldProps) => (
               <Row gap={3} className={styles.tripDates}>
-                <Input
+                <DatePicker
                   {...fieldProps}
-                  type="date"
                   aria-label="Fecha de salida"
+                  placeholder="Salida"
                   value={startsOn}
                   max={endsOn || undefined}
-                  onChange={(e) => setStartsOn(e.target.value)}
+                  onChange={(v) => setStartsOn(v ?? '')}
                 />
-                <Input
-                  type="date"
+                <DatePicker
                   aria-label="Fecha de vuelta"
+                  placeholder="Vuelta"
                   value={endsOn}
                   min={startsOn || undefined}
-                  onChange={(e) => setEndsOn(e.target.value)}
+                  onChange={(v) => setEndsOn(v ?? '')}
                 />
               </Row>
             )}

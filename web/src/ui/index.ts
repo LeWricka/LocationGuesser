@@ -3,6 +3,7 @@
 export { Button } from './Button'
 export { FileButton } from './FileButton'
 export { Input } from './Input'
+export { DatePicker } from './DatePicker'
 export { Field } from './Field'
 export { Card } from './Card'
 export { Modal } from './Modal'
