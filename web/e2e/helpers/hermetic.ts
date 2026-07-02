@@ -60,6 +60,37 @@ function fakeSession() {
 // como en prod. El flujo debe degradar a "sin Street View" y dejar crear igual.
 function installGoogleMapsMock(page: Page, svAvailable: boolean) {
   return page.addInitScript((available: boolean) => {
+    // Geolocalización mockeada: el flujo GeoGuessr puro abre GPS al montar.
+    // Sobreescribimos navigator.geolocation con un mock que responde al instante
+    // con las coordenadas del panorama hermético (Madrid, coincide con HERMETIC_PANO).
+    Object.defineProperty(navigator, 'geolocation', {
+      writable: true,
+      configurable: true,
+      value: {
+        getCurrentPosition(success: PositionCallback) {
+          // Simula GPS exitoso: misma posición que el panorama hermético.
+          setTimeout(() => {
+            success({
+              coords: {
+                latitude: 40.4,
+                longitude: -3.7,
+                accuracy: 10,
+                altitude: null,
+                altitudeAccuracy: null,
+                heading: null,
+                speed: null,
+              },
+              timestamp: Date.now(),
+            } as GeolocationPosition)
+          }, 50)
+        },
+        watchPosition() {
+          return 0
+        },
+        clearWatch() {},
+      },
+    })
+
     const StreetViewService = class {
       getPanorama() {
         if (!available) return Promise.reject(new Error('ZERO_RESULTS'))
@@ -74,16 +105,31 @@ function installGoogleMapsMock(page: Page, svAvailable: boolean) {
       }
     }
     const StreetViewPreference = { NEAREST: 'nearest', BEST: 'best' }
-    // Panorama interactivo: StreetViewPreview lo monta cuando el creador ACEPTA el
-    // Street View (sin foto, el SV es la escena y se muestra la previa). El mock es
-    // inerte pero con la forma que consume el componente (addListener → remove, getPov)
-    // para que la previa monte sin lanzar y el flujo no reviente (#453).
+    // Panorama interactivo: el flujo GeoGuessr puro monta StreetViewPanorama
+    // directamente (sin previa separada). El mock es inerte pero con la forma completa
+    // que consume el componente: addListener → remove, getPov, getPosition, getPano.
     const StreetViewPanorama = class {
-      addListener() {
-        return { remove() {} }
+      _listeners: Map<string, (() => void)[]> = new Map()
+      addListener(event: string, cb: () => void) {
+        if (!this._listeners.has(event)) this._listeners.set(event, [])
+        this._listeners.get(event)!.push(cb)
+        return {
+          remove: () => {
+            const list = this._listeners.get(event) ?? []
+            const idx = list.indexOf(cb)
+            if (idx >= 0) list.splice(idx, 1)
+          },
+        }
       }
       getPov() {
         return { heading: 0, pitch: 0 }
+      }
+      getPosition() {
+        return { lat: () => 40.4, lng: () => -3.7 }
+      }
+      // getPano() devuelve el panoId activo (llamado con cast unknown en el componente).
+      getPano() {
+        return 'HERMETIC_PANO'
       }
       setPov() {}
       setPano() {}
