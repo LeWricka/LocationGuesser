@@ -1,0 +1,108 @@
+/*
+ * MarcadorTab — clasificación del viaje integrada en la pestaña Marcador.
+ *
+ * Diseño Grafito+teal: cada fila es superficie blanca con hairline suave;
+ * el acento teal solo destaca la fila del usuario activo. Sin fondos de color
+ * en filas genéricas: los tokens de papel mandan.
+ */
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Fila de clasificación: flex con avatar + info + puntos. */
+.fila {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline-soft);
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--motion-transition-fast);
+}
+
+/* Fila del usuario actual: borde teal + fondo teal tenue (acento en detalle). */
+.fila.miPosicion {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+/* Posición: nº o icono de medalla. Ancho fijo para alinear el contenido. */
+.posicion {
+  flex-shrink: 0;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* Icono de medalla del podio (1º–3º): colores semánticos de podio, no de marca. */
+.posicion.oro {
+  color: var(--medal-gold);
+}
+.posicion.plata {
+  color: var(--medal-silver);
+}
+.posicion.bronce {
+  color: var(--medal-bronze);
+}
+
+/* Bloque de nombre + partidas. */
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.nombre {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.partidas {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Puntos: teal en el podio y en la fila propia; grafito para el resto. */
+.puntos {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+
+.fila.miPosicion .puntos,
+.fila .puntos.destaca {
+  color: var(--accent);
+}
+
+/* Estado vacío: sin clasificación aún. */
+.vacio {
+  text-align: center;
+  padding: var(--space-7) var(--space-4);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+}
+
+.vacioCabeza {
+  display: block;
+  margin-bottom: var(--space-2);
+}

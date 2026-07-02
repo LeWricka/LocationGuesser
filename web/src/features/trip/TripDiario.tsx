@@ -1,10 +1,10 @@
-import { forwardRef } from 'react'
 import { Map as MapIcon } from 'lucide-react'
 import { EmptyState, Icon } from '../../ui'
+import { ShellInmersivo } from '../../ui/shells'
 import type { Moment, RoutePoint } from '../../lib/trip'
 import { TripMap } from './TripMap'
-import { MomentCard } from './MomentCard'
 import { MomentTimeline } from './MomentTimeline'
+import { DiarioFeed } from './DiarioFeed'
 import styles from './TripDiario.module.css'
 
 interface Props {
@@ -25,79 +25,70 @@ interface Props {
 }
 
 /**
- * Sección DIARIO del viaje: el MAPA SATÉLITE/GLOBO A SANGRE es el protagonista (llena
- * la pantalla, estilo Polarsteps) y los momentos FLOTAN ENCIMA en un dock inferior
- * (timeline + carrusel) con los pines sobre el mapa. NO es un mapa "enmarcado" con la
- * lista debajo: el mapa manda y el contenido se posa sobre él.
+ * Sección DIARIO del viaje: patrón globo/mapa héroe + hoja (ShellInmersivo).
  *
- * Es una de las dos páginas hermanas de TripPage; vive en un panel a sangre (sin
- * scroll vertical: el mapa ocupa todo y el dock flota). El `ref` apunta al carrusel
- * (TripPage gobierna el scroll-sync carrusel↔mapa y la reproducción del recorrido).
+ * El MAPA SATÉLITE/GLOBO ocupa TODA la pantalla como protagonista a sangre
+ * (backdrop de ShellInmersivo). La hoja blanca asoma desde abajo con el feed
+ * foto-first (DiarioFeed): cada momento pasa del carrusel compacto a una
+ * TARJETA GRANDE (ratio 3:2, foto real, título + lugar + fecha sobre velo).
+ *
+ * La timeline de puntos (navegación temporal) flota entre el mapa y la hoja
+ * como chrome translúcido — vive en el backdrop-container para posicionarse
+ * sobre el mapa sin entrar en la hoja.
  */
-export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
-  {
-    moments,
-    route,
-    activeMoment,
-    selectedId,
-    canCreate,
-    playing,
-    onTogglePlay,
-    onSelectFromMap,
-    onSelectFromCarousel,
-    onExpand,
-    onPlay,
-    onAddMoment,
-  },
-  carouselRef,
-) {
+export function TripDiario({
+  moments,
+  route,
+  activeMoment,
+  selectedId,
+  canCreate,
+  playing,
+  onTogglePlay,
+  onSelectFromMap,
+  onExpand,
+  onPlay,
+  onAddMoment,
+}: Props) {
   const hasMoments = moments.length > 0
 
   return (
     <div className={styles.diario}>
-      {/* Mapa A SANGRE: llena toda la sección (el protagonista del diario). Los pines
-          de momentos viven sobre él; el dock de abajo flota encima. */}
-      <div className={styles.map}>
-        <TripMap
-          route={route}
-          activeMoment={activeMoment}
-          selectedChallengeId={selectedId}
-          playing={playing}
-          onSelectMoment={onSelectFromMap}
-        />
-      </div>
-
-      {hasMoments ? (
-        /* DOCK flotante inferior: timeline + carrusel de momentos posados sobre el
-           mapa. El velo funde el dock con el mapa para que el contenido respire. */
-        <div className={styles.dock}>
-          <MomentTimeline
-            moments={moments}
-            selectedId={selectedId}
-            onSelect={onSelectFromMap}
-            playing={playing}
-            onTogglePlay={onTogglePlay}
-          />
-
-          <div className={styles.carousel} ref={carouselRef}>
-            {moments.map((m) => (
-              <div key={m.challengeId} className={styles.slide} data-cid={m.challengeId}>
-                <MomentCard
-                  moment={m}
-                  selected={m.challengeId === selectedId}
-                  onExpand={() => {
-                    onSelectFromCarousel(m.challengeId)
-                    onExpand(m)
-                  }}
-                  onPlay={m.status === 'active' ? () => onPlay(m.challengeId) : undefined}
+      <ShellInmersivo
+        backdrop={
+          /* El mapa y la timeline de puntos viven en el backdrop.
+             La timeline flota justo encima del borde superior de la hoja (sin
+             entrar en ella), usando posición absoluta bottom fija dentro del
+             contenedor del backdrop. El mapa llena el resto del backdrop. */
+          <div className={styles.backdropContainer}>
+            <div className={styles.map}>
+              <TripMap
+                route={route}
+                activeMoment={activeMoment}
+                selectedChallengeId={selectedId}
+                playing={playing}
+                onSelectMoment={onSelectFromMap}
+              />
+            </div>
+            {/* Timeline: flota sobre el mapa, encima del borde de la hoja. */}
+            {hasMoments && (
+              <div className={styles.timelineFloat}>
+                <MomentTimeline
+                  moments={moments}
+                  selectedId={selectedId}
+                  onSelect={onSelectFromMap}
+                  playing={playing}
+                  onTogglePlay={onTogglePlay}
                 />
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      ) : (
-        /* Sin momentos: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre). */
-        <div className={styles.emptyDock}>
+        }
+      >
+        {/* Feed foto-first dentro de la hoja: lista vertical de tarjetas grandes
+            (DiarioFeed). Si aún no hay momentos, estado vacío centrado. */}
+        {hasMoments ? (
+          <DiarioFeed moments={moments} onExpand={onExpand} onPlay={onPlay} />
+        ) : (
           <EmptyState
             icon={<Icon icon={MapIcon} size={32} />}
             title="Aún no hay momentos"
@@ -105,8 +96,8 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
             actionLabel={canCreate ? 'Añadir momento' : undefined}
             onAction={canCreate ? onAddMoment : undefined}
           />
-        </div>
-      )}
+        )}
+      </ShellInmersivo>
     </div>
   )
-})
+}
