@@ -3,6 +3,7 @@ import { describe, test, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DatePicker } from './DatePicker'
+import styles from './DatePicker.module.css'
 
 // Arnés controlado: el DatePicker es controlado (value + onChange), así que un
 // wrapper con estado reproduce el uso real y deja observar lo que emite.
@@ -144,6 +145,87 @@ describe('DatePicker', () => {
     const trigger = screen.getByRole('button', { name: 'Fecha' })
     expect(trigger).toHaveAttribute('aria-haspopup', 'dialog')
     expect(trigger).toHaveAttribute('aria-invalid', 'true')
+  })
+
+  test('el popover se alinea al borde derecho si desbordaría el viewport por la derecha', async () => {
+    const user = userEvent.setup()
+    Object.defineProperty(window, 'innerWidth', { value: 400, configurable: true })
+    // Simula un trigger cerca del borde derecho de un viewport estrecho (caso
+    // "Vuelta" en la columna derecha del formulario) y un popover de 320px: con
+    // left:0 desbordaría, así que debe alinearse a la derecha (popoverEnd).
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute('role') === 'dialog') {
+          return {
+            width: 320,
+            height: 380,
+            top: 0,
+            left: 0,
+            right: 320,
+            bottom: 380,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect
+        }
+        return {
+          width: 140,
+          height: 44,
+          top: 100,
+          left: 300,
+          right: 440,
+          bottom: 144,
+          x: 300,
+          y: 100,
+          toJSON: () => ({}),
+        } as DOMRect
+      })
+    render(<DatePicker value={null} onChange={vi.fn()} aria-label="Fecha" />)
+    await user.click(screen.getByRole('button', { name: 'Fecha' }))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.className).toContain(styles.popoverEnd)
+    rectSpy.mockRestore()
+  })
+
+  test('el popover se abre hacia arriba si no cabe debajo del disparador', async () => {
+    const user = userEvent.setup()
+    Object.defineProperty(window, 'innerHeight', { value: 500, configurable: true })
+    // Trigger cerca del borde inferior del viewport: con top:100% desbordaría,
+    // así que debe abrirse hacia arriba (popoverFlip).
+    const rectSpy = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function (this: HTMLElement) {
+        if (this.getAttribute('role') === 'dialog') {
+          return {
+            width: 320,
+            height: 380,
+            top: 0,
+            left: 0,
+            right: 320,
+            bottom: 380,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect
+        }
+        return {
+          width: 140,
+          height: 44,
+          top: 440,
+          left: 0,
+          right: 140,
+          bottom: 484,
+          x: 0,
+          y: 440,
+          toJSON: () => ({}),
+        } as DOMRect
+      })
+    render(<DatePicker value={null} onChange={vi.fn()} aria-label="Fecha" />)
+    await user.click(screen.getByRole('button', { name: 'Fecha' }))
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.className).toContain(styles.popoverFlip)
+    rectSpy.mockRestore()
   })
 
   test('el día de hoy lleva aria-current="date"', async () => {

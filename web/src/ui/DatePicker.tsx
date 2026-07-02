@@ -124,8 +124,26 @@ export function DatePicker({
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const gridRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
   const gridId = useId()
   const today = todayIso()
+
+  // Alineación/apertura del popover: por defecto cuelga a la izquierda y hacia
+  // abajo del disparador, pero eso desborda el viewport cuando el trigger vive
+  // cerca del borde derecho (p.ej. "Vuelta" en un layout a dos columnas) o cerca
+  // del borde inferior. Se recalcula al abrir midiendo el disparador y el propio
+  // popover ya montado (useLayoutEffect corre antes del paint: sin parpadeo).
+  const [popoverAlign, setPopoverAlign] = useState<'start' | 'end'>('start')
+  const [popoverFlip, setPopoverFlip] = useState(false)
+
+  const reposition = useCallback(() => {
+    if (!rootRef.current || !popoverRef.current) return
+    const rootRect = rootRef.current.getBoundingClientRect()
+    const popRect = popoverRef.current.getBoundingClientRect()
+    const margin = 8 // colchón mínimo respecto al borde del viewport
+    setPopoverAlign(rootRect.left + popRect.width > window.innerWidth - margin ? 'end' : 'start')
+    setPopoverFlip(rootRect.bottom + popRect.height > window.innerHeight - margin)
+  }, [])
 
   // Abre el calendario recolocando el mes visible sobre la selección (o el
   // mínimo, o hoy) y fijando el foco de teclado en un día sensato para navegar
@@ -168,6 +186,21 @@ export function DatePicker({
     const el = gridRef.current.querySelector<HTMLButtonElement>(`[data-iso="${focusIso}"]`)
     el?.focus()
   }, [open, focusIso, viewDate])
+
+  // Recalcula la posición al abrir y al cambiar de mes (la rejilla puede tener 5
+  // o 6 semanas y variar de alto). Antes del paint: evita el parpadeo de un
+  // popover que nace desbordado y luego "salta" a su sitio.
+  useLayoutEffect(() => {
+    if (!open) return
+    reposition()
+  }, [open, viewDate, reposition])
+
+  // Re-encaja si el usuario rota el móvil o redimensiona con el popover abierto.
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener('resize', reposition)
+    return () => window.removeEventListener('resize', reposition)
+  }, [open, reposition])
 
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
@@ -296,7 +329,19 @@ export function DatePicker({
       )}
 
       {open && (
-        <div className={styles.popover} role="dialog" aria-modal="false" aria-label="Elegir fecha">
+        <div
+          ref={popoverRef}
+          className={[
+            styles.popover,
+            popoverAlign === 'end' ? styles.popoverEnd : null,
+            popoverFlip ? styles.popoverFlip : null,
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          role="dialog"
+          aria-modal="false"
+          aria-label="Elegir fecha"
+        >
           <div className={styles.calHeader}>
             <button
               type="button"

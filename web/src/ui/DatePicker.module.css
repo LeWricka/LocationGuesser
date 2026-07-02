@@ -123,6 +123,22 @@
   animation: dp-rise var(--motion-duration-base) var(--motion-ease-emphasized);
 }
 
+/* Alinea el popover al borde DERECHO del disparador en vez del izquierdo: se
+   activa cuando abrirlo a la izquierda lo desbordaría por el borde derecho del
+   viewport (caso típico: el trigger "Vuelta" en la columna derecha de un
+   layout a dos columnas). */
+.popoverEnd {
+  left: auto;
+  right: 0;
+}
+
+/* Abre hacia ARRIBA en vez de hacia abajo: se activa cuando no cabe debajo del
+   disparador (p.ej. trigger cerca del borde inferior del viewport). */
+.popoverFlip {
+  top: auto;
+  bottom: calc(100% + var(--space-2));
+}
+
 @keyframes dp-rise {
   from {
     opacity: 0;
