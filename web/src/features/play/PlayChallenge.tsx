@@ -54,6 +54,7 @@ import {
   useReducedMotion,
   useToast,
 } from '../../ui'
+import { IconDiana, IconMedalla, IconTrofeo } from '../../ui/icons'
 
 // Puntuación máxima del scoring `5000·e^(−km/2000)`: base del % del anillo de
 // resultado. No cambia el scoring (vive en lib/result); solo lo visualiza.
@@ -723,13 +724,24 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     Solo se monta si fue gran tiro; respeta reduced-motion (no pinta
                     ni vibra). Va absoluto sobre el bloque, sin capturar toques. */}
                 <RevealBurst active={result.points >= GREAT_SHOT} />
-                {/* Titular de celebración: cálido y enérgico si fue gran tiro. */}
+                {/* Titular de celebración: icono custom + texto cálido si fue gran
+                    tiro; diana neutra si fue un resultado normal. */}
                 <span
                   className={`${styles.scoreEyebrow} ${
                     result.points >= GREAT_SHOT ? styles.scoreEyebrowWin : ''
                   }`}
                 >
-                  {result.points >= GREAT_SHOT ? '¡Gran tiro!' : 'Resultado'}
+                  {result.points >= GREAT_SHOT ? (
+                    <span className={styles.inlineIcon}>
+                      <IconTrofeo size={16} />
+                      ¡Gran tiro!
+                    </span>
+                  ) : (
+                    <span className={styles.inlineIcon}>
+                      <IconDiana size={16} />
+                      Resultado
+                    </span>
+                  )}
                 </span>
                 {/* Anillo de acierto protagonista: % de la puntuación máxima, con
                     los puntos (count-up) gigantes en el centro. */}
@@ -746,6 +758,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                       pudo calcular con los votos del reto. */}
                   {rank && (
                     <span className={styles.rank}>
+                      <IconMedalla size={14} />
                       {rank.position}º de {rank.total}
                     </span>
                   )}
@@ -863,7 +876,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   }}
                 >
                   <span className={styles.inlineIcon}>
-                    Ver clasificación <Icon icon={ArrowRight} size={16} />
+                    <IconTrofeo size={16} />
+                    Ver clasificación
+                    <Icon icon={ArrowRight} size={16} />
                   </span>
                 </Button>
               </Row>

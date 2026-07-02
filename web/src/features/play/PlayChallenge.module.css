@@ -185,196 +185,163 @@
   transform: scale(0.94);
 }
 
-/* Asa-pastilla del mapa, CENTRO inferior: la pieza única que SUBE la hoja del mapa
- * (lenguaje de "hoja que sube"). Icono + texto + asa de arrastre en una sola
- * pastilla salvia → no hay etiqueta flotante aparte que pueda solaparse. Centrada
- * (no a la derecha) para no pisar el control +/- del Street View, que Google pinta
- * abajo-derecha. Ancho acotado para que no choque con los controles del panorama. */
-.mapHandle {
+/* ==========================================================================
+ * Mini-mapa GeoGuessr (esquina inferior derecha).
+ *
+ * Dos estados: colapsado (thumbnail táctil 128px) → expandido (mapa grande +
+ * "Clavar tiro"). Sin hoja/sheet: el SV cubre el fondo.
+ * El mapa se mantiene SIEMPRE montado para conservar zoom/posición.
+ * ======================================================================== */
+
+/* --- Mini-mapa COLAPSADO (esquina inferior derecha) --- */
+.miniMapa {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
-  z-index: var(--z-header);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  max-width: min(58vw, 240px);
-  padding: var(--space-3) var(--space-5);
+  right: calc(var(--space-4) + env(safe-area-inset-right));
+  z-index: var(--z-sheet);
+  /* Tamaño del thumbnail */
+  width: 128px;
+  height: 128px;
+  padding: 0;
   border: none;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  box-shadow: var(--shadow-md), var(--ring-contact);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow:
+    var(--shadow-chrome),
+    0 0 0 2px var(--surface);
   cursor: pointer;
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
+  background: none;
+  appearance: none;
+  /* Pulso al entrar: llama la atención la primera vez. */
+  animation: lg-minimapa-in var(--duration-slow) var(--ease-emphasized) both;
 }
-.mapHandle:hover {
-  background: var(--color-accent-hover);
-  box-shadow: var(--shadow-lg), var(--ring-contact);
+@keyframes lg-minimapa-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
-.mapHandle:active {
-  transform: translateX(-50%) translateY(1px) scale(0.98);
-}
-
-/* Asa de arrastre: la "pestaña" clara que insinúa que esta pieza es la cabeza de
-   una hoja que sube. Puramente visual. */
-.mapHandleGrip {
-  width: var(--grab-bar-width);
-  height: var(--grab-bar-height);
-  border-radius: var(--radius-full);
-  background: var(--color-on-accent);
-  opacity: 0.55;
-}
-
-.mapHandleRow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  line-height: 1;
+@media (prefers-reduced-motion: reduce) {
+  .miniMapa {
+    animation: none;
+  }
 }
 
-.mapHandleLabel {
-  font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-md);
-  white-space: nowrap;
-}
-
-/* Punto que avisa de que ya hay un pin colocado. Vive DENTRO de la pastilla (no
-   flotando sobre una esquina), así nunca se solapa con texto ni con el borde. */
-.mapHandleDot {
-  width: var(--space-3);
-  height: var(--space-3);
-  border-radius: var(--radius-full);
-  background: var(--color-success);
-  box-shadow: 0 0 0 2px var(--color-on-accent);
-}
-
-/* Velo tras la hoja (oscurece la escena, capta el toque para cerrar). */
-.sheetScrim {
+/* El lienzo del mapa llena el thumbnail (pointer-events:none: el botón padre
+   captura el toque, no el mapa). */
+.miniMapaScene {
   position: absolute;
   inset: 0;
-  /* Mismo piso que la hoja; la hoja la sigue en el DOM y queda por encima. */
-  z-index: var(--z-sheet);
-  background: var(--color-scrim);
-  opacity: 0;
-  visibility: hidden;
-  transition:
-    opacity var(--transition-base),
-    visibility var(--transition-base);
+  pointer-events: none;
 }
-.sheetScrimOpen {
-  opacity: 1;
-  visibility: visible;
+.miniMapaScene :global(.lg-map) {
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-/* Hoja inferior con el mapa de adivinar: sube desde abajo casi a pantalla. */
-.sheet {
+/* Etiqueta "Adivinar" sobre el borde inferior del thumbnail: pastilla clara con
+   diana + texto. El texto (no solo icono) guía al jugador y evita un chrome mudo. */
+.miniMapaLabel {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: var(--space-1);
+  right: var(--space-1);
+  bottom: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+  box-shadow: var(--shadow-xs);
+}
+
+/* --- Mini-mapa EXPANDIDO (clavar el tiro) --- */
+.mapaExpandido {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   z-index: var(--z-sheet);
-  /* % del contenedor inmersivo (ya atado al alto visible real): la hoja nunca pasa
-     del viewport visible aunque haya teclado/chrome. Cap en px para tablets. */
-  height: min(92%, 760px);
-  max-height: 100%;
   display: flex;
   flex-direction: column;
-  /* min-height:0 para que el mapa interior (hijo flex) pueda encoger sin desbordar. */
-  min-height: 0;
-  background: var(--color-surface);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
-  padding-bottom: env(safe-area-inset-bottom);
-  transform: translateY(100%);
-  transition: transform var(--duration-slow) var(--ease-emphasized);
+  gap: var(--space-3);
+  /* Entrada suave desde la esquina. */
+  animation: lg-mapa-expand var(--duration-slow) var(--ease-emphasized) both;
 }
-.sheetOpen {
-  transform: translateY(0);
+@keyframes lg-mapa-expand {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(var(--space-4));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
-
-/* Asa de arrastre de la hoja: zona táctil ancha (toda la cabecera) que cierra al
-   tocarla, con la "pestaña" centrada — el affordance de detents tipo Apple Maps. */
-.sheetGrabber {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 100%;
-  padding: var(--space-2) 0 var(--space-1);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  appearance: none;
-}
-.sheetHandle {
-  width: var(--grab-bar-width);
-  height: var(--grab-bar-height);
-  border-radius: var(--radius-full);
-  background: var(--color-border-strong);
+@media (prefers-reduced-motion: reduce) {
+  .mapaExpandido {
+    animation: none;
+  }
 }
 
-/* Cabecera de la hoja: título a la izquierda, cerrar a la derecha. */
-.sheetHeader {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 var(--space-3) 0 var(--space-4);
+/* Lienzo del mapa grande. */
+.mapaExpandidoScene {
+  position: relative;
+  height: 300px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-chrome);
+  border: 2px solid var(--surface);
 }
-.sheetTitle {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
+.mapaExpandidoScene :global(.lg-map) {
+  height: 100%;
+  border-radius: 0;
+  box-shadow: none;
 }
 
-.sheetClose {
+/* Diana de centro fijo: pin clavado al centro del mapa expandido.
+   pointer-events:none para no robar el arrastre al mapa. */
+.dianaFija {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--color-accent);
+  filter: drop-shadow(0 2px 4px var(--photo-text-shadow));
+  pointer-events: none;
+}
+
+/* Botón de colapsar (volver al SV): esquina superior derecha del mapa expandido. */
+.mapaExpandidoCerrar {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
   width: var(--tap-target);
   height: var(--tap-target);
   display: grid;
   place-items: center;
   border: none;
   border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--color-text-muted);
+  background: var(--scene-surface);
+  color: var(--scene-ink);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
+  transition: transform var(--transition-fast);
 }
-.sheetClose:hover {
-  color: var(--color-text);
-}
-
-/* El mapa llena la hoja; se monta ya a este tamaño → carga sin gris. */
-.sheetMap {
-  flex: 1;
-  min-height: 0;
-  padding: var(--space-2) var(--space-3) 0;
-}
-.sheetMap :global(.lg-map) {
-  height: 100%;
-  border-radius: var(--radius-md);
-  box-shadow: none;
-}
-
-.sheetFooter {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sheet {
-    transition: none;
-  }
-  .sheetScrim {
-    transition: none;
-  }
+.mapaExpandidoCerrar:active {
+  transform: scale(0.92);
 }
 
 /* ==========================================================================
@@ -530,6 +497,9 @@
 /* Tu puesto en el reto ("3º de 6"): pista discreta que pica a mejorar. */
 .rank {
   margin-top: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-wide);

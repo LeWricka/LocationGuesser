@@ -1,11 +1,12 @@
 import { type CSSProperties, type RefObject } from 'react'
-import { Compass as CompassIcon, Expand, House, Lock, MapPin, Maximize2, X } from 'lucide-react'
+import { Compass as CompassIcon, Expand, House, Maximize2 } from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { SceneImage } from './SceneImage'
 import type { LatLng } from '../../lib/geo'
 import { AppHeader } from '../../ui/AppHeader'
-import { Badge, Button, CountdownRing, Icon, Lightbox, Modal, Row, Stack } from '../../ui'
+import { Button, CountdownRing, Icon, Lightbox, Modal, Stack } from '../../ui'
+import { IconDiana } from '../../ui/icons'
 import styles from './PlayChallenge.module.css'
 
 // Escena de Street View del reto (lo que de verdad se monta a pantalla completa).
@@ -50,9 +51,10 @@ interface Props {
   backLabel: string
   onBack: () => void
 
-  // --- Mapa de adivinar (hoja inferior) ---
+  // --- Mini-mapa de adivinar (GeoGuessr: esquina → expandido) ---
   guess: LatLng | null
   onGuess: (p: LatLng) => void
+  /** Mini-mapa expandido (para clavar el tiro) vs. colapsado (esquina). */
   mapOpen: boolean
   onOpenMap: () => void
   onCloseMap: () => void
@@ -231,98 +233,81 @@ export function GameScene({
         </div>
       )}
 
-      {/* Asa-pastilla inferior: SUBE la hoja del mapa para adivinar. Es una sola
-          pieza (icono + texto + asa) — no hay etiqueta flotante aparte que pueda
-          solaparse. El asa superior la liga visualmente a la hoja que asoma. */}
-      <button
-        type="button"
-        className={styles.mapHandle}
-        onClick={onOpenMap}
-        aria-label="Abrir el mapa para adivinar"
-      >
-        <span className={styles.mapHandleGrip} aria-hidden="true" />
-        <span className={styles.mapHandleRow}>
-          <Icon icon={MapPin} size={20} />
-          <span className={styles.mapHandleLabel}>{guess ? 'Ajustar tu pin' : 'Adivinar'}</span>
-          {guess && <span className={styles.mapHandleDot} aria-hidden="true" />}
-        </span>
-      </button>
+      {/* -------- Mini-mapa GeoGuessr (esquina inferior derecha) --------
+          Dos estados: colapsado (thumbnail táctil) → expandido (mapa grande + CTA).
+          El mapa se monta SIEMPRE para conservar zoom/posición; solo cambia el CSS.
+          Sin hoja ni popup "¿Dónde es?": el juego es el Street View, no un cartel. */}
 
-      {/* Hoja inferior con el mapa de adivinar. El mapa se mantiene SIEMPRE montado
-          (solo se traslada fuera de pantalla al cerrar) para conservar zoom/posición. */}
-      <div
-        className={`${styles.sheetScrim} ${mapOpen ? styles.sheetScrimOpen : ''}`}
-        onClick={onCloseMap}
-        aria-hidden={!mapOpen}
-      />
-      <section
-        className={`${styles.sheet} ${mapOpen ? styles.sheetOpen : ''}`}
-        role="dialog"
-        aria-label="Mapa para adivinar"
-        aria-hidden={!mapOpen}
-      >
-        {/* Asa de arrastre + cabecera: el asa la liga al gesto de "hoja que sube"
-            (lenguaje de detents tipo Apple Maps); también cierra al tocarla. */}
+      {/* Estado COLAPSADO: thumbnail en esquina; toca para expandir. NO se guarda
+          bajo `sceneReady`: el mini-mapa es el mapa de ADIVINAR (mundo entero), no la
+          escena del reto, así que mostrarlo antes de Empezar no es spoiler y monta ya
+          el mapa (conserva zoom/posición). Lleva etiqueta "Adivinar" visible (no solo
+          icono): guía al jugador y da contenido de texto al contenedor inmersivo. */}
+      {!mapOpen && (
         <button
           type="button"
-          className={styles.sheetGrabber}
-          onClick={onCloseMap}
-          aria-label="Cerrar el mapa"
+          className={styles.miniMapa}
+          onClick={onOpenMap}
+          aria-label="Abrir el mapa para clavar el tiro"
         >
-          <span className={styles.sheetHandle} aria-hidden="true" />
+          <div className={styles.miniMapaScene} aria-hidden="true">
+            <PlayMap
+              guess={guess}
+              answer={null}
+              locked={false}
+              onPick={onGuess}
+              meAvatar={meAvatar}
+              meUserId={meUserId}
+              preset="jugar"
+              fixedCenterPin
+            />
+          </div>
+          {/* Etiqueta con diana: indica "toca para apuntar". */}
+          <span className={styles.miniMapaLabel}>
+            <IconDiana size={14} />
+            {guess ? 'Ajustar tiro' : 'Adivinar'}
+          </span>
         </button>
-        <div className={styles.sheetHeader}>
-          <span className={styles.sheetTitle}>¿Dónde es?</span>
-          <button
-            type="button"
-            className={styles.sheetClose}
-            onClick={onCloseMap}
-            aria-label="Cerrar el mapa"
-          >
-            <Icon icon={X} size={20} />
-          </button>
-        </div>
-        <div className={styles.sheetMap}>
-          {/* Mapa etiquetado (preset `jugar`, tipo GeoGuessr) con PIN DE CENTRO FIJO:
-              mueves el mapa y el pin queda clavado al centro; el voto = centro al
-              asentarse el arrastre. Más preciso a una mano en móvil. */}
-          <PlayMap
-            guess={guess}
-            answer={null}
-            locked={false}
-            onPick={onGuess}
-            meAvatar={meAvatar}
-            meUserId={meUserId}
-            preset="jugar"
-            fixedCenterPin
-          />
-        </div>
-        {/* Barra de acción PROPIA bajo el mapa (no flota sobre él: así no tapa la zona
-            de pan). Anclada con safe-area por el padding de la hoja. */}
-        <div className={styles.sheetFooter}>
-          {guess ? (
-            <Row gap={2} align="center">
-              <Badge tone="accent">
-                <Icon icon={MapPin} size={14} /> Tu pin
-              </Badge>
-              <span className={styles.coords}>
-                {guess.lat.toFixed(4)}, {guess.lng.toFixed(4)}
-              </span>
-            </Row>
-          ) : (
-            <span className={styles.status}>Mueve el mapa para apuntar con el pin central.</span>
-          )}
+      )}
+
+      {/* Estado EXPANDIDO: mapa a pantalla parcial + botón "Clavar tiro".
+          Montado como overlay absoluto (no hoja): el SV sigue visible arriba.
+          El botón de confirmar DENTRO del mapa (como GeoGuessr). */}
+      {sceneReady && mapOpen && (
+        <div className={styles.mapaExpandido}>
+          <div className={styles.mapaExpandidoScene}>
+            <PlayMap
+              guess={guess}
+              answer={null}
+              locked={false}
+              onPick={onGuess}
+              meAvatar={meAvatar}
+              meUserId={meUserId}
+              preset="jugar"
+              fixedCenterPin
+            />
+            {/* Diana central: pin fijo de GeoGuessr. */}
+            <span className={styles.dianaFija} aria-hidden="true">
+              <IconDiana size={30} />
+            </span>
+            {/* Botón de cerrar: vuelve al SV sin clavarlo. */}
+            <button
+              type="button"
+              className={styles.mapaExpandidoCerrar}
+              onClick={onCloseMap}
+              aria-label={`Volver a ${hasStreetView ? 'Street View' : 'la imagen'}`}
+            >
+              <Icon icon={Expand} size={16} />
+            </button>
+          </div>
           <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
             <span className={styles.btnIcon}>
-              <Icon icon={Lock} size={18} />
-              Bloquear mi respuesta
+              <IconDiana size={18} />
+              Clavar tiro
             </span>
           </Button>
-          <Button variant="secondary" fullWidth onClick={onCloseMap}>
-            Volver a {hasStreetView ? 'Street View' : 'la imagen'}
-          </Button>
         </div>
-      </section>
+      )}
 
       {/* Visor a pantalla completa de la foto del reto. */}
       {(imageUrl || hintPhotoUrl) && (
