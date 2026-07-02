@@ -1,99 +1,64 @@
-// Datos de MUESTRA para el showcase de la landing deslogueada (issue #452): un
-// "viaje bien montado" que el visitante ve ANTES de entrar, para entender de un
-// vistazo QUÉ es Tabide y QUÉ puede hacer (la validación de jul-2026 dice que el
-// eslogan es vago y que "ver el producto antes de entrar es clave").
+// Datos del showcase de la landing deslogueada (issue #462): en vez de recrear el
+// producto con componentes vivos, enseñamos CAPTURAS REALES de pantallas de Tabide
+// —fotografiadas con el sistema de galería (fixtures deterministas + Playwright)—
+// dentro de marcos de móvil, al estilo Polarsteps (imagen de producto real sobre una
+// composición editorial). El dueño lo pidió así: "capturas reales, tipo la home de
+// Polarsteps". Sustituye al showcase de componentes de la #452/#454.
 //
-// No son placeholders sueltos: es UN viaje coherente (una vuelta al mundo de un
-// grupo), con sus momentos-diario, un reto de ejemplo y su marcador. Reutiliza
-// las MISMAS fotos empaquetadas que el globo héroe (features/home/assets/*.webp,
-// Wikimedia CC, EXIF estripado) para que el showcase refuerce el globo de arriba
-// y todo cargue offline y determinista (galería de revisión visual).
+// Las imágenes están versionadas y optimizadas (webp) en assets/landing/. Se generan
+// con `npm run gallery:shots` (viewport móvil 390×844@2x) y se convierten a webp.
+// Límite conocido: los mapas de la galería van stubeados (fondo oscuro plano), así que
+// elegimos pantallas que lucen SIN depender de tiles reales (globo héroe, resultado,
+// podio del marcador).
 
-import lisboaPhoto from '../home/assets/lisboa.webp'
-import romaPhoto from '../home/assets/roma.webp'
-import tokioPhoto from '../home/assets/tokio.webp'
-import ciudadDelCaboPhoto from '../home/assets/ciudad-del-cabo.webp'
+import homeShot from '../../assets/landing/home.webp'
+import resultadoShot from '../../assets/landing/resultado.webp'
+import marcadorShot from '../../assets/landing/marcador.webp'
 
-// Un momento del diario: foto a sangre + lugar clavado + nota corta. Es lo que un
-// visitante debe reconocer como "un diario visual de viaje en grupo".
-export interface ShowcaseMoment {
+// Una diapositiva del showcase: un texto editorial (eyebrow + título + lede) junto a
+// una captura real montada en un marco de móvil. El orden cuenta el bucle del producto.
+export interface ShowcaseShot {
   id: string
-  photo: string
-  /** País/ciudad resuelto (eyebrow versalita, como en MomentCard real). */
-  place: string
-  /** Nota corta del autor (la voz del diario). */
-  note: string
-  /** Fecha compacta ya formateada ("8 abr"). */
-  date: string
-  /** Quién lo compartió (identidad del grupo). */
-  author: string
+  /** Captura real (webp empaquetado), mostrada dentro del marco de móvil. */
+  image: string
+  /** Texto alternativo descriptivo de la pantalla. */
+  alt: string
+  /** Versalita editorial sobre el título. */
+  eyebrow: string
+  /** Título serif de la diapositiva. */
+  title: string
+  /** Frase de apoyo que explica qué se ve. */
+  lede: string
 }
 
-// El reto de ejemplo: enseña la mecánica de adivinar SIN spoilear el diario.
-export interface ShowcaseChallenge {
-  photo: string
-  /** La pregunta del reto ("¿Dónde tomó Marta esta foto?"). */
-  question: string
-  author: string
-  /** Cuántos ya han adivinado (prueba social del bucle). */
-  guessedCount: number
-}
-
-// Una fila del marcador: cierra el bucle "gana quien más se acerca".
-export interface ShowcaseScoreRow {
-  rank: 1 | 2 | 3 | 4
-  name: string
-  /** Distancia al punto real, ya formateada ("4,2 km"). */
-  km: string
-  points: number
-}
-
-export const SHOWCASE_TRIP_NAME = 'La vuelta al mundo de los García'
-
-// 3 momentos-diario de destinos reconocibles (mismas fotos que el globo). El
-// orden cuenta un mini-relato de viaje; cada nota es la voz de un miembro distinto.
-export const SHOWCASE_MOMENTS: ShowcaseMoment[] = [
+// Tres pantallas héroe que cierran el bucle "comparte → adivina → gana", cada una una
+// captura real de la app: la home (globo + reto a jugar), el resultado (cercanía en
+// puntos) y el marcador (podio del viaje). Ninguna depende de tiles de mapa reales.
+export const SHOWCASE_SHOTS: ShowcaseShot[] = [
   {
-    id: 'lisboa',
-    photo: lisboaPhoto,
-    place: 'Portugal · Lisboa',
-    note: 'El tram 28 subiendo a la Alfama. Nos perdimos y fue lo mejor del día.',
-    date: '4 abr',
-    author: 'Marta',
+    id: 'home',
+    image: homeShot,
+    alt: 'Pantalla de inicio de Tabide: un globo con el pin del viaje y el reto pendiente de jugar.',
+    eyebrow: 'Tu mundo',
+    title: 'Todo el viaje en un globo',
+    lede: 'Cada momento que compartes se clava en el mapa. Al abrir Tabide, tu gente ve dónde habéis estado y qué reto toca jugar.',
   },
   {
-    id: 'roma',
-    photo: romaPhoto,
-    place: 'Italia · Roma',
-    note: 'Madrugón para ver el Coliseo sin colas. Mereció la pena cada minuto.',
-    date: '9 abr',
-    author: 'Javi',
+    id: 'resultado',
+    image: resultadoShot,
+    alt: 'Pantalla de resultado de Tabide: los puntos de un intento y lo cerca que quedó del lugar real.',
+    eyebrow: 'La partida',
+    title: 'Gana quien más se acerca',
+    lede: 'Marcas en el mapa dónde crees que es. Cuanto más cerca del lugar real, más puntos. Con cuenta atrás.',
   },
   {
-    id: 'ciudad-del-cabo',
-    photo: ciudadDelCaboPhoto,
-    place: 'Sudáfrica · Ciudad del Cabo',
-    note: 'Table Mountain de fondo y el agua helada. Nadie se atrevió a bañarse.',
-    date: '21 abr',
-    author: 'Nerea',
+    id: 'marcador',
+    image: marcadorShot,
+    alt: 'Pantalla de marcador de Tabide: el podio del viaje con los tres primeros y sus puntos.',
+    eyebrow: 'El recuerdo',
+    title: 'Un marcador que os une',
+    lede: 'Reto a reto se llena el podio del viaje. Al final revivís juntos por dónde pasasteis y quién ganó.',
   },
-]
-
-// El reto de ejemplo (mecánica de adivinar): una foto de Tokio con la pregunta.
-export const SHOWCASE_CHALLENGE: ShowcaseChallenge = {
-  photo: tokioPhoto,
-  question: '¿Dónde tomó Marta esta foto?',
-  author: 'Marta',
-  guessedCount: 5,
-}
-
-// El marcador tras jugar el reto: el ganador (más cerca) en oro; el resto por
-// distancia. Cierra el "gana quien más se acerca".
-export const SHOWCASE_SCORES: ShowcaseScoreRow[] = [
-  { rank: 1, name: 'Lucía', km: '3,1 km', points: 4870 },
-  { rank: 2, name: 'Javi', km: '18 km', points: 4210 },
-  { rank: 3, name: 'Nerea', km: '54 km', points: 3560 },
-  { rank: 4, name: 'Pablo', km: '210 km', points: 2140 },
 ]
 
 // El relato de una línea del bucle (foto-first, cuatro pasos cortos, estilo
