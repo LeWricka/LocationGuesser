@@ -5,7 +5,7 @@
 //
 // Flujos (cuentas-y-home.md §2.2; entrada de baja fricción #438):
 //  - loading                  → spinner de arranque
-//  - sin sesión               → Landing (CTA → LoginPopup: nombre+email → dentro al instante)
+//  - sin sesión               → Landing (CTA → EnterScreen: nombre+email → dentro al instante)
 //  - sesión sin nombre elegido → ProfileGate (raro: el nombre se captura al entrar)
 //  - sesión OK                → router por hash:
 //       #g=&c=  → PlayChallenge (auto-join)          [permitido con email pendiente]

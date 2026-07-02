@@ -73,8 +73,9 @@ test.describe('smoke', () => {
     await expect(root).not.toBeEmpty()
 
     // 3. La portada pública es visible: hero del producto y CTA de entrada. El
-    //    correo ya NO está a la vista: aparece en un popup al pulsar el CTA
-    //    (textos/roles reales de Landing.tsx). Damos margen porque al arrancar
+    //    correo ya NO está a la vista: aparece al pulsar el CTA, que abre la
+    //    pantalla de entrada EnterScreen (textos/roles reales de Landing.tsx).
+    //    Damos margen porque al arrancar
     //    AuthProvider resuelve la sesión persistida (spinner) antes de pintar.
     // La frase ancla aparece dos veces (hero h1 + sección "cómo funciona"); basta
     // con que el hero sea visible, así que tomamos el primero.
@@ -84,7 +85,7 @@ test.describe('smoke', () => {
     const openAuth = page.getByRole('button', { name: 'Empieza', exact: true })
     await expect(openAuth).toBeVisible()
 
-    // 4. El CTA abre la hoja de ENTRADA de baja fricción (#438): nombre + correo,
+    // 4. El CTA abre la pantalla de ENTRADA de baja fricción (#438/#474): nombre + correo,
     //    sin paso de código. No pulsamos "Entrar" (tocaría Supabase): el smoke se
     //    queda en la puerta, comprobando que el nuevo formulario monta bien.
     await openAuth.click()

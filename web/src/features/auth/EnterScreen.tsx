@@ -5,9 +5,10 @@
 // ShellUtilitario (hoja limpia sobre --paper), paleta Grafito+teal, tipografía
 // serif para el titular, sin colores hardcodeados.
 //
-// Esta es la versión PANTALLA COMPLETA de la entrada. El popup de landing
-// (LoginPopup) sigue vivo para el flujo de invitación dentro de la hoja flotante;
-// esta pantalla se usa cuando la entrada ocupa toda la vista (flujos sin landing).
+// Es la ÚNICA entrada del producto: pantalla completa (patrón aprobado #474).
+// Sustituye al antiguo LoginPopup (modal): la Landing la muestra a pantalla
+// completa al pulsar su CTA, y el mismo componente sirve para el flujo de
+// invitación (`joining`) y para la entrada genérica de marca.
 //
 // Estados:
 //  - 'form'    → formulario nombre + email + CTA "Entrar"
