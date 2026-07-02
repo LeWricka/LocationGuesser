@@ -55,6 +55,38 @@
   filter: drop-shadow(0 4px 8px rgba(24, 32, 43, 0.32));
 }
 
+/* CAUSA RAÍZ #530 (mismo bug que #523/HomeGlobe, PR #528): `new gl.Marker({ element:
+   el })` (MapLibre) NO envuelve el elemento en un contenedor propio — le aplica
+   `style.transform` DIRECTAMENTE y espera que sea `.maplibregl-marker { position:
+   absolute; top: 0; left: 0 }` (su CSS base, ver `maplibre-gl/dist/maplibre-gl.css`).
+   La regla de arriba, `.lg-trip-pin:has(.lg-trip-pin__disc)`, tiene la MISMA
+   especificidad (0,2,0) que `.maplibregl-marker`; si este fichero se importa DESPUÉS
+   del CSS de MapLibre —como pasa en TripMapGlobe.tsx y en HomeGlobe.tsx (import
+   dinámico de `maplibre-gl/dist/maplibre-gl.css` DENTRO del efecto de montaje,
+   después de este `import './tripPins.css'` de nivel de módulo)— gana y deja
+   `position: relative`. Con `relative` los markers, hijos DIRECTOS y en orden del
+   mismo `canvasContainer` sin wrapper que los aísle, se apilan en flujo de bloque
+   (offset = índice × alto del pin) en vez de quedarse donde MapLibre los
+   `translate()`: el primero cae bien por coincidencia, el resto se desplaza cada vez
+   más abajo de su sitio real.
+   Arreglamos la regla OFENSORA aquí mismo (no en cada consumidor): añadimos el
+   discriminante real —la clase `.maplibregl-marker` que MapLibre pone en el elemento
+   al crear el Marker— con la MISMA especificidad (0,2,0) pero DESPUÉS en este mismo
+   fichero, así que gana por orden SIEMPRE, sin depender de qué otro CSS importe cada
+   consumidor ni en qué orden (a diferencia del parche de #528 en
+   HomeGlobe.module.css, que sí dependía del orden de imports entre ficheros).
+   Arregla TripMapGlobe Y, de paso, HomeGlobe (comparten este fichero y el mismo
+   patrón de Marker sin wrapper) sin tocar ni romper ese parche —queda redundante
+   pero inofensivo—. Leaflet (`divIcon`, que NO lleva `.maplibregl-marker`) no se ve
+   afectado: sigue en `position: relative`, que es justo lo que necesita como
+   ancestro posicionado de su puntita `::after` y del disco `position: absolute;
+   inset: 0` de más abajo. */
+.lg-trip-pin.maplibregl-marker {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
 /* Puntita: rombo del color del borde que asoma bajo el disco para clavar el pin. */
 .lg-trip-pin:has(.lg-trip-pin__disc)::after {
   content: '';
