@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { useMapsLibrary } from '@vis.gl/react-google-maps'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { MapPin } from 'lucide-react'
+import { MapPicker } from './MapPicker'
+import { StreetViewPreview } from './StreetViewPreview'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import { createChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes } from '../../lib/time'
@@ -9,6 +10,7 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
+import type { LatLng } from '../../lib/geo'
 import { AppHeader, SegmentedControl, Spinner, useToast } from '../../ui'
 import { IconGps } from '../../ui/icons/IconGps'
 import { IconCandado } from '../../ui/icons/IconCandado'
@@ -25,7 +27,7 @@ interface Props {
   onCreated: (challenge: ChallengeForPlay) => void
 }
 
-// Plazo del reto: duración relativa en minutos. El mismo set que el flujo clásico.
+// Plazo del reto: duración relativa en minutos.
 const DEADLINE_OPTIONS: { minutes: number; label: string }[] = [
   { minutes: 60, label: '1 h' },
   { minutes: 240, label: '4 h' },
@@ -43,36 +45,46 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
 ]
 const DEFAULT_GUESS_INDEX = 1 // 30 s
 
-// Radio de búsqueda del panorama desde la posición GPS inicial (metros).
-const GPS_PANO_RADIUS = 80
+// Centro y zoom inicial del mapa (España como fallback cuando no hay GPS).
+const DEFAULT_CENTER: LatLng = { lat: 40.4, lng: -3.7 }
+const DEFAULT_ZOOM = 5
+// Radio de búsqueda del panorama desde el punto elegido (metros).
+const PANO_SEARCH_RADIUS = 80
 
-// Estado de carga del Street View.
-type SvState =
-  | { kind: 'locating' } // esperando GPS
-  | { kind: 'searching'; lat: number; lng: number } // buscando panorama
-  | { kind: 'no_location' } // GPS denegado / error
-  | { kind: 'no_coverage'; lat: number; lng: number } // sin cobertura SV
-  | { kind: 'ready'; pano: PanoramaMatch } // panorama disponible
+// Estado de la búsqueda de panorama tras elegir un punto en el mapa.
+type PanoState =
+  | { kind: 'idle' } // sin punto elegido aún
+  | { kind: 'searching'; at: LatLng } // buscando panorama
+  | { kind: 'ready'; pano: PanoramaMatch } // panorama encontrado
+  | { kind: 'no_coverage'; at: LatLng } // sin cobertura SV en ese punto
 
-// Reto ¿Dónde? GeoGuessr puro: el Street View ES la escena, no una pista opcional.
-// El creador navega dentro del SV hasta su sitio exacto; la posición del panorama
-// activo (lat/lng) es la respuesta oculta. Sin foto, sin mapa+pin, sin pasos extra.
+// Estado del GPS (solo para centrar el mapa, no es la respuesta).
+type GpsState = 'idle' | 'locating' | 'done' | 'error'
+
+// Reto ¿Dónde? con selección MANUAL del punto en el mapa.
 //
 // Flujo:
-//  1. Montar → pedir GPS → findPanorama → abrir el SV en pantalla completa.
-//  2. El creador pasea dentro del SV; cada position_changed actualiza la respuesta.
-//  3. Barra compacta abajo: reglas + CTA "Este es mi sitio · Lanzar el reto".
-//  4. Al lanzar: createChallenge con lat/lng del panorama activo + panoId + POV.
-// Devuelve el estado inicial del SV según si hay geolocalización disponible.
-// Se llama UNA vez al inicializar el componente (no en el render loop).
-function initialSvState(): SvState {
-  return navigator.geolocation ? { kind: 'locating' } : { kind: 'no_location' }
-}
-
+//  1. Mapa (Leaflet) — el usuario toca para elegir el sitio.
+//  2. Al elegir el punto: se busca el panorama de Street View más cercano.
+//  3. Si hay cobertura → previa de SV del punto elegido + CTA "Lanzar".
+//     Si no hay cobertura → aviso inline, CTA deshabilitado.
+//  4. "Usar mi ubicación" (GPS, botón secundario) vuela el mapa a tu posición.
+//  5. CTA crea el reto con lat/lng del panorama + panoId + POV.
 export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated }: Props) {
-  const [svState, setSvState] = useState<SvState>(initialSvState)
-  const [currentPano, setCurrentPano] = useState<PanoramaMatch | null>(null)
+  // Punto elegido por el usuario en el mapa (pin).
+  const [pickedPoint, setPickedPoint] = useState<LatLng | null>(null)
+  // flyTo: coordenadas a las que debe volar el mapa (GPS o nada).
+  const [flyTo, setFlyTo] = useState<LatLng | null>(null)
+  // Centro inicial del mapa: actualizado con GPS si llega antes de que el usuario interactúe.
+  const [mapCenter, setMapCenter] = useState<LatLng>(DEFAULT_CENTER)
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
+
+  // Estado de la búsqueda de panorama.
+  const [panoState, setPanoState] = useState<PanoState>({ kind: 'idle' })
+  // POV capturado de la previa (encuadre inicial para los jugadores).
   const [pov, setPov] = useState({ heading: 0, pitch: 0 })
+
+  const [gpsState, setGpsState] = useState<GpsState>('idle')
 
   const [deadlineIndex, setDeadlineIndex] = useState(DEFAULT_DEADLINE_INDEX)
   const [guessIndex, setGuessIndex] = useState(DEFAULT_GUESS_INDEX)
@@ -82,147 +94,96 @@ export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated 
   const [created, setCreated] = useState<ChallengeForPlay | null>(null)
   const [celebrating, setCelebrating] = useState(false)
 
-  const svRef = useRef<HTMLDivElement>(null)
-  const panoramaRef = useRef<google.maps.StreetViewPanorama | null>(null)
-  const streetViewLib = useMapsLibrary('streetView')
   const toast = useToast()
   const { user } = useSession()
+  // Id incremental para cancelar búsquedas de panorama en vuelo.
+  const searchIdRef = useRef(0)
 
-  // Paso 1: pedir GPS al montar (solo si hay geolocalización; si no, el estado
-  // inicial ya es 'no_location' y el efecto no corre gracias a la condición).
+  // Al montar: intentamos obtener el GPS para centrar el mapa automáticamente.
+  // Si llega antes de que el usuario toque el mapa, arranca ya centrado en su posición.
+  // No llamamos setGpsState('locating') aquí (setState síncrono en effect = cascada);
+  // el estado 'locating' lo gestionamos solo en el botón GPS manual.
   useEffect(() => {
-    if (svState.kind !== 'locating') return
+    if (!navigator.geolocation) return
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setSvState({ kind: 'searching', lat: pos.coords.latitude, lng: pos.coords.longitude })
+        const p: LatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setGpsState('done')
+        // Solo centramos si el usuario aún no ha elegido punto (no queremos "saltar" el mapa).
+        setPickedPoint((prev) => {
+          if (!prev) {
+            setMapCenter(p)
+            setMapZoom(14)
+            setFlyTo(p)
+          }
+          return prev
+        })
       },
-      () => {
-        setSvState({ kind: 'no_location' })
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
+      () => setGpsState('error'),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     )
-    // Solo corre cuando entramos en el estado 'locating' (inicio o re-centrado).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [svState.kind === 'locating'])
+  }, [])
 
-  // Paso 2: buscar el panorama al tener coordenadas.
-  useEffect(() => {
-    if (svState.kind !== 'searching') return
-    const { lat, lng } = svState
-    let alive = true
-    void (async () => {
-      const match = await findPanorama(lat, lng, GPS_PANO_RADIUS)
-      if (!alive) return
-      if (!match) {
-        setSvState({ kind: 'no_coverage', lat, lng })
-      } else {
-        setSvState({ kind: 'ready', pano: match })
-        setCurrentPano(match)
-      }
-    })()
-    return () => {
-      alive = false
-    }
-  }, [svState])
-
-  // El panoId efectivo (solo cuando el estado es ready).
-  const readyPanoId = svState.kind === 'ready' ? svState.pano.panoId : null
-
-  // Paso 3: montar el StreetViewPanorama cuando hay cobertura y la lib cargó.
-  useEffect(() => {
-    if (!readyPanoId || !streetViewLib || !svRef.current) return
-
-    const panorama = new streetViewLib.StreetViewPanorama(svRef.current, {
-      pano: readyPanoId,
-      pov: { heading: 0, pitch: 0 },
-      // Ocultar lo que delata la ubicación (spoiler) y los controles innecesarios.
-      addressControl: false,
-      showRoadLabels: false,
-      fullscreenControl: false,
-      zoomControl: false,
-      panControl: false,
-      enableCloseButton: false,
-      motionTracking: false,
-      motionTrackingControl: false,
-      // SÍ permitir navegar entre panoramas: el usuario pasea hasta su sitio exacto.
-      linksControl: true,
-    })
-    panoramaRef.current = panorama
-
-    // Seguimos el POV (encuadre) al girar la vista.
-    const povListener = panorama.addListener('pov_changed', () => {
-      const p = panorama.getPov()
-      setPov({ heading: p.heading, pitch: p.pitch })
-    })
-
-    // Seguimos la posición real del panorama al navegar entre panoramas adyacentes.
-    // getPano() devuelve el panoId activo; la posición es el lat/lng del panorama.
-    const posListener = panorama.addListener('position_changed', () => {
-      const pos = panorama.getPosition()
-      // getPano no está en los tipos públicos pero sí en el objeto nativo de Maps.
-      const activePanoId = (panorama as unknown as { getPano: () => string }).getPano?.()
-      if (pos && activePanoId) {
-        const updated: PanoramaMatch = { panoId: activePanoId, lat: pos.lat(), lng: pos.lng() }
-        setCurrentPano(updated)
-      }
-    })
-
-    return () => {
-      povListener.remove()
-      posListener.remove()
-      panoramaRef.current = null
-    }
-    // readyPanoId es la identidad del panorama; al cambiar (re-centrado), re-montamos.
-  }, [readyPanoId, streetViewLib])
-
-  // Botón GPS: re-centrar al panorama de la posición GPS actual.
-  function recenterGps() {
+  // Botón "Usar mi ubicación": vuela el mapa a tu posición GPS actual.
+  function useGpsLocation() {
     if (!navigator.geolocation) {
       toast.show('Tu navegador no permite geolocalización.', { tone: 'danger' })
       return
     }
-    // Guardamos el pano actual por si el GPS falla y hay que restaurar.
-    const prevPano = currentPano
-    setSvState({ kind: 'locating' })
+    setGpsState('locating')
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setSvState({ kind: 'searching', lat: pos.coords.latitude, lng: pos.coords.longitude })
+        const p: LatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setGpsState('done')
+        setFlyTo(p)
       },
       () => {
+        setGpsState('error')
         toast.show('No se pudo obtener tu ubicación.', { tone: 'danger' })
-        // Restaurar el estado anterior para no dejar el SV en "locating".
-        if (prevPano) {
-          setSvState({ kind: 'ready', pano: prevPano })
-        } else {
-          setSvState({ kind: 'no_location' })
-        }
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 },
     )
   }
+
+  // Al elegir un punto en el mapa: buscamos el panorama de SV más cercano.
+  const handlePick = useCallback(async (point: LatLng) => {
+    setPickedPoint(point)
+    const myId = ++searchIdRef.current
+    setPanoState({ kind: 'searching', at: point })
+
+    const match = await findPanorama(point.lat, point.lng, PANO_SEARCH_RADIUS)
+    // Si llegó otra búsqueda mientras esperábamos, ignoramos este resultado.
+    if (searchIdRef.current !== myId) return
+
+    if (!match) {
+      setPanoState({ kind: 'no_coverage', at: point })
+    } else {
+      setPanoState({ kind: 'ready', pano: match })
+    }
+  }, [])
 
   async function save() {
     if (!user) {
       toast.show('Inicia sesión para crear un reto.', { tone: 'danger' })
       return
     }
-    if (!currentPano) {
-      toast.show('No hay panorama activo. Muévete a un punto con Street View.', { tone: 'danger' })
+    if (panoState.kind !== 'ready') {
+      toast.show('Elige un punto en el mapa con cobertura de Street View.', { tone: 'danger' })
       return
     }
 
+    const pano = panoState.pano
     setBusy(true)
     try {
       setStatus('Lanzando el reto…')
-      // Título por defecto: el nombre del viaje si está disponible, o un genérico.
       const title = groupName ? `¿Dónde? · ${groupName}` : '¿Dónde?'
       const { challenge } = await createChallenge({
         title,
-        lat: currentPano.lat,
-        lng: currentPano.lng,
+        lat: pano.lat,
+        lng: pano.lng,
         createdBy: user.id,
         groupId,
-        svPanoId: currentPano.panoId,
+        svPanoId: pano.panoId,
         svHeading: pov.heading,
         svPitch: pov.pitch,
         deadlineAt: deadlineFromMinutes(DEADLINE_OPTIONS[deadlineIndex].minutes),
@@ -242,7 +203,7 @@ export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated 
         duration_hours: DEADLINE_OPTIONS[deadlineIndex].minutes / 60,
         difficulty: 'streetview',
         score_scale: 'ciudad',
-        location_source: 'gps',
+        location_source: 'map_pick',
       })
       setCelebrating(true)
       window.setTimeout(() => {
@@ -264,137 +225,162 @@ export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated 
     }
   }
 
-  const isLoading = svState.kind === 'locating' || svState.kind === 'searching'
-  const noCoverage = svState.kind === 'no_coverage'
-  const noLocation = svState.kind === 'no_location'
-  const hasPane = svState.kind === 'ready'
-  const canLaunch = hasPane && currentPano != null && !busy
+  const isSearching = panoState.kind === 'searching'
+  const noCoverage = panoState.kind === 'no_coverage'
+  const hasPano = panoState.kind === 'ready'
+  const canLaunch = hasPano && !busy
+  const isGpsLocating = gpsState === 'locating'
 
   return (
     <div className={styles.root}>
-      {/* Cabecera flotante: atrás + título + botón GPS (solo con SV activo). */}
+      {/* Cabecera: atrás + título + botón GPS secundario. */}
       <AppHeader
-        variant="floating"
+        variant="plain"
         lead="back"
         onLead={onBack}
         leadLabel="Atrás"
-        title="¿Dónde estás?"
+        title="¿Dónde?"
         action={
-          hasPane ? (
-            <button
-              type="button"
-              className={styles.gpsBtn}
-              aria-label="Volver a mi posición GPS"
-              onClick={recenterGps}
-            >
-              <IconGps size={20} />
-            </button>
-          ) : undefined
+          <button
+            type="button"
+            className={styles.gpsBtn}
+            aria-label="Usar mi ubicación"
+            title="Centrar el mapa en mi posición"
+            onClick={useGpsLocation}
+            disabled={isGpsLocating}
+          >
+            {isGpsLocating ? <Spinner size={18} /> : <IconGps size={20} />}
+          </button>
         }
       />
 
-      {/* Street View a sangre: ocupa toda la pantalla. */}
-      <div className={styles.sv} ref={svRef} aria-label="Street View" />
-
-      {/* Estado de carga / error superpuesto. */}
-      {isLoading && (
-        <div className={styles.overlay} role="status">
-          <Spinner size={28} />
-          <span>{svState.kind === 'locating' ? 'Localizándote…' : 'Buscando Street View…'}</span>
-        </div>
-      )}
-
-      {noLocation && (
-        <div className={styles.overlay} role="alert">
-          <MapPin size={32} strokeWidth={1.5} className={styles.overlayIco} />
-          <p className={styles.overlayTitle}>No pudimos localizarte</p>
-          <p className={styles.overlaySub}>
-            Activa la ubicación en tu navegador e inténtalo de nuevo.
-          </p>
-          <button type="button" className={styles.retryCta} onClick={recenterGps}>
-            Reintentar
-          </button>
-        </div>
-      )}
-
-      {noCoverage && (
-        <div className={styles.overlay} role="alert">
-          <MapPin size={32} strokeWidth={1.5} className={styles.overlayIco} />
-          <p className={styles.overlayTitle}>Sin Street View aquí</p>
-          <p className={styles.overlaySub}>No hay cobertura de Street View cerca de tu posición.</p>
-          <button type="button" className={styles.retryCta} onClick={recenterGps}>
-            Reintentar con otra posición
-          </button>
-        </div>
-      )}
-
-      {/* Chip de privacidad: flota en la parte superior cuando el SV está activo. */}
-      {hasPane && (
-        <div className={styles.placeChip} aria-hidden>
-          <IconCandado size={13} />
-          Tu sitio queda oculto
-        </div>
-      )}
-
-      {/* Hoja inferior compacta con las reglas y el CTA de lanzar. */}
-      {hasPane && (
-        <div className={styles.sheet}>
-          <div className={styles.sheetPull}>
-            <span className={styles.sheetBar} />
+      {/* Área principal: mapa de selección. */}
+      <div className={styles.mapArea}>
+        <MapPicker
+          value={pickedPoint}
+          flyTo={flyTo}
+          center={mapCenter}
+          zoom={mapZoom}
+          onPick={(p) => void handlePick(p)}
+        />
+        {/* Hint inicial: solo cuando no hay punto elegido. */}
+        {!pickedPoint && (
+          <div className={styles.mapHint} aria-live="polite">
+            <MapPin size={15} strokeWidth={1.8} aria-hidden />
+            Toca el mapa para elegir el sitio
           </div>
+        )}
+      </div>
 
-          <p className={styles.sheetLede}>
-            Navega hasta tu sitio exacto. Los demás adivinarán en el mapa.
+      {/* Panel inferior: estado del SV + reglas + CTA. */}
+      <div className={styles.panel}>
+        {/* ── Sin punto elegido: lede explicativo ── */}
+        {!pickedPoint && (
+          <p className={styles.idleLede}>
+            Elige el sitio exacto en el mapa arriba. Los demás adivinarán dónde es.
           </p>
+        )}
 
-          <div className={styles.rules}>
-            <div className={styles.ruleRow}>
-              <label className={styles.ruleLabel}>Plazo</label>
-              <SegmentedControl
-                label="Plazo para jugar"
-                options={DEADLINE_OPTIONS.map((opt, i) => ({ value: String(i), label: opt.label }))}
-                value={String(deadlineIndex)}
-                onChange={(v) => setDeadlineIndex(Number(v))}
-              />
-            </div>
-            <div className={styles.ruleRow}>
-              <label className={styles.ruleLabel}>Tiempo por jugada</label>
-              <SegmentedControl
-                label="Tiempo por jugada"
-                options={GUESS_OPTIONS.map((opt, i) => ({ value: String(i), label: opt.label }))}
-                value={String(guessIndex)}
-                onChange={(v) => setGuessIndex(Number(v))}
-              />
+        {/* ── Buscando panorama ── */}
+        {isSearching && (
+          <div className={styles.searchingState} role="status">
+            <Spinner size={20} />
+            <span>Buscando Street View…</span>
+          </div>
+        )}
+
+        {/* ── Sin cobertura de SV ── */}
+        {noCoverage && (
+          <div className={styles.noCoverageState} role="alert">
+            <MapPin size={18} strokeWidth={1.5} className={styles.noCoverageIco} aria-hidden />
+            <div>
+              <p className={styles.noCoverageTitle}>Sin Street View aquí</p>
+              <p className={styles.noCoverageSub}>
+                Mueve el pin a una calle con cobertura para poder lanzar el reto.
+              </p>
             </div>
           </div>
+        )}
 
-          {status && (
-            <div className={styles.statusRow}>
-              <Spinner size={15} />
-              <span>{status}</span>
+        {/* ── Panorama listo: previa interactiva + reglas ── */}
+        {hasPano && panoState.kind === 'ready' && (
+          <>
+            <div className={styles.svPreviewWrap}>
+              <StreetViewPreview
+                panoId={panoState.pano.panoId}
+                heading={pov.heading}
+                pitch={pov.pitch}
+                onPovChange={setPov}
+              />
+              {/* Chip de privacidad sobre la previa. */}
+              <div className={styles.privacyChip} aria-hidden>
+                <IconCandado size={12} />
+                Tu sitio queda oculto
+              </div>
             </div>
-          )}
 
+            <div className={styles.rules}>
+              <div className={styles.ruleRow}>
+                <label className={styles.ruleLabel}>Plazo</label>
+                <SegmentedControl
+                  label="Plazo para jugar"
+                  options={DEADLINE_OPTIONS.map((opt, i) => ({
+                    value: String(i),
+                    label: opt.label,
+                  }))}
+                  value={String(deadlineIndex)}
+                  onChange={(v) => setDeadlineIndex(Number(v))}
+                />
+              </div>
+              <div className={styles.ruleRow}>
+                <label className={styles.ruleLabel}>Tiempo por jugada</label>
+                <SegmentedControl
+                  label="Tiempo por jugada"
+                  options={GUESS_OPTIONS.map((opt, i) => ({ value: String(i), label: opt.label }))}
+                  value={String(guessIndex)}
+                  onChange={(v) => setGuessIndex(Number(v))}
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* CTA y nota de privacidad — aparecen solo cuando hay punto elegido. */}
+        {pickedPoint && (
           <div className={styles.footer}>
-            <div className={styles.privacy}>
-              <IconCandado size={14} />
-              <span>Tu posición en el mapa queda oculta hasta que todos jueguen.</span>
-            </div>
+            {status && (
+              <div className={styles.statusRow}>
+                <Spinner size={15} />
+                <span>{status}</span>
+              </div>
+            )}
+            {hasPano && (
+              <div className={styles.privacy}>
+                <IconCandado size={14} aria-hidden />
+                <span>Tu posición en el mapa queda oculta hasta que todos jueguen.</span>
+              </div>
+            )}
             <button
               type="button"
               className={styles.launchBtn}
               disabled={!canLaunch}
               onClick={() => void save()}
-              aria-label="Este es mi sitio: lanzar el reto al grupo"
+              aria-label={
+                noCoverage
+                  ? 'Sin Street View — elige otro punto en el mapa'
+                  : 'Este es mi sitio: lanzar el reto al grupo'
+              }
             >
               {busy ? <Spinner size={18} /> : <RocketIcon />}
-              Este es mi sitio · Lanzar el reto
+              {noCoverage
+                ? 'Sin Street View — elige otro punto'
+                : 'Este es mi sitio · Lanzar el reto'}
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Microcelebración al lanzar: overlay oscuro + burst + texto. */}
+      {/* Microcelebración al lanzar. */}
       {celebrating && (
         <div className={styles.celebrate} role="status">
           <div className={styles.celebrateCard}>

@@ -7,12 +7,12 @@ import {
   HERMETIC_CHALLENGE_ID,
 } from './helpers/hermetic'
 
-// E2E HERMÉTICO del bucle de crear reto (#443, actualizado #473). Mockea sesión +
+// E2E HERMÉTICO del bucle de crear reto (#443, actualizado #485). Mockea sesión +
 // Supabase + Google Maps + geolocalización, así que corre SIEMPRE (local y CI) sin
 // secretos ni escribir en BD, y es determinista. Cubre lo que el dueño pidió cazar:
-//   1) CAMINO FELIZ: GPS + SV → lanzar → éxito (deep link jugable).
-//   2) STREET VIEW NO DISPONIBLE: sin cobertura → muestra error "Sin Street View aquí".
-//   3) MÓVIL: el SV carga y el CTA de lanzar es accesible en viewport de teléfono.
+//   1) CAMINO FELIZ: elegir punto en el mapa → previa SV → lanzar → deep link jugable.
+//   2) STREET VIEW NO DISPONIBLE: elegir punto sin cobertura → aviso inline, CTA deshabilitado.
+//   3) MÓVIL: el mapa carga, el usuario elige punto, el CTA de lanzar es accesible.
 // Si el bucle de crear se rompe (gating atascado, insert que peta, regresión de
 // props/estado), estos tests lo paran.
 
@@ -67,32 +67,43 @@ async function openCreateFromTrip(page: Page): Promise<void> {
   await page.getByRole('menuitem', { name: 'Reto' }).click()
 }
 
-// Recorre el flujo de crear ¿Dónde? GeoGuessr puro: GPS → SV → lanzar (sin mapa ni
-// foto). El flujo nuevo abre directamente el Street View desde la posición GPS y el
-// creador lanza con un solo botón. `streetViewAvailable` controla si el mock de Maps
-// devuelve un panorama (true) o rechaza la búsqueda (false = sin cobertura).
+// Recorre el flujo de crear ¿Dónde? con selección de punto en el mapa.
+// El flujo abre el mapa (Leaflet), el usuario toca para elegir el sitio,
+// se busca el SV del punto → si hay cobertura, aparece la previa y el CTA.
+// `streetViewAvailable` controla si el mock de Maps devuelve panorama o rechaza.
 async function runCreateFlow(page: Page, opts: { streetViewAvailable: boolean }): Promise<void> {
-  // Selector de tipo → ¿Dónde? → abre CreateLocationChallenge directamente.
+  // Selector de tipo → ¿Dónde? → abre CreateLocationChallenge con el mapa.
   await page.getByRole('button', { name: /Crear reto ¿Dónde\?/ }).click()
 
+  // El mapa Leaflet debe cargarse como primer paso (es la opción PRINCIPAL).
+  const map = page.locator('.leaflet-container')
+  await expect(map).toBeVisible({ timeout: 20_000 })
+
+  // Simular clic en el mapa para elegir el punto (acción principal del usuario).
+  // El mock de findPanorama responde al instante; el resultado depende de svAvailable.
+  await map.click({ position: { x: 180, y: 200 } })
+
   if (opts.streetViewAvailable) {
-    // Camino feliz: GPS OK + cobertura SV → el botón de lanzar aparece habilitado.
-    // El mock de geolocalización responde en 50 ms; findPanorama resuelve al instante.
-    // Esperamos a que el CTA de lanzar aparezca (señal de que el SV está montado).
+    // Camino feliz: punto elegido + cobertura SV → previa + CTA habilitado.
+    // Esperamos a que el CTA de lanzar aparezca (señal de que la previa está montada).
     const launchBtn = page.getByRole('button', {
       name: /Este es mi sitio/,
     })
     await expect(launchBtn).toBeVisible({ timeout: 20_000 })
     await expect(launchBtn).toBeEnabled()
 
-    // Lanzar el reto: un solo clic en el CTA (sin mapa, sin foto, sin pasos).
+    // Lanzar el reto: un solo clic en el CTA.
     await launchBtn.evaluate((el) => (el as HTMLButtonElement).click())
   } else {
-    // Sin cobertura SV: el overlay de error aparece ("Sin Street View aquí") y el
-    // botón de lanzar NO aparece. Verificamos que el flujo no se atasca ni revienta.
+    // Sin cobertura SV: aviso inline "Sin Street View aquí" en el panel inferior.
+    // El CTA aparece pero deshabilitado con mensaje de error.
     await expect(page.getByText('Sin Street View aquí')).toBeVisible({ timeout: 20_000 })
-    // Fin del test: no hay CTA de lanzar cuando no hay cobertura — es el comportamiento
-    // esperado. El test de "sin cobertura" valida SOLO que el error se muestra.
+    // El botón de lanzar aparece pero no se puede pulsar.
+    const launchBtn = page.getByRole('button', { name: /Sin Street View/ })
+    await expect(launchBtn).toBeVisible({ timeout: 5_000 })
+    await expect(launchBtn).toBeDisabled()
+    // Fin del test: con CTA deshabilitado el flujo queda detenido hasta que
+    // el usuario elija otro punto con cobertura.
     return
   }
 
@@ -132,7 +143,9 @@ async function assertCreatedChallengeIsPlayable(page: Page): Promise<void> {
 }
 
 test.describe('crear reto (hermético)', () => {
-  test('camino feliz: punto + foto → lanzar → deep link jugable, sin errores', async ({ page }) => {
+  test('camino feliz: elegir punto en mapa → previa SV → lanzar → deep link jugable, sin errores', async ({
+    page,
+  }) => {
     const errors = trackErrors(page)
     await primeHermeticCreate(page, { streetViewAvailable: true })
 
@@ -145,10 +158,9 @@ test.describe('crear reto (hermético)', () => {
     expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
   })
 
-  // Sin cobertura de SV en el GPS actual: el flujo muestra un overlay de error
-  // ("Sin Street View aquí") en vez de bloquear o reventar. El CTA de lanzar
-  // no aparece, el flujo queda recuperable (botón "Reintentar").
-  test('Street View NO disponible → se muestra error "Sin Street View aquí"', async ({ page }) => {
+  // Sin cobertura de SV en el punto elegido: aviso inline + CTA deshabilitado.
+  // El usuario puede mover el pin a otra calle con cobertura.
+  test('Street View NO disponible → aviso inline y CTA deshabilitado', async ({ page }) => {
     const errors = trackErrors(page)
     await primeHermeticCreate(page, { streetViewAvailable: false })
 
@@ -158,24 +170,34 @@ test.describe('crear reto (hermético)', () => {
     expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
   })
 
-  // Flujo GeoGuessr en viewport de teléfono: el SV ocupa toda la pantalla a sangre y
-  // el CTA de lanzar es accesible (dentro del viewport) sin necesidad de hacer scroll.
-  test('reto de lugar en móvil: el SV carga y el CTA de lanzar es accesible', async ({ page }) => {
+  // Flujo de lugar en viewport de teléfono: el mapa carga, el usuario elige punto,
+  // la previa de SV + CTA son accesibles dentro del viewport sin necesidad de scroll.
+  test('reto de lugar en móvil: mapa visible, elegir punto, CTA accesible', async ({ page }) => {
     // Teléfono típico (iPhone-ish).
-    await page.setViewportSize({ width: 390, height: 667 })
+    await page.setViewportSize({ width: 390, height: 844 })
     await primeHermeticCreate(page, { streetViewAvailable: true })
 
     await openCreateFromTrip(page)
     await page.getByRole('button', { name: /Crear reto ¿Dónde\?/ }).click()
 
-    // El CTA de lanzar aparece cuando el SV está montado (GPS + findPanorama OK).
+    // El mapa Leaflet es el protagonista: debe cargarse en pantalla (mitad superior).
+    const map = page.locator('.leaflet-container')
+    await expect(map).toBeVisible({ timeout: 20_000 })
+
+    // Elegir punto en el mapa: el CTA aparece en el panel inferior.
+    await map.click({ position: { x: 190, y: 200 } })
+
     const launchBtn = page.getByRole('button', { name: /Este es mi sitio/ })
     await expect(launchBtn).toBeVisible({ timeout: 20_000 })
     await expect(launchBtn).toBeEnabled()
-    // El botón debe estar dentro del viewport del teléfono: ni tapado ni fuera de pantalla.
+
+    // El panel inferior es scrollable en móvil (overflow-y: auto): el botón puede
+    // estar fuera del viewport inicial si la previa de SV es alta. Lo desplazamos
+    // a la vista antes de asertar que es alcanzable.
+    await launchBtn.scrollIntoViewIfNeeded()
     await expect(launchBtn).toBeInViewport()
-    // No hay mapa ni foto: el SV es la escena completa.
-    await expect(page.locator('.leaflet-container')).not.toBeVisible()
+
+    // No hay foto ni historia: el SV es la previa, no la escena completa.
     await expect(page.getByRole('heading', { name: 'Enseña tu momento' })).not.toBeVisible()
   })
 })
