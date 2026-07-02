@@ -1,15 +1,9 @@
 /*
- * Sección DIARIO: patrón globo/mapa héroe a sangre + hoja foto-first (ShellInmersivo).
- *
- * El mapa ocupa TODA la pantalla como protagonista (backdrop del shell). La hoja blanca
- * asoma desde abajo con el feed de tarjetas grandes (DiarioFeed). La timeline de puntos
- * flota sobre el mapa justo encima del borde superior de la hoja.
- *
- * TripPage monta esta sección en un panel a sangre (sin padding ni scroll propios),
- * así que .diario y .backdropContainer llenan todo el espacio disponible.
+ * Sección DIARIO: el MAPA A SANGRE es el protagonista (llena la sección, estilo
+ * Polarsteps) y los momentos FLOTAN encima en un dock inferior. No es un mapa
+ * enmarcado con lista debajo: el mapa manda y el contenido se posa sobre él.
+ * Vive en un panel a sangre de TripPage (sin padding ni scroll propio).
  */
-
-/* Raíz de la sección: llena el panel a sangre de TripPage. */
 .diario {
   position: relative;
   width: 100%;
@@ -17,63 +11,102 @@
   overflow: hidden;
 }
 
-/* Contenedor del backdrop de ShellInmersivo: el mapa + la timeline flotan aquí.
-   El shell posiciona .backdrop como inset:0 absoluto, así que este div ya LLENA
-   toda la pantalla; el mapa y la timeline son hijos posicionados dentro. */
-.backdropContainer {
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
-
-/* Mapa a sangre: llena todo el backdrop. El TripMap se posiciona absoluto dentro. */
+/* Mapa a sangre: ocupa toda la sección. El propio TripMap (globo/plano) se
+   posiciona absoluto dentro y rellena inset:0. */
 .map {
   position: absolute;
   inset: 0;
-  /* Aísla el contexto de apilado del mapa (Leaflet asigna z-index altos internos).
-     Con isolation el mapa queda como una capa por debajo de la timeline. */
+  /* Aísla el contexto de apilado del mapa: Leaflet/MapLibre asignan z-index altos
+     (200-700) a sus paneles internos. Como `.track` de TripPage crea contexto por
+     su transform, esos paneles competían en el mismo contexto que el `.dock`
+     (z-index 2) y lo tapaban (el dock de momentos desaparecía bajo el mapa).
+     Con isolation + z-index 0 el mapa queda como una capa propia por DEBAJO del
+     dock. Mismo arreglo que el mapa inmersivo de crear-reto. */
   isolation: isolate;
-  /* design-lint-allow: capa local del diario (mapa aislado bajo la timeline) */
+  /* design-lint-allow: capa local del diario (mapa aislado bajo el dock) */
   z-index: 0;
 }
-
 .map > :global(*) {
   position: absolute;
   inset: 0;
 }
 
-/*
- * Timeline flotante: chrome translúcido sobre el mapa, encima del borde de la hoja.
- * La hoja de ShellInmersivo tiene min-height: --sheet-peek (240px por defecto).
- * La timeline flota justo por encima de ese borde, con velo de legibilidad.
- *
- * La variable --sheet-peek coincide con la del CSS del shell (mismo token);
- * si el shell no la sobreescribe, el valor de defecto es 240px.
- */
-.timelineFloat {
+/* Dock flotante inferior: timeline + carrusel posados sobre el mapa. El velo funde
+   el dock con el mapa (token compartido) para que los momentos respiren sin tapar
+   el mapa entero. No intercepta toques fuera de sus hijos (el mapa sigue arrastrable
+   por encima del velo). */
+.dock {
   position: absolute;
   left: 0;
   right: 0;
-  /* Flota encima del borde superior de la hoja: sheet-peek + pequeño respiro. */
-  bottom: calc(var(--sheet-peek, 240px) + var(--space-2));
-  /* design-lint-allow: capa local del diario (timeline sobre el mapa, bajo la hoja) */
-  z-index: 1;
-  /* Velo de legibilidad suave bajo la timeline (blanco-a-transparente).
-     Usa el token del mapa para no hardcodear: en fondo oscuro (satélite) quedaría
-     igual de legible que con la paleta de paper.*/
-  padding: var(--space-5) 0 var(--space-2);
-  background: linear-gradient(
-    to top,
-    rgba(246, 247, 249, 0.7) 0%,
-    /* design-lint-allow: velo claro bajo la timeline (funde con el papel de la hoja) */
-    rgba(246, 247, 249, 0.2) 60%,
-    /* design-lint-allow: velo claro bajo la timeline (funde con el papel de la hoja) */ transparent
-      100%
-  );
+  bottom: 0;
+  /* design-lint-allow: capa local del diario (dock flotante sobre el mapa) */
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Más aire arriba del dock: el MAPA respira y manda (Polarsteps). El dock se posa
+     abajo; las tarjetas son bajas para no partir la pantalla por la mitad. */
+  padding: var(--space-8) 0 calc(env(safe-area-inset-bottom) + var(--space-3));
+  background: var(--map-bottom-scrim);
   pointer-events: none;
 }
-
-/* Los hijos de la timeline SÍ son interactivos (los botones de la MomentTimeline). */
-.timelineFloat > * {
+/* Los hijos del dock SÍ son interactivos (timeline, carrusel); el velo no. */
+.dock > * {
   pointer-events: auto;
+}
+
+/* Carrusel horizontal de momentos con scroll-snap. Altura fija de tarjeta: flota
+   sobre el mapa, no la dicta el flujo vertical de la página.
+   Reserva a la derecha la huella del FAB "＋" (fijo abajo-derecha): su inset
+   (--space-4) + el diámetro del botón (56px) + un respiro (--space-3). Así la tarjeta
+   centrada/última y su acción no caen bajo el FAB. */
+.carousel {
+  --fab-clearance: calc(var(--space-4) + 56px + var(--space-3));
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--fab-clearance) 0 var(--space-4);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-right: var(--fab-clearance);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+.slide {
+  flex: 0 0 82%;
+  max-width: 300px;
+  /* Tarjeta horizontal baja (~4:3 / 16:10) de altura fija: el dock no depende del
+     flujo y deja más mapa visible. */
+  height: 124px;
+  scroll-snap-align: center;
+}
+
+/* Desktop/tablet: el mapa tiene más espacio, así que las tarjetas se achican aún
+   más (el dock pesa menos sobre el globo). */
+@media (min-width: 700px) {
+  .slide {
+    height: 104px;
+  }
+}
+
+/* Vacío: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre). */
+.emptyDock {
+  position: absolute;
+  left: 50%;
+  bottom: var(--space-6);
+  transform: translateX(-50%);
+  /* design-lint-allow: capa local del diario (tarjeta vacía sobre el mapa) */
+  z-index: 2;
+  width: min(92%, 420px);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-lg);
 }
