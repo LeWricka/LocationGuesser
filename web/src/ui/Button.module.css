@@ -6,7 +6,9 @@
   gap: var(--space-2);
   min-height: var(--tap-target);
   border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  /* Esquina más suave (md) que la del input viejo: lee "pastilla" contemporánea,
+   * no control nativo cuadrado. */
+  border-radius: var(--radius-md);
   font-family: inherit;
   font-weight: var(--font-weight-semibold);
   line-height: 1;
@@ -47,13 +49,15 @@
 }
 
 /* ---- Tamaños ---- */
+/* Relleno lateral algo más generoso que el mínimo: da aire y presencia
+ * (Polarsteps respira), sin salir de la escala de espaciado. */
 .sm {
   min-height: var(--tap-target-sm);
-  padding: var(--space-0) var(--space-3);
+  padding: var(--space-0) var(--space-4);
   font-size: var(--font-size-sm);
 }
 .md {
-  padding: var(--space-0) var(--space-4);
+  padding: var(--space-0) var(--space-5);
   font-size: var(--font-size-md);
 }
 .lg {
@@ -65,30 +69,37 @@
 
 /* ---- Variantes ---- */
 /* Primario: acento azul pizarra SÓLIDO, texto blanco. Sin gradiente, sin glow,
- * sin barrido. La presencia la da el color y una sombra muy sutil. */
+ * sin barrido. La presencia la da el color; la elevación, una sombra suave que
+ * crece al pasar el cursor (se despega del papel), no un brillo de marca. */
 .primary {
   background-color: var(--color-accent);
   color: var(--color-on-accent);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
 }
 .primary:hover:not(:disabled) {
   background-color: var(--color-accent-hover);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-lg);
 }
 .primary:active:not(:disabled) {
   background-color: var(--color-accent-active);
-  box-shadow: none;
+  box-shadow: var(--shadow-xs);
 }
 
-/* Secundario: hoja de papel con hairline marcado y texto en tinta. */
+/* Secundario: pastilla de papel elevada (hairline fino + sombra sutil), no un
+ * recuadro con borde marcado de aspecto nativo. La elevación la da la sombra. */
 .secondary {
   background-color: var(--color-surface);
-  border-color: var(--color-border-strong);
+  border-color: var(--color-border);
   color: var(--color-text);
+  box-shadow: var(--shadow-sm);
 }
 .secondary:hover:not(:disabled) {
   background-color: var(--color-surface-hover);
-  border-color: var(--color-border-strong);
+  border-color: var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+.secondary:active:not(:disabled) {
+  box-shadow: var(--shadow-xs);
 }
 
 .ghost {
@@ -104,14 +115,15 @@
 .danger {
   background-color: var(--color-danger);
   color: var(--color-on-accent);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
 }
 .danger:hover:not(:disabled) {
   background-color: color-mix(in srgb, var(--color-danger) 88%, black);
+  box-shadow: var(--shadow-lg);
 }
 .danger:active:not(:disabled) {
   background-color: color-mix(in srgb, var(--color-danger) 80%, black);
-  box-shadow: none;
+  box-shadow: var(--shadow-xs);
 }
 
 .fullWidth {
