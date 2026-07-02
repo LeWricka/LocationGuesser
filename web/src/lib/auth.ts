@@ -102,6 +102,40 @@ export async function signOut(): Promise<void> {
   if (error) throw error
 }
 
+// ── Sesión anónima legada (issue #514) ───────────────────────────────────────
+// #507 eliminó la entrada anónima y CreateGate; la migración 0032 exige
+// `is_anonymous = false` para crear un grupo. Los navegadores que aún conservan
+// una sesión anónima del modelo viejo entraban a la home como si nada y solo
+// veían el error crudo de RLS al intentar crear. Estas sesiones ya no sirven en
+// el modelo nuevo: las tratamos como inválidas.
+
+const LEGACY_SESSION_KEY = 'lg.legacySessionCleared'
+
+/** Marca (una vez) que se cerró una sesión anónima legada, para avisar en la landing. */
+function markLegacySessionCleared(): void {
+  localStorage.setItem(LEGACY_SESSION_KEY, '1')
+}
+
+/** Lee y consume el aviso de sesión legada (uso único, evita repetir el toast). */
+export function takeLegacySessionNotice(): boolean {
+  const flag = localStorage.getItem(LEGACY_SESSION_KEY)
+  if (flag) localStorage.removeItem(LEGACY_SESSION_KEY)
+  return Boolean(flag)
+}
+
+/**
+ * Si la sesión es anónima (modelo pre-#507), la trata como inválida: cierra
+ * sesión y deja marca para el aviso en la landing. Devuelve `true` si actuó
+ * (el llamante debe descartar la sesión), `false` si la sesión es válida o no
+ * hay sesión.
+ */
+export async function clearLegacyAnonymousSession(session: Session | null): Promise<boolean> {
+  if (!session?.user || session.user.is_anonymous !== true) return false
+  markLegacySessionCleared()
+  await signOut()
+  return true
+}
+
 // Sesión actual (o null si no hay login). Útil para el gating inicial: antes de
 // pintar la home o de auto-join, comprobar que existe sesión.
 export async function getSession(): Promise<Session | null> {
