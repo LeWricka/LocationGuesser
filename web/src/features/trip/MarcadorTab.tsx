@@ -1,4 +1,5 @@
-import { Avatar, IconMedalla, IconTrofeo } from '../../ui'
+import { Share2, Target } from 'lucide-react'
+import { Avatar, Button, Icon, IconMedalla, IconTrofeo } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import styles from './MarcadorTab.module.css'
 
@@ -6,6 +7,13 @@ interface Props {
   leaderboard: LeaderboardEntry[]
   /** userId del usuario en sesión: resalta su fila con acento teal. */
   myUserId?: string | null
+  /** Abre la hoja de invitar (CTA del vacío: sin retos ni marcador, invitar es el
+   * siguiente paso obvio, no un texto sin acción — issue #510). */
+  onInvite: () => void
+  /** Abre el flujo de crear reto. Solo se ofrece a quien puede crear (dueño). */
+  onAddChallenge: () => void
+  /** ¿Puede el usuario crear retos? (dueño) — gobierna el CTA "Crear un reto". */
+  canCreate: boolean
 }
 
 /**
@@ -20,12 +28,23 @@ interface Props {
  *
  * Si no hay clasificación (nadie ha jugado aún), muestra un estado vacío descriptivo.
  */
-export function MarcadorTab({ leaderboard, myUserId }: Props) {
+export function MarcadorTab({ leaderboard, myUserId, onInvite, onAddChallenge, canCreate }: Props) {
   if (leaderboard.length === 0) {
     return (
       <div className={styles.vacio} role="status">
         <IconTrofeo size={32} className={styles.vacioCabeza} />
         <p>Cuando alguien adivine un reto, aquí aparecerá la clasificación.</p>
+        {/* Poco texto, visual-first: acción, no solo un párrafo sin salida. */}
+        <div className={styles.vacioAcciones}>
+          <Button variant="secondary" size="sm" onClick={onInvite}>
+            <Icon icon={Share2} size={16} /> Invitar
+          </Button>
+          {canCreate && (
+            <Button size="sm" onClick={onAddChallenge}>
+              <Icon icon={Target} size={16} /> Crear un reto
+            </Button>
+          )}
+        </div>
       </div>
     )
   }

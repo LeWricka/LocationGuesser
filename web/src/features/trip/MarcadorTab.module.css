@@ -106,3 +106,11 @@
   display: block;
   margin-bottom: var(--space-2);
 }
+
+/* Acciones del vacío: invitar (siempre) + crear un reto (solo dueño). */
+.vacioAcciones {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}

@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
-import { Map as MapIcon } from 'lucide-react'
-import { EmptyState, Icon } from '../../ui'
+import { Map as MapIcon, Share2 } from 'lucide-react'
+import { Button, EmptyState, Icon } from '../../ui'
 import type { Moment, RoutePoint } from '../../lib/trip'
 import { TripMap } from './TripMap'
 import { MomentCard } from './MomentCard'
@@ -22,6 +22,9 @@ interface Props {
   onExpand: (moment: Moment) => void
   onPlay: (challengeId: string) => void
   onAddMoment: () => void
+  /** Abre la hoja de invitar (CTA secundario del vacío: invitar es tan visible
+   * como añadir el primer momento — issue #510, invitar quedaba escondido tras el ···). */
+  onInvite: () => void
 }
 
 /**
@@ -48,6 +51,7 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
     onExpand,
     onPlay,
     onAddMoment,
+    onInvite,
   },
   carouselRef,
 ) {
@@ -96,7 +100,9 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
           </div>
         </div>
       ) : (
-        /* Sin momentos: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre). */
+        /* Sin momentos: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre).
+           Además de "Añadir momento" (dueño), un secundario "Invitar" — cualquier
+           miembro puede repartir el enlace, y antes solo vivía tras el menú ···. */
         <div className={styles.emptyDock}>
           <EmptyState
             icon={<Icon icon={MapIcon} size={32} />}
@@ -105,6 +111,15 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
             actionLabel={canCreate ? 'Añadir momento' : undefined}
             onAction={canCreate ? onAddMoment : undefined}
           />
+          <Button
+            variant="ghost"
+            size="sm"
+            fullWidth
+            className={styles.emptyInvite}
+            onClick={onInvite}
+          >
+            <Icon icon={Share2} size={16} /> Invitar
+          </Button>
         </div>
       )}
     </div>
