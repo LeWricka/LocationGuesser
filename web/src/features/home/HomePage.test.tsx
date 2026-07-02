@@ -70,6 +70,15 @@ describe('HomePage', () => {
     expect(screen.getByText(/Te han pasado un enlace/i)).toBeInTheDocument()
   })
 
+  test('usuario sin grupos (bienvenida) → SÍ hay acceso a perfil/ajustes (#516)', async () => {
+    render(<HomePage />)
+    await waitFor(() => expect(screen.getByText('Cómo funciona')).toBeInTheDocument())
+    // Antes de #516 la variante de bienvenida no daba ningún acceso a perfil: mismo
+    // patrón de botones (ajustes + avatar) que la home con viajes (HomeDashboard).
+    expect(screen.getByRole('button', { name: 'Abrir tus ajustes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abrir tu perfil' })).toBeInTheDocument()
+  })
+
   test('con grupos → feed de portadas con el viaje, sin montar mapamundi', async () => {
     myGroupsMock.mockResolvedValue([
       {

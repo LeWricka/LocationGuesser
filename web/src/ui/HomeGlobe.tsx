@@ -230,8 +230,23 @@ export function HomeGlobe({
       // puntita caían por debajo, de modo que un pin cerca del borde inferior del globo
       // salía CORTADO (el globo recorta su overflow); anclar por la punta lo sube dentro
       // del encuadre y hace coherente el clavado con el resto de la app.
+      //
+      // `opacityWhenCovered: 0` — CULLING de la cara oculta del globo (#516). MapLibre
+      // reposiciona el Marker con `map.project()` para CUALQUIER lngLat, incluida la cara
+      // TRASERA de la esfera: esa proyección no tiene en cuenta la curvatura (no es un
+      // recorte real), así que un pin oculto puede acabar dibujado en un punto sin
+      // relación con su coordenada real —el "swap" que reportó el dueño (tranvía de
+      // Lisboa sobre el Sáhara, Coliseo junto a la Antártida)— o fuera del disco visible,
+      // sobre la costura con la hoja. Por defecto MapLibre solo ATENÚA esos pines ocultos
+      // al 20% (`opacityWhenCovered` por defecto en Marker), pensado para terreno 3D, no
+      // para el globo: se seguían viendo, mal proyectados. Forzando 0 se ocultan del todo
+      // en cuanto `map.transform.isLocationOccluded` los marca como traseros; al girar el
+      // globo (deriva o gesto) vuelven a aparecer solos, en su sitio real, al cruzar al
+      // hemisferio visible.
       markersRef.current.push(
-        new gl.Marker({ element: el, anchor: 'bottom' }).setLngLat([pin.lng, pin.lat]).addTo(map),
+        new gl.Marker({ element: el, anchor: 'bottom', opacityWhenCovered: 0 })
+          .setLngLat([pin.lng, pin.lat])
+          .addTo(map),
       )
     }
   }, [])

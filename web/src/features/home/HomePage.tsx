@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Settings } from 'lucide-react'
 import {
+  Avatar,
   Card,
   EmptyState,
   GlobeSheet,
@@ -190,14 +191,49 @@ export function HomePage() {
         // cómo funciona + crear/unirse). SIN FAB "+": aquí el CTA primario ya es "Crear
         // viaje" dentro de la hoja, así que el FAB sería redundante y, peor, tapa la 3ª
         // tarjeta de "cómo funciona". El FAB vuelve en el dashboard, donde sí aporta.
+        //
+        // `framing="world"` (#516, no el 'pins' por defecto): los pines DEMO están
+        // REPARTIDOS por todo el planeta a propósito (ver homeDemoPins.ts), así que un
+        // `fitBounds` a sus coordenadas encajaría una vista casi antípoda —zoom mínimo,
+        // cámara ESTÁTICA (sin deriva; ver HomeGlobe)— donde media constelación queda
+        // para siempre en la cara oculta del globo. Ahí sí importaba el culling, pero un
+        // pin oculto de forma PERMANENTE es peor experiencia que uno que, con la deriva
+        // de 'world', entra y sale del hemisferio visible con el giro. 'world' es además
+        // el mismo framing que ya usa la landing deslogueada (Landing.tsx) para estos
+        // mismos pines: aquí faltaba pasarlo explícitamente y por eso cayó al 'pins' por
+        // defecto (la causa real de los pines en sitios imposibles del reporte).
         <GlobeSheet
           pins={HOME_DEMO_PINS}
           onOpenPin={onCreateGroup}
+          framing="world"
           sheetLabel="Bienvenida"
           overlay={
-            <span className={styles.brand}>
-              <Logo variant="wordmark" size={20} monochrome />
-            </span>
+            <>
+              <span className={styles.brand}>
+                <Logo variant="wordmark" size={20} monochrome />
+              </span>
+              <button
+                type="button"
+                className={styles.sceneButton}
+                onClick={gotoProfile}
+                aria-label="Abrir tus ajustes"
+              >
+                <Icon icon={Settings} size={20} />
+              </button>
+              <button
+                type="button"
+                className={styles.avatarButton}
+                onClick={gotoProfile}
+                aria-label="Abrir tu perfil"
+              >
+                <Avatar
+                  userId={userId}
+                  name={displayName}
+                  avatarUrl={profile?.avatar_url}
+                  size="sm"
+                />
+              </button>
+            </>
           }
         >
           <div className={styles.welcome}>

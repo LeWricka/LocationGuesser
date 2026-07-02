@@ -118,6 +118,14 @@
   }
 }
 
+/* Pin en la cara OCULTA del globo (#516): MapLibre pone esta clase cuando
+   `Marker.opacityWhenCovered` se aplica (ver HomeGlobe.tsx). Con opacidad 0 ya es
+   invisible; aquí además le quitamos el click: sin esto quedaba un pin FANTASMA —
+   invisible pero tocable— en la posición mal proyectada de su cara trasera. */
+:global(.maplibregl-marker-covered) {
+  pointer-events: none;
+}
+
 /* Deriva sutil de la textura del globo evocado. Se desactiva con reduced-motion. */
 :global(.lg-home-globe-breathe) {
   animation: lg-home-globe-breathe 50s linear infinite;
