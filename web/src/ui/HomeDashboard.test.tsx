@@ -101,12 +101,14 @@ describe('HomeDashboard (patrón globo + hoja)', () => {
     expect(screen.queryByText('Te toca jugar')).not.toBeInTheDocument()
   })
 
-  test('un viaje sin portada muestra placeholder con la inicial (no gris vacío)', () => {
-    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
-    // Los tres viajes de prueba no traen coverUrl → cada tarjeta pinta su inicial.
-    expect(screen.getByText('I')).toBeInTheDocument() // Interrail
-    expect(screen.getByText('F')).toBeInTheDocument() // Finde Lisboa
-    expect(screen.getByText('P')).toBeInTheDocument() // Pirineos
+  test('un viaje sin portada muestra el fondo "mapa nocturno" con pin, sin inicial gigante', () => {
+    const { container } = render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    // Los tres viajes de prueba no traen coverUrl → cada tarjeta pinta su placeholder.
+    expect(container.querySelectorAll('span[class*="placeholder"]')).toHaveLength(3)
+    // La inicial gigante como marca de agua ya no existe (parecía un bug).
+    expect(screen.queryByText('I')).not.toBeInTheDocument()
+    expect(screen.queryByText('F')).not.toBeInTheDocument()
+    expect(screen.queryByText('P')).not.toBeInTheDocument()
   })
 
   test('el avatar abre el perfil', async () => {

@@ -9,6 +9,7 @@ import { Logo } from './Logo'
 import type { GroupStatus } from './GroupCard'
 import { GlobeSheet } from './GlobeSheet'
 import type { GlobePin } from './HomeGlobe'
+import { IconPin } from './icons'
 import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
 import styles from './HomeDashboard.module.css'
 
@@ -61,25 +62,6 @@ function sortTrips(list: HomeGroup[]): HomeGroup[] {
 }
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
-
-// Portada-placeholder para viajes SIN foto: un degradado de dos tonos derivado del nombre
-// (mismo nombre → mismo color, estable) más la inicial grande, en vez de un gris vacío.
-// En vez de un matiz HSL arbitrario (que se iba a morados/magentas fuera de paleta), el
-// nombre elige de forma determinista UNA de un set acotado de variantes ON-BRAND
-// (pizarra/tinta de escena/oro), definidas en el CSS como `.variantN`. Mismo nombre →
-// misma variante, estable.
-const PLACEHOLDER_VARIANTS = 5
-
-function placeholderVariant(name: string): number {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0
-  return Math.abs(hash) % PLACEHOLDER_VARIANTS
-}
-
-/** Inicial visible del nombre del viaje (primera letra, en mayúscula). */
-function tripInitial(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || '·'
-}
 
 /** Parte una fecha de calendario 'YYYY-MM-DD' sin pasar por Date (evita saltos de huso). */
 function parseDay(iso: string): { y: number; m: number; d: number } | null {
@@ -297,16 +279,11 @@ function TripCard({
           aria-hidden="true"
         />
       ) : (
-        // Sin portada todavía: placeholder digno (degradado on-brand derivado del nombre +
-        // inicial) en lugar de un gris vacío. La inicial es decorativa (el nombre ya va en
-        // el cuerpo). La variante (pizarra/tinta/oro) la elige el nombre, siempre on-brand.
-        <span
-          className={[styles.placeholder, styles[`variant${placeholderVariant(group.name)}`]].join(
-            ' ',
-          )}
-          aria-hidden="true"
-        >
-          <span className={styles.placeholderInitial}>{tripInitial(group.name)}</span>
+        // Sin portada todavía: fondo discreto de "mapa nocturno" (gradiente grafito/teal
+        // con tokens de escena) más un pin a tamaño moderado y baja opacidad. Antes iba
+        // una inicial gigante como marca de agua: parecía un bug y pisaba los chips.
+        <span className={styles.placeholder} aria-hidden="true">
+          <IconPin size={44} className={styles.placeholderIcon} />
         </span>
       )}
       <span className={styles.cardBody}>

@@ -137,12 +137,15 @@
 
 /* Crédito de tiles (Esri) PROPIO — NO el control de MapLibre. El modo compacto de
    MapLibre no ocultaba el texto en prod (salía como banda); aquí no hay control suyo,
-   así que pintamos nuestro "ⓘ" y controlamos el texto al 100%. Esquina inferior, sobre
-   el lienzo; tokens de escena. Va por encima de la veladura (`.globe::after` z-index 1). */
+   así que pintamos nuestro "ⓘ" y controlamos el texto al 100%. Esquina inferior derecha
+   DE LA ESCENA, sobre el lienzo; tokens de escena. Va por encima de la veladura
+   (`.globe::after` z-index 1). El `bottom` despeja el fundido de la costura de GlobeSheet
+   (una franja de --space-4 sobre el borde de la hoja): el "ⓘ" queda anclado dentro del
+   mapa, nunca a caballo de la costura globo→hoja. */
 .credit {
   position: absolute;
   right: var(--space-2);
-  bottom: var(--space-2);
+  bottom: calc(var(--space-4) + var(--space-2));
   z-index: 2;
   display: flex;
   align-items: center;
