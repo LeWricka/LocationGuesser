@@ -1,37 +1,32 @@
 // Landing pública para visitantes SIN sesión (issue #175; portada visual #183;
-// patrón globo + hoja #343; flujo login/registro #495).
+// patrón globo + hoja #343; flujo email-first #506).
 //
 // Patrón GLOBO + HOJA (referencia Polarsteps): un globo a sangre arriba con pines-foto
 // de datos demo curados (el wow y la identidad) y una HOJA BLANCA que sube debajo con el
 // mensaje y el CTA (la legibilidad).
 //
-// La política sigue siendo passwordless puro: sin contraseñas (cuentas-y-home.md §1.2).
-// Ahora distinguimos ALTA (EnterScreen: nombre+email → dentro al instante) de LOGIN
-// (LoginEmailScreen: solo email → magic link → home directa sin ProfileGate).
+// La política es passwordless puro: sin contraseñas (cuentas-y-home.md §1.2).
+// MODELO EMAIL-FIRST (issue #506): un único CTA lleva a LoginFlow (email → código OTP).
+// Nuevo y recurrente usan el mismo flujo: Supabase detecta si existe la cuenta.
 //
 // Cambios respecto al diseño anterior (#495):
-//  - CTA primario: "Crear tu viaje" → EnterScreen (alta).
-//  - CTA secundario: "Ya tengo cuenta · Entrar" → LoginEmailScreen (login).
+//  - CTA único: "Empieza a compartir" → LoginFlow (email-first con código OTP).
+//  - ELIMINADO: separación signup/login (ya no hay "Crear tu viaje" vs "Ya tengo cuenta").
 //  - ELIMINADO: "Tengo un código" (los viajes van por enlace, no por código manual).
 //  - Conservada: nota "¿Te han pasado un enlace? Ábrelo y entras directo."
-//  - Copy del lead: de "Gana quien más se acerca" a guardar/compartir/interactuar.
+//  - Conservado: showcase del producto en acción dentro de la hoja.
 //
 // Reutiliza:
 //  - `features/home/GlobeSheet` para el patrón globo + hoja.
-//  - `EnterScreen` para el alta (nombre + email → dentro al instante).
-//  - `LoginEmailScreen` para el login (email → magic link → home sin ProfileGate).
+//  - `LoginFlow` para el flujo de entrada (email → código OTP → sesión).
 //  - `LandingShowcase` para enseñar el producto en acción dentro de la hoja.
 
 import { useState } from 'react'
 import { Button, GlobeSheet, Logo, Stack } from '../../ui'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { LandingShowcase } from './LandingShowcase'
-import { EnterScreen } from './EnterScreen'
-import { LoginEmailScreen } from './LoginEmailScreen'
+import { LoginFlow } from './LoginFlow'
 import styles from './Landing.module.css'
-
-// Qué pantalla de auth muestra la landing cuando el usuario pulsa un CTA.
-type AuthMode = 'none' | 'signup' | 'login'
 
 interface Props {
   /**
@@ -47,31 +42,15 @@ interface Props {
 }
 
 export function Landing({ groupName, redirectTo }: Props) {
-  // El auth NO está a la vista: al pulsar un CTA se muestra la pantalla correspondiente
-  // a PANTALLA COMPLETA (patrón aprobado #474), no un modal.
-  const [authMode, setAuthMode] = useState<AuthMode>('none')
+  // Cuando el usuario pulsa el CTA se muestra el flujo de entrada a pantalla completa.
+  const [showAuth, setShowAuth] = useState(false)
 
   const joining = Boolean(groupName)
 
-  // Alta: EnterScreen (nombre + email → dentro al instante). Mismo flujo en ambos
-  // contextos (landing genérica e invitación a viaje).
-  if (authMode === 'signup') {
+  // LoginFlow: email → código OTP → sesión. Mismo flujo para nuevo y recurrente.
+  if (showAuth) {
     return (
-      <EnterScreen joining={joining} redirectTo={redirectTo} onBack={() => setAuthMode('none')} />
-    )
-  }
-
-  // Login: LoginEmailScreen (solo email → magic link → home directa sin ProfileGate).
-  // Desde el flujo de invitación, "¿Ya tienes cuenta? Entra" abre el login: el auto-join
-  // al volver del enlace se encarga del grupo. El redirectTo preserva el destino deep-link
-  // guardado por App.tsx en lg.next.
-  if (authMode === 'login') {
-    return (
-      <LoginEmailScreen
-        redirectTo={redirectTo}
-        onBack={() => setAuthMode('none')}
-        onSignUp={() => setAuthMode('signup')}
-      />
+      <LoginFlow groupName={groupName} redirectTo={redirectTo} onBack={() => setShowAuth(false)} />
     )
   }
 
@@ -83,7 +62,7 @@ export function Landing({ groupName, redirectTo }: Props) {
         // esférico, nunca aplanado por un encuadre cercano de pines agrupados.
         framing="world"
         // Tocar un pin demo en la landing = invitar a crear (no hay viaje real).
-        onOpenPin={() => setAuthMode('signup')}
+        onOpenPin={() => setShowAuth(true)}
         sheetLabel="Empieza a compartir"
         overlay={
           <span className={styles.brand}>
@@ -114,18 +93,9 @@ export function Landing({ groupName, redirectTo }: Props) {
           )}
 
           <Stack gap={2} className={styles.actions}>
-            {/* CTA primario: alta → EnterScreen (nombre + email). */}
-            <Button
-              size="lg"
-              fullWidth
-              onClick={() => setAuthMode('signup')}
-              data-testid="open-auth"
-            >
-              {joining ? 'Únete al viaje' : 'Crear tu viaje'}
-            </Button>
-            {/* CTA secundario: login → LoginEmailScreen (solo email). */}
-            <Button variant="ghost" size="lg" fullWidth onClick={() => setAuthMode('login')}>
-              {joining ? '¿Ya tienes cuenta? Entra' : 'Ya tengo cuenta · Entrar'}
+            {/* CTA único: email-first (nuevo y recurrente, mismo flujo). */}
+            <Button size="lg" fullWidth onClick={() => setShowAuth(true)} data-testid="open-auth">
+              {joining ? 'Únete al viaje' : 'Empieza a compartir'}
             </Button>
           </Stack>
 
@@ -141,9 +111,7 @@ export function Landing({ groupName, redirectTo }: Props) {
             producto en acción de un vistazo, dentro de la hoja (scrolleable). No lo
             mostramos en el flujo de invitación (ya vienen a un viaje concreto): ahí el hero
             + CTA bastan y el showcase distraería del "únete a <grupo>". */}
-        {!joining && (
-          <LandingShowcase className={styles.how} onStart={() => setAuthMode('signup')} />
-        )}
+        {!joining && <LandingShowcase className={styles.how} onStart={() => setShowAuth(true)} />}
       </GlobeSheet>
     </main>
   )

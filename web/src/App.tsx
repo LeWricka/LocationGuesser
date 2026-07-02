@@ -3,28 +3,30 @@
 // basado en sesión. Cada feature vive en su carpeta; App solo decide qué pantalla
 // pintar según { sesión, hash }.
 //
-// Flujos (#495):
+// Flujos (email-first con código OTP, issue #506):
 //  - loading                  → spinner de arranque
-//  - sin sesión               → Landing:
-//       CTA "Crear tu viaje"         → EnterScreen (nombre+email → dentro al instante)
-//       CTA "Ya tengo cuenta·Entrar" → LoginEmailScreen (email → magic link → home)
-//  - sesión OK                → router por hash (ProfileGate eliminado del flujo normal):
-//       #g=&c=  → PlayChallenge (auto-join)          [permitido con email pendiente]
-//       #g=     → TripPage     (auto-join)            [permitido con email pendiente]
-//       #nuevo  → CreateGroup si el email está VALIDADO; si no, CreateGate
+//  - sin sesión               → Landing (CTA único email-first → LoginFlow)
+//  - sesión OK, sin nombre    → ProfileGate (paso de nombre para cuentas nuevas)
+//  - sesión OK, con nombre    → router por hash:
+//       #g=&c=  → PlayChallenge (auto-join)          [permitido sin nombre también]
+//       #g=     → TripPage     (auto-join)            [permitido sin nombre también]
+//       #nuevo  → CreateGroup (con sesión OTP verificada, sin muro adicional)
 //       #perfil → ProfileEditScreen  (acceso BAJO DEMANDA; no como puerta de entrada)
 //       #admin  → AdminPage (SOLO admin; un no-admin cae a la home)
 //       raíz    → HomePage
 //
-// ProfileGate eliminado del flujo de onboarding (#495): el nombre siempre se captura
-// al registrarse (EnterScreen) y al volver por magic link ya existe en el perfil. No
-// hay escenario legítimo donde llegar a ProfileGate sin haber dado un nombre antes.
+// CreateGate ELIMINADO (issue #506): con OTP, cualquier usuario que verifica su
+// código tiene sesión permanente (no anónima) y puede crear directo. La RLS
+// `groups_insert_owner` sigue siendo el candado real en BD.
+//
+// ProfileGate: solo se muestra a cuentas NUEVAS (sin display_name) como parte del
+// alta, tras el código. Una vez elegido el nombre, no vuelve a aparecer.
 // La edición de perfil es accesible bajo demanda vía #perfil, no como paso forzado.
 
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { isAdminEmail } from './lib/admin'
-import { Landing, ProfileEditScreen, CreateGate, useDeepLinkJoin } from './features/auth'
+import { Landing, ProfileGate, useDeepLinkJoin } from './features/auth'
 import { OnboardingGate, ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
@@ -34,6 +36,7 @@ import { setNextDestination, takeNextDestination } from './lib/auth'
 import { getGroup } from './lib/groupData'
 import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
 import { Icon, Spinner, Stack, withViewTransition } from './ui'
+import { needsProfileStep } from './features/auth'
 import styles from './App.module.css'
 
 // CODE-SPLITTING POR RUTA (perf): las pantallas pesadas (mapas Leaflet/Google,
@@ -58,6 +61,9 @@ const TripPage = lazy(() =>
 )
 const HomePage = lazy(() =>
   import('./features/home/HomePage').then((m) => ({ default: m.HomePage })),
+)
+const ProfileEditScreen = lazy(() =>
+  import('./features/auth/ProfileEditScreen').then((m) => ({ default: m.ProfileEditScreen })),
 )
 const AdminPage = lazy(() => import('./features/admin').then((m) => ({ default: m.AdminPage })))
 
@@ -117,9 +123,6 @@ function AppRoutes() {
   }
 
   // ── Sesión OK → router por hash ──────────────────────────────────────────────
-  // ProfileGate eliminado (#495): el nombre SIEMPRE se captura al entrar (EnterScreen)
-  // o ya existe en el perfil (login por magic link). No hay escenario normal donde
-  // llegar aquí sin nombre. La edición es #perfil bajo demanda.
   return <LoggedIn route={route} adminRoute={adminRoute} />
 }
 
@@ -168,7 +171,7 @@ function LoggedIn({
   route: ReturnType<typeof parseHash>
   adminRoute: boolean
 }) {
-  const { user, profile, verified, refreshProfile } = useSession()
+  const { user, profile, refreshProfile } = useSession()
   const joinIfGroup = useDeepLinkJoin(user?.id)
 
   // Al volver del email: si guardamos un destino (#g…), lo restauramos (auto-join
@@ -192,6 +195,22 @@ function LoggedIn({
   if (adminRoute) {
     if (isAdminEmail(user?.email)) return <AdminPage onBack={() => goHome()} />
     return <RedirectHome />
+  }
+
+  // ProfileGate: solo para cuentas NUEVAS que no tienen nombre aún (issue #506).
+  // Al entrar con OTP por primera vez, el perfil existe (trigger lo crea) pero
+  // display_name puede estar vacío. Pedimos el nombre UNA sola vez; tras guardarlo,
+  // refreshProfile actualiza el contexto y este bloque deja de ejecutarse.
+  // EXCEPCIÓN: rutas #g= y #g=&c= (ver/jugar) NO requieren nombre para acceder.
+  // El usuario puede ver y jugar sin nombre; solo la home y crear lo requieren.
+  if (needsProfileStep(profile) && !route.group && !adminRoute) {
+    return (
+      <ProfileGate
+        userId={user!.id}
+        initialName={profile?.display_name ?? ''}
+        onDone={refreshProfile}
+      />
+    )
   }
 
   // Reto concreto → jugar. Solo grupo → página del grupo. (El auto-join corre en
@@ -295,12 +314,9 @@ function LoggedIn({
     )
   }
   if (route.view === 'new') {
-    // Crear viaje EXIGE email validado (issue #438): un usuario con email pendiente
-    // (anónimo recién entrado) ve el gate "valida tu correo" en vez del asistente.
-    // La RLS (groups_insert_owner) es el candado real; esto es la cara amable.
-    if (!verified) {
-      return <CreateGate email={user?.email} onBack={() => goHome()} />
-    }
+    // Crear viaje: con el modelo email-first (issue #506), cualquier usuario con
+    // sesión OTP verificada puede crear. La RLS `groups_insert_owner` es el candado
+    // real; aquí ya no hay muro de "valida tu correo". CreateGate eliminado.
     return (
       <OnboardingGate context="create-trip" userId={user?.id}>
         <CreateGroup onBack={() => goHome()} />

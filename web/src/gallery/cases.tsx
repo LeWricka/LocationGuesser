@@ -10,8 +10,7 @@
 
 import type { ReactNode } from 'react'
 import { Landing } from '../features/auth/Landing'
-import { EnterScreen } from '../features/auth/EnterScreen'
-import { CreateGate } from '../features/auth/CreateGate'
+import { LoginFlow } from '../features/auth/LoginFlow'
 import { HomePage } from '../features/home/HomePage'
 import { TripPage } from '../features/trip/TripPage'
 import { PlayChallenge } from '../features/play/PlayChallenge'
@@ -307,17 +306,10 @@ export const cases: GalleryCase[] = [
     render: () => <LoginScreen email="" onEmailChange={noop} />,
   },
   {
-    id: 'entrada-nombre-email',
-    title: 'Entrada (nombre + email, sin espera)',
+    id: 'entrada-email-first',
+    title: 'Entrada email-first (LoginFlow)',
     section: 'Entrar',
-    // Pantalla completa (ShellUtilitario): la entrada ya no es un modal (#474).
-    render: () => <EnterScreen />,
-  },
-  {
-    id: 'gate-valida-correo',
-    title: 'Valida tu correo (gate de crear)',
-    section: 'Entrar',
-    render: () => <CreateGate email="lewis@ejemplo.com" onBack={noop} />,
+    render: () => <LoginFlow />,
   },
   {
     id: 'jugar-ubicacion',

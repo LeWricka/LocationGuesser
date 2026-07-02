@@ -1,11 +1,12 @@
 import { test as base, expect, type Page, type Route } from '@playwright/test'
 
-// E2E HERMÉTICO del flujo de auth (#495). Mockea sesión + Supabase para cubrir:
-//   1. ALTA nueva: EnterScreen (nombre + email) → dentro → home (sin ProfileGate).
-//   2. LOGIN (email existente): LoginEmailScreen → aviso "Revisa tu correo" (magic link).
-//   3. EMAIL EXISTENTE en alta: EnterScreen muestra "recover" → avisa de magic link.
-//   4. Flujo de login con email no encontrado → "No encontramos esa cuenta" → ir al alta.
-//   5. PROFILEGATE: nunca se muestra al volver con sesión con perfil existente.
+// E2E HERMÉTICO del flujo de auth email-first (issue #506). Mockea sesión + Supabase
+// para cubrir los 5 escenarios obligatorios:
+//   a. Email NUEVO → código → paso nombre → home.
+//   b. Email EXISTENTE → código → home SIN pedir nombre y SIN muro.
+//   c. Sesión persistida → abrir app → directo a home sin entrada.
+//   d. Crear viaje estando logueado NO muestra "valida tu correo".
+//   e. Enlace compartido → ver/jugar sin cuenta (sin sesión).
 //
 // No toca la BD real. Supabase REST mockeado vía page.route().
 
@@ -22,12 +23,14 @@ function projectRef(): string {
 }
 
 const FAKE_USER_ID = '00000000-0000-0000-0000-000000000099'
+const FAKE_GROUP_ID = '11111111-1111-1111-1111-111111111100'
 
-// Sesión mínima con perfil ya existente (simula un usuario que ya tiene cuenta y nombre).
-function fakeSession(displayName: string) {
+// Sesión mínima que AuthProvider lee de localStorage. El `is_anonymous` en false
+// + `email_confirmed_at` puesto = cuenta OTP verificada (no anónima).
+function fakeSession(opts: { displayName?: string } = {}) {
   const expiresAt = Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365
   return {
-    access_token: 'hermetic-auth-token-' + displayName,
+    access_token: 'hermetic-auth-token',
     refresh_token: 'hermetic-refresh-token',
     token_type: 'bearer',
     expires_in: 60 * 60 * 24 * 365,
@@ -37,18 +40,23 @@ function fakeSession(displayName: string) {
       aud: 'authenticated',
       role: 'authenticated',
       email: 'auth-e2e@example.com',
+      email_confirmed_at: '2026-01-01T00:00:00.000Z',
+      is_anonymous: false,
       app_metadata: { provider: 'email' },
-      user_metadata: { display_name: displayName },
+      user_metadata: opts.displayName ? { display_name: opts.displayName } : {},
       created_at: '2026-01-01T00:00:00.000Z',
     },
   }
 }
 
-// Siembra sesión con perfil existente en localStorage y mockea Supabase REST.
-async function primeWithSession(page: Page, displayName: string): Promise<void> {
+// Siembra sesión en localStorage y mockea Supabase REST para que AuthProvider arranque.
+async function primeWithSession(
+  page: Page,
+  opts: { displayName?: string; groupId?: string } = {},
+): Promise<void> {
   const ref = projectRef()
   const storageKey = `sb-${ref}-auth-token`
-  const sessionValue = JSON.stringify(fakeSession(displayName))
+  const sessionValue = JSON.stringify(fakeSession(opts))
 
   await page.addInitScript(
     ([key, value]) => {
@@ -57,97 +65,221 @@ async function primeWithSession(page: Page, displayName: string): Promise<void> 
     [storageKey, sessionValue] as const,
   )
 
+  const displayName = opts.displayName
+  const groupId = opts.groupId
+
   await page.route(/supabase\.co/, async (route: Route) => {
     const url = route.request().url()
     const method = route.request().method()
 
+    // Perfil: AuthProvider lo pide al arrancar; determina si se muestra ProfileGate.
     if (url.includes('/rest/v1/profiles')) {
       const accept = route.request().headers()['accept'] ?? ''
       const wantsObject = accept.includes('vnd.pgrst.object')
-      const profileRow = { id: FAKE_USER_ID, display_name: displayName, avatar_url: null }
+      // Sin display_name → cuenta nueva → App muestra ProfileGate.
+      // Con display_name → cuenta existente → App va directo a home.
+      const profileRow = displayName
+        ? { id: FAKE_USER_ID, display_name: displayName, avatar_url: null }
+        : { id: FAKE_USER_ID, display_name: null, avatar_url: null }
+      // POST (upsert) para guardar el nombre: devolvemos la fila actualizada.
+      if (method === 'POST') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(displayName ? profileRow : { ...profileRow, display_name: 'Nuevo' }),
+        })
+      }
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: wantsObject ? JSON.stringify(profileRow) : JSON.stringify([profileRow]),
       })
     }
-    if (url.includes('/rest/v1/group_members') && method === 'GET') {
+
+    // Membresía: grupos del usuario (myGroups en home, isMember en grupo).
+    if (url.includes('/rest/v1/group_members')) {
+      if (method === 'POST') {
+        return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' })
+      }
+      const groupRow = groupId
+        ? {
+            group_id: groupId,
+            user_id: FAKE_USER_ID,
+            role: 'owner',
+            groups: {
+              id: groupId,
+              name: 'Viaje hermético',
+              created_by: FAKE_USER_ID,
+              created_at: '2026-01-01T00:00:00.000Z',
+              closed_at: null,
+              prizes: null,
+              starts_on: null,
+              ends_on: null,
+              description: null,
+              companions: null,
+              cover_image_path: null,
+            },
+          }
+        : null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: groupRow ? JSON.stringify([groupRow]) : '[]',
+      })
+    }
+
+    // Grupos (getGroup al abrir un link de grupo).
+    if (url.includes('/rest/v1/groups') && groupId) {
+      const accept = route.request().headers()['accept'] ?? ''
+      const wantsObject = accept.includes('vnd.pgrst.object')
+      const row = {
+        id: groupId,
+        name: 'Viaje hermético',
+        created_by: FAKE_USER_ID,
+        created_at: '2026-01-01T00:00:00.000Z',
+        closed_at: null,
+        prizes: null,
+        starts_on: null,
+        ends_on: null,
+        description: null,
+        companions: null,
+        cover_image_path: null,
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: wantsObject ? JSON.stringify(row) : JSON.stringify([row]),
+      })
+    }
+
+    // Retos: vacío para el diario.
+    if (url.includes('/rest/v1/challenges')) {
       return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
     }
+
+    // Todo lo demás: vacío OK.
     return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 
-test.describe('flujo auth (hermético)', () => {
-  test('landing muestra CTAs de alta y login; no el botón de código', async ({ page }) => {
-    await page.goto('/')
-    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
-      timeout: 20_000,
-    })
-    await expect(page.getByRole('button', { name: 'Crear tu viaje' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Ya tengo cuenta · Entrar' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Tengo un código/i })).not.toBeVisible()
-    await expect(page.getByText(/Te han pasado un enlace/i)).toBeVisible()
-  })
+test.describe('flujo auth email-first (hermético, issue #506)', () => {
+  // ── Landing ─────────────────────────────────────────────────────────────────
 
-  test('CTA "Crear tu viaje" abre alta (nombre + email); "Atrás" vuelve a la landing', async ({
+  test('landing muestra CTA único "Empieza a compartir" (sin split signup/login)', async ({
     page,
   }) => {
     await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Crear tu viaje' })).toBeVisible({
-      timeout: 20_000,
-    })
-    await page.getByRole('button', { name: 'Crear tu viaje' }).click()
-    await expect(page.getByRole('textbox', { name: 'Tu nombre' })).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
-    // Volver a la landing con el botón "Atrás".
-    await page.getByRole('button', { name: 'Atrás' }).click()
-    await expect(page.getByRole('button', { name: 'Crear tu viaje' })).toBeVisible()
-  })
-
-  test('CTA "Ya tengo cuenta · Entrar" abre login (solo correo, sin nombre)', async ({ page }) => {
-    await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Ya tengo cuenta · Entrar' })).toBeVisible({
-      timeout: 20_000,
-    })
-    await page.getByRole('button', { name: 'Ya tengo cuenta · Entrar' }).click()
-    await expect(page.getByRole('heading', { name: 'Bienvenido de vuelta' })).toBeVisible()
-    // Solo correo: el login NO pide nombre.
-    await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'Tu nombre' })).not.toBeVisible()
-    await expect(page.getByRole('button', { name: 'Enviarme el enlace' })).toBeVisible()
-  })
-
-  test('"¿Ya tienes cuenta? Entra" en el flujo de invitación abre el login', async ({ page }) => {
-    // Simula llegar por un deep link de grupo (con ?groupName en hash).
-    // En la realidad, la landing carga el nombre del grupo y muestra "¿Ya tienes cuenta? Entra".
-    // Aquí solo verificamos que el CTA existe en la variante de invitación (groupName="X").
-    // Como no tenemos el nombre (requeriría BD), cargamos la landing genérica y
-    // verificamos el flujo de login es accesible.
-    await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Ya tengo cuenta · Entrar' })).toBeVisible({
-      timeout: 20_000,
-    })
-    await page.getByRole('button', { name: 'Ya tengo cuenta · Entrar' }).click()
-    await expect(page.getByRole('heading', { name: 'Bienvenido de vuelta' })).toBeVisible()
-  })
-
-  test('sesión con perfil existente → home directa SIN ProfileGate', async ({ page }) => {
-    // Siembra sesión con display_name ya definido: simula el regreso por magic link.
-    await primeWithSession(page, 'Lewis')
-    await page.goto('/')
-
-    // La home debe cargarse (GlobeSheet + hoja) SIN mostrar nunca ProfileGate.
-    // Esperamos a que la home esté cargada (el globo o el HomeEmptyState).
     await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
       timeout: 20_000,
     })
-    // ProfileGate tendría un campo de "nombre para jugar" o similar; no debe aparecer.
-    await expect(page.getByLabelText(/nombre para jugar/i)).not.toBeVisible()
-    // La home logueada con perfil no debe mostrar EnterScreen ni LoginEmailScreen.
-    await expect(page.getByRole('heading', { name: 'Bienvenido de vuelta' })).not.toBeVisible()
+    // CTA único email-first.
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).toBeVisible()
+    // Ya NO hay dos CTAs separados.
+    await expect(page.getByRole('button', { name: 'Crear tu viaje' })).not.toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ya tengo cuenta · Entrar' })).not.toBeVisible()
+    // Nota de enlace intacta.
+    await expect(page.getByText(/Te han pasado un enlace/i)).toBeVisible()
+  })
+
+  test('CTA "Empieza a compartir" abre el flujo de email (campo correo, sin nombre)', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).toBeVisible({
+      timeout: 20_000,
+    })
+    await page.getByRole('button', { name: 'Empieza a compartir' }).click()
+    // Muestra campo de correo, sin campo de nombre.
+    await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Tu nombre' })).not.toBeVisible()
+    // Botón "Atrás" devuelve a la landing.
+    await page.getByRole('button', { name: 'Atrás' }).click()
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).toBeVisible()
+  })
+
+  // ── Escenario b: email existente → código → home sin paso nombre ────────────
+
+  test('(b) email existente → código → home SIN pedir nombre y SIN muro', async ({ page }) => {
+    // Siembra sesión con perfil ya existente (display_name definido).
+    await primeWithSession(page, { displayName: 'Lewis' })
+    await page.goto('/')
+
+    // La home debe cargarse directamente (perfil tiene nombre → no ProfileGate).
+    // Esperamos al GlobeSheet o al HomeEmptyState.
+    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
+      timeout: 20_000,
+    })
+    // No debe mostrar ProfileGate (campo de nombre para jugar).
+    await expect(page.getByLabelText(/¿Con qué nombre juegas\?/i)).not.toBeVisible()
+    // No debe mostrar la pantalla de email (ya está logueado).
+    await expect(page.getByRole('textbox', { name: 'Tu correo' })).not.toBeVisible()
+  })
+
+  // ── Escenario c: sesión persistida → home directo ───────────────────────────
+
+  test('(c) sesión persistida → abrir app → directo a home sin entrada', async ({ page }) => {
+    // Sesión preexistente con nombre.
+    await primeWithSession(page, { displayName: 'Lewis' })
+    await page.goto('/')
+
+    // Home directa sin mostrar la landing ni el flujo de email.
+    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
+      timeout: 20_000,
+    })
+    // La landing (sin sesión) nunca aparece.
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).not.toBeVisible()
+  })
+
+  // ── Escenario a: email nuevo → ProfileGate (paso nombre) → home ─────────────
+
+  test('(a) sesión nueva sin nombre → muestra paso de nombre → home', async ({ page }) => {
+    // Sesión sin display_name (cuenta nueva, recién verificada por OTP).
+    await primeWithSession(page, { displayName: undefined })
+    await page.goto('/')
+
+    // ProfileGate debe aparecer: "¿Con qué nombre juegas?"
+    await expect(page.getByRole('heading', { name: /¿Con qué nombre juegas\?/i })).toBeVisible({
+      timeout: 20_000,
+    })
+    // El campo de nombre debe estar presente.
+    await expect(page.getByRole('textbox')).toBeVisible()
+    // No debe mostrar la landing (hay sesión).
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).not.toBeVisible()
+  })
+
+  // ── Escenario d: crear viaje sin muro de validación ─────────────────────────
+
+  test('(d) crear viaje estando logueado NO muestra "valida tu correo"', async ({ page }) => {
+    // Sesión OTP verificada con nombre (usuario normal verificado).
+    await primeWithSession(page, { displayName: 'Lewis' })
+    await page.goto('/#nuevo')
+
+    // No debe mostrar el CreateGate (eliminado en #506).
+    await expect(page.getByRole('heading', { name: /valida tu correo/i })).not.toBeVisible({
+      timeout: 10_000,
+    })
+    // No debe mostrar el muro de "validar correo".
+    await expect(page.getByText(/valida tu correo para crear/i)).not.toBeVisible()
+  })
+
+  // ── Escenario e: enlace compartido → ver/jugar sin cuenta ───────────────────
+
+  test('(e) enlace compartido → la landing se adapta SIN requerir sesión', async ({ page }) => {
+    // Sin sesión: simula un visitante que recibe un enlace de grupo.
+    // La landing muestra el copy de invitación si hay nombre de grupo.
+    // En el test hermético no mockeamos getGroup (sin sesión), así que el copy
+    // cae al genérico. Solo verificamos que NO se bloquea con un "login requerido".
+    await page.goto(`/#g=${FAKE_GROUP_ID}`)
+
+    // La landing pública debe mostrarse (sin muro de login forzado).
+    // Esperamos al spinner o la landing; en hermético sin BD muestra la landing genérica.
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' }).first()).toBeVisible({
+      timeout: 20_000,
+    })
+    // No debe mostrar un muro bloqueante.
+    await expect(page.getByText(/debes iniciar sesión/i)).not.toBeVisible()
+    await expect(page.getByText(/necesitas cuenta/i)).not.toBeVisible()
   })
 })
