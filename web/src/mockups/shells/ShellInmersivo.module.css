@@ -106,21 +106,20 @@
 }
 
 /* Contenido interior de la hoja: scroll propio, padding horizontal estándar.
- * El padding-bottom extra (--space-10 ≈ 80px + safe-area) deja espacio para el
- * CTA absoluto que flota por encima de la hoja (botón lg ~56px + space-5 ~20px). */
+ * padding-bottom modesto: el CTA ya no flota encima (es footer en el flujo),
+ * así que solo hace falta un respiro visual entre el último contenido y el CTA. */
 .sheetInner {
   flex: 1;
+  min-height: 0; /* permite que el hijo flex scrollee en vez de desbordar */
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 var(--space-5) var(--space-9);
-  padding-bottom: calc(var(--space-9) + env(safe-area-inset-bottom));
+  padding: 0 var(--space-5) var(--space-4);
 }
 
-/* CTA fijo al fondo, separado de la hoja para que siempre sea visible. */
+/* CTA como footer DENTRO del flujo flex de la hoja (no absoluto).
+ * flex-shrink: 0 lo fija abajo; el .sheetInner de arriba absorbe el scroll.
+ * Resultado: el CTA NUNCA tapa contenido, sea cual sea su alto. */
 .cta {
-  position: absolute;
-  left: var(--space-5);
-  right: var(--space-5);
-  bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
-  z-index: calc(var(--z-sheet) + 1);
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));
 }

@@ -48,11 +48,11 @@ export function PantallaJugar() {
         >
           ¿Dónde es esto?
         </h2>
+        {/* Una sola línea de ayuda (antes había dos que repetían "Toca el mapa"). */}
         <p className="t-body" style={{ color: 'var(--color-text-muted)' }}>
-          Toca el mapa para clavar tu tiro. El más cercano gana.
+          Toca el mapa para clavar tu tiro. Gana quien más se acerque.
         </p>
       </div>
-      <p className={styles.pista}>Toca el mapa para ampliar · Arrastra para mover el pin</p>
     </ShellInmersivo>
   )
 }

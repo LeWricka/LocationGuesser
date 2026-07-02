@@ -3,31 +3,48 @@
  * Dos estados: (a) Ubicación y (b) Confirmar Street View.
  */
 
-/* Selector de estado (herramienta de navegación del mockup) */
-.selectorEstado {
-  display: flex;
-  gap: var(--space-2);
+/* Andamiaje de MOCKUP: conmutador de sub-estados. Estilo de "herramienta de
+ * desarrollo" (borde discontinuo + etiqueta) para NO confundirse con UI real. */
+.scaffold {
   margin-bottom: var(--space-4);
+  padding: var(--space-2);
+  border: 1px dashed var(--hairline-strong);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
 }
 
-.estadoBtn {
+.scaffoldLabel {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.scaffoldBtns {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.scaffoldBtn {
   flex: 1;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--hairline-strong);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--hairline-soft);
   background: var(--surface);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   cursor: pointer;
   text-align: center;
 }
 
-.estadoBtn.activo {
-  background: var(--accent-tint);
-  border-color: var(--accent);
-  color: var(--accent);
+.scaffoldBtn.activo {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--surface);
 }
 
 /* Instrucción de la hoja (estado a: Ubicación) */

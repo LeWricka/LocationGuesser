@@ -47,22 +47,14 @@ export function PantallaCrearReto({ estadoInicial = 'ubicacion' }: Props) {
           variant="floating"
         />
       }
-      // Caption: solo en estado ubicacion (sobre el mapa).
-      // En confirmar-sv, usamos sheetTitle (se alternan: regla dura cumplida).
-      caption={
-        estado === 'ubicacion' ? (
-          <span className="t-caption" style={{ color: 'var(--scene-ink-soft)' }}>
-            Mueve el pin a tu ubicación exacta
-          </span>
-        ) : undefined
-      }
-      // sheetTitle: solo en confirmar-sv y sin-cobertura.
+      // Regla dura caption XOR sheetTitle: cada estado usa SOLO el título de la hoja.
+      // (Antes ubicacion tenía caption + título repitiendo "el pin/tu ubicación".)
       sheetTitle={
-        estado === 'confirmar-sv'
-          ? 'Este es tu sitio.'
-          : estado === 'sin-cobertura'
-            ? 'Sin Street View aquí'
-            : undefined
+        estado === 'ubicacion'
+          ? '¿Dónde estás?'
+          : estado === 'confirmar-sv'
+            ? 'Este es tu sitio.'
+            : 'Sin Street View aquí'
       }
       cta={
         <EstadoCTA
@@ -72,22 +64,23 @@ export function PantallaCrearReto({ estadoInicial = 'ubicacion' }: Props) {
         />
       }
     >
-      {/* Selector de estado (solo en galería, para navegar entre los sub-estados) */}
-      <div className={styles.selectorEstado}>
-        {(['ubicacion', 'confirmar-sv', 'sin-cobertura'] as Estado[]).map((e) => (
-          <button
-            key={e}
-            type="button"
-            className={[styles.estadoBtn, estado === e ? styles.activo : ''].join(' ')}
-            onClick={() => setEstado(e)}
-          >
-            {e === 'ubicacion'
-              ? '1. Ubicación'
-              : e === 'confirmar-sv'
-                ? '2. Confirmar SV'
-                : '⚠ Sin SV'}
-          </button>
-        ))}
+      {/* Andamiaje de MOCKUP (no es UI de producto): conmuta entre los sub-estados
+          de esta pantalla. Estilo deliberadamente "de herramienta" (etiqueta MOCKUP,
+          borde discontinuo, monoespaciado) para que no se confunda con tabs reales. */}
+      <div className={styles.scaffold}>
+        <span className={styles.scaffoldLabel}>MOCKUP · estado</span>
+        <div className={styles.scaffoldBtns}>
+          {(['ubicacion', 'confirmar-sv', 'sin-cobertura'] as Estado[]).map((e) => (
+            <button
+              key={e}
+              type="button"
+              className={[styles.scaffoldBtn, estado === e ? styles.activo : ''].join(' ')}
+              onClick={() => setEstado(e)}
+            >
+              {e === 'ubicacion' ? 'Ubicación' : e === 'confirmar-sv' ? 'Confirmar SV' : 'Sin SV'}
+            </button>
+          ))}
+        </div>
       </div>
 
       {estado === 'ubicacion' && <ContenidoUbicacion />}
@@ -135,15 +128,10 @@ function EstadoCTA({
 }
 
 // Contenido de la hoja en estado "Ubicación".
+// El título "¿Dónde estás?" va en sheetTitle; aquí solo la ayuda (sin repetir).
 function ContenidoUbicacion() {
   return (
     <div className={styles.instruccion}>
-      <h2
-        className="t-section"
-        style={{ color: 'var(--color-text)', marginBottom: 'var(--space-1)' }}
-      >
-        ¿Dónde estás?
-      </h2>
       <p className="t-body" style={{ color: 'var(--color-text-muted)' }}>
         Centra el pin en tu ubicación. Luego verás el Street View para confirmar.
       </p>
@@ -152,11 +140,13 @@ function ContenidoUbicacion() {
 }
 
 // Contenido de la hoja en estado "Confirmar SV".
+// Una sola frase de privacidad (la tarjeta-candado); el subtítulo aporta algo
+// distinto (qué verán) sin repetir el "nadie sabrá dónde es".
 function ContenidoConfirmarSV() {
   return (
     <div className={styles.confirmacion}>
       <p className="t-body" style={{ color: 'var(--color-text-muted)' }}>
-        Así es como lo verán tus compañeros. Nadie sabrá dónde es hasta que acabe el reto.
+        Así es como lo verán tus compañeros.
       </p>
       <div className={styles.nota}>
         <span className={styles.notaEmoji}>🔒</span>

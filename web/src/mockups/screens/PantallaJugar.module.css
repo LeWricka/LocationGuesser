@@ -48,11 +48,3 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-
-/* Pista de minimapa expandir */
-.pista {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  font-family: var(--font-sans);
-  text-align: center;
-}

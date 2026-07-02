@@ -63,7 +63,11 @@ export function ShellInmersivo({ backdrop, header, caption, sheetTitle, children
            el caption. En ese caso, usar sheetTitle en su lugar. */}
       {caption && <div className={styles.caption}>{caption}</div>}
 
-      {/* 4. Hoja blanca que asoma desde abajo. */}
+      {/* 4. Hoja blanca que asoma desde abajo.
+           El CTA vive DENTRO de la hoja como footer en el flujo flex (no absoluto):
+           así el contenido scrolleable (.sheetInner) nunca queda tapado por el botón,
+           sea cual sea su alto (regla dura anti-recorte). El .sheetInner scrollea;
+           el .cta queda fijo abajo con flex-shrink: 0. */}
       <div className={styles.sheet}>
         <div className={styles.sheetPull}>
           <span className={styles.sheetPullBar} />
@@ -73,10 +77,8 @@ export function ShellInmersivo({ backdrop, header, caption, sheetTitle, children
           {sheetTitle && <SheetTitle>{sheetTitle}</SheetTitle>}
           {children}
         </div>
+        {cta && <div className={styles.cta}>{cta}</div>}
       </div>
-
-      {/* 5. CTA fijo al fondo, por encima de la hoja. */}
-      {cta && <div className={styles.cta}>{cta}</div>}
     </div>
   )
 }
