@@ -23,6 +23,10 @@ interface Props {
 type Stage = 0 | 1
 const TOTAL_STAGES = 2
 
+// Id del disparador de "Salida": Enter en el nombre lo usa para llevar el foco
+// ahí en vez de saltarse las fechas (ver el onKeyDown del input de nombre).
+const START_DATE_TRIGGER_ID = 'cg-starts-on'
+
 // Crear un viaje (flujo grupo-primero). El viaje es el contenedor social del
 // plan: lo creas, los invitas y lo viven contigo. No se crea ningún reto aquí;
 // eso se hace luego dentro del viaje. Quien crea queda como dueño (`created_by` +
@@ -232,11 +236,16 @@ export function CreateGroup({ onBack }: Props) {
                 type="text"
                 placeholder="Japón en otoño"
                 value={name}
+                enterKeyHint="next"
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => {
+                  // Enter/"siguiente" del teclado móvil NO debe enviar el
+                  // formulario ni saltarse las fechas (antes llamaba a advance()
+                  // y pasaba directo a la etapa de resumen). Lleva el foco al
+                  // siguiente control interactivo: el disparador de "Salida".
                   if (e.key === 'Enter') {
                     e.preventDefault()
-                    advance()
+                    document.getElementById(START_DATE_TRIGGER_ID)?.focus()
                   }
                 }}
               />
@@ -251,6 +260,7 @@ export function CreateGroup({ onBack }: Props) {
                 <div className={styles.dateBox}>
                   <span className={styles.dateCap}>Salida</span>
                   <DatePicker
+                    id={START_DATE_TRIGGER_ID}
                     aria-label="Fecha de salida"
                     placeholder="Elige día"
                     value={startsOn}
@@ -291,6 +301,7 @@ export function CreateGroup({ onBack }: Props) {
                   type="text"
                   placeholder="Marta, Diego y yo"
                   value={companions}
+                  enterKeyHint="done"
                   onChange={(e) => setCompanions(e.target.value)}
                 />
               </div>
