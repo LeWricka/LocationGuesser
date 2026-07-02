@@ -12,15 +12,35 @@
   overflow: hidden;
 }
 
-/* Selector de capa flotando sobre la esquina del mapa, como pastilla blanca
-   translúcida (chrome Atelier): se lee sobre satélite sin tapar la foto aérea. */
+/* Barra superior del mapa: buscador (izda, crece) + selector de capa (dcha,
+   ancho fijo), EN LA MISMA FILA. Con columna en vez de fila, el desplegable de
+   resultados (que cuelga del buscador a ancho completo) caía justo encima del
+   selector de capa y lo tapaba; en fila, el desplegable solo ocupa el ancho
+   del buscador y nunca llega a la pastilla de capa. `pointer-events: none` en
+   el contenedor y `auto` en los hijos para que el hueco entre ambos deje pasar
+   los toques al mapa. */
+.topBar {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  pointer-events: none;
+}
+
+.topBar > * {
+  pointer-events: auto;
+}
+
+/* Selector de capa: pastilla blanca translúcida (chrome Atelier), ahora hijo
+   flex de `.topBar` (ya no se posiciona a sí mismo) alineada a la derecha. */
 .layers {
   display: flex;
   gap: var(--space-1);
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  z-index: var(--z-sticky);
+  flex: none;
   background: var(--map-chrome-bg);
   -webkit-backdrop-filter: var(--map-chrome-blur);
   backdrop-filter: var(--map-chrome-blur);

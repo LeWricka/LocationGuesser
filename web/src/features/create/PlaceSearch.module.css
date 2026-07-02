@@ -1,0 +1,125 @@
+/* `flex: 1` (no `width: 100%`): este componente vive junto al selector de capa
+   de MapPicker en una misma fila y debe crecer para ocupar el hueco sin
+   empujarlo fuera de la pantalla. `min-width: 0` evita que el input impida el
+   encogido del flex item (el bug clásico de inputs en flex row). */
+.wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Campo de búsqueda: pastilla translúcida al estilo chrome Atelier (mismo
+   tratamiento que el selector de capa de MapPicker), para leer sobre
+   satélite sin tapar la foto aérea. */
+.field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-3);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+}
+
+.field:focus-within {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+
+.spinner {
+  flex: none;
+}
+
+/* Input a medida (no el `Input` del UI kit, que trae su propio marco de
+   tarjeta): flush dentro de la pastilla del buscador. `appearance: none`
+   normaliza el estilo nativo de type=search entre navegadores. */
+.input {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  min-height: var(--tap-target-sm);
+}
+
+.input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-text-faint);
+}
+
+/* Lista de resultados: tarjeta sólida (no chrome translúcido, para que se lea
+   con claridad sobre cualquier tile) colgando justo debajo del campo. */
+.results {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.empty {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+}
+
+.resultBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  cursor: pointer;
+  min-height: var(--tap-target);
+  transition: background var(--transition-fast);
+}
+
+.resultBtn:hover {
+  background: var(--color-surface-hover);
+}
+
+.resultBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.resultName {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.resultDetail {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
