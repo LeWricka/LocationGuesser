@@ -7,10 +7,12 @@ import {
   HERMETIC_CHALLENGE_ID,
 } from './helpers/hermetic'
 
-// E2E HERMÉTICO del bucle de crear reto (#443, actualizado #485). Mockea sesión +
-// Supabase + Google Maps + geolocalización, así que corre SIEMPRE (local y CI) sin
-// secretos ni escribir en BD, y es determinista. Cubre lo que el dueño pidió cazar:
-//   1) CAMINO FELIZ: elegir punto en el mapa → previa SV → lanzar → deep link jugable.
+// E2E HERMÉTICO del bucle de crear reto (#443, actualizado #485 y #509). Mockea
+// sesión + Supabase + Google Maps + geolocalización, así que corre SIEMPRE (local y
+// CI) sin secretos ni escribir en BD, y es determinista. Cubre lo que el dueño pidió cazar:
+//   1) CAMINO FELIZ: elegir punto en el mapa → previa SV → lanzar → volver al VIAJE
+//      (#509: el creador ya no aterriza jugando su propio reto) y, si abre el deep
+//      link del reto, ve la guarda "Este reto es tuyo" (no el juego).
 //   2) STREET VIEW NO DISPONIBLE: elegir punto sin cobertura → aviso inline, CTA deshabilitado.
 //   3) MÓVIL: el mapa carga, el usuario elige punto, el CTA de lanzar es accesible.
 // Si el bucle de crear se rompe (gating atascado, insert que peta, regresión de
@@ -115,35 +117,62 @@ async function runCreateFlow(page: Page, opts: { streetViewAvailable: boolean })
     timeout: 15_000,
   })
 
-  // "Ver el reto en el viaje" navega al deep link del reto recién creado (#g=…&c=…).
+  // "Ver el reto en el viaje" vuelve a la página del VIAJE (#g=…, sin &c=): tras
+  // crear, el creador NO aterriza jugando su propio reto (#509); su reto se ve en
+  // el diario y el deep link es para repartirlo al grupo.
   await page.getByRole('button', { name: /Ver el reto en el viaje/ }).click()
-  await page.waitForFunction(() => location.hash.includes('#g=') && location.hash.includes('&c='), {
-    timeout: 30_000,
+  await page.waitForFunction(
+    () => location.hash.includes('#g=') && !location.hash.includes('&c='),
+    { timeout: 30_000 },
+  )
+  // Prueba de que es la pantalla Viaje: el FAB de crear vuelve a estar disponible.
+  await expect(page.getByRole('button', { name: 'Crear momento o reto' })).toBeVisible({
+    timeout: 20_000,
   })
 }
 
-// Comprueba el TRASPASO crear → jugar: abre el deep link del reto recién creado y
-// verifica que PlayChallenge monta en estado JUGABLE (overlay «Empezar»). No jugamos
-// la partida (el mapa de Google y su `idle` no son deterministas en un mock); solo
-// asertamos que el reto que se creó es ALCANZABLE y arranca la partida — que es donde
-// más duele que se rompa el bucle. El deep link ya está en el hash tras runCreateFlow.
-async function assertCreatedChallengeIsPlayable(page: Page): Promise<void> {
-  // Cargamos el deep link ya presente en el hash. El overlay «Empezar» (Modal) tapa la
-  // escena, así que el mapa/Street View NO se montan aún: llegar aquí no depende de
-  // Google Maps. Si getChallenge/getExistingVote fallaran, no habría overlay.
-  await expect(page.getByRole('heading', { name: '¿Listo para jugar?' })).toBeVisible({
-    timeout: 20_000,
-  })
-  await expect(page.getByRole('button', { name: 'Empezar' })).toBeVisible()
-  // El hash apunta al reto concreto que creamos (no a otro): confirma que el deep link
-  // que ofrece la tarjeta de compartir lleva de verdad a ESTE reto.
+// Comprueba el deep link del reto recién creado ABIERTO POR SU CREADOR (#509): la
+// sesión hermética ES el creador (created_by = usuario mockeado), así que en vez del
+// juego debe montar la guarda "Este reto es tuyo" (con "Ver marcador" / "Volver al
+// viaje"), nunca el overlay «Empezar». El harness solo tiene UN usuario (la sesión
+// va sembrada en localStorage), así que el caso "otro usuario juega el deep link"
+// no se puede simular aquí sin infraestructura nueva; lo cubren los unit tests de
+// PlayChallenge (flujo normal para un reto ajeno).
+async function assertCreatorSeesOwnChallengeGuard(page: Page): Promise<void> {
+  // Navegación SUAVE al deep link (hashchange, sin recarga): igual que seguir el
+  // enlace dentro de la app. El auto-join normaliza a `#g=…&c=…`, que es el mismo
+  // hash, así que no lo reescribe.
+  await page.evaluate(
+    ([g, c]) => {
+      location.hash = `#g=${g}&c=${c}`
+    },
+    [HERMETIC_GROUP_ID, HERMETIC_CHALLENGE_ID] as const,
+  )
+
+  // Guarda del creador: estado "Este reto es tuyo", sin juego (no hay «Empezar»).
+  await expect(page.getByText('Este reto es tuyo')).toBeVisible({ timeout: 20_000 })
+  // El mock de votos devuelve []: el creador ve que nadie ha jugado aún.
+  await expect(page.getByText('Nadie ha votado todavía.')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Ver marcador/ })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Empezar' })).not.toBeVisible()
+  // El hash apunta al reto concreto que creamos (no a otro): confirma que el deep
+  // link que ofrece la tarjeta de compartir lleva de verdad a ESTE reto.
   await expect
     .poll(() => page.evaluate(() => location.hash))
     .toContain(`c=${HERMETIC_CHALLENGE_ID}`)
+
+  // "Volver al viaje" saca al creador de la guarda y aterriza en la página del
+  // viaje. Hay dos controles con ese nombre (BackHomeButton arriba + el botón de la
+  // tarjeta); pulsamos el de la tarjeta (el último), que es el CTA del estado.
+  await page.getByRole('button', { name: 'Volver al viaje' }).last().click()
+  await page.waitForFunction(
+    () => location.hash.includes('#g=') && !location.hash.includes('&c='),
+    { timeout: 20_000 },
+  )
 }
 
 test.describe('crear reto (hermético)', () => {
-  test('camino feliz: elegir punto en mapa → previa SV → lanzar → deep link jugable, sin errores', async ({
+  test('camino feliz: elegir punto en mapa → previa SV → lanzar → volver al viaje; el creador ve "Este reto es tuyo" en su deep link, sin errores', async ({
     page,
   }) => {
     const errors = trackErrors(page)
@@ -151,9 +180,9 @@ test.describe('crear reto (hermético)', () => {
 
     await openCreateFromTrip(page)
     await runCreateFlow(page, { streetViewAvailable: true })
-    // El bucle no acaba al crear: el reto tiene que quedar JUGABLE. Seguimos el deep
-    // link y comprobamos que PlayChallenge arranca (overlay «Empezar»).
-    await assertCreatedChallengeIsPlayable(page)
+    // El bucle no acaba al crear: el deep link tiene que ser ALCANZABLE. Pero el
+    // creador no lo juega (#509): al abrirlo ve la guarda "Este reto es tuyo".
+    await assertCreatorSeesOwnChallengeGuard(page)
 
     expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
   })
