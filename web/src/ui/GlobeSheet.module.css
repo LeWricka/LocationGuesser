@@ -79,8 +79,8 @@
     to bottom,
     transparent 0%,
     transparent 74%,
-    color-mix(in srgb, var(--surface) 50%, transparent) 90%,
-    var(--surface) 100%
+    color-mix(in srgb, var(--paper) 50%, transparent) 90%,
+    var(--paper) 100%
   );
   transition: top var(--duration-slow) var(--ease-emphasized);
 }
@@ -100,7 +100,7 @@
   left: 0;
   right: 0;
   height: calc(var(--radius-xl) + var(--space-1));
-  background: var(--surface);
+  background: var(--paper);
   z-index: 1;
   pointer-events: none;
   transition: top var(--duration-slow) var(--ease-emphasized);
@@ -117,7 +117,7 @@
   z-index: 2;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  background: var(--paper);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   /* Sombra hacia arriba CORTA, no la global `--shadow-sheet`: esa proyecta 36px de blur a
      10px de offset y manchaba el globo por encima del canto, sumándose a la costura (la
