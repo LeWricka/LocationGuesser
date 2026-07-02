@@ -62,21 +62,17 @@ function MomentoCard({
   const placeName = moment.country?.name ?? null
 
   return (
-    <article
-      className={styles.card}
-      onClick={() => onExpand(moment)}
-      // La tarjeta en sí es el target de tocar para abrir el detalle.
-      // El CTA "Adivina →" tiene stopPropagation para no abrir el detalle también.
-      role="button"
-      tabIndex={0}
-      aria-label={moment.title}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onExpand(moment)
-        }
-      }}
-    >
+    <article className={styles.card}>
+      {/* Acción primaria "abrir detalle": botón overlay que cubre la tarjeta. Es
+          HERMANO del CTA "Adivina →" (no lo anida), para no crear controles
+          interactivos anidados (a11y: nested-interactive). Teclado nativo. */}
+      <button
+        type="button"
+        className={styles.openButton}
+        aria-label={moment.title}
+        onClick={() => onExpand(moment)}
+      />
+
       {/* Fondo: foto real o escena de reto. */}
       {hasPhoto ? (
         <div className={styles.footoWrapper}>
@@ -120,13 +116,7 @@ function MomentoCard({
           detiene la propagación para no disparar `onExpand` al mismo tiempo. */}
       {isActive && (
         <div className={styles.cta}>
-          <Button
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation()
-              onPlay(moment.challengeId)
-            }}
-          >
+          <Button size="sm" onClick={() => onPlay(moment.challengeId)}>
             Adivina →
           </Button>
         </div>

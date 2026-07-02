@@ -64,9 +64,11 @@
   padding: var(--space-5) 0 var(--space-2);
   background: linear-gradient(
     to top,
-    rgba(246, 247, 249, 0.7) 0%, /* design-lint-allow: velo claro bajo la timeline (funde con el papel de la hoja) */
-    rgba(246, 247, 249, 0.2) 60%, /* design-lint-allow: velo claro bajo la timeline (funde con el papel de la hoja) */
-    transparent 100%
+    rgba(246, 247, 249, 0.7) 0%,
+    /* design-lint-allow: velo claro bajo la timeline (funde con el papel de la hoja) */
+    rgba(246, 247, 249, 0.2) 60%,
+    /* design-lint-allow: velo claro bajo la timeline (funde con el papel de la hoja) */ transparent
+      100%
   );
   pointer-events: none;
 }
