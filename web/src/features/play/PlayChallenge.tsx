@@ -28,6 +28,7 @@ import {
 } from '../../lib/challenges'
 import { deleteMyVote, getExistingVote, getVotes, submitVote } from '../../lib/votes'
 import { getGroup } from '../../lib/groupData'
+import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
@@ -71,8 +72,10 @@ interface Props {
 
 // Fases del juego. El overlay "Empezar" tapa todo en `idle`; al pulsar Empezar se
 // pasa por `countdown` (3·2·1 sobre la foto del reto) antes de `playing`; el reloj
-// de la jugada solo corre en `playing`; tras `revealed` el voto queda fijo.
-type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed'
+// de la jugada solo corre en `playing`; tras `revealed` el voto queda fijo. `own`
+// es la guarda defensiva (#509): el creador del reto no juega el suyo propio, ni
+// aunque llegue por un enlace directo.
+type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own'
 
 // `start_at` por reto en localStorage: recargar durante la jugada no regala
 // tiempo (el reloj se reconstruye desde el instante en que se pulsó Empezar).
@@ -119,6 +122,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // solo recibe el código del grupo (groupId); el nombre lo leemos aparte. Null
   // hasta resolver (o si no hay grupo / falla): la tarjeta cae a "tu grupo".
   const [groupName, setGroupName] = useState<string | null>(null)
+  // Recuento de votos del reto, solo para la guarda "es tuyo" (#509): el creador
+  // ve cuánta gente ha jugado ya, sin entrar al juego. Null hasta resolver o si
+  // el reto no es propio (no se usa en el resto de fases).
+  const [ownVoteCount, setOwnVoteCount] = useState<number | null>(null)
   // Compartir mi resultado: estado del PNG. `sharingResult` deshabilita el botón
   // mientras se rasteriza/comparte; el ref apunta a la tarjeta montada fuera del
   // viewport para el snapshot (mismo patrón que ShareLeaderboardModal).
@@ -280,6 +287,21 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         const c = await getChallenge(challengeId)
         if (cancelled) return
         setChallenge(c)
+
+        // Guarda defensiva (#509): el creador no juega su propio reto, ni aunque
+        // llegue por un enlace directo (el flujo normal ya no lo manda aquí tras
+        // crear). Corta ANTES de mirar el tipo: aplica a lugar Y a número, sin
+        // llegar a delegar en PlayNumberChallenge.
+        if (user && c.created_by === user.id) {
+          try {
+            const votes = await getVotes(c.id)
+            if (!cancelled) setOwnVoteCount(votes.length)
+          } catch {
+            // Sin recuento: el estado se muestra igual, sin la cifra.
+          }
+          if (!cancelled) setPhase('own')
+          return
+        }
 
         // Reto de NÚMERO ("¿Adivinas?"): lo juega PlayNumberChallenge (rama propia, sin
         // mapa). NO corremos aquí la lógica de lugar (voto previo de lat/lng, etc.); el
@@ -546,6 +568,55 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             <Stack gap={2}>
               <strong>No se pudo cargar el reto.</strong>
               <span className={styles.status}>{loadError}</span>
+            </Stack>
+          </Card>
+        </Stack>
+      </main>
+    )
+  }
+
+  // Guarda "es tuyo" (#509): el creador no juega su propio reto. Va ANTES del
+  // despacho por tipo (lugar/número): no llegamos a montar ningún juego.
+  if (phase === 'own' && challenge) {
+    const backLabelOwn = groupId ? 'Volver al viaje' : 'Inicio'
+    return (
+      <main className="lg-page">
+        <Stack gap={4}>
+          <BackHomeButton onClick={goBack} label={backLabelOwn} />
+          <Stack gap={2} className={styles.header}>
+            <h1 className={styles.title}>{challenge.title}</h1>
+          </Stack>
+          <Card padding="md" raised>
+            <Stack gap={3} align="center">
+              <IconTrofeo size={40} />
+              <strong>Este reto es tuyo</strong>
+              <p className={styles.status}>
+                Lo creaste tú: ya conoces la respuesta, así que no puedes jugarlo.
+              </p>
+              {ownVoteCount != null && (
+                <p className={styles.status}>
+                  {ownVoteCount === 0
+                    ? 'Nadie ha votado todavía.'
+                    : `${ownVoteCount} ${ownVoteCount === 1 ? 'persona ha votado' : 'personas han votado'}.`}
+                </p>
+              )}
+              {groupId && (
+                <Button
+                  fullWidth
+                  size="lg"
+                  onClick={() => {
+                    location.hash = marcadorGroupHash(groupId)
+                  }}
+                >
+                  <span className={styles.inlineIcon}>
+                    <IconTrofeo size={18} />
+                    Ver marcador
+                  </span>
+                </Button>
+              )}
+              <Button variant="secondary" fullWidth onClick={goBack}>
+                Volver al viaje
+              </Button>
             </Stack>
           </Card>
         </Stack>
@@ -872,7 +943,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   variant="secondary"
                   size="sm"
                   onClick={() => {
-                    location.hash = `#g=${groupId}`
+                    // Al Marcador (no al Diario): venimos de jugar, lo esperable es
+                    // ver la clasificación (#509).
+                    location.hash = marcadorGroupHash(groupId)
                   }}
                 >
                   <span className={styles.inlineIcon}>

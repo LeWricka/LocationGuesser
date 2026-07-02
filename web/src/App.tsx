@@ -256,7 +256,8 @@ function LoggedIn({
     }
     // FAB "Reto" del viaje → flujo INMERSIVO de crear reto (mapa satélite a sangre
     // + hoja que crece por etapas). Reemplaza al asistente clásico de 3 pasos. Al
-    // crear, volvemos al reto recién lanzado (deep link) para ofrecer su enlace.
+    // crear, volvemos al viaje (diario): el creador no debe acabar jugando su
+    // propio reto (#509); el enlace para compartir se ofrece desde el viaje.
     if (route.groupAddChallenge) {
       return (
         <OnboardingGate context="create-challenge" userId={user?.id}>
@@ -268,8 +269,10 @@ function LoggedIn({
               onBack={() => {
                 location.hash = groupHash(groupId)
               }}
-              onCreated={(challenge) => {
-                location.hash = groupHash(groupId, challenge.id)
+              // El creador NO debe acabar jugando su propio reto (#509): tras crear,
+              // volvemos al viaje (diario), no al reto recién creado.
+              onCreated={() => {
+                location.hash = groupHash(groupId)
               }}
             />
           </GoogleMapsProvider>

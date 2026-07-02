@@ -312,6 +312,9 @@ export async function myGroups(userId: string): Promise<MyGroup[]> {
  * Retos abiertos en mis grupos que aún no he votado, ordenados por deadline más
  * próxima (cuentas-y-home.md §3.1, "🔔 Te toca jugar"). Vacío → la sección no se
  * muestra (decisión de UI #3).
+ *
+ * Excluye los retos que YO mismo he creado (#509): el creador conoce la
+ * respuesta, así que "Te toca jugar" no debe ofrecerle su propio reto.
  */
 export async function pendingChallenges(userId: string): Promise<PendingChallenge[]> {
   const groups = await myGroups(userId)
@@ -327,7 +330,7 @@ export async function pendingChallenges(userId: string): Promise<PendingChalleng
   const now = new Date()
   return (
     challenges
-      .filter((c) => isLive(c, now) && !votedChallengeIds.has(c.id))
+      .filter((c) => isLive(c, now) && !votedChallengeIds.has(c.id) && c.created_by !== userId)
       // Tras `isLive`, el plazo no es null (un recuerdo nunca está en vivo); el `?? 0`
       // solo satisface al tipo `string | null` (deadline_at nullable desde 0022).
       .sort(
