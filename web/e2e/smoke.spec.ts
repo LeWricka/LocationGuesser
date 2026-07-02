@@ -82,27 +82,23 @@ test.describe('smoke', () => {
     await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
       timeout: 20_000,
     })
-    // CTA principal (alta) y secundario (login) presentes (#495).
-    const createBtn = page.getByRole('button', { name: 'Crear tu viaje', exact: true })
-    const loginBtn = page.getByRole('button', { name: 'Ya tengo cuenta · Entrar', exact: true })
-    await expect(createBtn).toBeVisible()
-    await expect(loginBtn).toBeVisible()
-    // "Tengo un código" eliminado (#495): los viajes van por enlace.
-    await expect(page.getByRole('button', { name: /Tengo un código/i })).not.toBeVisible()
+    // CTA ÚNICO email-first (#506): "Empieza a compartir". Ya no hay separación
+    // alta/login ("Crear tu viaje" / "Ya tengo cuenta") ni "Tengo un código" (los
+    // viajes van por enlace). Puede haber más de un CTA con ese nombre (hero +
+    // showcase), así que tomamos el primero.
+    const startBtn = page.getByRole('button', { name: 'Empieza a compartir', exact: true }).first()
+    await expect(startBtn).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Crear tu viaje', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Ya tengo cuenta/i })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /Tengo un código/i })).toHaveCount(0)
 
-    // 4a. El CTA de alta ("Crear tu viaje") abre EnterScreen: nombre + correo, sin código.
-    await createBtn.click()
-    await expect(page.getByRole('textbox', { name: 'Tu nombre' })).toBeVisible()
+    // El CTA abre el login email-first (LoginScreen): SOLO correo, un único flujo para
+    // nuevo y recurrente. Sin campo de nombre (si la cuenta es nueva, el nombre se
+    // pide DESPUÉS del código, no aquí).
+    await startBtn.click()
+    await expect(page.getByRole('heading', { name: 'Entra a Tabide' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
-    // Volver a la landing.
-    await page.getByRole('button', { name: 'Atrás' }).click()
-
-    // 4b. El CTA de login ("Ya tengo cuenta · Entrar") abre LoginEmailScreen: solo correo.
-    await loginBtn.click()
-    await expect(page.getByRole('heading', { name: 'Bienvenido de vuelta' })).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
-    await expect(page.getByRole('textbox', { name: 'Tu nombre' })).not.toBeVisible()
-    await expect(page.getByRole('button', { name: 'Enviarme el enlace' })).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Tu nombre' })).toHaveCount(0)
 
     // 5. Higiene: ningún error PROPIO de consola/JS/petición (terceros tolerados).
     expect(errors, `Errores inesperados al cargar la landing:\n${errors.join('\n')}`).toEqual([])
