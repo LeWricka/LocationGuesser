@@ -1,6 +1,6 @@
 /*
- * PantallaCrearReto — pantalla 3/5 (mockup). Flujo de crear "¿Dónde?" GeoGuessr puro.
- * Dos estados: (a) Ubicación y (b) Confirmar Street View.
+ * PantallaCrearReto — pantalla "Crear ¿Dónde?" (mockup). Un solo paso: Street View
+ * directo. Dos estados: (a) street-view (con cobertura) y (b) sin-cobertura.
  */
 
 /* Andamiaje de MOCKUP: conmutador de sub-estados. Estilo de "herramienta de
@@ -47,15 +47,7 @@
   color: var(--surface);
 }
 
-/* Instrucción de la hoja (estado a: Ubicación) */
-.instruccion {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-
-/* Estado (b): confirmación del Street View */
+/* Contenido de la hoja (ayuda + privacidad, o aviso sin cobertura) */
 .confirmacion {
   display: flex;
   flex-direction: column;
@@ -75,19 +67,4 @@
 .notaEmoji {
   font-size: var(--font-size-xl); /* aprox 32px vía token */
   flex-shrink: 0;
-}
-
-/* Estado "sin cobertura de SV" */
-.avisoSinCobertura {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--color-warning-soft);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--hairline-strong);
-}
-
-.avisoIcon {
-  font-size: var(--font-size-xl); /* aprox 32px vía token */
 }

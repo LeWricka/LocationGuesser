@@ -23,8 +23,9 @@ interface MockupPantalla {
   render: () => React.ReactElement
 }
 
-// Registro de las 5 pantallas del camino feliz.
-// PantallaCrearReto tiene 3 sub-estados; registramos los 3 para la galería.
+// Registro de las 6 pantallas del camino feliz.
+// "Crear ¿Dónde?" es un solo paso (Street View directo) con 2 sub-estados
+// (con cobertura / sin cobertura); registramos ambos para la galería.
 const PANTALLAS: MockupPantalla[] = [
   {
     id: 'entrar',
@@ -39,20 +40,14 @@ const PANTALLAS: MockupPantalla[] = [
     render: () => <PantallaVerViaje />,
   },
   {
-    id: 'crear-reto-ubicacion',
-    nombre: 'Crear reto — Ubicación',
-    shell: 'ShellInmersivo',
-    render: () => <PantallaCrearReto estadoInicial="ubicacion" />,
-  },
-  {
     id: 'crear-reto-sv',
-    nombre: 'Crear reto — Confirmar Street View',
+    nombre: 'Crear ¿Dónde? — Street View',
     shell: 'ShellInmersivo',
-    render: () => <PantallaCrearReto estadoInicial="confirmar-sv" />,
+    render: () => <PantallaCrearReto estadoInicial="street-view" />,
   },
   {
     id: 'crear-reto-sin-sv',
-    nombre: 'Crear reto — Sin cobertura SV',
+    nombre: 'Crear ¿Dónde? — Sin cobertura',
     shell: 'ShellInmersivo',
     render: () => <PantallaCrearReto estadoInicial="sin-cobertura" />,
   },

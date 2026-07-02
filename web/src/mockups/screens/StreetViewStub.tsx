@@ -3,7 +3,14 @@
 
 import styles from './StreetViewStub.module.css'
 
-export function StreetViewStub() {
+interface Props {
+  /** Chip de lugar centrado arriba (dónde cae el panorama). */
+  label?: string
+  /** Afordancia sutil de "recentrar en mi ubicación" (GPS) arriba a la derecha. */
+  showGps?: boolean
+}
+
+export function StreetViewStub({ label, showGps = false }: Props) {
   return (
     <div className={styles.root}>
       <div className={styles.buildingLeft} />
@@ -11,6 +18,8 @@ export function StreetViewStub() {
       <div className={styles.road} />
       <div className={styles.vanish} />
       <div className={styles.veil} />
+      {label && <div className={styles.label}>{label}</div>}
+      {showGps && <div className={styles.gps}>◎</div>}
       <span className={styles.badge}>Street View</span>
     </div>
   )

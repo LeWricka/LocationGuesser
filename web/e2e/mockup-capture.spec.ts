@@ -27,7 +27,6 @@ const VIEWPORTS: Viewport[] = [
 const MOCKUP_IDS = [
   'entrar',
   'ver-viaje',
-  'crear-reto-ubicacion',
   'crear-reto-sv',
   'crear-reto-sin-sv',
   'jugar',
