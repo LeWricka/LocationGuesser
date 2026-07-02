@@ -598,7 +598,9 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
-  color: var(--color-text-faint);
+  /* Es un rol de ETIQUETA (debe leerse): tinta `muted` (AA en todos los fondos)
+     en vez de `faint`, decorativo y que no cumple contraste a este tamaño. */
+  color: var(--color-text-muted);
 }
 
 /*

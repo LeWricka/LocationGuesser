@@ -5,15 +5,15 @@
 // de datos demo curados (el wow y la identidad) y una HOJA BLANCA que sube debajo con el
 // mensaje y el CTA (la legibilidad). Sustituye a la portada con imagen estática: ahora el
 // héroe es el globo real, interactivo, y el relato vive en la hoja. El correo NO está a la
-// vista: aparece en un popup fino (LoginPopup) al pulsar "Empieza".
+// vista: al pulsar "Empieza" se muestra EnterScreen a pantalla completa (#474).
 //
 // La política sigue siendo passwordless puro: sin contraseñas (cuentas-y-home.md §1.2 y
-// §2). Login y registro son el MISMO flujo OTP, así que un solo popup sirve para ambos.
+// §2). Login y registro son el MISMO flujo de entrada, así que una sola pantalla sirve.
 //
 // Reutiliza:
 //  - `features/home/GlobeSheet` (+ HomeGlobe) para el patrón globo + hoja, con el preset
 //    de mapa `diario` (satélite + etiquetas) y los pines-foto del mapa de viaje.
-//  - `ui/Modal` (vía LoginPopup) para la hoja de entrada, con todo el wiring OTP.
+//  - `EnterScreen` para la pantalla de entrada (nombre + email), con todo el wiring.
 //  - `LandingShowcase` para ENSEÑAR un viaje de ejemplo (diario + reto + marcador) dentro
 //    de la hoja: el visitante ve el producto en acción antes de entrar (issue #452;
 //    validación jul-2026: "ver el producto antes de entrar es clave", el eslogan solo es
@@ -25,7 +25,7 @@ import { Button, GlobeSheet, Field, Input, Logo, Stack } from '../../ui'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { joinByCode } from '../home/navigation'
 import { LandingShowcase } from './LandingShowcase'
-import { LoginPopup } from './LoginPopup'
+import { EnterScreen } from './EnterScreen'
 import styles from './Landing.module.css'
 
 interface Props {
@@ -42,8 +42,9 @@ interface Props {
 }
 
 export function Landing({ groupName, redirectTo }: Props) {
-  // El email no está a la vista: se abre la hoja al pulsar el CTA (o "ya tengo cuenta",
-  // que es el mismo flujo OTP — login y registro no se distinguen).
+  // El email no está a la vista: al pulsar el CTA (o "ya tengo cuenta", que es el
+  // mismo flujo de entrada) se muestra EnterScreen a PANTALLA COMPLETA (patrón
+  // aprobado #474), no un modal. Enviar entra igual; volver atrás repinta la landing.
   const [authOpen, setAuthOpen] = useState(false)
 
   // Atajo opcional (solo landing genérica): el visitante que ya tiene un código de VIAJE
@@ -54,6 +55,16 @@ export function Landing({ groupName, redirectTo }: Props) {
   const [codeError, setCodeError] = useState<string | undefined>(undefined)
 
   const joining = Boolean(groupName)
+
+  // Al pulsar el CTA: la entrada ocupa toda la vista. La lógica (useEnter,
+  // enterWithNameAndEmail, estado recover) vive en EnterScreen; el redirectTo y
+  // el destino deep-link ya guardado por App.tsx se preservan tal cual, así que
+  // el auto-join al reto/viaje al volver del correo sigue funcionando.
+  if (authOpen) {
+    return (
+      <EnterScreen joining={joining} redirectTo={redirectTo} onBack={() => setAuthOpen(false)} />
+    )
+  }
 
   return (
     <main className={styles.page}>
@@ -149,13 +160,6 @@ export function Landing({ groupName, redirectTo }: Props) {
             + CTA bastan y el showcase distraería del "únete a <grupo>". */}
         {!joining && <LandingShowcase className={styles.how} onStart={() => setAuthOpen(true)} />}
       </GlobeSheet>
-
-      <LoginPopup
-        open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        joining={joining}
-        redirectTo={redirectTo}
-      />
     </main>
   )
 }
