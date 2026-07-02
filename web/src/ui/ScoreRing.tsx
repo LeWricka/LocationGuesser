@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useReducedMotion } from './motion'
 import styles from './ScoreRing.module.css'
 
@@ -20,6 +20,9 @@ interface Props {
 // Presentacional: no calcula scoring, solo lo visualiza.
 export function ScoreRing({ value, max, size = 96, children, className }: Props) {
   const reduced = useReducedMotion()
+  // Id único del gradiente: si dos anillos se montan a la vez (galería, listas),
+  // un id fijo compartiría el mismo <linearGradient> entre ambos SVG.
+  const gradientId = useId()
   const stroke = Math.max(6, Math.round(size * 0.085))
   const r = (size - stroke) / 2
   const c = 2 * Math.PI * r
@@ -52,18 +55,20 @@ export function ScoreRing({ value, max, size = 96, children, className }: Props)
     >
       <svg viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden="true">
         <defs>
-          <linearGradient id="lg-score-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#ffce82" />
-            <stop offset="0.5" stopColor="#ffb24d" />
-            <stop offset="1" stopColor="#ff7a59" />
+          {/* Degradado de marca Grafito+teal (antes ámbar/naranja). Los stops usan
+              clases con `stop-color` (CSS) en vez de `stopColor` inline: así leen
+              los tokens de marca y no disparan la regla de color del design-lint. */}
+          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" className={styles.stopStart} />
+            <stop offset="1" className={styles.stopEnd} />
           </linearGradient>
         </defs>
         <circle
+          className={styles.track}
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="rgba(150, 220, 225, 0.16)"
           strokeWidth={stroke}
         />
         <circle
@@ -72,7 +77,7 @@ export function ScoreRing({ value, max, size = 96, children, className }: Props)
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="url(#lg-score-grad)"
+          stroke={`url(#${gradientId})`}
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={c}
