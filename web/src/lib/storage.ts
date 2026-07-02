@@ -25,6 +25,22 @@ interface DecodedImage {
 }
 
 /**
+ * La imagen concreta que no se pudo leer. `fileName` deja que el llamador (p.ej.
+ * un bucle que sube varias fotos de una galería) sepa CUÁL falló sin tener que
+ * parsear el mensaje; el mensaje también lleva el nombre para que el toast de
+ * error ya sea útil sin cambios en la UI.
+ */
+export class ImageDecodeError extends Error {
+  readonly fileName: string
+
+  constructor(fileName: string, options?: ErrorOptions) {
+    super(`No se pudo leer la imagen «${fileName}». Prueba con otra foto (JPEG o PNG).`, options)
+    this.name = 'ImageDecodeError'
+    this.fileName = fileName
+  }
+}
+
+/**
  * ¿Es la foto un HEIC/HEIF de iPhone? Los navegadores que no lo decodifican
  * nativamente (Chrome, Firefox de escritorio) no pueden con `createImageBitmap`
  * ni `<img>.decode()`, así que hay que convertirla antes. Detectamos por MIME
@@ -52,16 +68,65 @@ async function heicToJpeg(file: File): Promise<File> {
 }
 
 /**
+ * Carga el archivo en un `<img>` y espera a 'load'. Es la MISMA vía que pinta la
+ * miniatura del selector de galería (`MomentGalleryPicker`) — que en el bug de
+ * Android (#520) se pinta bien aunque el resto del pipeline falle — así que si
+ * esto rechaza, el navegador de verdad no puede con el archivo (no hay fallback
+ * posible). A propósito NO llamamos a `.decode()`: `decode()` exige tener toda
+ * la imagen decodificada a resolución NATIVA en memoria, y precisamente eso es
+ * lo que revienta con fotos de 40-100 MP de cámaras Android (aunque el mismo
+ * navegador SÍ sepa pintar esa misma foto reducida, que es por lo que la
+ * miniatura del picker se ve bien mientras el guardado falla).
+ */
+function loadImageElement(file: File): Promise<{ img: HTMLImageElement; url: string }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => resolve({ img, url })
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('El navegador no pudo cargar la imagen'))
+    }
+    img.src = url
+  })
+}
+
+/**
  * Decodifica el archivo de forma robusta en móvil:
- * 1) `createImageBitmap` (rápido y respeta la orientación EXIF).
- * 2) Fallback a `<img>` + `decode()` si lo anterior falla — pasa en algunos
- *    Chrome de Android (p.ej. Pixel) con JPEG grandes o progresivos, que lanzan
- *    "source image could not be decoded". Los navegadores aplican la
- *    orientación EXIF a `<img>`, así que el canvas queda derecho igualmente.
+ * 1) `<img>` (ver `loadImageElement`): de aquí sacamos las dimensiones NATURALES
+ *    sin forzar un decode de píxeles a resolución nativa.
+ * 2) `createImageBitmap`, YA pidiendo el tamaño final (`resizeWidth`/
+ *    `resizeHeight` calculados con la proporción real del paso 1). Pedirlo a
+ *    resolución nativa —como se hacía antes— es lo que revienta con fotos
+ *    gigantes de cámaras Android (el bitmap de una foto de 100 MP pesa varios
+ *    cientos de MB en RGBA); pedirlo ya reducido evita reservar esa memoria. Al
+ *    conocer ya la proporción real no hay upscale ni distorsión.
+ * 3) Si `createImageBitmap` aun así falla (browsers viejos que ignoran el
+ *    resize, formatos raros…), usamos directamente el `<img>` del paso 1 como
+ *    fuente para `drawImage` — sin `decode()` explícito, por el mismo motivo
+ *    que en el paso 1.
  */
 async function decodeImage(file: File): Promise<DecodedImage> {
+  // Si ni el <img> puede con el archivo, no hay nada que hacer: es justo la vía
+  // que demuestra que el navegador SÍ sabe pintar la foto (miniatura del picker).
+  const { img, url } = await loadImageElement(file)
+  const naturalWidth = img.naturalWidth
+  const naturalHeight = img.naturalHeight
+  const hasNaturalSize = naturalWidth > 0 && naturalHeight > 0
+  const target = hasNaturalSize ? scaledSize(naturalWidth, naturalHeight) : null
+
   try {
-    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const bitmap = await createImageBitmap(file, {
+      imageOrientation: 'from-image',
+      ...(target
+        ? {
+            resizeWidth: target.width,
+            resizeHeight: target.height,
+            resizeQuality: 'medium' as const,
+          }
+        : {}),
+    })
+    URL.revokeObjectURL(url)
     return {
       width: bitmap.width,
       height: bitmap.height,
@@ -69,23 +134,14 @@ async function decodeImage(file: File): Promise<DecodedImage> {
       release: () => bitmap.close(),
     }
   } catch {
-    // createImageBitmap no pudo: probamos con <img>.
+    // createImageBitmap no pudo: seguimos con el <img> que ya cargamos arriba.
   }
 
-  const url = URL.createObjectURL(file)
-  try {
-    const img = new Image()
-    img.src = url
-    await img.decode()
-    return {
-      width: img.naturalWidth,
-      height: img.naturalHeight,
-      source: img,
-      release: () => URL.revokeObjectURL(url),
-    }
-  } catch {
-    URL.revokeObjectURL(url)
-    throw new Error('No se pudo leer la imagen. Prueba con otra foto (JPEG o PNG).')
+  return {
+    width: naturalWidth,
+    height: naturalHeight,
+    source: img,
+    release: () => URL.revokeObjectURL(url),
   }
 }
 
@@ -112,9 +168,7 @@ async function compressAndStripExif(file: File): Promise<Blob> {
         fileSizeKb: Math.round(file.size / 1024),
         fileName: file.name,
       })
-      throw new Error('No se pudo leer la imagen. Prueba con otra foto (JPEG o PNG).', {
-        cause: err,
-      })
+      throw new ImageDecodeError(file.name, { cause: err })
     }
   }
 
@@ -122,8 +176,10 @@ async function compressAndStripExif(file: File): Promise<Blob> {
   try {
     img = await decodeImage(decodable)
   } catch (err) {
-    // Ni `createImageBitmap` ni `<img>.decode()` pudieron con el archivo.
-    // Reportamos para tener visibilidad del formato problemático en Sentry.
+    // Ni el `<img>` (paso 1) ni `createImageBitmap` (paso 2) pudieron con el
+    // archivo. Reportamos para tener visibilidad del formato problemático en
+    // Sentry; el error de cara al usuario lleva el nombre para saber cuál foto
+    // fue (si hay varias, como en la galería de un recuerdo).
     reportError(err, {
       area: 'image_decode',
       stage: 'decode',
@@ -131,7 +187,7 @@ async function compressAndStripExif(file: File): Promise<Blob> {
       fileSizeKb: Math.round(file.size / 1024),
       fileName: file.name,
     })
-    throw err
+    throw new ImageDecodeError(file.name, { cause: err })
   }
   try {
     const { width, height } = scaledSize(img.width, img.height)
@@ -165,9 +221,7 @@ async function squareCropToJpeg(file: File): Promise<Blob> {
         fileSizeKb: Math.round(file.size / 1024),
         fileName: file.name,
       })
-      throw new Error('No se pudo leer la imagen. Prueba con otra foto (JPEG o PNG).', {
-        cause: err,
-      })
+      throw new ImageDecodeError(file.name, { cause: err })
     }
   }
 
@@ -182,7 +236,7 @@ async function squareCropToJpeg(file: File): Promise<Blob> {
       fileSizeKb: Math.round(file.size / 1024),
       fileName: file.name,
     })
-    throw err
+    throw new ImageDecodeError(file.name, { cause: err })
   }
   try {
     // Cuadrado centrado: tomamos el lado corto y descartamos los bordes del lado
