@@ -5,7 +5,7 @@ const meta = {
   title: 'Cuentas/HomeEmptyState',
   component: HomeEmptyState,
   parameters: { layout: 'padded' },
-  args: { name: 'Lewis', onCreateGroup: () => {}, onJoinGroup: () => {} },
+  args: { name: 'Lewis', onCreateGroup: () => {} },
 } satisfies Meta<typeof HomeEmptyState>
 
 export default meta

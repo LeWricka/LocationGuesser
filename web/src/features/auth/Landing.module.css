@@ -62,13 +62,12 @@
   margin-top: var(--space-5);
 }
 
-.codeForm {
-  margin-top: var(--space-4);
-  text-align: left;
-  width: 100%;
-  max-width: var(--container-max);
-  margin-left: auto;
-  margin-right: auto;
+/* Nota de ayuda: "¿Te han pasado un enlace? Ábrelo y entras directo."
+ * Discreta (faint) para no competir con los CTAs pero siempre visible. */
+.linkHint {
+  margin-top: var(--space-3);
+  text-align: center;
+  color: var(--color-text-faint);
 }
 
 /* "Cómo funciona" dentro de la hoja: separación del bloque del hero. */

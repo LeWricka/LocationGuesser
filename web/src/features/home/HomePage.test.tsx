@@ -63,9 +63,11 @@ describe('HomePage', () => {
   test('usuario sin grupos → hero explicativo con "cómo funciona"', async () => {
     render(<HomePage />)
     await waitFor(() => expect(screen.getByText('Cómo funciona')).toBeInTheDocument())
-    // CTAs de empezar: crear o unirse con código.
+    // CTA de empezar: solo crear (el "Unirme con un código" se elimina en #495).
     expect(screen.getByRole('button', { name: 'Crear viaje' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Unirme con un código' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Unirme con un código' })).not.toBeInTheDocument()
+    // La nota de enlace sí aparece.
+    expect(screen.getByText(/Te han pasado un enlace/i)).toBeInTheDocument()
   })
 
   test('con grupos → feed de portadas con el viaje, sin montar mapamundi', async () => {

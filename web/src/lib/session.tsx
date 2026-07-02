@@ -55,9 +55,19 @@ export function AuthProvider({ children }: Props) {
 
     // Cambios posteriores: login (incluido el callback del magic link que
     // detectSessionInUrl procesa), logout y refresh de token.
+    //
+    // IMPORTANTE (bug #495): ponemos loading:true durante la carga del perfil para
+    // que App no intente renderizar el árbol logueado con profile=null (transitorio).
+    // Sin este flag, onAuthStateChange seteaba session (con user) pero profile aún era
+    // null → needsProfileStep(null)=true → ProfileGate aparecía un instante para
+    // usuarios que SÍ tienen perfil (p.ej. vuelven por magic link). Con loading:true
+    // App muestra BootScreen hasta que el perfil esté disponible: sin parpadeo.
     const subscription = onAuthStateChange((_event, nextSession) => {
+      setLoading(true)
       setSession(nextSession)
-      void loadProfile(nextSession?.user ?? null)
+      void loadProfile(nextSession?.user ?? null).finally(() => {
+        if (active) setLoading(false)
+      })
     })
 
     return () => {

@@ -1,31 +1,30 @@
 // Raíz de la app con cuentas + home (cuentas-y-home.md §2 y §3.4). App es el
 // INTEGRADOR del enrutado: monta <AuthProvider> y, dentro, un router por hash
 // basado en sesión. Cada feature vive en su carpeta; App solo decide qué pantalla
-// pintar según { sesión, perfil, hash }.
+// pintar según { sesión, hash }.
 //
-// Flujos (cuentas-y-home.md §2.2; entrada de baja fricción #438):
+// Flujos (#495):
 //  - loading                  → spinner de arranque
-//  - sin sesión               → Landing (CTA → EnterScreen: nombre+email → dentro al instante)
-//  - sesión sin nombre elegido → ProfileGate (raro: el nombre se captura al entrar)
-//  - sesión OK                → router por hash:
+//  - sin sesión               → Landing:
+//       CTA "Crear tu viaje"         → EnterScreen (nombre+email → dentro al instante)
+//       CTA "Ya tengo cuenta·Entrar" → LoginEmailScreen (email → magic link → home)
+//  - sesión OK                → router por hash (ProfileGate eliminado del flujo normal):
 //       #g=&c=  → PlayChallenge (auto-join)          [permitido con email pendiente]
-//       #g=     → GroupPage     (auto-join)          [permitido con email pendiente]
-//       #nuevo  → CreateGroup si el email está VALIDADO; si no, CreateGate ("valida tu correo")
-//       #perfil → ProfileEditScreen
+//       #g=     → TripPage     (auto-join)            [permitido con email pendiente]
+//       #nuevo  → CreateGroup si el email está VALIDADO; si no, CreateGate
+//       #perfil → ProfileEditScreen  (acceso BAJO DEMANDA; no como puerta de entrada)
 //       #admin  → AdminPage (SOLO admin; un no-admin cae a la home)
 //       raíz    → HomePage
+//
+// ProfileGate eliminado del flujo de onboarding (#495): el nombre siempre se captura
+// al registrarse (EnterScreen) y al volver por magic link ya existe en el perfil. No
+// hay escenario legítimo donde llegar a ProfileGate sin haber dado un nombre antes.
+// La edición de perfil es accesible bajo demanda vía #perfil, no como paso forzado.
 
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { isAdminEmail } from './lib/admin'
-import {
-  Landing,
-  ProfileGate,
-  ProfileEditScreen,
-  CreateGate,
-  useDeepLinkJoin,
-  needsProfileStep,
-} from './features/auth'
+import { Landing, ProfileEditScreen, CreateGate, useDeepLinkJoin } from './features/auth'
 import { OnboardingGate, ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
@@ -82,7 +81,7 @@ function isAdminHash(hash: string = window.location.hash): boolean {
 }
 
 function AppRoutes() {
-  const { user, profile, loading, refreshProfile } = useSession()
+  const { user, loading } = useSession()
   const [route, setRoute] = useState(parseHash())
   // El hash de admin se sigue aparte porque parseHash lo colapsa a la home; sin
   // este estado, navegar a `#admin` no repintaría (mismo valor de route).
@@ -104,29 +103,23 @@ function AppRoutes() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  // Arranque: resolviendo la sesión persistida.
+  // Arranque: resolviendo la sesión persistida O cargando el perfil tras onAuthStateChange.
+  // Con el fix de session.tsx, loading cubre ambas situaciones: arranque inicial y los
+  // instantes en que onAuthStateChange dispara y el perfil aún no ha llegado.
   if (loading) return <BootScreen />
 
   // ── Sin sesión ──────────────────────────────────────────────────────────────
   // Cualquier ruta cae a la landing pública. Si la URL trae un deep link de
   // grupo, guardamos el destino para restaurarlo tras el email y adaptamos el
-  // copy ("Únete a <grupo> y juega") con el nombre del grupo.
+  // copy ("Vive los viajes de <grupo>") con el nombre del grupo.
   if (!user) {
     return <LoggedOut route={route} />
   }
 
-  // ── Sesión, pero falta elegir nombre (primer login) ──────────────────────────
-  if (needsProfileStep(profile)) {
-    return (
-      <ProfileGate
-        userId={user.id}
-        initialName={profile?.display_name ?? ''}
-        onDone={() => void refreshProfile()}
-      />
-    )
-  }
-
-  // ── Sesión + perfil OK ───────────────────────────────────────────────────────
+  // ── Sesión OK → router por hash ──────────────────────────────────────────────
+  // ProfileGate eliminado (#495): el nombre SIEMPRE se captura al entrar (EnterScreen)
+  // o ya existe en el perfil (login por magic link). No hay escenario normal donde
+  // llegar aquí sin nombre. La edición es #perfil bajo demanda.
   return <LoggedIn route={route} adminRoute={adminRoute} />
 }
 

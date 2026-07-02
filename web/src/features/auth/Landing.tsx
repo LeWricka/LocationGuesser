@@ -1,32 +1,37 @@
 // Landing pública para visitantes SIN sesión (issue #175; portada visual #183;
-// patrón globo + hoja #343).
+// patrón globo + hoja #343; flujo login/registro #495).
 //
 // Patrón GLOBO + HOJA (referencia Polarsteps): un globo a sangre arriba con pines-foto
 // de datos demo curados (el wow y la identidad) y una HOJA BLANCA que sube debajo con el
-// mensaje y el CTA (la legibilidad). Sustituye a la portada con imagen estática: ahora el
-// héroe es el globo real, interactivo, y el relato vive en la hoja. El correo NO está a la
-// vista: al pulsar "Empieza" se muestra EnterScreen a pantalla completa (#474).
+// mensaje y el CTA (la legibilidad).
 //
-// La política sigue siendo passwordless puro: sin contraseñas (cuentas-y-home.md §1.2 y
-// §2). Login y registro son el MISMO flujo de entrada, así que una sola pantalla sirve.
+// La política sigue siendo passwordless puro: sin contraseñas (cuentas-y-home.md §1.2).
+// Ahora distinguimos ALTA (EnterScreen: nombre+email → dentro al instante) de LOGIN
+// (LoginEmailScreen: solo email → magic link → home directa sin ProfileGate).
+//
+// Cambios respecto al diseño anterior (#495):
+//  - CTA primario: "Crear tu viaje" → EnterScreen (alta).
+//  - CTA secundario: "Ya tengo cuenta · Entrar" → LoginEmailScreen (login).
+//  - ELIMINADO: "Tengo un código" (los viajes van por enlace, no por código manual).
+//  - Conservada: nota "¿Te han pasado un enlace? Ábrelo y entras directo."
+//  - Copy del lead: de "Gana quien más se acerca" a guardar/compartir/interactuar.
 //
 // Reutiliza:
-//  - `features/home/GlobeSheet` (+ HomeGlobe) para el patrón globo + hoja, con el preset
-//    de mapa `diario` (satélite + etiquetas) y los pines-foto del mapa de viaje.
-//  - `EnterScreen` para la pantalla de entrada (nombre + email), con todo el wiring.
-//  - `LandingShowcase` para ENSEÑAR un viaje de ejemplo (diario + reto + marcador) dentro
-//    de la hoja: el visitante ve el producto en acción antes de entrar (issue #452;
-//    validación jul-2026: "ver el producto antes de entrar es clave", el eslogan solo es
-//    vago). Sustituye a `HowItWorksImmersive`, que solo lo contaba con placeholders.
-//  - `features/home/navigation.joinByCode` para el atajo "tengo un código de viaje".
+//  - `features/home/GlobeSheet` para el patrón globo + hoja.
+//  - `EnterScreen` para el alta (nombre + email → dentro al instante).
+//  - `LoginEmailScreen` para el login (email → magic link → home sin ProfileGate).
+//  - `LandingShowcase` para enseñar el producto en acción dentro de la hoja.
 
 import { useState } from 'react'
-import { Button, GlobeSheet, Field, Input, Logo, Stack } from '../../ui'
+import { Button, GlobeSheet, Logo, Stack } from '../../ui'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
-import { joinByCode } from '../home/navigation'
 import { LandingShowcase } from './LandingShowcase'
 import { EnterScreen } from './EnterScreen'
+import { LoginEmailScreen } from './LoginEmailScreen'
 import styles from './Landing.module.css'
+
+// Qué pantalla de auth muestra la landing cuando el usuario pulsa un CTA.
+type AuthMode = 'none' | 'signup' | 'login'
 
 interface Props {
   /**
@@ -42,27 +47,31 @@ interface Props {
 }
 
 export function Landing({ groupName, redirectTo }: Props) {
-  // El email no está a la vista: al pulsar el CTA (o "ya tengo cuenta", que es el
-  // mismo flujo de entrada) se muestra EnterScreen a PANTALLA COMPLETA (patrón
-  // aprobado #474), no un modal. Enviar entra igual; volver atrás repinta la landing.
-  const [authOpen, setAuthOpen] = useState(false)
-
-  // Atajo opcional (solo landing genérica): el visitante que ya tiene un código de VIAJE
-  // lo pega aquí y entra directo al flujo de unirse (#g=<código>). Se despliega bajo el
-  // botón ghost. Es distinto del código OTP de login: este navega, no autentica.
-  const [codeOpen, setCodeOpen] = useState(false)
-  const [groupCode, setGroupCode] = useState('')
-  const [codeError, setCodeError] = useState<string | undefined>(undefined)
+  // El auth NO está a la vista: al pulsar un CTA se muestra la pantalla correspondiente
+  // a PANTALLA COMPLETA (patrón aprobado #474), no un modal.
+  const [authMode, setAuthMode] = useState<AuthMode>('none')
 
   const joining = Boolean(groupName)
 
-  // Al pulsar el CTA: la entrada ocupa toda la vista. La lógica (useEnter,
-  // enterWithNameAndEmail, estado recover) vive en EnterScreen; el redirectTo y
-  // el destino deep-link ya guardado por App.tsx se preservan tal cual, así que
-  // el auto-join al reto/viaje al volver del correo sigue funcionando.
-  if (authOpen) {
+  // Alta: EnterScreen (nombre + email → dentro al instante). Mismo flujo en ambos
+  // contextos (landing genérica e invitación a viaje).
+  if (authMode === 'signup') {
     return (
-      <EnterScreen joining={joining} redirectTo={redirectTo} onBack={() => setAuthOpen(false)} />
+      <EnterScreen joining={joining} redirectTo={redirectTo} onBack={() => setAuthMode('none')} />
+    )
+  }
+
+  // Login: LoginEmailScreen (solo email → magic link → home directa sin ProfileGate).
+  // Desde el flujo de invitación, "¿Ya tienes cuenta? Entra" abre el login: el auto-join
+  // al volver del enlace se encarga del grupo. El redirectTo preserva el destino deep-link
+  // guardado por App.tsx en lg.next.
+  if (authMode === 'login') {
+    return (
+      <LoginEmailScreen
+        redirectTo={redirectTo}
+        onBack={() => setAuthMode('none')}
+        onSignUp={() => setAuthMode('signup')}
+      />
     )
   }
 
@@ -73,8 +82,8 @@ export function Landing({ groupName, redirectTo }: Props) {
         // Pines DECORATIVOS: vista mundo fija (sin fit) → el globo héroe se ve SIEMPRE
         // esférico, nunca aplanado por un encuadre cercano de pines agrupados.
         framing="world"
-        // Tocar un pin demo en la landing = invitar a empezar (no hay viaje real).
-        onOpenPin={() => setAuthOpen(true)}
+        // Tocar un pin demo en la landing = invitar a crear (no hay viaje real).
+        onOpenPin={() => setAuthMode('signup')}
         sheetLabel="Empieza a compartir"
         overlay={
           <span className={styles.brand}>
@@ -89,7 +98,9 @@ export function Landing({ groupName, redirectTo }: Props) {
               <h1 className={styles.headline}>
                 Vive los viajes de <span className={styles.accent}>{groupName}</span>
               </h1>
-              <p className={styles.lead}>Te comparten dónde estuvieron y tú lo vives con ellos.</p>
+              <p className={styles.lead}>
+                Guarda lo que vivís. Compartid cada momento de una forma diferente.
+              </p>
             </>
           ) : (
             <>
@@ -97,60 +108,32 @@ export function Landing({ groupName, redirectTo }: Props) {
                 Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
               </h1>
               <p className={styles.lead}>
-                Tu gente adivina dónde estuviste. Gana quien más se acerca.
+                Guarda tu viaje, comparte cada lugar y deja que tu gente interactúe contigo.
               </p>
             </>
           )}
 
           <Stack gap={2} className={styles.actions}>
-            {/* CTA primario: abre la hoja de entrada (el correo vive allí). */}
-            <Button size="lg" fullWidth onClick={() => setAuthOpen(true)} data-testid="open-auth">
-              {joining ? 'Únete al viaje' : 'Empieza'}
+            {/* CTA primario: alta → EnterScreen (nombre + email). */}
+            <Button
+              size="lg"
+              fullWidth
+              onClick={() => setAuthMode('signup')}
+              data-testid="open-auth"
+            >
+              {joining ? 'Únete al viaje' : 'Crear tu viaje'}
             </Button>
-            {joining ? (
-              // Login y registro son el mismo flujo: este enlace abre el mismo popup.
-              <Button variant="ghost" size="lg" fullWidth onClick={() => setAuthOpen(true)}>
-                ¿Ya tienes cuenta? Entra
-              </Button>
-            ) : (
-              // Atajo de código de viaje: despliega el campo bajo el botón.
-              <Button variant="ghost" size="lg" fullWidth onClick={() => setCodeOpen((v) => !v)}>
-                Tengo un código
-              </Button>
-            )}
+            {/* CTA secundario: login → LoginEmailScreen (solo email). */}
+            <Button variant="ghost" size="lg" fullWidth onClick={() => setAuthMode('login')}>
+              {joining ? '¿Ya tienes cuenta? Entra' : 'Ya tengo cuenta · Entrar'}
+            </Button>
           </Stack>
 
-          {!joining && codeOpen && (
-            <form
-              className={styles.codeForm}
-              noValidate
-              onSubmit={(event) => {
-                event.preventDefault()
-                if (joinByCode(groupCode)) {
-                  setCodeError(undefined)
-                } else {
-                  setCodeError('Pega un código o enlace de viaje válido.')
-                }
-              }}
-            >
-              <Stack gap={3}>
-                <Field label="Código o enlace del viaje" error={codeError}>
-                  {(fieldProps) => (
-                    <Input
-                      {...fieldProps}
-                      type="text"
-                      name="group-code"
-                      placeholder="Pega aquí el código o el enlace"
-                      value={groupCode}
-                      onChange={(e) => setGroupCode(e.target.value)}
-                    />
-                  )}
-                </Field>
-                <Button type="submit" variant="secondary" fullWidth>
-                  Unirme al viaje
-                </Button>
-              </Stack>
-            </form>
+          {/* Nota de ayuda: los viajes van por enlace, no por código manual. */}
+          {!joining && (
+            <p className={['t-label', styles.linkHint].join(' ')}>
+              ¿Te han pasado un enlace? Ábrelo y entras directo.
+            </p>
           )}
         </div>
 
@@ -158,7 +141,9 @@ export function Landing({ groupName, redirectTo }: Props) {
             producto en acción de un vistazo, dentro de la hoja (scrolleable). No lo
             mostramos en el flujo de invitación (ya vienen a un viaje concreto): ahí el hero
             + CTA bastan y el showcase distraería del "únete a <grupo>". */}
-        {!joining && <LandingShowcase className={styles.how} onStart={() => setAuthOpen(true)} />}
+        {!joining && (
+          <LandingShowcase className={styles.how} onStart={() => setAuthMode('signup')} />
+        )}
       </GlobeSheet>
     </main>
   )
