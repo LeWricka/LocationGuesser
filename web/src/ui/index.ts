@@ -1,4 +1,10 @@
 // Barril del UI kit. Importa desde aquí: `import { Button, Card } from '../ui'`.
+//
+// Fase 1 del rediseño añade:
+//   - Paleta Grafito+teal en tokens.css (propagada automáticamente a toda la app).
+//   - Iconos custom de marca (web/src/ui/icons/).
+//   - 3 shells de pantalla (web/src/ui/shells/).
+// Las pantallas de feature no se tocan todavía (Fase 2).
 
 export { Button } from './Button'
 export { FileButton } from './FileButton'
@@ -68,3 +74,30 @@ export { MapSkeleton } from './MapSkeleton'
 
 // Marca: logo de "Tabide" (símbolo + wordmark serif).
 export { Logo } from './Logo'
+
+// ── Fase 1 del rediseño ────────────────────────────────────────────────────
+
+// Iconos custom de marca Tabide. Set propio con carácter (pin, globo, diana,
+// trofeo, cámara, reto, medalla, candado, confeti, GPS). Acento teal en detalles
+// con significado semántico. No reemplaza lucide en componentes existentes todavía
+// (eso es Fase 2); solo deja el set disponible y los shells lo usan en sus slots.
+export {
+  IconPin,
+  IconGlobe,
+  IconDiana,
+  IconTrofeo,
+  IconCamara,
+  IconReto,
+  IconMedalla,
+  IconCandado,
+  IconConfeti,
+  IconGps,
+} from './icons'
+
+// Shells de pantalla: la capa de composición que codifica las reglas duras de
+// backdrop+hoja+caption para que los bugs de vacío negro y caption huérfano
+// no puedan reaparecer en ninguna pantalla nueva.
+//   ShellInmersivo  → protagonista visual a sangre (mapa, SV, foto)
+//   ShellUtilitario → hoja limpia sin protagonista (formularios, auth)
+//   ShellFeed       → cabecera fija + lista/feed con scroll
+export { ShellInmersivo, ShellUtilitario, ShellFeed } from './shells'

@@ -1,0 +1,59 @@
+/*
+ * ShellUtilitario — shell para pantallas de formulario sin protagonista visual.
+ *
+ * CUÁNDO USARLO: formularios, configuración, perfil — cualquier pantalla
+ * sin imagen o mapa protagonista (p.ej. reto de cifra, editar viaje, auth).
+ *
+ * REGLAS DURAS (por qué, no solo qué):
+ *  - SIN backdrop: ningún nodo oscuro de fondo. El ShellInmersivo tiene
+ *    protagonista; si no lo hay, usar este shell evita el vacío negro.
+ *  - SIN caption flotante: sin protagonista no hay contexto para el caption.
+ *  - SIN vacío negro: el fondo es siempre --paper (papel claro). Si aparece
+ *    oscuro es que el caller está usando el shell equivocado.
+ *  - CTA fijo abajo: footer en el flujo flex, NUNCA absoluto (evita que tape el
+ *    contenido scrolleable cuando el teclado virtual sube).
+ *
+ * Estructura:
+ *   .root
+ *     .header   ← cabecera con botón atrás + chip de título (AppHeader plain)
+ *     .body     ← contenido principal con scroll propio
+ *     .footer   ← CTA fijo anclado al fondo (border-top hairline + safe-area)
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  /* Siempre papel claro. Nunca oscuro: si el fondo es negro, el caller usa
+   * ShellInmersivo en vez de este (o falta el protagonista). */
+  background: var(--paper);
+  overflow: hidden;
+}
+
+/* Cabecera: AppHeader sobre papel (variant="plain"). flex-shrink: 0 la fija arriba. */
+.header {
+  flex-shrink: 0;
+}
+
+/* Cuerpo: scroll propio, padding lateral estándar.
+ * min-height: 0 permite que el hijo flex scrollee en vez de desbordar el contenedor. */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-5) var(--space-5) 0;
+}
+
+/* Pie: CTA fijo con separador hairline y respeto al safe-area.
+ * background: surface (blanco opaco) para que el contenido que scrollea por debajo
+ * no aparezca sobre el botón. */
+.footer {
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-5);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--hairline-soft);
+  background: var(--surface);
+}

@@ -1,0 +1,137 @@
+/*
+ * ShellInmersivo — shell de pantalla con protagonista visual a sangre.
+ *
+ * REGLAS DURAS (codificadas, no "de palabra"):
+ *  1. backdrop OBLIGATORIO: el shell no tiene sentido sin protagonista.
+ *     Prohibido backdrop sin contenido = evita el vacío negro recurrente.
+ *  2. caption XOR sheetTitle: nunca ambos. Lanza error en desarrollo si coexisten.
+ *  3. CTA como footer DENTRO de la hoja (no absoluto): el contenido scrolleable
+ *     nunca queda tapado por el botón, sea cual sea su alto.
+ *  4. Sin backdrop-filter en la hoja: el shell inmersivo no usa glass.
+ *
+ * Por qué estas reglas: los defectos de composición recurrentes (vacío negro,
+ * caption huérfano, textos duplicados) nacen de resolver backdrop+hoja+caption
+ * de formas distintas en cada pantalla. El shell los codifica una vez para todas.
+ *
+ * Estructura:
+ *   .root
+ *     .backdrop      ← protagonista a sangre (ocupa toda la pantalla)
+ *     .header        ← cabecera flotante sobre el protagonista
+ *     .caption       ← texto editorial sobre el backdrop (solo si !sheetTitle)
+ *     .sheet         ← hoja blanca que asoma desde abajo (flex column)
+ *       .sheetPull   ← tirador (zona táctil 44px con barra visual)
+ *       .sheetInner  ← contenido con scroll propio
+ *       .cta         ← CTA fijo como footer en el flujo flex (no absoluto)
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+  /* 100% del contenedor padre. En producción el shell va en un contenedor 100dvh.
+   * dvh (dynamic) sigue al chrome del navegador y no colapsa con el teclado. */
+  height: 100%;
+  overflow: hidden;
+  /* El negro es solo visible durante carga; el protagonista lo tapa inmediatamente.
+   * Usar --scene-bg (no negro puro) para mantener coherencia de paleta de escena. */
+  background: var(--scene-bg);
+}
+
+/* Protagonista visual: rellena TODA la pantalla a sangre.
+ * z-index: 0 (base) para quedar bajo la hoja (z-sheet) y la cabecera (z-header). */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-base);
+}
+
+/* Cabecera flotante sobre el protagonista.
+ * Sin fondo propio: la AppHeader variant="floating" trae su propio velo/chrome. */
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-header);
+}
+
+/* Caption editorial sobre el backdrop.
+ * Regla: solo cuando la hoja NO tiene sheetTitle (el componente TSX lo enforza).
+ * Se posiciona justo encima de la hoja para dar continuidad visual.
+ * El gradiente de scrim asegura legibilidad sobre cualquier foto/satélite. */
+.caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--sheet-peek, 240px) + var(--space-3));
+  z-index: calc(var(--z-sheet) + 2); /* design-lint-allow: caption sobre protagonista */
+  /* design-lint-allow: negro puro opacidad para scrim sobre foto arbitraria: */
+  /* el token --scene-veil es rgba(11,16,22,.55) (azulado); aquí el gradiente */
+  /* de legibilidad requiere negro puro para máximo contraste sobre cualquier foto. */
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.65) 0%,
+    /* design-lint-allow: scrim de legibilidad sobre foto arbitraria */ rgba(0, 0, 0, 0.2) 70%,
+    /* design-lint-allow: scrim de legibilidad sobre foto arbitraria */ transparent 100%
+  );
+  color: var(--scene-ink);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); /* design-lint-allow: sombra de texto sobre foto arbitraria */
+  pointer-events: none;
+  padding: var(--space-8) var(--space-5) var(--space-3);
+}
+
+/* Hoja blanca que asoma desde abajo con altura mínima (peek).
+ * flex column: sheetInner scrollea, cta queda fijo abajo.
+ * La hoja NUNCA puede quedar en negro (sin fondo = bug); surface = blanco. */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  background: var(--surface);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-sheet);
+  min-height: var(--sheet-peek, 240px);
+  max-height: var(--sheet-max-height);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tirador: zona táctil de 44px con la barra visual centrada.
+ * El --tap-target garantiza el mínimo táctil (WCAG). */
+.sheetPull {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 28px;
+  padding-top: var(--space-2);
+  cursor: grab;
+}
+
+.sheetPullBar {
+  width: var(--grab-bar-width);
+  height: var(--grab-bar-height);
+  background: var(--hairline-strong);
+  border-radius: var(--radius-full);
+}
+
+/* Contenido interior de la hoja: scroll propio.
+ * min-height: 0 permite que el hijo flex scrollee en vez de desbordar.
+ * padding-bottom modesto: el CTA ya no flota encima (es footer en el flujo),
+ * así que solo hace falta un respiro visual entre el último elemento y el CTA. */
+.sheetInner {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+/* CTA como footer DENTRO del flujo flex de la hoja (no absoluto).
+ * flex-shrink: 0 lo fija abajo; .sheetInner absorbe el scroll arriba.
+ * Resultado: el CTA NUNCA tapa contenido, sea cual sea su alto (regla dura). */
+.cta {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));
+}

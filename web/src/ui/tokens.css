@@ -1,26 +1,26 @@
 /*
- * Tabide — Design tokens · "Atelier" (paleta Pizarra)
+ * Tabide — Design tokens · "Grafito + teal"
  *
  * Una sola fuente de verdad para color, tipografía, espaciado, etc.
  * Todo el UI kit consume estas variables; no se hardcodean valores en los
  * CSS Modules.
  *
- * Dirección visual (Kinfolk editorial · paleta Pizarra):
- *  - PAPEL, no vidrio: superficies blancas opacas sobre fondo papel claro, con
- *    hairline finísimo y sombra MUY sutil. La elevación la da el hairline + una
- *    sombra tenue, nunca un glow.
- *  - TINTA SOBRE PAPEL: tinta gris-azulada casi negra (#18202B) por niveles. La
- *    jerarquía la marca el TAMAÑO/PESO/FAMILIA, jamás un fondo de color.
+ * Dirección visual (paleta Grafito + teal, aprobada 2 jul 2026):
+ *  - CHROME NEUTRO, las FOTOS ponen el color. Fondo papel claro (#F4F5F6),
+ *    superficies blancas opacas, hairline fino (#E4E7EA) y sombra muy sutil.
+ *  - TINTA SOBRE PAPEL: grafito casi negro (#1B2127) por niveles. La jerarquía
+ *    la marca el TAMAÑO/PESO/FAMILIA, jamás un fondo de color.
  *  - VOZ SERIF (Cormorant Garamond) para titulares/display; sans del sistema
  *    para cuerpo y UI. El contraste serif/sans es la identidad.
- *  - UN SOLO ACENTO sobrio: azul pizarra (#34506B), reservado a CTA, foco y el
- *    dato "en juego". Color SÓLIDO, sin gradientes ni glows.
- *  - QUIETUD: se retira el fondo "vivo" (aurora animada, rejilla náutica,
- *    brillos en bucle). El movimiento queda solo en entradas y micro-feedback.
+ *  - PRIMARIO/CTA: grafito #1F2A30 — botones primarios, estados activos.
+ *  - ACENTO teal #0F766E — SOLO en detalle (enlaces, iconos activos, chip "Reto",
+ *    foco). Nunca en rellenos grandes: compite con las fotos.
+ *  - QUIETUD: sin gradientes decorativos ni glows de marca. El movimiento queda
+ *    solo en entradas y micro-feedback.
  *
- * Nota de migración: mantenemos VIVOS los nombres de token antiguos
+ * Nota de migración: mantenemos VIVOS los nombres de token heredados
  * (--ocean-*, --land-*, --glass-*, --gradient-accent, --glow-*, etc.) remapeados
- * a la nueva paleta, para que las pantallas de features sigan compilando y se
+ * a Grafito+teal, para que las pantallas de features sigan compilando y se
  * vean coherentes sin tocarlas todavía (restyle por lotes; las features son una
  * fase posterior). Se limpiarán cuando cada pantalla migre.
  */
@@ -57,47 +57,59 @@
   color-scheme: light;
 
   /* ----------------------------------------------------------------------
-   * Color — paleta Pizarra
-   * Papel claro + tinta gris-azulada por niveles + un acento azul pizarra.
+   * Color — paleta Grafito + teal (aprobada 2 jul 2026)
+   *
+   * Principio: CHROME NEUTRO, las FOTOS ponen el color.
+   * Primario/CTA: #1F2A30 (grafito) — botones primarios, estados activos.
+   * Acento: #0F766E (teal profundo) — SOLO en detalle (enlaces, iconos activos,
+   *         chip "Reto", foco). NUNCA en rellenos grandes.
    * -------------------------------------------------------------------- */
 
   /* Papel / superficies (de fondo a frente). */
-  --paper: #f6f7f9; /* fondo de página */
+  --paper: #f4f5f6; /* fondo de página — gris muy claro, neutro */
   --surface: #ffffff; /* hojas/tarjetas (blanco puro) */
 
   /* Textura del papel (capas de `body` en index.css). El blanco plano era soso;
    * estas tres capas lo hacen "papel" sin ensuciarlo ni bajar el contraste:
    *  - --paper-grain: grano SVG `feTurbulence` desaturado, opacidad ~0.05. Es un
    *    data-URI inline (sin red, va en el CSS). El `%23` es `#` escapado en la URL.
-   *  - --paper-halo-cool: halo radial frío (acento pizarra) arriba-izquierda, <7% alpha.
-   *  - --paper-halo-warm: halo radial cálido (arena) arriba-derecha, <6% alpha.
+   *  - --paper-halo-cool: halo radial frío (teal) arriba-izquierda, <5% alpha.
+   *  - --paper-halo-warm: halo radial cálido (gris arena) arriba-derecha, <4% alpha.
    * Todas son ESTÁTICAS (ningún halo/grano anima). */
-  --paper-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.05'/></svg>");
+  --paper-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.04'/></svg>");
   --paper-halo-cool: radial-gradient(
     900px 520px at 18% -8%,
-    rgba(52, 80, 107, 0.06),
+    rgba(15, 118, 110, 0.04),
     transparent 60%
   );
   --paper-halo-warm: radial-gradient(
     760px 600px at 102% 14%,
-    rgba(231, 226, 216, 0.5),
+    rgba(228, 231, 234, 0.4),
     transparent 55%
   );
 
-  /* Tinta (jerarquía de grises azulados sobre papel). */
-  --ink-900: #18202b; /* titulares, texto principal (~14:1 sobre papel, AAA) */
-  --ink-600: #5a6675; /* texto secundario / meta (~5.4:1, AA) */
-  --ink-400: #97a0ac; /* ayudas / placeholders / iconos decorativos */
+  /* Tinta (jerarquía de grafito sobre papel). */
+  --ink-900: #1b2127; /* titulares, texto principal (grafito, ~15:1 sobre papel, AAA) */
+  --ink-600: #6b7480; /* texto secundario / meta (~5.5:1, AA) */
+  --ink-400: #9ca3ae; /* ayudas / placeholders / iconos decorativos */
 
-  /* Hairlines. */
-  --hairline: rgba(24, 32, 43, 0.1);
-  --hairline-soft: rgba(24, 32, 43, 0.06);
-  --hairline-strong: rgba(24, 32, 43, 0.18);
+  /* Hairlines — derivadas del grafito (mismo tono que la tinta, opacidad baja). */
+  --hairline: rgba(27, 33, 39, 0.1); /* línea estándar */
+  --hairline-soft: rgba(27, 33, 39, 0.06); /* separador muy suave */
+  --hairline-strong: rgba(27, 33, 39, 0.18); /* borde de énfasis */
 
-  /* Acento: azul pizarra. SÓLIDO (sin gradiente). */
-  --accent: #34506b;
-  --accent-deep: #2a4256; /* hover/active y links de texto */
-  --accent-tint: #eaeef2; /* fondo tenue de badge/chip/selección */
+  /* Primario (CTA / botones principales): grafito casi negro.
+   * No es el negro puro (#000): el grafito #1F2A30 es cálido y contenido.
+   * Se diferencia del teal: el primario RELLENA, el acento solo detalla. */
+  --primary: #1f2a30; /* relleno de botón primario, estados activos */
+  --primary-hover: #141d21; /* hover/active — 12% más oscuro */
+  --primary-ink: #ffffff; /* texto/icono sobre primario (>7:1, AAA) */
+
+  /* Acento teal: reservado a detalles pequeños (enlace, icono activo, chip "Reto",
+   * anillo de foco). NUNCA como relleno grande — compite con las fotos. */
+  --accent: #0f766e; /* teal profundo */
+  --accent-deep: #0a5c56; /* hover/active y links de texto */
+  --accent-tint: #e6f2f1; /* fondo tenue de badge/chip/selección */
   --accent-ink: #ffffff; /* texto/icono sobre acento (>7:1, AAA) */
   --on-photo: #ffffff; /* texto/icono sobre foto */
 
@@ -110,7 +122,7 @@
   --color-bg: var(--paper);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface); /* la elevación la da la sombra, no el color */
-  --color-surface-hover: #eef0f3; /* hover suave de superficie sólida */
+  --color-surface-hover: #eceef0; /* hover suave de superficie sólida */
   /* Realce cenital del estilo viejo: en papel no hay sheen → transparente. */
   --color-surface-sheen: transparent;
 
@@ -123,29 +135,35 @@
   --color-border: var(--hairline);
   --color-border-strong: var(--hairline-strong);
 
-  /* Acento de marca (azul pizarra). CTA / foco / dato "en juego". */
+  /* Acento de marca (teal). Solo en detalle — CTA primario usa --primary, no --accent.
+   * Los componentes que ACTUALMENTE usan --color-accent como CTA (Button primary)
+   * se migrarán en Fase 2; de momento el token apunta al teal para el kit nuevo
+   * y a --primary para el barril semántico de CTA. */
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-on-primary: var(--primary-ink);
+
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-deep);
   --color-accent-active: var(--accent-deep);
   --color-accent-soft: var(--accent-tint); /* fondos tenues, badges */
-  --color-accent-glow-soft: rgba(52, 80, 107, 0.16); /* destello contenido (sin halo cálido) */
+  --color-accent-glow-soft: rgba(15, 118, 110, 0.14); /* destello contenido */
   --color-on-accent: var(--accent-ink);
 
-  /* Acento secundario (antes teal "mapa"): se neutraliza a la misma pizarra. */
+  /* Acento secundario (alias histórico): apunta al teal. */
   --color-accent-2: var(--accent);
   --color-accent-2-soft: var(--accent-tint);
 
-  /* Gradiente de marca → ahora color SÓLIDO. Se conserva el NOMBRE para que las
-   * features que aún lo usan (FAB, anillos, HomeDashboard) no se rompan; el
-   * valor es un "gradiente" de un solo color = plano pizarra. */
-  --gradient-accent: linear-gradient(0deg, var(--accent), var(--accent));
-  --gradient-accent-hover: linear-gradient(0deg, var(--accent-deep), var(--accent-deep));
+  /* Gradiente de marca → color SÓLIDO (grafito). Se conserva el NOMBRE para que las
+   * features que aún lo usan (FAB, anillos, HomeDashboard) no se rompan. */
+  --gradient-accent: linear-gradient(0deg, var(--primary), var(--primary));
+  --gradient-accent-hover: linear-gradient(0deg, var(--primary-hover), var(--primary-hover));
 
-  /* Foco. Anillo de acento sobre papel. */
+  /* Foco. Anillo de acento (teal) sobre papel. */
   --color-focus-ring: var(--accent);
 
-  /* Velo modal/overlay: tinta translúcida (no negro puro). */
-  --color-scrim: rgba(24, 32, 43, 0.42);
+  /* Velo modal/overlay: grafito translúcido (no negro puro). */
+  --color-scrim: rgba(27, 33, 39, 0.42);
 
   /* Blanco para texto/iconos SOBRE imágenes (lightbox, pie de foto). */
   --color-on-photo: var(--on-photo);
@@ -153,13 +171,11 @@
   /* ----------------------------------------------------------------------
    * Modo escena (oscuro) — paleta para pantallas inmersivas.
    *
-   * La paleta "pizarra" es solo el modo CLARO. Pero medio producto es inmersivo
+   * El primario/acento es el modo CLARO. Pero medio producto es inmersivo
    * (globo a sangre, satélite, foto al jugar, cabeceras flotantes sobre imagen)
-   * y ahí hoy se hardcodean blancos, negros y velos por todas partes — de donde
-   * vuelve gran parte de los colores literales. Estos tokens son la ÚNICA fuente
-   * para "tinta clara sobre escena oscura": nadie escribe `#0b1016` ni
-   * `rgba(255,255,255,.85)` a mano. Calibrados para leer sobre satélite/foto
-   * arbitraria (de ahí los velos translúcidos: tiñen el fondo, no la tinta).
+   * y ahí se hardcodean blancos, negros y velos — de donde vuelve gran parte de
+   * los colores literales. Estos tokens son la ÚNICA fuente para "tinta clara
+   * sobre escena oscura". Calibrados para leer sobre satélite/foto arbitraria.
    * -------------------------------------------------------------------- */
   --scene-bg: #0b1016; /* fondo de escena (globo/satélite/foto a sangre) */
   --scene-ink: rgba(255, 255, 255, 0.96); /* texto/icono principal sobre escena */
@@ -170,11 +186,11 @@
   --scene-shadow: 0 8px 28px -8px rgba(0, 0, 0, 0.55), 0 2px 8px -3px rgba(0, 0, 0, 0.4);
 
   /* Tinte/borde para leer texto sobre fotos arbitrarias. */
-  --photo-overlay-strong: rgba(18, 24, 32, 0.62);
-  --photo-text-shadow: rgba(18, 24, 32, 0.55);
+  --photo-overlay-strong: rgba(27, 33, 39, 0.62);
+  --photo-text-shadow: rgba(27, 33, 39, 0.55);
 
   /* ----------------------------------------------------------------------
-   * Tokens del estilo viejo, remapeados a Pizarra (vivos hasta migrar features).
+   * Tokens del estilo viejo, remapeados a Grafito+teal (vivos hasta migrar features).
    * -------------------------------------------------------------------- */
 
   /* Océano (frío) → niveles de papel/superficie claros. */
@@ -183,7 +199,7 @@
   --ocean-700: var(--surface);
   --ocean-600: var(--color-surface-hover);
 
-  /* Tierra / teal → acento pizarra neutralizado. */
+  /* Tierra / teal → acento teal. */
   --land-600: var(--accent-deep);
   --land-500: var(--accent);
   --land-400: var(--accent);
@@ -228,9 +244,9 @@
   --map-chrome-bg: rgba(255, 255, 255, 0.86);
   --map-chrome-blur: blur(14px) saturate(110%);
 
-  /* Anillo del pin-foto. */
+  /* Anillo del pin-foto. El activo usa el teal (acento). */
   --pin-ring-closed: #ffffff;
-  --pin-ring-active: var(--accent);
+  --pin-ring-active: var(--accent); /* teal al activar el pin */
   --pin-ring-width: 3px;
 
   /* Trazo de la ruta sobre el mapa.
@@ -289,10 +305,10 @@
    * -------------------------------------------------------------------- */
   --card-gradient: var(--surface);
   --card-surface: #f1f3f5; /* fila / CTA / miniatura */
-  --card-tint-accent: var(--accent-tint); /* bloque de puntos / premios */
-  --card-border-accent: var(--accent);
-  --card-border: rgba(24, 32, 43, 0.12); /* borde de fila */
-  --card-border-footer: rgba(24, 32, 43, 0.14); /* separador del pie */
+  --card-tint-accent: var(--accent-tint); /* bloque de puntos / premios (teal tenue) */
+  --card-border-accent: var(--accent); /* borde de énfasis (teal) */
+  --card-border: rgba(27, 33, 39, 0.12); /* borde de fila (grafito) */
+  --card-border-footer: rgba(27, 33, 39, 0.14); /* separador del pie */
 
   /* ----------------------------------------------------------------------
    * Tipografía
@@ -380,10 +396,11 @@
   --shadow-accent: var(--shadow-md);
   --shadow-accent-hover: var(--shadow-lg);
 
-  /* Glows de halo → marca QUIETA: un anillo finísimo de contacto, sin halo. */
-  --glow-accent: 0 0 0 1px rgba(52, 80, 107, 0.16);
-  --glow-accent-strong: 0 0 0 1px rgba(52, 80, 107, 0.28);
-  --glow-teal: 0 0 0 1px rgba(52, 80, 107, 0.16);
+  /* Glows de halo → marca QUIETA: un anillo finísimo de contacto, sin halo.
+   * Usan el teal (#0F766E) para coherencia con el nuevo acento. */
+  --glow-accent: 0 0 0 1px rgba(15, 118, 110, 0.18);
+  --glow-accent-strong: 0 0 0 1px rgba(15, 118, 110, 0.3);
+  --glow-teal: 0 0 0 1px rgba(15, 118, 110, 0.18);
   --glow-fab-hover: var(--shadow-lg);
 
   /* ----------------------------------------------------------------------
