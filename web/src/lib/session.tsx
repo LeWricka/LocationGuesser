@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { onAuthStateChange, isVerifiedUser } from './auth'
+import { onAuthStateChange, isVerifiedUser, clearLegacyAnonymousSession } from './auth'
 import { getProfile } from './profile'
 import type { Profile } from './database.types'
 import { SessionContext, type SessionState } from './session-context'
@@ -47,8 +47,14 @@ export function AuthProvider({ children }: Props) {
     async function bootstrap() {
       const { data } = await supabase.auth.getSession()
       if (!active) return
-      setSession(data.session)
-      await loadProfile(data.session?.user ?? null)
+      // Sesión anónima legada (issue #514): el modelo pre-#507 dejó sesiones
+      // anónimas vivas en localStorage que ya no sirven (la RLS de groups exige
+      // is_anonymous=false). Las descartamos aquí, ANTES de pintar nada logueado.
+      const legacy = await clearLegacyAnonymousSession(data.session)
+      if (!active) return
+      const validSession = legacy ? null : data.session
+      setSession(validSession)
+      await loadProfile(validSession?.user ?? null)
       if (active) setLoading(false)
     }
     void bootstrap()
@@ -64,10 +70,16 @@ export function AuthProvider({ children }: Props) {
     // App muestra BootScreen hasta que el perfil esté disponible: sin parpadeo.
     const subscription = onAuthStateChange((_event, nextSession) => {
       setLoading(true)
-      setSession(nextSession)
-      void loadProfile(nextSession?.user ?? null).finally(() => {
-        if (active) setLoading(false)
-      })
+      void clearLegacyAnonymousSession(nextSession)
+        .then((legacy) => {
+          if (!active) return
+          const validSession = legacy ? null : nextSession
+          setSession(validSession)
+          return loadProfile(validSession?.user ?? null)
+        })
+        .finally(() => {
+          if (active) setLoading(false)
+        })
     })
 
     return () => {

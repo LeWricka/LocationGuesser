@@ -142,10 +142,17 @@ export function CreateGroup({ onBack }: Props) {
       // "Failed to fetch" suele ser la red del usuario (VPN, DNS, bloqueador),
       // no la app.
       const networkish = /failed to fetch|networkerror|load failed/i.test(msg)
+      // Red de seguridad (issue #514): si el gate de sesión legada no atrapó una
+      // sesión anónima antigua, el INSERT choca con la RLS `groups_insert_owner`
+      // (exige is_anonymous=false) y Postgres devuelve este texto crudo. Nunca lo
+      // enseñamos tal cual: es indescifrable para quien no conoce la BD.
+      const rlsish = /row-level security policy/i.test(msg)
       toast.show(
         networkish
           ? 'Sin conexión con el servidor. Prueba con datos en vez de WiFi (o al revés) y desactiva VPN, DNS privado o bloqueador; luego reinténtalo.'
-          : `No se pudo crear el viaje: ${msg}`,
+          : rlsish
+            ? 'Tu sesión se ha quedado antigua. Cierra sesión y entra de nuevo.'
+            : `No se pudo crear el viaje: ${msg}`,
         { tone: 'danger' },
       )
       setBusy(false)
