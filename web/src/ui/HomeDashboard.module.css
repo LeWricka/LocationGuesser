@@ -183,54 +183,29 @@
   transform: scale(1.05);
 }
 
-/* Placeholder de portada (viaje SIN foto): degradado de dos tonos ON-BRAND + inicial
-   grande translúcida. Sustituye al gris vacío. La variante (pizarra/tinta de escena/oro
-   sobrio) la elige el nombre en el componente vía `.variantN`; todas se construyen con
-   tokens de marca (acento, tinta, escena, oro) y son lo bastante oscuras para que el
-   texto blanco del cuerpo + el velo al pie sigan leyendo AA. */
+/* Placeholder de portada (viaje SIN foto): fondo discreto de "mapa nocturno" — un
+   gradiente grafito/teal sobrio con tokens de escena y un halo frío arriba a la derecha
+   que evoca el globo — más un pin a tamaño moderado y baja opacidad. Nada de iniciales
+   gigantes (parecían un bug pisando los chips). Lo bastante oscuro para que el texto
+   blanco del cuerpo + el velo al pie sigan leyendo AA. */
 .placeholder {
   position: absolute;
   inset: 0;
   z-index: -2;
   display: grid;
   place-items: center;
-  /* Fallback on-brand por si faltara la variante. */
-  background-image: linear-gradient(150deg, var(--accent) 0%, var(--scene-bg) 100%);
+  background-image:
+    radial-gradient(
+      90% 72% at 78% 16%,
+      color-mix(in srgb, var(--accent) 24%, transparent) 0%,
+      transparent 60%
+    ),
+    linear-gradient(160deg, var(--accent-deep) 0%, var(--scene-bg) 82%);
 }
-
-/* Pizarra profunda (acento → noche de escena). */
-.variant0 {
-  background-image: linear-gradient(150deg, var(--accent-deep) 0%, var(--scene-bg) 100%);
-}
-/* Pizarra (acento → acento profundo): el más "marca". */
-.variant1 {
-  background-image: linear-gradient(150deg, var(--accent) 0%, var(--accent-deep) 100%);
-}
-/* Tinta (titular → noche): el más sobrio y oscuro. */
-.variant2 {
-  background-image: linear-gradient(150deg, var(--ink-900) 0%, var(--scene-bg) 100%);
-}
-/* Noche con remate de acento (invierte la dirección del frío). */
-.variant3 {
-  background-image: linear-gradient(150deg, var(--scene-bg) 0%, var(--accent) 100%);
-}
-/* Oro sobrio: remate cálido de oro de medalla SOBRE noche (toque, no relleno). El oro
-   queda en una esquina y la masa sigue siendo escena oscura → on-brand y legible. */
-.variant4 {
-  background-image: linear-gradient(
-    150deg,
-    var(--medal-gold) 0%,
-    var(--accent-deep) 60%,
-    var(--scene-bg) 100%
-  );
-}
-.placeholderInitial {
-  font-family: var(--font-serif);
-  font-weight: var(--font-weight-bold);
-  font-size: 7rem;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.16);
-  user-select: none;
+/* El pin, como marca de agua discreta: tinta de escena suave, translúcida. */
+.placeholderIcon {
+  color: var(--scene-ink-soft);
+  opacity: 0.35;
   /* Centrado óptico hacia arriba: el velo de lectura al pie pesa abajo. */
   transform: translateY(-12%);
 }
@@ -258,10 +233,13 @@
   padding: var(--space-4) var(--space-5) var(--space-5);
 }
 
-/* Fila superior: corona / chip de estado / mini-mapa. */
+/* Fila superior: corona / chip de estado / mini-mapa. Los chips viven ARRIBA y el
+   título abajo sobre el velo: `margin-bottom: auto` reparte el hueco y `flex-wrap`
+   garantiza que en anchos mínimos los chips envuelvan en vez de pisarse. */
 .cardTop {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-bottom: auto;
 }

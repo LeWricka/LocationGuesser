@@ -52,34 +52,28 @@
   pointer-events: auto;
 }
 
-/* COSTURA héroe + hoja: velo de fusión anclado al borde de la hoja y que sube SOBRE el
-   globo. Degrada de transparente (arriba, deja ver el globo) a la superficie de la hoja
-   (abajo, ya es blanco), así el globo se funde con la hoja sin corte seco ni banda
-   intermedia. Hereda el `top` inline de la hoja (mismo borde) y se eleva con un alto
-   propio restando de su `top`. Encima del globo, debajo del contenido de la hoja. */
+/* COSTURA héroe + hoja: fundido CORTO y sutil anclado al borde de la hoja, subiendo
+   apenas sobre el globo. El borde limpio lo dan la hoja (esquinas redondeadas + sombra
+   corta) y el faldón detrás de ellas; esta franja solo suaviza el último tramo para que
+   el canto no sea un corte a cuchillo. Antes medía ~96px y ese velo difuso alto parecía
+   un render a medias (y el crédito del mapa flotaba dentro). Hereda el `top` inline de
+   la hoja (mismo borde) y se eleva con translateY negativo. Encima del globo, debajo
+   del contenido de la hoja. Tokens de superficie, no blancos. */
 .seam {
   position: absolute;
   left: 0;
   right: 0;
-  /* Altura del fundido: una franja generosa para que la transición sea suave. */
-  height: calc(var(--space-8) + var(--space-6));
+  /* Altura del fundido: corta, un remate, no media pantalla. */
+  height: var(--space-4);
   /* Sube sobre el globo: el borde inferior coincide con el top de la hoja (mismo inline
      `top`), y el cuerpo se eleva con translateY negativo. */
-  transform: translateY(calc((var(--space-8) + var(--space-6)) * -1));
+  transform: translateY(calc(var(--space-4) * -1));
   z-index: 1;
   pointer-events: none;
-  /* ÚNICA fuente de fundido globo→hoja (el globo ya NO re-oscurece su borde inferior y la
-     sombra de la hoja se acota para no sumarse). La franja se mantiene transparente la
-     mayor parte de su alto —deja ver el globo a sangre, sin velo oscuro añadido— y solo en
-     el último tramo resuelve a la superficie de la hoja, justo donde nace el canto blanco.
-     Así no hay gris muerto a media altura (el problema venía de cruzar noche→blanco por un
-     punto medio gris): el globo manda arriba y la hoja remata abajo en un fundido corto y
-     controlado. Tokens de superficie, no blancos. */
   background: linear-gradient(
     to bottom,
     transparent 0%,
-    transparent 74%,
-    color-mix(in srgb, var(--paper) 50%, transparent) 90%,
+    color-mix(in srgb, var(--paper) 45%, transparent) 62%,
     var(--paper) 100%
   );
   transition: top var(--duration-slow) var(--ease-emphasized);
@@ -168,9 +162,10 @@
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain; /* el scroll de la hoja no arrastra al globo/página */
   /* Holgura inferior generosa: el FAB "+" flota abajo-derecha (56px + su offset), así que
-     el contenido necesita despejar SU altura para que el botón no se encime a la última
-     tarjeta ni a su icono de ubicación. `--space-8 + --space-6` deja aire bajo el FAB. */
-  padding: 0 var(--space-4) calc(var(--space-8) + var(--space-6) + env(safe-area-inset-bottom));
+     el contenido necesita despejar SU altura CON aire de sobra para que el botón nunca
+     tape la esquina de la última tarjeta ni su icono de ubicación. `--space-8 + --space-7`
+     (112px) cubre el FAB (56px) + su offset (24px) + un margen visible de respiro. */
+  padding: 0 var(--space-4) calc(var(--space-8) + var(--space-7) + env(safe-area-inset-bottom));
   /* Oculta la barra de scroll del SO sin perder el scroll: en Android/WebKit el track gris
      + thumb de esta capa scrollable asomaba como una franja/"||" gris pegada al borde
      derecho del globo (lo reportó el dueño en su móvil 1080×2400; headless no pinta
