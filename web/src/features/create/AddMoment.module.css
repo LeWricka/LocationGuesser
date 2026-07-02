@@ -84,6 +84,20 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* El fill-mode "both" de la entrada `lg-stagger` deja el transform final
+   aplicado (no vuelve a "none"), así que cada hijo directo de `.body` —cada
+   `.block` y el CTA "Guardar recuerdo"— queda convertido en su PROPIO stacking
+   context. El popover del DatePicker (position:absolute, z-index alto) vive
+   DENTRO del stacking context de este bloque: su z-index solo compite dentro
+   de ese bloque, no puede "escapar" para ganarle al CTA, que es un hermano
+   posterior en el DOM y por tanto se pinta encima (issue #521). Cuando el
+   popover está abierto elevamos el bloque entero al piso de hoja para que
+   compita en el nivel correcto y quede por encima del CTA. */
+.block:has([aria-label='Elegir fecha']) {
+  position: relative;
+  z-index: var(--z-sheet);
+}
+
 /* Etiqueta de bloque: nombre del campo + pastilla "opcional". */
 .blockLabel {
   display: flex;

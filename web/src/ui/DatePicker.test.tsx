@@ -113,6 +113,34 @@ describe('DatePicker', () => {
     expect(onChange).toHaveBeenCalledWith('2026-03-12')
   })
 
+  test('con max pero SIN min (caso "recuerdo") no restringe días pasados', async () => {
+    // Regresión #521: el formulario de "Nuevo recuerdo" pasa max=hoy y NO min
+    // (un diario documenta lo YA VIVIDO; limitar el futuro es lo único razonable).
+    // clampToBounds solo debe descartar por `min` cuando se pasa explícitamente,
+    // así que sin él cualquier día pasado —del mismo mes o de meses anteriores—
+    // debe quedar habilitado; solo lo posterior al `max` se deshabilita.
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    render(<Harness initial="2026-06-15" max="2026-06-15" onChange={onChange} />)
+    await user.click(screen.getByRole('button', { name: 'Fecha' }))
+
+    // Un día pasado del mismo mes está habilitado y emite al elegirlo.
+    const pastDay = screen.getByRole('gridcell', { name: '3 de junio de 2026' })
+    expect(pastDay).not.toBeDisabled()
+    await user.click(pastDay)
+    expect(onChange).toHaveBeenCalledWith('2026-06-03')
+
+    // Un día futuro (después del max) sigue deshabilitado.
+    await user.click(screen.getByRole('button', { name: 'Fecha' }))
+    const futureDay = screen.getByRole('gridcell', { name: '20 de junio de 2026' })
+    expect(futureDay).toBeDisabled()
+
+    // Un mes anterior completo también queda accesible navegando hacia atrás.
+    await user.click(screen.getByRole('button', { name: 'Mes anterior' }))
+    const mayDay = screen.getByRole('gridcell', { name: '10 de mayo de 2026' })
+    expect(mayDay).not.toBeDisabled()
+  })
+
   test('teclado: flechas mueven el foco y Enter elige', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()
