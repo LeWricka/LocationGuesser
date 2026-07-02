@@ -23,9 +23,9 @@ import type { Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
 import { GroupSettingsModal } from '../group/GroupSettingsModal'
-import { GroupPage } from '../group/GroupPage'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
+import { MarcadorTab } from './MarcadorTab'
 import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import styles from './TripPage.module.css'
@@ -474,7 +474,6 @@ export function TripPage({
             aria-label="Diario"
           >
             <TripDiario
-              ref={carouselRef}
               moments={moments}
               route={route}
               activeMoment={activeMoment}
@@ -490,16 +489,17 @@ export function TripPage({
             />
           </section>
         ) : (
-          /* MARCADOR: el marcador completo + retos + miembros, reutilizando la
-             GroupPage en modo INCRUSTADO (sin su chrome propio: el viaje aporta
-             cabecera, ⋯ y FAB). Es la pestaña del viaje, no una pantalla suelta. */
+          /* MARCADOR: clasificación foto-first Grafito+teal. MarcadorTab muestra
+             la clasificación general del viaje con IconMedalla para el podio y
+             acento teal en la fila del usuario activo. El wiring de datos viene
+             de useTripData (leaderboard ya calculado). */
           <section
             key="marcador"
             className={`${styles.panel} ${styles.panelMarcador} ${reducedMotion ? '' : styles.panelEnter}`}
             role="tabpanel"
             aria-label="Marcador"
           >
-            <GroupPage groupId={groupId} embedded onBack={onBack} />
+            <MarcadorTab leaderboard={leaderboard} myUserId={user?.id ?? null} />
           </section>
         )}
       </div>
