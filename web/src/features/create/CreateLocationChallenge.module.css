@@ -1,29 +1,69 @@
-/* CreateLocationChallenge — GeoGuessr puro, Street View a sangre.
-   El SV es el protagonista; la hoja inferior es un chrome mínimo.
+/* CreateLocationChallenge — mapa primero + previa de Street View.
+   Layout: cabecera → mapa (mitad superior) → panel inferior (SV + reglas + CTA).
    Tokens Grafito+teal del sistema de diseño (tokens.css). */
 
 .root {
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  background: var(--scene-bg);
+  background: var(--surface);
   isolation: isolate;
   font-family: var(--font-sans);
   color: var(--ink-900);
 }
 
-/* ─── Street View a sangre ─────────────────────────────────────── */
-.sv {
-  position: absolute;
-  inset: 0;
-  z-index: var(--z-base);
-  /* El SV de Google rellena el contenedor al 100%; sin esto queda en 0px alto. */
-  width: 100%;
+/* ─── Área del mapa (mitad superior) ────────────────────────────── */
+/* El mapa ocupa el espacio libre entre la cabecera y el panel inferior.
+   flex: 1 + min-height: 0 para que no desborde al crecer el panel. */
+.mapArea {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  /* El MapPicker necesita height: 100% para que Leaflet no quede en 0px. */
+}
+/* El MapPicker ocupa todo el contenedor del área del mapa. */
+.mapArea > :first-child {
   height: 100%;
 }
+/* También el mapa interno de Leaflet dentro del MapPicker. */
+.mapArea :global(.leaflet-container) {
+  height: 100%;
+  border-radius: 0; /* sin radio: va de borde a borde */
+  border: none;
+}
 
-/* ─── Botón GPS (ranura action del AppHeader) ───────────────────── */
+/* ─── Hint superpuesto sobre el mapa ────────────────────────────── */
+/* Pastilla semi-transparente en la parte inferior del mapa. Aparece solo
+   mientras el usuario no ha elegido punto. pointer-events: none para no
+   bloquear clicks al mapa. */
+.mapHint {
+  position: absolute;
+  bottom: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: rgba(18, 26, 36, 0.64); /* design-lint-allow: pastilla de escena oscura sobre mapa */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #fff; /* design-lint-allow: texto blanco sobre pastilla oscura traslúcida */
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: fadeIn var(--motion-duration-base) var(--motion-ease-standard);
+  z-index: var(--z-sticky);
+}
+
+/* ─── Botón GPS (ranura action del AppHeader plain) ─────────────── */
+/* En la cabecera plain (fondo blanco/papel), el botón usa tinta y
+   superficies de la paleta estándar (sin tokens de escena oscura). */
 .gpsBtn {
   display: inline-flex;
   align-items: center;
@@ -31,184 +71,123 @@
   width: var(--tap-target);
   height: var(--tap-target);
   border-radius: var(--radius-full);
-  border: 1px solid var(--scene-hairline);
-  background: var(--scene-surface);
-  color: var(--scene-ink);
+  border: 1px solid var(--hairline);
+  background: transparent;
+  color: var(--ink-700);
   cursor: pointer;
   transition: background var(--motion-transition-fast);
+  font-family: inherit;
+}
+.gpsBtn:hover {
+  background: var(--surface-raised);
 }
 .gpsBtn:active {
-  background: rgba(
-    255,
-    255,
-    255,
-    0.2
-  ); /* design-lint-allow: press-state translúcido sobre escena oscura */
+  background: var(--surface-sunken);
+}
+.gpsBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
-/* ─── Overlay de carga / error ──────────────────────────────────── */
-.overlay {
-  position: absolute;
-  inset: 0;
-  z-index: var(--z-header); /* encima del SV, debajo de la hoja */
-  background: rgba(
-    11,
-    16,
-    22,
-    0.72
-  ); /* design-lint-allow: velo de overlay de escena, equivale a --scene-veil ajustado */
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-3);
-  color: var(--scene-ink);
-  text-align: center;
-  padding: var(--space-6);
-  animation: fadeIn var(--motion-duration-base) var(--motion-ease-standard);
-}
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.overlayIco {
-  color: var(--accent);
-  opacity: 0.85;
-}
-.overlayTitle {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  margin: 0;
-}
-.overlaySub {
-  font-size: var(--font-size-sm);
-  color: var(--scene-ink-soft);
-  margin: 0;
-  max-width: 28ch;
-}
-.retryCta {
-  margin-top: var(--space-2);
-  border: 1px solid var(--scene-hairline);
-  border-radius: var(--radius-sm);
-  padding: var(--space-2) var(--space-4);
-  background: var(--scene-surface);
-  color: var(--scene-ink);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  font-family: inherit;
-  cursor: pointer;
-  transition: background var(--motion-transition-fast);
-}
-.retryCta:active {
-  background: rgba(
-    255,
-    255,
-    255,
-    0.2
-  ); /* design-lint-allow: press-state translúcido sobre escena oscura */
-}
-
-/* ─── Chip de privacidad (flotante arriba) ──────────────────────── */
-.placeChip {
-  position: absolute;
-  z-index: var(--z-header);
-  left: 50%;
-  top: calc(env(safe-area-inset-top, 0px) + 64px);
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--scene-hairline);
-  background: rgba(
-    18,
-    26,
-    36,
-    0.48
-  ); /* design-lint-allow: chip de escena oscura translúcida sobre SV */
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  color: var(--scene-ink); /* design-lint-allow: texto claro sobre chip de escena oscura */
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
-  pointer-events: none;
-  animation: chipIn var(--motion-duration-slow) var(--motion-ease-emphasized) both;
-}
-@keyframes chipIn {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(8px) scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0) scale(1);
-  }
-}
-
-/* ─── Hoja inferior compacta ────────────────────────────────────── */
-.sheet {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--z-sheet);
-  background: var(--surface);
-  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  box-shadow: var(--shadow-sheet);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  animation: sheetUp var(--motion-duration-slow) var(--motion-ease-emphasized) both;
-}
-@keyframes sheetUp {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Tirador del asa. */
-.sheetPull {
-  display: flex;
-  justify-content: center;
-  padding-top: var(--space-2);
+/* ─── Panel inferior ────────────────────────────────────────────── */
+/* Área de contenido bajo el mapa: estado + previa SV + reglas + CTA.
+   overflow-y: auto para que en móvil pequeño sea desplazable. */
+.panel {
   flex-shrink: 0;
-}
-.sheetBar {
-  width: var(--grab-bar-width);
-  height: var(--grab-bar-height);
-  background: var(--hairline-strong);
-  border-radius: var(--radius-full);
+  max-height: 55vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-top: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
 }
 
-/* Descripción de acción. */
-.sheetLede {
-  margin: 0 var(--space-5);
+/* Lede cuando no hay punto elegido. */
+.idleLede {
+  margin: 0;
   font-size: var(--font-size-sm);
+  color: var(--ink-600);
+  line-height: var(--line-height-snug);
+  padding: var(--space-2) 0;
+}
+
+/* ─── Estado: buscando panorama ────────────────────────────────── */
+.searchingState {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  font-size: var(--font-size-sm);
+  color: var(--ink-600);
+}
+
+/* ─── Estado: sin cobertura de SV ──────────────────────────────── */
+.noCoverageState {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+  border: 1px solid var(--hairline);
+}
+.noCoverageIco {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+.noCoverageTitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--ink-900);
+}
+.noCoverageSub {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-xs);
   color: var(--ink-600);
   line-height: var(--line-height-snug);
 }
 
-/* Reglas: plazo + tiempo. */
+/* ─── Previa de Street View ─────────────────────────────────────── */
+/* Contenedor relativo para el chip de privacidad superpuesto. */
+.svPreviewWrap {
+  position: relative;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  flex-shrink: 0;
+  /* La previa hereda height de StreetViewPreview.module.css (260px). */
+}
+
+/* Chip de privacidad flotante sobre la previa de SV. */
+.privacyChip {
+  position: absolute;
+  bottom: var(--space-2);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(18, 26, 36, 0.56); /* design-lint-allow: chip de escena oscura sobre SV */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff; /* design-lint-allow: texto blanco sobre chip oscuro traslúcido */
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ─── Reglas: plazo + tiempo ────────────────────────────────────── */
 .rules {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: 0 var(--space-5);
 }
 .ruleRow {
   display: flex;
@@ -223,23 +202,22 @@
   letter-spacing: var(--letter-spacing-wide);
 }
 
+/* ─── Footer (privacidad + CTA) ─────────────────────────────────── */
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
 /* Fila de estado (spinner + mensaje). */
 .statusRow {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-5);
   font-size: var(--font-size-sm);
   color: var(--ink-600);
 }
 
-/* Footer: aviso de privacidad + CTA. */
-.footer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: 0 var(--space-5) var(--space-4);
-}
 .privacy {
   display: flex;
   align-items: flex-start;
@@ -286,6 +264,16 @@
 .launchBtn svg {
   width: 17px;
   height: 17px;
+}
+
+/* ─── Animaciones ───────────────────────────────────────────────── */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ─── Microcelebración ──────────────────────────────────────────── */
