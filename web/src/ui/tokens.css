@@ -90,7 +90,7 @@
 
   /* Tinta (jerarquía de grafito sobre papel). */
   --ink-900: #1b2127; /* titulares, texto principal (grafito, ~15:1 sobre papel, AAA) */
-  --ink-600: #6b7480; /* texto secundario / meta (~5.5:1, AA) */
+  --ink-600: #575f6c; /* texto secundario / meta (≥5.5:1 AA sobre todos los fondos del sistema) */
   --ink-400: #9ca3ae; /* ayudas / placeholders / iconos decorativos */
 
   /* Hairlines — derivadas del grafito (mismo tono que la tinta, opacidad baja). */
