@@ -72,6 +72,25 @@
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
+  /* La tarjeta vecina asoma (peek) recortada por el borde del propio scroller: sin
+     esto se ve como texto guillotinado a mitad de palabra (bug #500). Un fundido
+     en los bordes (máscara) convierte ese corte en un peek INTENCIONADO — la
+     tarjeta se desvanece hacia el mapa en vez de morir en seco a mitad de frase.
+     El radio de la tarjeta sigue asomando entero, solo se atenúa su contenido. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--space-5),
+    black calc(100% - var(--fab-clearance)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--space-5),
+    black calc(100% - var(--fab-clearance)),
+    transparent 100%
+  );
 }
 .carousel::-webkit-scrollbar {
   display: none;

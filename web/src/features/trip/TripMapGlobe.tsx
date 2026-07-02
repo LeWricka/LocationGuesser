@@ -55,6 +55,13 @@ const MIN_FILL_ZOOM = 3.2
 const INTRO_START_ZOOM = 0.6
 const INTRO_DURATION = 1500
 
+// Red de seguridad del skeleton: si el `idle` de MapLibre nunca llega (motor que
+// no lo soporta bien, teselas que fallan en bucle, o un doble de mapa en tests/
+// galería que solo emite `load`), el skeleton no debe quedar pegado para siempre
+// tapando el globo con un spinner sin salida (bug #500: "spinner desnudo"). Pasado
+// este margen, lo damos por listo igual — el satélite real ya habrá pintado algo.
+const MAP_READY_FALLBACK_MS = 4000
+
 // Ids de fuente/capa de la ruta (line). Constantes para añadir/quitar sin colisión.
 const ROUTE_SRC = 'lg-route'
 const ROUTE_LINE = 'lg-route-line'
@@ -192,6 +199,9 @@ export function TripMapGlobe({
   // llegar, lo marcamos oculto y se funde; `skeletonGone` lo desmonta al terminar.
   const [mapReady, setMapReady] = useState(false)
   const [skeletonGone, setSkeletonGone] = useState(false)
+  // Timer de la red de seguridad de `mapReady` (ver MAP_READY_FALLBACK_MS): se
+  // limpia tanto si `idle` llega a tiempo como al desmontar.
+  const readyFallbackRef = useRef<number | null>(null)
 
   // Props en refs: así las funciones de pintado (que el handler `load` invoca de
   // forma asíncrona) leen SIEMPRE el último valor, sin recrear el mapa ni arrastrar
@@ -414,8 +424,17 @@ export function TripMapGlobe({
           // raster = teselas del encuadre cargadas y sin transiciones en curso. Es
           // el momento en que el lienzo ya muestra el satélite, no el hueco negro.
           map.once('idle', () => {
+            if (readyFallbackRef.current != null) {
+              window.clearTimeout(readyFallbackRef.current)
+              readyFallbackRef.current = null
+            }
             if (!disposed) setMapReady(true)
           })
+          // Red de seguridad: si `idle` no llega, no dejamos el spinner colgado.
+          readyFallbackRef.current = window.setTimeout(() => {
+            readyFallbackRef.current = null
+            if (!disposed) setMapReady(true)
+          }, MAP_READY_FALLBACK_MS)
           repaint()
           // Entrada cinematográfica una sola vez; si no la hace, fitBounds normal.
           if (!introDoneRef.current) {
@@ -434,6 +453,10 @@ export function TripMapGlobe({
     return () => {
       disposed = true
       readyRef.current = false
+      if (readyFallbackRef.current != null) {
+        window.clearTimeout(readyFallbackRef.current)
+        readyFallbackRef.current = null
+      }
       for (const m of markersRef.current) m.remove()
       markersRef.current = []
       mapRef.current?.remove()

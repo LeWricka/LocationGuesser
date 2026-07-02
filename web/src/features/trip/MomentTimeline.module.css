@@ -135,8 +135,16 @@
   border-color: var(--color-danger);
   animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
 }
+/* "En juego" en texto suelto (rojo sobre el propio satélite) no garantiza AA: un
+   satélite oscuro se traga el rojo pese al text-shadow (bug #500). Un chip/pill
+   con fondo CLARO opaco (mismo par que `Badge tone="danger"`, ~4.9:1 AA) desliga
+   el contraste de lo que haya debajo, sea satélite claro u oscuro. */
 .active .label {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-danger-soft);
   color: var(--color-danger);
+  text-shadow: none;
   opacity: 1;
 }
 
