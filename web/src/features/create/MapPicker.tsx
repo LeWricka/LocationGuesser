@@ -11,7 +11,12 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { LatLng } from '../../lib/geo'
 import { CARTO_VOYAGER, ESRI_REFERENCE_LABELS, ESRI_SATELLITE } from '../../lib/mapPresets'
+import { PlaceSearch } from './PlaceSearch'
 import styles from './MapPicker.module.css'
+
+// Zoom razonable al elegir un resultado del buscador: ciudad/barrio, no calle
+// ni país (issue #522).
+const SEARCH_ZOOM = 13
 
 // Pin del marcador como SVG de lucide (MapPin) en vez de emoji: unifica el marker
 // con el resto del set de iconos (mismo trazo y color por token). El color sale de
@@ -71,10 +76,14 @@ function ClickHandler({ onPick }: { onPick: (p: LatLng) => void }) {
   return null
 }
 
-function Recenter({ flyTo }: { flyTo: LatLng | null }) {
+function Recenter({ flyTo, zoom }: { flyTo: LatLng | null; zoom?: number }) {
   const map = useMap()
   useEffect(() => {
-    if (flyTo) map.setView([flyTo.lat, flyTo.lng], Math.max(map.getZoom(), 14))
+    if (flyTo) map.setView([flyTo.lat, flyTo.lng], zoom ?? Math.max(map.getZoom(), 14))
+    // `zoom` es una constante por instancia (SEARCH_ZOOM o undefined): no hace
+    // falta re-disparar el efecto si cambiara, solo `flyTo` marca "hay un vuelo
+    // nuevo".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flyTo, map])
   return null
 }
@@ -82,27 +91,43 @@ function Recenter({ flyTo }: { flyTo: LatLng | null }) {
 export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
   const [layer, setLayer] = useState<BaseLayer>(readStoredLayer)
 
+  // flyTo INTERNO del buscador (issue #522), independiente del `flyTo` que
+  // llega por props: así podemos recentrar el mapa al elegir un resultado sin
+  // que el padre tenga que enterarse ni pisar su propio estado de flyTo (GPS,
+  // EXIF…). Ver `Recenter` más abajo, que vigila ambas señales por separado.
+  const [searchFlyTo, setSearchFlyTo] = useState<LatLng | null>(null)
+
   function chooseLayer(next: BaseLayer) {
     setLayer(next)
     localStorage.setItem(LAYER_KEY, next)
+  }
+
+  // Sitio elegido en el buscador: marca el pin (vía `onPick`, igual que un
+  // click en el mapa) y dispara el vuelo interno hacia ese punto.
+  function onSearchSelect(point: LatLng) {
+    onPick(point)
+    setSearchFlyTo(point)
   }
 
   const base = LAYERS[layer]
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.layers} role="group" aria-label="Estilo de mapa">
-        {(Object.keys(LAYERS) as BaseLayer[]).map((key) => (
-          <button
-            key={key}
-            type="button"
-            className={key === layer ? styles.layerActive : styles.layer}
-            aria-pressed={key === layer}
-            onClick={() => chooseLayer(key)}
-          >
-            {LAYERS[key].label}
-          </button>
-        ))}
+      <div className={styles.topBar}>
+        <PlaceSearch onSelect={onSearchSelect} />
+        <div className={styles.layers} role="group" aria-label="Estilo de mapa">
+          {(Object.keys(LAYERS) as BaseLayer[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              className={key === layer ? styles.layerActive : styles.layer}
+              aria-pressed={key === layer}
+              onClick={() => chooseLayer(key)}
+            >
+              {LAYERS[key].label}
+            </button>
+          ))}
+        </div>
       </div>
       <MapContainer
         center={[center.lat, center.lng]}
@@ -142,6 +167,11 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
         )}
         <ClickHandler onPick={onPick} />
         <Recenter flyTo={flyTo} />
+        {/* Recenter independiente para el buscador: no comparte la misma prop
+            (`flyTo` la controla el padre y a veces queda fija, p.ej. tras GPS),
+            así que un segundo watcher garantiza que SIEMPRE vuele al elegir un
+            resultado, gane quien gane la carrera de qué señal llegó última. */}
+        <Recenter flyTo={searchFlyTo} zoom={SEARCH_ZOOM} />
         {value && <Marker position={[value.lat, value.lng]} icon={pinIcon} />}
       </MapContainer>
     </div>
