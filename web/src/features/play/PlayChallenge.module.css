@@ -408,7 +408,19 @@
 /*
  * Mapa de resultado: protagonista tras revelar. Grande, ocupa el ancho y una
  * altura cómoda para ver tu pin + 🎯 + la línea entre ambos.
+ *
+ * La altura va TAMBIÉN en `.resultMap` (no solo en el `.lg-map` de dentro):
+ * `PlayMap` envuelve el mapa en un `.wrap` con `height: 100%`, y un 100% contra
+ * un contenedor sin alto explícito se resuelve a 0/auto (spec CSS). Sin este
+ * alto aquí, `.wrap` colapsaba a 0px y el lienzo del mapa (con el propio SDK o
+ * el stub de la galería posicionándolo `absolute`) quedaba fuera del flujo,
+ * flotando y solapando la tarjeta del resultado que va justo debajo.
  */
+.resultMap {
+  height: 62svh;
+  min-height: 320px;
+}
+
 .resultMap :global(.lg-map) {
   height: 62svh;
   min-height: 320px;
@@ -416,6 +428,9 @@
 }
 
 @media (min-width: 768px) {
+  .resultMap {
+    height: 560px;
+  }
   .resultMap :global(.lg-map) {
     height: 560px;
   }
