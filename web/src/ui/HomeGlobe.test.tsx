@@ -1,5 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
+import fs from 'node:fs'
+import path from 'node:path'
 import type { GlobePin } from './HomeGlobe'
 
 // --- Doble mínimo de maplibre-gl -------------------------------------------------
@@ -141,5 +143,83 @@ describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
     await waitFor(() => expect(mapInstances).toHaveLength(1))
     mapInstances[0].fire('load')
     await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
+  })
+})
+
+// --- Regresión #523: el pin "lead" (Roma) caía sobre el Congo ---------------------
+//
+// Causa raíz REAL: NO es una animación CSS ni una proyección manual (las dos
+// hipótesis obvias), sino un choque de ESPECIFICIDAD entre dos hojas de estilo.
+// MapLibre posiciona el Marker aplicando `style.transform` directamente sobre el
+// elemento que le pasamos (`new Marker({ element: el })`, sin wrapper propio —
+// ver `node_modules/maplibre-gl/src/ui/marker.ts#_update`) y espera que ese
+// elemento sea `.maplibregl-marker { position: absolute; top: 0; left: 0 }` (su
+// CSS base). Pero `.lg-trip-pin:has(.lg-trip-pin__disc)` (tripPins.css) tiene la
+// MISMA especificidad (0,2,0) y llega DESPUÉS en la cascada, así que gana y pone
+// `position: relative`. Con `position: relative` el pin ya no sale del flujo:
+// como los markers del globo de la home son hijos DIRECTOS y en orden del mismo
+// contenedor (sin wrapper que los aísle), cada uno apila su alto (42px) en flujo
+// de bloque DEBAJO del anterior, sumándose al `translate()` correcto de MapLibre.
+// El primer pin (offset 0) cae bien de pura casualidad; el resto se desplaza
+// `índice × 42px` — el pin "lead" (Roma, el último de la constelación demo) es
+// el más afectado, con 210px de más hacia abajo: suficiente para caer del
+// Mediterráneo al Congo.
+//
+// Este test monta las hojas de estilo REALES (tripPins.css + HomeGlobe.module.css,
+// en el mismo orden que las importa HomeGlobe.tsx) en jsdom —cuyo motor de
+// selectores (nwsapi) sí resuelve `:has()` y la cascada por especificidad/orden—
+// y comprueba `position` computado, exactamente la propiedad que rompía el
+// posicionamiento. Sin el fix (quitando `position/top/left` de la regla
+// `:global(.lg-trip-pin.lg-home-pin)` en HomeGlobe.module.css) este test falla:
+// `getComputedStyle(el).position` vuelve a ser `'relative'`.
+describe('HomeGlobe — pin "lead" no se sale de position:absolute (#523)', () => {
+  function loadRealStylesheets(): void {
+    const tripCss = fs.readFileSync(
+      path.resolve(__dirname, '../features/trip/tripPins.css'),
+      'utf8',
+    )
+    // `HomeGlobe.module.css` usa `:global(...)` (sintaxis de CSS Modules, no CSS
+    // válido suelto): para las reglas `:global(X)` el output compilado es
+    // literalmente `X` (esa es la semántica de "global" — sin scoping). Quitamos
+    // el wrapper para inyectar el CSS resultante tal cual lo vería el navegador.
+    const homeCssRaw = fs.readFileSync(path.resolve(__dirname, './HomeGlobe.module.css'), 'utf8')
+    const homeCssGlobal = homeCssRaw.replace(/:global\(([^)]+)\)/g, '$1')
+
+    // Base real de MapLibre (`maplibre-gl/dist/maplibre-gl.css`), la que el propio
+    // motor asume para CUALQUIER Marker con `element` custom.
+    const style = document.createElement('style')
+    style.textContent = `
+      .maplibregl-marker { left: 0; position: absolute; top: 0; will-change: transform; }
+      ${tripCss}
+      ${homeCssGlobal}
+    `
+    document.head.appendChild(style)
+  }
+
+  // Réplica del markup que `buildPinElement`/`buildHomePinElement` (pinMarkers.ts)
+  // generan para un pin-foto cerrado del globo de la home.
+  function homePinElement(lead: boolean): HTMLElement {
+    const el = document.createElement('div')
+    el.className = ['lg-trip-pin', 'lg-home-pin', lead ? 'lg-home-pin--lead' : '']
+      .filter(Boolean)
+      .join(' ')
+    el.classList.add('maplibregl-marker', 'maplibregl-marker-anchor-bottom')
+    const disc = document.createElement('span')
+    disc.className = 'lg-trip-pin__disc'
+    el.appendChild(disc)
+    document.body.appendChild(el)
+    return el
+  }
+
+  test('el pin normal de la home queda position:absolute (no relative)', () => {
+    loadRealStylesheets()
+    const el = homePinElement(false)
+    expect(getComputedStyle(el).position).toBe('absolute')
+  })
+
+  test('el pin "lead" de la home TAMBIÉN queda position:absolute (no relative)', () => {
+    loadRealStylesheets()
+    const el = homePinElement(true)
+    expect(getComputedStyle(el).position).toBe('absolute')
   })
 })

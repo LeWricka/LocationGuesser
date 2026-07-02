@@ -66,8 +66,33 @@
    compacto (caben varios). El borde/fondo van en el disco hijo (estructura nueva).
    ESPECIFICIDAD: `.lg-trip-pin:has(.lg-trip-pin__disc)` tiene 0,2,0; usamos
    `.lg-trip-pin.lg-home-pin` (también 0,2,0) para empatar y ganar por orden (este
-   archivo se importa DESPUÉS de tripPins.css en HomeGlobe.tsx). */
+   archivo se importa DESPUÉS de tripPins.css en HomeGlobe.tsx).
+   `position: absolute; top: 0; left: 0` — CAUSA RAÍZ de #523 (Roma/lead cayendo sobre
+   el Congo): el elemento del pin es el MISMO nodo que MapLibre posiciona con
+   `style.transform` (`new Marker({ element: el })`, sin wrapper propio; ver
+   `marker.ts#_update`). MapLibre espera que ESE nodo sea `.maplibregl-marker { position:
+   absolute; top: 0; left: 0 }` (su CSS base), pero `.lg-trip-pin:has(.lg-trip-pin__disc)`
+   (tripPins.css) empata esa especificidad y la sobrescribe a `position: relative` (la
+   necesita para la puntita `::after` del mapa de Viaje, donde cada pin vive en su propio
+   contenedor Leaflet/aislado). Con `position: relative` el pin YA NO sale del flujo
+   normal: como los markers de MapLibre son hijos DIRECTOS y en orden del mismo
+   `canvasContainer` (sin wrapper que los aísle), cada uno apila su propio alto (42px) en
+   flujo de bloque DEBAJO del anterior — un offset vertical que se SUMA al `translate()`
+   correcto de MapLibre. El primer pin (offset 0) cae bien por pura coincidencia; el resto
+   se desplaza `índice × 42px` hacia abajo (el último —"lead", el 6.º— acumula 210px, lo
+   bastante para caer del Mediterráneo al Congo). Sin CSS animation ni proyección manual
+   de por medio: es un choque de especificidad entre dos reglas de posicionamiento.
+   Recuperamos aquí el `position: absolute` que espera MapLibre para los pines DEL
+   GLOBO DE LA HOME (alcance de esta issue). El mapa de Viaje (`TripMapGlobe.tsx`) crea
+   sus markers con el MISMO patrón (`new gl.Marker({ element: el })`, sin wrapper) sobre
+   la MISMA clase base `.lg-trip-pin:has(.lg-trip-pin__disc)`, así que probablemente
+   arrastra el mismo bug de apilado (cada pin cerrado suma 48px de flujo de bloque al de
+   detrás); queda fuera de esta issue (#523, acotada al globo de la home) — pendiente de
+   una issue de seguimiento sobre `tripPins.css`/`TripMapGlobe.tsx`. */
 :global(.lg-trip-pin.lg-home-pin) {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 42px;
   height: 42px;
 }
