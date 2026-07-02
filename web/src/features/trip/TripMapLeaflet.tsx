@@ -21,7 +21,7 @@ import {
   SINGLE_ZOOM,
 } from '../../lib/mapPresets'
 import type { TripMapProps as Props } from './TripMap.types'
-import { activePinHtml, photoPinHtml, PIN_SIZE, PIN_TAIL } from './pinMarkers'
+import { buildActivePinElement, buildPinElement, PIN_SIZE, PIN_TAIL } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapLeaflet.module.css'
@@ -61,10 +61,13 @@ const PIN_ICON_ANCHOR: L.PointTuple = [PIN_SIZE / 2, PIN_SIZE + PIN_TAIL]
 // Pin-foto de un momento CERRADO (estilo Polarsteps): miniatura redonda con borde
 // blanco y puntita, clavada en su lat/lng. Sin foto → disco de acento con la inicial
 // del lugar (nunca un anillo vacío). El seleccionado lleva aro dorado (`featured`).
+// `divIcon.html` acepta un HTMLElement: le pasamos el de `buildPinElement`, que precarga
+// la foto y solo la sube si carga de verdad —una URL firmada de Storage caducada/404 cae
+// limpio a la inicial en vez de dejar un recuadro oscuro (el bug del pin ilegible).
 function closedPinIcon(point: RoutePoint, featured: boolean): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: photoPinHtml({ imageUrl: point.imageUrl, title: point.title, featured }),
+    html: buildPinElement({ imageUrl: point.imageUrl, title: point.title, featured }),
     iconSize: PIN_ICON_SIZE,
     iconAnchor: PIN_ICON_ANCHOR,
   })
@@ -74,7 +77,7 @@ function closedPinIcon(point: RoutePoint, featured: boolean): L.DivIcon {
 function activePinIcon(): L.DivIcon {
   return L.divIcon({
     className: '',
-    html: activePinHtml(),
+    html: buildActivePinElement(),
     iconSize: PIN_ICON_SIZE,
     iconAnchor: PIN_ICON_ANCHOR,
   })

@@ -55,11 +55,19 @@ export interface PhotoPinOptions {
  * (aro dorado si `featured`), sombra suave y puntita inferior que lo "clava" en el
  * mapa. Sin foto: disco de acento con la inicial del lugar (o glifo de ubicación),
  * nunca un anillo vacío. Devuelve el string para inyectar en el marcador.
- */
+ *
+ * El `imageUrl` pasa SIEMPRE por `isUsablePinImage`: una URL no usable (svg+xml con
+ * texto, esquema raro, vacío) NO se clava como `background-image` —caería en un
+ * rótulo minúsculo ilegible— sino que baja al disco de acento con la inicial. Aun
+ * así, este camino de STRING no puede detectar una imagen que sea usable pero luego
+ * falle al cargar (una URL firmada de Storage caducada/404), porque `background-image`
+ * no dispara `onerror`. Por eso los mapas NO usan este string para pintar: usan
+ * `buildPinElement` (más abajo), que precarga la foto y solo la sube si carga de
+ * verdad. `photoPinHtml` queda como base del markup (y camino sin foto seguro). */
 export function photoPinHtml({ imageUrl, title, featured = false }: PhotoPinOptions): string {
   const cls = ['lg-trip-pin']
   if (featured) cls.push('lg-trip-pin--featured')
-  if (imageUrl) {
+  if (isUsablePinImage(imageUrl)) {
     return `<div class="${cls.join(' ')}"><span class="lg-trip-pin__disc" style="background-image:url('${escapeUrl(
       imageUrl,
     )}')"></span></div>`
@@ -76,6 +84,22 @@ export function photoPinHtml({ imageUrl, title, featured = false }: PhotoPinOpti
  * clava en su sitio real (anti-spoiler), lo coloca el motor sobre el centroide. */
 export function activePinHtml(): string {
   return `<div class="lg-trip-pin lg-trip-pin--active"><span class="lg-trip-pin__disc">${HELP_MARKER_SVG}</span></div>`
+}
+
+/** Convierte un string de markup de pin en su ELEMENTO DOM raíz (`.lg-trip-pin`). */
+function elementFromHtml(html: string): HTMLDivElement {
+  const wrapper = document.createElement('div')
+  wrapper.innerHTML = html
+  // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como raíz del marcador.
+  return wrapper.firstElementChild as HTMLDivElement
+}
+
+/** ELEMENTO DOM del pin del momento ACTIVO (disco rojo pulsante con "?"). Los motores
+ * (Leaflet `divIcon`/MapLibre `Marker`) aceptan un HTMLElement como contenido, así que
+ * todos los pines se construyen como ELEMENTO (no string) para poder colgar la red de
+ * seguridad de precarga de foto de forma uniforme. El activo no lleva foto. */
+export function buildActivePinElement(): HTMLDivElement {
+  return elementFromHtml(activePinHtml())
 }
 
 /** ¿Es una URL de imagen USABLE como fondo de pin? Aceptamos lo que un navegador
@@ -101,35 +125,44 @@ export function isUsablePinImage(url: string | null | undefined): url is string 
   return /^(https?:|blob:)/i.test(src)
 }
 
-/** Opciones del pin-foto del globo de la home (subconjunto de GlobePin que consume
- * el DOM del pin). Definido aquí para que el builder sea testeable sin arrastrar el
- * módulo de MapLibre (HomeGlobe). */
-export interface HomePinInput {
-  title: string
+/** Input de un pin-foto CERRADO/situado, para construir su elemento DOM con la red de
+ * seguridad de precarga. Lo consumen HomeGlobe y los dos motores de mapa de Viaje. */
+export interface PinInput {
+  title?: string | null
   imageUrl: string | null
-  /** Marca el pin "lead" del grupo (aro cálido). */
+  /** Destacado/seleccionado (mapa de Viaje): aro dorado. */
+  featured?: boolean
+  /** Pin "lead" del grupo (globo de la home): aro cálido pulsante. */
   lead?: boolean
+  /** Home: añade la clase `lg-home-pin` (estructura de disco compartida). */
+  home?: boolean
 }
 
 /**
- * Construye el ELEMENTO DOM de un pin-foto del globo de la home a partir de su input.
- * Compartido por HomeGlobe (lo clava en el Marker de MapLibre) y por los tests.
+ * Construye el ELEMENTO DOM de un pin-foto (cerrado/situado) con la RED DE SEGURIDAD
+ * anti-garabato. ÚNICO camino de construcción de pin-foto de la app: lo usan el globo
+ * de la home (HomeGlobe) y los DOS motores del mapa de Viaje (Leaflet y MapLibre), de
+ * modo que TODOS los pines se comportan igual y ninguno puede recaer en la "tarjeta
+ * oscura".
  *
- * RED DE SEGURIDAD anti-garabato: arranca SIEMPRE en el estado sin foto (disco de
- * acento + inicial del lugar), que es el fallback visible. Solo sube a la miniatura
- * si (a) la URL es una imagen usable (`isUsablePinImage`: nada de svg+xml con texto
- * ni esquemas raros) y (b) esa imagen PRECARGA bien (`Image().onload`). Un
- * `background-image` no dispara `onerror`, así que sin esta precarga un asset
- * ausente/expirado dejaría el disco vacío; con ella, el estado por defecto es la
- * inicial y la foto es un upgrade que solo ocurre si carga de verdad.
+ * Arranca SIEMPRE en el estado sin foto (disco de acento + inicial del lugar), que es
+ * el fallback VISIBLE. Solo sube a la miniatura si:
+ *  (a) la URL es una imagen usable (`isUsablePinImage`: nada de svg+xml con texto ni
+ *      esquemas raros), y
+ *  (b) esa imagen PRECARGA bien (`Image().onload`).
+ * Un `background-image` no dispara `onerror`, así que sin esta precarga una URL firmada
+ * de Storage caducada/404 dejaría el disco vacío (recuadro oscuro) SIN caer a la
+ * inicial —el bug del pin ininteligible—. Con la precarga, el estado por defecto es la
+ * inicial limpia y la foto es un upgrade que solo ocurre si la imagen carga de verdad;
+ * si falla (`onerror`), el pin se queda en la inicial.
  */
-export function buildHomePinElement(pin: HomePinInput): HTMLDivElement {
-  const wrapper = document.createElement('div')
-  // Markup base sin foto (disco de acento + inicial): es el fallback visible de entrada.
-  wrapper.innerHTML = photoPinHtml({ imageUrl: null, title: pin.title })
-  // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como elemento del Marker.
-  const el = wrapper.firstElementChild as HTMLDivElement
-  el.classList.add('lg-home-pin')
+export function buildPinElement(pin: PinInput): HTMLDivElement {
+  // Markup base SIN foto (disco de acento + inicial): fallback visible de entrada. No
+  // pasamos `imageUrl` aquí a propósito: la foto entra solo tras precargar (abajo).
+  const el = elementFromHtml(
+    photoPinHtml({ imageUrl: null, title: pin.title, featured: pin.featured }),
+  )
+  if (pin.home) el.classList.add('lg-home-pin')
   if (pin.lead) el.classList.add('lg-home-pin--lead')
 
   if (isUsablePinImage(pin.imageUrl)) {
@@ -147,4 +180,18 @@ export function buildHomePinElement(pin: HomePinInput): HTMLDivElement {
     img.src = src
   }
   return el
+}
+
+/** Input del pin-foto del globo de la home (compat: subconjunto de `PinInput`). */
+export interface HomePinInput {
+  title: string
+  imageUrl: string | null
+  /** Marca el pin "lead" del grupo (aro cálido). */
+  lead?: boolean
+}
+
+/** Pin-foto del globo de la home. Fino envoltorio sobre `buildPinElement` (el builder
+ * compartido con el mapa de Viaje) que fija la variante `home`. */
+export function buildHomePinElement(pin: HomePinInput): HTMLDivElement {
+  return buildPinElement({ title: pin.title, imageUrl: pin.imageUrl, lead: pin.lead, home: true })
 }
