@@ -2,26 +2,27 @@
    Misma estética que el flujo inmersivo pero sobre papel del kit (no satélite):
    dos tarjetas grandes, tokens del UI kit, sin colores hardcodeados. */
 
+/* Contenedor raíz: pantalla completa para que ShellUtilitario se posicione
+   correctamente (mismo patrón que CreateGroup, que resolvió esta misma zona
+   muerta usando ShellUtilitario en vez de un flex propio con centrado vertical). */
 .root {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  background: var(--color-bg);
+  isolation: isolate;
   color: var(--ink-900);
   font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
-  overflow: hidden;
 }
 
-/* Cuerpo centrado verticalmente. La cabecera la pone AppHeader (variante papel). */
+/* Cuerpo anclado ARRIBA: fluye bajo la cabecera con el espaciado normal de
+   ShellUtilitario (su `.body` aporta el padding lateral/superior y el scroll
+   propio). Sin `justify-content: center`: eso dejaba más de media pantalla
+   vacía entre la cabecera y las tarjetas en viewports altos (#502). */
 .body {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
-  justify-content: center;
   gap: 28px;
-  padding: 8px var(--space-gutter) calc(env(safe-area-inset-bottom, 0px) + 28px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px);
   max-width: 520px;
   width: 100%;
   margin: 0 auto;
