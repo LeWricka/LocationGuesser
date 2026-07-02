@@ -58,7 +58,9 @@ export function ShellInmersivo({ backdrop, header, caption, sheetTitle, children
       {/* 2. Cabecera flotante (chrome sobre la imagen). */}
       {header && <div className={styles.header}>{header}</div>}
 
-      {/* 3. Caption editorial sobre el protagonista (solo si no hay sheetTitle). */}
+      {/* 3. Caption editorial sobre el protagonista (solo si no hay sheetTitle).
+           Nota: backdrops con gradientes complejos o compositing GPU pueden tapar
+           el caption. En ese caso, usar sheetTitle en su lugar. */}
       {caption && <div className={styles.caption}>{caption}</div>}
 
       {/* 4. Hoja blanca que asoma desde abajo. */}

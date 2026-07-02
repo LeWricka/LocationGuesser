@@ -20,12 +20,17 @@
 .root {
   position: relative;
   width: 100%;
-  height: 100dvh;
+  /* 100% del contenedor padre (la .screen del MockupIndex, que es flex: 1 y ocupa
+   * el viewport menos la barra de navegación del visor). En producción el shell
+   * irá en un contenedor 100dvh, pero en los mockups se adapta al espacio real. */
+  height: 100%;
   overflow: hidden;
   background: var(--scene-bg); /* solo visible en carga; el protagonista lo tapa */
 }
 
-/* Protagonista visual: rellena TODA la pantalla a sangre. */
+/* Protagonista visual: rellena TODA la pantalla a sangre.
+ * position: relative para que el .caption absolute se posicione dentro.
+ * z-index: 0 para establecer stacking context y quedar bajo la hoja (z-index 500). */
 .backdrop {
   position: absolute;
   inset: 0;
@@ -42,21 +47,26 @@
   /* Sin fondo propio: la AppHeader variant="floating" trae el velo. */
 }
 
-/* Caption editorial sobre el backdrop: velo semitransparente al pie del protagonista
- * para legibilidad. Solo se pinta cuando la hoja NO tiene título propio (regla dura:
- * caption y título de hoja nunca coexisten). */
+/* Caption editorial sobre el backdrop. Solo cuando la hoja no tiene sheetTitle.
+ * Se posiciona justo encima de la hoja (bottom ≈ sheet-peek + gap).
+ * Nota: backdrops con GPU compositing (gradientes complejos + border-radius oval)
+ * pueden tapar el caption por stacking order. En esos casos usar sheetTitle. */
 .caption {
   position: absolute;
   left: 0;
   right: 0;
-  /* La altura de la hoja la determina --sheet-peek; el caption vive justo por encima. */
-  bottom: var(--sheet-peek, 240px);
-  z-index: calc(var(--z-header) + 1);
-  padding: var(--space-5) var(--space-5) var(--space-4);
-  /* Velo de legibilidad: funde la parte inferior del protagonista con la hoja. */
-  background: linear-gradient(to top, var(--scene-veil) 0%, transparent 100%);
+  bottom: calc(var(--sheet-peek, 240px) + var(--space-3));
+  z-index: calc(var(--z-sheet) + 2); /* design-lint-allow: caption sobre protagonista */
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.65) 0%,
+    rgba(0, 0, 0, 0.2) 70%,
+    transparent 100%
+  );
   color: var(--scene-ink);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
   pointer-events: none;
+  padding: var(--space-8) var(--space-5) var(--space-3);
 }
 
 /* Hoja blanca que asoma desde abajo con altura fija (peek). Al expandirse, empuja
@@ -95,13 +105,15 @@
   border-radius: var(--radius-full);
 }
 
-/* Contenido interior de la hoja: scroll propio, padding horizontal estándar. */
+/* Contenido interior de la hoja: scroll propio, padding horizontal estándar.
+ * El padding-bottom extra (--space-10 ≈ 80px + safe-area) deja espacio para el
+ * CTA absoluto que flota por encima de la hoja (botón lg ~56px + space-5 ~20px). */
 .sheetInner {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 var(--space-5) var(--space-7);
-  padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+  padding: 0 var(--space-5) var(--space-9);
+  padding-bottom: calc(var(--space-9) + env(safe-area-inset-bottom));
 }
 
 /* CTA fijo al fondo, separado de la hoja para que siempre sea visible. */

@@ -46,14 +46,17 @@
   background: linear-gradient(to bottom, var(--route-gold), var(--route-gold-soft));
 }
 
-/* Velo inferior para fundir con la hoja */
+/* Velo inferior para fundir con la hoja.
+ * El globo tiene fondo oscuro (océano azul), por eso usamos el velo oscuro de escena,
+ * no el --map-bottom-scrim (que es claro y para mapas OSM de fondo claro). */
 .velo {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 40%;
-  background: var(--map-bottom-scrim);
+  height: 45%;
+  /* design-lint-allow: gradiente de velo sobre globo terráqueo (zona visual específica) */
+  background: linear-gradient(to top, rgba(11, 16, 22, 0.7) 0%, transparent 100%);
 }
 
 /* Nombre del viaje sobre el globo (caption editorial) */

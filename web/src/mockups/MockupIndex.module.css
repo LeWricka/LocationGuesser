@@ -70,6 +70,7 @@
 /* Contenido: la pantalla mockup ocupa el resto */
 .screen {
   flex: 1;
+  min-height: 0; /* evita que flex ignore el overflow y crezca por encima del viewport */
   position: relative;
   overflow: hidden;
 }

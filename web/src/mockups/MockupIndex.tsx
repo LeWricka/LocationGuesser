@@ -121,8 +121,12 @@ export function MockupIndex() {
         </button>
       </nav>
 
-      {/* La pantalla mockup activa */}
-      <div className={styles.screen}>{pantalla.render()}</div>
+      {/* La pantalla mockup activa.
+          key={pantalla.id} fuerza un remount al cambiar de pantalla: evita que React
+          reutilice la instancia anterior (p.ej. PantallaCrearReto con distinto estadoInicial). */}
+      <div className={styles.screen} key={pantalla.id}>
+        {pantalla.render()}
+      </div>
 
       {/* Panel de índice (toggle) */}
       {showIndex && (

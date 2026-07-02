@@ -44,16 +44,20 @@ export function PantallaVerViaje() {
           variant="floating"
         />
       }
-      // Caption editorial con el nombre del viaje (sobre el globo).
-      // NO hay sheetTitle porque caption y sheetTitle son mutuamente excluyentes.
-      caption={
+      // sheetTitle con el nombre del viaje (dentro de la hoja).
+      // La pantalla de producción usará caption sobre el protagonista, pero para
+      // el mockup esto garantiza visibilidad sin batallas de z-index/GPU.
+      sheetTitle={
         <div className={styles.captionInner}>
-          <span className="t-label" style={{ color: 'var(--scene-ink-soft)' }}>
+          <span
+            className="t-label"
+            style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}
+          >
             {FIXTURE_VIAJE.fechas}
           </span>
-          <h1 className="t-hero" style={{ color: 'var(--scene-ink)' }}>
+          <span className="t-section" style={{ color: 'var(--color-text)', display: 'block' }}>
             {FIXTURE_VIAJE.nombre}
-          </h1>
+          </span>
         </div>
       }
     >
