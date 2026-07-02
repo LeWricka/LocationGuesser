@@ -8,17 +8,15 @@ interface Props {
   name: string
   /** Crear el primer grupo (lo cablea la home). */
   onCreateGroup?: () => void
-  /** Unirse a un grupo con un código/enlace (lo cablea la home). */
-  onJoinGroup?: () => void
   className?: string
 }
 
 // Estado vacío de la home = hero explicativo del producto (issue #131). Para el
 // recién llegado (sin grupos, o que entra por un enlace) es protagonista: dice
-// QUÉ es en una frase, CÓMO funciona en 3 pasos y CÓMO empezar (crear o
-// unirse). Cuando el usuario ya tiene grupos, la home muestra el dashboard y
-// este hero no aparece.
-export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: Props) {
+// QUÉ es en una frase, CÓMO funciona en 3 pasos y CÓMO empezar (crear). Cuando
+// el usuario ya tiene grupos, la home muestra el dashboard y este hero no aparece.
+// "Unirme con un código" eliminado (#495): los viajes van por enlace, no por código.
+export function HomeEmptyState({ name, onCreateGroup, className }: Props) {
   return (
     <section
       className={[styles.empty, className].filter(Boolean).join(' ')}
@@ -30,7 +28,9 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
           <h1 className={styles.headline}>
             Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
           </h1>
-          <p className={styles.lead}>Comparte dónde estás. Gana quien más se acerca.</p>
+          <p className={styles.lead}>
+            Guarda tu viaje, comparte cada lugar y deja que tu gente interactúe contigo.
+          </p>
         </div>
 
         <HowItWorks compact />
@@ -39,9 +39,8 @@ export function HomeEmptyState({ name, onCreateGroup, onJoinGroup, className }: 
           <Button size="lg" fullWidth onClick={onCreateGroup}>
             Crear viaje
           </Button>
-          <Button variant="secondary" size="lg" fullWidth onClick={onJoinGroup}>
-            Unirme con un código
-          </Button>
+          {/* "Unirme con un código" eliminado: los viajes se comparten por enlace.
+              El enlace ya mete al usuario al instante; el código manual sobra (#495). */}
           <p className={styles.hint}>¿Te han pasado un enlace? Ábrelo y entras directo.</p>
         </Stack>
       </Stack>

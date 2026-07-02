@@ -34,10 +34,11 @@ describe('HomeEmptyState', () => {
     expect(onCreateGroup).toHaveBeenCalledOnce()
   })
 
-  test('dispara onJoinGroup al pulsar "Unirme con un código"', async () => {
-    const onJoinGroup = vi.fn()
-    render(<HomeEmptyState name="Lewis" onJoinGroup={onJoinGroup} />)
-    await userEvent.click(screen.getByRole('button', { name: 'Unirme con un código' }))
-    expect(onJoinGroup).toHaveBeenCalledOnce()
+  test('"Unirme con un código" eliminado (#495): solo la nota de enlace', () => {
+    render(<HomeEmptyState name="Lewis" />)
+    // El botón de código fue eliminado: los viajes van por enlace.
+    expect(screen.queryByRole('button', { name: /Unirme con un código/i })).not.toBeInTheDocument()
+    // La nota de ayuda para quien ya tiene un enlace sí aparece.
+    expect(screen.getByText(/Te han pasado un enlace/i)).toBeInTheDocument()
   })
 })

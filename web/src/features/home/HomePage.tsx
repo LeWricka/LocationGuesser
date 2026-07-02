@@ -20,7 +20,6 @@ import { track } from '../../lib/analytics'
 import { useHomeData } from './useHomeData'
 import { useWorldTrips } from './useWorldTrips'
 import { HOME_DEMO_PINS } from './homeDemoPins'
-import { JoinGroupModal } from './JoinGroupModal'
 import { gotoChallenge, gotoCreateGroup, gotoGroup, gotoProfile } from './navigation'
 import styles from './HomePage.module.css'
 
@@ -33,7 +32,6 @@ import styles from './HomePage.module.css'
 export function HomePage() {
   const { user, profile, loading: sessionLoading } = useSession()
   const { loading: dataLoading, error, data, reload } = useHomeData(user?.id)
-  const [joinOpen, setJoinOpen] = useState(false)
 
   // Coordenadas de los viajes situados → pines-foto del globo héroe. Es presentación
   // derivada (anti-spoiler ya aplicado en useWorldTrips). La lista de grupos la trae
@@ -99,10 +97,6 @@ export function HomePage() {
   function onCreateGroup() {
     track('create_group_cta')
     gotoCreateGroup()
-  }
-  function onJoinGroup() {
-    track('join_group_cta')
-    setJoinOpen(true)
   }
 
   // Mientras resolvemos la sesión persistida o cargamos la membresía → skeletons.
@@ -207,16 +201,10 @@ export function HomePage() {
           }
         >
           <div className={styles.welcome}>
-            <HomeEmptyState
-              name={displayName}
-              onCreateGroup={onCreateGroup}
-              onJoinGroup={onJoinGroup}
-            />
+            <HomeEmptyState name={displayName} onCreateGroup={onCreateGroup} />
           </div>
         </GlobeSheet>
       )}
-
-      <JoinGroupModal open={joinOpen} onClose={() => setJoinOpen(false)} />
     </main>
   )
 }

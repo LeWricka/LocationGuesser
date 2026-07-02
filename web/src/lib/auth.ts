@@ -76,6 +76,46 @@ export async function sendEmailOtp(
   if (error) throw error
 }
 
+// Tipo de resultado del intento de login de una cuenta existente.
+export type LoginResult =
+  | { kind: 'sent' } // el magic link se mandó (cuenta existe)
+  | { kind: 'not-found' } // no hay cuenta con ese email
+
+/**
+ * Login para quien ya TIENE cuenta: manda un magic link SIN crear usuario nuevo
+ * (`shouldCreateUser: false`). Si el email no existe, Supabase devuelve un error
+ * específico → devolvemos 'not-found' para que la UI ofrezca ir al alta.
+ *
+ * Al volver del enlace, AuthProvider carga la sesión y el perfil (que ya existe con
+ * display_name) → la condición `needsProfileStep` queda en false → ProfileGate no
+ * aparece. El usuario aterriza DIRECTO en la home o en el destino guardado.
+ */
+export async function signInExistingUser(email: string, redirectTo?: string): Promise<LoginResult> {
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      shouldCreateUser: false,
+      emailRedirectTo: redirectTo ?? defaultRedirect(),
+    },
+  })
+  if (error) {
+    // Supabase devuelve distintos códigos según versión del SDK / config.
+    // Capturamos todos los que indican "no existe esa cuenta".
+    const code = (error as { code?: string }).code ?? ''
+    const message = error.message?.toLowerCase() ?? ''
+    const notFound =
+      code === 'otp_disabled' ||
+      code === 'user_not_found' ||
+      code === 'email_not_found' ||
+      // Supabase responde con este mensaje cuando shouldCreateUser=false y el email no existe
+      message.includes('signups not allowed') ||
+      message.includes('email not confirmed')
+    if (notFound) return { kind: 'not-found' }
+    throw error
+  }
+  return { kind: 'sent' }
+}
+
 // Canjea el código de 6 dígitos del email por una sesión, sin salir de la app.
 // `type: 'email'` es el OTP que emite `signInWithOtp` para email. Al resolverse,
 // `onAuthStateChange` dispara y AuthProvider repinta logueado.
