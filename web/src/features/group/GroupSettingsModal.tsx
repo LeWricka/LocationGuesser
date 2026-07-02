@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   closeGroup,
   deleteGroup,
@@ -26,12 +26,23 @@ import {
 } from '../../ui'
 import styles from './GroupPage.module.css'
 
+/** Sección a la que aterriza el modal al abrirse. */
+export type SettingsSection = 'settings' | 'season' | 'danger'
+
 interface Props {
   groupId: string
   /** Nombre actual (puede ser null → mostramos el código). */
   currentName: string | null
   /** Temporada cerrada (closed_at no null): mostramos "Reabrir" en vez de "Cerrar". */
   isClosed: boolean
+  /**
+   * Sección inicial (por defecto 'settings', el formulario general). Cada
+   * entrada del menú "···" del viaje pasa la suya para no obligar a bucear:
+   * 'season' aterriza en la confirmación de cerrar temporada (o, si reabrir no
+   * tiene confirmación, hace scroll a esa sección del formulario) y 'danger'
+   * aterriza directo en la confirmación de borrado.
+   */
+  initialSection?: SettingsSection
   onClose: () => void
   /** Tras guardar (nombre/datos/portada): el grupo refresca la cabecera y el feed. */
   onRenamed: () => void
@@ -51,6 +62,7 @@ export function GroupSettingsModal({
   groupId,
   currentName,
   isClosed,
+  initialSection = 'settings',
   onClose,
   onRenamed,
   onSeasonChanged,
@@ -71,12 +83,27 @@ export function GroupSettingsModal({
 
   const [busy, setBusy] = useState(false)
   // Confirmación fuerte de borrado: el dueño teclea el nombre (o el código si no
-  // hay nombre) para habilitar el botón.
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  // hay nombre) para habilitar el botón. Si "Borrar viaje" del menú del viaje pidió
+  // initialSection='danger', aterrizamos YA en esta confirmación (no en el formulario).
+  const [confirmingDelete, setConfirmingDelete] = useState(initialSection === 'danger')
   const [confirmText, setConfirmText] = useState('')
-  // Confirmación ligera de cierre de temporada (reversible, no destructivo).
-  const [confirmingClose, setConfirmingClose] = useState(false)
+  // Confirmación ligera de cierre de temporada (reversible, no destructivo). Solo
+  // aplica si el viaje sigue abierto: "Reabrir" no tiene un paso de confirmación
+  // propio (ver el useEffect de scroll más abajo para ese caso).
+  const [confirmingClose, setConfirmingClose] = useState(initialSection === 'season' && !isClosed)
+  const seasonSectionRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
+
+  // "Reabrir viaje" del menú no tiene confirmación intermedia (es reversible): en
+  // ese caso el formulario general se muestra igualmente, así que hacemos scroll
+  // directo a su sección ("Temporada") en vez de dejar al dueño buscarla.
+  useEffect(() => {
+    if (initialSection === 'season' && isClosed) {
+      seasonSectionRef.current?.scrollIntoView({ block: 'start' })
+    }
+    // Solo al montar: initialSection/isClosed no cambian durante la vida del modal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Carga los datos del viaje y sus fechas/portada al montar. Tolerante a fallo: si
   // falla, los campos quedan editables en su estado por defecto (no bloquea Ajustes).
@@ -423,7 +450,7 @@ export function GroupSettingsModal({
 
           {/* Fin de temporada: cerrar congela el viaje (solo-lectura); reabrir lo
               reactiva. Reversible, por eso va separado de la zona peligrosa. */}
-          <div className={styles.settingsSection}>
+          <div className={styles.settingsSection} ref={seasonSectionRef}>
             <p className={styles.settingsSectionLabel}>Temporada</p>
             {isClosed ? (
               <Button

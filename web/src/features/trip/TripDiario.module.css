@@ -129,3 +129,9 @@
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-lg);
 }
+
+/* CTA secundario "Invitar" bajo la acción primaria del vacío: mismo ancho de
+   tarjeta, un pelín separado para no leer como un solo botón partido. */
+.emptyInvite {
+  margin-top: var(--space-2);
+}

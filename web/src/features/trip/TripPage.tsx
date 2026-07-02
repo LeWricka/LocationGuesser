@@ -22,7 +22,7 @@ import { tripShareUrl } from '../../lib/shareLinks'
 import type { Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
-import { GroupSettingsModal } from '../group/GroupSettingsModal'
+import { GroupSettingsModal, type SettingsSection } from '../group/GroupSettingsModal'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
 import { MarcadorTab } from './MarcadorTab'
@@ -135,8 +135,17 @@ export function TripPage({
   // Invitar al viaje: hoja de compartir (reusa InviteModal). Cuelga del menú ⋯ y
   // es SIEMPRE accesible (P0): cualquier miembro puede repartir el enlace.
   const [inviting, setInviting] = useState(false)
-  // Ajustes del viaje (renombrar / cerrar temporada / borrar): solo dueño.
+  // Ajustes del viaje (renombrar / cerrar temporada / borrar): solo dueño. La
+  // sección viaja aparte: "Ajustes", "Cerrar/Reabrir viaje" y "Borrar viaje" abren
+  // el mismo modal pero cada uno debe aterrizar en SU sección, no en el formulario
+  // genérico (issue #510: "Borrar viaje" aterrizaba en Ajustes sin la confirmación).
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('settings')
+  const openSettings = (section: SettingsSection) => {
+    setMenuOpen(false)
+    setSettingsSection(section)
+    setSettingsOpen(true)
+  }
 
   // Recap de cierre: el viaje está cerrado (closed_at) → ofrecemos el "wrap".
   const isClosed = group?.closed_at != null
@@ -487,6 +496,7 @@ export function TripPage({
               onExpand={(m) => setOpenMoment(m)}
               onPlay={onPlayChallenge}
               onAddMoment={onAddMoment}
+              onInvite={() => setInviting(true)}
             />
           </section>
         ) : (
@@ -500,7 +510,13 @@ export function TripPage({
             role="tabpanel"
             aria-label="Marcador"
           >
-            <MarcadorTab leaderboard={leaderboard} myUserId={user?.id ?? null} />
+            <MarcadorTab
+              leaderboard={leaderboard}
+              myUserId={user?.id ?? null}
+              onInvite={() => setInviting(true)}
+              onAddChallenge={onAddChallenge}
+              canCreate={canCreate}
+            />
           </section>
         )}
       </div>
@@ -598,10 +614,7 @@ export function TripPage({
               <button
                 type="button"
                 className={styles.menuItem}
-                onClick={() => {
-                  setMenuOpen(false)
-                  setSettingsOpen(true)
-                }}
+                onClick={() => openSettings('settings')}
               >
                 <span className={styles.menuItemIcon}>
                   <Icon icon={Settings} size={18} />
@@ -611,10 +624,7 @@ export function TripPage({
               <button
                 type="button"
                 className={styles.menuItem}
-                onClick={() => {
-                  setMenuOpen(false)
-                  setSettingsOpen(true)
-                }}
+                onClick={() => openSettings('season')}
               >
                 <span className={styles.menuItemIcon}>
                   <Icon icon={Flag} size={18} />
@@ -624,10 +634,7 @@ export function TripPage({
               <button
                 type="button"
                 className={`${styles.menuItem} ${styles.menuItemDanger}`}
-                onClick={() => {
-                  setMenuOpen(false)
-                  setSettingsOpen(true)
-                }}
+                onClick={() => openSettings('danger')}
               >
                 <span className={styles.menuItemIcon}>
                   <Icon icon={Trash2} size={18} />
@@ -664,6 +671,7 @@ export function TripPage({
           groupId={groupId}
           currentName={group?.name ?? null}
           isClosed={isClosed}
+          initialSection={settingsSection}
           onClose={() => setSettingsOpen(false)}
           onRenamed={() => {
             setSettingsOpen(false)

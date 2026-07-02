@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Share2 } from 'lucide-react'
 import { newGroupCode } from '../../lib/group'
 import { createGroup } from '../../lib/groupData'
 import { joinGroupAsOwner } from '../../lib/membership'
 import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
-import { AppHeader, Button, Spinner, DatePicker, useToast } from '../../ui'
+import { tripShareUrl } from '../../lib/shareLinks'
+import { AppHeader, Button, Icon, Spinner, DatePicker, useToast } from '../../ui'
 import { ShellUtilitario } from '../../ui/shells'
+import { InviteModal } from '../group/InviteModal'
 import { CalendarIcon, PeopleIcon, SparkIcon, TripPinIcon } from './CreateIcons'
 import { formatTripDates } from './tripDates'
 import styles from './CreateGroup.module.css'
@@ -40,6 +43,18 @@ export function CreateGroup({ onBack }: Props) {
   const [moreOpen, setMoreOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
+  // Id del viaje recién creado: solo se necesita para el CTA "Invitar ahora" de la
+  // microcelebración (el resto del flujo navega por hash, sin guardar estado).
+  const [createdGroupId, setCreatedGroupId] = useState<string | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  // Temporizador que lleva al viaje tras la microcelebración: si el dueño toca
+  // "Invitar ahora" lo cancelamos para no navegar debajo del modal de invitar.
+  const navigateTimer = useRef<number | null>(null)
+  useEffect(() => {
+    return () => {
+      if (navigateTimer.current != null) window.clearTimeout(navigateTimer.current)
+    }
+  }, [])
 
   // Al cambiar de etapa el cuerpo vuelve arriba (cada etapa empieza por su título).
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -111,9 +126,11 @@ export function CreateGroup({ onBack }: Props) {
         has_companions: companions.trim().length > 0,
       })
       // Microcelebración antes de entrar al viaje. El listener de hashchange de
-      // App.tsx recoge el cambio de hash y renderiza la página del viaje.
+      // App.tsx recoge el cambio de hash y renderiza la página del viaje. Si el
+      // dueño toca "Invitar ahora" en la tarjeta, este temporizador se cancela.
       setCelebrating(true)
-      window.setTimeout(() => {
+      setCreatedGroupId(groupId)
+      navigateTimer.current = window.setTimeout(() => {
         location.hash = `#g=${groupId}`
       }, 1400)
     } catch (err) {
@@ -364,7 +381,10 @@ export function CreateGroup({ onBack }: Props) {
         )}
       </ShellUtilitario>
 
-      {/* MICROCELEBRACIÓN al crear: burst + "¡Buen viaje!". */}
+      {/* MICROCELEBRACIÓN al crear: burst + "¡Buen viaje!". "Invitar ahora" no
+          bloquea el flujo: cancela el paso automático al viaje y abre la hoja de
+          invitar directamente (issue #510 — antes solo se podía invitar tras
+          entrar y buscar el enlace en el menú ···). */}
       {celebrating && (
         <div className={styles.celebrate} role="status">
           <div className={styles.celebrateCard}>
@@ -377,8 +397,34 @@ export function CreateGroup({ onBack }: Props) {
               <br />
               Comparte el enlace y empezad a llenar el diario.
             </p>
+            {createdGroupId && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  if (navigateTimer.current != null) window.clearTimeout(navigateTimer.current)
+                  setInviteOpen(true)
+                }}
+              >
+                <Icon icon={Share2} size={16} /> Invitar ahora
+              </Button>
+            )}
           </div>
         </div>
+      )}
+
+      {createdGroupId && (
+        <InviteModal
+          open={inviteOpen}
+          onClose={() => {
+            setInviteOpen(false)
+            location.hash = `#g=${createdGroupId}`
+          }}
+          groupId={createdGroupId}
+          groupName={name.trim() || createdGroupId}
+          link={tripShareUrl(location.origin, createdGroupId)}
+          challengeCount={0}
+        />
       )}
     </div>
   )
