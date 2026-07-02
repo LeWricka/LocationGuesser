@@ -1,8 +1,11 @@
-// Flujo de login passwordless, sin sesión (cuentas-y-home.md §2.2, flujos A y B).
+// Flujo de login passwordless email-first (issue #506, modelo unificado).
+// Un único flujo sirve para nuevo y recurrente: email → código OTP → sesión.
+// Tras la sesión, App detecta si el perfil ya tiene nombre (→ HOME directo) o
+// no (→ paso de nombre → HOME). No hay separación signup/login.
+//
 // Máquina de dos pantallas presentacionales del kit: LoginScreen (pide email) →
 // EnterCode (introduce el código de 6 dígitos). La lógica/wiring vive en el hook
-// `useMagicLink` (compartido con la landing pública); aquí solo conectamos esa
-// lógica a la UI del kit.
+// `useMagicLink`; aquí solo conectamos esa lógica a la UI del kit.
 //
 // El email lleva el código Y un enlace mágico (fallback): si el usuario pulsa el
 // enlace en vez de teclear el código, vuelve con sesión y AuthProvider repinta;
@@ -23,9 +26,14 @@ interface Props {
    * absoluta de retorno (origin), por defecto el origin actual.
    */
   redirectTo?: string
+  /**
+   * Vuelve atrás desde la pantalla de email (p.ej. a la landing). Si no se pasa,
+   * el botón de volver no aparece en la primera pantalla.
+   */
+  onBack?: () => void
 }
 
-export function LoginFlow({ groupName, redirectTo }: Props) {
+export function LoginFlow({ groupName, redirectTo, onBack }: Props) {
   const {
     step,
     email,
@@ -66,6 +74,7 @@ export function LoginFlow({ groupName, redirectTo }: Props) {
       loading={loading}
       error={error}
       groupName={groupName}
+      onBack={onBack}
     />
   )
 }

@@ -20,7 +20,7 @@ beforeEach(() => {
   verifyOtp.mockClear()
 })
 
-describe('LoginFlow', () => {
+describe('LoginFlow (email-first con código OTP, issue #506)', () => {
   test('email inválido no llama a Supabase y muestra error', async () => {
     render(<LoginFlow />)
     await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
@@ -65,8 +65,21 @@ describe('LoginFlow', () => {
     expect(screen.getByRole('heading', { name: 'Entra a Tabide' })).toBeInTheDocument()
   })
 
-  test('con groupName muestra el copy de unirse', () => {
+  test('con groupName muestra el copy de unirse al reto', () => {
     render(<LoginFlow groupName="Finde Lisboa" />)
     expect(screen.getByRole('heading', { name: 'Únete para jugar este reto' })).toBeInTheDocument()
+  })
+
+  test('con onBack pinta el botón "Atrás" en la pantalla de email', async () => {
+    const onBack = vi.fn()
+    render(<LoginFlow onBack={onBack} />)
+    // El botón "Atrás" aparece en el paso de email.
+    await userEvent.click(screen.getByRole('button', { name: 'Atrás' }))
+    expect(onBack).toHaveBeenCalledOnce()
+  })
+
+  test('sin onBack no aparece el botón "Atrás" en el paso de email', () => {
+    render(<LoginFlow />)
+    expect(screen.queryByRole('button', { name: 'Atrás' })).not.toBeInTheDocument()
   })
 })

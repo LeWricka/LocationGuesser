@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react'
 import { AuthScreen } from './AuthScreen'
+import { BackHomeButton } from './BackHomeButton'
 import { Button } from './Button'
 import { Field } from './Field'
 import { Input } from './Input'
@@ -22,12 +23,17 @@ interface Props {
    * cambia el copy a "Únete para jugar este reto" y muestra el nombre del grupo.
    */
   groupName?: string
+  /**
+   * Volver atrás (p.ej. a la landing). Si no se pasa, no se pinta el botón atrás.
+   */
+  onBack?: () => void
   className?: string
 }
 
-// Pantalla de login passwordless (§2): el usuario mete su email y le mandamos un
-// código (y un enlace como fallback). Presentacional y controlada: sin llamadas a
-// Supabase Auth (eso lo hace el hook). Dos copys según haya o no contexto de grupo.
+// Pantalla de login passwordless email-first (§2, issue #506): el usuario mete su
+// email y le mandamos un código (y un enlace como fallback). Un único flujo para
+// nuevo y recurrente. Presentacional y controlada: sin llamadas a Supabase Auth
+// (eso lo hace el hook). Dos copys según haya o no contexto de grupo.
 export function LoginScreen({
   email,
   onEmailChange,
@@ -35,6 +41,7 @@ export function LoginScreen({
   loading = false,
   error,
   groupName,
+  onBack,
   className,
 }: Props) {
   const joining = Boolean(groupName)
@@ -49,6 +56,7 @@ export function LoginScreen({
       className={className}
       icon={<Logo variant="mark" size={40} />}
       title={joining ? 'Únete para jugar este reto' : 'Entra a Tabide'}
+      header={onBack ? <BackHomeButton onClick={onBack} label="Atrás" /> : undefined}
       subtitle={
         joining ? (
           <>

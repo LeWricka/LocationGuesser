@@ -1,37 +1,31 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { EnterResult, LoginResult } from '../../lib/auth'
 
-// auth.ts importa ./supabase (lanza sin env). Mockeamos las dos funciones de auth:
-// enterWithNameAndEmail (alta) y signInExistingUser (login).
-const enter = vi.fn<(name: string, email: string, redirectTo?: string) => Promise<EnterResult>>(
-  async () => ({ kind: 'entered' }),
+// auth.ts importa ./supabase (lanza sin env). Mockeamos los helpers de OTP.
+const sendOtp = vi.fn<(email: string, displayName?: string, redirectTo?: string) => Promise<void>>(
+  async () => {},
 )
-const signIn = vi.fn<(email: string, redirectTo?: string) => Promise<LoginResult>>(
-  async () => ({ kind: 'sent' }),
-)
+const verifyOtp = vi.fn<(email: string, token: string) => Promise<void>>(async () => {})
 vi.mock('../../lib/auth', () => ({
-  enterWithNameAndEmail: (name: string, email: string, redirectTo?: string) =>
-    enter(name, email, redirectTo),
-  signInExistingUser: (email: string, redirectTo?: string) => signIn(email, redirectTo),
+  sendEmailOtp: (email: string, displayName?: string, redirectTo?: string) =>
+    sendOtp(email, displayName, redirectTo),
+  verifyEmailOtp: (email: string, token: string) => verifyOtp(email, token),
 }))
 
 import { Landing } from './Landing'
 
 beforeEach(() => {
-  enter.mockClear()
-  enter.mockResolvedValue({ kind: 'entered' })
-  signIn.mockClear()
-  signIn.mockResolvedValue({ kind: 'sent' })
+  sendOtp.mockClear()
+  verifyOtp.mockClear()
 })
 
 afterEach(() => {
   window.location.hash = ''
 })
 
-describe('Landing', () => {
-  test('la portada muestra hero + showcase + CTA principal, sin email a la vista', () => {
+describe('Landing (email-first, issue #506)', () => {
+  test('la portada muestra hero + showcase + CTA único email-first', () => {
     render(<Landing />)
     // El hero lleva la frase ancla.
     expect(
@@ -43,120 +37,88 @@ describe('Landing', () => {
     expect(screen.getByRole('heading', { name: 'Un marcador que os une' })).toBeInTheDocument()
     expect(screen.getByAltText(/Pantalla de inicio de Tabide/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Así funciona Tabide' })).toBeInTheDocument()
-    // CTA principal + CTA login presentes; email NO a la vista aún.
-    expect(screen.getByRole('button', { name: 'Crear tu viaje' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Ya tengo cuenta · Entrar' })).toBeInTheDocument()
+    // CTA único: "Empieza a compartir". SIN dos CTAs separados.
+    expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
+    // Ya NO hay separación signup/login.
+    expect(screen.queryByRole('button', { name: 'Crear tu viaje' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Ya tengo cuenta · Entrar' }),
+    ).not.toBeInTheDocument()
+    // Email no visible todavía.
     expect(screen.queryByLabelText('Tu correo')).not.toBeInTheDocument()
-    // "Tengo un código" eliminado (#495): los viajes van por enlace.
+    // "Tengo un código" eliminado.
     expect(screen.queryByRole('button', { name: /Tengo un código/i })).not.toBeInTheDocument()
     // La nota de enlace está visible.
     expect(screen.getByText(/Te han pasado un enlace/i)).toBeInTheDocument()
   })
 
-  test('"Crear tu viaje" abre el alta con campos nombre y correo', async () => {
+  test('"Empieza a compartir" abre el flujo de email (LoginFlow)', async () => {
     render(<Landing />)
-    await userEvent.click(screen.getByRole('button', { name: 'Crear tu viaje' }))
-    expect(screen.getByLabelText('Tu nombre')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    // LoginFlow paso 'email': LoginScreen con el campo de correo.
     expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Entrar' })).toBeInTheDocument()
-    // El alta no tiene paso de código OTP.
-    expect(screen.queryByLabelText(/código/i)).not.toBeInTheDocument()
-  })
-
-  test('"Ya tengo cuenta · Entrar" abre el login con solo el campo correo', async () => {
-    render(<Landing />)
-    await userEvent.click(screen.getByRole('button', { name: 'Ya tengo cuenta · Entrar' }))
-    // Solo correo: el login no pide nombre.
-    expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
+    // Sin campo de nombre: el modelo email-first no pide nombre al enviar el código.
     expect(screen.queryByLabelText('Tu nombre')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Enviarme el enlace' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
   })
 
-  test('login: email válido envía magic link y muestra aviso "Revisa tu correo"', async () => {
+  test('"Atrás" desde el flujo de email vuelve a la landing', async () => {
     render(<Landing />)
-    await userEvent.click(screen.getByRole('button', { name: 'Ya tengo cuenta · Entrar' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
+    // El LoginFlow tiene el botón "Atrás" que devuelve a la landing.
+    await userEvent.click(screen.getByRole('button', { name: 'Atrás' }))
+    expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Tu correo')).not.toBeInTheDocument()
+  })
+
+  test('email válido envía el OTP y pasa al paso del código', async () => {
+    render(<Landing />)
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el enlace' }))
-    expect(signIn).toHaveBeenCalledWith('lewis@ej.com', undefined)
-    expect(await screen.findByRole('heading', { name: 'Revisa tu correo' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    expect(sendOtp).toHaveBeenCalledWith('lewis@ej.com', undefined, undefined)
+    // Pasa al paso del código.
+    expect(await screen.findByLabelText('Código de 6 dígitos')).toBeInTheDocument()
   })
 
-  test('login: email no encontrado muestra opción de crear cuenta', async () => {
-    signIn.mockResolvedValue({ kind: 'not-found' })
+  test('email inválido no envía OTP y muestra error', async () => {
     render(<Landing />)
-    await userEvent.click(screen.getByRole('button', { name: 'Ya tengo cuenta · Entrar' }))
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'nuevo@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el enlace' }))
-    expect(
-      await screen.findByRole('heading', { name: 'No encontramos esa cuenta' }),
-    ).toBeInTheDocument()
-    // Ofrece ir al alta.
-    expect(screen.getByRole('button', { name: 'Crear cuenta' })).toBeInTheDocument()
-  })
-
-  test('login: "No encontramos esa cuenta" → "Crear cuenta" lleva al alta', async () => {
-    signIn.mockResolvedValue({ kind: 'not-found' })
-    render(<Landing />)
-    await userEvent.click(screen.getByRole('button', { name: 'Ya tengo cuenta · Entrar' }))
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'nuevo@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Enviarme el enlace' }))
-    await userEvent.click(await screen.findByRole('button', { name: 'Crear cuenta' }))
-    // Ha navegado al alta: aparecen los campos de nombre + correo.
-    expect(screen.getByLabelText('Tu nombre')).toBeInTheDocument()
-  })
-
-  test('email inválido en el alta no entra y muestra error', async () => {
-    render(<Landing />)
-    await userEvent.click(screen.getByRole('button', { name: 'Crear tu viaje' }))
-    await userEvent.type(screen.getByLabelText('Tu nombre'), 'Lewis')
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
-    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-    expect(enter).not.toHaveBeenCalled()
-    expect(screen.getByRole('alert')).toHaveTextContent('correo válido')
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    expect(sendOtp).not.toHaveBeenCalled()
+    expect(screen.getByRole('alert')).toHaveTextContent(/correo válido/i)
   })
 
-  test('alta: nombre + email válidos entran al instante', async () => {
-    render(<Landing />)
-    await userEvent.click(screen.getByRole('button', { name: 'Crear tu viaje' }))
-    await userEvent.type(screen.getByLabelText('Tu nombre'), 'Lewis')
+  test('pasa el redirectTo al enviar el OTP (preserva auto-join por deep link)', async () => {
+    render(<Landing redirectTo="https://app.example/" />)
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-    expect(enter).toHaveBeenCalledWith('Lewis', 'lewis@ej.com', undefined)
+    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    expect(sendOtp).toHaveBeenCalledWith('lewis@ej.com', undefined, 'https://app.example/')
   })
 
-  test('alta: pasa el redirectTo al entrar (preserva auto-join por deep link)', async () => {
-    render(<Landing redirectTo="https://app.example/#g=abc" />)
-    await userEvent.click(screen.getByRole('button', { name: 'Crear tu viaje' }))
-    await userEvent.type(screen.getByLabelText('Tu nombre'), 'Lewis')
-    await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
-    await userEvent.click(screen.getByRole('button', { name: 'Entrar' }))
-    expect(enter).toHaveBeenCalledWith('Lewis', 'lewis@ej.com', 'https://app.example/#g=abc')
-  })
-
-  test('con groupName adapta el copy del hero y muestra "¿Ya tienes cuenta? Entra"', () => {
+  test('con groupName adapta el copy del hero y muestra CTA de unirse', () => {
     render(<Landing groupName="Finde Lisboa" />)
     expect(
       screen.getByRole('heading', { name: /Vive los viajes de Finde Lisboa/i }),
     ).toBeInTheDocument()
-    // CTA primario y secundario con copy de invitación.
+    // CTA de unirse (en vez del genérico).
     expect(screen.getByRole('button', { name: 'Únete al viaje' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '¿Ya tienes cuenta? Entra' })).toBeInTheDocument()
-    // "Tengo un código" nunca aparece (ni en invitación ni en genérica).
+    // Sin CTAs del modelo antiguo.
     expect(screen.queryByRole('button', { name: /Tengo un código/i })).not.toBeInTheDocument()
-    // La nota de enlace tampoco: ya viene al viaje concreto.
+    // Sin nota de enlace en el flujo de invitación (ya vienen al viaje).
     expect(screen.queryByText(/Te han pasado un enlace/i)).not.toBeInTheDocument()
   })
 
-  test('con groupName "Únete al viaje" abre el alta con copy de unirse', async () => {
+  test('con groupName "Únete al viaje" abre el flujo de email con copy de invitación', async () => {
     render(<Landing groupName="Finde Lisboa" />)
     await userEvent.click(screen.getByRole('button', { name: 'Únete al viaje' }))
-    expect(screen.getByRole('heading', { name: 'Entra y vive el viaje' })).toBeInTheDocument()
-  })
-
-  test('con groupName "¿Ya tienes cuenta? Entra" abre el login (solo correo)', async () => {
-    render(<Landing groupName="Finde Lisboa" />)
-    await userEvent.click(screen.getByRole('button', { name: '¿Ya tienes cuenta? Entra' }))
+    // LoginFlow en contexto de grupo: copy "Únete para jugar este reto".
+    expect(screen.getByRole('heading', { name: 'Únete para jugar este reto' })).toBeInTheDocument()
     expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
+    // Sin campo de nombre.
     expect(screen.queryByLabelText('Tu nombre')).not.toBeInTheDocument()
   })
 })
