@@ -474,6 +474,7 @@ export function TripPage({
             aria-label="Diario"
           >
             <TripDiario
+              ref={carouselRef}
               moments={moments}
               route={route}
               activeMoment={activeMoment}
