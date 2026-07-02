@@ -1,0 +1,48 @@
+/*
+ * ShellFeed — shell para listas/feeds con scroll.
+ *
+ * CUÁNDO USARLO: diario de momentos, marcador de reto, cualquier lista
+ * donde la cabecera es fija y el contenido scrollea debajo.
+ *
+ * REGLAS DURAS:
+ *  - SIN backdrop (como el utilitario): fondo papel, no inmersivo.
+ *  - Cabecera fija (flex-shrink: 0): siempre visible, incluso al scrollear.
+ *  - Feed con scroll propio (overscroll-behavior: contain): evita que el
+ *    scroll "escape" a la ventana del navegador en iOS.
+ *  - padding-bottom generoso con safe-area: el último ítem no queda bajo
+ *    la home bar de iOS ni bajo un FAB flotante.
+ *
+ * Estructura:
+ *   .root
+ *     .header   ← AppHeader + SegmentedControl/tabs opcionales
+ *     .feed     ← lista con scroll propio
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+/* Cabecera fija: siempre visible. Surface blanco para destacarse del fondo papel.
+ * border-bottom hairline = separador limpio entre cabecera y feed. */
+.header {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+
+/* Feed: scroll propio, padding lateral estándar + padding-bottom para FAB/home bar. */
+.feed {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4) var(--space-5);
+  /* --space-7 (48px) deja espacio para un FAB flotante o la home bar de iOS. */
+  padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+}
