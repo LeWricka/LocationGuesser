@@ -81,8 +81,11 @@ export default defineConfig({
     // `dist/`); no introduce backend.
     VitePWA({
       registerType: 'autoUpdate',
-      // El plugin inyecta el registro del SW en el bundle (injectRegister 'auto').
-      injectRegister: 'auto',
+      // Registro MANUAL del SW (en main.tsx) en vez de auto-inyectado: necesitamos
+      // el callback `onRegisteredSW` para SONDEAR actualizaciones periódicamente. Un
+      // SPA no navega, así que sin ese sondeo un deploy nuevo no se detecta y el
+      // usuario se queda en la versión cacheada. `null` desactiva el auto-registro.
+      injectRegister: null,
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
