@@ -244,19 +244,24 @@
   box-shadow: none;
 }
 
-/* Diana sobre la esquina inferior derecha: indica "toca para apuntar". */
-.miniMapaHint {
+/* Etiqueta "Adivinar" sobre el borde inferior del thumbnail: pastilla clara con
+   diana + texto. El texto (no solo icono) guía al jugador y evita un chrome mudo. */
+.miniMapaLabel {
   position: absolute;
-  bottom: var(--space-1);
+  left: var(--space-1);
   right: var(--space-1);
-  display: flex;
+  bottom: var(--space-1);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
   box-shadow: var(--shadow-xs);
 }
 

@@ -238,8 +238,12 @@ export function GameScene({
           El mapa se monta SIEMPRE para conservar zoom/posición; solo cambia el CSS.
           Sin hoja ni popup "¿Dónde es?": el juego es el Street View, no un cartel. */}
 
-      {/* Estado COLAPSADO: thumbnail en esquina; toca para expandir. */}
-      {sceneReady && !mapOpen && (
+      {/* Estado COLAPSADO: thumbnail en esquina; toca para expandir. NO se guarda
+          bajo `sceneReady`: el mini-mapa es el mapa de ADIVINAR (mundo entero), no la
+          escena del reto, así que mostrarlo antes de Empezar no es spoiler y monta ya
+          el mapa (conserva zoom/posición). Lleva etiqueta "Adivinar" visible (no solo
+          icono): guía al jugador y da contenido de texto al contenedor inmersivo. */}
+      {!mapOpen && (
         <button
           type="button"
           className={styles.miniMapa}
@@ -258,9 +262,10 @@ export function GameScene({
               fixedCenterPin
             />
           </div>
-          {/* Diana sobre la esquina: indica "toca para apuntar". */}
-          <span className={styles.miniMapaHint} aria-hidden="true">
-            <IconDiana size={16} />
+          {/* Etiqueta con diana: indica "toca para apuntar". */}
+          <span className={styles.miniMapaLabel}>
+            <IconDiana size={14} />
+            {guess ? 'Ajustar tiro' : 'Adivinar'}
           </span>
         </button>
       )}
