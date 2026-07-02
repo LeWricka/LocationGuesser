@@ -5,7 +5,8 @@ import { CreateNumberChallenge } from './CreateNumberChallenge'
 import { getChallenge, type ChallengeForPlay, type ChallengeKind } from '../../lib/challenges'
 import { signedImageUrl } from '../../lib/storage'
 import { reportError } from '../../lib/observability'
-import { Spinner } from '../../ui'
+import { RootErrorBoundary } from '../../lib/RootErrorBoundary'
+import { Button, Spinner } from '../../ui'
 import flow from './CreateChallengeFlow.module.css'
 
 interface Props {
@@ -30,13 +31,13 @@ interface Props {
 //  (b) desde el FAB "Reto" (sin id) → primero el selector de TIPO (¿Dónde? /
 //      ¿Adivinas?), luego el asistente propio de cada tipo, empezando vacío.
 // Atrás desde un asistente vuelve al selector (origen FAB) o sale (origen recuerdo).
-export function CreateChallengeFlow({
-  groupId,
-  groupName,
-  fromMomentId,
-  onBack,
-  onCreated,
-}: Props) {
+//
+// RED DE SEGURIDAD: todo el flujo va envuelto en un error-boundary ACOTADO
+// (`CreateChallengeFlow`). Si algo lanza al abrir/crear el reto (p.ej. el deep link
+// `#g=…&add=reto`), en vez de tumbar toda la app con el boundary raíz ("Algo ha
+// fallado" a pantalla completa), mostramos un fallback recuperable que deja VOLVER
+// al viaje. El error se sigue reportando a la observabilidad (Sentry) igual.
+function CreateChallengeFlowInner({ groupId, groupName, fromMomentId, onBack, onCreated }: Props) {
   const [kind, setKind] = useState<ChallengeKind | null>(null)
   // Pre-relleno cargado desde el recuerdo de origen (foto + lugar). `undefined`
   // mientras carga; `null` si no aplica o falló (el formulario empieza vacío).
@@ -111,5 +112,27 @@ export function CreateChallengeFlow({
       onBack={fromMomentId ? onBack : () => setKind(null)}
       onCreated={onCreated}
     />
+  )
+}
+
+// Fallback recuperable del boundary acotado: no es la pantalla en blanco del boundary
+// raíz. Explica que no se pudo abrir el reto y ofrece VOLVER al viaje (recarga la ruta,
+// que remonta limpio). Copy en positivo, sin disculpas largas (estilo del producto).
+function CreateChallengeErrorFallback({ onBack }: { onBack: () => void }) {
+  return (
+    <div className={flow.loading} role="alert">
+      <p>No hemos podido abrir el reto.</p>
+      <Button variant="primary" onClick={onBack}>
+        Volver al viaje
+      </Button>
+    </div>
+  )
+}
+
+export function CreateChallengeFlow(props: Props) {
+  return (
+    <RootErrorBoundary fallback={<CreateChallengeErrorFallback onBack={props.onBack} />}>
+      <CreateChallengeFlowInner {...props} />
+    </RootErrorBoundary>
   )
 }
