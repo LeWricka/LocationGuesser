@@ -63,8 +63,11 @@
  * ============================================================ */
 
 /* Pin de la home: MISMO markup que el viaje (círculo + puntita), solo algo más
-   compacto (caben varios). El borde/fondo van en el disco hijo (estructura nueva). */
-:global(.lg-home-pin) {
+   compacto (caben varios). El borde/fondo van en el disco hijo (estructura nueva).
+   ESPECIFICIDAD: `.lg-trip-pin:has(.lg-trip-pin__disc)` tiene 0,2,0; usamos
+   `.lg-trip-pin.lg-home-pin` (también 0,2,0) para empatar y ganar por orden (este
+   archivo se importa DESPUÉS de tripPins.css en HomeGlobe.tsx). */
+:global(.lg-trip-pin.lg-home-pin) {
   width: 42px;
   height: 42px;
 }
@@ -82,8 +85,11 @@
     0 0 0 4px rgba(217, 178, 90, 0.28),
     0 0 18px 2px rgba(217, 178, 90, 0.4);
 }
-/* La puntita inferior del pin "lead", también en oro (coherencia con el aro). */
-:global(.lg-home-pin--lead)::after {
+/* La puntita inferior del pin "lead", también en oro (coherencia con el aro).
+   ESPECIFICIDAD: `.lg-trip-pin:has(.lg-trip-pin__disc)::after` tiene 0,2,1;
+   usamos `.lg-trip-pin.lg-home-pin--lead::after` (también 0,2,1) para empatar y
+   ganar por orden de importación (HomeGlobe.module.css va después de tripPins.css). */
+:global(.lg-trip-pin.lg-home-pin--lead)::after {
   background: var(--route-gold);
 }
 /* Pulso de BIENVENIDA (1 ciclo, no bucle) alrededor del disco. Lo dibuja el `::before`

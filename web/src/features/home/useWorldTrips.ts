@@ -55,6 +55,23 @@ export interface WorldData {
 
 const EMPTY: WorldData = { trips: [], totalKm: 0, loading: true }
 
+/**
+ * Guarda de rangos: lat ∈ [−90, 90] y lng ∈ [−180, 180]. Descarta cualquier par de
+ * coordenadas fuera de rango (p.ej. lat/lng intercambiados: lat=135 caería en el mar).
+ * Tolerante: un punto inválido simplemente no pinta pin (no revienta el mapa).
+ * Exportada para test: permite verificar que el guard opera en los casos límite.
+ */
+export function isValidLatLng(lat: number, lng: number): boolean {
+  return (
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  )
+}
+
 /** Firma el path de una foto a URL; null si no hay path o si falla (no rompe el pin). */
 async function signOrNull(imagePath: string | null | undefined): Promise<string | null> {
   if (!imagePath) return null
@@ -92,10 +109,11 @@ async function resolveTrip(groupId: string, name: string): Promise<WorldTrip | n
   for (const c of past) {
     if (c.is_challenge) {
       const ans = answers.get(c.id)
-      if (ans) raw.push({ c, lat: ans.lat, lng: ans.lng })
+      if (ans && isValidLatLng(ans.lat, ans.lng)) raw.push({ c, lat: ans.lat, lng: ans.lng })
     } else if (c.place_lat != null && c.place_lng != null) {
       // Recuerdo con lugar visible (no es spoiler).
-      raw.push({ c, lat: c.place_lat, lng: c.place_lng })
+      if (isValidLatLng(c.place_lat, c.place_lng))
+        raw.push({ c, lat: c.place_lat, lng: c.place_lng })
     }
   }
   if (raw.length === 0) return null

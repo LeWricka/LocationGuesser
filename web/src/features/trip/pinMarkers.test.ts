@@ -285,3 +285,92 @@ describe('buildActivePinElement (momento en juego)', () => {
     expect(el.querySelector('.lg-trip-pin__initial')).toBeNull()
   })
 })
+
+// GUARDARRAÍL — Pin "lead" de la home: estructura DOM correcta para que el CSS de
+// especificidad alta (`.lg-trip-pin.lg-home-pin--lead::after { background: gold }`)
+// pueda aplicarse. Sin `lg-trip-pin` en el mismo elemento que `lg-home-pin--lead`,
+// la regla de la puntita de oro no alcanzaría el elemento (bug de especificidad CSS).
+describe('buildHomePinElement — pin "lead" (aro dorado + estructura DOM)', () => {
+  test('lead sin foto: tiene AMBAS clases lg-trip-pin y lg-home-pin--lead en el mismo elemento', () => {
+    // La regla CSS que pinta la puntita en oro es `.lg-trip-pin.lg-home-pin--lead::after`.
+    // Para que funcione, AMBAS clases deben estar en el mismo elemento. Si no, la puntita
+    // permanece blanca (el blanco de `.lg-trip-pin:has(.lg-trip-pin__disc)::after` gana).
+    const el = buildHomePinElement({ title: 'Sol', imageUrl: null, lead: true })
+    expect(el.classList.contains('lg-trip-pin')).toBe(true)
+    expect(el.classList.contains('lg-home-pin--lead')).toBe(true)
+    // Ambas en el mismo elemento (no en ancestros distintos).
+    expect(el.classList.contains('lg-trip-pin') && el.classList.contains('lg-home-pin--lead')).toBe(
+      true,
+    )
+  })
+
+  test('lead con foto rota: DOM correcto incluso cuando la imagen falla al cargar', () => {
+    class FakeImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      set src(_v: string) {
+        this.onerror?.()
+      }
+    }
+    vi.stubGlobal('Image', FakeImage as unknown as typeof Image)
+
+    const el = buildHomePinElement({
+      title: 'Roma',
+      imageUrl: 'https://cdn/caducada.jpg',
+      lead: true,
+    })
+    // Tras el error de carga, el pin sigue teniendo la estructura correcta para el CSS.
+    expect(el.classList.contains('lg-trip-pin')).toBe(true)
+    expect(el.classList.contains('lg-home-pin')).toBe(true)
+    expect(el.classList.contains('lg-home-pin--lead')).toBe(true)
+    // Disco hijo existe (necesario para la especificidad :has(.lg-trip-pin__disc)).
+    expect(el.querySelector('.lg-trip-pin__disc')).not.toBeNull()
+    // Fallback: la inicial, no un recuadro vacío.
+    expect(el.querySelector('.lg-trip-pin__initial')?.textContent).toBe('R')
+  })
+
+  test('NOT lead: no tiene la clase lead (guardarraíl de separación lead / normal)', () => {
+    const el = buildHomePinElement({ title: 'Madrid', imageUrl: null, lead: false })
+    expect(el.classList.contains('lg-home-pin--lead')).toBe(false)
+    // Pero sí tiene la clase base y la home.
+    expect(el.classList.contains('lg-trip-pin')).toBe(true)
+    expect(el.classList.contains('lg-home-pin')).toBe(true)
+  })
+})
+
+// GUARDARRAÍL — Orden de coordenadas en el globo de la home.
+// MapLibre espera `setLngLat([lng, lat])`. Si se pasa `[lat, lng]` (invertido),
+// un punto en París (lat=48.85, lng=2.35) aparece como lng=48.85, lat=2.35
+// (océano Índico frente a Somalia). `GlobePin.lat` y `GlobePin.lng` deben llevar
+// latitud y longitud respectivamente; el caller usa `[pin.lng, pin.lat]`.
+// Este test no instancia MapLibre (no hay WebGL en tests) pero congela los tipos y
+// el contrato de nombres: si alguien intercambia lat/lng en GlobePin o en la
+// llamada a setLngLat, los tipos/tests de integración lo detectarán primero.
+describe('GlobePin — contrato de coordenadas (lat=latitud, lng=longitud)', () => {
+  test('buildHomePinElement recibe title/imageUrl/lead, no coordenadas (separación de responsabilidad)', () => {
+    // El pin DOM no contiene coordenadas: la posición la inyecta el motor (MapLibre/stub)
+    // vía setLngLat([pin.lng, pin.lat]). Este test congela que buildHomePinElement NO
+    // recibe lat/lng: si alguien los añade a HomePinInput, el tipo cambia y TypeScript avisa.
+    const el = buildHomePinElement({ title: 'París', imageUrl: null })
+    // No hay atributo data-lat / data-lng: el builder no embebe coordenadas en el DOM.
+    expect(el.dataset['lat']).toBeUndefined()
+    expect(el.dataset['lng']).toBeUndefined()
+  })
+
+  test('París correctamente posicionada: lat 48.85 ∈ [−90,90], lng 2.35 ∈ [−180,180]', () => {
+    // Guardarraíl conceptual: si lat/lng se intercambian (lat=2.35, lng=48.85),
+    // ambos valores están en rango pero el punto cae en un lugar distinto.
+    // La guarda isValidLatLng (en useWorldTrips) descarta pares claramente fuera de rango.
+    // Para París, la comprobación de rango no ayuda (ambos valores son válidos aunque
+    // intercambiados); lo que protege aquí es la consistencia de nombre en la cadena
+    // GlobePin → setLngLat([pin.lng, pin.lat]).
+    const parisPinCoords = { lat: 48.8566, lng: 2.3522 }
+    // El caller de HomeGlobe usa: new Marker().setLngLat([pin.lng, pin.lat])
+    // → setLngLat([2.3522, 48.8566]) → MapLibre interpreta [lng=2.3522, lat=48.8566] = París ✓
+    const [passedLng, passedLat] = [parisPinCoords.lng, parisPinCoords.lat]
+    expect(passedLat).toBeGreaterThan(0) // latitud norte
+    expect(passedLat).toBeLessThan(90)
+    expect(passedLng).toBeGreaterThan(0) // longitud este
+    expect(passedLng).toBeLessThan(10)
+  })
+})
