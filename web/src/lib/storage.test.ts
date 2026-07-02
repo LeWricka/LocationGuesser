@@ -25,16 +25,44 @@ vi.mock('./observability', () => ({
   reportError,
 }))
 
-import { uploadImage } from './storage'
+import { uploadImage, ImageDecodeError } from './storage'
 
-// `createImageBitmap` y `<canvas>` no existen (o no pintan) en jsdom: los
-// stubeamos para que el pipeline de decodificación/canvas resuelva sin tocar
-// píxeles reales. Así el test se centra en el ENRUTADO (HEIC sí / JPEG no).
+// Fake mínimo de `<img>`: el nuevo `decodeImage` (storage.ts) carga SIEMPRE un
+// `<img>` primero (la misma vía que pinta la miniatura del picker, ver #520)
+// para leer `naturalWidth`/`naturalHeight` sin forzar un decode de píxeles a
+// resolución nativa. jsdom no carga imágenes de verdad, así que sustituimos el
+// global `Image`; el `src` setter dispara 'load' (o 'error') en un microtask,
+// como haría un navegador real.
+function fakeImageClass(
+  opts: { naturalWidth?: number; naturalHeight?: number; fails?: boolean } = {},
+) {
+  const { naturalWidth = 800, naturalHeight = 600, fails = false } = opts
+  return class FakeImage {
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    naturalWidth = naturalWidth
+    naturalHeight = naturalHeight
+    set src(_v: string) {
+      queueMicrotask(() => (fails ? this.onerror?.() : this.onload?.()))
+    }
+  }
+}
+
+// `createImageBitmap`, `<img>` y `<canvas>` no existen (o no pintan) en jsdom:
+// los stubeamos para que el pipeline de decodificación/canvas resuelva sin
+// tocar píxeles reales. Así los tests se centran en el ENRUTADO (HEIC sí /
+// JPEG no) y en los fallbacks de decodificación, no en el decode real del
+// navegador (imposible de reproducir en jsdom).
 function stubDecodePipeline() {
   vi.stubGlobal(
     'createImageBitmap',
     vi.fn().mockResolvedValue({ width: 800, height: 600, close: vi.fn() }),
   )
+  vi.stubGlobal('Image', fakeImageClass())
+  vi.stubGlobal('URL', {
+    createObjectURL: vi.fn(() => 'blob:fake'),
+    revokeObjectURL: vi.fn(),
+  })
   const ctx = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx)
   vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (
@@ -106,11 +134,13 @@ describe('uploadImage — enrutado HEIC vs. JPEG/PNG', () => {
 })
 
 describe('uploadImage — diagnóstico de fallos a Sentry', () => {
-  test('si la conversión HEIC falla, reporta a Sentry y lanza el error legible', async () => {
+  test('si la conversión HEIC falla, reporta a Sentry y lanza ImageDecodeError con el nombre', async () => {
     heic2any.mockRejectedValue(new Error('libheif boom'))
     const heic = new File(['x'.repeat(2048)], 'roto.heic', { type: 'image/heic' })
-    await expect(uploadImage(heic)).rejects.toThrow(/No se pudo leer la imagen/)
-    expect(reportError).toHaveBeenCalledTimes(1)
+    const err = await uploadImage(heic).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ImageDecodeError)
+    expect(err).toMatchObject({ fileName: 'roto.heic' })
+    expect((err as Error).message).toMatch(/No se pudo leer la imagen/)
     expect(reportError).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
@@ -123,17 +153,71 @@ describe('uploadImage — diagnóstico de fallos a Sentry', () => {
     expect(upload).not.toHaveBeenCalled()
   })
 
-  test('si la decodificación falla (createImageBitmap e <img>), reporta y propaga', async () => {
-    // Forzamos el fallo de ambos caminos de decodeImage para un JPEG.
-    vi.stubGlobal('createImageBitmap', vi.fn().mockRejectedValue(new Error('no decode')))
-    // jsdom no resuelve img.decode() con éxito: rechaza por sí mismo, así que
-    // decodeImage lanza el error legible.
-    const jpeg = new File(['x'], 'foto.jpg', { type: 'image/jpeg' })
-    await expect(uploadImage(jpeg)).rejects.toThrow()
+  test('si el navegador no puede ni pintar el archivo en un <img>, lanza ImageDecodeError con el nombre', async () => {
+    // Ni siquiera la vía "barata" (la misma que la miniatura del picker)
+    // puede con el archivo: no hay fallback posible, createImageBitmap no
+    // llega a intentarse.
+    vi.stubGlobal('Image', fakeImageClass({ fails: true }))
+    const bitmapSpy = vi.fn()
+    vi.stubGlobal('createImageBitmap', bitmapSpy)
+    const jpeg = new File(['x'], 'imposible.jpg', { type: 'image/jpeg' })
+
+    await expect(uploadImage(jpeg)).rejects.toMatchObject({
+      name: 'ImageDecodeError',
+      fileName: 'imposible.jpg',
+    })
+    expect(bitmapSpy).not.toHaveBeenCalled()
     expect(reportError).toHaveBeenCalledWith(
       expect.any(Error),
-      expect.objectContaining({ area: 'image_decode', stage: 'decode', fileType: 'image/jpeg' }),
+      expect.objectContaining({ area: 'image_decode', stage: 'decode', fileName: 'imposible.jpg' }),
     )
+  })
+
+  test('si createImageBitmap falla pero el <img> sí pudo cargar, usa el <img> como fallback y sube igual', async () => {
+    // Este es el caso real del bug (#520): en algunos Android,
+    // createImageBitmap revienta con fotos gigantes de la cámara aunque el
+    // navegador SÍ pueda pintar la misma foto en un <img> (la miniatura del
+    // selector se ve bien). El pipeline debe recomprimir igualmente.
+    vi.stubGlobal('createImageBitmap', vi.fn().mockRejectedValue(new Error('no decode')))
+    const jpeg = new File(['x'], 'foto-grande.jpg', { type: 'image/jpeg' })
+
+    await expect(uploadImage(jpeg)).resolves.toMatch(/\.jpg$/)
+    expect(upload).toHaveBeenCalledTimes(1)
     expect(heic2any).not.toHaveBeenCalled()
+  })
+
+  test('pide a createImageBitmap el tamaño YA reducido (bound al lado largo) para no reservar memoria a resolución nativa', async () => {
+    // Foto de cámara Android típica: gigante y en retrato. Sin bound, el
+    // bitmap nativo pesaría cientos de MB en RGBA y es justo lo que revienta.
+    vi.stubGlobal('Image', fakeImageClass({ naturalWidth: 6000, naturalHeight: 8000 }))
+    const bitmapSpy = vi.fn().mockResolvedValue({ width: 1200, height: 1600, close: vi.fn() })
+    vi.stubGlobal('createImageBitmap', bitmapSpy)
+    const jpeg = new File(['x'], 'foto-108mp.jpg', { type: 'image/jpeg' })
+
+    await uploadImage(jpeg)
+
+    expect(bitmapSpy).toHaveBeenCalledWith(
+      jpeg,
+      expect.objectContaining({ resizeWidth: 1200, resizeHeight: 1600 }),
+    )
+  })
+
+  test('sin dimensiones naturales (0x0) no revienta: pide el bitmap sin resize', async () => {
+    vi.stubGlobal('Image', fakeImageClass({ naturalWidth: 0, naturalHeight: 0 }))
+    const bitmapSpy = vi.fn().mockResolvedValue({ width: 800, height: 600, close: vi.fn() })
+    vi.stubGlobal('createImageBitmap', bitmapSpy)
+    const jpeg = new File(['x'], 'sin-dimensiones.jpg', { type: 'image/jpeg' })
+
+    await expect(uploadImage(jpeg)).resolves.toMatch(/\.jpg$/)
+    const [, options] = bitmapSpy.mock.calls[0] as [File, Record<string, unknown>]
+    expect(options).not.toHaveProperty('resizeWidth')
+    expect(options).not.toHaveProperty('resizeHeight')
+  })
+
+  test('un JPEG con file.type vacío (típico de algunos Android) sube igual', async () => {
+    const jpeg = new File(['x'], 'IMG_20260702.jpg', { type: '' })
+    await expect(uploadImage(jpeg)).resolves.toMatch(/\.jpg$/)
+    expect(heic2any).not.toHaveBeenCalled()
+    expect(upload).toHaveBeenCalledTimes(1)
   })
 })
