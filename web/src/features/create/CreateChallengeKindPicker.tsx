@@ -1,5 +1,6 @@
 import { Hash, MapPin } from 'lucide-react'
 import { AppHeader, Icon } from '../../ui'
+import { ShellUtilitario } from '../../ui/shells'
 import type { ChallengeKind } from '../../lib/challenges'
 import styles from './CreateChallengeKindPicker.module.css'
 
@@ -20,54 +21,61 @@ interface Props {
 export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) {
   return (
     <div className={styles.root}>
-      {/* Cabecera ÚNICA del producto (variante papel): mismo título serif y
-          back-disco de 44px que el resto del flujo de crear. El contexto del
-          viaje vive en el eyebrow del cuerpo (la cabecera es de una sola línea). */}
-      <AppHeader lead="back" onLead={onBack} leadLabel="Atrás" title="Nuevo reto" />
+      <ShellUtilitario
+        header={
+          // Cabecera ÚNICA del producto (variante papel): mismo título serif y
+          // back-disco de 44px que el resto del flujo de crear. El contexto del
+          // viaje vive en el eyebrow del cuerpo (la cabecera es de una sola línea).
+          <AppHeader lead="back" onLead={onBack} leadLabel="Atrás" title="Nuevo reto" />
+        }
+      >
+        {/* ShellUtilitario ancla el cuerpo ARRIBA (sin centrado vertical): en
+            viewports altos un `justify-content: center` propio dejaba más de
+            media pantalla vacía entre la cabecera y las tarjetas (#502). */}
+        <div className={styles.body}>
+          <header className={styles.lede}>
+            <span className={styles.eyebrow}>
+              {groupName ? `Viaje · ${groupName} · Elige el tipo` : 'Elige el tipo'}
+            </span>
+            <h1 className={styles.h}>¿A qué jugamos?</h1>
+            <p className={styles.sub}>Dos formas de retar al grupo. Eliges una y a por ello.</p>
+          </header>
 
-      <div className={styles.body}>
-        <header className={styles.lede}>
-          <span className={styles.eyebrow}>
-            {groupName ? `Viaje · ${groupName} · Elige el tipo` : 'Elige el tipo'}
-          </span>
-          <h1 className={styles.h}>¿A qué jugamos?</h1>
-          <p className={styles.sub}>Dos formas de retar al grupo. Eliges una y a por ello.</p>
-        </header>
+          <div className={styles.options}>
+            <button
+              type="button"
+              className={styles.option}
+              onClick={() => onPick('location')}
+              aria-label="Crear reto ¿Dónde?: adivinar el lugar en el mapa"
+            >
+              <span className={`${styles.optIco} ${styles.optIcoLocation}`}>
+                <Icon icon={MapPin} size={28} />
+              </span>
+              <span className={styles.optTxt}>
+                <b>¿Dónde?</b>
+                <span>Comparte un sitio; adivinan dónde es en el mapa.</span>
+              </span>
+              <ArrowRight />
+            </button>
 
-        <div className={styles.options}>
-          <button
-            type="button"
-            className={styles.option}
-            onClick={() => onPick('location')}
-            aria-label="Crear reto ¿Dónde?: adivinar el lugar en el mapa"
-          >
-            <span className={`${styles.optIco} ${styles.optIcoLocation}`}>
-              <Icon icon={MapPin} size={28} />
-            </span>
-            <span className={styles.optTxt}>
-              <b>¿Dónde?</b>
-              <span>Comparte un sitio; adivinan dónde es en el mapa.</span>
-            </span>
-            <ArrowRight />
-          </button>
-
-          <button
-            type="button"
-            className={styles.option}
-            onClick={() => onPick('number')}
-            aria-label="Crear reto ¿Adivinas?: adivinar una cifra"
-          >
-            <span className={`${styles.optIco} ${styles.optIcoNumber}`}>
-              <Icon icon={Hash} size={28} />
-            </span>
-            <span className={styles.optTxt}>
-              <b>¿Adivinas?</b>
-              <span>Lanza una pregunta de cifra; adivinan el número.</span>
-            </span>
-            <ArrowRight />
-          </button>
+            <button
+              type="button"
+              className={styles.option}
+              onClick={() => onPick('number')}
+              aria-label="Crear reto ¿Adivinas?: adivinar una cifra"
+            >
+              <span className={`${styles.optIco} ${styles.optIcoNumber}`}>
+                <Icon icon={Hash} size={28} />
+              </span>
+              <span className={styles.optTxt}>
+                <b>¿Adivinas?</b>
+                <span>Lanza una pregunta de cifra; adivinan el número.</span>
+              </span>
+              <ArrowRight />
+            </button>
+          </div>
         </div>
-      </div>
+      </ShellUtilitario>
     </div>
   )
 }
