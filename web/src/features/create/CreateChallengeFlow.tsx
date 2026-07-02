@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CreateChallengeKindPicker } from './CreateChallengeKindPicker'
 import { CreateChallengeImmersive, type ChallengePrefill } from './CreateChallengeImmersive'
+import { CreateLocationChallenge } from './CreateLocationChallenge'
 import { CreateNumberChallenge } from './CreateNumberChallenge'
 import { getChallenge, type ChallengeForPlay, type ChallengeKind } from '../../lib/challenges'
 import { signedImageUrl } from '../../lib/storage'
@@ -103,13 +104,29 @@ function CreateChallengeFlowInner({ groupId, groupName, fromMomentId, onBack, on
     )
   }
 
+  // Origen RECUERDO (fromMomentId): el reto nace de un momento existente con foto y
+  // lugar pre-rellenados. Seguimos usando el flujo clásico (CreateChallengeImmersive)
+  // porque el lugar ya viene dado y no necesita Street View desde GPS.
+  if (fromMomentId) {
+    return (
+      <CreateChallengeImmersive
+        groupId={groupId}
+        groupName={groupName}
+        prefill={prefill ?? undefined}
+        // Origen recuerdo: atrás sale del flujo (no hay selector de tipo que recuperar).
+        onBack={onBack}
+        onCreated={onCreated}
+      />
+    )
+  }
+
+  // Origen FAB (sin recuerdo): flujo GeoGuessr puro — Street View directo desde GPS.
+  // El usuario navega hasta su sitio exacto y lanza sin pasos intermedios.
   return (
-    <CreateChallengeImmersive
+    <CreateLocationChallenge
       groupId={groupId}
       groupName={groupName}
-      prefill={prefill ?? undefined}
-      // Origen recuerdo (sin selector): atrás sale del flujo. Origen FAB: vuelve al selector.
-      onBack={fromMomentId ? onBack : () => setKind(null)}
+      onBack={() => setKind(null)}
       onCreated={onCreated}
     />
   )
