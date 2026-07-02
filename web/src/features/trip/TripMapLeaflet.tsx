@@ -41,6 +41,12 @@ const WORLD_ZOOM = 2
 const FIT_PAD_TOP_LEFT: L.PointTuple = [48, 88]
 const FIT_PAD_BOTTOM_RIGHT: L.PointTuple = [48, 220]
 
+// Red de seguridad del skeleton: si el `load` de la capa base nunca llega (teselas
+// que fallan en bucle, o un doble de mapa en tests/galería), el skeleton no debe
+// quedar pegado para siempre tapando el mapa con un spinner sin salida (bug #500:
+// "spinner desnudo"). Pasado este margen, lo damos por listo igual.
+const MAP_READY_FALLBACK_MS = 4000
+
 /**
  * Posición FLOTANTE del momento activo: nunca su coordenada real (spoiler), sino
  * el centroide de los puntos cerrados (o el centro del mapa si aún no hay ninguno).
@@ -175,6 +181,13 @@ export function TripMapLeaflet({
   // visibles cargadas); entonces se funde y se desmonta.
   const [mapReady, setMapReady] = useState(false)
   const [skeletonGone, setSkeletonGone] = useState(false)
+
+  // Si el evento `load` de la capa base no llega (ver MAP_READY_FALLBACK_MS más
+  // arriba), no dejamos el spinner colgado: pasado el margen, lo damos por listo.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setMapReady(true), MAP_READY_FALLBACK_MS)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const activePos = useMemo<L.LatLngExpression | null>(
     () => (activeMoment ? floatingActivePos(route) : null),

@@ -9,6 +9,13 @@
   height: 100%;
   border-radius: var(--radius-lg);
   overflow: hidden;
+  /* Stacking context PROPIO: sin esto, el `transform` de `.selected` (lift) podía
+     promocionar el contenido de `.overlay` a su propia capa de composición y
+     "escapar" del recorte del `overflow: hidden` de arriba — el chip de estado
+     asomaba por encima del borde redondeado, pisando lo que hubiera detrás (bug
+     #500). `isolation: isolate` fuerza a la tarjeta a pintarse como una unidad
+     autocontenida: recorta siempre su propio contenido, tarjeta seleccionada o no. */
+  isolation: isolate;
   /* Sombra de "objeto físico" sobre el satélite: caída difusa marcada para que la
      tarjeta se despegue de un satélite oscuro y abigarrado (token calibrado para la
      tarjeta-foto del carrusel). Un hairline de escena le da un canto que captura luz
@@ -21,18 +28,27 @@
      suave (emphasized): la tarjeta centrada salta un punto hacia delante. */
   outline: 0 solid transparent;
   outline-offset: 2px;
+  /* Tarjeta en reposo (no centrada): un pelín más pequeña y apagada que la
+     seleccionada — la única pista de "cuál es la activa" era antes el anillo, que
+     se pierde de un vistazo al hojear rápido (bug #500). */
+  transform: scale(0.96);
+  opacity: 0.82;
   transition:
     outline-color var(--transition-fast),
     box-shadow var(--transition-base),
+    opacity var(--motion-transition-base),
     transform var(--duration-slow) var(--ease-spring);
 }
 
 /* Tarjeta seleccionada (centrada): anillo claro que la ata al pin resaltado, una
-   sombra más presente y un leve lift que la trae al frente del carrusel. */
+   sombra más presente, opacidad plena y un leve lift + escala que la traen al
+   frente del carrusel (misma pista visual que el "salto" del dot en la línea
+   temporal, con el par de motion compartido). */
 .card.selected {
   outline: 2px solid var(--color-on-photo);
   box-shadow: var(--shadow-photo-card-active);
-  transform: translateY(-4px);
+  transform: translateY(-4px) scale(1);
+  opacity: 1;
 }
 
 /* Marca de RECUERDO (contenido, no juego): filete fino a la izquierda en acento.
@@ -114,6 +130,14 @@
   justify-content: flex-end;
   padding: var(--space-3);
   pointer-events: none;
+  /* Recorte PROPIO: si el bloque de texto (chip + eyebrow + título de 2 líneas +
+     meta) pide más alto del que cabe, el flex-end lo desborda hacia ARRIBA — fuera
+     del degradado de legibilidad, asomando por encima del borde redondeado de la
+     tarjeta y pisando lo que hubiera detrás (bug #500, el chip "EN JUEGO" pisando
+     el contenido vecino). El `overflow:hidden` de `.card` no basta para contener un
+     hijo flex que se desborda por su propio eje: hay que recortar aquí, en el
+     propio contenedor flex donde nace el desbordamiento. */
+  overflow: hidden;
   /* Degradado de legibilidad al pie CALIBRADO (la foto manda): solo oscurece el
      pie donde va el texto y deja la foto respirar arriba (token del pase de craft,
      tres paradas suaves en vez de un corte al 55%). El texto se apila al pie como un
@@ -235,6 +259,9 @@
 @media (prefers-reduced-motion: reduce) {
   .card {
     transition: none;
+    /* Sin escala (nada de "zoom" para quien pide menos movimiento): la tarjeta
+       activa se distingue solo por opacidad, anillo y sombra. */
+    transform: none;
   }
   /* Sin movimiento: el enfoque se comunica por el anillo y la sombra, no por el
      lift (nada de desplazamiento para quien pide menos movimiento). */
