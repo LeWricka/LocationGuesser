@@ -1,0 +1,219 @@
+/*
+ * DiarioFeed — feed foto-first estilo Polarsteps.
+ *
+ * Cada momento ocupa el ancho completo de la hoja con un ratio ~3:2.
+ * La foto manda; el texto (título + lugar + fecha) flota sobre un velo
+ * en el pie de la tarjeta. Los retos sin foto muestran una escena de mapa
+ * + chip "Reto" en teal (semántico, no ámbar del mockup que usaba variables
+ * de mockup; aquí siempre --accent, el teal de producción).
+ */
+
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Tarjeta de momento: foto grande a ancho completo, ratio 3:2. */
+.card {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  /* Elevación suave sobre el papel de la hoja. */
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--hairline-soft);
+  background: var(--surface);
+  /* La foto define el alto (aspect-ratio). */
+  aspect-ratio: 3 / 2;
+  cursor: pointer;
+  /* Press-state táctil (feedback al tocar). */
+  transition: transform var(--motion-transition-fast);
+}
+
+.card:active {
+  transform: scale(var(--motion-press-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card:active {
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Acción primaria "abrir detalle": botón overlay transparente que cubre toda la
+ * tarjeta. Sibling del CTA "Adivina →" (no anidado) → sin nested-interactive.
+ * Va por encima del contenido decorativo (chip/badge/velo) para que tocar en
+ * cualquier punto abra el detalle; el CTA se coloca por encima de este. */
+.openButton {
+  position: absolute;
+  inset: 0;
+  /* design-lint-allow: capa local de la tarjeta (target de abrir sobre lo decorativo) */
+  z-index: 2;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.openButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
+/* Foto real (recuerdo/reto con foto): llena la tarjeta sin distorsión. */
+.foto {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Sin border-radius: el padre hace el clip con overflow:hidden. */
+}
+
+/*
+ * Imagen de Storage servida por ChallengePhoto: anulamos sus estilos de marco
+ * (ancho máximo, borde, radio) para que quede a sangre en la tarjeta.
+ */
+.footoWrapper {
+  position: absolute;
+  inset: 0;
+}
+
+.footoWrapper > * {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  border: none;
+  border-radius: 0;
+}
+
+/* Escena de reto: reto sin foto → fondo de mapa satélite sugerido (escena neutra).
+ * No usamos el océano teal del mockup (tenía tokens de mockup). Aquí el fondo es
+ * la escena oscura del sistema (--scene-bg) con una textura de cuadrícula cartográfica
+ * sutil. Semántico y portable a cualquier tema futuro. */
+.retoScene {
+  position: absolute;
+  inset: 0;
+  background: var(--scene-bg);
+  /* Cuadrícula cartográfica tenue: sugiere "mapa" sin sobrecargar. */
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      var(--scene-hairline) 0px,
+      var(--scene-hairline) 1px,
+      transparent 1px,
+      transparent 48px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      var(--scene-hairline) 0px,
+      var(--scene-hairline) 1px,
+      transparent 1px,
+      transparent 48px
+    );
+}
+
+/* Chip "Reto" sobre la escena: teal semántico (--accent), esquina sup-izq. */
+.retoChip {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  /* design-lint-allow: capa local de la tarjeta de reto (chip sobre la escena) */
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: var(--radius-full);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  box-shadow: var(--shadow-chrome);
+}
+
+/* Velo de legibilidad al pie de la tarjeta: degradado a negro (foto arbitraria). */
+.overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* La altura del velo cubre el bloque de texto más el chip (si hay). */
+  padding: var(--space-8) var(--space-4) var(--space-4);
+  /* design-lint-allow: velo de legibilidad sobre foto arbitraria */
+  background: linear-gradient(
+    to top,
+    rgba(18, 24, 32, 0.78) 0%,
+    /* design-lint-allow: velo de legibilidad sobre foto arbitraria */ rgba(18, 24, 32, 0.2) 60%,
+    /* design-lint-allow: velo de legibilidad sobre foto arbitraria */ transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Bloque texto: título (serif) + meta (lugar · fecha) apilados sobre el velo. */
+.titulo {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--on-photo);
+  /* design-lint-allow: sombra de texto sobre foto arbitraria */
+  text-shadow: 0 1px 4px rgba(18, 24, 32, 0.65);
+  /* Máx 2 líneas para no invadir la foto. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--on-photo);
+  opacity: 0.88;
+  /* design-lint-allow: sombra de texto sobre foto arbitraria */
+  text-shadow: 0 1px 2px rgba(18, 24, 32, 0.55);
+}
+
+.metaDot {
+  opacity: 0.6;
+}
+
+/* Estado "en juego": badge flotante (superior derecha) sobre la foto.
+ * No necesita velo propio — el texto ya lleva sombra; el badge trae fondo. */
+.activeBadge {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  /* design-lint-allow: capa local de la tarjeta (badge sobre la foto) */
+  z-index: 1;
+}
+
+/* CTA "Adivina →": sobre el overlay, interactivo, pie der. Solo en activos. */
+.cta {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  /* design-lint-allow: capa local; por encima del botón-overlay de abrir (z-index 2) */
+  z-index: 3;
+  pointer-events: auto;
+}
+
+/* Estado vacío: sin foto NI reto (reto en juego sin foto). En el mockup era una
+   escena de SV simulada; aquí reutilizamos la retoScene (mismo fondo). */
+.sinFoto {
+  position: absolute;
+  inset: 0;
+  background: var(--photo-loading-bg);
+}
