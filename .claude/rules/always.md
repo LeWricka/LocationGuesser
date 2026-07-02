@@ -90,3 +90,23 @@ hace la validación final; el orquestador valida primero.
 - **Priority** `PVTSSF_lAHOABkrCM4BbIkSzhV7RhY`: P0 `79628723` · P1 `0a877460` · P2 `da944a9c`.
 - **Size** `PVTSSF_lAHOABkrCM4BbIkSzhV7Rhc`: XS `6c6483d2` · S `f784b110` · M `7515a9f1` · L `817d0097` · XL `db339eb2`.
 - Crear issues + fijar campos: ver skill `create-use-cases`.
+
+## 9. Modelos y coste (tiering)
+
+> Objetivo: gastar Opus donde paga el razonamiento; el resto, en modelos baratos.
+
+- **El hilo principal (orquestador) va en Opus.** Descomponer, decidir causa-raíz difícil,
+  juicio de diseño, mergear: eso justifica Opus.
+- **Los agentes ejecutores van en Sonnet por defecto** (`model: 'sonnet'` en la llamada al
+  Agent tool / Workflow). Implementar un fix acotado, restyle, tests, refactor mecánico,
+  documentación: Sonnet sobra y cuesta una fracción.
+- **Sube un agente a Opus solo cuando el agente TIENE que pensar** (hunt de causa-raíz sin
+  repro, diseño abierto, algoritmo delicado). Es la excepción, no la norma.
+- **Tareas triviales (buscar ficheros, formatear) → Haiku** o hazlas inline en el hilo
+  principal en vez de levantar un worktree.
+- **No delegar lo pequeño.** Un fix de 1–2 ficheros cuesta menos inline que un worktree
+  (que implica `npm install` completo + contexto nuevo + verificación entera). El patrón de
+  agentes-en-paralelo es para trabajo **grande y disjunto**; lo pequeño, en el hilo principal.
+- **Punteros precisos** a los agentes (fichero + función + línea) → exploran menos → gastan menos.
+- **Apoyarse en CI para verificar.** No re-correr `format+lint+type-check+test+build+design-lint`
+  local Y en CI Y otra vez en el orquestador: correr local lo mínimo antes del push; CI es la red.
