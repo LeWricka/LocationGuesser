@@ -69,9 +69,9 @@
   /* de legibilidad requiere negro puro para máximo contraste sobre cualquier foto. */
   background: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0.65) 0%, /* design-lint-allow: scrim de legibilidad sobre foto arbitraria */
-    rgba(0, 0, 0, 0.2) 70%, /* design-lint-allow: scrim de legibilidad sobre foto arbitraria */
-    transparent 100%
+    rgba(0, 0, 0, 0.65) 0%,
+    /* design-lint-allow: scrim de legibilidad sobre foto arbitraria */ rgba(0, 0, 0, 0.2) 70%,
+    /* design-lint-allow: scrim de legibilidad sobre foto arbitraria */ transparent 100%
   );
   color: var(--scene-ink);
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); /* design-lint-allow: sombra de texto sobre foto arbitraria */
