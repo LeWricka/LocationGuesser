@@ -67,7 +67,8 @@
 .linkHint {
   margin-top: var(--space-3);
   text-align: center;
-  color: var(--color-text-faint);
+  /* `muted` (AA), no `faint`: es texto informativo que debe leerse (axe: color-contrast). */
+  color: var(--color-text-muted);
 }
 
 /* "Cómo funciona" dentro de la hoja: separación del bloque del hero. */
