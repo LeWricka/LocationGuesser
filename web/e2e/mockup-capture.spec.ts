@@ -24,14 +24,7 @@ const VIEWPORTS: Viewport[] = [
 ]
 
 // IDs de las pantallas del mockup (correspondencia 1:1 con PANTALLAS en MockupIndex.tsx).
-const MOCKUP_IDS = [
-  'entrar',
-  'ver-viaje',
-  'crear-reto-sv',
-  'crear-reto-sin-sv',
-  'jugar',
-  'marcador',
-]
+const MOCKUP_IDS = ['entrar', 'ver-viaje', 'crear-reto', 'jugar', 'marcador']
 
 // Bloquea peticiones externas (misma estrategia que la galería).
 const blockExternal = (route: Route) => {

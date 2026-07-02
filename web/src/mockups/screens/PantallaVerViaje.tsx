@@ -7,6 +7,7 @@
 import { useState } from 'react'
 import { AppHeader, SegmentedControl, type SegmentedOption } from '../../ui'
 import { ShellInmersivo } from '../shells/ShellInmersivo'
+import { IconReto, IconMedalla } from '../icons/MockupIcons'
 import { FIXTURE_VIAJE, FIXTURE_MOMENTOS, FIXTURE_MARCADOR } from './fixtures'
 import styles from './PantallaVerViaje.module.css'
 
@@ -76,48 +77,67 @@ export function PantallaVerViaje() {
   )
 }
 
-// Tab Diario: lista de momentos (foto + lugar + fecha).
+// Tab Diario: FOTO-FIRST (estilo Polarsteps). Cada momento es una tarjeta con
+// imagen grande a ancho completo; título+lugar+fecha sobre un velo en la foto.
+// Los retos de ubicación (sin foto) muestran una miniatura de SV/mapa + chip "Reto".
 function TabDiario() {
   return (
     <div className={styles.diario}>
       {FIXTURE_MOMENTOS.map((m) => (
-        <div key={m.id} className={styles.momento}>
-          <div className={styles.momentoEmoji}>{m.emoji}</div>
-          <div className={styles.momentoInfo}>
-            <div className={['t-body', styles.momentoTitulo].join(' ')}>{m.titulo}</div>
+        <article key={m.id} className={styles.momento}>
+          {m.tipo === 'foto' ? (
+            <img className={styles.momentoFoto} src={m.foto} alt={m.titulo} loading="lazy" />
+          ) : (
+            // Reto de ubicación: no hay foto → miniatura de Street View/mapa stub.
+            <div className={styles.momentoReto} aria-hidden="true">
+              <div className={styles.momentoRetoScene} />
+              <span className={styles.retoChipFloat}>
+                <IconReto size={14} />
+                Reto
+              </span>
+            </div>
+          )}
+          {/* Velo + texto sobre la imagen (título + lugar + fecha) */}
+          <div className={styles.momentoOverlay}>
+            <h3 className={styles.momentoTitulo}>{m.titulo}</h3>
             <div className={styles.momentoMeta}>
-              <span className="t-caption">{m.lugar}</span>
-              <span className="t-caption">·</span>
-              <span className="t-caption">{m.fecha}</span>
-              {m.tieneReto && <span className={styles.retoBadge}>Reto</span>}
+              <span>{m.lugar}</span>
+              <span className={styles.metaDot}>·</span>
+              <span>{m.fecha}</span>
             </div>
           </div>
-        </div>
+        </article>
       ))}
     </div>
   )
 }
 
-// Tab Marcador: tabla de clasificación por puntos.
+// Tab Marcador: clasificación por puntos. Medalla custom (oro/plata/bronce) para
+// el podio; avatar = círculo con inicial (sin emoji).
 function TabMarcador() {
   return (
     <div className={styles.marcador}>
-      {FIXTURE_MARCADOR.map((j, i) => (
-        <div key={j.nombre} className={styles.fila}>
-          <span className={[styles.filaPosicion, i === 0 ? styles.top : ''].join(' ')}>
-            {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}`}
-          </span>
-          <span className={styles.filaAvatar}>{j.emoji}</span>
-          <div className={styles.filaInfo}>
-            <div className={styles.filaNombre}>{j.nombre}</div>
-            <div className={styles.filaDistancia}>
-              {j.distanciaKm < 5 ? `${(j.distanciaKm * 1000).toFixed(0)} m` : `${j.distanciaKm} km`}{' '}
-              de distancia media
+      {FIXTURE_MARCADOR.map((j, i) => {
+        const rank = i < 3 ? ((i + 1) as 1 | 2 | 3) : undefined
+        return (
+          <div key={j.nombre} className={styles.fila}>
+            <span className={[styles.filaPosicion, styles[`medal${i + 1}`] ?? ''].join(' ')}>
+              {rank ? <IconMedalla size={22} rank={rank} /> : `${i + 1}`}
+            </span>
+            <span className={styles.filaAvatar}>{j.inicial}</span>
+            <div className={styles.filaInfo}>
+              <div className={styles.filaNombre}>{j.nombre}</div>
+              <div className={styles.filaDistancia}>
+                {j.distanciaKm < 5
+                  ? `${(j.distanciaKm * 1000).toFixed(0)} m`
+                  : `${j.distanciaKm} km`}{' '}
+                de distancia media
+              </div>
             </div>
+            <span className={styles.filaPuntos}>{j.puntos.toLocaleString()}</span>
           </div>
-          <span className={styles.filaPuntos}>{j.puntos.toLocaleString()}</span>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }

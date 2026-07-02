@@ -1,25 +1,106 @@
 /*
- * PantallaCrearReto — pantalla "Crear ¿Dónde?" (mockup). Un solo paso: Street View
- * directo. Dos estados: (a) street-view (con cobertura) y (b) sin-cobertura.
+ * PantallaCrearReto — "Crear ¿Dónde?" (mockup). SV operativo a pantalla completa
+ * con chrome mínimo (barra compacta abajo), NO hoja decorativa.
  */
 
-/* Andamiaje de MOCKUP: conmutador de sub-estados. Estilo de "herramienta de
- * desarrollo" (borde discontinuo + etiqueta) para NO confundirse con UI real. */
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--scene-bg);
+}
+
+/* Street View ocupa toda la pantalla (herramienta de trabajo) */
+.scene {
+  position: absolute;
+  inset: 0;
+}
+
+/* Cabecera flotante */
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-header);
+}
+
+/* Barra de controles compacta abajo: fondo semitransparente, NO hoja grande. */
+.controls {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--surface) 72%, transparent 100%);
+}
+
+/* Fila título + CTA */
+.controlsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.tituloBreve {
+  font-family: var(--font-serif, var(--font-sans));
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+/* Nota de privacidad compacta (una línea, con candado) */
+.privacidad {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-xs);
+}
+
+.privacidadIcon {
+  color: var(--mk-primary);
+  flex-shrink: 0;
+}
+
+.privacidadTexto {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Andamiaje de MOCKUP: conmutador de estados, arriba a la derecha bajo la cabecera.
+ * Estilo de herramienta (borde discontinuo, monoespaciado) para no parecer UI.
+ * Se baja bajo la fila del chip de lugar (StreetViewStub .label) para no solaparlo. */
 .scaffold {
-  margin-bottom: var(--space-4);
+  position: absolute;
+  top: calc(var(--space-8) + var(--space-7) + var(--space-4));
+  right: var(--space-3);
+  z-index: calc(var(--z-header) + 1);
   padding: var(--space-2);
-  border: 1px dashed var(--hairline-strong);
+  border: 1px dashed var(--scene-hairline);
   border-radius: var(--radius-sm);
-  background: var(--paper);
+  background: var(--scene-surface);
+  backdrop-filter: blur(8px);
 }
 
 .scaffoldLabel {
   display: block;
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   letter-spacing: 0.08em;
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
   text-transform: uppercase;
 }
 
@@ -29,42 +110,18 @@
 }
 
 .scaffoldBtn {
-  flex: 1;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs);
-  border: 1px solid var(--hairline-soft);
-  background: var(--surface);
+  border: 1px solid var(--scene-hairline);
+  background: transparent;
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
   cursor: pointer;
-  text-align: center;
 }
 
 .scaffoldBtn.activo {
-  background: var(--color-text);
-  border-color: var(--color-text);
-  color: var(--surface);
-}
-
-/* Contenido de la hoja (ayuda + privacidad, o aviso sin cobertura) */
-.confirmacion {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.nota {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  background: var(--accent-tint);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-accent-glow-soft);
-}
-
-.notaEmoji {
-  font-size: var(--font-size-xl); /* aprox 32px vía token */
-  flex-shrink: 0;
+  background: var(--scene-ink);
+  border-color: var(--scene-ink);
+  color: var(--scene-bg);
 }

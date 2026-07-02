@@ -44,14 +44,14 @@
   border-radius: var(--radius-md);
 }
 
-/* Pin central */
+/* Pin central (icono custom): el color de marca lo pone el propio icono via
+ * currentColor + su detalle en ámbar. */
 .pin {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -100%);
-  font-size: var(--font-size-2xl); /* aprox 28px vía token */
-  line-height: 1;
+  color: var(--mk-primary);
   filter: drop-shadow(0 2px 4px var(--photo-text-shadow));
 }
 
@@ -72,7 +72,7 @@
   box-shadow: var(--shadow-chrome);
 }
 
-/* Botón GPS bottom-right */
+/* Botón GPS bottom-right (icono custom) */
 .gps {
   position: absolute;
   bottom: var(--space-4);
@@ -85,7 +85,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-lg); /* aprox 22px vía token */
+  color: var(--mk-primary);
   cursor: pointer;
   border: 1px solid var(--hairline);
 }

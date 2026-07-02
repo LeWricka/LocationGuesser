@@ -14,6 +14,7 @@ import { PantallaVerViaje } from './screens/PantallaVerViaje'
 import { PantallaCrearReto } from './screens/PantallaCrearReto'
 import { PantallaJugar } from './screens/PantallaJugar'
 import { PantallaMarcador } from './screens/PantallaMarcador'
+import './mockups.css'
 import styles from './MockupIndex.module.css'
 
 interface MockupPantalla {
@@ -23,44 +24,39 @@ interface MockupPantalla {
   render: () => React.ReactElement
 }
 
-// Registro de las 6 pantallas del camino feliz.
-// "Crear ¿Dónde?" es un solo paso (Street View directo) con 2 sub-estados
-// (con cobertura / sin cobertura); registramos ambos para la galería.
+// Registro de las 5 pantallas del camino feliz.
+// "Crear ¿Dónde?" es un solo paso (Street View operativo); el caso "sin cobertura"
+// se resuelve INLINE dentro de esa misma pantalla (aviso + CTA deshabilitado),
+// conmutable con el andamiaje MOCKUP — no es una pantalla aparte.
 const PANTALLAS: MockupPantalla[] = [
   {
     id: 'entrar',
     nombre: 'Entrar',
-    shell: 'ShellUtilitario',
+    shell: 'Utilitario',
     render: () => <PantallaEntrar />,
   },
   {
     id: 'ver-viaje',
     nombre: 'Ver viaje',
-    shell: 'ShellInmersivo',
+    shell: 'Inmersivo (a sangre)',
     render: () => <PantallaVerViaje />,
   },
   {
-    id: 'crear-reto-sv',
-    nombre: 'Crear ¿Dónde? — Street View',
-    shell: 'ShellInmersivo',
-    render: () => <PantallaCrearReto estadoInicial="street-view" />,
-  },
-  {
-    id: 'crear-reto-sin-sv',
-    nombre: 'Crear ¿Dónde? — Sin cobertura',
-    shell: 'ShellInmersivo',
-    render: () => <PantallaCrearReto estadoInicial="sin-cobertura" />,
+    id: 'crear-reto',
+    nombre: 'Crear ¿Dónde?',
+    shell: 'Street View operativo',
+    render: () => <PantallaCrearReto />,
   },
   {
     id: 'jugar',
     nombre: 'Jugar / Adivinar',
-    shell: 'ShellInmersivo',
+    shell: 'GeoGuessr (SV + mini-mapa)',
     render: () => <PantallaJugar />,
   },
   {
     id: 'marcador',
     nombre: 'Marcador / Resultado',
-    shell: 'ShellFeed',
+    shell: 'Utilitario (feed)',
     render: () => <PantallaMarcador />,
   },
 ]
@@ -94,7 +90,8 @@ export function MockupIndex() {
   }
 
   return (
-    <div className={styles.root}>
+    // mockupTheme aplica la paleta "Teal viajero" a TODO el mockup (tokens locales).
+    <div className={[styles.root, 'mockupTheme'].join(' ')}>
       {/* Barra de navegación */}
       <nav className={styles.nav}>
         <button className={styles.navBtn} onClick={prev} aria-label="Pantalla anterior">

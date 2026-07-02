@@ -1,22 +1,30 @@
-// PantallaJugar — pantalla 4/5 del camino feliz (mockup).
+// PantallaJugar — "Jugar / Adivinar" (mockup). GeoGuessr de verdad.
 //
-// ShellInmersivo: Street View protagonista a sangre para explorar.
-// Mini-mapa en esquina inferior derecha (expandible) para clavar el tiro.
-// Cuenta atrás insinuada en la cabecera. CTA "Clavar tiro".
-//
-// Caption sobre el SV: instrucción de navegación. Hoja con mini-mapa e instrucción.
+// Street View a pantalla completa = el juego. NO hay popup/hoja "¿Dónde es esto?".
+// Mini-mapa en la esquina que se EXPANDE para clavar el tiro. Cuenta atrás arriba.
+// El "Clavar tiro" se hace desde el mini-mapa expandido.
 
+import { useState } from 'react'
 import { AppHeader, Button } from '../../ui'
-import { ShellInmersivo } from '../shells/ShellInmersivo'
 import { StreetViewStub } from './StreetViewStub'
 import { MapStub } from './MapStub'
+import { IconDiana } from '../icons/MockupIcons'
 import styles from './PantallaJugar.module.css'
 
 export function PantallaJugar() {
+  // Mini-mapa colapsado (esquina) ↔ expandido (clavar tiro). Arranca expandido
+  // para que la captura muestre el gesto clave; el andamiaje MOCKUP conmuta.
+  const [expandido, setExpandido] = useState(true)
+
   return (
-    <ShellInmersivo
-      backdrop={<StreetViewStub />}
-      header={
+    <div className={styles.root}>
+      {/* Street View a pantalla completa = el juego */}
+      <div className={styles.scene}>
+        <StreetViewStub />
+      </div>
+
+      {/* Cabecera flotante con cuenta atrás (sin título: es el juego) */}
+      <div className={styles.header}>
         <AppHeader
           title={undefined}
           onLead={() => {}}
@@ -25,46 +33,53 @@ export function PantallaJugar() {
           variant="floating"
           action={<CuentaAtras />}
         />
-      }
-      // Caption: instrucción de exploración sobre el SV.
-      // La hoja no tiene sheetTitle (regla dura cumplida).
-      caption={
-        <span className="t-caption" style={{ color: 'var(--scene-ink-soft)' }}>
-          Pasea y reconoce el lugar
-        </span>
-      }
-      cta={
-        <Button variant="primary" size="lg" fullWidth>
-          Clavar tiro
-        </Button>
-      }
-    >
-      {/* Mini-mapa para clavar el tiro: flota sobre la hoja (posición absoluta
-          en el shell, porque la hoja tiene overflow:hidden que lo cortaría) */}
-      <div className={styles.instruccion}>
-        <h2
-          className="t-section"
-          style={{ color: 'var(--color-text)', marginBottom: 'var(--space-1)' }}
-        >
-          ¿Dónde es esto?
-        </h2>
-        {/* Una sola línea de ayuda (antes había dos que repetían "Toca el mapa"). */}
-        <p className="t-body" style={{ color: 'var(--color-text-muted)' }}>
-          Toca el mapa para clavar tu tiro. Gana quien más se acerque.
-        </p>
       </div>
-    </ShellInmersivo>
-  )
-}
 
-// Mini-mapa superpuesto: flota en la esquina inferior derecha del shell.
-// No puede ir dentro de sheetInner (overflow la corta): se renderiza como
-// hermano del shell en MockupIndexWrapper, pero para el mockup lo dejamos como
-// elemento absoluto dentro del contenedor de PantallaJugar.
-export function MiniMapaFlotante() {
-  return (
-    <div className={styles.miniMapa}>
-      <MapStub pinEmoji="🎯" showGps={false} />
+      {/* Mini-mapa: colapsado en la esquina, o expandido para clavar el tiro. */}
+      {expandido ? (
+        <div className={styles.mapaExpandido}>
+          <div className={styles.mapaExpandidoScene}>
+            <MapStub />
+            <IconDiana size={30} className={styles.diana} />
+          </div>
+          <Button variant="primary" size="lg" fullWidth>
+            Clavar tiro
+          </Button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.miniMapa}
+          onClick={() => setExpandido(true)}
+          aria-label="Abrir el mapa para clavar el tiro"
+        >
+          <MapStub />
+          <span className={styles.miniMapaHint}>
+            <IconDiana size={16} />
+          </span>
+        </button>
+      )}
+
+      {/* Andamiaje de MOCKUP: conmuta mini-mapa colapsado / expandido. */}
+      <div className={styles.scaffold}>
+        <span className={styles.scaffoldLabel}>MOCKUP · mapa</span>
+        <div className={styles.scaffoldBtns}>
+          <button
+            type="button"
+            className={[styles.scaffoldBtn, expandido ? styles.activo : ''].join(' ')}
+            onClick={() => setExpandido(true)}
+          >
+            Expandido
+          </button>
+          <button
+            type="button"
+            className={[styles.scaffoldBtn, !expandido ? styles.activo : ''].join(' ')}
+            onClick={() => setExpandido(false)}
+          >
+            Esquina
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,23 +1,94 @@
 /*
- * PantallaJugar — pantalla 4/5 (mockup). ShellInmersivo: SV a sangre + mini-mapa.
+ * PantallaJugar — "Jugar / Adivinar" (mockup). GeoGuessr: SV a pantalla completa
+ * + mini-mapa de esquina que se expande. Sin popup/hoja.
  */
 
-/* Mini-mapa expandible en esquina inferior derecha */
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--scene-bg);
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+}
+
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-header);
+}
+
+/* --- Mini-mapa colapsado (esquina inferior derecha) --- */
 .miniMapa {
   position: absolute;
   bottom: var(--space-4);
   right: var(--space-4);
-  width: 140px;
-  height: 100px;
+  width: 128px;
+  height: 128px;
+  padding: 0;
   border-radius: var(--radius-md);
   overflow: hidden;
-  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  box-shadow: var(--shadow-chrome);
   border: 2px solid var(--surface);
-  z-index: calc(var(--z-sheet) - 1);
+  z-index: var(--z-sheet);
   cursor: pointer;
 }
 
-/* Cuenta atrás stub en la cabecera (pastilla sobre el SV) */
+/* Pista de "toca para ampliar": diana en ámbar sobre la esquina del mini-mapa */
+.miniMapaHint {
+  position: absolute;
+  bottom: var(--space-1);
+  right: var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--mk-accent);
+  box-shadow: var(--shadow-xs);
+}
+
+/* --- Mini-mapa expandido (clavar tiro) --- */
+.mapaExpandido {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  z-index: var(--z-sheet);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mapaExpandidoScene {
+  position: relative;
+  height: 300px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-chrome);
+  border: 2px solid var(--surface);
+}
+
+/* Diana central (donde caería el tiro) sobre el mapa expandido */
+.diana {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--mk-primary);
+  filter: drop-shadow(0 2px 4px var(--photo-text-shadow));
+  pointer-events: none;
+}
+
+/* --- Cuenta atrás en la cabecera --- */
 .cuentaAtras {
   display: inline-flex;
   align-items: center;
@@ -42,9 +113,47 @@
   font-family: var(--font-sans);
 }
 
-/* Instrucción en la hoja */
-.instruccion {
+/* --- Andamiaje de MOCKUP --- */
+.scaffold {
+  position: absolute;
+  top: calc(var(--space-8) + var(--space-4));
+  right: var(--space-3);
+  z-index: calc(var(--z-header) + 1);
+  padding: var(--space-2);
+  border: 1px dashed var(--scene-hairline);
+  border-radius: var(--radius-sm);
+  background: var(--scene-surface);
+  backdrop-filter: blur(8px);
+}
+
+.scaffoldLabel {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  color: var(--scene-ink-soft);
+  text-transform: uppercase;
+}
+
+.scaffoldBtns {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
+}
+
+.scaffoldBtn {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--scene-hairline);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--scene-ink-soft);
+  cursor: pointer;
+}
+
+.scaffoldBtn.activo {
+  background: var(--scene-ink);
+  border-color: var(--scene-ink);
+  color: var(--scene-bg);
 }

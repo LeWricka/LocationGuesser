@@ -1,6 +1,7 @@
 // StreetViewStub — placeholder de Street View para mockups (sin API key).
 // Simula la perspectiva de una calle con CSS/SVG puro, sin red.
 
+import { IconGps } from '../icons/MockupIcons'
 import styles from './StreetViewStub.module.css'
 
 interface Props {
@@ -19,7 +20,11 @@ export function StreetViewStub({ label, showGps = false }: Props) {
       <div className={styles.vanish} />
       <div className={styles.veil} />
       {label && <div className={styles.label}>{label}</div>}
-      {showGps && <div className={styles.gps}>◎</div>}
+      {showGps && (
+        <span className={styles.gps}>
+          <IconGps size={22} />
+        </span>
+      )}
       <span className={styles.badge}>Street View</span>
     </div>
   )

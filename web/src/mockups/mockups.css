@@ -1,0 +1,107 @@
+/*
+ * Paleta "Teal viajero" — tema del mockup.
+ *
+ * Se aplica SOLO dentro del visor de mockups (clase .mockupTheme en el root),
+ * sobrescribiendo los tokens base. Así la paleta se prueba sin tocar producción;
+ * portarla luego = mover estos valores a src/ui/tokens.css.
+ *
+ * Fuente de la paleta (validada por el dueño):
+ *   primario  #0EA5A4  (teal)
+ *   acento    #F4A259  (ámbar) → chips "Reto" y detalles/iconos
+ *   tinta     #0F2E2E
+ *   apagado   #5B7A78
+ *   superficie#FFFFFF
+ *   fondo     #F5F8F7
+ *   línea     #E2ECEA
+ *
+ * design-lint-allow: este fichero DEFINE la paleta del mockup; los literales de
+ * color viven aquí a propósito (igual que tokens.css). El resto del mockup usa
+ * solo var(--…), nunca literales sueltos.
+ */
+
+.mockupTheme {
+  /* Marca */
+  --mk-primary: #0ea5a4;
+  --mk-primary-strong: #0b8887;
+  --mk-primary-tint: #d8f0ef;
+  --mk-primary-glow-soft: #eaf8f7;
+  --mk-accent: #f4a259; /* ámbar: chips Reto, detalles, punto interior de iconos */
+  --mk-accent-tint: #fdecd8;
+  --mk-ink: #0f2e2e;
+  --mk-muted: #5b7a78;
+  --mk-faint: #91a8a6;
+  --mk-surface: #ffffff;
+  --mk-bg: #f5f8f7;
+  --mk-line: #e2ecea;
+  --mk-line-strong: #c9dcd9;
+
+  /* --- Remapeo de tokens base a la paleta teal --- */
+
+  /* Acción primaria / marca = teal. Se sobrescriben tanto los tokens base
+   * (--accent, --accent-deep, --accent-ink) como los derivados que usa el
+   * Button del UI kit (--color-accent*, --color-on-accent). */
+  --accent: var(--mk-primary);
+  --accent-deep: var(--mk-primary-strong);
+  --accent-ink: #ffffff;
+  --accent-tint: var(--mk-primary-tint);
+  --color-accent: var(--mk-primary);
+  --color-accent-hover: var(--mk-primary-strong);
+  --color-accent-active: var(--mk-primary-strong);
+  --color-on-accent: #ffffff;
+  --color-accent-soft: var(--mk-primary-strong);
+  --color-accent-glow-soft: var(--mk-primary-glow-soft);
+
+  /* Texto */
+  --color-text: var(--mk-ink);
+  --color-text-muted: var(--mk-muted);
+  --color-text-faint: var(--mk-faint);
+  --ink-900: var(--mk-ink);
+  --ink-700: var(--mk-ink);
+  --ink-400: var(--mk-muted);
+
+  /* Superficies y fondo */
+  --surface: var(--mk-surface);
+  --paper: var(--mk-bg);
+  --color-bg: var(--mk-bg);
+  --color-surface: var(--mk-surface);
+
+  /* Líneas */
+  --hairline: var(--mk-line);
+  --hairline-soft: var(--mk-line);
+  --hairline-strong: var(--mk-line-strong);
+
+  /* Detalles que en la paleta original eran "dorados" → ahora teal (ruta/globo) */
+  --route-gold: var(--mk-primary);
+  --route-gold-soft: var(--mk-primary-tint);
+  /* La medalla de oro sí conserva su dorado real (es semántica de podio),
+   * pero plata/bronce se resuelven en cada pantalla. */
+
+  /* Chrome flotante sobre foto: velo claro coherente con el fondo teal */
+  --chrome-bg: rgba(255, 255, 255, 0.86);
+
+  /* Escena (backdrops a sangre): tinta clara para legibilidad sobre foto */
+  --scene-bg: var(--mk-ink);
+  --scene-ink: rgba(255, 255, 255, 0.96);
+  --scene-ink-soft: rgba(255, 255, 255, 0.74);
+  --scene-veil: rgba(15, 46, 46, 0.55); /* velo tintado teal-oscuro */
+  --scene-surface: rgba(255, 255, 255, 0.14);
+  --scene-hairline: rgba(255, 255, 255, 0.22);
+}
+
+/* Chip "Reto" en ámbar (detalle de acento). Reutilizable en las pantallas. */
+.retoChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: var(--mk-accent-tint);
+  color: #9a5a1e; /* design-lint-allow: texto ámbar oscuro sobre tint ámbar (contraste AA) */
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-semibold);
+}
+
+.retoChip svg {
+  color: var(--mk-accent);
+}

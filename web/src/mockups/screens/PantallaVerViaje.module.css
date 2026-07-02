@@ -2,17 +2,17 @@
  * PantallaVerViaje — pantalla 2/5 (mockup). ShellInmersivo con globo/mapa.
  */
 
-/* Globo stub: placeholder del mapa del viaje (globo con ruta dorada) */
+/* Globo stub: placeholder del mapa del viaje. Océano tintado teal (paleta viajero). */
 .globo {
   width: 100%;
   height: 100%;
   position: relative;
-  /* design-lint-allow: gradiente de globo terráqueo (azul océano, colores de cartografía) */
-  background: radial-gradient(ellipse at 35% 40%, #3a7bd5 0%, #1a4a8a 45%, #0d2e5e 100%);
+  /* design-lint-allow: gradiente de globo terráqueo (océano teal, colores de cartografía) */
+  background: radial-gradient(ellipse at 35% 40%, #14b2b0 0%, #0c7877 45%, #063f3f 100%);
   overflow: hidden;
 }
 
-/* Continente stub (masa terrestre en verde) */
+/* Continente stub (masa terrestre en verde-teal) */
 .tierra {
   position: absolute;
   top: 18%;
@@ -20,30 +20,30 @@
   right: 10%;
   bottom: 30%;
   /* design-lint-allow: color de continente (verde tierra, cartografía) */
-  background: radial-gradient(ellipse at 40% 45%, #5aad6b 0%, #3d8a50 55%, #2a6338 100%);
+  background: radial-gradient(ellipse at 40% 45%, #6cbf8e 0%, #3f9469 55%, #2a6b4c 100%);
   border-radius: 42% 58% 36% 64% / 55% 45% 55% 45%;
 }
 
-/* Japón (pequeño punto destacado) */
+/* Japón (marcador de ubicación destacado, en ámbar de acento) */
 .japon {
   position: absolute;
   top: 32%;
   right: 22%;
   width: 18px;
   height: 24px;
-  background: var(--route-gold); /* reutiliza el token de ruta del viaje */
+  background: var(--mk-accent);
   border-radius: 50% 55% 42% 60% / 52% 45% 55% 48%;
-  box-shadow: 0 0 0 3px var(--route-gold-soft);
+  box-shadow: 0 0 0 3px var(--mk-accent-tint);
 }
 
-/* Ruta dorada stub */
+/* Ruta ámbar stub */
 .ruta {
   position: absolute;
   top: 38%;
   right: 22%;
   width: 2px;
   height: 20%;
-  background: linear-gradient(to bottom, var(--route-gold), var(--route-gold-soft));
+  background: linear-gradient(to bottom, var(--mk-accent), var(--mk-accent-tint));
 }
 
 /* Velo inferior para fundir con la hoja.
@@ -55,8 +55,8 @@
   left: 0;
   right: 0;
   height: 45%;
-  /* design-lint-allow: gradiente de velo sobre globo terráqueo (zona visual específica) */
-  background: linear-gradient(to top, rgba(11, 16, 22, 0.7) 0%, transparent 100%);
+  /* design-lint-allow: velo teal-oscuro sobre el globo para fundir con la hoja */
+  background: linear-gradient(to top, rgba(6, 63, 63, 0.7) 0%, transparent 100%);
 }
 
 /* Nombre del viaje sobre el globo (caption editorial) */
@@ -66,48 +66,92 @@
   gap: var(--space-1);
 }
 
-/* --- Diario --- */
+/* --- Diario (foto-first, estilo Polarsteps) --- */
 .diario {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
-/* Tarjeta de momento del diario */
+/* Tarjeta de momento: imagen grande a ancho completo con texto sobre velo. */
 .momento {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-3);
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
   background: var(--surface);
-  border-radius: var(--radius-md);
   border: 1px solid var(--hairline-soft);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-md);
+  aspect-ratio: 3 / 2; /* foto manda: ratio 3:2 */
 }
 
-.momentoEmoji {
-  font-size: var(--font-size-2xl); /* aprox 32px vía token */
-  line-height: 1;
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  display: flex;
+.momentoFoto {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Reto de ubicación (sin foto): miniatura de escena Street View/mapa. */
+.momentoReto {
+  position: absolute;
+  inset: 0;
+}
+
+.momentoRetoScene {
+  position: absolute;
+  inset: 0;
+  /* design-lint-allow: escena de calle/mapa stub para el reto (contenido de terceros) */
+  background:
+    linear-gradient(180deg, #8fb8c9 0%, #a9c9b6 46%, #9fb08c 60%, #7c8a68 100%),
+    repeating-linear-gradient(115deg, rgba(0, 0, 0, 0.05) 0 22px, transparent 22px 46px);
+  background-blend-mode: overlay;
+}
+
+/* Chip "Reto" flotante en ámbar sobre la miniatura */
+.retoChipFloat {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  background: var(--accent-tint);
-  border-radius: var(--radius-sm);
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  background: var(--mk-accent);
+  color: #ffffff; /* design-lint-allow: texto blanco sobre chip ámbar sólido */
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-chrome);
 }
 
-.momentoInfo {
-  flex: 1;
-  min-width: 0;
+.retoChipFloat svg {
+  color: #ffffff; /* design-lint-allow: icono blanco dentro del chip ámbar sólido */
+}
+
+/* Velo + texto sobre la imagen (parte inferior de la tarjeta) */
+.momentoOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  /* design-lint-allow: velo de legibilidad sobre foto (degradado a negro) */
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.72) 0%,
+    rgba(0, 0, 0, 0.1) 70%,
+    transparent 100%
+  );
 }
 
 .momentoTitulo {
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  margin: 0;
+  font-family: var(--font-serif, var(--font-sans));
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: #ffffff; /* design-lint-allow: texto blanco sobre velo de foto */
+  line-height: var(--line-height-tight);
 }
 
 .momentoMeta {
@@ -115,18 +159,13 @@
   align-items: center;
   gap: var(--space-2);
   margin-top: var(--space-1);
-  flex-wrap: wrap;
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  color: rgba(255, 255, 255, 0.82); /* design-lint-allow: meta sobre velo de foto */
 }
 
-.retoBadge {
-  display: inline-block;
-  padding: 1px var(--space-2);
-  background: var(--accent-tint);
-  color: var(--accent);
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-xs);
-  font-family: var(--font-sans);
-  font-weight: var(--font-weight-semibold);
+.metaDot {
+  opacity: 0.7;
 }
 
 /* --- Marcador --- */
@@ -147,22 +186,45 @@
 }
 
 .filaPosicion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-sans);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-md);
   color: var(--color-text-muted);
-  width: 20px;
+  width: 24px;
   text-align: center;
   flex-shrink: 0;
 }
 
-.filaPosicion.top {
-  color: var(--medal-gold);
+/* Colores de medalla del podio (oro/plata/bronce). */
+.medal1 {
+  color: #d4a017; /* design-lint-allow: oro de medalla (semántica de podio) */
 }
 
+.medal2 {
+  color: #9aa4ab; /* design-lint-allow: plata de medalla */
+}
+
+.medal3 {
+  color: #b1703c; /* design-lint-allow: bronce de medalla */
+}
+
+/* Avatar = círculo con inicial (sin emoji) */
 .filaAvatar {
-  font-size: var(--font-size-lg); /* aprox 22px vía token */
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--mk-primary-tint);
+  color: var(--mk-primary-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
 }
 
 .filaInfo {

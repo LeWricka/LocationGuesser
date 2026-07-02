@@ -3,10 +3,15 @@
 // con imágenes o placeholders estáticos.
 //
 // Imágenes reutilizadas del repo (no hay datos externos):
-//  - web/src/assets/landing/*.webp — capturas de producto (home, marcador, resultado)
-//  - web/src/features/home/assets/*.webp — fotos de ciudades del globo
+//  - web/src/features/home/assets/*.webp — fotos de ciudades (Tokio, etc.)
+//  - web/src/assets/landing/*.webp — capturas de producto
 //
-// Todos los avatares son emojis (texto) para no depender de URLs externas.
+// Los momentos con foto usan estas webp; los retos de ubicación (GeoGuessr, sin
+// foto) NO llevan imagen: la UI muestra una miniatura de mapa/SV en su lugar.
+
+import fotoTokio from '../../features/home/assets/tokio.webp'
+import fotoRoma from '../../features/home/assets/roma.webp'
+import fotoLisboa from '../../features/home/assets/lisboa.webp'
 
 export const FIXTURE_NOMBRE = 'Lewis'
 export const FIXTURE_EMAIL = 'lewis@tabide.app'
@@ -17,13 +22,18 @@ export const FIXTURE_VIAJE = {
   fechas: '4–18 jun · 14 días',
 }
 
+// Un momento del diario es o bien una FOTO (con imagen a ancho completo) o bien
+// un RETO de ubicación (GeoGuessr sin foto → la UI pone miniatura de SV/mapa).
+export type MomentoTipo = 'foto' | 'reto'
+
 export interface FixtureMomento {
   id: string
   titulo: string
   lugar: string
   fecha: string
-  emoji: string
-  tieneReto: boolean
+  tipo: MomentoTipo
+  /** URL de la foto (solo tipo 'foto'). */
+  foto?: string
 }
 
 export const FIXTURE_MOMENTOS: FixtureMomento[] = [
@@ -32,47 +42,54 @@ export const FIXTURE_MOMENTOS: FixtureMomento[] = [
     titulo: '¿Dónde está este torii?',
     lugar: 'Fushimi Inari, Kioto',
     fecha: 'hace 2 h',
-    emoji: '⛩️',
-    tieneReto: true,
+    tipo: 'reto',
   },
   {
     id: 'm2',
-    titulo: 'El bosque de bambú',
-    lugar: 'Arashiyama, Kioto',
+    titulo: 'Atardecer sobre Tokio',
+    lugar: 'Asakusa, Tokio',
     fecha: 'hace 1 día',
-    emoji: '🎋',
-    tieneReto: true,
+    tipo: 'foto',
+    foto: fotoTokio,
   },
   {
     id: 'm3',
-    titulo: 'El mejor ramen del viaje',
-    lugar: 'Gion, Kioto',
+    titulo: 'El bosque de bambú',
+    lugar: 'Arashiyama, Kioto',
     fecha: 'hace 2 días',
-    emoji: '🍜',
-    tieneReto: false,
+    tipo: 'reto',
   },
   {
     id: 'm4',
-    titulo: 'Vista desde el Skytree',
-    lugar: 'Asakusa, Tokio',
+    titulo: 'El mejor ramen del viaje',
+    lugar: 'Gion, Kioto',
+    fecha: 'hace 3 días',
+    tipo: 'foto',
+    foto: fotoRoma,
+  },
+  {
+    id: 'm5',
+    titulo: 'Templos al amanecer',
+    lugar: 'Higashiyama, Kioto',
     fecha: 'hace 4 días',
-    emoji: '🗼',
-    tieneReto: false,
+    tipo: 'foto',
+    foto: fotoLisboa,
   },
 ]
 
 export interface FixtureJugador {
   nombre: string
-  emoji: string
+  /** Inicial para el avatar (sin emoji: círculo con inicial). */
+  inicial: string
   puntos: number
   distanciaKm: number
 }
 
 export const FIXTURE_MARCADOR: FixtureJugador[] = [
-  { nombre: 'Marta', emoji: '🌸', puntos: 4880, distanciaKm: 1.2 },
-  { nombre: 'Lewis', emoji: '🗺️', puntos: 4200, distanciaKm: 8.0 },
-  { nombre: 'Iker', emoji: '⚽', puntos: 3100, distanciaKm: 42.0 },
-  { nombre: 'Noa', emoji: '🌊', puntos: 2600, distanciaKm: 87.0 },
+  { nombre: 'Marta', inicial: 'M', puntos: 4880, distanciaKm: 1.2 },
+  { nombre: 'Lewis', inicial: 'L', puntos: 4200, distanciaKm: 8.0 },
+  { nombre: 'Iker', inicial: 'I', puntos: 3100, distanciaKm: 42.0 },
+  { nombre: 'Noa', inicial: 'N', puntos: 2600, distanciaKm: 87.0 },
 ]
 
 // Coordenadas ficticias para el stub del mapa (Fushimi Inari, Kioto).

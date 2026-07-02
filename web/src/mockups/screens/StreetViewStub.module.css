@@ -170,13 +170,12 @@
   box-shadow: var(--shadow-chrome);
 }
 
-/* Afordancia sutil de recentrar en mi ubicación (GPS), abajo a la derecha,
- * bien por encima de la hoja para que asome sobre el Street View (z-index para
- * quedar sobre los edificios y el velo del propio stub). */
+/* Afordancia de recentrar en mi ubicación (GPS): botón flotante arriba a la
+ * derecha, bajo la cabecera y el badge, con el icono custom en teal. */
 .gps {
   position: absolute;
-  bottom: calc(var(--sheet-peek, 240px) + var(--space-8));
-  right: var(--space-4);
+  top: calc(var(--space-8) + var(--space-7));
+  left: var(--space-4);
   z-index: 2; /* design-lint-allow: afordancia GPS sobre la escena del stub */
   width: var(--tap-target);
   height: var(--tap-target);
@@ -186,7 +185,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--font-size-lg);
+  color: var(--mk-primary);
   cursor: pointer;
   border: 1px solid var(--hairline);
 }

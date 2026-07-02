@@ -7,13 +7,13 @@
 import { AppHeader, Button } from '../../ui'
 import { ShellFeed } from '../shells/ShellFeed'
 import { MapStub } from './MapStub'
+import { IconConfeti, IconMedalla, IconPin, IconDiana } from '../icons/MockupIcons'
 import { FIXTURE_MARCADOR, FIXTURE_RESPUESTA } from './fixtures'
 import styles from './PantallaMarcador.module.css'
 
 // Fixture del resultado personal (Lewis = posición 2)
 const MI_RESULTADO = {
   nombre: 'Lewis',
-  emoji: '🗺️',
   puntos: 4200,
   distanciaKm: 8.0,
   posicion: 2,
@@ -40,7 +40,9 @@ export function PantallaMarcador() {
       {/* Mi resultado personal */}
       <div className={styles.resultadoCard}>
         <div className={styles.resultadoHeader}>
-          <div className={styles.resultadoEmoji}>🎉</div>
+          <div className={styles.resultadoEmoji}>
+            <IconConfeti size={40} />
+          </div>
           <div className={styles.resultadoNumeros}>
             <div className={styles.resultadoPuntos}>{MI_RESULTADO.puntos.toLocaleString()} pts</div>
             <div className={styles.resultadoDistancia}>
@@ -51,33 +53,39 @@ export function PantallaMarcador() {
 
         {/* Mapa con el tiro y la respuesta real */}
         <div className={styles.mapaResultado}>
-          <MapStub label={FIXTURE_RESPUESTA.label} pinEmoji="📍" />
-          {/* Línea del tiro (SVG superpuesto) */}
+          <MapStub label={FIXTURE_RESPUESTA.label} pin="none" />
+          {/* Línea del tiro (SVG superpuesto): respuesta real (teal) → tiro (ámbar) */}
           <svg
             className={styles.lineaTiro}
             viewBox="0 0 280 160"
             preserveAspectRatio="xMidYMid meet"
           >
-            {/* Respuesta real: pin verde */}
-            <circle cx="140" cy="80" r="7" fill="#3e7d5a" opacity="0.9" />
-            {/* Tiro del jugador: pin rojo */}
-            <circle cx="185" cy="55" r="7" fill="#b23a36" opacity="0.9" />
+            {/* Respuesta real: punto teal */}
+            <circle cx="140" cy="80" r="7" fill="var(--mk-primary)" />
+            {/* Tiro del jugador: punto ámbar */}
+            <circle cx="185" cy="55" r="7" fill="var(--mk-accent)" />
             {/* Línea entre ambos */}
             <line
               x1="140"
               y1="80"
               x2="185"
               y2="55"
-              stroke="#b23a36"
+              stroke="var(--mk-accent)"
               strokeWidth="2"
               strokeDasharray="6 4"
-              opacity="0.8"
             />
           </svg>
         </div>
 
-        <p className="t-caption" style={{ color: 'var(--color-text-muted)' }}>
-          📍 {FIXTURE_RESPUESTA.label} · 🎯 Tu tiro
+        <p className={styles.leyenda}>
+          <span className={styles.leyendaItem}>
+            <IconPin size={16} className={styles.leyendaPin} />
+            {FIXTURE_RESPUESTA.label}
+          </span>
+          <span className={styles.leyendaItem}>
+            <IconDiana size={16} className={styles.leyendaDiana} />
+            Tu tiro
+          </span>
         </p>
       </div>
 
@@ -86,12 +94,15 @@ export function PantallaMarcador() {
         <h2 className={['t-section', styles.seccionTitulo].join(' ')}>Clasificación</h2>
         {FIXTURE_MARCADOR.map((j, i) => {
           const esYo = j.nombre === MI_RESULTADO.nombre
+          const rank = i < 3 ? ((i + 1) as 1 | 2 | 3) : undefined
           return (
             <div key={j.nombre} className={[styles.fila, esYo ? styles.yo : ''].join(' ')}>
-              <span className={styles.filaPosicion}>
-                {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`}
+              <span
+                className={[styles.filaPosicion, rank ? styles[`medal${i + 1}`] : ''].join(' ')}
+              >
+                {rank ? <IconMedalla size={22} rank={rank} /> : `${i + 1}.`}
               </span>
-              <span className={styles.filaAvatar}>{j.emoji}</span>
+              <span className={styles.filaAvatar}>{j.inicial}</span>
               <div className={styles.filaInfo}>
                 <div className={styles.filaNombre}>
                   {j.nombre}

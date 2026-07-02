@@ -22,9 +22,10 @@
   gap: var(--space-3);
 }
 
+/* Icono de confeti (celebración) en ámbar de acento */
 .resultadoEmoji {
-  font-size: var(--font-size-2xl); /* aprox 44px vía token */
   flex-shrink: 0;
+  color: var(--mk-accent);
 }
 
 .resultadoNumeros {
@@ -63,6 +64,30 @@
   pointer-events: none;
 }
 
+/* Leyenda del mapa (respuesta real + tu tiro) con iconos custom */
+.leyenda {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.leyendaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  color: var(--color-text-muted);
+}
+
+.leyendaPin {
+  color: var(--mk-primary);
+}
+
+.leyendaDiana {
+  color: var(--mk-accent);
+}
+
 /* --- Clasificación final --- */
 .seccion {
   margin-bottom: var(--space-3);
@@ -93,18 +118,43 @@
 }
 
 .filaPosicion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: var(--font-sans);
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-md);
   color: var(--color-text-muted);
   width: 28px;
-  text-align: center;
   flex-shrink: 0;
 }
 
+.medal1 {
+  color: #d4a017; /* design-lint-allow: oro de medalla (semántica de podio) */
+}
+
+.medal2 {
+  color: #9aa4ab; /* design-lint-allow: plata de medalla */
+}
+
+.medal3 {
+  color: #b1703c; /* design-lint-allow: bronce de medalla */
+}
+
+/* Avatar = círculo con inicial (sin emoji) */
 .filaAvatar {
-  font-size: var(--font-size-lg); /* aprox 22px vía token */
   flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--mk-primary-tint);
+  color: var(--mk-primary-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
 }
 
 .filaInfo {
