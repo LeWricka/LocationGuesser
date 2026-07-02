@@ -42,6 +42,27 @@
   }
 }
 
+/* Acción primaria "abrir detalle": botón overlay transparente que cubre toda la
+ * tarjeta. Sibling del CTA "Adivina →" (no anidado) → sin nested-interactive.
+ * Va por encima del contenido decorativo (chip/badge/velo) para que tocar en
+ * cualquier punto abra el detalle; el CTA se coloca por encima de este. */
+.openButton {
+  position: absolute;
+  inset: 0;
+  /* design-lint-allow: capa local de la tarjeta (target de abrir sobre lo decorativo) */
+  z-index: 2;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: inherit;
+  cursor: pointer;
+}
+
+.openButton:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+}
+
 /* Foto real (recuerdo/reto con foto): llena la tarjeta sin distorsión. */
 .foto {
   display: block;
@@ -127,9 +148,9 @@
   /* design-lint-allow: velo de legibilidad sobre foto arbitraria */
   background: linear-gradient(
     to top,
-    rgba(18, 24, 32, 0.78) 0%, /* design-lint-allow: velo de legibilidad sobre foto arbitraria */
-    rgba(18, 24, 32, 0.2) 60%, /* design-lint-allow: velo de legibilidad sobre foto arbitraria */
-    transparent 100%
+    rgba(18, 24, 32, 0.78) 0%,
+    /* design-lint-allow: velo de legibilidad sobre foto arbitraria */ rgba(18, 24, 32, 0.2) 60%,
+    /* design-lint-allow: velo de legibilidad sobre foto arbitraria */ transparent 100%
   );
   pointer-events: none;
 }
@@ -184,8 +205,8 @@
   position: absolute;
   right: var(--space-3);
   bottom: var(--space-3);
-  /* design-lint-allow: capa local de la tarjeta (CTA sobre el overlay) */
-  z-index: 1;
+  /* design-lint-allow: capa local; por encima del botón-overlay de abrir (z-index 2) */
+  z-index: 3;
   pointer-events: auto;
 }
 

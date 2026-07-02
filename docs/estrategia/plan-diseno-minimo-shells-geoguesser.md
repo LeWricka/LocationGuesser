@@ -139,9 +139,12 @@ el mockup de crear:
 
 ## Decisiones de diseño confirmadas (2 jul, validadas en artefacto)
 
-- **Paleta = Teal viajero:** primario `#0EA5A4` · acento ámbar `#F4A259` · tinta `#0F2E2E` ·
-  apagado `#5B7A78` · superficie `#FFFFFF` · fondo `#F5F8F7` · línea `#E2ECEA`. (Sustituye el
-  azul pizarra + oro.)
+- **Paleta = Grafito + teal (neutra/editorial):** primario/CTA `#1F2A30` (grafito casi
+  negro) · acento `#0F766E` (teal profundo, SOLO en detalle/enlaces, no en rellenos grandes) ·
+  tinta `#1B2127` · apagado `#6B7480` · superficie `#FFFFFF` · fondo `#F4F5F6` · línea
+  `#E4E7EA`. Principio: **chrome neutro, las FOTOS ponen el color.** (Sustituye el azul
+  pizarra + oro. Se descartó Teal viajero por leer "infantil": dos colores saturados
+  compitiendo con las fotos.)
 - **Iconos = Custom de marca:** set propio con carácter (pin, globo, diana, trofeo, foto…),
   detalle en ámbar donde aporta. Nada de iconos de librería por defecto ni emoji en UI.
 - **Foto-first:** el Diario es de **imágenes grandes** (tarjeta con foto a ancho completo,

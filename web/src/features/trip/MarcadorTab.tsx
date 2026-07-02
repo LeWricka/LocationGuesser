@@ -53,6 +53,9 @@ export function MarcadorTab({ leaderboard, myUserId }: Props) {
               ]
                 .filter(Boolean)
                 .join(' ')}
+              // role="img": la posición se comunica como medalla/nº. Sin un rol
+              // que admita nombre, aria-label en un span es un atributo prohibido.
+              role="img"
               aria-label={`Posición ${rank}`}
             >
               {esPodio ? <IconMedalla size={22} rank={rank as 1 | 2 | 3} /> : rank}
@@ -74,6 +77,8 @@ export function MarcadorTab({ leaderboard, myUserId }: Props) {
               className={[styles.puntos, esPodio || esMio ? styles.destaca : '']
                 .filter(Boolean)
                 .join(' ')}
+              // role="img" para poder nombrar "N puntos" (aria-label prohibido en span genérico).
+              role="img"
               aria-label={`${entry.points.toLocaleString('es')} puntos`}
             >
               {entry.points.toLocaleString('es')}
