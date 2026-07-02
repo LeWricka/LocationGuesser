@@ -146,6 +146,25 @@ describe('pendingChallenges', () => {
     expect(pending.map((p) => p.challenge.id)).toEqual(['c-soon', 'c-later'])
     expect(pending[0].groupName).toBe('A')
   })
+
+  test('excluye los retos creados por el propio usuario (#509)', async () => {
+    const soon = new Date(Date.now() + 60_000).toISOString()
+    results['group_members'] = {
+      data: [{ group_id: 'g1', role: 'owner', groups: { id: 'g1', name: 'A', created_by: 'u1' } }],
+      error: null,
+    }
+    results['challenges'] = {
+      data: [
+        { id: 'c-mine', group_id: 'g1', deadline_at: soon, created_by: 'u1' },
+        { id: 'c-otros', group_id: 'g1', deadline_at: soon, created_by: 'u2' },
+      ],
+      error: null,
+    }
+    results['votes'] = { data: [], error: null }
+
+    const pending = await pendingChallenges('u1')
+    expect(pending.map((p) => p.challenge.id)).toEqual(['c-otros'])
+  })
 })
 
 describe('getGroupMembers', () => {

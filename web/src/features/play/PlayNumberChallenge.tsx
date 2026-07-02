@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ArrowRight, Hash, Lock, RotateCcw, TimerOff } from 'lucide-react'
 import { useVisualViewport } from '../../lib/useVisualViewport'
+import { marcadorGroupHash } from '../../lib/route'
 import { CountdownOverlay } from './CountdownOverlay'
 import { RevealBurst } from './RevealBurst'
 import { NumberPad } from './NumberPad'
@@ -49,7 +50,10 @@ interface Props {
   preloaded?: ChallengeForPlay
 }
 
-type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed'
+// `own` es la guarda defensiva (#509): el creador del reto no juega el suyo
+// propio, ni aunque llegue aquí directamente (sin pasar por el guard de
+// PlayChallenge, que ya corta antes de delegar).
+type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own'
 
 const startKey = (challengeId: string) => `lg.play.startAt.${challengeId}`
 
@@ -92,6 +96,9 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
   const [saving, setSaving] = useState(false)
   const [votes, setVotes] = useState<VoteWithName[]>([])
   const [rank, setRank] = useState<{ position: number; total: number } | null>(null)
+  // Recuento de votos, solo para la guarda "es tuyo" (#509). Null hasta resolver
+  // o si el reto no es propio.
+  const [ownVoteCount, setOwnVoteCount] = useState<number | null>(null)
 
   const toast = useToast()
   const { user } = useSession()
@@ -205,6 +212,20 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
         const c = preloaded ?? (await getChallenge(challengeId))
         if (cancelled) return
         setChallenge(c)
+
+        // Guarda defensiva (#509): el creador no juega su propio reto. En el flujo
+        // real, PlayChallenge ya corta antes de delegar aquí; esto cubre el caso de
+        // llegar a este componente directamente (sin ese guard por delante).
+        if (user && c.created_by === user.id) {
+          try {
+            const vs = await getVotesWithNames(c.id)
+            if (!cancelled) setOwnVoteCount(vs.length)
+          } catch {
+            // Sin recuento: el estado se muestra igual, sin la cifra.
+          }
+          if (!cancelled) setPhase('own')
+          return
+        }
 
         const existing = user ? await getExistingVote(challengeId, user.id) : null
         if (cancelled) return
@@ -355,6 +376,48 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
             <Stack gap={2}>
               <strong>No se pudo cargar el reto.</strong>
               <span className={styles.status}>{loadError}</span>
+            </Stack>
+          </Card>
+        </Stack>
+      </main>
+    )
+  }
+
+  // Guarda "es tuyo" (#509): el creador no juega su propio reto.
+  if (phase === 'own' && challenge) {
+    const backLabelOwn = groupId ? 'Volver al viaje' : 'Inicio'
+    return (
+      <main className="lg-page">
+        <Stack gap={4}>
+          <BackHomeButton onClick={goBack} label={backLabelOwn} />
+          <Card padding="md" raised>
+            <Stack gap={3} align="center">
+              <Icon icon={Hash} size={40} />
+              <strong>Este reto es tuyo</strong>
+              <p className={styles.status}>
+                Lo creaste tú: ya conoces la respuesta, así que no puedes jugarlo.
+              </p>
+              {ownVoteCount != null && (
+                <p className={styles.status}>
+                  {ownVoteCount === 0
+                    ? 'Nadie ha votado todavía.'
+                    : `${ownVoteCount} ${ownVoteCount === 1 ? 'persona ha votado' : 'personas han votado'}.`}
+                </p>
+              )}
+              {groupId && (
+                <Button
+                  fullWidth
+                  size="lg"
+                  onClick={() => {
+                    location.hash = marcadorGroupHash(groupId)
+                  }}
+                >
+                  Ver marcador
+                </Button>
+              )}
+              <Button variant="secondary" fullWidth onClick={goBack}>
+                Volver al viaje
+              </Button>
             </Stack>
           </Card>
         </Stack>
@@ -632,7 +695,9 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
                 variant="secondary"
                 size="sm"
                 onClick={() => {
-                  location.hash = `#g=${groupId}`
+                  // Al Marcador (no al Diario): venimos de jugar, lo esperable es
+                  // ver la clasificación (#509).
+                  location.hash = marcadorGroupHash(groupId)
                 }}
               >
                 <span className={styles.inlineIcon}>

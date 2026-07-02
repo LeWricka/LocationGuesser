@@ -108,6 +108,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  window.location.hash = ''
 })
 
 describe('PlayNumberChallenge', () => {
@@ -159,5 +160,46 @@ describe('PlayNumberChallenge', () => {
     renderPlay()
     expect(await screen.findByText('La respuesta era')).toBeInTheDocument()
     expect(screen.getByText('84 €')).toBeInTheDocument()
+  })
+})
+
+describe('PlayNumberChallenge — guarda "es tuyo" (#509)', () => {
+  test('el creador ve el estado "Este reto es tuyo" en vez del juego', async () => {
+    getVotesWithNamesMock.mockResolvedValue([{ id: 'v1' }])
+    render(
+      <SessionContext.Provider value={session}>
+        <ToastProvider>
+          <PlayNumberChallenge
+            challengeId="n1"
+            groupId="g1"
+            preloaded={{ ...numberChallenge, created_by: 'u-me' }}
+          />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+
+    expect(await screen.findByText('Este reto es tuyo')).toBeInTheDocument()
+    expect(screen.getByText('1 persona ha votado.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Empezar' })).not.toBeInTheDocument()
+    expect(getExistingVoteMock).not.toHaveBeenCalled()
+  })
+
+  test('"Ver marcador" navega a la pestaña Marcador del viaje (no al Diario)', async () => {
+    getVotesWithNamesMock.mockResolvedValue([])
+    const u = userEvent.setup()
+    render(
+      <SessionContext.Provider value={session}>
+        <ToastProvider>
+          <PlayNumberChallenge
+            challengeId="n1"
+            groupId="g1"
+            preloaded={{ ...numberChallenge, created_by: 'u-me' }}
+          />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+
+    await u.click(await screen.findByRole('button', { name: 'Ver marcador' }))
+    expect(window.location.hash).toBe('#g=g1&v=marcador')
   })
 })
