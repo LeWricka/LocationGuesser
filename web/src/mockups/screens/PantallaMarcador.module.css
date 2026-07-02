@@ -1,0 +1,134 @@
+/*
+ * PantallaMarcador — pantalla 5/5 (mockup). ShellFeed: resultado + podio.
+ * Tras clavar el tiro: distancia + puntos, ubicación real en el mapa, podio.
+ */
+
+/* Encabezado del resultado personal */
+.resultadoCard {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline-soft);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.resultadoHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.resultadoEmoji {
+  font-size: var(--font-size-2xl); /* aprox 44px vía token */
+  flex-shrink: 0;
+}
+
+.resultadoNumeros {
+  flex: 1;
+}
+
+.resultadoPuntos {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-black);
+  color: var(--accent);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tighter);
+}
+
+.resultadoDistancia {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  margin-top: var(--space-1);
+}
+
+/* Mapa con la línea de tiro stub */
+.mapaResultado {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  height: 160px;
+  position: relative;
+  border: 1px solid var(--hairline-soft);
+}
+
+/* Línea del tiro al target (SVG stub) */
+.lineaTiro {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* --- Clasificación final --- */
+.seccion {
+  margin-bottom: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.seccionTitulo {
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+
+/* Fila de jugador */
+.fila {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline-soft);
+}
+
+.fila.yo {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.filaPosicion {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  width: 28px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.filaAvatar {
+  font-size: var(--font-size-lg); /* aprox 22px vía token */
+  flex-shrink: 0;
+}
+
+.filaInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.filaNombre {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.filaDistancia {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+}
+
+.filaPuntos {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  color: var(--accent);
+  flex-shrink: 0;
+}

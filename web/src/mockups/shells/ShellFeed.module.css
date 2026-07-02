@@ -1,0 +1,32 @@
+/*
+ * ShellFeed — shell para listas y feeds con scroll.
+ *
+ * Estructura:
+ *   .root
+ *     .header   ← cabecera fija (AppHeader + tabs opcionales)
+ *     .feed     ← lista con scroll propio
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.header {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hairline-soft);
+}
+
+.feed {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-4) var(--space-5);
+  padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+}

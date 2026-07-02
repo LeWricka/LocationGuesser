@@ -1,0 +1,58 @@
+/*
+ * PantallaJugar — pantalla 4/5 (mockup). ShellInmersivo: SV a sangre + mini-mapa.
+ */
+
+/* Mini-mapa expandible en esquina inferior derecha */
+.miniMapa {
+  position: absolute;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  width: 140px;
+  height: 100px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  border: 2px solid var(--surface);
+  z-index: calc(var(--z-sheet) - 1);
+  cursor: pointer;
+}
+
+/* Cuenta atrás stub en la cabecera (pastilla sobre el SV) */
+.cuentaAtras {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--scene-surface);
+  border: 1px solid var(--scene-hairline);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  backdrop-filter: blur(8px);
+}
+
+.cuentaAtrasNum {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--scene-ink);
+}
+
+.cuentaAtrasLabel {
+  font-size: var(--font-size-sm);
+  color: var(--scene-ink-soft);
+  font-family: var(--font-sans);
+}
+
+/* Instrucción en la hoja */
+.instruccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Pista de minimapa expandir */
+.pista {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  text-align: center;
+}

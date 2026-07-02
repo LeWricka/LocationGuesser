@@ -1,0 +1,114 @@
+/*
+ * ShellInmersivo — shell de pantalla con protagonista visual a sangre.
+ *
+ * Reglas duras (codificadas, no "de palabra"):
+ *  - SIEMPRE hay un protagonista visual (mapa / SV / foto) que ocupa el backdrop.
+ *  - El caption sobre el backdrop y el título de la hoja NUNCA coexisten.
+ *  - PROHIBIDO backdrop sin protagonista (vacío negro = bug).
+ *
+ * Estructura:
+ *   .root
+ *     .backdrop      ← protagonista a sangre (ocupa toda la pantalla)
+ *     .header        ← cabecera flotante (chrome sobre foto)
+ *     .caption       ← texto editorial sobre el backdrop (solo si !sheetTitle)
+ *     .sheet         ← hoja blanca que asoma desde abajo
+ *       .sheetPull   ← tirador
+ *       .sheetInner  ← contenido con scroll propio
+ *     .cta           ← botón CTA fijo al fondo (fuera de la hoja)
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--scene-bg); /* solo visible en carga; el protagonista lo tapa */
+}
+
+/* Protagonista visual: rellena TODA la pantalla a sangre. */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-base);
+}
+
+/* Cabecera flotante sobre el protagonista. */
+.header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-header);
+  /* Sin fondo propio: la AppHeader variant="floating" trae el velo. */
+}
+
+/* Caption editorial sobre el backdrop: velo semitransparente al pie del protagonista
+ * para legibilidad. Solo se pinta cuando la hoja NO tiene título propio (regla dura:
+ * caption y título de hoja nunca coexisten). */
+.caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  /* La altura de la hoja la determina --sheet-peek; el caption vive justo por encima. */
+  bottom: var(--sheet-peek, 240px);
+  z-index: calc(var(--z-header) + 1);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  /* Velo de legibilidad: funde la parte inferior del protagonista con la hoja. */
+  background: linear-gradient(to top, var(--scene-veil) 0%, transparent 100%);
+  color: var(--scene-ink);
+  pointer-events: none;
+}
+
+/* Hoja blanca que asoma desde abajo con altura fija (peek). Al expandirse, empuja
+ * el protagonista hacia arriba (transform). La hoja NO puede quedar en negro. */
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-sheet);
+  background: var(--surface);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-sheet);
+  /* Altura mínima visible (peek) + posibilidad de crecer hasta max. */
+  min-height: var(--sheet-peek, 240px);
+  max-height: var(--sheet-max-height);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Tirador: zona táctil de 44px con la barra visual centrada. */
+.sheetPull {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 28px;
+  padding-top: var(--space-2);
+  cursor: grab;
+}
+
+.sheetPullBar {
+  width: var(--grab-bar-width);
+  height: var(--grab-bar-height);
+  background: var(--hairline-strong);
+  border-radius: var(--radius-full);
+}
+
+/* Contenido interior de la hoja: scroll propio, padding horizontal estándar. */
+.sheetInner {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-5) var(--space-7);
+  padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
+}
+
+/* CTA fijo al fondo, separado de la hoja para que siempre sea visible. */
+.cta {
+  position: absolute;
+  left: var(--space-5);
+  right: var(--space-5);
+  bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+  z-index: calc(var(--z-sheet) + 1);
+}

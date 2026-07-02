@@ -1,0 +1,162 @@
+/*
+ * MockupIndex — índice de mockups navegables.
+ * Permite navegar prev/next entre pantallas y ver la lista completa.
+ */
+
+.root {
+  position: fixed;
+  inset: 0;
+  background: var(--scene-bg);
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-sans);
+  color: var(--scene-ink);
+  z-index: var(--z-toast); /* design-lint-allow: visor de herramienta encima de todo */
+}
+
+/* Barra de navegación superior */
+.nav {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--scene-surface); /* translúcido sobre escena */
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--scene-hairline);
+}
+
+.navTitle {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--scene-ink);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navBtn {
+  background: var(--scene-surface);
+  border: 1px solid var(--scene-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--scene-ink);
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  min-height: var(--tap-target-sm);
+  min-width: var(--tap-target-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navBtn:hover {
+  background: var(--scene-hairline);
+}
+
+.navBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.counter {
+  font-size: var(--font-size-xs);
+  color: var(--scene-ink-soft);
+  white-space: nowrap;
+}
+
+/* Contenido: la pantalla mockup ocupa el resto */
+.screen {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Panel de índice (lista de pantallas) */
+.indexPanel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--scene-bg);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--scene-hairline);
+  padding: var(--space-4);
+  z-index: var(--z-toast); /* design-lint-allow: visor de herramienta encima de todo */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 55dvh;
+  overflow-y: auto;
+}
+
+.indexTitle {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--scene-ink-soft);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  margin-bottom: var(--space-1);
+}
+
+.indexItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  border: none;
+  background: var(--scene-surface);
+  color: var(--scene-ink);
+  text-align: left;
+  width: 100%;
+}
+
+.indexItem:hover {
+  background: var(--scene-hairline);
+}
+
+.indexItem.activo {
+  background: var(--color-accent-glow-soft);
+  border: 1px solid var(--color-accent-soft);
+}
+
+.indexItemNum {
+  font-size: var(--font-size-sm);
+  color: var(--scene-ink-soft);
+  width: 20px;
+  flex-shrink: 0;
+}
+
+.indexItemNombre {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.indexItemShell {
+  font-size: var(--font-size-xs);
+  color: var(--scene-ink-soft);
+  margin-top: 2px;
+}
+
+/* Toggle lista */
+.menuBtn {
+  background: var(--scene-surface);
+  border: 1px solid var(--scene-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--scene-ink);
+  font-size: var(--font-size-sm);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+  min-height: var(--tap-target-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menuBtn:hover {
+  background: var(--scene-hairline);
+}

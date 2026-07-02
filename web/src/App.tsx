@@ -14,6 +14,10 @@
 //       #perfil → ProfileEditScreen
 //       #admin  → AdminPage (SOLO admin; un no-admin cae a la home)
 //       raíz    → HomePage
+//
+// MOCKUPS: si el hash inicial es exactamente `#mockups`, la app monta el visor de
+// mockups del camino feliz (web/src/mockups/) y NO arranca el flujo de producción.
+// El chunk se carga solo cuando se navega a `#mockups` (lazy import).
 
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Settings } from 'lucide-react'
@@ -62,7 +66,37 @@ const HomePage = lazy(() =>
 )
 const AdminPage = lazy(() => import('./features/admin').then((m) => ({ default: m.AdminPage })))
 
+// Mockups del camino feliz: lazy para no impactar el bundle de producción.
+// Solo se descarga cuando el hash es `#mockups`.
+const MockupIndex = lazy(() =>
+  import('./mockups/MockupIndex').then((m) => ({ default: m.MockupIndex })),
+)
+
+// Detecta si el hash inicial (o actual) es exactamente `#mockups`.
+function isMockupsHash(hash: string = window.location.hash): boolean {
+  return (hash.startsWith('#') ? hash.slice(1) : hash).trim() === 'mockups'
+}
+
 function App() {
+  // Si el hash es `#mockups`, montamos el visor de mockups en vez de la app real.
+  // Chequeamos con un estado para reaccionar a hashchange (en caso de navegar a
+  // `#mockups` desde la app, aunque en la práctica el usuario suele llegar por URL).
+  const [mockupsActive, setMockupsActive] = useState(isMockupsHash)
+
+  useEffect(() => {
+    const onHash = () => setMockupsActive(isMockupsHash())
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  if (mockupsActive) {
+    return (
+      <Suspense fallback={<BootScreen />}>
+        <MockupIndex />
+      </Suspense>
+    )
+  }
+
   return (
     <AuthProvider>
       {/* Suspense de raíz: mientras un chunk de ruta (lazy) se descarga, pinta el

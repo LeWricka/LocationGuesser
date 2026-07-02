@@ -1,0 +1,47 @@
+/*
+ * ShellUtilitario — shell para pantallas de formulario sin protagonista visual.
+ *
+ * Reglas duras:
+ *  - SIN backdrop (ningún nodo oscuro de fondo).
+ *  - SIN caption flotante.
+ *  - SIN vacío negro: el fondo es siempre --paper (hoja limpia).
+ *  - Cabecera (atrás + chip de título) + contenido con scroll + CTA fijo abajo.
+ *
+ * Estructura:
+ *   .root
+ *     .header     ← cabecera con atrás + título
+ *     .body       ← contenido con scroll propio
+ *     .footer     ← CTA fijo anclado al fondo
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper); /* hoja limpia; nunca oscuro */
+  overflow: hidden;
+}
+
+/* Cabecera: AppHeader sobre papel (variant="plain"). */
+.header {
+  flex-shrink: 0;
+}
+
+/* Cuerpo: scroll propio, padding lateral estándar. */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-5) var(--space-5) 0;
+}
+
+/* Pie: CTA fijo con separador hairline y respeto al safe-area. */
+.footer {
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-5);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--hairline-soft);
+  background: var(--surface);
+}

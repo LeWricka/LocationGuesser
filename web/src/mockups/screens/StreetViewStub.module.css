@@ -1,0 +1,140 @@
+/*
+ * StreetViewStub — placeholder de Street View para mockups (sin API key).
+ * Simula la perspectiva de una calle japonesa con gradientes y elementos SVG.
+ * Los colores aquí son colores de escena (edificios, asfalto, cielo):
+ * no existen como tokens porque son ilustrativos del contenido de terceros (Google Maps).
+ */
+
+.root {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  /* design-lint-allow: gradiente de cielo/calle del stub (colores de escena fotorrealista) */
+  background: linear-gradient(
+    to bottom,
+    #87c1e8 0%,
+    #a8d4f0 35%,
+    #d4e8c4 40%,
+    #c8ddb8 50%,
+    #b8c8a0 65%,
+    #a0ae88 80%,
+    #8a9870 100%
+  );
+}
+
+/* Edificio izquierdo */
+.buildingLeft {
+  position: absolute;
+  left: 0;
+  bottom: 30%;
+  width: 28%;
+  top: 20%;
+  background: linear-gradient(135deg, #e8e0d4 0%, #cec6b8 100%); /* design-lint-allow: color de edificio stub */
+  border-right: 2px solid var(--hairline-strong);
+}
+
+.buildingLeft::after {
+  content: '';
+  position: absolute;
+  inset: 8px 12px;
+  background-image: repeating-linear-gradient( /* design-lint-allow: ventanas del edificio stub */
+    to bottom,
+    transparent 0,
+    transparent 22px,
+    rgba(0, 0, 0, 0.06) 22px,
+    rgba(0, 0, 0, 0.06) 24px
+  );
+}
+
+/* Edificio derecho */
+.buildingRight {
+  position: absolute;
+  right: 0;
+  bottom: 30%;
+  width: 32%;
+  top: 15%;
+  background: linear-gradient(225deg, #d8d0c4 0%, #beb6a8 100%); /* design-lint-allow: color de edificio stub */
+  border-left: 2px solid var(--hairline-strong);
+}
+
+.buildingRight::after {
+  content: '';
+  position: absolute;
+  inset: 8px 12px;
+  background-image: repeating-linear-gradient( /* design-lint-allow: ventanas del edificio stub */
+    to bottom,
+    transparent 0,
+    transparent 18px,
+    rgba(0, 0, 0, 0.06) 18px,
+    rgba(0, 0, 0, 0.06) 20px
+  );
+}
+
+/* Calle en perspectiva */
+.road {
+  position: absolute;
+  bottom: 0;
+  left: 28%;
+  right: 32%;
+  height: 45%;
+  background: linear-gradient(to top, #888878 0%, #a8a898 60%, #bcbcac 100%); /* design-lint-allow: color de asfalto stub */
+}
+
+/* Líneas de la calle */
+.road::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 4px;
+  top: 0;
+  transform: translateX(-50%);
+  background: repeating-linear-gradient( /* design-lint-allow: líneas de calle stub */
+    to top,
+    rgba(255, 255, 255, 0.5) 0,
+    rgba(255, 255, 255, 0.5) 24px,
+    transparent 24px,
+    transparent 36px
+  );
+}
+
+/* Punto de fuga (vanishing point) */
+.vanish {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--scene-surface);
+}
+
+/* Velo inferior para fundir con la hoja */
+.veil {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35%;
+  background: linear-gradient(to top, var(--scene-veil), transparent);
+}
+
+/* Badge "Street View" tipo marca de agua */
+.badge {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: var(--scene-surface);
+  border: 1px solid var(--scene-hairline);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-xs);
+  padding: 2px var(--space-2);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  color: var(--scene-ink);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}

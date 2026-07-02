@@ -1,0 +1,76 @@
+/*
+ * PantallaCrearReto — pantalla 3/5 (mockup). Flujo de crear "¿Dónde?" GeoGuessr puro.
+ * Dos estados: (a) Ubicación y (b) Confirmar Street View.
+ */
+
+/* Selector de estado (herramienta de navegación del mockup) */
+.selectorEstado {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.estadoBtn {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  text-align: center;
+}
+
+.estadoBtn.activo {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Instrucción de la hoja (estado a: Ubicación) */
+.instruccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* Estado (b): confirmación del Street View */
+.confirmacion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.nota {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--accent-tint);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-accent-glow-soft);
+}
+
+.notaEmoji {
+  font-size: var(--font-size-xl); /* aprox 32px vía token */
+  flex-shrink: 0;
+}
+
+/* Estado "sin cobertura de SV" */
+.avisoSinCobertura {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-warning-soft);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline-strong);
+}
+
+.avisoIcon {
+  font-size: var(--font-size-xl); /* aprox 32px vía token */
+}

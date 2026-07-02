@@ -17,6 +17,8 @@ dist/
 
 # Capturas de la galería visual (PNGs generados por `npm run gallery:shots`)
 web/gallery-shots/
+# Capturas de los mockups del camino feliz (PNGs generados por Playwright)
+web/mockup-shots/
 # Artefactos de Playwright
 web/test-results/
 web/playwright-report/

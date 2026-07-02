@@ -1,0 +1,91 @@
+/*
+ * MapStub — placeholder de mapa para mockups (sin red, sin API key).
+ * Simula visualmente un mapa con fondo verde-azulado y cuadrícula de calles.
+ * Los colores aquí son colores literales del mapa (verde tierra, azul agua):
+ * no existen como tokens porque son colores de contenido de terceros (Leaflet/OSM).
+ */
+
+.root {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #e8f0e0; /* design-lint-allow: color de mapa (verde OSM stub) */
+  overflow: hidden;
+}
+
+/* Cuadrícula que imita calles */
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image: /* design-lint-allow: colores de cartografía OSM stub */
+    linear-gradient(rgba(180, 200, 170, 0.6) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180, 200, 170, 0.6) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* "Calles" más anchas */
+.roads {
+  position: absolute;
+  inset: 0;
+  background-image: /* design-lint-allow: colores de calles OSM stub */
+    linear-gradient(rgba(255, 255, 255, 0.7) 2px, transparent 2px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.7) 2px, transparent 2px);
+  background-size: 144px 144px;
+}
+
+/* Zona de agua (río stub) */
+.water {
+  position: absolute;
+  left: 15%;
+  right: 55%;
+  top: 30%;
+  bottom: 20%;
+  background: rgba(100, 170, 220, 0.4); /* design-lint-allow: color de agua OSM stub */
+  border-radius: var(--radius-md);
+}
+
+/* Pin central */
+.pin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  font-size: var(--font-size-2xl); /* aprox 28px vía token */
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px var(--photo-text-shadow));
+}
+
+/* Etiqueta de lugar (chip sobre el mapa) */
+.label {
+  position: absolute;
+  top: var(--space-4);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--chrome-bg);
+  backdrop-filter: var(--chrome-blur);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  white-space: nowrap;
+  box-shadow: var(--shadow-chrome);
+}
+
+/* Botón GPS bottom-right */
+.gps {
+  position: absolute;
+  bottom: var(--space-4);
+  right: var(--space-4);
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-size-lg); /* aprox 22px vía token */
+  cursor: pointer;
+  border: 1px solid var(--hairline);
+}

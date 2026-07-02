@@ -1,0 +1,188 @@
+/*
+ * PantallaVerViaje — pantalla 2/5 (mockup). ShellInmersivo con globo/mapa.
+ */
+
+/* Globo stub: placeholder del mapa del viaje (globo con ruta dorada) */
+.globo {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  /* design-lint-allow: gradiente de globo terráqueo (azul océano, colores de cartografía) */
+  background: radial-gradient(ellipse at 35% 40%, #3a7bd5 0%, #1a4a8a 45%, #0d2e5e 100%);
+  overflow: hidden;
+}
+
+/* Continente stub (masa terrestre en verde) */
+.tierra {
+  position: absolute;
+  top: 18%;
+  left: 8%;
+  right: 10%;
+  bottom: 30%;
+  /* design-lint-allow: color de continente (verde tierra, cartografía) */
+  background: radial-gradient(ellipse at 40% 45%, #5aad6b 0%, #3d8a50 55%, #2a6338 100%);
+  border-radius: 42% 58% 36% 64% / 55% 45% 55% 45%;
+}
+
+/* Japón (pequeño punto destacado) */
+.japon {
+  position: absolute;
+  top: 32%;
+  right: 22%;
+  width: 18px;
+  height: 24px;
+  background: var(--route-gold); /* reutiliza el token de ruta del viaje */
+  border-radius: 50% 55% 42% 60% / 52% 45% 55% 48%;
+  box-shadow: 0 0 0 3px var(--route-gold-soft);
+}
+
+/* Ruta dorada stub */
+.ruta {
+  position: absolute;
+  top: 38%;
+  right: 22%;
+  width: 2px;
+  height: 20%;
+  background: linear-gradient(to bottom, var(--route-gold), var(--route-gold-soft));
+}
+
+/* Velo inferior para fundir con la hoja */
+.velo {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: var(--map-bottom-scrim);
+}
+
+/* Nombre del viaje sobre el globo (caption editorial) */
+.captionInner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* --- Diario --- */
+.diario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Tarjeta de momento del diario */
+.momento {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline-soft);
+  box-shadow: var(--shadow-xs);
+}
+
+.momentoEmoji {
+  font-size: var(--font-size-2xl); /* aprox 32px vía token */
+  line-height: 1;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent-tint);
+  border-radius: var(--radius-sm);
+}
+
+.momentoInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.momentoTitulo {
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.momentoMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.retoBadge {
+  display: inline-block;
+  padding: 1px var(--space-2);
+  background: var(--accent-tint);
+  color: var(--accent);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* --- Marcador --- */
+.marcador {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.fila {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline-soft);
+}
+
+.filaPosicion {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.filaPosicion.top {
+  color: var(--medal-gold);
+}
+
+.filaAvatar {
+  font-size: var(--font-size-lg); /* aprox 22px vía token */
+  flex-shrink: 0;
+}
+
+.filaInfo {
+  flex: 1;
+}
+
+.filaNombre {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.filaDistancia {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+}
+
+.filaPuntos {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-md);
+  color: var(--accent);
+  flex-shrink: 0;
+}
