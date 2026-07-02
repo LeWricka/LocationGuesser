@@ -21,7 +21,62 @@
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
 
-/* ============ MAPA SATÉLITE A SANGRE (protagonista) ============== */
+/* ============ MAPA SATÉLITE (protagonista o recogido) ============== */
+/* Marco A SANGRE (etapa de lugar): el mapa ocupa todo el fondo. */
+.mapFull {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* Marco RECOGIDO (etapas foto/detalles/resumen): el mapa deja de dominar y pasa a
+   una tarjeta-preview compacta arriba, con esquinas y hairline (lenguaje Atelier).
+   La hoja crece por debajo y manda. Transición suave entre ambos modos. */
+.mapCard {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  left: var(--space-4, 16px);
+  right: var(--space-4, 16px);
+  height: 132px;
+  z-index: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--float-line);
+  box-shadow: var(--shadow-chrome);
+}
+/* En modo recogido el mapa es una VISTA (no se marca aquí): sin cursor de mira y
+   sin capturar toques, para que quede claro que el pin se ajusta en la etapa lugar. */
+.mapCard .map {
+  cursor: default;
+  pointer-events: none;
+}
+/* Etiqueta "Oculto" en la esquina de la tarjeta-preview: recuerda que el sitio no se
+   verá, sin tapar el pin (que vive en el centro de la tarjeta). */
+.mapCardTag {
+  position: absolute;
+  z-index: 1; /* design-lint-allow: apilado local dentro de la tarjeta (contexto propio), no un piso global */
+  top: var(--space-2, 8px);
+  left: var(--space-2, 8px);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--float-line);
+  background: var(--float-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.mapCardTag svg {
+  width: 12px;
+  height: 12px;
+}
+
 .map {
   position: absolute;
   inset: 0;
@@ -153,12 +208,14 @@
   text-shadow: 0 1px 8px rgba(11, 16, 22, 0.7);
 }
 
-/* chip "tu sitio quedará oculto" al marcar */
+/* Chip "tu sitio quedará oculto" al marcar: en una FRANJA ARRIBA, justo bajo la
+   cabecera flotante. NO en el centro del mapa — ahí vive el pin (donde vuela el
+   flyTo), y taparlo impedía verlo y ajustarlo con precisión (#455-E). */
 .coordChip {
   position: absolute;
   z-index: 4;
   left: 50%;
-  top: 18%;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
   transform: translateX(-50%);
   display: inline-flex;
   align-items: center;

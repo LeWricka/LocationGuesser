@@ -100,10 +100,12 @@ const DEFAULT_PRECISION_INDEX = 0 // mundo
 // Etapas de la hoja: 0=lugar (mapa + Street View) · 1=foto · 2=detalles · 3=resumen.
 type Stage = 0 | 1 | 2 | 3
 const TOTAL_STAGES = 4
-// Alturas (px) de la hoja por etapa: baja al marcar (hoja mínima sobre el mapa) y
-// crece con el contenido. La etapa de lugar crece cuando ya hay punto (aparece el
-// Street View junto a la selección) y más aún con la previa de SV montada.
-const STAGE_HEIGHTS: Record<Stage, number> = { 0: 140, 1: 360, 2: 430, 3: 380 }
+// Alturas (px) de la hoja por etapa. En la etapa de LUGAR (0) la hoja es baja para
+// dejar el mapa a sangre como protagonista; crece al haber punto (aparece el Street
+// View) y aún más con la previa de SV. En las demás etapas el mapa se RECOGE a una
+// tarjeta-preview compacta arriba (ya no es fondo a sangre), así que la hoja sube y
+// ocupa casi toda la pantalla, con el contenido de cada paso.
+const STAGE_HEIGHTS: Record<Stage, number> = { 0: 140, 1: 560, 2: 620, 3: 580 }
 const STAGE0_WITH_POINT = 300
 const STAGE0_WITH_PANO = 520
 
@@ -471,24 +473,42 @@ export function CreateChallengeImmersive({
     )
   }
 
-  return (
-    <div className={styles.root}>
-      {/* MAPA SATÉLITE A SANGRE: el protagonista. */}
-      <ImmersiveMap
-        value={point}
-        flyTo={flyTo}
-        center={SPAIN}
-        zoom={5}
-        onPick={pickPoint}
-        onInteract={() => setMapInteracted(true)}
-      />
+  // El mapa es PROTAGONISTA (a sangre) solo en la etapa de lugar (0), que es donde se
+  // coloca/ajusta el pin. En el resto de etapas (foto, detalles, resumen) se RECOGE a
+  // una tarjeta-preview compacta arriba: deja de dominar y la hoja pasa a mandar. Así
+  // el mapa full-bleed no acompaña a pasos que no van del mapa (#455 dir. de diseño).
+  const mapRecessed = stage !== 0
 
-      {/* Viñeta para legibilidad del chrome claro sobre el satélite. */}
-      <div className={styles.vignette} aria-hidden />
+  return (
+    <div className={`${styles.root} ${mapRecessed ? styles.mapRecessedRoot : ''}`}>
+      {/* MAPA SATÉLITE: protagonista a sangre en la etapa de lugar; recogido a una
+          tarjeta-preview compacta (esquinas + hairline) en las demás etapas. Una sola
+          instancia de Leaflet en ambos modos (solo cambia el marco por CSS). */}
+      <div className={mapRecessed ? styles.mapCard : styles.mapFull}>
+        <ImmersiveMap
+          value={point}
+          flyTo={flyTo}
+          center={SPAIN}
+          zoom={5}
+          onPick={pickPoint}
+          onInteract={() => setMapInteracted(true)}
+        />
+        {/* Etiqueta compacta sobre la tarjeta-preview (etapas recogidas): recuerda que
+            el sitio queda oculto sin tapar el pin (va en una esquina, no al centro). */}
+        {mapRecessed && point != null && (
+          <span className={styles.mapCardTag}>
+            <EyeOffMark />
+            Oculto
+          </span>
+        )}
+      </div>
+
+      {/* Viñeta para legibilidad del chrome claro sobre el satélite (solo a sangre). */}
+      {!mapRecessed && <div className={styles.vignette} aria-hidden />}
 
       {/* Guía "toca el mapa" antes de marcar. Desaparece al colocar el punto O al
           empezar a explorar (zoom/arrastre): no es un pin, es una ayuda (#388). */}
-      {point == null && !mapInteracted && (
+      {!mapRecessed && point == null && !mapInteracted && (
         <div className={styles.tapHint} aria-hidden>
           <span className={styles.tapRing}>
             <TargetIcon size={28} />
@@ -497,8 +517,10 @@ export function CreateChallengeImmersive({
         </div>
       )}
 
-      {/* Chip "tu sitio quedará oculto" cuando ya hay punto. */}
-      {point != null && (
+      {/* Chip "tu sitio quedará oculto" en una franja ARRIBA, fuera del centro del
+          mapa: el pin vive en el centro (donde vuela el flyTo), así que el chip nunca
+          lo tapa y el pin se puede ajustar con precisión (#455-E). Solo a sangre. */}
+      {!mapRecessed && point != null && (
         <div className={styles.coordChip}>
           <EyeOffMark />
           Tu sitio quedará oculto
