@@ -46,3 +46,74 @@
   /* --space-7 (48px) deja espacio para un FAB flotante o la home bar de iOS. */
   padding-bottom: calc(var(--space-7) + env(safe-area-inset-bottom));
 }
+
+/*
+ * ----------------------------------------------------------------------
+ * Coreografía de entrada al MONTAR el shell (issue #525), como
+ * ShellUtilitario: cabecera con fade, feed escalonado, SIN muelle. Solo
+ * `animation-fill-mode: backwards` (nunca `forwards`): al terminar cada
+ * animación el elemento vuelve a su estilo normal sin transform/opacity
+ * residual — evita que un ítem del feed quede como stacking context
+ * permanente y atrape un popover bajo un FAB/CTA fijo (ver PR #527).
+ * -------------------------------------------------------------------- */
+
+@keyframes shellFeedHeaderIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 1. Cabecera: fade corto, la primera en aparecer. */
+.headerIn {
+  animation: shellFeedHeaderIn var(--motion-duration-slow) var(--motion-ease-standard) backwards;
+}
+
+@keyframes shellFeedChildIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 2. Hijos directos del feed: entran escalonados justo después de la
+ * cabecera. Tope de 6 con delay propio; del séptimo en adelante heredan el
+ * delay del sexto (un feed largo no alarga la espera indefinidamente). */
+.feedStagger > * {
+  animation: shellFeedChildIn var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+}
+.feedStagger > *:nth-child(1) {
+  animation-delay: calc(var(--motion-stagger-step) * 1);
+}
+.feedStagger > *:nth-child(2) {
+  animation-delay: calc(var(--motion-stagger-step) * 2);
+}
+.feedStagger > *:nth-child(3) {
+  animation-delay: calc(var(--motion-stagger-step) * 3);
+}
+.feedStagger > *:nth-child(4) {
+  animation-delay: calc(var(--motion-stagger-step) * 4);
+}
+.feedStagger > *:nth-child(5) {
+  animation-delay: calc(var(--motion-stagger-step) * 5);
+}
+.feedStagger > *:nth-child(6) {
+  animation-delay: calc(var(--motion-stagger-step) * 6);
+}
+.feedStagger > *:nth-child(n + 7) {
+  animation-delay: calc(var(--motion-stagger-step) * 6);
+}
+
+/* Accesibilidad: sin movimiento, todo aparece ya en su estado final. */
+@media (prefers-reduced-motion: reduce) {
+  .headerIn,
+  .feedStagger > * {
+    animation: none;
+  }
+}

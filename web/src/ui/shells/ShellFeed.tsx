@@ -16,13 +16,25 @@ interface Props {
   header?: ReactNode
   /** Lista o feed de contenido con scroll propio. */
   children: ReactNode
+  /**
+   * Desactiva la coreografía de entrada (cabecera/stagger).
+   * Solo para tests o la galería cuando haga falta determinismo explícito
+   * más allá de `prefers-reduced-motion`; en producción siempre `true` (default).
+   */
+  entrance?: boolean
 }
 
-export function ShellFeed({ header, children }: Props) {
+export function ShellFeed({ header, children, entrance = true }: Props) {
+  // Coreografía de entrada (issue #525), como ShellUtilitario: cabecera con
+  // fade, feed escalonado, sin muelle. Clases siempre en el árbol (nunca se
+  // togglean tras montar) → la animación CSS corre una única vez por montaje
+  // del shell; un re-render posterior reconcilia el mismo nodo DOM.
+  const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(' ')
+
   return (
     <div className={styles.root}>
-      {header && <div className={styles.header}>{header}</div>}
-      <div className={styles.feed}>{children}</div>
+      {header && <div className={cx(styles.header, entrance && styles.headerIn)}>{header}</div>}
+      <div className={cx(styles.feed, entrance && styles.feedStagger)}>{children}</div>
     </div>
   )
 }

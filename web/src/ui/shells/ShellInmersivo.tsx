@@ -46,9 +46,23 @@ interface Props {
    * Vive como footer en el flujo flex de la hoja — NUNCA como posición absoluta.
    */
   cta?: ReactNode
+  /**
+   * Desactiva la coreografía de entrada (backdrop/hoja/stagger/CTA).
+   * Solo para tests o la galería cuando haga falta determinismo explícito
+   * más allá de `prefers-reduced-motion`; en producción siempre `true` (default).
+   */
+  entrance?: boolean
 }
 
-export function ShellInmersivo({ backdrop, header, caption, sheetTitle, children, cta }: Props) {
+export function ShellInmersivo({
+  backdrop,
+  header,
+  caption,
+  sheetTitle,
+  children,
+  cta,
+  entrance = true,
+}: Props) {
   // Guardarraíl de composición: caption y sheetTitle nunca deben coexistir.
   // El design-lint no puede verificar esto a nivel de AST (prop-passing en runtime);
   // el error explícito lo caza en dev y en la galería de shells antes de llegar a prod.
@@ -62,10 +76,19 @@ export function ShellInmersivo({ backdrop, header, caption, sheetTitle, children
   // En producción, sheetTitle gana si ambos se pasan (silencio defensivo).
   const showCaption = caption && !sheetTitle
 
+  // Coreografía de entrada (issue #525): backdrop → hoja → contenido en
+  // stagger → CTA con muelle. Las clases van SIEMPRE presentes en el árbol
+  // (nunca se togglean tras el montaje), así que la animación CSS corre una
+  // única vez al montar el shell (una navegación = un montaje = una entrada);
+  // un re-render posterior no la reinicia porque React reconcilia el mismo
+  // nodo DOM y `animation-name` no cambia. `entrance={false}` (solo
+  // tests/galería) la desactiva sin tocar la API pública por defecto.
+  const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(' ')
+
   return (
     <div className={styles.root}>
       {/* 1. Protagonista visual: ocupa TODA la pantalla como base. */}
-      <div className={styles.backdrop}>{backdrop}</div>
+      <div className={cx(styles.backdrop, entrance && styles.backdropIn)}>{backdrop}</div>
 
       {/* 2. Cabecera flotante (chrome sobre la imagen). */}
       {header && <div className={styles.header}>{header}</div>}
@@ -79,16 +102,16 @@ export function ShellInmersivo({ backdrop, header, caption, sheetTitle, children
            El CTA vive DENTRO de la hoja como footer en el flujo flex (no absoluto):
            el .sheetInner scrollea; el .cta queda fijo abajo con flex-shrink: 0.
            Resultado: el CTA NUNCA recorta texto, sea cual sea su alto. */}
-      <div className={styles.sheet}>
+      <div className={cx(styles.sheet, entrance && styles.sheetIn)}>
         <div className={styles.sheetPull}>
           <span className={styles.sheetPullBar} />
         </div>
-        <div className={styles.sheetInner}>
+        <div className={cx(styles.sheetInner, entrance && styles.sheetStagger)}>
           {/* Título de la hoja en serif (solo si no hay caption). */}
           {sheetTitle && <SheetTitle>{sheetTitle}</SheetTitle>}
           {children}
         </div>
-        {cta && <div className={styles.cta}>{cta}</div>}
+        {cta && <div className={cx(styles.cta, entrance && styles.ctaIn)}>{cta}</div>}
       </div>
     </div>
   )

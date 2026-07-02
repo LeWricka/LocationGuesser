@@ -57,3 +57,85 @@
   border-top: 1px solid var(--hairline-soft);
   background: var(--surface);
 }
+
+/*
+ * ----------------------------------------------------------------------
+ * Coreografía de entrada al MONTAR el shell (issue #525), versión sobria:
+ * cabecera con fade, cuerpo escalonado, SIN muelle (este shell es papel de
+ * formulario, no una escena). Mismo criterio que ShellInmersivo: solo
+ * `animation-fill-mode: backwards` (nunca `forwards`), así al terminar cada
+ * animación el elemento vuelve a su estilo normal sin transform/opacity
+ * residual — evita que un hijo quede como stacking context permanente y
+ * atrape popovers (datepicker, selects) bajo el footer fijo (ver PR #527).
+ * -------------------------------------------------------------------- */
+
+@keyframes shellUtilitarioHeaderIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 1. Cabecera: fade corto, la primera en aparecer. */
+.headerIn {
+  animation: shellUtilitarioHeaderIn var(--motion-duration-slow) var(--motion-ease-standard)
+    backwards;
+}
+
+@keyframes shellUtilitarioChildIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 2. Hijos directos del cuerpo: entran escalonados justo después de la
+ * cabecera. Tope de 6 con delay propio; del séptimo en adelante heredan el
+ * delay del sexto (un formulario largo no alarga la espera indefinidamente). */
+.bodyStagger > * {
+  animation: shellUtilitarioChildIn var(--motion-duration-slow) var(--motion-ease-emphasized)
+    backwards;
+}
+.bodyStagger > *:nth-child(1) {
+  animation-delay: calc(var(--motion-stagger-step) * 1);
+}
+.bodyStagger > *:nth-child(2) {
+  animation-delay: calc(var(--motion-stagger-step) * 2);
+}
+.bodyStagger > *:nth-child(3) {
+  animation-delay: calc(var(--motion-stagger-step) * 3);
+}
+.bodyStagger > *:nth-child(4) {
+  animation-delay: calc(var(--motion-stagger-step) * 4);
+}
+.bodyStagger > *:nth-child(5) {
+  animation-delay: calc(var(--motion-stagger-step) * 5);
+}
+.bodyStagger > *:nth-child(6) {
+  animation-delay: calc(var(--motion-stagger-step) * 6);
+}
+.bodyStagger > *:nth-child(n + 7) {
+  animation-delay: calc(var(--motion-stagger-step) * 6);
+}
+
+/* 3. Footer: fade + rise sobrio (sin muelle), entra tras el cuerpo. */
+.footerIn {
+  animation: shellUtilitarioChildIn var(--motion-duration-slow) var(--motion-ease-standard)
+    backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 7);
+}
+
+/* Accesibilidad: sin movimiento, todo aparece ya en su estado final. */
+@media (prefers-reduced-motion: reduce) {
+  .headerIn,
+  .bodyStagger > *,
+  .footerIn {
+    animation: none;
+  }
+}

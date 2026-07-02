@@ -135,3 +135,126 @@
   flex-shrink: 0;
   padding: var(--space-3) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom));
 }
+
+/*
+ * ----------------------------------------------------------------------
+ * Coreografía de entrada al MONTAR el shell (issue #525): escenario →
+ * hoja → contenido escalonado → CTA con muelle. Las clases están siempre
+ * en el árbol (no se togglean tras montar), así que la animación CSS
+ * corre una única vez por montaje del componente: un cambio de ruta
+ * desmonta/monta el shell (una entrada); un re-render con el mismo shell
+ * montado reconcilia el mismo nodo DOM y no reinicia la animación
+ * (`animation-name` no cambia entre renders).
+ *
+ * A propósito SIN `animation-fill-mode: forwards`: usamos solo
+ * `backwards`, que aplica el fotograma inicial durante el delay pero NO
+ * deja el fotograma final aplicado una vez termina la animación. Así
+ * ningún hijo queda con un `transform` residual (ni siquiera la identidad
+ * `translateY(0)`) que lo convierta en un stacking context permanente —
+ * el bug real que atrapó un popover bajo un CTA fijo en otra pantalla
+ * (ver PR #527). Al acabar, el elemento vuelve a su estilo normal (sin
+ * transform declarado aquí → `none`), idéntico visualmente al estado
+ * final que ya tenía el shell antes de esta coreografía.
+ * -------------------------------------------------------------------- */
+
+@keyframes shellInmersivoBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 1. Escenario: fade-in corto, el primero en aparecer. */
+.backdropIn {
+  animation: shellInmersivoBackdropIn var(--motion-duration-slow) var(--motion-ease-standard)
+    backwards;
+}
+
+@keyframes shellInmersivoSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 2. Hoja: sube 24px con fade. Arranca ~2 pasos de stagger (140ms) después
+ * del escenario, para que el orden de aparición se perciba con claridad. */
+.sheetIn {
+  animation: shellInmersivoSheetIn var(--motion-duration-slower) var(--motion-ease-emphasized)
+    backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 2);
+}
+
+@keyframes shellInmersivoChildIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 3. Hijos directos del cuerpo de la hoja (título + children): entran
+ * escalonados, empezando mientras la hoja aún está subiendo. Tope de 6 con
+ * delay propio; del séptimo en adelante heredan el delay del sexto (una
+ * lista larga no debe alargar la espera indefinidamente). */
+.sheetStagger > * {
+  animation: shellInmersivoChildIn var(--motion-duration-slow) var(--motion-ease-emphasized)
+    backwards;
+}
+.sheetStagger > *:nth-child(1) {
+  animation-delay: calc(var(--motion-stagger-step) * 3);
+}
+.sheetStagger > *:nth-child(2) {
+  animation-delay: calc(var(--motion-stagger-step) * 4);
+}
+.sheetStagger > *:nth-child(3) {
+  animation-delay: calc(var(--motion-stagger-step) * 5);
+}
+.sheetStagger > *:nth-child(4) {
+  animation-delay: calc(var(--motion-stagger-step) * 6);
+}
+.sheetStagger > *:nth-child(5) {
+  animation-delay: calc(var(--motion-stagger-step) * 7);
+}
+.sheetStagger > *:nth-child(6) {
+  animation-delay: calc(var(--motion-stagger-step) * 8);
+}
+.sheetStagger > *:nth-child(n + 7) {
+  animation-delay: calc(var(--motion-stagger-step) * 8);
+}
+
+@keyframes shellInmersivoCtaIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 4. CTA: el último en entrar, con un pop sutil (muelle). */
+.ctaIn {
+  animation: shellInmersivoCtaIn var(--motion-duration-slow) var(--motion-ease-spring) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 9);
+}
+
+/* Accesibilidad: sin movimiento, todo aparece ya en su estado final. */
+@media (prefers-reduced-motion: reduce) {
+  .backdropIn,
+  .sheetIn,
+  .sheetStagger > *,
+  .ctaIn {
+    animation: none;
+  }
+}
