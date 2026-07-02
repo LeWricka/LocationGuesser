@@ -1,20 +1,14 @@
-/* Crear viaje · flujo inmersivo "MAPA A SANGRE + HOJA QUE CRECE".
-   Mapa decorativo (ruta + pines) de fondo; bottom sheet que sube y crece por
-   etapas (reutiliza ImmersiveSheet y su CSS hermano). Sistema Atelier
-   (paper/tinta/pizarra) vía tokens del UI kit; nada hardcodeado. */
+/* Crear viaje · ShellUtilitario (hoja limpia sobre --paper).
+   Sin backdrop oscuro, sin zona muerta: es un formulario, no una pantalla con
+   protagonista visual. Sistema Atelier (paper/tinta/pizarra) vía tokens del UI
+   kit; nada hardcodeado. */
 
+/* Contenedor raíz: pantalla completa para que ShellUtilitario y la microcelebración
+   se posicionen correctamente. */
 .root {
-  --float-bg: var(--scene-surface);
-  --float-line: var(--scene-hairline);
-
   position: fixed;
   inset: 0;
   z-index: 1000;
-  overflow: hidden;
-  /* Escena a sangre (no papel): el fondo es un lienzo oscuro tipo satélite/globo
-     que el backdrop llena de pared a pared. Así el espacio superior es escena viva
-     en cualquier alto, nunca una franja de papel muerta. */
-  background: var(--scene-bg);
   isolation: isolate;
   font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
   color: var(--ink-900);
@@ -24,135 +18,24 @@
   font-family: 'Cormorant Garamond', Georgia, serif;
 }
 
-/* ============ BACKDROP DE ESCENA A SANGRE (héroe superior) ==============
-   Lienzo satélite/globo evocado que LLENA todo el alto disponible (100dvh,
-   no altura fija): a sangre con `inset: 0`, por debajo del chrome y la hoja.
-   Antes era una ilustración pálida sobre papel que en pantallas altas dejaba
-   un desierto gris entre la cabecera y la hoja; ahora es escena viva de pared
-   a pared, con relieve de continentes, ruta punteada y pines que caen. */
-.map {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  overflow: hidden;
-  /* Atmósfera noche evocada SOLO con tokens de escena: un halo de superficie
-     translúcida (océano iluminado) y un velo en los cantos, sobre el fondo de
-     escena oscuro. Los continentes y la ruta los dibuja el SVG encima. */
-  background:
-    radial-gradient(58% 56% at 50% 42%, var(--scene-surface) 0%, transparent 64%),
-    radial-gradient(120% 80% at 50% 14%, transparent 58%, var(--scene-veil) 100%), var(--scene-bg);
-}
-.map svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.land {
-  fill: var(--scene-surface);
-  stroke: var(--scene-hairline);
-  stroke-width: 0.8;
-}
-.route {
-  fill: none;
-  stroke: var(--accent);
-  stroke-width: 2.2;
-  stroke-dasharray: 5 6;
-  stroke-linecap: round;
-  opacity: 0.75;
-  stroke-dashoffset: 240;
-  animation: drawRoute 2.6s ease forwards;
-}
-@keyframes drawRoute {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-.mapPin {
-  position: absolute;
-  width: 13px;
-  height: 13px;
-  border-radius: 50% 50% 50% 0;
-  background: var(--accent);
-  transform: rotate(-45deg) scale(0);
-  box-shadow: var(--scene-shadow);
-  animation: dropPin 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
-}
-@keyframes dropPin {
-  to {
-    transform: rotate(-45deg) scale(1);
-  }
-}
-
-/* Veladura de INTEGRACIÓN (no banda, no canto duro): funde los cantos del lienzo
-   con el fondo de escena y degrada el borde inferior hacia la escena para coser
-   backdrop y hoja sin franja muerta intermedia (mismo espíritu que el globo de la
-   home). Más velo arriba para que el chrome flotante claro se lea. */
-.vignette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 2;
-  background:
-    radial-gradient(125% 82% at 50% 38%, transparent 56%, var(--scene-bg) 100%),
-    linear-gradient(
-      to bottom,
-      var(--scene-veil) 0%,
-      transparent 24%,
-      transparent 58%,
-      var(--scene-bg) 100%
-    );
-}
-
-/* ---- topbar flotante translúcido --------------------------------- */
-.top {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 5;
+/* ---- indicador de progreso ---------------------------------------- */
+/* Dos puntos: inactivo en hairline, activo en acento teal. Colapsado arriba
+   del formulario para dar contexto de paso sin ocupar espacio. */
+.progress {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 14px;
-  pointer-events: none;
+  gap: 6px;
+  margin-bottom: var(--space-4, 16px);
 }
-.iconBtn {
-  pointer-events: auto;
-  width: 40px;
-  height: 40px;
+.progressDot {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  border: 1px solid var(--float-line);
-  background: var(--float-bg);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: #fff;
+  background: var(--hairline-soft);
+  transition: background var(--motion-transition-base);
 }
-.iconBtn svg {
-  width: 20px;
-  height: 20px;
-}
-.topTitle {
-  pointer-events: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  padding: 6px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--float-line);
-  background: var(--float-bg);
-  backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-  color: #fff;
-}
-.topTitle b {
-  font-size: 14px;
-  font-weight: 600;
-  text-shadow: 0 1px 6px rgba(11, 16, 22, 0.6);
+.progressActive {
+  background: var(--accent);
 }
 
 /* ============ ETAPAS (contenido de la hoja) ============== */
@@ -366,42 +249,6 @@
 .moreShow {
   max-height: 420px;
   opacity: 1;
-}
-
-/* ---- botón primario --------------------------------------------- */
-.cta {
-  width: 100%;
-  border: none;
-  border-radius: 16px;
-  padding: 16px;
-  margin-top: 4px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 15.5px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  font-family: inherit;
-  transition:
-    transform 0.18s ease,
-    background 0.2s ease;
-}
-.cta:active {
-  transform: scale(0.98);
-}
-.cta:hover {
-  background: var(--accent-deep);
-}
-.cta svg {
-  width: 18px;
-  height: 18px;
-}
-.cta:disabled {
-  background: #cdd4dc;
-  cursor: not-allowed;
 }
 
 /* ---- resumen ---------------------------------------------------- */

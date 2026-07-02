@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { newGroupCode } from '../../lib/group'
 import { createGroup } from '../../lib/groupData'
 import { joinGroupAsOwner } from '../../lib/membership'
 import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
-import { AppHeader, DatePicker, Spinner, useToast } from '../../ui'
+import { AppHeader, Button, Spinner, DatePicker, useToast } from '../../ui'
+import { ShellUtilitario } from '../../ui/shells'
 import { CalendarIcon, PeopleIcon, SparkIcon, TripPinIcon } from './CreateIcons'
-import { ImmersiveSheet } from './ImmersiveSheet'
 import { formatTripDates } from './tripDates'
 import styles from './CreateGroup.module.css'
 
@@ -14,45 +14,22 @@ interface Props {
   onBack: () => void
 }
 
-// Etapas de la hoja: 0=el viaje (nombre · fechas · gente, una sola vez) · 1=resumen.
-// El campo de acompañantes vive SOLO en la etapa 0 (antes estaba duplicado en una
-// etapa "tu gente" aparte). NO se pide carátula al crear: la portada es opcional y
-// se añade después desde el viaje.
+// Etapas del formulario: 0=el viaje (nombre · fechas · gente) · 1=resumen.
+// El campo de acompañantes vive SOLO en la etapa 0.
+// NO se pide carátula al crear: la portada es opcional y se añade después.
 type Stage = 0 | 1
 const TOTAL_STAGES = 2
-// Alturas IDEALES (px) de la hoja por etapa: amplias para que el contenido respire.
-// La hoja es del tamaño de su contenido; NO crece para llenar pantallas altas (eso es
-// trabajo del backdrop de escena, que va a sangre detrás). El alto real solo se acota
-// contra el viewport (ver `useSheetHeight`).
-const STAGE_HEIGHTS: Record<Stage, number> = { 0: 560, 1: 480 }
-// Aire mínimo (px) que la hoja deja por arriba en pantallas cortas: la cabecera
-// flotante y un asomo de escena siempre se ven; el cuerpo de la hoja hace scroll.
-const SHEET_TOP_GAP = 120
-
-// Alto real de la hoja para la etapa. Se queda en su alto IDEAL (tamaño de contenido):
-// en pantallas altas el backdrop de escena llena el espacio sobrante (sin desierto, es
-// escena viva), y la hoja sigue siendo una hoja limpia, no un muro blanco. En pantallas
-// cortas se acota dejando `SHEET_TOP_GAP` de aire arriba y su cuerpo hace scroll.
-// Reacciona a rotaciones/cambios de viewport (teclado incluido) vía innerHeight (dvh).
-function useSheetHeight(stage: Stage): number {
-  const [vh, setVh] = useState(() => (typeof window === 'undefined' ? 844 : window.innerHeight))
-  useEffect(() => {
-    function onResize() {
-      setVh(window.innerHeight)
-    }
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
-  }, [])
-  return Math.min(STAGE_HEIGHTS[stage], vh - SHEET_TOP_GAP)
-}
 
 // Crear un viaje (flujo grupo-primero). El viaje es el contenedor social del
 // plan: lo creas, los invitas y lo viven contigo. No se crea ningún reto aquí;
 // eso se hace luego dentro del viaje. Quien crea queda como dueño (`created_by` +
-// fila 'owner' en group_members) y navegamos a #g=<código>. El flujo es
-// inmersivo: mapa a sangre de fondo + hoja que crece por etapas (coherente con
-// CreateChallengeImmersive y jugar). Los datos del viaje (fechas, descripción,
-// acompañantes) son OPCIONALES; solo el nombre hace falta para avanzar.
+// fila 'owner' en group_members) y navegamos a #g=<código>.
+//
+// La pantalla usa ShellUtilitario (hoja limpia sobre --paper, sin backdrop oscuro)
+// porque no hay protagonista visual real: es un formulario, no un mapa/foto.
+// Elimina la zona muerta oscura que aparecía arriba con el ImmersiveSheet anterior.
+// Los datos del viaje (fechas, descripción, acompañantes) son OPCIONALES; solo el
+// nombre hace falta para avanzar.
 export function CreateGroup({ onBack }: Props) {
   const [stage, setStage] = useState<Stage>(0)
   const [name, setName] = useState('')
@@ -64,7 +41,11 @@ export function CreateGroup({ onBack }: Props) {
   const [busy, setBusy] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
 
-  const sheetHeight = useSheetHeight(stage)
+  // Al cambiar de etapa el cuerpo vuelve arriba (cada etapa empieza por su título).
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0
+  }, [stage])
 
   const toast = useToast()
   const { user } = useSession()
@@ -150,52 +131,68 @@ export function CreateGroup({ onBack }: Props) {
     }
   }
 
+  // Footer CTA: varía según la etapa y el estado de carga.
+  const footer =
+    stage === 0 ? (
+      <Button
+        type="button"
+        size="lg"
+        fullWidth
+        disabled={!nameOk}
+        onClick={advance}
+        aria-label="Revisar y crear viaje"
+      >
+        Revisar y crear
+        <ArrowRight />
+      </Button>
+    ) : (
+      <Button
+        type="button"
+        size="lg"
+        fullWidth
+        disabled={busy}
+        onClick={() => void create()}
+        aria-label="Crear viaje"
+      >
+        {busy ? <Spinner size={18} /> : <SparkIcon size={18} />}
+        Crear viaje
+      </Button>
+    )
+
   return (
     <div className={styles.root}>
-      {/* MAPA DECORATIVO A SANGRE: ruta + pines, fondo inmersivo (sin Leaflet:
-          aquí no se marca ningún punto, es ambiente). */}
-      <div className={styles.map} aria-hidden>
-        <svg viewBox="0 0 390 840" preserveAspectRatio="xMidYMid slice">
-          <path
-            className={styles.land}
-            d="M-20,180 Q60,120 150,160 T320,140 L410,180 L410,360 Q300,330 220,370 T40,360 L-20,330 Z"
+      <ShellUtilitario
+        header={
+          <AppHeader
+            variant="plain"
+            lead="back"
+            onLead={stage === 0 ? onBack : retreat}
+            leadLabel={stage === 0 ? 'Volver' : 'Paso anterior'}
+            title="Nuevo viaje"
           />
-          <path
-            className={styles.land}
-            d="M40,520 Q140,470 240,520 T420,500 L420,720 Q300,690 200,730 T20,700 L20,560 Z"
-          />
-          <path
-            className={styles.route}
-            d="M95,250 C150,300 200,330 250,300 S320,420 270,560 S150,610 130,650"
-          />
-        </svg>
-        <span className={styles.mapPin} style={{ left: 90, top: 243, animationDelay: '0.6s' }} />
-        <span className={styles.mapPin} style={{ left: 248, top: 294, animationDelay: '0.95s' }} />
-        <span className={styles.mapPin} style={{ left: 266, top: 553, animationDelay: '1.3s' }} />
-        <span className={styles.mapPin} style={{ left: 126, top: 644, animationDelay: '1.65s' }} />
-      </div>
-
-      {/* Viñeta para legibilidad del chrome claro sobre el mapa. */}
-      <div className={styles.vignette} aria-hidden />
-
-      {/* Cabecera ÚNICA (variante flotante sobre la escena): atrás funcional + título. */}
-      <AppHeader
-        variant="floating"
-        lead="back"
-        onLead={onBack}
-        leadLabel="Volver"
-        title="Nuevo viaje"
-      />
-
-      {/* BOTTOM SHEET que sube y crece por etapas. */}
-      <ImmersiveSheet
-        stage={stage}
-        total={TOTAL_STAGES}
-        height={sheetHeight}
-        canAdvance={canAdvanceFromStage[stage]}
-        onAdvance={advance}
-        onRetreat={retreat}
+        }
+        footer={footer}
       >
+        {/* Indicador de progreso: puntos teal (activo) vs neutro. */}
+        <div
+          className={styles.progress}
+          role="progressbar"
+          aria-valuenow={stage + 1}
+          aria-valuemin={1}
+          aria-valuemax={TOTAL_STAGES}
+          aria-label={`Paso ${stage + 1} de ${TOTAL_STAGES}`}
+        >
+          {Array.from({ length: TOTAL_STAGES }, (_, i) => (
+            <span
+              key={i}
+              className={`${styles.progressDot} ${i <= stage ? styles.progressActive : ''}`}
+            />
+          ))}
+        </div>
+
+        {/* Referencia de scroll para volver arriba al cambiar etapa. */}
+        <div ref={bodyRef} />
+
         {/* ETAPA 0 — el viaje: nombre · fechas · gente (todo en una hoja que respira;
             el campo de acompañantes vive solo aquí, sin duplicar). */}
         {stage === 0 && (
@@ -310,10 +307,6 @@ export function CreateGroup({ onBack }: Props) {
               </div>
             </div>
 
-            <button className={styles.cta} type="button" disabled={!nameOk} onClick={advance}>
-              Revisar y crear
-              <ArrowRight />
-            </button>
             {!nameOk && <p className={styles.warnHint}>Falta el nombre del viaje.</p>}
           </section>
         )}
@@ -367,19 +360,9 @@ export function CreateGroup({ onBack }: Props) {
                 </div>
               )}
             </div>
-
-            <button
-              className={styles.cta}
-              type="button"
-              disabled={busy}
-              onClick={() => void create()}
-            >
-              {busy ? <Spinner size={18} /> : <SparkIcon size={18} />}
-              Crear viaje
-            </button>
           </section>
         )}
-      </ImmersiveSheet>
+      </ShellUtilitario>
 
       {/* MICROCELEBRACIÓN al crear: burst + "¡Buen viaje!". */}
       {celebrating && (
