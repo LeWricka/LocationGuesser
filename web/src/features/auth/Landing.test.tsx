@@ -32,13 +32,13 @@ describe('Landing', () => {
         name: /Comparte tus momentos de una forma diferente/i,
       }),
     ).toBeInTheDocument()
-    // El showcase ENSEÑA un viaje de ejemplo: diario + reto + marcador (issue #452).
-    expect(
-      screen.getByRole('heading', { name: /La vuelta al mundo de los García/i }),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '¿Adivinas dónde es?' })).toBeInTheDocument()
-    expect(screen.getByText('¿Dónde tomó Marta esta foto?')).toBeInTheDocument()
+    // El showcase ENSEÑA capturas reales del producto (issue #462): home, resultado
+    // y marcador, cada una en un marco de móvil con su texto editorial.
+    expect(screen.getByRole('heading', { name: 'Todo el viaje en un globo' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Gana quien más se acerca' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Un marcador que os une' })).toBeInTheDocument()
+    // Las capturas son imágenes reales (no recreaciones vivas): comprobamos una.
+    expect(screen.getByAltText(/Pantalla de inicio de Tabide/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Así funciona Tabide' })).toBeInTheDocument()
     // El CTA del hero abre el popup; el email NO está a la vista.
     expect(screen.getByRole('button', { name: 'Empieza' })).toBeInTheDocument()

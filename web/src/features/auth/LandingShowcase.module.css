@@ -1,8 +1,7 @@
-/* Showcase de la landing deslogueada (issue #452): un viaje de ejemplo bien
- * montado (diario + reto + marcador) para que el visitante entienda de un vistazo
- * qué es Tabide. Foto-first, mucho aire (referencia Polarsteps), sobre papel, con
- * tokens del sistema "Atelier". Móvil-first, sin overflow a 320px. Las fotos van a
- * sangre dentro de sus tarjetas; el chrome flota sobre ellas con velo de escena. */
+/* Showcase de la landing deslogueada (issue #462): CAPTURAS REALES del producto en
+ * marcos de móvil dibujados en CSS, estilo Polarsteps (imagen de producto real sobre
+ * composición editorial). Sin imágenes externas ni CDNs: el teléfono es puro CSS.
+ * Móvil-first, sin overflow a 320px, con tokens del sistema "Atelier/Pizarra". */
 
 .root {
   width: 100%;
@@ -10,27 +9,27 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  /* Aire generoso ENTRE bloques: cada sección respira como una página de revista. */
-  gap: var(--space-8);
+  /* Aire generoso ENTRE diapositivas: cada una respira como una página de revista. */
+  gap: var(--space-9);
 }
 
-/* ── Cabecera de sección (eyebrow + título serif + lede) ─────────────────────── */
-.section {
+/* ── Diapositiva: texto editorial + móvil con captura ────────────────────────── */
+.slide {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  align-items: center;
+  gap: var(--space-6);
+  text-align: center;
 }
 
-.head {
+.copy {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  align-items: center;
 }
 
 .eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
   margin: 0;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
@@ -52,218 +51,68 @@
 
 .lede {
   margin: 0;
-  max-width: 42ch;
+  max-width: 40ch;
   font-size: var(--font-size-md);
   line-height: var(--line-height-normal);
   color: var(--color-text-muted);
   text-wrap: pretty;
 }
 
-/* ── 1. Diario: momentos con foto a sangre ───────────────────────────────────── */
-.diary {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.momentCard {
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-}
-
-.momentPhoto {
+/* ── Marco de móvil (CSS puro) ────────────────────────────────────────────────
+ * El teléfono es un bezel oscuro con esquinas de radio de sistema; la captura vive
+ * dentro de la "pantalla" recortada. El altavoz y el brillo del cristal se dibujan
+ * con pseudo-elementos —cero assets externos—. El fondo de escena da el aire
+ * editorial (foto de producto flotando sobre panel oscuro, como Polarsteps). */
+.phone {
   position: relative;
-  /* La foto manda: va a sangre dentro de la tarjeta, sin marco propio. */
+  /* Anchura acotada para que quepa en 320px con margen; escala con la columna. */
+  width: min(74%, 280px);
+  /* Bezel oscuro del chasis. */
+  padding: var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--ink-900);
+  box-shadow: var(--scene-shadow);
 }
 
-/* Lugar clavado, chrome flotante sobre la foto (velo de escena + tinta clara). */
-.pin {
+/* Altavoz/notch: pastilla tenue sobre el bezel (hermano del cristal, pinta encima). */
+.phone::before {
+  content: '';
   position: absolute;
-  left: var(--space-3);
-  bottom: var(--space-3);
-  /* Va sobre la foto sin z-index: es hermano POSTERIOR al <img> de ChallengePhoto,
-     así que pinta encima por orden de pintado (sin subir de piso). */
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-3);
+  top: calc(var(--space-2) + var(--space-1));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34%;
+  height: var(--space-1);
   border-radius: var(--radius-full);
-  background: var(--scene-veil);
-  backdrop-filter: blur(6px);
-  color: var(--scene-ink);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-wide);
+  background: var(--scene-hairline);
 }
 
-.momentBody {
-  padding: var(--space-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.note {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-snug);
-  color: var(--color-text);
-  text-wrap: pretty;
-}
-
-.byline {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-.author {
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-}
-
-.dot {
-  color: var(--color-text-faint);
-}
-
-.date {
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── 2. Reto: la mecánica de adivinar ────────────────────────────────────────── */
-.challenge {
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-md);
-}
-
-.challengePhoto {
+.phoneScreen {
   position: relative;
-}
-
-.challengeBadge {
-  position: absolute;
-  left: var(--space-3);
-  top: var(--space-3);
-  /* Hermano posterior al <img>: pinta encima sin z-index (ver .pin). */
-}
-
-.challengeBody {
-  padding: var(--space-4) var(--space-4) var(--space-5);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.challengeQuestion {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-snug);
-  color: var(--color-text);
-  text-wrap: balance;
-}
-
-.challengeFoot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.social {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-/* ── 3. Marcador: gana quien más se acerca ──────────────────────────────────── */
-.board {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-}
-
-.scoreRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.scoreRow:last-child {
-  border-bottom: none;
-}
-
-.scoreRank {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  flex: none;
-}
-
-.scoreNum {
-  font-family: var(--font-serif);
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-md);
-  color: var(--color-text-faint);
-  font-variant-numeric: tabular-nums;
-}
-
-.scoreName {
-  flex: 1;
-  min-width: 0;
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-radius: var(--radius-lg);
+  /* Fondo de escena bajo la captura: si la imagen deja franja, no aparece blanco. */
+  background: var(--scene-bg);
+  /* Ratio del móvil (390×844 ≈ 9:19.5): la pantalla mantiene proporción real. */
+  aspect-ratio: 390 / 844;
 }
 
-.scoreWin .scoreName {
-  color: var(--color-accent);
+.shot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
 }
 
-.scoreKm {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-  flex: none;
-}
-
-.scorePoints {
-  min-width: 4ch;
-  text-align: right;
-  font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text);
-  flex: none;
-}
-
-.scoreWin .scorePoints {
-  color: var(--color-accent);
+/* Brillo diagonal del cristal: velo muy tenue que cruza la pantalla (hermano
+   posterior a la <img>, pinta encima sin z-index). */
+.phoneScreen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, var(--scene-surface) 0%, transparent 34%, transparent 100%);
+  pointer-events: none;
 }
 
 /* ── Relato del bucle + CTA ──────────────────────────────────────────────────── */
@@ -330,10 +179,33 @@
   color: var(--color-text-muted);
 }
 
-/* Desktop: el titular respira un escalón más. */
+/* Desktop: título con más aire y la diapositiva pasa a dos columnas (texto | móvil),
+   alternando el lado para un ritmo editorial (zig-zag tipo Polarsteps). */
 @media (min-width: 600px) {
   .title,
   .loopTitle {
     font-size: var(--font-size-2xl);
+  }
+
+  .slide {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-7);
+    text-align: left;
+  }
+
+  .slide:nth-child(even) {
+    flex-direction: row-reverse;
+  }
+
+  .copy {
+    flex: 1;
+    align-items: flex-start;
+  }
+
+  .phone {
+    flex: none;
+    width: 240px;
   }
 }
