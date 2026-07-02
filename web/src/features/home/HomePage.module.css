@@ -5,11 +5,68 @@
    "Crear viaje" vive en la hoja, así que el FAB sería redundante (y taparía la 3ª tarjeta
    de "cómo funciona"). El FAB solo aparece en el dashboard con viajes. */
 
-/* Marca en el overlay sobre el globo: tinta de escena clara. */
+/* Marca en el overlay sobre el globo: tinta de escena clara. `margin-right: auto`
+   empuja ajustes/avatar a la derecha (mismo patrón que HomeDashboard). */
 .brand {
   display: inline-flex;
   align-items: center;
+  margin-right: auto;
   color: var(--scene-ink);
+}
+
+/* Ajustes + avatar del overlay de bienvenida (#516): antes esta variante (sin viajes)
+   no daba NINGÚN acceso a perfil/ajustes. Mismas clases/comportamiento que
+   HomeDashboard.module.css (duplicadas: son CSS modules por fichero, sin `composes`
+   entre ellos) para que el chrome sea idéntico entre la bienvenida y el dashboard. */
+.sceneButton {
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--scene-hairline);
+  background: var(--scene-surface);
+  color: var(--scene-ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: transform var(--transition-fast);
+}
+.sceneButton:hover {
+  transform: translateY(-1px);
+}
+.sceneButton:active {
+  transform: scale(0.96);
+}
+
+.avatarButton {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  flex: none;
+  transition: transform var(--transition-fast);
+}
+.avatarButton:hover {
+  transform: translateY(-1px);
+}
+.avatarButton:active {
+  transform: scale(0.97);
+}
+.sceneButton:focus-visible,
+.avatarButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sceneButton,
+  .avatarButton {
+    transition: none;
+  }
 }
 
 /* Hero de bienvenida dentro de la hoja: columna de lectura centrada. */
