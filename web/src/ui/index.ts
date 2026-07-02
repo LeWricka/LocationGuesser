@@ -72,6 +72,10 @@ export { SkeletonCard } from './SkeletonCard'
 // (globo del viaje, plano de fallback y mapa de jugar) — issue #433.
 export { MapSkeleton } from './MapSkeleton'
 
+// Skeletons de fallback de <Suspense> por familia de ruta (viaje/jugar/
+// utilitario), en vez del spinner genérico único — issue #526.
+export { TripRouteSkeleton, PlayRouteSkeleton, UtilityRouteSkeleton } from './RouteSkeletons'
+
 // Marca: logo de "Tabide" (símbolo + wordmark serif).
 export { Logo } from './Logo'
 

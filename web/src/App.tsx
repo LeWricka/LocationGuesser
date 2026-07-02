@@ -35,15 +35,26 @@ import { GoogleMapsProvider } from './lib/GoogleMapsProvider'
 import { setNextDestination, takeNextDestination } from './lib/auth'
 import { getGroup } from './lib/groupData'
 import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
-import { Icon, Spinner, Stack, withViewTransition } from './ui'
+import {
+  Icon,
+  Spinner,
+  Stack,
+  withViewTransition,
+  TripRouteSkeleton,
+  PlayRouteSkeleton,
+  UtilityRouteSkeleton,
+} from './ui'
 import { needsProfileStep } from './features/auth'
 import styles from './App.module.css'
 
 // CODE-SPLITTING POR RUTA (perf): las pantallas pesadas (mapas Leaflet/Google,
 // flujos de crear/jugar) se cargan con React.lazy → Vite las separa en chunks que
 // solo se descargan al navegar a ellas. El bundle inicial deja de arrastrar
-// features + Leaflet; la landing (Landing/HomePage, importadas estáticas arriba)
-// solo carga lo suyo. El fallback de <Suspense> es el spinner de arranque.
+// features + Leaflet; la landing (Landing, importada estática arriba) solo carga
+// lo suyo. Cada ruta lazy tiene su PROPIO <Suspense> con el skeleton de su
+// familia (issue #526): así cada navegación anticipa el layout que llega, en vez
+// de resetear la sensación de fluidez con un spinner genérico. BootScreen queda
+// reservado solo para el arranque de sesión (línea `if (loading) …` más abajo).
 const CreateGroup = lazy(() =>
   import('./features/create/CreateGroup').then((m) => ({ default: m.CreateGroup })),
 )
@@ -70,11 +81,7 @@ const AdminPage = lazy(() => import('./features/admin').then((m) => ({ default: 
 function App() {
   return (
     <AuthProvider>
-      {/* Suspense de raíz: mientras un chunk de ruta (lazy) se descarga, pinta el
-          spinner de arranque en vez de dejar la pantalla en blanco. */}
-      <Suspense fallback={<BootScreen />}>
-        <AppRoutes />
-      </Suspense>
+      <AppRoutes />
     </AuthProvider>
   )
 }
@@ -193,7 +200,12 @@ function LoggedIn({
   // deniegan en servidor. Tras los hooks (no condicionarlos) y antes del resto del
   // router: un deep link de grupo viaja por #g, nunca por #admin, así que no chocan.
   if (adminRoute) {
-    if (isAdminEmail(user?.email)) return <AdminPage onBack={() => goHome()} />
+    if (isAdminEmail(user?.email))
+      return (
+        <Suspense fallback={<UtilityRouteSkeleton />}>
+          <AdminPage onBack={() => goHome()} />
+        </Suspense>
+      )
     return <RedirectHome />
   }
 
@@ -220,7 +232,9 @@ function LoggedIn({
       <ReceptorWelcomeGate groupId={route.group} userId={user?.id}>
         <OnboardingGate context="challenge" userId={user?.id}>
           <GoogleMapsProvider>
-            <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+            <Suspense fallback={<PlayRouteSkeleton />}>
+              <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+            </Suspense>
           </GoogleMapsProvider>
         </OnboardingGate>
       </ReceptorWelcomeGate>
@@ -236,20 +250,22 @@ function LoggedIn({
       return (
         <OnboardingGate context="add-moment" userId={user?.id}>
           <GoogleMapsProvider>
-            <AddMoment
-              groupId={groupId}
-              onBack={() => {
-                location.hash = groupHash(groupId)
-              }}
-              onCreated={() => {
-                location.hash = groupHash(groupId)
-              }}
-              // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
-              // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
-              onAddChallenge={(momentId) => {
-                location.hash = addChallengeHash(groupId, momentId)
-              }}
-            />
+            <Suspense fallback={<UtilityRouteSkeleton />}>
+              <AddMoment
+                groupId={groupId}
+                onBack={() => {
+                  location.hash = groupHash(groupId)
+                }}
+                onCreated={() => {
+                  location.hash = groupHash(groupId)
+                }}
+                // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
+                // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
+                onAddChallenge={(momentId) => {
+                  location.hash = addChallengeHash(groupId, momentId)
+                }}
+              />
+            </Suspense>
           </GoogleMapsProvider>
         </OnboardingGate>
       )
@@ -262,19 +278,21 @@ function LoggedIn({
       return (
         <OnboardingGate context="create-challenge" userId={user?.id}>
           <GoogleMapsProvider>
-            <CreateChallengeFlow
-              groupId={groupId}
-              // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
-              fromMomentId={route.groupChallengeFrom}
-              onBack={() => {
-                location.hash = groupHash(groupId)
-              }}
-              // El creador NO debe acabar jugando su propio reto (#509): tras crear,
-              // volvemos al viaje (diario), no al reto recién creado.
-              onCreated={() => {
-                location.hash = groupHash(groupId)
-              }}
-            />
+            <Suspense fallback={<UtilityRouteSkeleton />}>
+              <CreateChallengeFlow
+                groupId={groupId}
+                // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
+                fromMomentId={route.groupChallengeFrom}
+                onBack={() => {
+                  location.hash = groupHash(groupId)
+                }}
+                // El creador NO debe acabar jugando su propio reto (#509): tras crear,
+                // volvemos al viaje (diario), no al reto recién creado.
+                onCreated={() => {
+                  location.hash = groupHash(groupId)
+                }}
+              />
+            </Suspense>
           </GoogleMapsProvider>
         </OnboardingGate>
       )
@@ -291,26 +309,28 @@ function LoggedIn({
               con Google Maps) y EditChallenge (preview Street View); por eso el
               viaje necesita el provider de Maps. */}
           <GoogleMapsProvider>
-            <TripPage
-              groupId={groupId}
-              // Sección inicial: "Marcador" si el enlace lo pide (legado v=clasico /
-              // v=marcador), si no "Diario".
-              initialSection={route.groupView === 'marcador' ? 'marcador' : 'diario'}
-              // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
-              onPlayChallenge={(challengeId) => {
-                location.hash = groupHash(groupId, challengeId)
-              }}
-              // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
-              // un momento sin reto por defecto (el reto es una capa opcional con toggle).
-              onAddMoment={() => {
-                location.hash = addMomentHash(groupId)
-              }}
-              // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
-              onAddChallenge={() => {
-                location.hash = addChallengeHash(groupId)
-              }}
-              onBack={() => goHome()}
-            />
+            <Suspense fallback={<TripRouteSkeleton />}>
+              <TripPage
+                groupId={groupId}
+                // Sección inicial: "Marcador" si el enlace lo pide (legado v=clasico /
+                // v=marcador), si no "Diario".
+                initialSection={route.groupView === 'marcador' ? 'marcador' : 'diario'}
+                // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
+                onPlayChallenge={(challengeId) => {
+                  location.hash = groupHash(groupId, challengeId)
+                }}
+                // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
+                // un momento sin reto por defecto (el reto es una capa opcional con toggle).
+                onAddMoment={() => {
+                  location.hash = addMomentHash(groupId)
+                }}
+                // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
+                onAddChallenge={() => {
+                  location.hash = addChallengeHash(groupId)
+                }}
+                onBack={() => goHome()}
+              />
+            </Suspense>
           </GoogleMapsProvider>
         </OnboardingGate>
       </ReceptorWelcomeGate>
@@ -322,36 +342,43 @@ function LoggedIn({
     // real; aquí ya no hay muro de "valida tu correo". CreateGate eliminado.
     return (
       <OnboardingGate context="create-trip" userId={user?.id}>
-        <CreateGroup onBack={() => goHome()} />
+        <Suspense fallback={<UtilityRouteSkeleton />}>
+          <CreateGroup onBack={() => goHome()} />
+        </Suspense>
       </OnboardingGate>
     )
   }
   if (route.view === 'profile') {
     return (
-      <ProfileEditScreen
-        userId={user!.id}
-        profile={profile}
-        onSaved={refreshProfile}
-        onBack={() => goHome()}
-        onOpenAdmin={
-          isAdminEmail(user?.email)
-            ? () => {
-                location.hash = '#admin'
-              }
-            : undefined
-        }
-      />
+      <Suspense fallback={<UtilityRouteSkeleton />}>
+        <ProfileEditScreen
+          userId={user!.id}
+          profile={profile}
+          onSaved={refreshProfile}
+          onBack={() => goHome()}
+          onOpenAdmin={
+            isAdminEmail(user?.email)
+              ? () => {
+                  location.hash = '#admin'
+                }
+              : undefined
+          }
+        />
+      </Suspense>
     )
   }
 
   // Raíz sin hash → home/dashboard (centro de gravedad con sesión, §3). Para el
   // admin añadimos un acceso DISCRETO a `#admin` (un enlace flotante), invisible
   // para el resto. Solo en la home para no estorbar en grupo/jugar/perfil.
+  // La home no tiene familia propia de skeleton (no es viaje/jugar ni un
+  // formulario); usa el mismo Utility genérico como fallback mientras llega su
+  // chunk (una vez montada, HomePage pinta su propio HomeSkeleton por datos).
   return (
-    <>
+    <Suspense fallback={<UtilityRouteSkeleton />}>
       <HomePage />
       {isAdminEmail(user?.email) && <AdminLink />}
-    </>
+    </Suspense>
   )
 }
 
@@ -372,7 +399,11 @@ function RedirectHome() {
   useEffect(() => {
     goHome()
   }, [])
-  return <HomePage />
+  return (
+    <Suspense fallback={<UtilityRouteSkeleton />}>
+      <HomePage />
+    </Suspense>
+  )
 }
 
 // Navegación por hash: cambiar location.hash dispara el listener de hashchange y

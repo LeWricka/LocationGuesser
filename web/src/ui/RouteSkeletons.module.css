@@ -1,0 +1,84 @@
+/*
+ * Layout de los skeletons de ruta (RouteSkeletons.tsx). Sin animación propia:
+ * el shimmer vive en Skeleton.module.css (con su propio corte por
+ * prefers-reduced-motion); aquí solo se posicionan los bloques.
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background-color: var(--paper);
+}
+
+/* Cabecera: botón redondo a la izquierda, título centrado. El spacer de la
+ * derecha iguala el ancho del botón para que el título quede centrado de
+ * verdad (mismo truco de 3 columnas que AppHeader). */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-gutter);
+}
+
+.headerTitle {
+  flex: 1;
+  text-align: center;
+}
+
+.headerSpacer {
+  width: 40px;
+  flex-shrink: 0;
+}
+
+/* Bloque de mapa/globo del viaje: tono de escena oscuro y ESTÁTICO (el mapa
+ * real siempre arranca oscuro; no hace falta shimmer sobre este bloque). */
+.scene {
+  flex: 1;
+  min-height: 220px;
+  margin: 0 var(--space-gutter);
+  background-color: var(--scene-bg);
+  border-radius: var(--radius-lg);
+}
+
+.strip {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-gutter);
+}
+
+.stripCard {
+  flex: 1;
+}
+
+/* Jugar: escena a sangre (ocupa el grueso de la pantalla) + hoja clara abajo,
+ * apiladas en flujo (sin position:absolute — nada que solapar). */
+.playScene {
+  flex: 1;
+  min-height: 320px;
+  background-color: var(--scene-bg);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-gutter);
+  background-color: var(--color-surface);
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
+}
+
+.fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: 0 var(--space-gutter);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
