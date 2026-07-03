@@ -6,11 +6,12 @@ import {
   Button,
   ChallengePhoto,
   Icon,
+  IconCandado,
   Modal,
   useReducedMotion,
   useToast,
 } from '../../ui'
-import type { Moment } from '../../lib/trip'
+import { resolveMomentPhoto, type Moment } from '../../lib/trip'
 import type { LatLng } from '../../lib/geo'
 import { fmtDist, fmtNumber } from '../../lib/geo'
 import {
@@ -553,6 +554,10 @@ export function MomentSheet({
     : null
   // Eyebrow editorial sobre la foto: el tipo de momento (en juego / reto / recuerdo).
   const eyebrow = isActive ? 'En juego' : isReto ? 'Un reto para el grupo' : 'Recuerdo'
+  // Foto del héroe (issue #655): un reto en juego con foto-sorpresa no se pinta a
+  // pelo aquí (destriparía la respuesta antes de votar) — `resolveMomentPhoto`
+  // aplica la misma regla que la pestaña Fotos, con la excepción del creador.
+  const { src: heroPhotoSrc, surprise: photoSurprise } = resolveMomentPhoto(moment)
 
   // Umbral de cierre por DISTANCIA: % del alto REAL de la hoja (regla 2, issue
   // #646). Con la hoja sin pintar aún (alto 0, p. ej. en jsdom) caemos al alto de
@@ -752,9 +757,9 @@ export function MomentSheet({
               sutil vía CSS (anulado bajo reduced-motion). El "sello" de reto y el
               chip de lugar van superpuestos. */}
               <header className={styles.hero}>
-                <div className={styles.heroPhoto} data-empty={!moment.imageUrl || undefined}>
+                <div className={styles.heroPhoto} data-empty={!heroPhotoSrc || undefined}>
                   <ChallengePhoto
-                    src={moment.imageUrl}
+                    src={heroPhotoSrc}
                     alt={moment.title}
                     ratio="wide"
                     size="lg"
@@ -772,20 +777,31 @@ export function MomentSheet({
                   <Icon icon={ArrowLeft} size={20} />
                 </button>
 
-                {/* Estado del momento sobre la foto: sello dorado "Reto" o badge EN JUEGO. */}
-                {isActive ? (
+                {/* Estado del momento sobre la foto: sello dorado "Reto", badge EN JUEGO
+                    y/o el sello "Sorpresa" (issue #655) cuando la foto sigue oculta para
+                    el grupo — pueden convivir (p.ej. un reto EN JUEGO con foto sorpresa). */}
+                {(isActive || isReto || photoSurprise) && (
                   <div className={styles.heroSeal}>
-                    <Badge tone="live" dot>
-                      EN JUEGO
-                    </Badge>
+                    {isActive ? (
+                      <Badge tone="live" dot>
+                        EN JUEGO
+                      </Badge>
+                    ) : isReto ? (
+                      <span className={styles.seal}>
+                        <Icon icon={Target} size={13} /> Reto
+                      </span>
+                    ) : null}
+                    {photoSurprise && (
+                      <span
+                        className={styles.surpriseSeal}
+                        role="img"
+                        aria-label="Foto sorpresa: se revela al cerrar el reto"
+                      >
+                        <IconCandado size={14} />
+                      </span>
+                    )}
                   </div>
-                ) : isReto ? (
-                  <div className={styles.heroSeal}>
-                    <span className={styles.seal}>
-                      <Icon icon={Target} size={13} /> Reto
-                    </span>
-                  </div>
-                ) : null}
+                )}
 
                 {/* Chip de lugar (país) sobre la foto, estilo "place-chip" de A. */}
                 {country && (
