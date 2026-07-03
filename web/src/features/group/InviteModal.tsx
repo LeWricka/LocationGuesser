@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { MapPin, MessageCircle, Target, Users } from 'lucide-react'
+import { MapPin, Target, Users } from 'lucide-react'
 import { Button, Icon, Modal, useToast } from '../../ui'
 import { track } from '../../lib/analytics'
 import { getGroupMembers } from '../../lib/membership'
 import { useSession } from '../../lib/session-context'
-import { tripShareText, whatsappShareUrl } from '../../lib/shareLinks'
+import { tripShareText } from '../../lib/shareLinks'
 import styles from './InviteModal.module.css'
 
 interface Props {
@@ -32,11 +32,12 @@ function membersLabel(count: number | null): string | null {
 }
 
 // Modal de "Invitar al grupo": muestra un preview cuidado (nombre, miembros,
-// retos) y un mensaje cálido listo para repartir. Camino feliz: Web Share API
-// (hoja del SO → WhatsApp/etc.) con `url` aparte para que cada destino la maquete
-// como prefiera; fallback: copiar `texto + enlace` al portapapeles, y secundario
-// `wa.me` con todo prerellenado. El enlace LIMPIO (`…/v/<code>`) genera la tarjeta
-// OG al pegarlo (la sirve `web/api/share`).
+// retos) y un mensaje cálido listo para repartir. Dos acciones: primaria
+// "Compartir" (Web Share API → hoja del SO con WhatsApp/etc. ya incluido) con
+// `url` aparte para que cada destino la maquete como prefiera; secundaria
+// "Copiar enlace" (fallback universal, y a lo que cae "Compartir" si no hay Web
+// Share, p.ej. escritorio). El enlace LIMPIO (`…/v/<code>`) genera la tarjeta OG
+// al pegarlo (la sirve `web/api/share`).
 export function InviteModal({ open, onClose, groupId, groupName, link, challengeCount }: Props) {
   const { profile } = useSession()
   // Recuento de miembros emparejado con el groupId que lo pidió: así sabemos si
@@ -112,13 +113,6 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
     await copyLink()
   }
 
-  // Atajo a WhatsApp con el mensaje + enlace prerellenado (web y app). Útil en
-  // escritorio, donde no hay hoja de compartir nativa.
-  function shareWhatsApp() {
-    track('invite_shared', { surface: 'whatsapp', group_id: groupId })
-    window.open(whatsappShareUrl(text, link), '_blank', 'noopener,noreferrer')
-  }
-
   const membersText = membersLabel(memberCount)
 
   return (
@@ -127,17 +121,19 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
       onClose={onClose}
       title="Invitar al viaje"
       footer={
-        <>
-          <Button variant="ghost" onClick={() => void copyLink()}>
+        // Envuelve las dos acciones en un contenedor propio (no confiar en el
+        // .footer del Modal, compartido con otros modales): fila con wrap +
+        // min-width:0 para que, si el ancho aprieta (móviles pequeños o zoom
+        // de accesibilidad), los botones bajen de línea en vez de desbordar el
+        // panel (issue #607 — antes 3 botones se salían a ~560px).
+        <div className={styles.footerActions}>
+          <Button variant="ghost" className={styles.footerButton} onClick={() => void copyLink()}>
             Copiar enlace
           </Button>
-          <Button variant="ghost" onClick={shareWhatsApp}>
-            <Icon icon={MessageCircle} size={16} /> WhatsApp
-          </Button>
-          <Button onClick={() => void share()} loading={sharing}>
+          <Button className={styles.footerButton} onClick={() => void share()} loading={sharing}>
             Compartir
           </Button>
-        </>
+        </div>
       }
     >
       {/* Preview del grupo: tarjeta de marca con el nombre y la meta (personas /

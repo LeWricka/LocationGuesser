@@ -23,6 +23,7 @@ import { EditChallenge } from '../features/group/EditChallenge'
 import { MomentGallery } from '../features/trip/MomentGallery'
 import { MomentSheet } from '../features/trip/MomentSheet'
 import { GroupSettingsModal } from '../features/group/GroupSettingsModal'
+import { InviteModal } from '../features/group/InviteModal'
 import { ResultCard } from '../features/play/ResultCard'
 import { HomeDashboard, LoginScreen, type HomeGroup, type HomePinned } from '../ui'
 import type { GlobePin } from '../ui'
@@ -310,6 +311,27 @@ export const cases: GalleryCase[] = [
         onAddChallenge={noop}
         onBack={noop}
       />
+    ),
+  },
+  {
+    // Issue #607: el pie (Copiar enlace / Compartir) desbordaba el panel a
+    // ~560px con 3 botones. Caso de galería para poder verificarlo a varios
+    // anchos con la captura automática (multiviewport).
+    id: 'invitar-viaje',
+    title: 'Invitar al viaje',
+    section: 'Viaje',
+    render: () => (
+      <div className="lg-page">
+        <h1>{GROUP.name}</h1>
+        <InviteModal
+          open
+          onClose={noop}
+          groupId={GROUP_ID}
+          groupName={GROUP.name ?? GROUP_ID}
+          link={`https://tabide.app/v/${GROUP_ID}`}
+          challengeCount={CHALLENGES.length}
+        />
+      </div>
     ),
   },
   {
