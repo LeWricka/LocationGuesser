@@ -113,6 +113,32 @@ export function isMomentPhotoVisible(
   return moment.photoIsHint === true
 }
 
+/** Foto a pintar de un momento, más si debe llevar el sello "Sorpresa" (issue #655). */
+export interface MomentPhotoDisplay {
+  /** URL a pintar, o `null` si debe ocultarse del todo (placeholder de marca + candado). */
+  src: string | null
+  /** ¿Sigue siendo sorpresa para el RESTO del grupo? Gobierna el sello, se pinte o no la foto. */
+  surprise: boolean
+}
+
+/**
+ * Qué foto pintar de un momento en CUALQUIER superficie (carrusel del Diario,
+ * hoja de detalle, recap de cierre…) y si necesita el sello "Sorpresa" — el
+ * mismo anti-spoiler de `isMomentPhotoVisible` (pestaña Fotos, #645), con la
+ * única excepción del creador:
+ *  - visible para cualquiera (`isMomentPhotoVisible`): se pinta tal cual, sin sello;
+ *  - oculta para el resto pero el momento es MÍO (`isOwn`): la sigo viendo (es mi
+ *    propia foto — ocultármela a mí no protege nada), pero con el sello, para que
+ *    sepa que el resto del grupo aún no la ve;
+ *  - oculta para cualquier otro: `src: null` (placeholder de marca) + sello.
+ */
+export function resolveMomentPhoto(
+  moment: Pick<Moment, 'isChallenge' | 'status' | 'photoIsHint' | 'isOwn' | 'imageUrl'>,
+): MomentPhotoDisplay {
+  if (isMomentPhotoVisible(moment)) return { src: moment.imageUrl, surprise: false }
+  return { src: moment.isOwn ? moment.imageUrl : null, surprise: true }
+}
+
 /**
  * Punto de la RUTA en el mapa. Solo existen para momentos CERRADOS con lat/lng
  * visible: son los que la polyline "cose" en orden cronológico. Por eso lat/lng

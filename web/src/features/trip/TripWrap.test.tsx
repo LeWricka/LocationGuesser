@@ -166,4 +166,66 @@ describe('TripWrap', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(2)
   })
+
+  // Un viaje cerrado (la "temporada") no cierra automáticamente sus retos EN
+  // JUEGO: el timeline-resumen NO debe destripar la foto-sorpresa de uno de esos
+  // retos (issue #655), mismo criterio que el carrusel del Diario y la hoja.
+  test('reto EN JUEGO con foto sorpresa: sin <img> en su miniatura del timeline', () => {
+    const moments: Moment[] = [
+      moment({
+        challengeId: 'r1',
+        title: 'Reto sorpresa',
+        isChallenge: true,
+        status: 'active',
+        imageUrl: 'https://example.test/foto-sorpresa.jpg',
+        photoIsHint: false,
+        isOwn: false,
+      }),
+    ]
+
+    render(
+      <TripWrap
+        tripName="Viaje"
+        moments={moments}
+        route={[]}
+        leaderboard={[]}
+        prizes={null}
+        winnersByChallenge={new Map()}
+        onClose={() => {}}
+      />,
+    )
+
+    const item = screen.getByText('Reto sorpresa').closest('li')
+    expect(item).not.toBeNull()
+    expect(item?.querySelector('img')).not.toBeInTheDocument()
+  })
+
+  test('reto CERRADO con foto que era sorpresa: sí pinta la miniatura', () => {
+    const moments: Moment[] = [
+      moment({
+        challengeId: 'r1',
+        title: 'Reto cerrado',
+        isChallenge: true,
+        status: 'closed',
+        imageUrl: 'https://example.test/foto2.jpg',
+        photoIsHint: false,
+        isOwn: false,
+      }),
+    ]
+
+    render(
+      <TripWrap
+        tripName="Viaje"
+        moments={moments}
+        route={[]}
+        leaderboard={[]}
+        prizes={null}
+        winnersByChallenge={new Map()}
+        onClose={() => {}}
+      />,
+    )
+
+    const item = screen.getByText('Reto cerrado').closest('li')
+    expect(item?.querySelector('img')).toHaveAttribute('src', 'https://example.test/foto2.jpg')
+  })
 })
