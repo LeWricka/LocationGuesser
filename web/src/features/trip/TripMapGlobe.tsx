@@ -64,6 +64,22 @@ function computeMinFillZoom(width: number, height: number): number {
   return MIN_FILL_ZOOM_BASE + Math.max(0, Math.log2(maxDim / MIN_FILL_REFERENCE_PX))
 }
 
+// REGRESIÓN #640: el suelo de arriba se aplicaba como `minZoom` DURO del propio
+// mapa (constructor + resize), así que ganaba SIEMPRE — también sobre un
+// fitBounds que necesitara MENOS zoom para mostrar TODOS los pines (viaje
+// intercontinental, p.ej. Pamplona + Colombia). Resultado: la cámara centraba en
+// el punto medio del bounds (mitad del Atlántico) pero con un zoom demasiado
+// alto para que ninguno de los dos pines cupiera en pantalla. Regla correcta: el
+// suelo de relleno SOLO puede ganar cuando el propio encuadre ya cabe de sobra a
+// ese zoom (pines cercanos); si los pines están tan dispersos que aplicarlo los
+// recortaría, gana el zoom que el bounds necesita — el globo puede quedar más
+// pequeño que el lienzo (asoma cielo nocturno a los lados), pero NUNCA deja un
+// pin fuera de la vista inicial.
+function safeFitZoom(naturalZoom: number, minFill: number, maxZoom: number): number {
+  const capped = Math.min(naturalZoom, maxZoom)
+  return naturalZoom >= minFill ? Math.max(minFill, capped) : capped
+}
+
 // Entrada cinematográfica (Fase 2): arrancamos un punto MÁS lejos que WORLD_ZOOM
 // (vista de globo entero) y "aterrizamos" en el encuadre de la ruta. Duración corta
 // para que sea un gesto, no una espera. Con reduced-motion no se usa (salto directo).
@@ -276,15 +292,32 @@ export function TripMapGlobe({
     const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
     if (pts.length === 0) return
     const duration = prefersReducedMotion() ? 0 : 600
+    const rect = containerRef.current?.getBoundingClientRect()
+    const minFill = computeMinFillZoom(rect?.width ?? 0, rect?.height ?? 0)
     if (pts.length === 1) {
       // Un solo punto: zoom de ciudad (no de continente). fitBounds con un único
       // punto degenera en un zoom máximo absurdo, así que centramos a mano.
+      // El suelo de relleno nunca puede exigir MÁS zoom que el que vamos a usar
+      // (#640) — con un solo pin SINGLE_ZOOM siempre sobra, pero el `min` deja la
+      // invariante explícita en vez de asumirlo por los valores actuales. Se
+      // aplica ANTES del `easeTo`: si quedara un `minZoom` más alto de un
+      // encuadre previo (p.ej. el viaje tenía más pines hace un momento), ese
+      // suelo viejo clamparía por encima el propio `easeTo` de abajo.
+      map.setMinZoom(Math.min(minFill, SINGLE_ZOOM))
       map.easeTo({ center: pts[0], zoom: SINGLE_ZOOM, duration })
       return
     }
     const bounds = new gl.LngLatBounds(pts[0], pts[0])
     for (const p of pts) bounds.extend(p)
-    map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration })
+    // `cameraForBounds` calcula el centro/zoom que ENCUADRARÍA el bounds SIN
+    // moverla (a diferencia de `fitBounds`, que ya aplicaría la cámara): así
+    // decidimos el zoom final (`safeFitZoom`, #640) antes de tocar el mapa.
+    const natural = map.cameraForBounds(bounds, { padding: FIT_PADDING })
+    const zoom = safeFitZoom(natural?.zoom ?? FIT_MAX_ZOOM, minFill, FIT_MAX_ZOOM)
+    // Suelo ANTES del `easeTo` (mismo motivo que arriba): nunca clampar el vuelo
+    // que estamos a punto de lanzar con un suelo más alto de un encuadre previo.
+    map.setMinZoom(Math.min(minFill, zoom))
+    map.easeTo({ center: natural?.center ?? map.getCenter(), zoom, duration })
   }, [])
 
   // Entrada cinematográfica: arranca en vista de globo (bien lejos) y "aterriza" en
@@ -301,17 +334,26 @@ export function TripMapGlobe({
       fitToPins()
       return true
     }
+    const rect = containerRef.current?.getBoundingClientRect()
+    const minFill = computeMinFillZoom(rect?.width ?? 0, rect?.height ?? 0)
     const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
     if (pts.length === 0) {
-      // Viaje vacío: no hay destino. Igual hacemos un acercamiento sutil al globo
-      // para que la entrada no sea estática, sin reencuadrar nada.
-      map.easeTo({ zoom: WORLD_ZOOM, duration: INTRO_DURATION, essential: true })
+      // Viaje vacío: no hay destino NI bounds que proteger (#640) — el suelo de
+      // relleno manda sin restricción. Igual hacemos un acercamiento sutil al
+      // globo para que la entrada no sea estática, sin reencuadrar nada.
+      map.setMinZoom(minFill)
+      map.easeTo({ zoom: Math.max(WORLD_ZOOM, minFill), duration: INTRO_DURATION, essential: true })
       return true
     }
     // Punto de partida: globo entero (más lejos que el encuadre final). Lo fijamos sin
-    // animación y desde ahí volamos al destino, dando la sensación de aterrizar.
+    // animación y desde ahí volamos al destino, dando la sensación de aterrizar. El
+    // suelo aún no se ha tocado en este montaje (mapa recién creado, sin `minZoom`
+    // fijado): el `jumpTo` de partida nunca queda clampado.
     map.jumpTo({ center: WORLD_CENTER, zoom: INTRO_START_ZOOM })
     if (pts.length === 1) {
+      // Suelo ANTES del vuelo (#640, mismo motivo que `fitToPins`): nunca clampar
+      // el `flyTo` que viene justo debajo con un suelo más alto.
+      map.setMinZoom(Math.min(minFill, SINGLE_ZOOM))
       map.flyTo({
         center: pts[0],
         zoom: SINGLE_ZOOM,
@@ -322,9 +364,14 @@ export function TripMapGlobe({
     }
     const bounds = new gl.LngLatBounds(pts[0], pts[0])
     for (const p of pts) bounds.extend(p)
-    map.fitBounds(bounds, {
-      padding: FIT_PADDING,
-      maxZoom: FIT_MAX_ZOOM,
+    // Mismo criterio que `fitToPins` (#640): el suelo de relleno nunca recorta un
+    // bounds necesario — calculamos el zoom "seguro" ANTES de lanzar el vuelo.
+    const natural = map.cameraForBounds(bounds, { padding: FIT_PADDING })
+    const zoom = safeFitZoom(natural?.zoom ?? FIT_MAX_ZOOM, minFill, FIT_MAX_ZOOM)
+    map.setMinZoom(Math.min(minFill, zoom))
+    map.flyTo({
+      center: natural?.center ?? WORLD_CENTER,
+      zoom,
       duration: INTRO_DURATION,
       essential: true,
     })
@@ -349,21 +396,19 @@ export function TripMapGlobe({
         if (disposed) return
         glRef.current = gl
 
-        // Suelo de zoom calibrado contra el TAMAÑO REAL del contenedor en vez de la
-        // constante fija (regresión #593, ver `computeMinFillZoom`): así un viewport
-        // desktop ancho (más ancho que el móvil de referencia) sube el suelo lo
-        // necesario para que el satélite siga llenando el lienzo a sangre, sin
-        // asomar el cielo nocturno de `SCENE_GLOBE` a los lados.
-        const rect = container.getBoundingClientRect()
         const map = new gl.Map({
           container,
           style: BASE_STYLE,
           center: WORLD_CENTER,
           zoom: WORLD_ZOOM,
-          // Si un viaje tiene puntos muy dispersos, fitBounds clampa aquí y centra
-          // (raro en un viaje real, casi siempre regional). El intro cinematográfico
-          // también clampa.
-          minZoom: computeMinFillZoom(rect.width, rect.height),
+          // SIN `minZoom` fijo al crear el mapa: el suelo de relleno (#601,
+          // `computeMinFillZoom`) se aplica DESPUÉS de cada encuadre vía
+          // `map.setMinZoom(...)`, ya acotado a lo que el propio viaje necesita
+          // (`safeFitZoom`). Fijarlo aquí de entrada era la regresión #640: un
+          // `minZoom` alto de partida CLAMPA por encima cualquier fitBounds/
+          // cameraForBounds posterior que pidiera menos zoom para mostrar TODOS
+          // los pines (viaje intercontinental) — la cámara acababa centrada en el
+          // punto medio del bounds pero demasiado cerca para que ninguno cupiera.
           // SIN control de atribución de MapLibre: su modo compacto no ocultaba el texto
           // de Esri en prod (salía como banda, ver #363/#382). Sin control = imposible que
           // aparezca la banda; el crédito lo damos con nuestro propio "ⓘ" (ver render).
@@ -376,10 +421,22 @@ export function TripMapGlobe({
         // Recalcula el suelo de zoom si el contenedor cambia de tamaño (p.ej. al
         // redimensionar la ventana de escritorio): sin esto, el suelo calibrado al
         // montar quedaría obsoleto y el cielo nocturno podría volver a asomar (#593).
+        // Mismo criterio que el encuadre inicial (#640): con ≥2 pines, el suelo NUNCA
+        // sube por encima de lo que el bounds ACTUAL necesita para verse entero.
         onResize = () => {
           if (disposed) return
           const r = container.getBoundingClientRect()
-          map.setMinZoom(computeMinFillZoom(r.width, r.height))
+          const minFill = computeMinFillZoom(r.width, r.height)
+          const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
+          if (pts.length < 2) {
+            map.setMinZoom(minFill)
+            return
+          }
+          const bounds = new gl.LngLatBounds(pts[0], pts[0])
+          for (const p of pts) bounds.extend(p)
+          const natural = map.cameraForBounds(bounds, { padding: FIT_PADDING })
+          const zoom = safeFitZoom(natural?.zoom ?? FIT_MAX_ZOOM, minFill, FIT_MAX_ZOOM)
+          map.setMinZoom(Math.min(minFill, zoom))
         }
         window.addEventListener('resize', onResize)
 
