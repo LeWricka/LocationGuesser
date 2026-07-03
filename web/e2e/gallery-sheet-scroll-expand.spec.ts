@@ -10,8 +10,13 @@ import { type Route, expect, test } from '@playwright/test'
 // Nota: la galería NO reproduce el tacto real (touchmove del dedo); el dueño valida eso en
 // el móvil. Aquí solo aseguramos que la coordinación scroll↔expansión está cableada y no
 // regresiona (que el gesto mueve la hoja y engancha).
+//
+// Caso objetivo: la BIENVENIDA sin viajes (home-vacia), que es la pantalla que CONSERVA
+// el patrón globo + hoja tras la home inmersiva (issue #568: la home logueada con viajes
+// pasó a escena única SIN hoja, así que ya no ejercita este gesto; su guardia de
+// reemplazo vive en gallery-corner-integrity, test de la home inmersiva).
 
-const CASE = 'home-dashboard-lleno'
+const CASE = 'home-vacia'
 const TALL_VP = { width: 390, height: 858 }
 
 const blockExternal = (route: Route) => {
@@ -43,12 +48,18 @@ test('gesto scroll: la hoja se agranda al scrollear hacia arriba y se recoge hac
 
   // Scroll HACIA ARRIBA sobre el scroll interno (deltaY negativo = gesto arriba): debe
   // AGRANDAR la hoja (su top baja hacia 0). Emitimos varios ticks para superar el umbral y
-  // dejar que enganche a RAISED. El scroll interno es el hijo scrollable de la hoja.
-  const scroll = sheet.locator('div').last()
+  // dejar que enganche a RAISED. El scroll interno es el ÚNICO hijo <div> directo de la
+  // hoja (`.scroll` en GlobeSheet; el otro hijo es el <button> del asa). Antes se cogía el
+  // ÚLTIMO div en orden de documento, pero con contenido largo (la bienvenida) ese div cae
+  // bajo el pliegue y el wheel no aterrizaba en la hoja.
+  const scroll = sheet.locator('xpath=./div').first()
   const box = await scroll.boundingBox()
   expect(box).not.toBeNull()
   const cx = box!.x + box!.width / 2
-  const cy = box!.y + box!.height / 2
+  // Punto VISIBLE del scroll: su caja llega hasta el fondo del visor, así que el centro
+  // vertical del tramo visible (entre su top y el alto del viewport) es un punto seguro.
+  const visibleBottom = Math.min(box!.y + box!.height, TALL_VP.height)
+  const cy = box!.y + (visibleBottom - box!.y) / 2
 
   for (let i = 0; i < 8; i++) {
     await page.mouse.move(cx, cy)
