@@ -45,6 +45,13 @@ const MEMBER: GroupMemberInfo = {
   isOwner: false,
   isCreator: false,
 }
+const COOWNER2: GroupMemberInfo = {
+  userId: 'u-coowner2',
+  name: 'Dani',
+  role: 'owner',
+  isOwner: true,
+  isCreator: false,
+}
 
 function renderModal(props: Partial<Parameters<typeof MembersModal>[0]> = {}) {
   return render(
@@ -143,7 +150,7 @@ describe('MembersModal — lista y roles', () => {
   })
 })
 
-describe('MembersModal — expulsar (RLS: solo el creador)', () => {
+describe('MembersModal — expulsar (RLS group_members_delete, 0033)', () => {
   test('el creador expulsa a un miembro con confirmación propia', async () => {
     getGroupMembersMock.mockResolvedValue([CREATOR, MEMBER])
     const onChanged = vi.fn()
@@ -159,13 +166,46 @@ describe('MembersModal — expulsar (RLS: solo el creador)', () => {
     expect(onChanged).toHaveBeenCalled()
   })
 
-  test('un CO-DUEÑO no ve "Expulsar" (la RLS group_members_delete solo respalda al creador)', async () => {
+  test('el creador puede expulsar también a un CO-DUEÑO (a cualquiera menos a sí mismo)', async () => {
     getGroupMembersMock.mockResolvedValue([CREATOR, COOWNER, MEMBER])
+    const user = userEvent.setup()
+    renderModal()
+
+    const row = await memberRow('Bob')
+    await user.click(within(row).getByRole('button', { name: /Expulsar/ }))
+    await user.click(screen.getByRole('button', { name: 'Expulsar' }))
+    await waitFor(() => expect(kickMemberMock).toHaveBeenCalledWith('g1', 'u-coowner'))
+  })
+
+  test('un CO-DUEÑO expulsa a un MIEMBRO (la RLS ahora lo permite si role=member)', async () => {
+    getGroupMembersMock.mockResolvedValue([CREATOR, COOWNER, MEMBER])
+    const onChanged = vi.fn()
+    const user = userEvent.setup()
+    renderModal({ meId: 'u-coowner', onChanged })
+
+    const row = await memberRow('Cris')
+    await user.click(within(row).getByRole('button', { name: /Expulsar/ }))
+    await user.click(screen.getByRole('button', { name: 'Expulsar' }))
+    await waitFor(() => expect(kickMemberMock).toHaveBeenCalledWith('g1', 'u-member'))
+    expect(onChanged).toHaveBeenCalled()
+  })
+
+  test('un CO-DUEÑO no ve "Expulsar" en otro co-dueño ni en el creador (la RLS solo le respalda role=member)', async () => {
+    getGroupMembersMock.mockResolvedValue([CREATOR, COOWNER, COOWNER2, MEMBER])
     renderModal({ meId: 'u-coowner' })
-    await screen.findByText('Cris')
-    expect(screen.queryByRole('button', { name: /Expulsar/ })).toBeNull()
+    const creatorRow = await memberRow('Ana')
+    const otherOwnerRow = await memberRow('Dani')
+    expect(within(creatorRow).queryByRole('button', { name: /Expulsar/ })).toBeNull()
+    expect(within(otherOwnerRow).queryByRole('button', { name: /Expulsar/ })).toBeNull()
     // Pero sí gestiona roles (0026 lo respalda para cualquier owner).
     expect(screen.getByRole('button', { name: /Hacer co-dueño/ })).toBeInTheDocument()
+  })
+
+  test('nadie ve "Expulsar" en su propia fila (ni el creador ni un co-dueño)', async () => {
+    getGroupMembersMock.mockResolvedValue([CREATOR, COOWNER, MEMBER])
+    renderModal({ meId: 'u-coowner' })
+    const myRow = await memberRow('Bob')
+    expect(within(myRow).queryByRole('button', { name: /Expulsar/ })).toBeNull()
   })
 })
 
