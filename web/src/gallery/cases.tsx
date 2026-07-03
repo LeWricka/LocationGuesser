@@ -96,6 +96,7 @@ const MOMENT_CON_FOTO: Moment = {
   lat: 35.0036,
   lng: 135.7788,
   guessedCount: 0,
+  isOwn: false,
   guessSeconds: null,
   svPanoId: null,
   country: { code: 'JP', name: 'JAPÓN', flag: '🇯🇵' },

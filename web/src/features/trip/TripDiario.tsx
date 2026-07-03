@@ -93,7 +93,12 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
                     onSelectFromCarousel(m.challengeId)
                     onExpand(m)
                   }}
-                  onPlay={m.status === 'active' ? () => onPlay(m.challengeId) : undefined}
+                  // El propio reto activo no ofrece "Adivina →" (el creador no puede
+                  // jugar su reto, guarda #513): MomentCard pinta el recuento de
+                  // jugadas en su lugar cuando `moment.isOwn` (#578).
+                  onPlay={
+                    m.status === 'active' && !m.isOwn ? () => onPlay(m.challengeId) : undefined
+                  }
                 />
               </div>
             ))}

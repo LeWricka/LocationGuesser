@@ -267,6 +267,26 @@
   pointer-events: auto;
 }
 
+/* Estado del reto PROPIO en juego (issue #578): mismo hueco que el CTA cálido pero
+   SIN prometer una acción — un disco de vidrio con el recuento real de jugadas, no
+   un botón. `pointer-events: none` explícito: es información, no se toca. */
+.ownStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-on-photo);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-chrome);
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card {
     transition: none;

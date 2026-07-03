@@ -88,10 +88,13 @@ function statusOf(challenge: ChallengeForPlay, now: Date): MomentStatus {
  *  - Fotos del bucket privado: se firman en LOTE (Promise.all), no una por una.
  *  - `guessedCount` = nº de VOTANTES DISTINTOS por reto, derivado de los votos
  *    reales del grupo (no un número inventado).
+ *  - `isOwn` = `created_by === myUserId` (el `userId` de la sesión actual, pasado
+ *    por quien llama). Nunca se infiere en la UI: así la tarjeta de un reto propio
+ *    no ofrece un "Adivina →" que aterriza en la guarda "Este reto es tuyo" (#578).
  *  - Realtime: nos resuscribimos a los votos del grupo (igual patrón que
  *    GroupPage) para que likes/contadores y nuevos momentos se refresquen solos.
  */
-export function useTripData(groupId: string): TripData {
+export function useTripData(groupId: string, myUserId: string | null): TripData {
   const [group, setGroup] = useState<GroupInfo | null>(null)
   const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(null)
   const [votes, setVotes] = useState<VoteWithName[] | null>(null)
@@ -247,13 +250,16 @@ export function useTripData(groupId: string): TripData {
         lat: coord.lat,
         lng: coord.lng,
         guessedCount: guessedCountById.get(ch.id)?.size ?? 0,
+        // Sin sesión (myUserId null) nunca es "propio": no hay guardas de dueño que
+        // esquivar para un visitante anónimo sin cuenta.
+        isOwn: myUserId != null && ch.created_by === myUserId,
         guessSeconds: ch.guess_seconds,
         svPanoId: ch.sv_pano_id,
         // `undefined` mientras no se ha resuelto: la UI no pinta bandera todavía.
         country: countryById[ch.id],
       }
     })
-  }, [challenges, answersById, imageUrlById, guessedCountById, countryById])
+  }, [challenges, answersById, imageUrlById, guessedCountById, countryById, myUserId])
 
   // Ruta: los momentos con un lugar VISIBLE en el mapa, en orden cronológico ASC.
   // Entran los RECUERDOS con lugar (place_*) y los RETOS CERRADOS con respuesta

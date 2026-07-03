@@ -98,7 +98,7 @@ export function TripPage({
 }: Props) {
   const { user, profile } = useSession()
   const { group, moments, route, leaderboard, winnersByChallenge, loading, error, refresh } =
-    useTripData(groupId)
+    useTripData(groupId, user?.id ?? null)
   const reducedMotion = useReducedMotion()
   const toast = useToast()
 
