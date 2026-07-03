@@ -81,3 +81,61 @@ describe('MomentCard — reto EN JUEGO (issue #578)', () => {
     expect(screen.getByText('1 han jugado')).toBeInTheDocument()
   })
 })
+
+describe('MomentCard — foto sorpresa (issue #655, spoiler del carrusel)', () => {
+  const SORPRESA_LABEL = 'Foto sorpresa: se revela al cerrar el reto'
+  const FOTO = 'https://example.test/foto.jpg'
+
+  test('reto EN JUEGO con foto sorpresa (photoIsHint: false), NO propio: sin <img>, con candado', () => {
+    const { container } = render(
+      <MomentCard
+        moment={activeChallenge({ imageUrl: FOTO, photoIsHint: false, isOwn: false })}
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(container.querySelector('img')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: SORPRESA_LABEL })).toBeInTheDocument()
+  })
+
+  test('reto EN JUEGO con foto sorpresa, PROPIO (isOwn): sí pinta su foto, con el sello', () => {
+    const { container } = render(
+      <MomentCard
+        moment={activeChallenge({ imageUrl: FOTO, photoIsHint: false, isOwn: true })}
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(container.querySelector('img')).toHaveAttribute('src', FOTO)
+    expect(screen.getByRole('img', { name: SORPRESA_LABEL })).toBeInTheDocument()
+  })
+
+  test('reto EN JUEGO con foto PISTA (photoIsHint: true): visible, sin candado', () => {
+    const { container } = render(
+      <MomentCard
+        moment={activeChallenge({ imageUrl: FOTO, photoIsHint: true, isOwn: false })}
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(container.querySelector('img')).toHaveAttribute('src', FOTO)
+    expect(screen.queryByRole('img', { name: SORPRESA_LABEL })).not.toBeInTheDocument()
+  })
+
+  test('reto CERRADO con foto que era sorpresa: ya visible, sin candado', () => {
+    const { container } = render(
+      <MomentCard
+        moment={activeChallenge({
+          status: 'closed',
+          imageUrl: FOTO,
+          photoIsHint: false,
+          isOwn: false,
+        })}
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(container.querySelector('img')).toHaveAttribute('src', FOTO)
+    expect(screen.queryByRole('img', { name: SORPRESA_LABEL })).not.toBeInTheDocument()
+  })
+})

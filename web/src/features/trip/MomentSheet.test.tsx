@@ -82,6 +82,28 @@ const RETO_CERRADO: Moment = {
   country: { code: 'ES', name: 'ESPAÑA', flag: '🇪🇸' },
 }
 
+// Reto EN JUEGO con foto SORPRESA (`photoIsHint: false`, issue #655): fixture
+// para las pruebas anti-spoiler del héroe de la hoja.
+const RETO_ACTIVO_SORPRESA: Moment = {
+  challengeId: 'c3',
+  title: '¿Dónde estamos?',
+  description: null,
+  status: 'active',
+  isChallenge: true,
+  date: '2026-07-01T10:00:00.000Z',
+  deadlineAt: '2026-07-02T10:00:00.000Z',
+  imageUrl: 'https://example.test/foto-sorpresa.jpg',
+  imagePath: 'path/foto-sorpresa.jpg',
+  lat: null,
+  lng: null,
+  guessedCount: 0,
+  isOwn: false,
+  guessSeconds: null,
+  svPanoId: null,
+  country: null,
+  photoIsHint: false,
+}
+
 function makeVote(overrides: Partial<Vote> = {}): Vote {
   return {
     id: 'v1',
@@ -461,5 +483,38 @@ describe('MomentSheet', () => {
       )
       expect(onEdited).toHaveBeenCalledTimes(1)
     })
+  })
+})
+
+// --- Foto sorpresa en el héroe de la hoja (issue #655) -------------------------
+describe('MomentSheet — foto sorpresa (issue #655)', () => {
+  const SORPRESA_LABEL = 'Foto sorpresa: se revela al cerrar el reto'
+
+  test('reto EN JUEGO con foto sorpresa, NO propio: sin <img>, con candado', () => {
+    const { container } = renderSheet({ moment: RETO_ACTIVO_SORPRESA })
+    expect(container.querySelector('img')).not.toBeInTheDocument()
+    expect(screen.getByRole('img', { name: SORPRESA_LABEL })).toBeInTheDocument()
+  })
+
+  test('reto EN JUEGO con foto sorpresa, PROPIO (isOwn): pinta la foto con el sello', () => {
+    const { container } = renderSheet({
+      moment: { ...RETO_ACTIVO_SORPRESA, isOwn: true },
+    })
+    expect(container.querySelector('img')).toHaveAttribute('src', RETO_ACTIVO_SORPRESA.imageUrl)
+    expect(screen.getByRole('img', { name: SORPRESA_LABEL })).toBeInTheDocument()
+  })
+
+  test('foto PISTA (photoIsHint: true) en juego: visible, sin candado', () => {
+    const { container } = renderSheet({
+      moment: { ...RETO_ACTIVO_SORPRESA, photoIsHint: true },
+    })
+    expect(container.querySelector('img')).toHaveAttribute('src', RETO_ACTIVO_SORPRESA.imageUrl)
+    expect(screen.queryByRole('img', { name: SORPRESA_LABEL })).not.toBeInTheDocument()
+  })
+
+  test('reto CERRADO con foto que era sorpresa: ya visible, sin candado', () => {
+    const { container } = renderSheet({ moment: RETO_CERRADO })
+    expect(container.querySelector('img')).toHaveAttribute('src', RETO_CERRADO.imageUrl)
+    expect(screen.queryByRole('img', { name: SORPRESA_LABEL })).not.toBeInTheDocument()
   })
 })

@@ -28,27 +28,28 @@
      suave (emphasized): la tarjeta centrada salta un punto hacia delante. */
   outline: 0 solid transparent;
   outline-offset: 2px;
-  /* Tarjeta en reposo (no centrada): un pelín más pequeña y apagada que la
-     seleccionada — la única pista de "cuál es la activa" era antes el anillo, que
-     se pierde de un vistazo al hojear rápido (bug #500). */
+  /* Tarjeta en reposo (no centrada): un pelín más pequeña que la seleccionada —
+     la única pista de "cuál es la activa" era antes el anillo, que se pierde de
+     un vistazo al hojear rápido (bug #500). La atenuación de la NO centrada vive
+     SOLO en `.photo` (filter, no `opacity` de la tarjeta entera): un `opacity`
+     aquí apagaría a la vez el texto/los badges del `.overlay`, bajando su
+     contraste por debajo de AA (axe, issue #655/#632 — mismo pecado que ya se
+     corrigió en la Home). */
   transform: scale(0.96);
-  opacity: 0.82;
   transition:
     outline-color var(--transition-fast),
     box-shadow var(--transition-base),
-    opacity var(--motion-transition-base),
     transform var(--duration-slow) var(--ease-spring);
 }
 
 /* Tarjeta seleccionada (centrada): anillo claro que la ata al pin resaltado, una
-   sombra más presente, opacidad plena y un leve lift + escala que la traen al
-   frente del carrusel (misma pista visual que el "salto" del dot en la línea
-   temporal, con el par de motion compartido). */
+   sombra más presente y un leve lift + escala que la traen al frente del
+   carrusel (misma pista visual que el "salto" del dot en la línea temporal, con
+   el par de motion compartido). */
 .card.selected {
   outline: 2px solid var(--color-on-photo);
   box-shadow: var(--shadow-photo-card-active);
   transform: translateY(-4px) scale(1);
-  opacity: 1;
 }
 
 /* Marca de RECUERDO (contenido, no juego): filete fino a la izquierda en acento.
@@ -128,6 +129,16 @@
   max-width: none;
   border: 0;
   border-radius: var(--radius-lg);
+  /* Atenuación de la tarjeta NO centrada (issue #655): solo la FOTO se apaga
+     (saturación/brillo, mismos valores que la Home, #632) — el texto/badges del
+     `.overlay` (sibling, fuera de este marco) quedan siempre a contraste pleno.
+     Seleccionada = filtro neutro (ver `.card.selected .photo`). */
+  filter: saturate(0.8) brightness(0.92);
+  transition: filter var(--motion-transition-base);
+}
+
+.card.selected .photo {
+  filter: saturate(1) brightness(1);
 }
 
 /* Capa de contenido sobre la foto: ocupa toda la tarjeta y no intercepta toques
@@ -196,6 +207,30 @@
 .flagEmoji {
   font-size: var(--font-size-md);
   line-height: 1;
+}
+
+/* Sello "Sorpresa" (issue #655): mismo lenguaje de disco de vidrio que `.flag`,
+   esquina sup-derecha (libre: los activos/práctica con foto-sorpresa no llevan
+   bandera de país todavía). Solo informa, no se toca. */
+.surprise {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  /* design-lint-allow: capa local de la tarjeta (chrome flotante sobre la foto) */
+  z-index: 1;
+  width: var(--tap-target-sm);
+  height: var(--tap-target-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  color: var(--color-on-photo);
+  pointer-events: none;
 }
 
 /* Chip de estado ("EN JUEGO" / "🎯 Reto") sobre el título, dentro del pie. En flujo
@@ -309,12 +344,15 @@
   .card {
     transition: none;
     /* Sin escala (nada de "zoom" para quien pide menos movimiento): la tarjeta
-       activa se distingue solo por opacidad, anillo y sombra. */
+       activa se distingue solo por el filtro de su foto, el anillo y la sombra. */
     transform: none;
   }
   /* Sin movimiento: el enfoque se comunica por el anillo y la sombra, no por el
      lift (nada de desplazamiento para quien pide menos movimiento). */
   .card.selected {
     transform: none;
+  }
+  .photo {
+    transition: none;
   }
 }

@@ -204,13 +204,35 @@
   outline-offset: 2px;
 }
 
-/* Contenedor del estado (badge EN JUEGO / sello Reto) arriba-derecha. */
+/* Contenedor del estado (badge EN JUEGO / sello Reto, + sello Sorpresa si aplica)
+   arriba-derecha. Columna con los sellos apilados: normalmente uno solo, pero un
+   reto EN JUEGO con foto sorpresa (#655) pinta los dos. */
 .heroSeal {
   position: absolute;
   top: var(--space-5);
   right: var(--space-4);
   /* design-lint-allow: capa local del hero (chrome flotante sobre la foto) */
   z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+/* Sello "Sorpresa" (issue #655): mismo lenguaje de chrome que `.heroClose` (disco
+   de velo de escena), sin texto — el candado ya lo dice, el detalle va en el
+   `aria-label` del elemento. */
+.surpriseSeal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  width: var(--tap-target-sm);
+  height: var(--tap-target-sm);
+  border-radius: var(--radius-full);
+  color: var(--scene-ink);
+  background: var(--scene-veil);
+  border: 1px solid var(--scene-hairline);
 }
 
 /* Sello dorado "Reto": pastilla de oro SÓLIDA (sin gradiente ni glow cálido; el oro

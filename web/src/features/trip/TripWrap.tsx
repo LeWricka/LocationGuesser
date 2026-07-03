@@ -1,9 +1,9 @@
 import { useEffect, type CSSProperties } from 'react'
 import { Camera, Flag, Footprints, Target, Users, X } from 'lucide-react'
-import { Avatar, Icon, IconCamara } from '../../ui'
+import { Avatar, Icon, IconCamara, IconCandado } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
-import type { Moment, RoutePoint } from '../../lib/trip'
+import { resolveMomentPhoto, type Moment, type RoutePoint } from '../../lib/trip'
 import { Podium, type PodiumClasses } from '../group/Podium'
 import { TripMap } from './TripMap'
 import type { ChallengeWinner } from './useTripData'
@@ -219,14 +219,19 @@ export function TripWrap({
             <ol className={styles.tlList}>
               {moments.map((m) => {
                 const winner = m.isChallenge ? winnersByChallenge.get(m.challengeId) : undefined
+                // Un viaje cerrado no cierra automáticamente sus retos EN JUEGO (son
+                // dos "cierres" independientes, ver GroupSettingsModal): la sorpresa
+                // (`photoIsHint: false`) de uno de esos retos NO se pinta aquí tampoco
+                // (issue #655) — mismo `resolveMomentPhoto` que el carrusel/la hoja.
+                const { src: thumbSrc, surprise: thumbSurprise } = resolveMomentPhoto(m)
                 return (
                   <li key={m.challengeId} className={styles.tlItem}>
                     <span className={styles.tlThumb} aria-hidden="true">
-                      {m.imageUrl ? (
-                        <img src={m.imageUrl} alt="" loading="lazy" />
+                      {thumbSrc ? (
+                        <img src={thumbSrc} alt="" loading="lazy" />
                       ) : (
                         <span className={styles.tlThumbFallback}>
-                          <IconCamara size={18} />
+                          {thumbSurprise ? <IconCandado size={16} /> : <IconCamara size={18} />}
                         </span>
                       )}
                     </span>

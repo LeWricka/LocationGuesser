@@ -1,6 +1,6 @@
 import { Target, User } from 'lucide-react'
-import { Badge, Button, ChallengePhoto, Icon } from '../../ui'
-import type { Moment } from '../../lib/trip'
+import { Badge, Button, ChallengePhoto, Icon, IconCandado } from '../../ui'
+import { resolveMomentPhoto, type Moment } from '../../lib/trip'
 import styles from './MomentCard.module.css'
 
 interface Props {
@@ -46,6 +46,13 @@ function formatMomentDate(value: string): string | null {
  * botón que promete algo imposible. Mantiene el badge "EN JUEGO" (sigue en curso) pero
  * el hueco del CTA pasa a informar del recuento real de jugadas ("N han jugado" /
  * "Esperando jugadas" si aún nadie jugó). Tocar la tarjeta sigue abriendo el detalle.
+ *
+ * FOTO SORPRESA (issue #655): un reto EN JUEGO/práctica con `photoIsHint: false` no
+ * pinta `moment.imageUrl` a pelo — sería destriparlo antes de que nadie vote.
+ * `resolveMomentPhoto` (lib/trip.ts, misma regla que la pestaña Fotos) decide la
+ * foto real a mostrar y si hace falta el sello "Sorpresa"; el creador (`isOwn`) SÍ
+ * ve su propia foto en preview, con el mismo sello para que sepa que el resto
+ * del grupo aún no la ve.
  */
 export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
   const isActive = moment.status === 'active'
@@ -60,6 +67,7 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
   // pregunta, en su propio renglón dentro del mismo bloque de texto: así el nombre
   // del lugar y la pregunta jamás se solapan (bug nº1 del test de diseño).
   const placeName = moment.country?.name ?? null
+  const { src: photoSrc, surprise } = resolveMomentPhoto(moment)
 
   return (
     <article
@@ -71,7 +79,7 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
           grande). Un solo gesto claro — sin botón de "ampliar" suelto, que se perdía
           sobre fotos claras. El zoom real de la imagen vive ya en el detalle. */}
       <ChallengePhoto
-        src={moment.imageUrl}
+        src={photoSrc}
         alt={moment.title}
         ratio="wide"
         zoomable={false}
@@ -86,6 +94,21 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
       {moment.country?.flag && (
         <div className={styles.flag} aria-hidden="true">
           <span className={styles.flagEmoji}>{moment.country.flag}</span>
+        </div>
+      )}
+
+      {/* Sello "Sorpresa" (issue #655): disco de vidrio esquina sup-der (mismo
+          lenguaje que la bandera) cuando la foto sigue siendo secreta para el
+          grupo — se pinte (preview del creador) o no (placeholder de marca). Sin
+          texto: el candado ya lo dice, `aria-label` lleva el detalle a lectores
+          de pantalla. */}
+      {surprise && (
+        <div
+          className={styles.surprise}
+          role="img"
+          aria-label="Foto sorpresa: se revela al cerrar el reto"
+        >
+          <IconCandado size={14} />
         </div>
       )}
 
