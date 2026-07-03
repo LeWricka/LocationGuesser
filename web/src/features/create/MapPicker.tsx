@@ -265,7 +265,15 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
               resultado, gane quien gane la carrera de qué señal llegó última. */}
           <Recenter flyTo={searchFlyTo} zoom={SEARCH_ZOOM} flownRef={flownSearchRef} />
           <ViewTracker onChange={setView} />
-          {value && <Marker position={[value.lat, value.lng]} icon={pinIcon} />}
+          {/* Pin presentacional: el sitio se marca tocando el MAPA, no operando el pin — sin foco de teclado ni rol de comando (a11y: aria-command-name) */}
+          {value && (
+            <Marker
+              position={[value.lat, value.lng]}
+              icon={pinIcon}
+              keyboard={false}
+              interactive={false}
+            />
+          )}
         </MapContainer>
         <div className={styles.controls}>
           <LayerToggle layer={layer} onChoose={chooseLayer} />
@@ -339,7 +347,15 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
                   <Recenter flyTo={flyTo} flownRef={flownExternalRef} />
                   <Recenter flyTo={searchFlyTo} zoom={SEARCH_ZOOM} flownRef={flownSearchRef} />
                   <ViewTracker onChange={setView} />
-                  {value && <Marker position={[value.lat, value.lng]} icon={pinIcon} />}
+                  {/* Pin presentacional: el sitio se marca tocando el MAPA, no operando el pin — sin foco de teclado ni rol de comando (a11y: aria-command-name) */}
+                  {value && (
+                    <Marker
+                      position={[value.lat, value.lng]}
+                      icon={pinIcon}
+                      keyboard={false}
+                      interactive={false}
+                    />
+                  )}
                 </MapContainer>
                 <div className={styles.controls}>
                   <LayerToggle layer={layer} onChoose={chooseLayer} />

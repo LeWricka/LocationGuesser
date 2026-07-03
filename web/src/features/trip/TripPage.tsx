@@ -652,6 +652,8 @@ export function TripPage({
       <MomentSheet
         moment={openMoment}
         canEdit={canCreate}
+        tripStartsOn={group?.starts_on ?? null}
+        tripEndsOn={group?.ends_on ?? null}
         onClose={() => setOpenMoment(null)}
         onPlay={
           openMoment?.status === 'active'

@@ -20,11 +20,13 @@ import { AddMoment } from '../features/create/AddMoment'
 import { CreateChallengeFlow } from '../features/create/CreateChallengeFlow'
 import { EditChallenge } from '../features/group/EditChallenge'
 import { MomentGallery } from '../features/trip/MomentGallery'
+import { MomentSheet } from '../features/trip/MomentSheet'
 import { GroupSettingsModal } from '../features/group/GroupSettingsModal'
 import { ResultCard } from '../features/play/ResultCard'
 import { HomeDashboard, LoginScreen, type HomeGroup, type HomePinned } from '../ui'
 import type { GlobePin } from '../ui'
 import type { ChallengeForPlay } from '../lib/challenges'
+import type { Moment } from '../lib/trip'
 import {
   CHALLENGES,
   CH_ACTIVE,
@@ -64,6 +66,53 @@ function challengeForPlay(id: string): ChallengeForPlay {
 }
 
 const noop = () => {}
+
+// Foto stub para `MomentSheet` (issue #571): mismo estilo que el SVG data-URI que
+// firma el Storage falso (`fakeSupabase.photoDataUri`, no exportado), duplicado
+// aquí en miniatura porque `MomentSheet` recibe `imageUrl` ya resuelto (no lo
+// firma él mismo; solo `MomentGallery` pasa por el cliente falso).
+function stubPhoto(label: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice">
+    <rect width="800" height="1000" fill="#2f4a63"/>
+    <text x="400" y="520" fill="#f6f7f9" font-family="Georgia, serif" font-size="40" text-anchor="middle" opacity="0.4">${label}</text>
+  </svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+// Recuerdo CON foto: mismo `challengeId` que CH_MEMORY, así la galería embebida
+// ("La serie" / la tira editable) carga los `MOMENT_IMAGES` ya sembrados para ese
+// momento a través del cliente falso — sin foto propia inventada sin fotos detrás.
+const MOMENT_CON_FOTO: Moment = {
+  challengeId: CH_MEMORY,
+  title: 'El mejor ramen del viaje',
+  description: 'Una barra de ocho asientos perdida en un callejón.',
+  status: 'recuerdo',
+  isChallenge: false,
+  date: '2026-06-11T10:00:00.000Z',
+  deadlineAt: null,
+  imageUrl: stubPhoto('El mejor ramen del viaje'),
+  imagePath: 'photo-ramen.jpg',
+  lat: 35.0036,
+  lng: 135.7788,
+  guessedCount: 0,
+  guessSeconds: null,
+  svPanoId: null,
+  country: { code: 'JP', name: 'JAPÓN', flag: '🇯🇵' },
+}
+
+// Recuerdo SIN foto (la captura exacta del dueño, #571): `challengeId` propio, sin
+// filas en `MOMENT_IMAGES`, así la galería embebida también queda vacía de verdad.
+const MOMENT_SIN_FOTO: Moment = {
+  ...MOMENT_CON_FOTO,
+  challengeId: 'ch-memory-sin-foto',
+  title: 'Tinto de verano en la plaza',
+  description: null,
+  imageUrl: null,
+  imagePath: null,
+  lat: null,
+  lng: null,
+  country: null,
+}
 
 // HomeDashboard directo (home logueada, estado lleno): mismo patrón que su story,
 // pero con los fixtures del viaje sembrado para coherencia con el resto de casos.
@@ -271,6 +320,33 @@ export const cases: GalleryCase[] = [
         <MomentGallery challengeId={CH_MEMORY} initialCoverUrl={null} canEdit onChanged={noop} />
       </div>
     ),
+  },
+  {
+    id: 'recuerdo-vista-con-foto',
+    title: 'Recuerdo · Vista (con foto)',
+    section: 'Viaje',
+    render: () => <MomentSheet moment={MOMENT_CON_FOTO} canEdit onClose={noop} />,
+  },
+  {
+    id: 'recuerdo-vista-sin-foto',
+    title: 'Recuerdo · Vista (sin foto)',
+    section: 'Viaje',
+    render: () => <MomentSheet moment={MOMENT_SIN_FOTO} canEdit onClose={noop} />,
+  },
+  {
+    // La captura del dueño (#571): editar un recuerdo SIN foto ya NO hereda el
+    // héroe de la escena (vacío negro + título gigante duplicado) — formulario de
+    // papel, misma gramática que "Nuevo recuerdo".
+    id: 'recuerdo-editar-sin-foto',
+    title: 'Recuerdo · Editar de papel (sin foto)',
+    section: 'Viaje',
+    render: () => <MomentSheet moment={MOMENT_SIN_FOTO} canEdit initialEditing onClose={noop} />,
+  },
+  {
+    id: 'recuerdo-editar-con-foto',
+    title: 'Recuerdo · Editar de papel (con foto)',
+    section: 'Viaje',
+    render: () => <MomentSheet moment={MOMENT_CON_FOTO} canEdit initialEditing onClose={noop} />,
   },
   {
     id: 'crear-viaje',

@@ -13,6 +13,7 @@ import { deadlineFromMinutes } from '../../lib/time'
 import { lockBodyScroll } from '../../lib/scrollLock'
 import { MapPicker } from '../create/MapPicker'
 import { Countdown } from './Countdown'
+import { EditMomentForm } from './EditMomentForm'
 import { MomentGallery } from './MomentGallery'
 import { MomentMiniMap } from './MomentMiniMap'
 import styles from './MomentSheet.module.css'
@@ -22,6 +23,19 @@ interface Props {
   moment: Moment | null
   /** El usuario es dueño del viaje: puede editar la descripción y convertir en reto. */
   canEdit?: boolean
+  /**
+   * Fechas del viaje (si las tiene, migración 0027): acotan el tope superior del
+   * calendario al editar un recuerdo, mismo criterio que "Nuevo recuerdo" (#565).
+   * `null`/`undefined` si el viaje no tiene fechas — el tope cae a "hoy".
+   */
+  tripStartsOn?: string | null
+  tripEndsOn?: string | null
+  /**
+   * Arranca la hoja directamente en modo EDITAR (papel) en vez de la vista. Solo
+   * para la galería visual y tests: en producción siempre se entra por "Editar
+   * recuerdo" desde la vista.
+   */
+  initialEditing?: boolean
   onClose: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
@@ -76,6 +90,24 @@ function formatMomentDate(value: string): string | null {
   return dateFmt.format(date)
 }
 
+// Fecha de hoy en `YYYY-MM-DD` local — mismo criterio que `AddMoment` (no se puede
+// importar de `features/create`; helper minúsculo, se duplica a propósito).
+function todayIso(): string {
+  const d = new Date()
+  const off = d.getTimezoneOffset()
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10)
+}
+
+// Tope superior del calendario al editar un recuerdo: mismo criterio que el campo
+// "Fecha" de "Nuevo recuerdo" (#565) — hoy, salvo que el viaje sea FUTURO (con
+// fechas), en cuyo caso se amplía hasta su fin. Sin `min`: AddMoment tampoco lo
+// aplica (aplicar "lo mismo" barato es solo el tope superior).
+function computeEditMaxDate(startsOn: string | null, endsOn: string | null): string {
+  const today = todayIso()
+  const isFutureTrip = startsOn != null && startsOn > today
+  return isFutureTrip && endsOn ? endsOn : today
+}
+
 // Umbral de arrastre (px) a partir del cual soltar cierra la hoja. Por debajo,
 // la hoja vuelve a su sitio (gesto cancelado).
 const DRAG_CLOSE_PX = 110
@@ -125,6 +157,9 @@ const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
 export function MomentSheet({
   moment,
   canEdit = false,
+  tripStartsOn = null,
+  tripEndsOn = null,
+  initialEditing = false,
   onClose,
   onPlay,
   onPromoted,
@@ -159,7 +194,7 @@ export function MomentSheet({
   // ── Editar el RECUERDO (título, fecha, lugar) ───────────────────────────────
   // Sub-formulario del dueño sobre un recuerdo. Estado local sembrado del momento;
   // el panel se remonta por `key`, así que arranca limpio en cada apertura.
-  const [editingMeta, setEditingMeta] = useState(false)
+  const [editingMeta, setEditingMeta] = useState(initialEditing)
   const [editTitle, setEditTitle] = useState(moment?.title ?? '')
   const [editDate, setEditDate] = useState(moment ? dateInputValue(moment.date) : '')
   const [editPlace, setEditPlace] = useState<LatLng | null>(
@@ -248,9 +283,12 @@ export function MomentSheet({
     }
   }
 
-  // Guarda los datos del RECUERDO (título, fecha y lugar). Optimista igual que la
-  // descripción: cierra la edición y avisa al padre para refrescar el viaje (la
-  // tarjeta, el mapa y el orden de la línea de tiempo dependen de estos campos).
+  // Guarda los datos del RECUERDO (título, descripción, fecha y lugar) del
+  // formulario de PAPEL (#571): UNA sola escritura para los cuatro campos, en vez
+  // de dos (esta + `saveDescription`) — el formulario los presenta juntos, como
+  // "Nuevo recuerdo". Optimista: cierra la edición y avisa al padre para refrescar
+  // el viaje (la tarjeta, el mapa y el orden de la línea de tiempo dependen de
+  // título/fecha/lugar).
   const saveMeta = async () => {
     if (!moment) return
     const trimmedTitle = editTitle.trim()
@@ -262,11 +300,15 @@ export function MomentSheet({
     try {
       await updateMoment(moment.challengeId, {
         title: trimmedTitle,
+        description,
         createdAt: editDate ? dateInputToIso(editDate, moment.date) : undefined,
         // Lugar: el dueño lo marca/mueve en el mapa; null lo quita del mapa.
         place: editPlace ? { lat: editPlace.lat, lng: editPlace.lng } : null,
       })
       setEditingMeta(false)
+      // La edición inline de la descripción (el lápiz junto al texto) queda
+      // cerrada: el formulario de papel ya guardó lo que hubiera en curso.
+      setEditing(false)
       toast.show('Recuerdo actualizado', { tone: 'success' })
       onEdited?.()
     } catch (err) {
@@ -386,9 +428,8 @@ export function MomentSheet({
   // la clase `.closing` lo lleve a `translateY(100%)` continuando desde donde esté.
   const panelStyle = !closing && dragY ? { transform: `translateY(${dragY}px)` } : undefined
 
-  // ¿Hay un sub-formulario abierto (editar datos o convertir en reto)? En ese caso
-  // la vista entra en "modo edición": el foco es el formulario y se atenúa el resto.
-  const formOpen = editingMeta || promoting
+  // Tope superior del calendario al editar (mismo criterio que "Nuevo recuerdo").
+  const editMaxDate = computeEditMaxDate(tripStartsOn, tripEndsOn)
 
   return (
     <div className={styles.overlay} onClick={close}>
@@ -411,421 +452,376 @@ export function MomentSheet({
           if (closing && e.propertyName === 'transform') onClose()
         }}
       >
-        {/* Asa de arrastre: zona de gesto para cerrar tirando hacia abajo. */}
-        <div
-          className={styles.handleZone}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-        >
-          <span className={styles.handle} aria-hidden="true" />
-        </div>
+        {/* Asa de arrastre: zona de gesto para cerrar tirando hacia abajo. Solo en
+            la VISTA (escena): editar es una TAREA de papel, sin gesto de cierre
+            accidental que tire un formulario a medio rellenar (#571). */}
+        {!editingMeta && (
+          <div
+            className={styles.handleZone}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+          >
+            <span className={styles.handle} aria-hidden="true" />
+          </div>
+        )}
 
-        {/* El contenido es el ÚNICO scrollable: foto a sangre arriba + cuerpo
-            editorial (papel) debajo. El scroll vive aquí, nunca en la página. */}
+        {/* El contenido es el ÚNICO scrollable. VISTA (escena): foto a sangre +
+            cuerpo editorial (papel) debajo. EDITAR (#571): formulario utilitario
+            de papel, misma gramática que "Nuevo recuerdo" — sin héroe, sin chip
+            flotante, sin duplicar el título. */}
         <div className={styles.content}>
-          {/* ── HERO: FOTO A SANGRE ───────────────────────────────────────────
+          {editingMeta ? (
+            <EditMomentForm
+              moment={moment}
+              title={editTitle}
+              onTitleChange={setEditTitle}
+              description={description}
+              onDescriptionChange={setDescription}
+              date={editDate}
+              onDateChange={setEditDate}
+              maxDate={editMaxDate}
+              place={editPlace}
+              onPlaceChange={setEditPlace}
+              saving={savingMeta}
+              onCancel={() => setEditingMeta(false)}
+              onSave={() => void saveMeta()}
+              onGalleryChanged={onEdited}
+            />
+          ) : (
+            <>
+              {/* ── HERO: FOTO A SANGRE ───────────────────────────────────────────
               La foto manda. Velo inferior con la info editorial encima. Ken Burns
               sutil vía CSS (anulado bajo reduced-motion). El "sello" de reto y el
               chip de lugar van superpuestos. */}
-          <header className={styles.hero}>
-            <div className={styles.heroPhoto} data-empty={!moment.imageUrl || undefined}>
-              <ChallengePhoto
-                src={moment.imageUrl}
-                alt={moment.title}
-                ratio="wide"
-                size="lg"
-                className={styles.heroImg}
-              />
-            </div>
-
-            {/* Cerrar: chip flotante arriba-izquierda (toca el velo del mapa de A). */}
-            <button
-              type="button"
-              className={[styles.heroClose, 'lg-press'].join(' ')}
-              onClick={close}
-              aria-label="Volver"
-            >
-              <Icon icon={ArrowLeft} size={20} />
-            </button>
-
-            {/* Estado del momento sobre la foto: sello dorado "Reto" o badge EN JUEGO. */}
-            {isActive ? (
-              <div className={styles.heroSeal}>
-                <Badge tone="live" dot>
-                  EN JUEGO
-                </Badge>
-              </div>
-            ) : isReto ? (
-              <div className={styles.heroSeal}>
-                <span className={styles.seal}>
-                  <Icon icon={Target} size={13} /> Reto
-                </span>
-              </div>
-            ) : null}
-
-            {/* Chip de lugar (país) sobre la foto, estilo "place-chip" de A. */}
-            {country && (
-              <div className={styles.placeChip}>
-                <Icon icon={MapPin} size={13} />
-                <span>{country.name}</span>
-              </div>
-            )}
-
-            {/* Velo inferior con la info: eyebrow + título serif GRANDE + meta. */}
-            <div className={styles.veil}>
-              <p className={styles.eyebrow}>{eyebrow}</p>
-              <h1 className={styles.title}>{moment.title}</h1>
-              <span className={styles.rule} aria-hidden="true" />
-              {(country || date) && (
-                <p className={styles.meta}>
-                  {country && (
-                    <span className={styles.country}>
-                      <span aria-hidden="true">{country.flag}</span> {country.name}
-                    </span>
-                  )}
-                  {country && date && <span aria-hidden="true"> · </span>}
-                  {date}
-                </p>
-              )}
-              {/* Cuenta atrás VIVA solo si el reto está EN JUEGO. */}
-              {isActive && (
-                <div className={styles.countdown}>
-                  <Countdown deadlineAt={moment.deadlineAt} />
+              <header className={styles.hero}>
+                <div className={styles.heroPhoto} data-empty={!moment.imageUrl || undefined}>
+                  <ChallengePhoto
+                    src={moment.imageUrl}
+                    alt={moment.title}
+                    ratio="wide"
+                    size="lg"
+                    className={styles.heroImg}
+                  />
                 </div>
-              )}
-            </div>
-          </header>
 
-          {/* ── CUERPO EDITORIAL (papel) ──────────────────────────────────────
+                {/* Cerrar: chip flotante arriba-izquierda (toca el velo del mapa de A). */}
+                <button
+                  type="button"
+                  className={[styles.heroClose, 'lg-press'].join(' ')}
+                  onClick={close}
+                  aria-label="Volver"
+                >
+                  <Icon icon={ArrowLeft} size={20} />
+                </button>
+
+                {/* Estado del momento sobre la foto: sello dorado "Reto" o badge EN JUEGO. */}
+                {isActive ? (
+                  <div className={styles.heroSeal}>
+                    <Badge tone="live" dot>
+                      EN JUEGO
+                    </Badge>
+                  </div>
+                ) : isReto ? (
+                  <div className={styles.heroSeal}>
+                    <span className={styles.seal}>
+                      <Icon icon={Target} size={13} /> Reto
+                    </span>
+                  </div>
+                ) : null}
+
+                {/* Chip de lugar (país) sobre la foto, estilo "place-chip" de A. */}
+                {country && (
+                  <div className={styles.placeChip}>
+                    <Icon icon={MapPin} size={13} />
+                    <span>{country.name}</span>
+                  </div>
+                )}
+
+                {/* Velo inferior con la info: eyebrow + título serif GRANDE + meta. */}
+                <div className={styles.veil}>
+                  <p className={styles.eyebrow}>{eyebrow}</p>
+                  <h1 className={styles.title}>{moment.title}</h1>
+                  <span className={styles.rule} aria-hidden="true" />
+                  {(country || date) && (
+                    <p className={styles.meta}>
+                      {country && (
+                        <span className={styles.country}>
+                          <span aria-hidden="true">{country.flag}</span> {country.name}
+                        </span>
+                      )}
+                      {country && date && <span aria-hidden="true"> · </span>}
+                      {date}
+                    </p>
+                  )}
+                  {/* Cuenta atrás VIVA solo si el reto está EN JUEGO. */}
+                  {isActive && (
+                    <div className={styles.countdown}>
+                      <Countdown deadlineAt={moment.deadlineAt} />
+                    </div>
+                  )}
+                </div>
+              </header>
+
+              {/* ── CUERPO EDITORIAL (papel) ──────────────────────────────────────
               lg-stagger: se ensambla en cascada al subir la hoja (anulado bajo
               reduced-motion por la utilidad global). */}
-          <article className={`${styles.article} lg-stagger`}>
-            {/* EDITAR el recuerdo (título, fecha, lugar): el formulario es el foco
-                único; ocultamos el resto del cuerpo. Solo recuerdos del dueño. */}
-            {editingMeta ? (
-              <div className={styles.metaEdit}>
-                <label className={styles.editLabel}>
-                  Título
-                  <input
-                    className={styles.editInput}
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    placeholder="Ponle un título al recuerdo"
-                    maxLength={120}
-                    autoFocus
-                    disabled={savingMeta}
-                  />
-                </label>
-
-                <label className={styles.editLabel}>
-                  Fecha
-                  <input
-                    type="date"
-                    className={styles.editInput}
-                    value={editDate}
-                    onChange={(e) => setEditDate(e.target.value)}
-                    disabled={savingMeta}
-                  />
-                </label>
-
-                <div className={styles.promoteField}>
-                  <span className={styles.editLabel}>Lugar en el mapa</span>
-                  <MapPicker
-                    value={editPlace}
-                    flyTo={editPlace}
-                    center={editPlace ?? SPAIN}
-                    zoom={editPlace ? 12 : 4}
-                    onPick={setEditPlace}
-                  />
-                  <div className={styles.editPlaceRow}>
-                    <span className={styles.promoteHint}>
-                      {editPlace
-                        ? `${editPlace.lat.toFixed(4)}, ${editPlace.lng.toFixed(4)}`
-                        : 'Toca el mapa para situarlo (opcional).'}
-                    </span>
-                    {editPlace && (
-                      <button
-                        type="button"
-                        className={styles.descEditBtn}
-                        onClick={() => setEditPlace(null)}
-                        disabled={savingMeta}
-                      >
-                        Quitar lugar
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className={styles.descActions}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingMeta(false)}
-                    disabled={savingMeta}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button size="sm" onClick={() => void saveMeta()} loading={savingMeta}>
-                    Guardar
-                  </Button>
-                </div>
-              </div>
-            ) : null}
-
-            {/* Resto del cuerpo: oculto mientras se editan los datos del recuerdo
-                (el formulario manda). */}
-            {formOpen && !promoting ? null : (
-              <>
-                {/* DESCRIPCIÓN: cuerpo de artículo con drop-cap sutil (injerto C).
+              <article className={`${styles.article} lg-stagger`}>
+                {/* EDITAR el recuerdo (título, fecha, lugar, descripción): ahora vive en
+                `EditMomentForm`, fuera de esta escena (#571) — este `article` solo
+                se renderiza en modo VISTA. Cada sección de abajo se oculta por su
+                cuenta mientras `promoting` (convertir en reto) es el foco. */}
+                <>
+                  {/* DESCRIPCIÓN: cuerpo de artículo con drop-cap sutil (injerto C).
                     Se muestra a todos; el DUEÑO la edita en línea. Se oculta durante
                     "Convertir en reto" para que ese flujo sea el foco. */}
-                {!promoting &&
-                  (editing ? (
-                    <div className={styles.descEdit}>
-                      <textarea
-                        className={styles.descArea}
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        placeholder="Cuenta el día: dónde fue, qué pasó…"
-                        rows={4}
-                        autoFocus
-                        disabled={saving}
+                  {!promoting &&
+                    (editing ? (
+                      <div className={styles.descEdit}>
+                        <textarea
+                          className={styles.descArea}
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          placeholder="Cuenta el día: dónde fue, qué pasó…"
+                          rows={4}
+                          autoFocus
+                          disabled={saving}
+                        />
+                        <div className={styles.descActions}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setDescription(moment.description ?? '')
+                              setEditing(false)
+                            }}
+                            disabled={saving}
+                          >
+                            Cancelar
+                          </Button>
+                          <Button size="sm" onClick={() => void saveDescription()} loading={saving}>
+                            Guardar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : trimmedDesc ? (
+                      <div className={styles.descBlock}>
+                        <p className={styles.description}>{trimmedDesc}</p>
+                        {canEdit && (
+                          <button
+                            type="button"
+                            className={styles.descEditBtn}
+                            onClick={() => setEditing(true)}
+                          >
+                            <Icon icon={Pencil} size={14} /> Editar
+                          </button>
+                        )}
+                      </div>
+                    ) : canEdit ? (
+                      <button
+                        type="button"
+                        className={[styles.descAdd, 'lg-press'].join(' ')}
+                        onClick={() => setEditing(true)}
+                      >
+                        <Icon icon={Pencil} size={14} /> Añadir descripción del día
+                      </button>
+                    ) : null)}
+
+                  {/* GALERÍA "la serie": tira de fotogramas enmarcados (injerto C),
+                    solo en un RECUERDO (un reto muestra una sola foto). El componente
+                    trae el carrusel + los controles del dueño (portada/añadir/quitar). */}
+                  {isRecuerdo && !promoting && (
+                    <section className={styles.gallerySection}>
+                      <p className={styles.sectionLabel}>La serie</p>
+                      <MomentGallery
+                        challengeId={moment.challengeId}
+                        initialCoverUrl={moment.imageUrl}
+                        canEdit={canEdit}
+                        onChanged={onEdited}
                       />
+                    </section>
+                  )}
+
+                  {/* "EN EL MAPA": mapa REAL (Leaflet estático, preset diario) centrado
+                    en las coordenadas con el pin, para que se vea DÓNDE es. Antes era un
+                    blob abstracto de CSS que no decía nada. Solo si hay lugar visible
+                    (recuerdo con lugar o reto cerrado). */}
+                  {hasPlace && !promoting && (
+                    <section className={styles.mapSection}>
+                      <p className={styles.sectionLabel}>En el mapa</p>
+                      <div className={styles.mapCard}>
+                        <MomentMiniMap lat={moment.lat as number} lng={moment.lng as number} />
+                        <div className={styles.mapFoot}>
+                          <span className={styles.mapPlace}>
+                            {country ? (
+                              <span className={styles.mapPlaceName}>{country.name}</span>
+                            ) : null}
+                            <span className={styles.coord}>{coordLabel}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Social ligero: contador real de PARTICIPACIÓN (derivado de votos);
+                    solo tiene sentido en un reto. Es un recuento de quién JUGÓ, no de
+                    aciertos, así que el copy dice "participó / participaron". */}
+                  {(isReto || isActive) && !promoting ? (
+                    <p className={styles.social}>
+                      <span className={styles.socialIcon} aria-hidden="true">
+                        <Icon icon={User} size={15} />
+                      </span>
+                      {moment.guessedCount}{' '}
+                      {moment.guessedCount === 1 ? 'persona participó' : 'personas participaron'}
+                    </p>
+                  ) : null}
+
+                  {/* CTA "Adivina dónde es →": el gancho del reto en juego. */}
+                  {isActive && onPlay && !promoting && (
+                    <Button size="lg" fullWidth onClick={onPlay} className={styles.cta}>
+                      Adivina dónde es →
+                    </Button>
+                  )}
+
+                  {/* CONVERTIR EN RETO — solo el dueño, solo sobre un RECUERDO. */}
+                  {canEdit && isRecuerdo && !promoting && (
+                    <Button
+                      size="lg"
+                      fullWidth
+                      variant="secondary"
+                      onClick={startPromote}
+                      className={styles.cta}
+                    >
+                      <Icon icon={Target} size={16} /> Convertir en reto
+                    </Button>
+                  )}
+
+                  {canEdit && isRecuerdo && promoting && (
+                    <section className={styles.promote}>
+                      <header className={styles.promoteHead}>
+                        <span className={styles.promoteTitle}>
+                          <Icon icon={Target} size={15} /> Convertir en reto
+                        </span>
+                        <span className={styles.promoteHint}>
+                          Esconde el lugar y que adivinen dónde es, con cuenta atrás.
+                        </span>
+                      </header>
+
+                      <div className={styles.promoteField}>
+                        <span className={styles.promoteLabel}>Punto a adivinar</span>
+                        <MapPicker
+                          value={answer}
+                          flyTo={answer}
+                          center={answer ?? SPAIN}
+                          zoom={answer ? 13 : 5}
+                          onPick={setAnswer}
+                        />
+                        {!answer && (
+                          <span className={styles.promoteWarn}>
+                            Marca en el mapa el sitio que habrá que adivinar.
+                          </span>
+                        )}
+                      </div>
+
+                      <div className={styles.promoteField}>
+                        <span className={styles.promoteLabel}>Duración: {durationStop.label}</span>
+                        <input
+                          type="range"
+                          className={styles.promoteSlider}
+                          min={0}
+                          max={DURATION_STOPS.length - 1}
+                          step={1}
+                          value={durationIndex}
+                          onChange={(e) => setDurationIndex(Number(e.target.value))}
+                          aria-label="Duración del reto"
+                          aria-valuetext={durationStop.label}
+                        />
+                      </div>
+
+                      <div className={styles.promoteField}>
+                        <span className={styles.promoteLabel}>Tiempo por jugada</span>
+                        <div className={styles.promoteOptions}>
+                          {GUESS_OPTIONS.map((opt) => (
+                            <Button
+                              key={opt.label}
+                              variant={guessSeconds === opt.value ? 'primary' : 'secondary'}
+                              size="sm"
+                              aria-pressed={guessSeconds === opt.value}
+                              onClick={() => setGuessSeconds(opt.value)}
+                            >
+                              {opt.label}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+
                       <div className={styles.descActions}>
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setDescription(moment.description ?? '')
-                            setEditing(false)
-                          }}
-                          disabled={saving}
+                          onClick={() => setPromoting(false)}
+                          disabled={promoteBusy}
                         >
                           Cancelar
                         </Button>
-                        <Button size="sm" onClick={() => void saveDescription()} loading={saving}>
-                          Guardar
+                        <Button
+                          size="sm"
+                          onClick={() => void confirmPromote()}
+                          loading={promoteBusy}
+                          disabled={!answer}
+                        >
+                          Crear reto
                         </Button>
                       </div>
-                    </div>
-                  ) : trimmedDesc ? (
-                    <div className={styles.descBlock}>
-                      <p className={styles.description}>{trimmedDesc}</p>
-                      {canEdit && (
-                        <button
-                          type="button"
-                          className={styles.descEditBtn}
-                          onClick={() => setEditing(true)}
-                        >
-                          <Icon icon={Pencil} size={14} /> Editar
-                        </button>
-                      )}
-                    </div>
-                  ) : canEdit ? (
-                    <button
-                      type="button"
-                      className={[styles.descAdd, 'lg-press'].join(' ')}
-                      onClick={() => setEditing(true)}
-                    >
-                      <Icon icon={Pencil} size={14} /> Añadir descripción del día
-                    </button>
-                  ) : null)}
+                    </section>
+                  )}
 
-                {/* GALERÍA "la serie": tira de fotogramas enmarcados (injerto C),
-                    solo en un RECUERDO (un reto muestra una sola foto). El componente
-                    trae el carrusel + los controles del dueño (portada/añadir/quitar). */}
-                {isRecuerdo && !promoting && (
-                  <section className={styles.gallerySection}>
-                    <p className={styles.sectionLabel}>La serie</p>
-                    <MomentGallery
-                      challengeId={moment.challengeId}
-                      initialCoverUrl={moment.imageUrl}
-                      canEdit={canEdit}
-                      onChanged={onEdited}
-                    />
-                  </section>
-                )}
-
-                {/* "EN EL MAPA": mapa REAL (Leaflet estático, preset diario) centrado
-                    en las coordenadas con el pin, para que se vea DÓNDE es. Antes era un
-                    blob abstracto de CSS que no decía nada. Solo si hay lugar visible
-                    (recuerdo con lugar o reto cerrado). */}
-                {hasPlace && !promoting && (
-                  <section className={styles.mapSection}>
-                    <p className={styles.sectionLabel}>En el mapa</p>
-                    <div className={styles.mapCard}>
-                      <MomentMiniMap lat={moment.lat as number} lng={moment.lng as number} />
-                      <div className={styles.mapFoot}>
-                        <span className={styles.mapPlace}>
-                          {country ? (
-                            <span className={styles.mapPlaceName}>{country.name}</span>
-                          ) : null}
-                          <span className={styles.coord}>{coordLabel}</span>
-                        </span>
-                      </div>
-                    </div>
-                  </section>
-                )}
-
-                {/* Social ligero: contador real de PARTICIPACIÓN (derivado de votos);
-                    solo tiene sentido en un reto. Es un recuento de quién JUGÓ, no de
-                    aciertos, así que el copy dice "participó / participaron". */}
-                {(isReto || isActive) && !promoting ? (
-                  <p className={styles.social}>
-                    <span className={styles.socialIcon} aria-hidden="true">
-                      <Icon icon={User} size={15} />
-                    </span>
-                    {moment.guessedCount}{' '}
-                    {moment.guessedCount === 1 ? 'persona participó' : 'personas participaron'}
-                  </p>
-                ) : null}
-
-                {/* CTA "Adivina dónde es →": el gancho del reto en juego. */}
-                {isActive && onPlay && !promoting && (
-                  <Button size="lg" fullWidth onClick={onPlay} className={styles.cta}>
-                    Adivina dónde es →
-                  </Button>
-                )}
-
-                {/* CONVERTIR EN RETO — solo el dueño, solo sobre un RECUERDO. */}
-                {canEdit && isRecuerdo && !promoting && (
-                  <Button
-                    size="lg"
-                    fullWidth
-                    variant="secondary"
-                    onClick={startPromote}
-                    className={styles.cta}
-                  >
-                    <Icon icon={Target} size={16} /> Convertir en reto
-                  </Button>
-                )}
-
-                {canEdit && isRecuerdo && promoting && (
-                  <section className={styles.promote}>
-                    <header className={styles.promoteHead}>
-                      <span className={styles.promoteTitle}>
-                        <Icon icon={Target} size={15} /> Convertir en reto
-                      </span>
-                      <span className={styles.promoteHint}>
-                        Esconde el lugar y que adivinen dónde es, con cuenta atrás.
-                      </span>
-                    </header>
-
-                    <div className={styles.promoteField}>
-                      <span className={styles.promoteLabel}>Punto a adivinar</span>
-                      <MapPicker
-                        value={answer}
-                        flyTo={answer}
-                        center={answer ?? SPAIN}
-                        zoom={answer ? 13 : 5}
-                        onPick={setAnswer}
-                      />
-                      {!answer && (
-                        <span className={styles.promoteWarn}>
-                          Marca en el mapa el sitio que habrá que adivinar.
-                        </span>
-                      )}
-                    </div>
-
-                    <div className={styles.promoteField}>
-                      <span className={styles.promoteLabel}>Duración: {durationStop.label}</span>
-                      <input
-                        type="range"
-                        className={styles.promoteSlider}
-                        min={0}
-                        max={DURATION_STOPS.length - 1}
-                        step={1}
-                        value={durationIndex}
-                        onChange={(e) => setDurationIndex(Number(e.target.value))}
-                        aria-label="Duración del reto"
-                        aria-valuetext={durationStop.label}
-                      />
-                    </div>
-
-                    <div className={styles.promoteField}>
-                      <span className={styles.promoteLabel}>Tiempo por jugada</span>
-                      <div className={styles.promoteOptions}>
-                        {GUESS_OPTIONS.map((opt) => (
-                          <Button
-                            key={opt.label}
-                            variant={guessSeconds === opt.value ? 'primary' : 'secondary'}
-                            size="sm"
-                            aria-pressed={guessSeconds === opt.value}
-                            onClick={() => setGuessSeconds(opt.value)}
-                          >
-                            {opt.label}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className={styles.descActions}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setPromoting(false)}
-                        disabled={promoteBusy}
-                      >
-                        Cancelar
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => void confirmPromote()}
-                        loading={promoteBusy}
-                        disabled={!answer}
-                      >
-                        Crear reto
-                      </Button>
-                    </div>
-                  </section>
-                )}
-
-                {/* Acciones del DUEÑO al pie: editar y borrar. Para un RECUERDO,
+                  {/* Acciones del DUEÑO al pie: editar y borrar. Para un RECUERDO,
                     "Editar" abre el formulario de datos aquí; para un RETO lo lleva al
                     editor completo. Borrar pide confirmación. */}
-                {canEdit && !promoting && (
-                  <div className={styles.ownerActions}>
-                    {isRecuerdo ? (
+                  {canEdit && !promoting && (
+                    <div className={styles.ownerActions}>
+                      {isRecuerdo ? (
+                        <button
+                          type="button"
+                          className={[styles.ownerAction, 'lg-press'].join(' ')}
+                          onClick={() => {
+                            setEditTitle(moment.title)
+                            setEditDate(dateInputValue(moment.date))
+                            setEditPlace(
+                              moment.lat != null && moment.lng != null
+                                ? { lat: moment.lat, lng: moment.lng }
+                                : null,
+                            )
+                            setEditingMeta(true)
+                          }}
+                        >
+                          <Icon icon={Pencil} size={15} /> Editar recuerdo
+                        </button>
+                      ) : onEditChallenge ? (
+                        <button
+                          type="button"
+                          className={[styles.ownerAction, 'lg-press'].join(' ')}
+                          onClick={() => onEditChallenge(moment.challengeId)}
+                        >
+                          <Icon icon={Pencil} size={15} /> Editar reto
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        className={[styles.ownerAction, 'lg-press'].join(' ')}
-                        onClick={() => {
-                          setEditTitle(moment.title)
-                          setEditDate(dateInputValue(moment.date))
-                          setEditPlace(
-                            moment.lat != null && moment.lng != null
-                              ? { lat: moment.lat, lng: moment.lng }
-                              : null,
-                          )
-                          setEditingMeta(true)
-                        }}
+                        className={[styles.ownerAction, styles.ownerActionDanger, 'lg-press'].join(
+                          ' ',
+                        )}
+                        onClick={() => setConfirmingDelete(true)}
                       >
-                        <Icon icon={Pencil} size={15} /> Editar recuerdo
+                        <Icon icon={Trash2} size={15} /> Borrar
                       </button>
-                    ) : onEditChallenge ? (
-                      <button
-                        type="button"
-                        className={[styles.ownerAction, 'lg-press'].join(' ')}
-                        onClick={() => onEditChallenge(moment.challengeId)}
-                      >
-                        <Icon icon={Pencil} size={15} /> Editar reto
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      className={[styles.ownerAction, styles.ownerActionDanger, 'lg-press'].join(
-                        ' ',
-                      )}
-                      onClick={() => setConfirmingDelete(true)}
-                    >
-                      <Icon icon={Trash2} size={15} /> Borrar
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </article>
+                    </div>
+                  )}
+                </>
+              </article>
+            </>
+          )}
         </div>
       </div>
 
