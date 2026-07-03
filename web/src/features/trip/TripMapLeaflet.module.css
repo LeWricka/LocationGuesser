@@ -20,9 +20,10 @@
   background: var(--ocean-900);
 }
 
-/* Toggle de capa (claro ↔ satélite): pastilla clara del chrome, abajo-derecha del
-   mapa, sobre el carrusel. Mismo lenguaje glass que iconPill (pastilla blanca
-   translúcida + icono en tinta), legible sobre basemap claro o satélite. */
+/* Toggle de capa (claro ↔ satélite): disco flotante abajo-derecha del mapa, sobre
+   el carrusel. Vidrio esmerilado (regla dura #537: todo chrome sobre un MAPA es
+   vidrio) — tinte grafito translúcido + blur + borde de contacto blanco, icono en
+   tinta clara para leer sobre cualquier basemap. */
 .layerToggle {
   position: absolute;
   right: var(--space-3);
@@ -34,10 +35,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-muted);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
+  color: var(--scene-ink);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-chrome), var(--ring-contact);
@@ -79,11 +80,12 @@
   margin: 0 var(--space-2) var(--space-2) 0;
   padding: 1px var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   box-shadow: var(--ring-contact);
-  color: var(--color-text-faint);
+  color: var(--scene-ink-soft);
   /* design-lint-allow: micro-atribución de Leaflet, por debajo de la escala xs */
   font-size: 11px;
   line-height: 1.6;
@@ -105,5 +107,5 @@
 }
 
 .wrap :global(.leaflet-control-attribution a) {
-  color: var(--color-text-muted);
+  color: var(--scene-ink);
 }

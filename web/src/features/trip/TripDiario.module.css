@@ -112,7 +112,14 @@
   }
 }
 
-/* Vacío: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre). */
+/* Vacío: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre).
+ * EXCEPCIÓN deliberada a la regla dura del vidrio grafito (#537): contiene un
+ * <EmptyState> genérico con tinta OSCURA fija (--color-text/-muted, pensada para
+ * papel), no "consciente de escena". Ponerle el vidrio grafito nuevo (--glass-bg)
+ * dejaría ese texto ilegible. Se queda en el glass CLARO ya existente
+ * (--map-chrome-bg, casi opaco) — sigue siendo vidrio esmerilado, solo que claro
+ * en vez de grafito. Pendiente para cuando <EmptyState> tenga una variante
+ * "sobre escena" (anotado para una issue futura, no para #537). */
 .emptyDock {
   position: absolute;
   left: 50%;
@@ -126,7 +133,7 @@
   background: var(--map-chrome-bg);
   -webkit-backdrop-filter: var(--map-chrome-blur);
   backdrop-filter: var(--map-chrome-blur);
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--hairline);
   box-shadow: var(--shadow-lg);
 }
 

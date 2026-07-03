@@ -5,16 +5,23 @@
  * el papel. Sobre ella se desliza un THUMB de superficie blanca elevada (sombra
  * muy sutil, no glow) que marca la opción activa. El texto del segmento activo va
  * en tinta llena; el resto, en tinta apagada. Nada de dos cajas de acento planas.
- */
+ *
+ * Personalización vía `--segctl-*` (con fallback a los valores opacos de
+ * fábrica): cuando este control flota sobre una FOTO o un MAPA, la pantalla que
+ * lo envuelve (p.ej. TripPage sobre el mapa del Diario) redefine estas variables
+ * en un ancestro para convertir la pista en vidrio esmerilado (regla dura #537).
+ * Sin esa redefinición el control es idéntico a como era: opaco sobre papel. */
 .group {
   position: relative;
   display: inline-flex;
   padding: var(--space-1);
   gap: var(--space-1);
   /* Pastilla: fondo tenue hundido + hairline suavísimo (no borde marcado). */
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--segctl-border, var(--color-border));
   border-radius: var(--radius-full);
-  background: var(--color-surface-hover);
+  background: var(--segctl-bg, var(--color-surface-hover));
+  -webkit-backdrop-filter: var(--segctl-blur, none);
+  backdrop-filter: var(--segctl-blur, none);
 }
 
 .fullWidth {
@@ -58,7 +65,7 @@
   border: none;
   border-radius: var(--radius-full);
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--segctl-ink, var(--color-text-muted));
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
@@ -71,7 +78,7 @@
 }
 
 .segment:hover:not(.selected) {
-  color: var(--color-text);
+  color: var(--segctl-ink-hover, var(--color-text));
 }
 
 .segment:focus-visible {
