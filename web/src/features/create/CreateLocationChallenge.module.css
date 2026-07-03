@@ -259,7 +259,7 @@
   text-transform: none;
   letter-spacing: normal;
   font-weight: var(--font-weight-medium);
-  color: var(--ink-400);
+  color: var(--color-text-muted); /* AA: --ink-400 falla contraste (gotcha .t-label, 3a vez) */
 }
 
 /* ─── Footer: CTA fijo (ambos pasos) ────────────────────────────── */
