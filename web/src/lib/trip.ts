@@ -85,6 +85,32 @@ export interface Moment {
    * `undefined` = aún sin resolver; `null` = resuelto y sin país (mar abierto, etc.).
    */
   country?: CountryInfo | null
+  /**
+   * Si `isChallenge` y hay foto, ¿se sirve como PISTA visible (true) o se
+   * reserva SORPRESA para el revelado (false)? Espejo de `challenges.photo_is_hint`
+   * (0022), añadido aquí para que la pestaña Fotos (issue #645) sepa si puede
+   * enseñar la foto de un reto EN JUEGO sin destriparlo. Irrelevante en un
+   * recuerdo (su foto nunca es spoiler) — ver `isMomentPhotoVisible`.
+   */
+  photoIsHint?: boolean
+}
+
+/**
+ * ¿Se puede mostrar la foto de este momento FUERA del contexto del propio reto
+ * (p.ej. la pestaña Fotos, issue #645)? Reglas anti-spoiler:
+ *  - un RECUERDO nunca es spoiler: su foto es contenido, no respuesta;
+ *  - un RETO ya CERRADO ya está revelado: da igual si su foto era pista o sorpresa;
+ *  - un RETO en juego (activo o práctica) con foto PISTA (`photoIsHint: true`)
+ *    tampoco es secreta: ya se ve así en el carrusel del Diario;
+ *  - un RETO en juego con foto SORPRESA (`photoIsHint: false`) SÍ debe ocultarse:
+ *    enseñarla antes del revelado destriparía la respuesta.
+ */
+export function isMomentPhotoVisible(
+  moment: Pick<Moment, 'isChallenge' | 'status' | 'photoIsHint'>,
+): boolean {
+  if (!moment.isChallenge) return true
+  if (moment.status === 'closed') return true
+  return moment.photoIsHint === true
 }
 
 /**

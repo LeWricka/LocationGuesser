@@ -18,11 +18,12 @@ export interface Route {
   /**
    * Sección inicial dentro del viaje (`#g=…&v=…`). Por defecto el viaje abre en
    * "Diario"; `v=marcador` (y el legado `v=clasico`) hace que el viaje arranque en
-   * la pestaña "Marcador". Antes el marcador era una pantalla aparte (GroupPage);
-   * ahora es la segunda sección del propio viaje, así que la ruta solo decide en
+   * la pestaña "Marcador"; `v=fotos` en la pestaña "Fotos" (galería completa del
+   * viaje, issue #645). Antes el marcador era una pantalla aparte (GroupPage);
+   * ahora ambas son secciones del propio viaje, así que la ruta solo decide en
    * qué pestaña aterrizar. No afecta a los deep links de reto (`#c`).
    */
-  groupView?: 'marcador'
+  groupView?: 'marcador' | 'fotos'
   /**
    * Intención de abrir directamente "Añadir momento" al entrar al viaje
    * (`#g=…&v=marcador&add=1`). Lo usa el asistente de reto clásico.
@@ -85,10 +86,12 @@ export function parseHash(hash: string = window.location.hash): Route {
   if (challenge) route.challenge = challenge
 
   // Sección inicial del viaje: `marcador` (canónico) o `clasico` (legado de los
-  // enlaces de la GroupPage de antes) abren el viaje en la pestaña "Marcador".
-  // Cualquier otro valor se ignora y el viaje abre en "Diario".
+  // enlaces de la GroupPage de antes) abren el viaje en la pestaña "Marcador";
+  // `fotos` en la pestaña "Fotos" (issue #645). Cualquier otro valor se ignora y
+  // el viaje abre en "Diario".
   const v = params.get('v')?.trim()
   if (v === 'marcador' || v === 'clasico') route.groupView = 'marcador'
+  else if (v === 'fotos') route.groupView = 'fotos'
 
   // Intención de abrir "Añadir momento" directo (solo junto a la vista clásica).
   if (params.get('add')?.trim() === '1') route.groupAdd = true
@@ -123,6 +126,15 @@ export function groupHash(groupId: string, challengeId?: string): string {
  */
 export function marcadorGroupHash(groupId: string): string {
   return `#g=${encodeURIComponent(groupId)}&v=marcador`
+}
+
+/**
+ * Hash que abre un viaje directamente en la pestaña "Fotos" (`#g=…&v=fotos`):
+ * la galería completa del viaje, agrupada por día (issue #645). Mismo patrón
+ * que `marcadorGroupHash`.
+ */
+export function fotosGroupHash(groupId: string): string {
+  return `#g=${encodeURIComponent(groupId)}&v=fotos`
 }
 
 /**

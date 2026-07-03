@@ -315,6 +315,9 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         svPanoId: ch.sv_pano_id,
         // `undefined` mientras no se ha resuelto: la UI no pinta bandera todavía.
         country: countryById[ch.id],
+        // Espejo de `photo_is_hint`: la pestaña Fotos (#645) lo usa para no
+        // enseñar la foto-sorpresa de un reto aún en juego.
+        photoIsHint: ch.photo_is_hint,
       }
     })
   }, [challenges, answersById, imageUrlById, audioUrlById, guessedCountById, countryById, myUserId])

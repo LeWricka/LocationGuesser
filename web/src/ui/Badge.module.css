@@ -50,7 +50,10 @@
 /* "En vivo": punto rojo discreto (semáforo) sobre superficie clara, con un
  * pulso muy leve (es información de estado, no decoración). */
 .live {
-  background: var(--color-surface-hover);
+  /* Fondo SOLIDO danger-soft: sobre una FOTO el surface-hover translucido dejaba
+   * el rojo sin contraste AA (axe, caso viaje-diario con foto real); danger-soft
+   * + danger ya se verifico AA (~4.9:1) en el badge del timeline (#500). */
+  background: var(--color-danger-soft);
   border-color: var(--color-border);
   color: var(--color-danger);
 }

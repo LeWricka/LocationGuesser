@@ -154,6 +154,10 @@ export const CH_CLOSED_OTHER = 'ch-closed-kinkakuji'
 export const CH_MEMORY = 'ch-memory-ramen'
 // Reto de NÚMERO cerrado: ¿cuánto costó?
 export const CH_NUMBER = 'ch-number-shinkansen'
+// Reto EN JUEGO con foto SORPRESA (`photo_is_hint: false`): la pestaña Fotos
+// (issue #645) NO debe enseñar su foto mientras siga en juego — caso de
+// vigilancia visual del filtro anti-spoiler (`isMomentPhotoVisible`).
+export const CH_ACTIVE_SORPRESA = 'ch-active-sorpresa-dotombori'
 
 export const CHALLENGES: ChallengeRow[] = [
   baseChallenge({
@@ -226,6 +230,22 @@ export const CHALLENGES: ChallengeRow[] = [
     deadline_at: null,
     created_by: 'user-noa-0003',
     created_at: isoFromNow(-4 * DAY),
+  }),
+  // Reto EN JUEGO con foto SORPRESA: `photo_is_hint: false` + `deadline_at`
+  // futuro. La pestaña Fotos debe OCULTAR esta foto (issue #645) — no debe
+  // aparecer ninguna tarjeta "Dotonbori" en el caso de galería `viaje-fotos`.
+  baseChallenge({
+    id: CH_ACTIVE_SORPRESA,
+    title: '¿Dónde cenamos anoche?',
+    image_path: 'photo-dotombori.jpg',
+    photo_is_hint: false,
+    place_lat: null,
+    place_lng: null,
+    lat: 34.6687,
+    lng: 135.5013,
+    deadline_at: isoFromNow(20 * HOUR),
+    created_by: ME_ID,
+    created_at: isoFromNow(-2 * HOUR),
   }),
 ]
 
@@ -363,6 +383,7 @@ export const PHOTO_LABELS: Record<string, string> = {
   'photo-ramen.jpg': 'Ramen',
   'photo-ramen-2.jpg': 'La barra',
   'photo-ramen-3.jpg': 'El caldo',
+  'photo-dotombori.jpg': 'Dotonbori (sorpresa oculta)',
 }
 
 // Galería del recuerdo del ramen: varias fotos ordenadas por sort_order (la de 0

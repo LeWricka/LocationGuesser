@@ -4,6 +4,7 @@ import {
   groupHash,
   classicGroupHash,
   marcadorGroupHash,
+  fotosGroupHash,
   addMomentHash,
   addChallengeHash,
 } from './route'
@@ -86,6 +87,14 @@ describe('parseHash', () => {
     })
   })
 
+  test('v=fotos → arranca en la pestaña Fotos (issue #645)', () => {
+    expect(parseHash('#g=abc123&v=fotos')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      groupView: 'fotos',
+    })
+  })
+
   test('v desconocido se ignora (cae a Diario)', () => {
     expect(parseHash('#g=abc123&v=otra')).toEqual({ view: 'home', group: 'abc123' })
   })
@@ -150,6 +159,11 @@ describe('marcadorGroupHash / classicGroupHash / addMomentHash', () => {
     expect(classicGroupHash('abc123')).toBe('#g=abc123&v=clasico')
     // El enlace viejo se mapea a la pestaña Marcador (compatibilidad).
     expect(parseHash(classicGroupHash('abc123')).groupView).toBe('marcador')
+  })
+
+  test('fotosGroupHash apunta a la pestaña Fotos (issue #645)', () => {
+    expect(fotosGroupHash('abc123')).toBe('#g=abc123&v=fotos')
+    expect(parseHash(fotosGroupHash('abc123')).groupView).toBe('fotos')
   })
 
   test('addMomentHash abre el flujo ligero "Añadir recuerdo"', () => {
