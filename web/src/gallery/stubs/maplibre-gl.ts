@@ -15,6 +15,7 @@ interface MapOptions {
 export class Map {
   private container: HTMLElement | null = null
   private loadCbs: Array<() => void> = []
+  private idleCbs: Array<() => void> = []
 
   constructor(opts: MapOptions = {}) {
     const c = opts.container
@@ -27,6 +28,18 @@ export class Map {
     // 'load' en microtarea: deja que el componente registre su callback primero.
     queueMicrotask(() => {
       for (const cb of this.loadCbs) cb()
+      // 'idle' justo después (issue #652): TripMapGlobe usa `map.once('idle', …)`
+      // dentro de su propio handler 'load' para ocultar el skeleton de carga (el
+      // registro de 'idle' ocurre síncrono dentro del bucle de arriba, así que ya
+      // está en `idleCbs` en este punto). El motor real dispara 'idle' cuando no
+      // quedan teselas pendientes; el stub no pinta teselas de verdad, así que no
+      // hay nada pendiente — sin este microtask, el skeleton se queda colgado hasta
+      // su temporizador de red de seguridad (MAP_READY_FALLBACK_MS, 4s), más que el
+      // tiempo que espera la captura de la galería, y sale un spinner en vez del
+      // diario/globo con sus pines.
+      queueMicrotask(() => {
+        for (const cb of this.idleCbs) cb()
+      })
     })
   }
 
@@ -35,6 +48,10 @@ export class Map {
     return this
   }
   once(event: string, cb: () => void): this {
+    if (event === 'idle') {
+      this.idleCbs.push(cb)
+      return this
+    }
     return this.on(event, cb)
   }
   off(): this {
@@ -78,6 +95,31 @@ export class Map {
   }
   resize(): this {
     return this
+  }
+  // Faltaban estos cuatro (issue #652): TripMapGlobe los llama SIN feature-detect
+  // (a diferencia de HomeGlobe, que sí comprueba `typeof map.jumpTo === 'function'`
+  // antes de usarlo). Sin ellos, la entrada cinematográfica del diario lanzaba un
+  // `TypeError` no capturado dentro del handler `load` — abortaba a media
+  // ejecución y con ello el registro de `idle` (ver microtarea del constructor):
+  // el skeleton del mapa se quedaba colgado hasta su temporizador de red de
+  // seguridad (MAP_READY_FALLBACK_MS), más lento que la espera de la galería.
+  jumpTo(): this {
+    return this
+  }
+  setCenter(): this {
+    return this
+  }
+  setMinZoom(): this {
+    return this
+  }
+  getCenter(): { lng: number; lat: number } {
+    return { lng: 0, lat: 0 }
+  }
+  getZoom(): number {
+    return 2
+  }
+  cameraForBounds(): { center: LngLat; zoom: number } | undefined {
+    return undefined
   }
   getCanvas(): HTMLCanvasElement {
     return document.createElement('canvas')

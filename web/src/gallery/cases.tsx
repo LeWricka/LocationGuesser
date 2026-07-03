@@ -25,9 +25,23 @@ import { MomentSheet } from '../features/trip/MomentSheet'
 import { GroupSettingsModal } from '../features/group/GroupSettingsModal'
 import { InviteModal } from '../features/group/InviteModal'
 import { ResultCard } from '../features/play/ResultCard'
+import { GameScene } from '../features/play/GameScene'
+import { TripDiario } from '../features/trip/TripDiario'
 import { OnboardingSlideshow, getSlides } from '../features/onboarding'
-import { HomeDashboard, LoginScreen, type HomeGroup, type HomePinned } from '../ui'
+import {
+  BackHomeButton,
+  Card,
+  ChallengePhoto,
+  HomeDashboard,
+  LoginScreen,
+  ScoreRing,
+  Stack,
+  type HomeGroup,
+  type HomePinned,
+} from '../ui'
 import type { GlobePin } from '../ui'
+import { AppHeader } from '../ui/AppHeader'
+import { IconTrofeo } from '../ui/icons'
 import type { ChallengeForPlay } from '../lib/challenges'
 import type { Moment } from '../lib/trip'
 import {
@@ -43,6 +57,22 @@ import {
   ME_ID,
   setEmptyWorld,
 } from './fixtures'
+import {
+  SHOWCASE_HOME_GROUPS,
+  SHOWCASE_HOME_PINNED,
+  SHOWCASE_JUGAR_SCENE,
+  SHOWCASE_JUGAR_TITLE,
+  SHOWCASE_MOMENTS,
+  SHOWCASE_REVEAL_DISTANCE_KM,
+  SHOWCASE_REVEAL_MAX_POINTS,
+  SHOWCASE_REVEAL_PHOTO,
+  SHOWCASE_REVEAL_POINTS,
+  SHOWCASE_REVEAL_RANK,
+  SHOWCASE_REVEAL_TITLE,
+  SHOWCASE_ROUTE,
+  SHOWCASE_SELECTED_MOMENT,
+} from './showcaseFixtures'
+import { HOME_DEMO_PINS } from '../features/home/homeDemoPins'
 
 export interface GalleryCase {
   id: string
@@ -631,6 +661,139 @@ export const cases: GalleryCase[] = [
         onSkip={noop}
         onComplete={noop}
       />
+    ),
+  },
+  // ── Showcase de la landing (issue #652) ──────────────────────────────────
+  // Las 4 pantallas que alimentan LandingShowcase (features/auth/LandingShowcase)
+  // y los tutoriales de onboarding (#636): capturas ACTUALES con FOTOS REALES en
+  // vez del diseño viejo + stubs grises de junio (#462). Fixtures en
+  // `showcaseFixtures.ts` (fichero propio, no toca `fixtures.ts` ni el "mundo" del
+  // cliente Supabase falso): las 3 pantallas son 100% presentacionales, así que
+  // basta con props ricas.
+  {
+    id: 'showcase-home',
+    title: 'Showcase · Home (globo + carrusel de fotos reales)',
+    section: 'Showcase',
+    render: () => (
+      <HomeDashboard
+        userId={ME_ID}
+        displayName="Lewis"
+        groups={SHOWCASE_HOME_GROUPS}
+        pins={HOME_DEMO_PINS}
+        pinned={SHOWCASE_HOME_PINNED}
+        onOpenProfile={noop}
+        onCreateGroup={noop}
+        onOpenGroup={noop}
+        onPlayPinned={noop}
+      />
+    ),
+  },
+  {
+    id: 'showcase-viaje',
+    title: 'Showcase · Viaje (diario con momentos y pines-foto reales)',
+    section: 'Showcase',
+    render: () => (
+      <div style={{ position: 'relative', height: '100dvh', overflow: 'hidden' }}>
+        <AppHeader
+          variant="floating"
+          lead="back"
+          leadLabel="Volver"
+          onLead={noop}
+          title={
+            <span>
+              La vuelta al mundo
+              <br />
+              <span style={{ fontSize: '0.8em', fontWeight: 400 }}>Tú, Marta y Noa</span>
+            </span>
+          }
+        />
+        <TripDiario
+          groupId="showcase-viaje"
+          moments={SHOWCASE_MOMENTS}
+          route={SHOWCASE_ROUTE}
+          selectedId={SHOWCASE_SELECTED_MOMENT}
+          canCreate={false}
+          onSelectFromMap={noop}
+          onExpand={noop}
+          onPlay={noop}
+          onAddMoment={noop}
+          onInvite={noop}
+        />
+      </div>
+    ),
+  },
+  {
+    // Escena de JUGAR a pantalla completa con una FOTO REAL (issue #652): el mapa
+    // de adivinar sigue stubeado en galería, pero queda reducido al mini-mapa de
+    // esquina (pequeño), no protagonista — la escena a sangre es la foto real.
+    id: 'showcase-jugar',
+    title: 'Showcase · Jugar (foto real a pantalla completa)',
+    section: 'Showcase',
+    render: () => (
+      <GameScene
+        title={SHOWCASE_JUGAR_TITLE}
+        scene={SHOWCASE_JUGAR_SCENE}
+        sceneReady
+        remaining={22}
+        guessSeconds={30}
+        backLabel="Salir (sigue el tiempo)"
+        onBack={noop}
+        guess={null}
+        onGuess={noop}
+        mapOpen={false}
+        onOpenMap={noop}
+        onCloseMap={noop}
+        meUserId={ME_ID}
+        onConfirm={noop}
+        photoExpanded={false}
+        onExpandPhoto={noop}
+        onClosePhoto={noop}
+      />
+    ),
+  },
+  {
+    // Reveal recortado al bloque que SÍ luce (issue #652): el revelado real de
+    // PlayChallenge antepone un mapa a 62svh (rectángulo azul pizarra liso bajo el
+    // stub de la galería) que se come media pantalla sin vender nada. Aquí solo el
+    // anillo teal + puntos (ScoreRing, SVG/CSS puro) y la foto sorpresa real.
+    id: 'showcase-reveal',
+    title: 'Showcase · Reveal (anillo teal + puntos)',
+    section: 'Showcase',
+    render: () => (
+      <main className="lg-page">
+        <Stack gap={4}>
+          <BackHomeButton onClick={noop} label="Volver al viaje" />
+          <h1>{SHOWCASE_REVEAL_TITLE}</h1>
+          <Card padding="md" raised>
+            <Stack gap={4} align="center">
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <IconTrofeo size={16} />
+                ¡Gran tiro!
+              </span>
+              <ScoreRing value={SHOWCASE_REVEAL_POINTS} max={SHOWCASE_REVEAL_MAX_POINTS} size={168}>
+                {/* Número ESTÁTICO, no `CountUp` (issue #652): la captura es una
+                    imagen fija — un conteo a medio animar (`CountUp` no respeta
+                    `disableAnimations`, solo `prefers-reduced-motion`) haría el
+                    valor no determinista entre corridas de la galería. */}
+                <span>{SHOWCASE_REVEAL_POINTS.toLocaleString('es-ES')}</span>
+                <span>puntos</span>
+              </ScoreRing>
+              <Stack gap={1} align="center">
+                <strong>Muy cerca</strong>
+                <span>a {SHOWCASE_REVEAL_DISTANCE_KM.toLocaleString('es-ES')} km del objetivo</span>
+                <span>
+                  {SHOWCASE_REVEAL_RANK.position}º de {SHOWCASE_REVEAL_RANK.total}
+                </span>
+              </Stack>
+            </Stack>
+          </Card>
+          <ChallengePhoto
+            src={SHOWCASE_REVEAL_PHOTO}
+            alt="Foto del reto"
+            caption="La foto del reto"
+          />
+        </Stack>
+      </main>
     ),
   },
 ]

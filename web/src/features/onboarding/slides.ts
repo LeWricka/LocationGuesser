@@ -27,7 +27,7 @@ import type { LucideIcon } from 'lucide-react'
 import type { OnboardingContext } from '../../lib/onboardingFlags'
 import homeShot from '../../assets/landing/home.webp'
 import resultadoShot from '../../assets/landing/resultado.webp'
-import marcadorShot from '../../assets/landing/marcador.webp'
+import viajeShot from '../../assets/landing/viaje.webp'
 import lisboaPhoto from '../home/assets/lisboa.webp'
 import tokioPhoto from '../home/assets/tokio.webp'
 import nuevaYorkPhoto from '../home/assets/nueva-york.webp'
@@ -171,8 +171,8 @@ const ADD_MOMENT_SLIDES: OnboardingSlide[] = [
     visual: 'spark',
     title: 'Los tuyos lo viven',
     body: 'Aparece en el viaje al instante para todos.',
-    // Captura REAL del marcador: el viaje compartido que os une.
-    image: marcadorShot,
+    // Captura REAL del diario: el momento ya clavado en el viaje compartido.
+    image: viajeShot,
   },
 ]
 
