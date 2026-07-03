@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowRight, Hash, Lock, RotateCcw, Timer, TimerOff } fro
 import { useVisualViewport } from '../../lib/useVisualViewport'
 import { marcadorGroupHash } from '../../lib/route'
 import { CountdownOverlay } from './CountdownOverlay'
+import { ExitConfirmModal } from './ExitConfirmModal'
 import { RevealBurst } from './RevealBurst'
 import { NumberPad } from './NumberPad'
 import { SceneImage } from './SceneImage'
@@ -102,6 +103,9 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
   // Guarda "es tuyo" (#509), compartida con PlayChallenge (#579): el creador
   // ve cuánta gente ha jugado ya, sin entrar al juego.
   const { ownVoteCount, checkOwn } = useOwnChallengeGuard(getVotesWithNames)
+  // Confirmación de "salir mientras juegas" (issue #663): sustituye window.confirm
+  // por el modal del UI kit (ver ExitConfirmModal).
+  const [confirmingExit, setConfirmingExit] = useState(false)
 
   const toast = useToast()
   const { user } = useSession()
@@ -329,11 +333,12 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
     location.hash = groupId ? `#g=${groupId}` : ''
   }
   function goBackWhilePlaying() {
-    const timed = challenge?.guess_seconds != null
-    const msg = timed
-      ? 'El tiempo sigue corriendo aunque salgas. Al volver seguirás donde lo dejaste, no se reinicia. ¿Salir?'
-      : 'Al volver seguirás en este reto, no se reinicia. ¿Salir?'
-    if (window.confirm(msg)) goBack()
+    setConfirmingExit(true)
+  }
+
+  function confirmExit() {
+    setConfirmingExit(false)
+    goBack()
   }
 
   async function replay() {
@@ -546,6 +551,13 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
         </div>
 
         {phase === 'countdown' && <CountdownOverlay photoUrl={photoUrl} onDone={beginPlaying} />}
+
+        <ExitConfirmModal
+          open={confirmingExit}
+          timed={challenge.guess_seconds != null}
+          onConfirm={confirmExit}
+          onCancel={() => setConfirmingExit(false)}
+        />
       </>
     )
   }
