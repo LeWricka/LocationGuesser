@@ -7,18 +7,20 @@ import {
   HERMETIC_CHALLENGE_ID,
 } from './helpers/hermetic'
 
-// E2E HERMÉTICO del bucle de crear reto (#443, actualizado #485, #509 y #585).
-// Mockea sesión + Supabase + Google Maps + geolocalización, así que corre SIEMPRE
-// (local y CI) sin secretos ni escribir en BD, y es determinista. Cubre lo que el
-// dueño pidió cazar, sobre el flujo EN DOS PASOS de #585:
-//   1) CAMINO FELIZ: tocar el mapa → "Confirmar sitio" → paso 2 (previa SV +
+// E2E HERMÉTICO del bucle de crear reto (#443, actualizado #485, #509, #585 y
+// #592). Mockea sesión + Supabase + Google Maps + geolocalización, así que corre
+// SIEMPRE (local y CI) sin secretos ni escribir en BD, y es determinista. Cubre lo
+// que el dueño pidió cazar, sobre el flujo v3 (#592, rediseño de #585):
+//   1) CAMINO FELIZ: tocar el mapa → tarjeta SV flotante EN EL PASO 1 (sin cambiar
+//      de paso) → "Continuar" (solo habilitado con cobertura) → paso 2 (SOLO
 //      reglas) → lanzar → volver al VIAJE (#509: el creador ya no aterriza jugando
 //      su propio reto) y, si abre el deep link del reto, ve la guarda "Este reto
 //      es tuyo" (no el juego).
-//   2) STREET VIEW NO DISPONIBLE: el aviso inline y el CTA deshabilitado viven en
-//      el paso 2; "Cambiar sitio" vuelve al mapa CONSERVANDO el pin.
+//   2) STREET VIEW NO DISPONIBLE: el aviso "Sin Street View aquí" y el CTA
+//      "Continuar" deshabilitado viven EN LA TARJETA del paso 1 — ya no existe
+//      "Cambiar sitio" (el usuario simplemente sigue en el mismo mapa).
 //   3) MÓVIL: el paso 1 entero — mapa protagonista, elegir punto, CTA
-//      "Confirmar sitio" accesible sin scroll.
+//      "Continuar" accesible sin scroll.
 // Si el bucle de crear se rompe (gating atascado, insert que peta, regresión de
 // props/estado), estos tests lo paran.
 
@@ -73,10 +75,11 @@ async function openCreateFromTrip(page: Page): Promise<void> {
   await page.getByRole('menuitem', { name: 'Reto' }).click()
 }
 
-// Recorre el flujo de crear ¿Dónde? EN DOS PASOS (#585): el mapa a pantalla
-// completa para elegir el sitio (paso 1, CTA "Confirmar sitio" al haber pin) y
-// la previa de SV + reglas + Lanzar (paso 2). La búsqueda del panorama arranca
-// al tocar el mapa y su resultado se muestra en el paso 2.
+// Recorre el flujo de crear ¿Dónde? v3 (#592): el mapa a pantalla completa para
+// elegir el sitio (paso 1), con la previa de SV — o el aviso de "sin cobertura" —
+// EN UNA TARJETA FLOTANTE sobre el propio mapa (nunca cambia de paso para eso).
+// El CTA "Continuar" solo se habilita con cobertura y lleva al paso 2, que queda
+// SOLO con las reglas (plazo/tiempo) + Lanzar.
 // `streetViewAvailable` controla si el mock de Maps devuelve panorama o rechaza.
 async function runCreateFlow(page: Page, opts: { streetViewAvailable: boolean }): Promise<void> {
   // Selector de tipo → ¿Dónde? → abre CreateLocationChallenge con el mapa.
@@ -90,44 +93,37 @@ async function runCreateFlow(page: Page, opts: { streetViewAvailable: boolean })
   // El mock de findPanorama responde al instante; el resultado depende de svAvailable.
   await map.click({ position: { x: 180, y: 200 } })
 
-  // Con pin: aparece el CTA fijo "Confirmar sitio" (no espera al resultado de
-  // la búsqueda de SV; ese estado vive en el paso 2). Confirmar avanza de paso.
-  const confirmBtn = page.getByRole('button', { name: /Confirmar este sitio/ })
-  await expect(confirmBtn).toBeVisible({ timeout: 20_000 })
-  await expect(confirmBtn).toBeEnabled()
-  await confirmBtn.click()
+  const continueBtn = page.getByRole('button', { name: /continuar/i })
 
   if (opts.streetViewAvailable) {
-    // PASO 2, camino feliz: cobertura SV → previa grande + reglas + CTA habilitado.
-    // El CTA de lanzar conserva el nombre accesible "Este es mi sitio: lanzar…".
-    const launchBtn = page.getByRole('button', {
-      name: /Este es mi sitio/,
-    })
-    await expect(launchBtn).toBeVisible({ timeout: 20_000 })
-    await expect(launchBtn).toBeEnabled()
-    // Las reglas (plazo + tiempo por jugada) acompañan a la previa en este paso.
-    await expect(page.getByText('Plazo', { exact: true })).toBeVisible()
-    await expect(page.getByText('Tiempo por jugada', { exact: true })).toBeVisible()
+    // Camino feliz: cobertura SV → tarjeta flotante con la previa, EN EL PASO 1
+    // (el mapa sigue visible detrás), y el CTA "Continuar" se habilita.
+    await expect(continueBtn).toBeVisible({ timeout: 20_000 })
+    await expect(continueBtn).toBeEnabled({ timeout: 20_000 })
+    await expect(map).toBeVisible()
 
-    // Lanzar el reto: un solo clic en el CTA.
+    // Continuar avanza al paso 2: SOLO reglas (plazo + tiempo por jugada), sin
+    // mapa ni previa (ya cumplieron su función en el paso 1).
+    await continueBtn.click()
+    await expect(page.getByText('Plazo', { exact: true })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByText('Tiempo por jugada', { exact: true })).toBeVisible()
+    await expect(page.locator('.leaflet-container')).not.toBeVisible()
+
+    // El CTA de lanzar conserva el nombre accesible "Este es mi sitio: lanzar…".
+    const launchBtn = page.getByRole('button', { name: /Este es mi sitio/ })
+    await expect(launchBtn).toBeVisible({ timeout: 10_000 })
+    await expect(launchBtn).toBeEnabled()
     await launchBtn.evaluate((el) => (el as HTMLButtonElement).click())
   } else {
-    // PASO 2, sin cobertura SV: aviso inline "Sin Street View aquí" + CTA
-    // deshabilitado; "Cambiar sitio" queda como salida (vuelve al mapa
-    // conservando el pin).
+    // Sin cobertura SV: aviso "Sin Street View aquí" EN LA TARJETA del paso 1
+    // (nunca fuerza un paso 2) + CTA "Continuar" deshabilitado. Ya no existe
+    // "Cambiar sitio": el usuario sigue en el mismo mapa para probar otro punto.
     await expect(page.getByText('Sin Street View aquí')).toBeVisible({ timeout: 20_000 })
-    const launchBtn = page.getByRole('button', { name: /Sin Street View/ })
-    await expect(launchBtn).toBeVisible({ timeout: 5_000 })
-    await expect(launchBtn).toBeDisabled()
-    // La vuelta al paso 1 CONSERVA el pin: el CTA "Confirmar sitio" sigue
-    // disponible sin volver a tocar el mapa (#585).
-    await page.getByRole('button', { name: 'Cambiar sitio' }).click()
-    await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: 20_000 })
-    await expect(page.getByRole('button', { name: /Confirmar este sitio/ })).toBeVisible({
-      timeout: 5_000,
-    })
-    // Fin del test: sin cobertura el flujo queda detenido hasta que el usuario
-    // elija otro punto con cobertura.
+    await expect(continueBtn).toBeVisible({ timeout: 5_000 })
+    await expect(continueBtn).toBeDisabled()
+    await expect(map).toBeVisible()
+    // Fin del test: sin cobertura el flujo queda detenido en el paso 1 hasta
+    // que el usuario elija otro punto con cobertura.
     return
   }
 
@@ -224,10 +220,13 @@ test.describe('crear reto (hermético)', () => {
     expect(errors, `Errores inesperados durante el flujo:\n${errors.join('\n')}`).toEqual([])
   })
 
-  // Paso 1 en viewport de teléfono (#585): el mapa es la escena (todo el alto bajo
-  // la cabecera), el usuario elige punto y el CTA fijo "Confirmar sitio" queda
-  // accesible dentro del viewport SIN scroll (es un footer en flujo, no tapa nada).
-  test('reto de lugar en móvil: mapa visible, elegir punto, CTA accesible', async ({ page }) => {
+  // Paso 1 en viewport de teléfono (#592): el mapa es la escena (todo el alto bajo
+  // la cabecera), el usuario elige punto y el CTA fijo "Continuar" queda accesible
+  // dentro del viewport SIN scroll (es un footer en flujo, no tapa nada), igual que
+  // la tarjeta SV flotante que aparece encima del mapa.
+  test('reto de lugar en móvil: mapa visible, elegir punto, tarjeta SV y CTA accesibles', async ({
+    page,
+  }) => {
     // Teléfono típico (iPhone-ish).
     await page.setViewportSize({ width: 390, height: 844 })
     await primeHermeticCreate(page, { streetViewAvailable: true })
@@ -240,19 +239,53 @@ test.describe('crear reto (hermético)', () => {
     const map = page.locator('.leaflet-container')
     await expect(map).toBeVisible({ timeout: 20_000 })
 
-    // Elegir punto en el mapa: aparece el CTA fijo "Confirmar sitio".
+    // Elegir punto en el mapa: aparece la tarjeta SV flotante y, con cobertura,
+    // el CTA fijo "Continuar".
     await map.click({ position: { x: 190, y: 200 } })
 
-    const confirmBtn = page.getByRole('button', { name: /Confirmar este sitio/ })
-    await expect(confirmBtn).toBeVisible({ timeout: 20_000 })
-    await expect(confirmBtn).toBeEnabled()
+    const continueBtn = page.getByRole('button', { name: /continuar/i })
+    await expect(continueBtn).toBeVisible({ timeout: 20_000 })
+    await expect(continueBtn).toBeEnabled()
     // CTA fijo como footer en flujo: SIEMPRE dentro del viewport, sin scroll.
-    await expect(confirmBtn).toBeInViewport()
+    await expect(continueBtn).toBeInViewport()
     // Y el mapa sigue visible con el CTA presente (el footer no lo tapa).
     await expect(map).toBeInViewport()
 
     // No hay foto ni historia: este flujo es el GeoGuessr puro, no el asistente
     // inmersivo de foto.
     await expect(page.getByRole('heading', { name: 'Enseña tu momento' })).not.toBeVisible()
+  })
+
+  // Atrás coherente (issue #592 punto 4): en el paso 2 vuelve al paso 1
+  // conservando el pin; el atrás DEL NAVEGADOR hace lo mismo (no se salta el
+  // paso ni sale del flujo entero).
+  test('atrás: la cabecera y el navegador vuelven del paso 2 al paso 1 conservando el pin', async ({
+    page,
+  }) => {
+    await primeHermeticCreate(page, { streetViewAvailable: true })
+    await openCreateFromTrip(page)
+
+    await page.getByRole('button', { name: /Crear reto ¿Dónde\?/ }).click()
+    const map = page.locator('.leaflet-container')
+    await expect(map).toBeVisible({ timeout: 20_000 })
+    await map.click({ position: { x: 180, y: 200 } })
+
+    const continueBtn = page.getByRole('button', { name: /continuar/i })
+    await expect(continueBtn).toBeEnabled({ timeout: 20_000 })
+    await continueBtn.click()
+    await expect(page.getByText('Plazo', { exact: true })).toBeVisible({ timeout: 10_000 })
+
+    // La flecha "Atrás" de la cabecera vuelve al paso 1 con el pin conservado.
+    await page.getByRole('button', { name: 'Atrás' }).click()
+    await expect(map).toBeVisible({ timeout: 10_000 })
+    await expect(continueBtn).toBeEnabled({ timeout: 10_000 })
+
+    // Avanzar de nuevo y esta vez volver con el botón atrás DEL NAVEGADOR: debe
+    // retroceder un paso, no saltárselo y salir del flujo de crear entero.
+    await continueBtn.click()
+    await expect(page.getByText('Plazo', { exact: true })).toBeVisible({ timeout: 10_000 })
+    await page.goBack()
+    await expect(map).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('button', { name: /Crear reto ¿Dónde\?/ })).not.toBeVisible()
   })
 })

@@ -1,8 +1,10 @@
-/* CreateLocationChallenge — ¿Dónde? en DOS PASOS (issue #585).
+/* CreateLocationChallenge — ¿Dónde? en DOS PASOS (issue #592, rediseño de #585).
    Paso 1 (el sitio): cabecera → mapa a TODO el alto disponible (el buscador es
-   una barra de vidrio DENTRO del mapa) → CTA fijo "Confirmar sitio" al haber pin.
-   Paso 2 (la previa y las reglas): cabecera → previa SV grande + chips de
-   plazo/tiempo → CTA fijo (Cambiar sitio + Lanzar).
+   una barra de vidrio DENTRO del mapa) → tarjeta SV flotante sobre el mapa al
+   haber pin (buscando / sin cobertura / previa interactiva) → CTA fijo
+   "Continuar" (solo habilitado con cobertura).
+   Paso 2 (las reglas): cabecera → chips de plazo/tiempo + privacidad → CTA
+   fijo "Lanzar". Sin mapa ni previa: ya cumplieron su función en el paso 1.
    Tokens Grafito+teal del sistema de diseño (tokens.css). */
 
 .root {
@@ -103,6 +105,94 @@
   z-index: var(--z-sticky);
 }
 
+/* ─── Tarjeta SV flotante sobre el mapa (issue #592, paso 1) ────── */
+/* Vidrio flotante (mismo chrome que el buscador/controles del mapa,
+   `--map-chrome-bg`/`--map-chrome-blur`): aparece al marcar el pin, se
+   actualiza sola al moverlo, y NUNCA cambia de paso — ni para avisar de que
+   falta cobertura. Alto fijo en la franja pedida (~180-220px) para que el
+   layout no salte entre sus tres estados (buscando / sin cobertura / previa). */
+.svCard {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  z-index: var(--z-sticky);
+  height: clamp(180px, 24vh, 220px);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  animation: fadeIn var(--motion-duration-base) var(--motion-ease-standard);
+}
+
+/* Estado "buscando panorama": centrado, sin más adorno. */
+.svCardState {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--ink-700);
+}
+
+/* Estado "sin cobertura": el aviso vive AQUÍ (issue #592 punto 3), nunca
+   fuerza un cambio de paso — el usuario solo tiene que mover el pin. */
+.svCardNoCoverage {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  text-align: center;
+  color: var(--ink-700);
+}
+.svCardNoCoverage p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-snug);
+}
+
+/* Estado "previa lista": la previa interactiva llena toda la tarjeta. */
+.svCardPreview {
+  position: relative;
+  height: 100%;
+}
+.svCardPreview > :first-child {
+  height: 100%;
+  border: none;
+  border-radius: 0;
+}
+
+/* Chip de privacidad flotante sobre la previa de SV. */
+.privacyChip {
+  position: absolute;
+  bottom: var(--space-2);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  /* 0.72: contraste AA del texto blanco sobre previa vacía o escena clara (axe, #585). */
+  background: rgba(18, 26, 36, 0.72); /* design-lint-allow: chip de escena oscura sobre SV */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #fff; /* design-lint-allow: texto blanco sobre chip oscuro traslúcido */
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 /* ─── Botón GPS (ranura action del AppHeader plain) ─────────────── */
 /* En la cabecera plain (fondo blanco/papel), el botón usa tinta y
    superficies de la paleta estándar (sin tokens de escena oscura). */
@@ -131,9 +221,10 @@
   opacity: 0.6;
 }
 
-/* ─── Paso 2: cuerpo de la previa ───────────────────────────────── */
-/* Previa SV (protagonista, crece) + reglas, con scroll propio en móvil
-   pequeño. El footer (CTA fijo) queda fuera, anclado abajo. */
+/* ─── Paso 2: cuerpo de las reglas ───────────────────────────────── */
+/* Solo plazo/tiempo (issue #592): sin mapa ni previa, que ya cumplieron su
+   función en el paso 1. Scroll propio en móvil pequeño; el footer (CTA fijo)
+   queda fuera, anclado abajo. */
 .previaBody {
   flex: 1;
   min-height: 0;
@@ -142,84 +233,6 @@
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4) var(--space-5) var(--space-3);
-}
-
-/* ─── Estado: buscando panorama ────────────────────────────────── */
-.searchingState {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  font-size: var(--font-size-sm);
-  color: var(--ink-600);
-}
-
-/* ─── Estado: sin cobertura de SV ──────────────────────────────── */
-.noCoverageState {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--surface-raised);
-  border: 1px solid var(--hairline);
-}
-.noCoverageIco {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--accent);
-}
-.noCoverageTitle {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--ink-900);
-}
-.noCoverageSub {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-xs);
-  color: var(--ink-600);
-  line-height: var(--line-height-snug);
-}
-
-/* ─── Previa de Street View (protagonista del paso 2) ───────────── */
-/* Contenedor relativo para el chip de privacidad superpuesto. GRANDE (#585):
-   crece para absorber el alto libre del paso (el mapa ya no compite — está en
-   el paso 1), con un mínimo digno en pantallas bajas. */
-.svPreviewWrap {
-  position: relative;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  flex: 1;
-  min-height: 260px;
-}
-/* La previa interna llena el contenedor (pisa el height fijo de 260px que trae
-   StreetViewPreview.module.css, pensado para su uso compacto). */
-.svPreviewWrap > :first-child {
-  height: 100%;
-}
-
-/* Chip de privacidad flotante sobre la previa de SV. */
-.privacyChip {
-  position: absolute;
-  bottom: var(--space-2);
-  left: 50%;
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  /* 0.72 (antes 0.56): con la previa vacía o una escena clara detrás, el tinte
-     al 56% no llegaba al contraste AA del texto blanco (axe, #585). */
-  background: rgba(18, 26, 36, 0.72); /* design-lint-allow: chip de escena oscura sobre SV */
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #fff; /* design-lint-allow: texto blanco sobre chip oscuro traslúcido */
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  white-space: nowrap;
-  pointer-events: none;
 }
 
 /* ─── Reglas: plazo + tiempo ────────────────────────────────────── */
@@ -254,46 +267,6 @@
   padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--hairline);
   background: var(--surface);
-}
-
-/* Fila de acciones del paso 2: "Cambiar sitio" (secundario) + Lanzar (primario). */
-.footerActions {
-  display: flex;
-  align-items: stretch;
-  gap: var(--space-2);
-}
-.footerActions .launchBtn {
-  flex: 1;
-  width: auto;
-}
-
-/* Botón secundario "Cambiar sitio": vuelve al paso 1 conservando el pin. */
-.changeBtn {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
-  padding: var(--space-3) var(--space-4);
-  background: transparent;
-  color: var(--ink-700);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  font-family: inherit;
-  cursor: pointer;
-  transition: background var(--motion-transition-fast);
-}
-.changeBtn:hover {
-  background: var(--surface-raised);
-}
-.changeBtn:active {
-  background: var(--surface-sunken);
-}
-.changeBtn:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 /* Fila de estado (spinner + mensaje). */

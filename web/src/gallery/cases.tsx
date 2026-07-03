@@ -383,13 +383,14 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
-    // Flujo "GeoGuessr puro" (origen FAB, sin recuerdo), PASO 1 de 2 (#585):
-    // mapa a todo el alto con el buscador como barra de vidrio DENTRO del mapa
-    // (variante `searchPlacement="overlay"` de MapPicker — verificar aquí que
-    // no tapa el zoom ni el toggle de capa, y que "Añadir recuerdo" conserva
-    // su buscador encima del mapa, la variante por defecto).
+    // Flujo "GeoGuessr puro" (origen FAB, sin recuerdo), PASO 1 de 2 (v3,
+    // issue #592): mapa a todo el alto con el buscador como barra de vidrio
+    // DENTRO del mapa (variante `searchPlacement="overlay"` de MapPicker —
+    // verificar aquí que no tapa el zoom ni el toggle de capa, y que "Añadir
+    // recuerdo" conserva su buscador encima del mapa, la variante por
+    // defecto). Sin pin todavía: solo el hint "Toca el mapa…", sin tarjeta SV.
     id: 'crear-donde',
-    title: 'Crear ¿Dónde? · Paso 1 (el sitio)',
+    title: 'Crear ¿Dónde? · Paso 1 (el sitio, sin pin)',
     section: 'Crear',
     render: () => (
       <CreateLocationChallenge
@@ -401,13 +402,14 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
-    // PASO 2 de 2 (#585): previa de Street View grande + plazo/tiempo por
-    // jugada + "Cambiar sitio" + Lanzar. `initialPreview` siembra pin y
-    // panorama (el SDK de Maps está stubeado en galería: la previa se ve como
-    // lienzo vacío enmarcado, pero el LAYOUT — protagonismo, chips, CTA fijo —
-    // es el real).
-    id: 'crear-donde-previa',
-    title: 'Crear ¿Dónde? · Paso 2 (la previa y las reglas)',
+    // Paso 1 CON pin y cobertura confirmada (issue #592 punto 3): la previa de
+    // SV vive AHORA en una tarjeta flotante sobre el propio mapa (vidrio,
+    // ~180-220px), no en un paso aparte. `initialState` siembra pin + panorama
+    // (el SDK de Maps está stubeado en galería: la previa se ve como lienzo
+    // vacío enmarcado, pero el LAYOUT — tarjeta flotante, chip de privacidad,
+    // CTA "Continuar" habilitado — es el real).
+    id: 'crear-donde-sv',
+    title: 'Crear ¿Dónde? · Paso 1 (tarjeta SV inline)',
     section: 'Crear',
     render: () => (
       <CreateLocationChallenge
@@ -415,9 +417,46 @@ export const cases: GalleryCase[] = [
         groupName={GROUP.name}
         onBack={noop}
         onCreated={noop}
-        initialPreview={{
+        initialState={{
           point: { lat: 35.0036, lng: 135.7788 },
           pano: { panoId: 'pano-galeria', lat: 35.0036, lng: 135.7788 },
+        }}
+      />
+    ),
+  },
+  {
+    // Paso 1 CON pin pero SIN cobertura (issue #592 punto 3): el aviso "Sin
+    // Street View aquí" vive EN LA MISMA tarjeta, sin forzar un cambio de
+    // paso — el CTA "Continuar" queda deshabilitado hasta mover el pin.
+    id: 'crear-donde-sin-cobertura',
+    title: 'Crear ¿Dónde? · Paso 1 (sin cobertura de Street View)',
+    section: 'Crear',
+    render: () => (
+      <CreateLocationChallenge
+        groupId={GROUP_ID}
+        groupName={GROUP.name}
+        onBack={noop}
+        onCreated={noop}
+        initialState={{ point: { lat: 35.0036, lng: 135.7788 }, pano: 'none' }}
+      />
+    ),
+  },
+  {
+    // PASO 2 de 2 (issue #592): sin mapa ni previa (ya cumplieron su función
+    // en el paso 1) — solo plazo/tiempo por jugada, privacidad y Lanzar.
+    id: 'crear-donde-reglas',
+    title: 'Crear ¿Dónde? · Paso 2 (las reglas)',
+    section: 'Crear',
+    render: () => (
+      <CreateLocationChallenge
+        groupId={GROUP_ID}
+        groupName={GROUP.name}
+        onBack={noop}
+        onCreated={noop}
+        initialState={{
+          point: { lat: 35.0036, lng: 135.7788 },
+          pano: { panoId: 'pano-galeria', lat: 35.0036, lng: 135.7788 },
+          step: 'previa',
         }}
       />
     ),
