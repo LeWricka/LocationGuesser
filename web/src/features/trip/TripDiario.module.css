@@ -95,21 +95,17 @@
 .carousel::-webkit-scrollbar {
   display: none;
 }
+/* Foto-first (issue #573): misma subida proporcional que la home — la tarjeta
+   crece de una banda baja (~4:3/16:10, 124px de alto fijo) a una proporción 3:2
+   vía `aspect-ratio`, así la foto gana protagonismo sin depender de un alto en
+   px que no escalaba con el ancho. `max-width` sigue acotando el tamaño absoluto
+   en pantallas grandes (el mapa manda), y el timeline/scroll-sync de arriba no
+   se tocan: solo cambian las dimensiones de la tarjeta. */
 .slide {
   flex: 0 0 82%;
-  max-width: 300px;
-  /* Tarjeta horizontal baja (~4:3 / 16:10) de altura fija: el dock no depende del
-     flujo y deja más mapa visible. */
-  height: 124px;
+  max-width: 320px;
+  aspect-ratio: 3 / 2;
   scroll-snap-align: center;
-}
-
-/* Desktop/tablet: el mapa tiene más espacio, así que las tarjetas se achican aún
-   más (el dock pesa menos sobre el globo). */
-@media (min-width: 700px) {
-  .slide {
-    height: 104px;
-  }
 }
 
 /* Vacío: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre).

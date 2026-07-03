@@ -315,9 +315,10 @@ function PinnedChip({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => voi
   )
 }
 
-// Tarjeta-portada de un viaje del carrusel: la FOTO es la tarjeta, tamaño compacto
-// (~190×148, ver `.slide`). Velo inferior, nombre serif sobre el velo, fechas (chip) +
-// estado, corona si es tuyo y mini-cinta de mapa. Tocar abre el viaje; la tarjeta
+// Tarjeta-portada de un viaje del carrusel: la FOTO es la tarjeta, protagonista
+// (~72% del viewport, alto 3:2, ver `.slide` — issue #573). Velo inferior, nombre
+// serif sobre el velo, fechas (chip) + estado, corona si es tuyo y mini-cinta de
+// mapa. Tocar abre el viaje; la tarjeta
 // CENTRADA (`active`) va a opacidad/escala plenas, las demás atenuadas (issue #568,
 // sin animar bajo `prefers-reduced-motion`: transición "a corte").
 //
