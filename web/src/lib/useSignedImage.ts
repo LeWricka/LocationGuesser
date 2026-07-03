@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { signedImageUrl } from './storage'
+import { signedImageUrl, SIGNED_URL_TTL_SECONDS } from './storage'
 
 /**
  * Resuelve la URL firmada de una imagen del bucket privado a partir de su
@@ -8,7 +8,10 @@ import { signedImageUrl } from './storage'
  * devolvemos la url si corresponde al path actual — así no hace falta limpiar
  * el estado de forma síncrona en el efecto). Cancela en el desmontaje.
  */
-export function useSignedImage(path: string | null, expiresIn = 3600): string | null {
+export function useSignedImage(
+  path: string | null,
+  expiresIn: number = SIGNED_URL_TTL_SECONDS,
+): string | null {
   const [resolved, setResolved] = useState<{ path: string; url: string | null } | null>(null)
   useEffect(() => {
     if (!path) return

@@ -208,6 +208,13 @@ interface Props {
   onOpenGroup?: (id: string) => void
   /** Jugar el reto fijado (lo cablea HomePage a #g=<id>&c=<challengeId>). */
   onPlayPinned?: () => void
+  /**
+   * Recuperación cuando la portada de una tarjeta falla al pintarse (issue
+   * #638): típico de una URL firmada caducada tras una PWA viva horas.
+   * HomePage la cablea a su `reload`. Opcional: sin ella, la tarjeta se queda
+   * con el tinte/placeholder sin intentar refrescar nada.
+   */
+  onCoverError?: () => void
   className?: string
 }
 
@@ -234,6 +241,7 @@ export function HomeDashboard({
   onCreateGroup,
   onOpenGroup,
   onPlayPinned,
+  onCoverError,
   className,
 }: Props) {
   const feed = sortTrips(groups)
@@ -444,6 +452,7 @@ export function HomeDashboard({
                   isReturningHero={group.id === heroReturnId}
                   onFocus={() => setActiveId(group.id)}
                   onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+                  onCoverError={onCoverError}
                 />
               </li>
             ))}
@@ -539,6 +548,7 @@ function TripCard({
   isReturningHero,
   onClick,
   onFocus,
+  onCoverError,
 }: {
   group: HomeGroup
   active: boolean
@@ -547,6 +557,8 @@ function TripCard({
   isReturningHero?: boolean
   onClick?: () => void
   onFocus?: () => void
+  /** Ver `Props.onCoverError` (issue #638). */
+  onCoverError?: () => void
 }) {
   const isButton = typeof onClick === 'function'
   const dates = formatTripDates(group.startsOn, group.endsOn)
@@ -560,8 +572,11 @@ function TripCard({
   // ChallengePhoto): `.cover` es un `background-image`, sin evento `onLoad`
   // propio, así que precargamos con un `Image()` de apoyo para saber cuándo el
   // bitmap ya está listo y activar el fundido — evita el "pop" de golpe sobre el
-  // tinte de carga (`--photo-loading-bg`).
-  const coverLoaded = useImagePreload(coverUrl)
+  // tinte de carga (`--photo-loading-bg`). Un 'error' (issue #638, típico de una
+  // URL firmada caducada) NO cuenta como "cargada": se queda en `styles.coverHidden`
+  // igual que "aún cargando", y dispara `onCoverError` para intentar recuperar el dato.
+  const coverState = useImagePreload(coverUrl, onCoverError)
+  const coverLoaded = coverState === 'loaded'
 
   // Elemento foto/placeholder que hace de héroe en la transición (issue #589). El
   // nombre se gestiona SIEMPRE de forma imperativa (ref), nunca en el objeto
@@ -657,37 +672,73 @@ function TripCard({
   )
 }
 
-// Precarga de una URL de imagen (issue #623): devuelve `true` en cuanto el bitmap
-// terminó de cargar (o ya estaba en caché — `img.complete`), para poder disparar
-// un fundido de entrada sobre un `background-image` (que no tiene `onLoad`
-// propio). Mismo espíritu que ChallengePhoto, adaptado a portadas por CSS.
-function useImagePreload(url: string | null): boolean {
-  const [loaded, setLoaded] = useState(false)
+/** Estado de la precarga de una portada: 'idle' (sin url o aún cargando),
+ * 'loaded' (bitmap listo, fundido de entrada) o 'error' (issue #638: la URL
+ * falló — típico de una firmada caducada — se queda en tinte/placeholder). */
+type ImagePreloadState = 'idle' | 'loaded' | 'error'
+
+// Debounce compartido del `onCoverError` (issue #638): si varias portadas
+// caducan a la vez (todas se firmaron en el mismo lote, con el mismo TTL), cada
+// tarjeta dispararía su propio `onCoverError` casi al mismo tiempo — el mismo
+// `reload` llamado N veces. Agrupamos por identidad de la función: una ráfaga de
+// fallos en esta ventana se resuelve con UNA sola llamada.
+const COVER_ERROR_DEBOUNCE_MS = 400
+const coverErrorTimers = new WeakMap<() => void, number>()
+
+function scheduleCoverErrorRecovery(onError: () => void): void {
+  const pending = coverErrorTimers.get(onError)
+  if (pending != null) window.clearTimeout(pending)
+  coverErrorTimers.set(
+    onError,
+    window.setTimeout(() => {
+      coverErrorTimers.delete(onError)
+      onError()
+    }, COVER_ERROR_DEBOUNCE_MS),
+  )
+}
+
+// Precarga de una URL de imagen (issue #623): devuelve 'loaded' en cuanto el
+// bitmap terminó de cargar (o ya estaba en caché — `img.complete`), para poder
+// disparar un fundido de entrada sobre un `background-image` (que no tiene
+// `onLoad` propio). Mismo espíritu que ChallengePhoto, adaptado a portadas por
+// CSS. `onError` (issue #638) es la vía de recuperación: si la imagen falla
+// (URL firmada caducada, típico tras una PWA viva horas), NO fingimos 'loaded'
+// —eso dejaba la tarjeta en blanco, ver bug original— y avisamos al consumidor
+// para que refresque el dato (agrupado, ver `scheduleCoverErrorRecovery`).
+function useImagePreload(url: string | null, onError?: () => void): ImagePreloadState {
+  const [state, setState] = useState<ImagePreloadState>('idle')
+  // Ref: un `onError` inline (nueva identidad en cada render del padre) no debe
+  // reenganchar el efecto de abajo — solo nos interesa la url. Se actualiza en un
+  // efecto sin deps (regla react-hooks/refs: no se muta un ref durante el render).
+  const onErrorRef = useRef(onError)
+  useEffect(() => {
+    onErrorRef.current = onError
+  })
 
   useEffect(() => {
     if (!url) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- estado terminal sin url
-      setLoaded(false)
+      setState('idle')
       return
     }
     let cancelled = false
     const img = new Image()
     img.onload = () => {
-      if (!cancelled) setLoaded(true)
+      if (!cancelled) setState('loaded')
     }
     img.onerror = () => {
-      // Si falla, no dejamos la tarjeta en tinte plano para siempre: se muestra
-      // igual (el navegador ya intentó pintar el background-image real).
-      if (!cancelled) setLoaded(true)
+      if (cancelled) return
+      setState('error')
+      if (onErrorRef.current) scheduleCoverErrorRecovery(onErrorRef.current)
     }
     img.src = url
-    if (img.complete) setLoaded(true)
+    if (img.complete) setState('loaded')
     return () => {
       cancelled = true
     }
   }, [url])
 
-  return loaded
+  return state
 }
 
 // Portada AUTOMÁTICA derivada del nombre del lugar (fallback cuando el viaje no tiene

@@ -14,10 +14,11 @@
 // Promise.allSettled; un viaje que falle (RLS, red) simplemente no aporta puntos
 // (sigue como portada en "Tus viajes"). Nunca rompe la home.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { resolveVisibleTripMoments, pickTripCoverImagePath } from '../../lib/tripCover'
 import { signedImageUrl } from '../../lib/storage'
 import { haversine } from '../../lib/geo'
+import { useVisibilityReload } from '../../lib/useVisibilityReload'
 
 // `isValidLatLng` vive ahora en `lib/tripCover` (compartida con la invitación al
 // viaje, #619); se re-exporta aquí para no romper a quien la importe desde este
@@ -122,6 +123,11 @@ export function useWorldTrips(groups: { id: string; name: string }[]): WorldData
   const [data, setData] = useState<WorldData>(EMPTY)
   // Clave estable del conjunto de grupos: re-resolvemos solo si cambia la lista.
   const key = groups.map((g) => g.id).join(',')
+  // Cuándo se resolvió el último lote (issue #638): alimenta `useVisibilityReload`.
+  const lastResolvedAtRef = useRef<number | null>(null)
+  // Este hook no expone un `reload` propio (se re-resuelve por `key`): forzamos
+  // una nueva pasada del efecto de abajo con un contador que entra en sus deps.
+  const [visibilityTick, setVisibilityTick] = useState(0)
 
   useEffect(() => {
     if (groups.length === 0) {
@@ -138,14 +144,24 @@ export function useWorldTrips(groups: { id: string; name: string }[]): WorldData
         .map((r) => r.value)
         .filter((t): t is WorldTrip => t !== null)
       const totalKm = Math.round(trips.reduce((sum, t) => sum + tripKm(t.points), 0))
+      lastResolvedAtRef.current = Date.now()
       setData({ trips, totalKm, loading: false })
     })()
     return () => {
       cancelled = true
     }
     // `key` resume la lista de grupos; `groups` se re-lee dentro (no re-dispara solo).
+    // `visibilityTick` fuerza una re-resolución al volver de fondo con dato viejo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key])
+  }, [key, visibilityTick])
+
+  // Re-firma defensiva (issue #638): mismas miniaturas de pines/portada que la
+  // home, mismo TTL — si la pestaña vuelve tras estar de fondo con el dato viejo,
+  // forzamos otra pasada del efecto de arriba.
+  useVisibilityReload(
+    () => lastResolvedAtRef.current,
+    () => setVisibilityTick((t) => t + 1),
+  )
 
   return data
 }

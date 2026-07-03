@@ -414,13 +414,29 @@ export async function uploadImage(file: File): Promise<string> {
 }
 
 /**
+ * TTL por defecto de una URL firmada del bucket privado (issue #638). Antes eran
+ * 3600s (1h): de sobra para una visita normal, pero una PWA puede quedar viva en
+ * segundo plano mucho más tiempo (pestaña dormida, app en background) — al
+ * volver, las portadas/pines/héroes que ya se habían firmado aparecían en
+ * blanco (URL caducada) sin que nada las re-firmara. 24h da margen para una
+ * sesión larga sin abrir una ventana de exposición desproporcionada (la URL
+ * sigue exigiendo ser miembro del viaje para generarse, vía RLS). Exportada:
+ * TODOS los puntos de firma del camino de lectura (home y viaje) cuelgan de
+ * este único número, en vez de repetir el mágico por su cuenta.
+ */
+export const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24
+
+/**
  * URL firmada (temporal) de una imagen del bucket a partir de su `path`. El
  * bucket es PRIVADO (la foto puede revelar el sitio = la respuesta, sobre todo
  * en modo sorpresa), así que no vale `getPublicUrl`: se firma con caducidad y
  * solo un usuario autenticado (miembro) puede generarla (RLS de storage). Null
  * si no se puede firmar. Async: se resuelve en el cliente.
  */
-export async function signedImageUrl(path: string, expiresIn = 3600): Promise<string | null> {
+export async function signedImageUrl(
+  path: string,
+  expiresIn = SIGNED_URL_TTL_SECONDS,
+): Promise<string | null> {
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresIn)
   if (error) return null
   return data?.signedUrl ?? null

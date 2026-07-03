@@ -2,11 +2,13 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 
 // Las factories de vi.mock se elevan al inicio del fichero; declaramos los
 // espías con vi.hoisted para que estén inicializados cuando corren.
-const { heic2any, upload, reportError } = vi.hoisted(() => ({
+const { heic2any, upload, createSignedUrl, reportError } = vi.hoisted(() => ({
   // heic2any: import dinámico que storage.ts solo usa cuando llega un HEIC.
   heic2any: vi.fn(),
   // Supabase Storage: comprobamos que se sube algo, sin red.
   upload: vi.fn(),
+  // Firma de URLs del bucket privado (issue #638): comprobamos con qué TTL se llama.
+  createSignedUrl: vi.fn(),
   // Observabilidad: espiamos qué se reporta a Sentry en los fallos.
   reportError: vi.fn(),
 }))
@@ -17,7 +19,7 @@ vi.mock('heic2any', () => ({
 
 vi.mock('./supabase', () => ({
   supabase: {
-    storage: { from: () => ({ upload }) },
+    storage: { from: () => ({ upload, createSignedUrl }) },
   },
 }))
 
@@ -25,7 +27,7 @@ vi.mock('./observability', () => ({
   reportError,
 }))
 
-import { uploadImage, ImageDecodeError } from './storage'
+import { uploadImage, signedImageUrl, ImageDecodeError, SIGNED_URL_TTL_SECONDS } from './storage'
 
 // Fake mínimo de `<img>`: el nuevo `decodeImage` (storage.ts) carga SIEMPRE un
 // `<img>` primero (la misma vía que pinta la miniatura del picker, ver #520)
@@ -122,6 +124,33 @@ beforeEach(() => {
   vi.restoreAllMocks()
   stubDecodePipeline()
   upload.mockResolvedValue({ error: null })
+  createSignedUrl.mockResolvedValue({
+    data: { signedUrl: 'https://firmada.example/x.jpg' },
+    error: null,
+  })
+})
+
+// Issue #638: las tarjetas de la home se quedaban en blanco tras ~1h de PWA
+// viva — la URL firmada (antes 3600s) caducaba sin que nada la re-firmara. El
+// fix unifica el TTL en `SIGNED_URL_TTL_SECONDS` (24h) como valor por defecto:
+// estos tests fijan ese contrato para que un cambio futuro no lo rompa en
+// silencio.
+describe('signedImageUrl — TTL por defecto (issue #638)', () => {
+  test('firma con SIGNED_URL_TTL_SECONDS (24h) por defecto, no con el 3600s antiguo', async () => {
+    await signedImageUrl('viajes/foto.jpg')
+    expect(createSignedUrl).toHaveBeenCalledWith('viajes/foto.jpg', SIGNED_URL_TTL_SECONDS)
+    expect(SIGNED_URL_TTL_SECONDS).toBe(60 * 60 * 24)
+  })
+
+  test('un TTL explícito (p.ej. 5s para verificar sin esperar 24h) lo respeta igual', async () => {
+    await signedImageUrl('viajes/foto.jpg', 5)
+    expect(createSignedUrl).toHaveBeenCalledWith('viajes/foto.jpg', 5)
+  })
+
+  test('si Storage devuelve error, resuelve null en vez de lanzar', async () => {
+    createSignedUrl.mockResolvedValue({ data: null, error: new Error('boom') })
+    await expect(signedImageUrl('viajes/foto.jpg')).resolves.toBeNull()
+  })
 })
 
 describe('uploadImage — enrutado HEIC vs. JPEG/PNG', () => {
