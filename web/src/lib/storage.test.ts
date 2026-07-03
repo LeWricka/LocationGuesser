@@ -48,6 +48,46 @@ function fakeImageClass(
   }
 }
 
+// Variante que decide éxito/fallo según el PREFIJO del `src` recibido: nos
+// deja simular "el <img> por objectURL (blob:) falla pero por dataURL (data:)
+// sí funciona" — el caso del fallback FileReader (#550) — con la MISMA clase
+// global `Image` para las dos vías (como pasaría en el navegador real).
+function fakeImageClassBySrcPrefix(succeedsFor: (src: string) => boolean) {
+  return class FakeImage {
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    naturalWidth = 800
+    naturalHeight = 600
+    set src(v: string) {
+      queueMicrotask(() => (succeedsFor(v) ? this.onload?.() : this.onerror?.()))
+    }
+  }
+}
+
+// Fake mínimo de `FileReader`: el fallback de `decodeImage` (#550) lo usa
+// SOLO cuando el `<img>` por objectURL ya falló, para intentar una segunda vía
+// (dataURL) — cubre File/Blob raros de content-providers de Android.
+function fakeFileReaderClass(opts: { fails?: boolean } = {}) {
+  const { fails = false } = opts
+  return class FakeFileReader {
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    result: string | ArrayBuffer | null = null
+    // Sin parámetro: el fake no necesita leer el contenido real del archivo,
+    // solo simular el evento load/error (como fakeImageClass con `src`).
+    readAsDataURL() {
+      queueMicrotask(() => {
+        if (fails) {
+          this.onerror?.()
+          return
+        }
+        this.result = 'data:image/jpeg;base64,eHh4'
+        this.onload?.()
+      })
+    }
+  }
+}
+
 // `createImageBitmap`, `<img>` y `<canvas>` no existen (o no pintan) en jsdom:
 // los stubeamos para que el pipeline de decodificación/canvas resuelva sin
 // tocar píxeles reales. Así los tests se centran en el ENRUTADO (HEIC sí /
@@ -59,6 +99,9 @@ function stubDecodePipeline() {
     vi.fn().mockResolvedValue({ width: 800, height: 600, close: vi.fn() }),
   )
   vi.stubGlobal('Image', fakeImageClass())
+  // Por defecto FileReader "funciona" (dataURL válido): solo entra en juego si
+  // un test hace fallar el <img> por objectURL primero (ver tests de #550).
+  vi.stubGlobal('FileReader', fakeFileReaderClass())
   vi.stubGlobal('URL', {
     createObjectURL: vi.fn(() => 'blob:fake'),
     revokeObjectURL: vi.fn(),
@@ -219,5 +262,81 @@ describe('uploadImage — diagnóstico de fallos a Sentry', () => {
     await expect(uploadImage(jpeg)).resolves.toMatch(/\.jpg$/)
     expect(heic2any).not.toHaveBeenCalled()
     expect(upload).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('uploadImage — guardas y fallbacks del #550 (fotos de galería en Android)', () => {
+  test('un archivo de 0 bytes (foto de Google Photos aún no descargada) da un mensaje accionable y reporta el motivo a Sentry', async () => {
+    const cloudOnly = new File([], 'IMG_2026_cloud.jpg', { type: 'image/jpeg' })
+
+    const err = await uploadImage(cloudOnly).catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(ImageDecodeError)
+    expect((err as Error).message).toMatch(/descargada en el dispositivo/i)
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        area: 'image_decode',
+        stage: 'decode',
+        reason: 'empty_file',
+        fileName: 'IMG_2026_cloud.jpg',
+      }),
+    )
+    expect(upload).not.toHaveBeenCalled()
+  })
+
+  test('si el <img> por objectURL falla pero FileReader→dataURL sí puede, usa esa vía y sube igual (sin reportar fallo)', async () => {
+    vi.stubGlobal(
+      'Image',
+      fakeImageClassBySrcPrefix((src) => src.startsWith('data:')),
+    )
+    const jpeg = new File(['x'], 'content-provider.jpg', { type: 'image/jpeg' })
+
+    await expect(uploadImage(jpeg)).resolves.toMatch(/\.jpg$/)
+
+    expect(upload).toHaveBeenCalledTimes(1)
+    expect(reportError).not.toHaveBeenCalled()
+  })
+
+  test('si ni el objectURL ni el FileReader→dataURL pueden, reporta el detalle de AMBOS intentos y lanza ImageDecodeError', async () => {
+    vi.stubGlobal('Image', fakeImageClass({ fails: true }))
+    const bitmapSpy = vi.fn()
+    vi.stubGlobal('createImageBitmap', bitmapSpy)
+    const jpeg = new File(['x'], 'imposible-2.jpg', { type: 'image/jpeg' })
+
+    await expect(uploadImage(jpeg)).rejects.toMatchObject({
+      name: 'ImageDecodeError',
+      fileName: 'imposible-2.jpg',
+    })
+    // No arriesgamos un decode a resolución nativa solo para diagnosticar
+    // (sería reintroducir el riesgo de OOM que el #524 evitaba).
+    expect(bitmapSpy).not.toHaveBeenCalled()
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        area: 'image_decode',
+        stage: 'decode',
+        reason: 'img_failed',
+        usedFileReaderFallback: true,
+        objectUrlError: expect.objectContaining({ message: expect.any(String) }),
+        dataUrlError: expect.objectContaining({ message: expect.any(String) }),
+        fileName: 'imposible-2.jpg',
+        fileLastModified: jpeg.lastModified,
+      }),
+    )
+  })
+
+  test('si FileReader tampoco puede (sin soporte), el detalle del fallo lo identifica como error de FileReader', async () => {
+    vi.stubGlobal('Image', fakeImageClass({ fails: true }))
+    vi.stubGlobal('FileReader', fakeFileReaderClass({ fails: true }))
+    const jpeg = new File(['x'], 'sin-filereader.jpg', { type: 'image/jpeg' })
+
+    await expect(uploadImage(jpeg)).rejects.toMatchObject({ name: 'ImageDecodeError' })
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        dataUrlError: expect.objectContaining({ message: expect.stringMatching(/filereader/i) }),
+      }),
+    )
   })
 })
