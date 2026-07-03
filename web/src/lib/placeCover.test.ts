@@ -81,18 +81,27 @@ describe('resolvePlaceCover', () => {
     expect(invoke).toHaveBeenCalledTimes(1)
   })
 
-  test('un error de la función no rompe: devuelve sin imagen', async () => {
+  test('un error de la función no rompe, devuelve sin imagen y se cachea (no reintenta)', async () => {
     invoke.mockResolvedValue({ data: null, error: new Error('boom') })
     const cover = await resolvePlaceCover('Sitio Inexistente')
     expect(cover.imageUrl).toBeNull()
+
+    await resolvePlaceCover('Sitio Inexistente')
+    expect(invoke).toHaveBeenCalledTimes(1)
   })
 
-  test('una excepción de red no rompe ni cachea (se podrá reintentar)', async () => {
+  // #591: un fallo que LANZA (red, o el preflight CORS rechazado — el SDK de
+  // Supabase lo propaga como excepción, no como `error`) debe frenar el
+  // reintento igual que uno que resuelve con `error`. Antes NO se cacheaba, y
+  // cada remonte de la tarjeta (p.ej. el carrusel de momentos) volvía a
+  // martillear la función rota en bucle, congelando la web.
+  test('una excepción (red o CORS) se cachea: un solo intento por lugar y sesión', async () => {
     invoke.mockRejectedValueOnce(new Error('network'))
     const first = await resolvePlaceCover('Madrid')
     expect(first.imageUrl).toBeNull()
 
-    // Segundo intento: como el fallo no se cacheó, vuelve a invocar y ahora acierta.
+    // Segundo intento con el MISMO nombre normalizado: no debe volver a invocar,
+    // aunque esta vez la función respondería bien — el fallo ya quedó cacheado.
     invoke.mockResolvedValueOnce({
       data: {
         image_url: 'https://upload.wikimedia.org/madrid.jpg',
@@ -102,7 +111,7 @@ describe('resolvePlaceCover', () => {
       error: null,
     })
     const second = await resolvePlaceCover('Madrid')
-    expect(second.imageUrl).toBe('https://upload.wikimedia.org/madrid.jpg')
-    expect(invoke).toHaveBeenCalledTimes(2)
+    expect(second.imageUrl).toBeNull()
+    expect(invoke).toHaveBeenCalledTimes(1)
   })
 })

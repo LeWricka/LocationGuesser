@@ -96,6 +96,11 @@ export async function resolvePlaceCover(name: string | null | undefined): Promis
       body: { name: normalized, lang: 'es' },
     })
     if (error || !data) {
+      // Un solo intento por lugar y sesión: si la función falla (red, CORS, 404
+      // porque aún no está desplegada, 5xx…) NO reintentamos en cada remonte de
+      // la tarjeta. Sin esto, un fallo persistente se convierte en un martilleo
+      // sin fin cada vez que el carrusel de momentos remonta la misma tarjeta
+      // (#591: preflight CORS roto, congelaba la web al cambiar de momento).
       cache.set(normalized, EMPTY)
       return EMPTY
     }
@@ -112,8 +117,15 @@ export async function resolvePlaceCover(name: string | null | undefined): Promis
     cache.set(normalized, result)
     return result
   } catch {
-    // Best-effort: un tropiezo de red no debe romper la tarjeta. No cacheamos el
-    // fallo (puede ser transitorio): un próximo render reintentará.
+    // Best-effort: un tropiezo de red/CORS no debe romper la tarjeta. Cacheamos
+    // el fallo igual que arriba (un solo intento por lugar y sesión): un fallo
+    // que LANZA (p.ej. una petición rechazada en el preflight CORS, que el SDK
+    // de Supabase propaga como excepción en vez de como `error`) es tan
+    // repetible como uno que resuelve con `error`, así que debe frenar el
+    // reintento igual — si no, es la vía por la que se coló el bucle de #591.
+    // Si el fallo era transitorio, la siguiente carga de página (cache nueva)
+    // reintenta sola.
+    cache.set(normalized, EMPTY)
     return EMPTY
   }
 }

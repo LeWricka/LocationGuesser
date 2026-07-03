@@ -4,3 +4,13 @@
 #   npx supabase link --project-ref ykquigyjvgxisgdxryxr
 #   npx supabase db push
 project_id = "locationguesser"
+
+# `place-cover` la llama el front SIN sesión (como `resolve-maps-url`), así que no
+# debe exigir un JWT. Se fija aquí (en vez de depender solo de acordarse del flag
+# `--no-verify-jwt` en cada `deploy`) porque, si algún día se despliega sin el
+# flag, `verify_jwt=true` rechaza en la plataforma hasta el preflight OPTIONS
+# (falla ANTES de llegar al código de la función, el handler de CORS nunca se
+# ejecuta y el navegador ve "preflight sin HTTP ok" — el síntoma de #591). El
+# flag de CLI, si se pasa, sigue prevaleciendo sobre esto.
+[functions.place-cover]
+verify_jwt = false
