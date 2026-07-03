@@ -43,6 +43,16 @@ export function HomePage() {
   )
   const world = useWorldTrips(tripList)
 
+  // Portada derivada por viaje (fallback #2 de la cascada): useWorldTrips YA resuelve,
+  // para el pin del globo, la foto del momento situado más reciente de cada viaje
+  // (resolveTrip → WorldTrip.coverUrl, misma firma que usan los pines). La reutilizamos
+  // aquí para la tarjeta en vez de repetir la consulta/firma (#554): un viaje sin portada
+  // propia pero con recuerdos situados ya no cae directo al placeholder.
+  const worldCoverByGroup = useMemo(
+    () => new Map(world.trips.map((t) => [t.groupId, t.coverUrl])),
+    [world.trips],
+  )
+
   // Portadas firmadas del feed: cada viaje trae su path de portada propia (coverPath); lo
   // firmamos a URL aquí (es presentación). Tolerante a fallo: un path que no firme cae a
   // null (la tarjeta usa el fondo de relleno) y nunca rompe la home.
@@ -133,11 +143,12 @@ export function HomePage() {
   const userId = user?.id ?? ''
   const hasGroups = data.groups.length > 0
 
-  // Portada por viaje: usamos la portada propia ya firmada (null → la tarjeta cae al fondo
-  // de relleno).
+  // Cascada de portada por viaje: (1) portada propia firmada; (2) foto del recuerdo más
+  // reciente (ya resuelta por useWorldTrips para el pin del globo, ver arriba); (3) null →
+  // la tarjeta cae al fondo de relleno (placeholder de mapa nocturno).
   const groups: HomeGroup[] = data.groups.map((g) => ({
     ...g,
-    coverUrl: coverByGroup.get(g.id) ?? null,
+    coverUrl: coverByGroup.get(g.id) ?? worldCoverByGroup.get(g.id) ?? null,
   }))
 
   // Pines-foto del globo: un pin por punto situado de cada viaje; el más reciente del
