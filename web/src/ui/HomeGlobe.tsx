@@ -43,6 +43,18 @@ interface Props {
    * (pausamos el repaint continuo) para no malgastar batería con el globo tapado.
    */
   relaxed?: boolean
+  /**
+   * Id del destino "activo" ahora mismo (p.ej. el viaje enfocado en la hoja, pieza 2
+   * de la home inmersiva — issue #567). Al cambiar a un valor con un pin cuyo
+   * `targetId` coincida, el globo VUELA suave a ese pin y le aplica en EXCLUSIVA el
+   * estado "lead" (anillo dorado + escala, el mismo estilo que ya existe para
+   * `pin.lead`), retirándoselo a cualquier otro —incluido uno que lo llevara por
+   * dato—. `null`/`undefined` (o un id sin pin correspondiente) es un NO-OP: deja
+   * intacto el framing/deriva y el "lead" que ya hubiera (por dato o por un vuelo
+   * anterior). Contrato exacto con la pieza 2: SOLO esta prop, sin más cambios de
+   * API pública.
+   */
+  activeTargetId?: string | null
   className?: string
 }
 
@@ -72,6 +84,18 @@ const GLOBE_MAX_ZOOM = 2.4
 const FIT_MAX_ZOOM = 2.2
 // Un solo pin: acercamos algo más, pero sin perder la curvatura del globo.
 const SINGLE_ZOOM = 2.2
+// Vuelo al pin ACTIVO (`activeTargetId`, #567): mismo zoom "un solo pin" de arriba.
+// Duración del vuelo en ms (lo que pide `Map#easeTo`) — el sistema `--motion` no
+// tiene un token propio para "viaje de cámara" (su techo, `--duration-slower`, son
+// 480ms, pensados para transiciones de UI, no para un giro de globo); 700ms es
+// DELIBERADAMENTE más lento, coherente con el resto de este fichero, que YA usa 700ms
+// para `fitToPins` (arriba). MapLibre pide la curva como función `(t) => t'` de
+// progreso temporal, no como cadena `cubic-bezier()`, así que no podemos reenchufar
+// literalmente `--motion-ease-emphasized`; dejamos el easing por defecto de
+// `easeTo` (una curva ease-out equivalente en sensación a `--motion-ease-emphasized`,
+// arranca rápido y frena suave) en vez de reimplementar un evaluador de Bézier solo
+// para este vuelo.
+const FLY_TO_ACTIVE_DURATION_MS = 700
 // Alto/ancho aproximado del pin de la home (disco + puntita + aro "lead") en px. El
 // marcador se ancla por la PUNTA (base) y el disco crece HACIA ARRIBA, así que el fit
 // necesita reservar ~este alto por ENCIMA de cada coordenada para que ningún disco quede
@@ -174,6 +198,7 @@ export function HomeGlobe({
   onOpenPin,
   framing = 'pins',
   relaxed = false,
+  activeTargetId = null,
   className,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -192,12 +217,25 @@ export function HomeGlobe({
   const pinsRef = useRef(pins)
   const onOpenRef = useRef(onOpenPin)
   const framingRef = useRef(framing)
+  const activeTargetIdRef = useRef(activeTargetId)
   useEffect(() => {
     pinsRef.current = pins
     onOpenRef.current = onOpenPin
     framingRef.current = framing
     relaxedRef.current = relaxed
+    activeTargetIdRef.current = activeTargetId
   })
+
+  // Gesto del usuario (arrastre) en curso: si `activeTargetId` cambia mientras el
+  // dueño está girando el globo a mano, el vuelo de cámara NO le pelea el gesto. De
+  // las dos formas "simples" posibles (cancelar el vuelo, o encolarlo para lanzarlo
+  // al soltar) elegimos CANCELAR: encolarlo obligaría a recordar "hay un vuelo
+  // pendiente" con más estado y un timing menos predecible (¿qué pasa si cambia de
+  // destino otra vez antes de soltar?); cancelar es un no-op limpio y, si el usuario
+  // sigue navegando, la práxima vez que cambie `activeTargetId` sí volará. El
+  // resaltado del pin ("lead") NO se cancela: es gratis (solo CSS) y no compite con
+  // el paneo.
+  const interactingRef = useRef(false)
 
   // Deriva (auto-spin) del globo en reposo: hace que el héroe se sienta VIVO. La
   // gestiona el rAF de abajo; estos refs la pausan/reanudan sin recrear el mapa.
@@ -210,6 +248,27 @@ export function HomeGlobe({
   // Valor de `relaxed` en ref: el handler `load` (async) y el montaje lo leen sin meter
   // `relaxed` en sus deps (recrear el mapa WebGL al arrastrar la hoja sería carísimo).
   const relaxedRef = useRef(relaxed)
+
+  // Aplica la clase "lead" (aro dorado) según `activeTargetId`, EXCLUSIVA sobre los
+  // markers ya creados: idempotente y sin animación propia (a diferencia de
+  // `repaint`, no toca `background-image`/DOM de cada pin, solo `classList`), así
+  // que se puede llamar en cada repintado de pines sin producir el parpadeo de
+  // "vacío → foto" que causaría reconstruir los elementos. Sin override activo (o
+  // sin pin cuyo `targetId` coincida) es un NO-OP: deja el `lead` que trajera el
+  // propio dato (`pin.lead`, ya horneado en el elemento por `buildHomePinElement`).
+  // Devuelve el índice encontrado (o -1) para que `flyToTarget` decida si vuela.
+  const applyActiveLead = useCallback((): number => {
+    const targetId = activeTargetIdRef.current
+    if (targetId == null) return -1
+    const idx = pinsRef.current.findIndex((p) => p.targetId === targetId)
+    if (idx === -1) return -1
+    // Recorremos TODOS los markers (no solo "el anterior recordado"): así también
+    // sustituye limpio un `lead` que viniera del propio dato, sin refs extra.
+    markersRef.current.forEach((marker, i) => {
+      marker.getElement().classList.toggle('lg-home-pin--lead', i === idx)
+    })
+    return idx
+  }, [])
 
   // Repinta los marcadores (pines-foto) desde las refs.
   const repaint = useCallback(() => {
@@ -249,7 +308,12 @@ export function HomeGlobe({
           .addTo(map),
       )
     }
-  }, [])
+    // Reaplica el override de `activeTargetId` sobre los markers RECIÉN creados: sin
+    // esto, un cambio de `pins` (nuevo momento subido, etc.) con un target ya activo
+    // perdería el aro dorado hasta el siguiente cambio de `activeTargetId` (los
+    // elementos nuevos solo llevan el `lead` horneado desde el propio dato).
+    applyActiveLead()
+  }, [applyActiveLead])
 
   // Encuadra todos los pines (sin pines, queda el mundo entero). En modo `'world'`
   // (landing decorativa) NO encuadra: deja la vista mundo de arranque, siempre esférica.
@@ -293,6 +357,39 @@ export function HomeGlobe({
     const bounds = new gl.LngLatBounds([minLng, minLat], [maxLng, maxLat])
     map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration })
   }, [])
+
+  // Vuela al pin de `activeTargetId` (#567) y le aplica el "lead" en exclusiva
+  // (vía `applyActiveLead`, que también corrige el `classList`). `null`/`undefined`
+  // o un id sin pin correspondiente: NO-OP total, ni clase ni cámara — deja intacto
+  // el framing/deriva y el `lead` que ya hubiera (contrato de la prop, ver `Props`).
+  const flyToTarget = useCallback(() => {
+    const map = mapRef.current
+    if (!map || !readyRef.current) return
+    const idx = applyActiveLead()
+    if (idx === -1) return
+    // `framing: 'world'` (landing decorativa) NUNCA reencuadra —ver `fitToPins`
+    // arriba—, así que tampoco volamos ahí: mantenemos esa invariante también para
+    // `activeTargetId` (el resaltado del pin, arriba, sí se aplica igualmente: no
+    // reencuadra nada). El gesto del usuario manda igual de tajante: si está
+    // arrastrando el globo, cancelamos el vuelo en vez de pelearle la cámara.
+    if (framingRef.current === 'world' || interactingRef.current) return
+    const pin = pinsRef.current[idx]
+    const center: [number, number] = [pin.lng, pin.lat]
+    if (prefersReducedMotion()) {
+      // Reduced-motion: salto directo, sin vuelo (la escala del "lead" tampoco anima:
+      // la regla `@media (prefers-reduced-motion: reduce)` de HomeGlobe.module.css ya
+      // desactiva el pulso de bienvenida del `::before`). Robustez: si el doble/stub
+      // (galería) no expone `jumpTo`, un `easeTo` con `duration: 0` es el mismo salto
+      // instantáneo (ambos aceptan las mismas opciones de cámara).
+      if (typeof map.jumpTo === 'function') {
+        map.jumpTo({ center, zoom: SINGLE_ZOOM })
+      } else {
+        map.easeTo({ center, zoom: SINGLE_ZOOM, duration: 0 })
+      }
+      return
+    }
+    map.easeTo({ center, zoom: SINGLE_ZOOM, duration: FLY_TO_ACTIVE_DURATION_MS })
+  }, [applyActiveLead])
 
   // Bucle de deriva: empuja la longitud del centro a velocidad constante (grados/seg), de
   // modo que el globo gira solo. Solo en reposo (no pausado) y sin reduced-motion. Mover el
@@ -405,6 +502,10 @@ export function HomeGlobe({
           readyRef.current = true
           repaint()
           fitToPins()
+          // Si `activeTargetId` ya llega con valor en el primer render (p.ej. la home
+          // abre con un viaje ya enfocado), aplica su vuelo/lead nada más cargar —si no,
+          // habría que esperar a que la prop CAMBIE para que se refleje.
+          flyToTarget()
 
           // Deriva en reposo: solo en la landing decorativa (`world`); en la home con
           // viajes reales (`pins`) el globo queda encuadrado en los pines, sin girar. Si la
@@ -421,6 +522,17 @@ export function HomeGlobe({
         map.on('mousedown', pauseSpinThenResume)
         map.on('touchstart', pauseSpinThenResume)
         map.on('wheel', pauseSpinThenResume)
+
+        // Arrastre en curso (#567): mientras el dueño gira el globo a mano, un vuelo a
+        // `activeTargetId` no le pelea el gesto (ver `interactingRef`/`flyToTarget`).
+        // `dragstart`/`dragend` (no `mousedown`/`mouseup`) porque son los que MapLibre
+        // dispara específicamente para el paneo del globo, en ratón y en touch por igual.
+        map.on('dragstart', () => {
+          interactingRef.current = true
+        })
+        map.on('dragend', () => {
+          interactingRef.current = false
+        })
       } catch {
         if (!disposed) setFailed(true)
       }
@@ -440,13 +552,21 @@ export function HomeGlobe({
     // `relaxed` NO va en las deps: cambia al arrastrar la hoja y recrear el mapa WebGL en
     // cada toque sería carísimo. Su efecto vive en el useEffect de abajo (pausa/reanuda la
     // deriva y el render sin recrear nada). El montaje lee su valor inicial vía `relaxedRef`.
-  }, [webgl, repaint, fitToPins, startSpin, stopSpin])
+  }, [webgl, repaint, fitToPins, flyToTarget, startSpin, stopSpin])
 
   // Repinta + reencuadra cuando cambian los pines (no recrea el mapa).
   useEffect(() => {
     repaint()
     if (readyRef.current) fitToPins()
   }, [pins, repaint, fitToPins])
+
+  // Vuela/resalta al cambiar `activeTargetId` (no recrea nada; ver `flyToTarget`).
+  // No hace falta comparar con el valor anterior: `flyToTarget` ya es un NO-OP total
+  // si no hay id o no hay pin correspondiente, y el efecto solo se dispara cuando la
+  // prop CAMBIA de valor (dependencia `[activeTargetId]`).
+  useEffect(() => {
+    if (readyRef.current) flyToTarget()
+  }, [activeTargetId, flyToTarget])
 
   // Rendimiento + deriva según la hoja. Con la hoja SUBIDA (`relaxed`) el globo queda casi
   // tapado: paramos la rotación de teselas (batería) y PAUSAMOS la deriva. Al RECOGERSE la
