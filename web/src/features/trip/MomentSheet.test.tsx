@@ -260,6 +260,119 @@ describe('MomentSheet', () => {
     })
   })
 
+  // --- Swipe-down para cerrar desde toda la hoja (#646) -----------------------
+  //
+  // El héroe (foto) está DENTRO del único scrollable (`.content`), así que la
+  // guarda de scroll (regla 1) se comprueba sobre `contentRef` sin importar si el
+  // dedo empieza en la foto o en el cuerpo: ambos burbujean al mismo handler del
+  // panel. jsdom no dispone `setPointerCapture` de verdad ni layout real (el alto
+  // del panel es 0), así que el umbral de distancia cae a `window.innerHeight *
+  // 0.25` (ver `closeThresholdPx`) — con `clientY` moviéndose cientos de píxeles
+  // en los tests replicamos un arrastre claramente por encima o por debajo de ese
+  // umbral sin depender de layout.
+  describe('swipe-down para cerrar desde toda la hoja (#646)', () => {
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    test('arrastre desde el héroe por encima del umbral cierra la hoja', () => {
+      const onClose = vi.fn()
+      renderSheet({ onClose })
+
+      // El héroe (la foto) es el primer contenido del scrollable: arrastrar
+      // desde ahí debe cerrar igual que arrastrar desde el asa.
+      const hero = screen.getByAltText('Aguas turquesa')
+      fireEvent.pointerDown(hero, { clientY: 0 })
+      fireEvent.pointerMove(hero, { clientY: 400 }) // supera el umbral de intención y el de distancia
+      fireEvent.pointerUp(hero)
+
+      expect(onClose).not.toHaveBeenCalled() // la salida anima antes de desmontar
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    test('con scroll interno (scrollTop>0) el arrastre no cierra: manda el scroll nativo', () => {
+      const onClose = vi.fn()
+      renderSheet({ onClose })
+
+      // Simula el cuerpo YA scrolleado (el héroe ha quedado por encima, fuera de
+      // vista): la guarda de la regla 1 debe rechazar el gesto de cierre.
+      const content = screen.getByTestId('moment-sheet-content')
+      content.scrollTop = 50
+
+      const hero = screen.getByAltText('Aguas turquesa')
+      fireEvent.pointerDown(hero, { clientY: 0 })
+      fireEvent.pointerMove(hero, { clientY: 400 })
+      fireEvent.pointerUp(hero)
+
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    test('soltar por debajo del umbral no cierra: la hoja vuelve a su sitio', () => {
+      const onClose = vi.fn()
+      renderSheet({ onClose })
+
+      const hero = screen.getByAltText('Aguas turquesa')
+      fireEvent.pointerDown(hero, { clientY: 0 })
+      // Pasa el umbral de INTENCIÓN (8px) pero se queda muy por debajo del de
+      // distancia/velocidad: al soltar, no cierra.
+      fireEvent.pointerMove(hero, { clientY: 40 })
+      fireEvent.pointerUp(hero)
+
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    test('en modo edición (papel, #571) el gesto no aplica', () => {
+      const onClose = vi.fn()
+      renderSheet({ onClose, initialEditing: true })
+
+      // Sin héroe en edición: el gesto arranca sobre el propio diálogo.
+      const dialog = screen.getByRole('dialog')
+      fireEvent.pointerDown(dialog, { clientY: 0 })
+      fireEvent.pointerMove(dialog, { clientY: 400 })
+      fireEvent.pointerUp(dialog)
+
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(onClose).not.toHaveBeenCalled()
+      // El formulario de papel sigue montado: nada se cerró de refilón.
+      expect(screen.getByRole('heading', { name: 'Editar recuerdo' })).toBeInTheDocument()
+    })
+
+    test('reduced motion: el cierre por arrastre es instantáneo, sin animación de seguimiento', () => {
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: true,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }))
+      const onClose = vi.fn()
+      renderSheet({ onClose })
+
+      const hero = screen.getByAltText('Aguas turquesa')
+      fireEvent.pointerDown(hero, { clientY: 0 })
+      fireEvent.pointerMove(hero, { clientY: 400 })
+      fireEvent.pointerUp(hero)
+
+      // Reduced motion reutiliza el cierre determinista (#613) sin animar: no
+      // hace falta esperar al timeout de seguridad, `onClose` ya se disparó.
+      expect(onClose).toHaveBeenCalledTimes(1)
+      vi.unstubAllGlobals()
+    })
+  })
+
   describe('reto cerrado · "Tu resultado" (#580)', () => {
     test('jugado: muestra mis puntos y distancia, y "Ver marcador" navega', async () => {
       const user = userEvent.setup()

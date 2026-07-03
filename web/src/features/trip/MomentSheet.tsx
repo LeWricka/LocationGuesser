@@ -123,9 +123,18 @@ function computeEditMaxDate(startsOn: string | null, endsOn: string | null): str
   return isFutureTrip && endsOn ? endsOn : today
 }
 
-// Umbral de arrastre (px) a partir del cual soltar cierra la hoja. Por debajo,
-// la hoja vuelve a su sitio (gesto cancelado).
-const DRAG_CLOSE_PX = 110
+// Arrastre para cerrar (issue #646): la hoja ENTERA sigue el dedo, no solo el
+// asa. Umbral de INTENCIÓN: hasta que el dedo no se mueva esto, no decidimos si
+// el gesto es un cierre, un scroll o un simple tap (evita robar clicks/scrolls).
+const DRAG_INTENT_PX = 8
+// Umbral de DISTANCIA: cierra si se arrastra más de este % del alto de la hoja.
+const CLOSE_DISTANCE_RATIO = 0.25
+// Umbral de VELOCIDAD (px/ms) de un flick: cierra aunque no llegue al umbral de
+// distancia si el dedo suelta con suficiente inercia hacia abajo.
+const CLOSE_VELOCITY_PX_MS = 0.6
+// Piso (ms) entre dos muestras para calcular la velocidad instantánea del flick:
+// por debajo, el `dt` es demasiado pequeño para ser fiable (ver `onPanelPointerMove`).
+const MIN_VELOCITY_SAMPLE_MS = 4
 
 // Timeout de SEGURIDAD (ms) para el cierre: si `transitionend` no llega —
 // `prefers-reduced-motion` detectado distinto entre CSS y JS, un remontaje a
@@ -188,10 +197,28 @@ export function MomentSheet({
   onDeleted,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
+  // Cuerpo scrolleable de la hoja (foto + artículo): la guarda de scroll del
+  // gesto de cierre consulta su `scrollTop` (regla 1, issue #646).
+  const contentRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
-  // Desplazamiento vertical en curso del gesto de arrastre (0 = en su sitio).
+  // Desplazamiento vertical en curso del gesto de arrastre (0 = en su sitio). Bajo
+  // `prefers-reduced-motion` se queda siempre en 0 — sin animación de seguimiento
+  // (ver `onPanelPointerMove`): el gesto se sigue calculando, solo no se dibuja.
   const [dragY, setDragY] = useState(0)
-  const dragStart = useRef<number | null>(null)
+  // Fase del gesto en curso, en un ref (no dispara render en cada paso):
+  //  - 'idle': sin gesto en marcha.
+  //  - 'pending': dedo abajo, aún sin decidir si es cierre, scroll o un tap.
+  //  - 'dragging': decidido — la hoja sigue el dedo.
+  //  - 'rejected': decidido que NO es nuestro (scroll interno o hacia arriba) —
+  //    se deja el resto del gesto al comportamiento nativo, sin más lógica.
+  const dragPhase = useRef<'idle' | 'pending' | 'dragging' | 'rejected'>('idle')
+  const dragStartY = useRef(0)
+  // Último delta vertical (px) del gesto, incluso si no se refleja en pantalla
+  // (reduced motion): el umbral de cierre al soltar lo necesita igual.
+  const dragDelta = useRef(0)
+  // Última muestra (posición + tiempo) para la velocidad instantánea del flick.
+  const lastSample = useRef<{ y: number; t: number } | null>(null)
+  const velocity = useRef(0)
   // ¿La hoja está ejecutando su animación de SALIDA? Mientras cae hacia abajo
   // ignoramos gestos nuevos y esperamos al fin de la transición para llamar a
   // onClose: la hoja sale animada (continuidad), nunca desaparece de golpe.
@@ -307,6 +334,10 @@ export function MomentSheet({
     setClosing(false)
     setDragY(0)
     setDragging(false)
+    dragPhase.current = 'idle'
+    dragDelta.current = 0
+    velocity.current = 0
+    lastSample.current = null
     if (closeTimer.current !== null) {
       window.clearTimeout(closeTimer.current)
       closeTimer.current = null
@@ -477,27 +508,114 @@ export function MomentSheet({
   // Eyebrow editorial sobre la foto: el tipo de momento (en juego / reto / recuerdo).
   const eyebrow = isActive ? 'En juego' : isReto ? 'Un reto para el grupo' : 'Recuerdo'
 
-  // Arrastre desde el asa: seguimos el dedo solo hacia abajo (transform 1:1, sin
-  // transición mientras se arrastra); al soltar, si pasó el umbral la hoja CAE hasta
-  // salir (deja el `closing` que transiciona el transform desde donde está el dedo
-  // hasta fuera del viewport — inercia), si no vuelve a su sitio con muelle.
-  const onPointerDown = (e: React.PointerEvent) => {
+  // Umbral de cierre por DISTANCIA: % del alto REAL de la hoja (regla 2, issue
+  // #646). Con la hoja sin pintar aún (alto 0, p. ej. en jsdom) caemos al alto de
+  // la ventana: mejor una referencia razonable que un umbral de 0px que cerraría
+  // con cualquier roce.
+  const closeThresholdPx = () => {
+    const height = panelRef.current?.getBoundingClientRect().height
+    const base = height && height > 0 ? height : window.innerHeight
+    return base * CLOSE_DISTANCE_RATIO
+  }
+
+  // El ASA siempre arrastra (es la afordancia dedicada, sin la guarda de scroll
+  // de abajo): decide 'dragging' de inmediato y corta la propagación — el
+  // pointerdown no debe volver a pasar por `onPanelPointerDown` (que lo
+  // reinterpretaría como 'pending' y perdería el punto de partida real).
+  const onHandlePointerDown = (e: React.PointerEvent) => {
     if (closing) return
-    dragStart.current = e.clientY
+    e.stopPropagation()
+    dragPhase.current = 'dragging'
+    dragStartY.current = e.clientY
+    dragDelta.current = 0
+    velocity.current = 0
+    lastSample.current = { y: e.clientY, t: performance.now() }
     setDragging(true)
-    e.currentTarget.setPointerCapture(e.pointerId)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
   }
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (dragStart.current === null) return
-    setDragY(Math.max(0, e.clientY - dragStart.current))
+
+  // Pointerdown en CUALQUIER punto de la hoja (regla 1, issue #646): arranca
+  // "pendiente" — todavía no decidimos si es un cierre, un scroll o un simple
+  // tap. La decisión (guarda de scroll + umbral de intención) vive en
+  // `onPanelPointerMove`. En EDICIÓN (papel, #571) el gesto no aplica: un
+  // formulario a medio rellenar no se cierra por accidente con el teclado abierto.
+  const onPanelPointerDown = (e: React.PointerEvent) => {
+    if (closing || editingMeta) return
+    dragPhase.current = 'pending'
+    dragStartY.current = e.clientY
+    dragDelta.current = 0
+    velocity.current = 0
+    lastSample.current = { y: e.clientY, t: performance.now() }
   }
-  const onPointerUp = () => {
-    if (dragStart.current === null) return
-    const shouldClose = dragY > DRAG_CLOSE_PX
-    dragStart.current = null
+
+  const onPanelPointerMove = (e: React.PointerEvent) => {
+    const phase = dragPhase.current
+    if (phase === 'idle' || phase === 'rejected') return
+    const delta = e.clientY - dragStartY.current
+
+    if (phase === 'pending') {
+      // Sin intención clara todavía: no tocamos el evento (deja pasar el tap o
+      // el arranque de un scroll nativo sin interferir).
+      if (Math.abs(delta) < DRAG_INTENT_PX) return
+      // Guarda de scroll (regla 1): solo iniciamos el cierre si el cuerpo
+      // scrolleable está en scrollTop=0 Y el movimiento es hacia ABAJO. Si no,
+      // el gesto es del scroll nativo — se rechaza sin más intervención.
+      const atTop = (contentRef.current?.scrollTop ?? 0) <= 0
+      if (delta <= 0 || !atTop) {
+        dragPhase.current = 'rejected'
+        return
+      }
+      dragPhase.current = 'dragging'
+      setDragging(true)
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+    }
+
+    // El gesto es nuestro: solo a partir de aquí interceptamos el evento (nunca
+    // antes de decidir, para no robarle el gesto al scroll nativo sin motivo).
+    e.preventDefault()
+    const clamped = Math.max(0, delta)
+    dragDelta.current = clamped
+    const now = performance.now()
+    if (lastSample.current) {
+      const dt = now - lastSample.current.t
+      // Piso de MIN_VELOCITY_SAMPLE_MS: dos muestras casi simultáneas (eventos
+      // coalescidos del navegador, o el propio ritmo síncrono de un test) darían
+      // una velocidad disparada por un `dt` cercano a 0. Con el piso, esas
+      // muestras se ignoran y la velocidad conserva su último valor fiable.
+      if (dt >= MIN_VELOCITY_SAMPLE_MS) velocity.current = (e.clientY - lastSample.current.y) / dt
+    }
+    lastSample.current = { y: e.clientY, t: now }
+    // Reduced motion (regla 6, extendida a todo el gesto): la hoja NO sigue el
+    // dedo — seguimos calculando distancia/velocidad para decidir al soltar,
+    // pero sin pintar ningún transform intermedio que animar.
+    if (!reducedMotion) setDragY(clamped)
+  }
+
+  const onPanelPointerUp = () => {
+    const wasDragging = dragPhase.current === 'dragging'
+    dragPhase.current = 'idle'
+    lastSample.current = null
+    if (!wasDragging) return
     setDragging(false)
+    // Cierra por distancia (>25% del alto) O por velocidad de flick (regla 2),
+    // aunque no haya llegado al umbral de distancia.
+    const shouldClose =
+      dragDelta.current > closeThresholdPx() || velocity.current > CLOSE_VELOCITY_PX_MS
+    dragDelta.current = 0
+    velocity.current = 0
     if (shouldClose) close()
     else setDragY(0)
+  }
+
+  // Cancelación del gesto (p. ej. el sistema se lo lleva a una navegación por
+  // gestos): vuelve todo a reposo sin cerrar ni dejar un arrastre a medias.
+  const onPanelPointerCancel = () => {
+    dragPhase.current = 'idle'
+    lastSample.current = null
+    dragDelta.current = 0
+    velocity.current = 0
+    setDragging(false)
+    setDragY(0)
   }
 
   // Estilo del panel: mientras se arrastra seguimos el dedo (1:1, sin transición);
@@ -524,6 +642,13 @@ export function MomentSheet({
         style={panelStyle}
         // El panel no propaga el click al overlay (que cierra).
         onClick={(e) => e.stopPropagation()}
+        // Gesto de cierre (issue #646) capturado en el CONTENEDOR completo: hero,
+        // artículo y asa burbujean hasta aquí (el asa decide 'dragging' de
+        // inmediato y corta la propagación, ver `onHandlePointerDown`).
+        onPointerDown={onPanelPointerDown}
+        onPointerMove={onPanelPointerMove}
+        onPointerUp={onPanelPointerUp}
+        onPointerCancel={onPanelPointerCancel}
         // Fin de la caída de salida → desmontar (camino feliz). Cancela el
         // temporizador de seguridad de `close()`: ya no hace falta, y sin esto
         // un segundo `onClose()` fantasma podía llegar 400ms tarde si el padre
@@ -537,16 +662,13 @@ export function MomentSheet({
           onClose()
         }}
       >
-        {/* Asa de arrastre: zona de gesto para cerrar tirando hacia abajo. Solo en
-            la VISTA (escena): editar es una TAREA de papel, sin gesto de cierre
-            accidental que tire un formulario a medio rellenar (#571). */}
+        {/* Asa de arrastre: misma afordancia de siempre, ahora un atajo directo al
+            gesto de la hoja completa (sin la guarda de scroll: el asa siempre
+            arrastra). Solo en la VISTA (escena): editar es una TAREA de papel,
+            sin gesto de cierre accidental que tire un formulario a medio
+            rellenar (#571). */}
         {!editingMeta && (
-          <div
-            className={styles.handleZone}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-          >
+          <div className={styles.handleZone} onPointerDown={onHandlePointerDown}>
             <span className={styles.handle} aria-hidden="true" />
           </div>
         )}
@@ -554,8 +676,10 @@ export function MomentSheet({
         {/* El contenido es el ÚNICO scrollable. VISTA (escena): foto a sangre +
             cuerpo editorial (papel) debajo. EDITAR (#571): formulario utilitario
             de papel, misma gramática que "Nuevo recuerdo" — sin héroe, sin chip
-            flotante, sin duplicar el título. */}
-        <div className={styles.content}>
+            flotante, sin duplicar el título. Su `scrollTop` es la guarda del
+            gesto de cierre (regla 1, issue #646): `onPanelPointerMove` lo
+            consulta vía `contentRef`. */}
+        <div className={styles.content} ref={contentRef} data-testid="moment-sheet-content">
           {editingMeta ? (
             <EditMomentForm
               moment={moment}
