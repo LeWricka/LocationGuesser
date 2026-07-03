@@ -118,4 +118,34 @@ describe('Lightbox', () => {
     render(<Lightbox open images={images} startIndex={2} onClose={() => undefined} />)
     expect(screen.getByRole('img')).toHaveAttribute('src', '/c.jpg')
   })
+
+  test('sin secondaryActionLabel/onSecondaryAction, no aparece ningún botón extra (retrocompatible)', () => {
+    render(<Lightbox open src="/f.jpg" onClose={() => undefined} />)
+    expect(screen.queryByRole('button', { name: 'Ver el momento' })).not.toBeInTheDocument()
+  })
+
+  test('acción secundaria: al pulsarla, cierra el visor y avisa con el índice ACTUAL', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    const onSecondaryAction = vi.fn()
+    const images = [
+      { src: '/a.jpg', alt: 'A' },
+      { src: '/b.jpg', alt: 'B' },
+    ]
+    render(
+      <Lightbox
+        open
+        images={images}
+        onClose={onClose}
+        secondaryActionLabel="Ver el momento"
+        onSecondaryAction={onSecondaryAction}
+      />,
+    )
+    // Navega a la segunda foto antes de pulsar la acción: debe avisar con SU índice.
+    await user.click(screen.getByRole('button', { name: 'Foto siguiente' }))
+    await user.click(screen.getByRole('button', { name: 'Ver el momento' }))
+
+    expect(onSecondaryAction).toHaveBeenCalledWith(1)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
 })

@@ -300,6 +300,25 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
+    // Issue #645: galería completa del viaje agrupada por día. El mundo
+    // sembrado ya trae un recuerdo con galería multi-foto (CH_MEMORY, 3 fotos)
+    // y un reto EN JUEGO con foto SORPRESA (CH_ACTIVE_SORPRESA, `photo_is_hint:
+    // false`) que NO debe aparecer — vigilancia visual del filtro anti-spoiler.
+    id: 'viaje-fotos',
+    title: 'Viaje · Fotos',
+    section: 'Viaje',
+    render: () => (
+      <TripPage
+        groupId={GROUP_ID}
+        initialSection="fotos"
+        onPlayChallenge={noop}
+        onAddMoment={noop}
+        onAddChallenge={noop}
+        onBack={noop}
+      />
+    ),
+  },
+  {
     id: 'viaje-marcador',
     title: 'Viaje · Marcador',
     section: 'Viaje',

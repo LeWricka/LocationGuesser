@@ -18,6 +18,7 @@ function momentImagesBuilder() {
   const builder: Record<string, unknown> = {}
   builder.select = () => builder
   builder.eq = () => builder
+  builder.in = () => builder
   builder.order = () => Promise.resolve(listResult)
   builder.insert = (rows: unknown) => {
     calls.insert(rows)
@@ -59,13 +60,14 @@ vi.mock('./supabase', () => ({
 
 import {
   addMomentImages,
+  listGroupMomentImages,
   listMomentImages,
   removeMomentImage,
   setMomentCover,
 } from './momentImages'
 
-function img(id: string, sort: number, path = `${id}.jpg`): MomentImage {
-  return { id, challenge_id: 'c1', image_path: path, sort_order: sort, created_at: 'now' }
+function img(id: string, sort: number, path = `${id}.jpg`, challengeId = 'c1'): MomentImage {
+  return { id, challenge_id: challengeId, image_path: path, sort_order: sort, created_at: 'now' }
 }
 
 beforeEach(() => {
@@ -79,6 +81,30 @@ describe('listMomentImages', () => {
     listResult.data = [img('a', 0), img('b', 1)]
     const out = await listMomentImages('c1')
     expect(out.map((i) => i.id)).toEqual(['a', 'b'])
+  })
+})
+
+describe('listGroupMomentImages', () => {
+  test('sin ids: no consulta y devuelve un mapa vacío', async () => {
+    const out = await listGroupMomentImages([])
+    expect(out.size).toBe(0)
+  })
+
+  test('agrupa las filas de VARIOS momentos por challenge_id, en orden', async () => {
+    listResult.data = [
+      img('a1', 0, 'a1.jpg', 'c1'),
+      img('b1', 0, 'b1.jpg', 'c2'),
+      img('a2', 1, 'a2.jpg', 'c1'),
+    ]
+    const out = await listGroupMomentImages(['c1', 'c2'])
+    expect(out.get('c1')?.map((i) => i.id)).toEqual(['a1', 'a2'])
+    expect(out.get('c2')?.map((i) => i.id)).toEqual(['b1'])
+  })
+
+  test('un momento sin filas de galería no tiene entrada en el mapa', async () => {
+    listResult.data = [img('a1', 0, 'a1.jpg', 'c1')]
+    const out = await listGroupMomentImages(['c1', 'c2'])
+    expect(out.has('c2')).toBe(false)
   })
 })
 

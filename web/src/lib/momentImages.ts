@@ -28,6 +28,38 @@ export async function listMomentImages(challengeId: string): Promise<MomentImage
 }
 
 /**
+ * Lista la galería de VARIOS momentos a la vez (patrón dos-consultas: el
+ * llamante ya tiene los ids de `challenges` del grupo — de `getGroupChallenges`
+ * o `useTripData` — así que aquí solo hace falta el `.in()` sobre
+ * `moment_images`; `moment_images` no lleva `group_id` propio, así que no se
+ * puede filtrar por grupo en una sola consulta/JOIN vía PostgREST, igual gotcha
+ * que `listTripPhotos` en `groupData.ts`). Agrupa por `challenge_id`,
+ * conservando el orden `sort_order` asc DENTRO de cada momento (el `.order()`
+ * es global al resultado, pero como el `sort_order` de cada momento es
+ * independiente, el orden relativo dentro de cada grupo se conserva).
+ * Usa la pestaña Fotos del viaje (issue #645) para pintar la galería completa
+ * sin una consulta por momento.
+ */
+export async function listGroupMomentImages(
+  challengeIds: string[],
+): Promise<Map<string, MomentImage[]>> {
+  const byChallenge = new Map<string, MomentImage[]>()
+  if (challengeIds.length === 0) return byChallenge
+  const { data, error } = await supabase
+    .from('moment_images')
+    .select('id, challenge_id, image_path, sort_order, created_at')
+    .in('challenge_id', challengeIds)
+    .order('sort_order', { ascending: true })
+  if (error) throw error
+  for (const row of data ?? []) {
+    const bucket = byChallenge.get(row.challenge_id)
+    if (bucket) bucket.push(row)
+    else byChallenge.set(row.challenge_id, [row])
+  }
+  return byChallenge
+}
+
+/**
  * Espeja la portada (la imagen de menor `sort_order`, o null si no quedan) en
  * `challenges.image_path`, para que la tarjeta del viaje y el mapamundi reflejen
  * la nueva portada. Lo hace el cliente porque `image_path` no se deriva en BD.

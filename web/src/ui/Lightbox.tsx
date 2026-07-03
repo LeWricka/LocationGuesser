@@ -22,6 +22,20 @@ interface Props {
   /** Índice inicial dentro de `images`. Por defecto 0. */
   startIndex?: number
   onClose: () => void
+  /**
+   * Texto de una acción secundaria opcional, bajo la foto (p.ej. "Ver el
+   * momento" en la pestaña Fotos del viaje, issue #645). Sin `onSecondaryAction`
+   * no se pinta nada: prop retrocompatible, el visor queda igual que antes.
+   */
+  secondaryActionLabel?: string
+  /**
+   * Acción secundaria: recibe el índice de la foto ACTUAL (tras swipe/flechas,
+   * no el `startIndex` de apertura) para que quien la use sepa a qué elemento
+   * corresponde. Se invoca DESPUÉS de cerrar el visor (mismo `close()` que la X
+   * y Escape: resetea el zoom y llama a `onClose`), así funciona igual si el
+   * padre desmonta el Lightbox al cerrar o solo baja `open`.
+   */
+  onSecondaryAction?: (index: number) => void
 }
 
 // Visor de imagen a pantalla completa (lightbox). Overlay propio en vez de
@@ -37,6 +51,8 @@ export function Lightbox({
   images,
   startIndex = 0,
   onClose,
+  secondaryActionLabel,
+  onSecondaryAction,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   // Zoom como toggle simple: tocar la imagen alterna tamaño completo / acercada.
@@ -212,11 +228,29 @@ export function Lightbox({
             alt={currentAlt}
           />
         </button>
-        {/* Contador discreto (1/3) solo si hay varias. */}
-        {multiple && (
-          <span className={styles.counter} aria-hidden="true">
-            {index + 1} / {slides.length}
-          </span>
+        {/* Pie del visor: acción secundaria opcional ("Ver el momento") + el
+            contador discreto (1/3) si hay varias. Apilados y centrados abajo. */}
+        {(multiple || (secondaryActionLabel && onSecondaryAction)) && (
+          <div className={styles.bottomBar}>
+            {secondaryActionLabel && onSecondaryAction && (
+              <button
+                type="button"
+                className={styles.secondaryAction}
+                onClick={() => {
+                  const at = index
+                  close()
+                  onSecondaryAction(at)
+                }}
+              >
+                {secondaryActionLabel}
+              </button>
+            )}
+            {multiple && (
+              <span className={styles.counter} aria-hidden="true">
+                {index + 1} / {slides.length}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>,

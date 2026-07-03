@@ -297,11 +297,11 @@ function LoggedIn({
         </OnboardingGate>
       )
     }
-    // UNA vista por viaje: el grupo SIEMPRE abre la pantalla "Viaje", que tiene dos
-    // secciones con un tab (Diario · Marcador). El marcador completo + gestión ya no
-    // es una pantalla suelta: es la pestaña "Marcador" del propio viaje (GroupPage
-    // incrustada). Los enlaces viejos `#g=…&v=clasico` aterrizan en esa pestaña
-    // (`groupView === 'marcador'`), así que no se rompe nada.
+    // UNA vista por viaje: el grupo SIEMPRE abre la pantalla "Viaje", que tiene TRES
+    // secciones con un tab (Diario · Fotos · Marcador, issue #645). El marcador
+    // completo + gestión ya no es una pantalla suelta: es una pestaña del propio
+    // viaje (GroupPage incrustada). Los enlaces viejos `#g=…&v=clasico` aterrizan
+    // en esa pestaña (`groupView === 'marcador'`), así que no se rompe nada.
     return (
       <ReceptorWelcomeGate groupId={groupId} userId={user?.id}>
         <OnboardingGate context="group" userId={user?.id}>
@@ -312,9 +312,15 @@ function LoggedIn({
             <Suspense fallback={<TripRouteSkeleton />}>
               <TripPage
                 groupId={groupId}
-                // Sección inicial: "Marcador" si el enlace lo pide (legado v=clasico /
-                // v=marcador), si no "Diario".
-                initialSection={route.groupView === 'marcador' ? 'marcador' : 'diario'}
+                // Sección inicial: "Marcador" o "Fotos" si el enlace lo pide (legado
+                // v=clasico / v=marcador, o v=fotos), si no "Diario".
+                initialSection={
+                  route.groupView === 'marcador'
+                    ? 'marcador'
+                    : route.groupView === 'fotos'
+                      ? 'fotos'
+                      : 'diario'
+                }
                 // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
                 onPlayChallenge={(challengeId) => {
                   location.hash = groupHash(groupId, challengeId)

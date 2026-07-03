@@ -1,0 +1,111 @@
+/*
+ * Pestaña FOTOS del viaje (issue #645): galería completa a sangre sobre una
+ * ESCENA oscura (mismo grafito `--scene-bg` que el mapa satélite del Diario),
+ * agrupada por día. Grid de 3 columnas con gap finísimo, fotos cuadradas
+ * recortadas con `ChallengePhoto` (reusa su fade-in + shimmer de carga).
+ */
+.scene {
+  min-height: 100%;
+  background: var(--scene-bg);
+}
+
+/* Cabecera de día: pegajosa (queda fija mientras su grupo desfila; las cabeceras
+ * se van "empujando" entre sí al llegar la siguiente, patrón de lista agrupada),
+ * fecha corta en serif sobre un degradado que la separa de las fotos que la
+ * atraviesan al hacer scroll.
+ *
+ * `top: 0` — GOTCHA (issue #645): el offset de `position: sticky` se resuelve
+ * contra el BORDE DE CONTENIDO del contenedor de scroll (`.panelFotos`), que ya
+ * arranca desplazado por SU PROPIO `padding-top` (la reserva de la cabecera +
+ * tabs flotantes). Un `top` que repita esa reserva (p.ej. el mismo calc que
+ * `.panelFotos`) se SUMA a ella en vez de sustituirla: la primera cabecera de
+ * día aparecía pegada al doble de esa distancia, flotando en medio de sus
+ * propias fotos. `top: 0` ya fija la cabecera justo donde empieza el contenido
+ * (debajo del chrome flotante); no hace falta repetir la reserva aquí. */
+.dayHeader {
+  position: sticky;
+  top: 0;
+  /* capa local de la pestaña: cabecera de día pegajosa sobre la rejilla de fotos */
+  z-index: 2; /* design-lint-allow: capa local (ver comentario arriba), no compite con el chrome del viaje */
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--scene-ink-soft);
+  background: linear-gradient(to bottom, var(--scene-bg) 65%, transparent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* Gap fino (2px): más fino que cualquier token --space-* (el más pequeño es
+   * 4px) — deliberado, gramática de grid "a sangre" (Polarsteps/IG), no una
+   * omisión del sistema de espaciado (que no cubre huecos así de finos, ver
+   * la nota en design-lint.mjs sobre por qué no hay regla de spacing). */
+  gap: 2px;
+  padding: 0 2px var(--space-3);
+}
+
+/* Envoltorio de cada celda: lleva el stagger de entrada (la propia
+ * `ChallengePhoto` no acepta `style` — el `--i` vive aquí, en el elemento que
+ * controla la pantalla, siguiendo el mismo patrón que el podio de MarcadorTab). */
+.cellWrap {
+  animation: fotos-cell-in var(--motion-duration-base) var(--motion-ease-emphasized) backwards;
+  /* Tope de retardo (issue #645): con decenas de fotos, un stagger sin límite
+   * tardaría segundos en llegar a la última celda. `min()` lo clampa a 12 pasos
+   * — el resto entra junto, ya no se nota individualmente de todas formas. */
+  animation-delay: calc(var(--motion-stagger-step) * min(var(--i, 0), 12));
+}
+@keyframes fotos-cell-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Anula el marco de `ChallengePhoto` (borde + radio, pensados para una tarjeta
+ * suelta) para que la foto sea a sangre real dentro del grid — mismo patrón de
+ * override que `MomentCard.module.css .photo`. */
+.cell {
+  border: none;
+  border-radius: 0;
+}
+
+.skeletonCell {
+  display: block;
+  aspect-ratio: 1 / 1;
+}
+
+.emptyWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70svh;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* `EmptyState` usa tinta fija `--color-text` (pensada para papel): sobre la
+ * ESCENA oscura de esta pestaña sería casi invisible. Misma excepción ya
+ * documentada en `TripDiario.module.css .emptyDock` — una tarjeta opaca de
+ * superficie por debajo, en vez de esperar a una variante "sobre escena". */
+.emptyCard {
+  width: min(92%, 420px);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cellWrap {
+    animation: none;
+  }
+}

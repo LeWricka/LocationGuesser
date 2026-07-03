@@ -28,16 +28,18 @@ import { MembersModal } from '../group/MembersModal'
 import { GroupSettingsModal, type SettingsSection } from '../group/GroupSettingsModal'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
+import { FotosTab } from './FotosTab'
 import { MarcadorTab } from './MarcadorTab'
 import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import styles from './TripPage.module.css'
 
-/** Las dos secciones del viaje (tab). Solo la activa se monta en el DOM. */
-type Section = 'diario' | 'marcador'
+/** Las TRES secciones del viaje (tab, issue #645). Solo la activa se monta en el DOM. */
+type Section = 'diario' | 'fotos' | 'marcador'
 
 const SECTION_OPTIONS = [
   { value: 'diario' as const, label: 'Diario' },
+  { value: 'fotos' as const, label: 'Fotos' },
   { value: 'marcador' as const, label: 'Marcador' },
 ]
 
@@ -45,7 +47,8 @@ interface Props {
   groupId: string
   /**
    * Sección inicial al abrir el viaje. Por defecto "Diario"; los enlaces antiguos
-   * a la GroupPage clásica (`#g=…&v=clasico`) entran ya en "Marcador".
+   * a la GroupPage clásica (`#g=…&v=clasico`) entran ya en "Marcador"; `v=fotos`
+   * entra en "Fotos" (issue #645).
    */
   initialSection?: Section
   /** Lanza el flujo de adivinar de un momento (reto). Lo cablea App al router. */
@@ -430,12 +433,15 @@ export function TripPage({
     )
   }
 
-  const onDiario = section === 'diario'
+  // Escena PAPEL solo en Marcador; Diario Y Fotos son escenas OSCURAS a sangre
+  // (mapa satélite / galería sobre grafito), así que comparten el chrome de
+  // vidrio esmerilado (regla #537: sobre fondo oscuro, vidrio).
+  const isPaperScene = section === 'marcador'
 
   return (
     <div
       key="trip"
-      className={`${styles.screen} ${onDiario ? styles.sceneDiario : styles.scenePaper} lg-content-in`}
+      className={`${styles.screen} ${isPaperScene ? styles.scenePaper : styles.sceneDiario} lg-content-in`}
     >
       {/* Cabecera ÚNICA del producto (AppHeader floating): atrás · nombre del viaje
           · menú ⋯. Flota SIEMPRE sobre el contenido (overlay absoluto, layout estable
@@ -466,8 +472,9 @@ export function TripPage({
           </button>
         }
       />
-      {/* Tab Diario · Marcador: el control segmentado conmuta de sección. Flota bajo
-          la cabecera, centrado, sobre cada fondo (mapa o papel). */}
+      {/* Tab Diario · Fotos · Marcador (issue #645): el control segmentado conmuta
+          de sección. Flota bajo la cabecera, centrado, sobre cada fondo (mapa,
+          galería o papel). */}
       <div className={styles.tabs}>
         <SegmentedControl
           options={SECTION_OPTIONS}
@@ -501,7 +508,7 @@ export function TripPage({
           transición entre tabs es un cross-fade del único panel montado (key=section),
           anulado bajo reduced-motion. */}
       <div className={styles.viewport}>
-        {onDiario ? (
+        {section === 'diario' && (
           <section
             key="diario"
             className={`${styles.panel} ${styles.panelBleed} ${reducedMotion ? '' : styles.panelEnter}`}
@@ -524,7 +531,28 @@ export function TripPage({
               onInvite={() => setInviting(true)}
             />
           </section>
-        ) : (
+        )}
+        {section === 'fotos' && (
+          /* FOTOS (issue #645): galería completa del viaje agrupada por día.
+             Reusa los MISMOS `moments` ya cargados por useTripData (sin pedir
+             el grupo/los retos de nuevo); "Ver el momento" del lightbox abre la
+             MISMA hoja de detalle que el Diario (`setOpenMoment`). */
+          <section
+            key="fotos"
+            className={`${styles.panel} ${styles.panelFotos} ${reducedMotion ? '' : styles.panelEnter}`}
+            role="tabpanel"
+            aria-label="Fotos"
+          >
+            <FotosTab
+              groupId={groupId}
+              moments={moments}
+              canCreate={canCreate}
+              onAddMoment={onAddMoment}
+              onOpenMoment={(m) => setOpenMoment(m)}
+            />
+          </section>
+        )}
+        {section === 'marcador' && (
           /* MARCADOR: clasificación foto-first Grafito+teal. MarcadorTab muestra
              la clasificación general del viaje con IconMedalla para el podio y
              acento teal en la fila del usuario activo. El wiring de datos viene
