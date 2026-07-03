@@ -1,5 +1,23 @@
+/* Picker de mapa (issue #551): buscador FUERA del lienzo (fila propia, en
+   flujo, a todo el ancho) + lienzo con controles flotantes (capa, ampliar) +
+   vista a pantalla completa. `flex-direction: column` reparte el alto entre
+   la fila del buscador (auto) y `.canvas` (crece); funciona igual embebido
+   (alto natural, `.lg-map` fija 340/420px) que a pantalla completa dentro de
+   un contenedor con `height: 100%` forzado (CreateLocationChallenge). */
 .wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+/* `.wrap` puede recibir `height: 100%` desde fuera (pantalla "¿Dónde?", ver
+   CreateLocationChallenge.module.css `.mapArea > :first-child`); sin
+   `flex: 1; min-height: 0` en `.canvas` ese alto no llegaría al mapa. */
+.canvas {
   position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 /* El mapa, enmarcado al estilo Atelier: radio de hoja/sheet, hairline finísimo y
@@ -12,17 +30,23 @@
   overflow: hidden;
 }
 
-/* Barra superior del mapa: buscador (izda, crece) + selector de capa (dcha,
-   ancho fijo), EN LA MISMA FILA. Con columna en vez de fila, el desplegable de
-   resultados (que cuelga del buscador a ancho completo) caía justo encima del
-   selector de capa y lo tapaba; en fila, el desplegable solo ocupa el ancho
-   del buscador y nunca llega a la pastilla de capa. `pointer-events: none` en
-   el contenedor y `auto` en los hijos para que el hueco entre ambos deje pasar
-   los toques al mapa. */
-.topBar {
+/* Variante a pantalla completa: a sangre, sin marco (ya la da `.fullscreen`). */
+.mapFull {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  height: 100%;
+  width: 100%;
+}
+
+/* Controles flotantes DENTRO del lienzo (capa + ampliar): arriba-derecha, para
+   no pisar el control de zoom +/- de Leaflet (arriba-izquierda). Antes el
+   buscador vivía aquí y tapaba el zoom (issue #551); ahora es la única fila
+   flotante y el zoom queda libre. `pointer-events: none` en el contenedor y
+   `auto` en los hijos para no bloquear el mapa en el hueco entre controles. */
+.controls {
   position: absolute;
   top: var(--space-2);
-  left: var(--space-2);
   right: var(--space-2);
   z-index: var(--z-sticky);
   display: flex;
@@ -31,12 +55,11 @@
   pointer-events: none;
 }
 
-.topBar > * {
+.controls > * {
   pointer-events: auto;
 }
 
-/* Selector de capa: pastilla blanca translúcida (chrome Atelier), ahora hijo
-   flex de `.topBar` (ya no se posiciona a sí mismo) alineada a la derecha. */
+/* Selector de capa: pastilla blanca translúcida (chrome Atelier). */
 .layers {
   display: flex;
   gap: var(--space-1);
@@ -96,13 +119,46 @@
   outline-offset: 2px;
 }
 
+/* Botón "Ampliar mapa": mismo chrome vidrio que el selector de capa, circular,
+   con el icono `Expand` (lucide). Vive en `.controls`, junto a la capa. */
+.expandBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  flex: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--map-chrome-bg);
+  -webkit-backdrop-filter: var(--map-chrome-blur);
+  backdrop-filter: var(--map-chrome-blur);
+  color: var(--color-text);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.expandBtn:active {
+  transform: scale(var(--motion-press-scale));
+}
+
+.expandBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 /* Atribución de Esri/Leaflet COLAPSADA (obligatoria pero discreta): en reposo es
    solo el botón "ⓘ" (el prefix), una pastilla diminuta del chrome Atelier; al
    pasar/tocar despliega los créditos completos. Nada de banda "Leaflet | Tiles ©
    Esri…" a sangre bajo el mapa. Es `:global` porque el control lo pinta Leaflet
    fuera del scope del CSS module; lo acotamos bajo `.wrap` para no tocar otros
-   mapas. Mismo patrón que los mapas del viaje (`TripMapLeaflet`). */
-.wrap :global(.leaflet-control-attribution) {
+   mapas. Mismo patrón que los mapas del viaje (`TripMapLeaflet`). También bajo
+   `.fullscreen`: el picker a pantalla completa vive en un PORTAL a
+   `document.body` (issue #551), fuera del DOM de `.wrap`, así que necesita su
+   propio ancestro para que el selector le alcance. */
+.wrap :global(.leaflet-control-attribution),
+.fullscreen :global(.leaflet-control-attribution) {
   margin: 0 var(--space-2) var(--space-2) 0;
   padding: 1px var(--space-2);
   border-radius: var(--radius-full);
@@ -125,18 +181,107 @@
 }
 
 .wrap :global(.leaflet-control-attribution:hover),
-.wrap :global(.leaflet-control-attribution:focus-within) {
+.wrap :global(.leaflet-control-attribution:focus-within),
+.fullscreen :global(.leaflet-control-attribution:hover),
+.fullscreen :global(.leaflet-control-attribution:focus-within) {
   max-width: calc(100% - var(--space-4));
   opacity: 1;
 }
 
-.wrap :global(.leaflet-control-attribution a) {
+.wrap :global(.leaflet-control-attribution a),
+.fullscreen :global(.leaflet-control-attribution a) {
   color: var(--color-text-muted);
+}
+
+/* ─── Picker a pantalla completa (issue #551) ──────────────────────────────
+   Portal a `document.body` (como Lightbox/Modal): un `position: fixed` dentro
+   de un ancestro con transform/backdrop-filter/animación se ancla a ESE
+   ancestro, no al viewport, y el picker saldría descolocado en vez de cubrir
+   la pantalla. 100dvh (no vh): el alto sigue al chrome del navegador móvil. */
+.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  height: 100dvh;
+  width: 100%;
+  background: var(--color-surface);
+  animation: fullscreen-in var(--motion-duration-base) var(--motion-ease-standard);
+}
+
+.fullscreenPanel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  outline: none;
+  /* El mapa gestiona sus propios gestos (pinch/drag); evita que iOS interprete
+     un arrastre que empieza cerca del borde como "volver atrás" o rebote de
+     scroll del documento por detrás. */
+  overscroll-behavior: contain;
+}
+
+.fullscreenTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  flex: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.closeBtn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+.closeBtn:active {
+  transform: scale(var(--motion-press-scale));
+}
+
+.closeBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.fullscreenFooter {
+  flex: none;
+  padding: var(--space-3) var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+@keyframes fullscreen-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .layer:active,
-  .layerActive:active {
+  .layerActive:active,
+  .expandBtn:active,
+  .closeBtn:active {
     transform: none;
+  }
+  .fullscreen {
+    animation: none;
   }
 }
