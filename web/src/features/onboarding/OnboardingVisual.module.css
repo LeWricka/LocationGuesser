@@ -1,8 +1,10 @@
-/* Mini-simulación CSS de un gesto del producto (issue #625). El "escenario" toma
- * prestados los tokens de ESCENA (--scene-*) que ya usa el resto del sistema para
- * componer sobre fondos oscuros tipo foto/mapa (ver HowItWorksImmersive,
- * LandingShowcase): así el mini-demo lee como una pantalla real, no como un
- * icono suelto. Sin imágenes ni CDNs, solo CSS + el icono de la slide. */
+/* Mini-simulación de un gesto del producto (issue #625, imagen real desde #636).
+ * El "escenario" toma prestados los tokens de ESCENA (--scene-*) que ya usa el
+ * resto del sistema para componer sobre fondos oscuros tipo foto/mapa (ver
+ * HowItWorksImmersive, LandingShowcase): así el mini-demo lee como una pantalla
+ * real. `--stage-image` la fija el TSX (varía por slide, ver slides.ts); aquí solo
+ * el material: escala, marco y el velo de contraste (regla dura #537: chrome sobre
+ * FOTO usa vidrio, nunca un bloque opaco a mano — el badge de abajo es vidrio). */
 
 .stage {
   position: relative;
@@ -13,11 +15,26 @@
   aspect-ratio: 4 / 5;
   margin-inline: auto;
   border-radius: var(--radius-lg);
-  background: var(--scene-bg);
+  background-color: var(--scene-bg);
+  background-image: var(--stage-image);
+  background-size: cover;
+  background-position: center;
   box-shadow: var(--scene-shadow);
   overflow: hidden;
   /* Reserva de espacio inherente vía var(--i) para la coreografía de entrada:
      el escenario SIEMPRE es el primer bloque revelado (ver OnboardingSlideshow). */
+}
+
+/* Velo de contraste sobre la foto real: sin él, el badge/grid/ring del gesto se
+   pierden contra una imagen clara o muy detallada. `z-index: 0` (mismo "nivel" que
+   `::before`, ver comentario de abajo) — el badge/grid/ring/echo llevan z-index
+   positivo explícito para quedar SIEMPRE encima, sin depender del orden del DOM. */
+.stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0; /* design-lint-allow: capa local del escenario (velo sobre la foto) */
+  background: color-mix(in srgb, var(--scene-bg) 42%, transparent);
 }
 
 /* Pastilla superior: el mismo guiño de "marco de móvil" que la landing, sin
@@ -28,6 +45,7 @@
   top: var(--space-3);
   left: 50%;
   transform: translateX(-50%);
+  z-index: 1; /* design-lint-allow: capa local del escenario (notch sobre el velo) */
   width: 28%;
   height: 3px;
   border-radius: var(--radius-full);
@@ -38,6 +56,7 @@
 .grid {
   position: absolute;
   inset: 0;
+  z-index: 1; /* design-lint-allow: capa local del escenario, por encima del velo */
   background-image:
     linear-gradient(var(--scene-hairline) 1px, transparent 1px),
     linear-gradient(90deg, var(--scene-hairline) 1px, transparent 1px);
@@ -48,6 +67,7 @@
 /* ── Escenario del timer: aro de cuenta atrás detrás del icono ────────────────── */
 .ring {
   position: absolute;
+  z-index: 1; /* design-lint-allow: capa local del escenario, por encima del velo */
   width: 64px;
   height: 64px;
   border-radius: var(--radius-full);
@@ -55,15 +75,22 @@
 }
 
 /* ── El icono (badge) ─────────────────────────────────────────────────────────── */
+/* Vidrio, no un disco opaco a mano (regla dura #537: chrome sobre foto = vidrio):
+   el badge flota ahora sobre una foto real, que varía en claridad de slide a slide,
+   y el vidrio esmerilado se lee bien sobre cualquiera de ellas. */
 .badge {
   position: relative;
+  z-index: 2; /* design-lint-allow: capa local del escenario, sobre el velo y la retícula */
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: var(--space-8);
   height: var(--space-8);
   border-radius: var(--radius-full);
-  background: var(--scene-surface);
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
   color: var(--scene-ink);
   animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
 }
@@ -90,6 +117,7 @@
 /* ── Eco de contacto: pin aterriza, tap se pulsa, timer cuenta atrás ──────────── */
 .echo {
   position: absolute;
+  z-index: 2; /* design-lint-allow: mismo nivel que .badge, sobre el velo y el escenario */
   width: var(--space-8);
   height: var(--space-8);
   border-radius: var(--radius-full);

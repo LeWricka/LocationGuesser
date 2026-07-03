@@ -171,21 +171,25 @@
 }
 
 /* ===== Dock inferior: label + carrusel de tarjetas-foto flotando sobre la escena =====
-   El velo de fondo (mismo `color-mix` con `--scene-bg` que el resto del sistema, nunca
-   un rgba suelto) funde el dock con la escena Y de paso tapa el crédito propio del
-   globo ("ⓘ" de HomeGlobe, anclado al fondo de SU contenedor): al llenar ahora el globo
-   TODA la pantalla, ese crédito cae justo bajo el dock; el z-index más alto de `.dock`
-   ya lo pinta encima, y este velo evita que se transparente en los huecos del layout
-   (mismo patrón que usa TripDiario con `--map-bottom-scrim`, adaptado a escena oscura). */
+   SIN velo de fondo (issue #636): con la tarjeta más pequeña (ver `.slide`) el globo
+   recupera su mitad superior ENTERA, y las tarjetas son opacas desde #634 — ya no
+   necesitan un fundido detrás que disimule "barro" del globo transparentándose. El
+   velo oscuro que había aquí antes (que de paso tapaba el crédito propio del globo,
+   el "ⓘ" de HomeGlobe anclado al fondo de SU contenedor) se retira entero: al no
+   pintar nada en el hueco de `padding-bottom`, ese "ⓘ" vuelve a asomar solo, con su
+   propia pastilla de vidrio (ver HomeGlobe.module.css `.creditButton`) — no hace
+   falta moverlo (alternativa que barajaba la issue, al estilo #505). Legibilidad del
+   label/chips sin velo: el propio `.globe::after` de HomeGlobe ya oscurece el borde
+   inferior de la escena (viñeta radial), y `.dockLabel`/`.dockCount` llevan su propia
+   sombra de texto (ver abajo) como refuerzo AA sobre cualquier zona del satélite. */
 .dock {
   position: relative;
   z-index: 4; /* design-lint-allow: capa local de la escena (dock sobre el globo) */
   flex: none;
   display: flex;
   flex-direction: column;
-  /* Gap un punto más generoso que antes (issue #632): con la tarjeta más alta
-     (ver `.slide`), el label/chips de filtro necesitan algo más de aire para no
-     leerse pegados al carrusel. */
+  /* Gap compacto (issue #636): el label/chips van PEGADOS al carrusel, como cabecera
+     del propio dock, no flotando sueltos sobre el globo. */
   gap: var(--space-2);
   /* --space-8 (issue #632, punto 4): el chip flotante "Admin" (App.tsx, esquina
      inferior izquierda, SOLO visible para el admin) comparte el mismo inset
@@ -196,12 +200,6 @@
      (~38px) más un respiro. No tocamos App.tsx (fuera del área de esta tarea,
      ver issue #632) así que la holgura se da aquí. */
   padding-bottom: calc(env(safe-area-inset-bottom) + var(--space-8));
-  background: linear-gradient(
-    to top,
-    color-mix(in srgb, var(--scene-bg) 88%, transparent) 0%,
-    color-mix(in srgb, var(--scene-bg) 55%, transparent) 60%,
-    transparent 100%
-  );
 }
 .dockHead {
   display: flex;
@@ -217,11 +215,15 @@
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-eyebrow);
   color: var(--scene-ink);
+  /* Refuerzo AA sin velo (issue #636): mismo token de sombra que usa `.name` de la
+     tarjeta para leer sobre foto/satélite, aquí en texto pequeño sobre el globo. */
+  text-shadow: 0 1px 6px var(--photo-text-shadow);
 }
 .dockCount {
   font-size: var(--font-size-sm);
   color: var(--scene-ink-soft);
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 6px var(--photo-text-shadow);
 }
 
 /* ===== Chips de filtro Todos · Míos · De amigos (issue #609) =====
@@ -325,16 +327,17 @@
   display: none;
 }
 
-/* Foto-first (issue #573, agrandada en #632): la tarjeta sube a ~78vw de ancho
-   (techo/suelo para no reventar en tablet ni encogerse de más en móvil pequeño)
-   con proporción 4:5 — más alta que el 3:2 de antes, así la foto respira y deja
-   de leerse "recortada" (captura del dueño, #632). Sigue en `aspect-ratio` (no
-   alto fijo en px): escala igual de bien a 390×844 que a 1080×2400. El alto extra
-   lo cede el hueco del dock (`.dock` ya lo compensa), NO el globo — el globo es
-   `position: absolute` a sangre y no se encoge por esto (ver `.globeLayer`). La
-   vecina sigue asomando (peek) con el mismo `gap`/padding del carrusel. */
+/* Foto-first (issue #573, agrandada en #632, ATENUADA en #636): el 78vw de #632 se
+   pasó — tapaba el globo entero (solo asomaba un gajo) y pisaba el pin/label. Punto
+   medio: clamp(220px, 62vw, 300px), proporción 4:5 — la foto sigue respirando (no
+   vuelve al 3:2 original) pero el dock ya no se come media pantalla, así el globo
+   recupera su mitad superior ENTERA. Sigue en `aspect-ratio` (no alto fijo en px):
+   escala igual de bien a 390×844 que a 1080×2400. El alto extra lo cede el hueco del
+   dock (`.dock` ya lo compensa), NO el globo — el globo es `position: absolute` a
+   sangre y no se encoge por esto (ver `.globeLayer`). La vecina sigue asomando (peek)
+   con el mismo `gap`/padding del carrusel. */
 .slide {
-  flex: 0 0 clamp(260px, 78vw, 380px);
+  flex: 0 0 clamp(220px, 62vw, 300px);
   aspect-ratio: 4 / 5;
   scroll-snap-align: center;
 }

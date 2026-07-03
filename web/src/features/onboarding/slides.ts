@@ -2,10 +2,13 @@
 // Separado de la UI para que el componente sea presentacional puro y el copy se
 // edite sin tocar lógica. Texto en español, claro y breve (sin i18n hoy).
 //
-// Visual-first: la gente no lee. Cada slide es un icono lucide animado dentro de
-// un escenario CSS (mini-simulación de la acción, ver OnboardingVisual) + un
-// titular corto + una frase. Sin capturas ni assets externos: todo se dibuja con
-// CSS y los iconos de lucide (issue #625).
+// Visual-first: la gente no lee. Cada slide es un icono lucide animado (mini-
+// simulación de la acción, ver OnboardingVisual) sobre una imagen REAL de fondo
+// (issue #636: los marcos con lienzo vacío quedaban tristes) + un titular corto +
+// una frase. La imagen es la captura de producto de LandingShowcase cuando existe
+// una que encaja con el gesto (p.ej. "jugar" ↔ la pantalla de resultado real); si
+// no hay una captura que encaje, cae a una foto de viaje bonita de homeDemoPins.
+// Todo empaquetado en el bundle (imports estáticos), sin red.
 
 import {
   Camera,
@@ -22,6 +25,15 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { OnboardingContext } from '../../lib/onboardingFlags'
+import homeShot from '../../assets/landing/home.webp'
+import resultadoShot from '../../assets/landing/resultado.webp'
+import marcadorShot from '../../assets/landing/marcador.webp'
+import lisboaPhoto from '../home/assets/lisboa.webp'
+import tokioPhoto from '../home/assets/tokio.webp'
+import nuevaYorkPhoto from '../home/assets/nueva-york.webp'
+import sidneyPhoto from '../home/assets/sidney.webp'
+import ciudadDelCaboPhoto from '../home/assets/ciudad-del-cabo.webp'
+import romaPhoto from '../home/assets/roma.webp'
 
 // Mini-simulaciones disponibles (OnboardingVisual.tsx pinta la animación según
 // el kind; el icono de la slide es el protagonista de la coreografía). Vocabulario
@@ -42,6 +54,9 @@ export interface OnboardingSlide {
   visual: OnboardingVisualKind
   title: string
   body: string
+  /** Imagen real de fondo del marco (issue #636): captura de producto o foto de
+   * viaje, empaquetada (import estático). Nunca vacía: sustituye al lienzo liso. */
+  image: string
 }
 
 /** Parámetros opcionales para personalizar slides (p.ej. la bienvenida del receptor). */
@@ -59,18 +74,25 @@ const GROUP_SLIDES: OnboardingSlide[] = [
     visual: 'card',
     title: 'Comparte un momento',
     body: 'Una foto y/o Street View del sitio donde estuviste.',
+    // Sin captura real de "añadir momento" en LandingShowcase: foto de viaje bonita.
+    image: lisboaPhoto,
   },
   {
     icon: LinkIcon,
     visual: 'link',
     title: 'Invita a tu grupo',
     body: 'Les pasas el enlace del viaje y entran sin complicarse.',
+    // Sin captura real del share: foto de viaje bonita.
+    image: sidneyPhoto,
   },
   {
     icon: MapPin,
     visual: 'pin',
     title: 'Juega un reto',
     body: 'El guiño divertido: adivinar en el mapa dónde es. Gana quien más se acerca.',
+    // Captura REAL de la pantalla de resultado (puntos + cercanía): es, literalmente,
+    // jugar un reto.
+    image: resultadoShot,
   },
 ]
 
@@ -80,18 +102,22 @@ const CHALLENGE_SLIDES: OnboardingSlide[] = [
     visual: 'card',
     title: 'Mira las pistas',
     body: 'Carteles, paisaje, detalles… todo cuenta.',
+    image: tokioPhoto,
   },
   {
     icon: Pin,
     visual: 'pin',
     title: 'Coloca tu pin',
     body: 'Toca el mapa donde crees que es.',
+    image: nuevaYorkPhoto,
   },
   {
     icon: Timer,
     visual: 'timer',
     title: 'Confirma a tiempo',
     body: 'Hay cuenta atrás. Cuanto más cerca, más puntos.',
+    // Captura REAL de la pantalla de resultado: encaja con "cuanto más cerca, más puntos".
+    image: resultadoShot,
   },
 ]
 
@@ -103,18 +129,22 @@ const CREATE_TRIP_SLIDES: OnboardingSlide[] = [
     visual: 'card',
     title: 'Crea tu viaje',
     body: 'El sitio donde guardas el plan y lo vives con los tuyos.',
+    // Captura REAL de la home: es, literalmente, el sitio donde vive el viaje.
+    image: homeShot,
   },
   {
     icon: Users,
     visual: 'link',
     title: 'Invita a tu gente',
     body: 'Les pasas un enlace y entran sin complicarse.',
+    image: ciudadDelCaboPhoto,
   },
   {
     icon: Camera,
     visual: 'tap',
     title: 'Y empieza a compartir',
     body: 'Cada parada, una foto. El recuerdo queda para todos.',
+    image: romaPhoto,
   },
 ]
 
@@ -126,18 +156,23 @@ const ADD_MOMENT_SLIDES: OnboardingSlide[] = [
     visual: 'tap',
     title: 'Guarda un momento',
     body: 'Una foto del sitio donde estás. Sin más.',
+    image: romaPhoto,
   },
   {
     icon: MapPin,
     visual: 'pin',
     title: 'Pon dónde fue',
     body: 'El lugar en el mapa: así tus recuerdos cuentan el viaje.',
+    // Captura REAL de la home (globo + pin): el lugar en el mapa.
+    image: homeShot,
   },
   {
     icon: Sparkles,
     visual: 'spark',
     title: 'Los tuyos lo viven',
     body: 'Aparece en el viaje al instante para todos.',
+    // Captura REAL del marcador: el viaje compartido que os une.
+    image: marcadorShot,
   },
 ]
 
@@ -149,18 +184,22 @@ const CREATE_CHALLENGE_SLIDES: OnboardingSlide[] = [
     visual: 'pin',
     title: 'Lánzales un reto',
     body: 'Sube un sitio y rétales a adivinar dónde es.',
+    image: sidneyPhoto,
   },
   {
     icon: Timer,
     visual: 'timer',
     title: 'Pon cuenta atrás',
     body: 'Tienen un tiempo para acertar. Cuanto más cerca, más puntos.',
+    // Captura REAL de la pantalla de resultado: encaja con "cuanto más cerca, más puntos".
+    image: resultadoShot,
   },
   {
     icon: Send,
     visual: 'link',
     title: 'Comparte el enlace',
     body: 'Al crearlo te damos el enlace para pasarlo por el chat.',
+    image: ciudadDelCaboPhoto,
   },
 ]
 
@@ -187,18 +226,23 @@ function welcomeSlides(tripName?: string): OnboardingSlide[] {
       visual: 'spark',
       title: trip ? `Te invitan a vivir ${trip}` : 'Te invitan a un viaje',
       body: 'Te comparten dónde estuvieron para que lo vivas con ellos.',
+      // Captura REAL de la home: literalmente lo que se van a encontrar al entrar.
+      image: homeShot,
     },
     {
       icon: Camera,
       visual: 'card',
       title: 'Mira cada parada',
       body: 'Una foto de cada sitio. Tú adivinas en el mapa dónde es.',
+      image: tokioPhoto,
     },
     {
       icon: MapPin,
       visual: 'pin',
       title: 'Únete y juega',
       body: 'Ya estás dentro. Abre el viaje y empieza a adivinar.',
+      // Captura REAL de la pantalla de resultado: es, literalmente, jugar.
+      image: resultadoShot,
     },
   ]
 }
