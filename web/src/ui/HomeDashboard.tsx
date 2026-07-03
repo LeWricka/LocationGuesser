@@ -71,6 +71,22 @@ function heroTransitionName(groupId: string): string {
   return `trip-hero-${groupId}`
 }
 
+/**
+ * Centra el carrusel sobre la tarjeta `id` (issue #632): recorre las `[data-gid]`
+ * (mismo patrón que el scroll-sync de abajo) y fija `scrollLeft` para que el
+ * CENTRO de esa tarjeta coincida con el centro del visor. Asignación directa a
+ * la propiedad (no `.scrollTo()`, que jsdom no implementa en los tests) — sin
+ * animación: es un ajuste "de reposo", no un gesto del usuario.
+ */
+function centerCarouselOn(container: HTMLElement, id: string): void {
+  for (const slide of container.querySelectorAll<HTMLElement>('[data-gid]')) {
+    if (slide.dataset.gid === id) {
+      container.scrollLeft = slide.offsetLeft + slide.offsetWidth / 2 - container.clientWidth / 2
+      return
+    }
+  }
+}
+
 /** Lee y BORRA el id pendiente (consumo único): una vuelta futura sin relación
  * con este viaje no debe reclamar el nombre por error. */
 function takeHeroReturnId(): string | null {
@@ -242,22 +258,36 @@ export function HomeDashboard({
   const tint = useAmbientTint(activeTrip?.coverUrl ?? null)
 
   // Cambiar de chip salta a la primera tarjeta del resultado filtrado (el globo la
-  // sigue vía `activeTargetId`, ya cableado más abajo) y devuelve el carrusel al
-  // inicio: el scroll anterior ya no corresponde al nuevo contenido.
+  // sigue vía `activeTargetId`, ya cableado más abajo); el centrado real del
+  // carrusel sobre esa tarjeta lo hace el efecto de abajo (depende de `filter`) una
+  // vez el DOM ya tiene el nuevo `visibleFeed` pintado (aquí, en el propio click,
+  // aún es el anterior).
   function handleFilterChange(next: TripFilter) {
     setFilter(next)
     storeFilter(next)
     const nextFeed = feed.filter((g) => matchesFilter(g, next))
     setActiveId(nextFeed[0]?.id ?? NEW_TRIP_SENTINEL)
-    // Asignación directa (no `scrollTo`, que jsdom no implementa en los tests): el
-    // contenido cambia por completo, así que el scroll anterior ya no corresponde.
-    if (carouselRef.current) carouselRef.current.scrollLeft = 0
   }
 
   // Transición héroe (issue #589), mitad de "vuelta": se consume UNA vez al montar
   // (el initializer de useState solo corre en el mount, no en re-renders) para que
   // la tarjeta del viaje del que venimos reclame el nombre compartido.
   const [heroReturnId] = useState<string | null>(() => takeHeroReturnId())
+
+  // Detección de la tarjeta activa "en reposo" al cargar (issue #632): con
+  // `scrollLeft` en 0, la primera tarjeta queda pegada al padding izquierdo del
+  // carrusel, NO centrada bajo el criterio que usa el propio scroll-sync de abajo
+  // (`syncToCenteredCard`) — a simple vista, ninguna tarjeta parecía "la activa"
+  // (captura del dueño). Solo depende de `filter` (montar cuenta como un cambio de
+  // filtro implícito) a propósito: `activeId` también cambia por scroll, y si
+  // estuviera en las deps este efecto "pelearía" con el gesto de arrastre del
+  // usuario, forzando el centrado exacto en cada asentamiento del scroll-sync.
+  useLayoutEffect(() => {
+    const el = carouselRef.current
+    if (!el) return
+    centerCarouselOn(el, activeId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ver comentario de arriba
+  }, [filter])
 
   // Scroll-sync del carrusel (mismo patrón que TripPage/TripDiario): tras cada
   // scroll, con un pequeño reposo (140ms) para no recalcular en cada frame,

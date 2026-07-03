@@ -183,11 +183,19 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  /* Gap/padding-bottom un punto más ceñidos que antes (issue #573): la tarjeta
-     crece, así que el hueco muerto del dock cede ese alto — el globo (`.spacer`)
-     no tiene por qué encogerse tanto como crece la tarjeta. */
-  gap: var(--space-1);
-  padding-bottom: calc(env(safe-area-inset-bottom) + var(--space-3));
+  /* Gap un punto más generoso que antes (issue #632): con la tarjeta más alta
+     (ver `.slide`), el label/chips de filtro necesitan algo más de aire para no
+     leerse pegados al carrusel. */
+  gap: var(--space-2);
+  /* --space-8 (issue #632, punto 4): el chip flotante "Admin" (App.tsx, esquina
+     inferior izquierda, SOLO visible para el admin) comparte el mismo inset
+     izquierdo (`--space-4`) que este dock y queda anclado a `--space-4` + el
+     safe-area del borde inferior — con el `--space-3` de antes, la tarjeta (ya
+     más alta) le pisaba el pie. Este padding es el hueco real entre el borde
+     inferior de la tarjeta y el borde de pantalla: cubre la altura del chip
+     (~38px) más un respiro. No tocamos App.tsx (fuera del área de esta tarea,
+     ver issue #632) así que la holgura se da aquí. */
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--space-8));
   background: linear-gradient(
     to top,
     color-mix(in srgb, var(--scene-bg) 88%, transparent) 0%,
@@ -317,16 +325,17 @@
   display: none;
 }
 
-/* Foto-first (issue #573): la tarjeta pasa de ~190×150 (compacta) a protagonista —
-   ~72% del ancho del viewport (con techo/suelo razonables para no reventar en
-   tablet ni encogerse de más en móviles pequeños) y alto proporcional 3:2 vía
-   `aspect-ratio` (en vez de un alto fijo en px, así escala igual de bien a
-   390×844 que a 1080×2400). La vecina sigue asomando (peek): con la tarjeta más
-   ancha basta con el mismo `gap`/padding del carrusel para que el snap al
-   centro se lea limpio. */
+/* Foto-first (issue #573, agrandada en #632): la tarjeta sube a ~78vw de ancho
+   (techo/suelo para no reventar en tablet ni encogerse de más en móvil pequeño)
+   con proporción 4:5 — más alta que el 3:2 de antes, así la foto respira y deja
+   de leerse "recortada" (captura del dueño, #632). Sigue en `aspect-ratio` (no
+   alto fijo en px): escala igual de bien a 390×844 que a 1080×2400. El alto extra
+   lo cede el hueco del dock (`.dock` ya lo compensa), NO el globo — el globo es
+   `position: absolute` a sangre y no se encoge por esto (ver `.globeLayer`). La
+   vecina sigue asomando (peek) con el mismo `gap`/padding del carrusel. */
 .slide {
-  flex: 0 0 clamp(240px, 72vw, 340px);
-  aspect-ratio: 3 / 2;
+  flex: 0 0 clamp(260px, 78vw, 380px);
+  aspect-ratio: 4 / 5;
   scroll-snap-align: center;
 }
 
@@ -349,11 +358,11 @@
   background: var(--accent-deep); /* relleno si la foto no carga */
   isolation: isolate;
   -webkit-tap-highlight-color: transparent;
-  opacity: 1;
   transform: scale(1);
+  filter: saturate(1) brightness(1);
   transition:
-    opacity var(--motion-transition-base),
-    transform var(--motion-transition-base);
+    transform var(--motion-transition-base),
+    filter var(--motion-transition-base);
 }
 .card:disabled {
   cursor: default;
@@ -370,11 +379,17 @@
     inset 0 0 0 1.5px color-mix(in srgb, var(--medal-gold) 55%, transparent);
 }
 
-/* Tarjeta NO centrada: atenuada y algo encogida — la centrada (`data-active`) manda
-   (issue #568). Bajo `prefers-reduced-motion` la transición se apaga (ver abajo). */
+/* Tarjeta NO centrada: encogida y algo apagada — la centrada (`data-active`) manda
+   (issue #568). Captura del dueño (#632): con `opacity` de por medio la tarjeta
+   se volvía TRANSPARENTE sobre el globo (mapa/rótulos leyéndose a través de la
+   foto = "barro"), y encima el velo del dock (`.dock`, `background`) se
+   transparentaba doble a través de ese hueco. La tarjeta ahora es SIEMPRE opaca
+   (ver `.card`, sin `opacity`) — la diferencia activa/inactiva es solo escala +
+   saturación/brillo, que no abren ningún hueco al fondo. Bajo
+   `prefers-reduced-motion` la transición se apaga (ver abajo). */
 .card[data-active='false'] {
-  opacity: 0.55;
-  transform: scale(0.94);
+  transform: scale(0.92);
+  filter: saturate(0.8) brightness(0.92);
 }
 
 /* La foto, a sangre detrás del contenido. */
@@ -419,7 +434,11 @@
 
 /* Velo de lectura al pie: la foto manda, el texto serif blanco se lee AA encima.
    `color-mix` con `--scene-bg` (la misma tinta de escena del placeholder/globo) en
-   vez de un rgba suelto: el velo queda atado al sistema de color, no a un literal. */
+   vez de un rgba suelto: el velo queda atado al sistema de color, no a un literal.
+   Confinado al ~38% inferior (issue #632, punto 3 — antes se difuminaba hasta el
+   68%, empañando más de la mitad de la foto sin necesidad: el título vive en
+   `.cardBody` con `justify-content: flex-end`, así que solo hace falta velo bajo
+   él). Encima del 38% la foto queda LIMPIA, sin ningún velo extra. */
 .card::after {
   content: '';
   position: absolute;
@@ -427,10 +446,9 @@
   z-index: -1;
   background: linear-gradient(
     to top,
-    color-mix(in srgb, var(--scene-bg) 88%, transparent) 0%,
-    color-mix(in srgb, var(--scene-bg) 58%, transparent) 32%,
-    color-mix(in srgb, var(--scene-bg) 16%, transparent) 55%,
-    transparent 68%
+    color-mix(in srgb, var(--scene-bg) 85%, transparent) 0%,
+    color-mix(in srgb, var(--scene-bg) 45%, transparent) 18%,
+    transparent 38%
   );
 }
 
@@ -549,11 +567,11 @@
   background: var(--scene-surface);
   color: var(--scene-ink);
   cursor: pointer;
-  opacity: 1;
   transform: scale(1);
+  filter: saturate(1) brightness(1);
   transition:
-    opacity var(--motion-transition-base),
     transform var(--motion-transition-base),
+    filter var(--motion-transition-base),
     border-color var(--transition-fast),
     background var(--transition-fast);
 }
@@ -561,9 +579,11 @@
   border-color: var(--scene-ink);
   background: var(--glass-bg-strong);
 }
+/* Mismo modelo que `.card[data-active='false']` (issue #632): escala + filtro,
+   nunca `opacity` — coherencia con el resto del carrusel. */
 .newCard[data-active='false'] {
-  opacity: 0.55;
-  transform: scale(0.94);
+  transform: scale(0.92);
+  filter: saturate(0.8) brightness(0.92);
 }
 .newIcon {
   width: 36px;
