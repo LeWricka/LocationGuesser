@@ -32,8 +32,10 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 /** Descarga cualquier URL de imagen (Storage firmada o remota) y la vuelve data
- * URL. `null` ante cualquier fallo (red, CORS, 404…), nunca lanza. */
-async function urlToDataUrl(url: string): Promise<string | null> {
+ * URL. `null` ante cualquier fallo (red, CORS, 404…), nunca lanza. Exportada:
+ * la reutiliza también la cascada de portada de la invitación al viaje
+ * (`features/group/tripInviteCover`, issue #617) para no duplicar la conversión. */
+export async function urlToDataUrl(url: string): Promise<string | null> {
   try {
     const res = await fetch(url)
     if (!res.ok) return null
@@ -44,8 +46,10 @@ async function urlToDataUrl(url: string): Promise<string | null> {
   }
 }
 
-/** Firma un path de Storage y lo vuelve data URL; null ante cualquier fallo. */
-async function storagePathToDataUrl(path: string): Promise<string | null> {
+/** Firma un path de Storage y lo vuelve data URL; null ante cualquier fallo.
+ * Exportada por el mismo motivo que `urlToDataUrl` (reutilizada por
+ * `features/group/tripInviteCover`, issue #617). */
+export async function storagePathToDataUrl(path: string): Promise<string | null> {
   try {
     const url = await signedImageUrl(path)
     if (!url) return null

@@ -1,17 +1,35 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 
-// Issue #607: el pie pasa de 3 botones (Copiar enlace / WhatsApp / Compartir) a
-// 2 (Copiar enlace / Compartir) — WhatsApp ya vive dentro de la hoja nativa de
-// Web Share. Aislamos analítica y el conteo de miembros (lib/membership).
 const trackMock = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
 
 const getGroupMembersMock = vi.fn()
 vi.mock('../../lib/membership', () => ({
   getGroupMembers: (...args: unknown[]) => getGroupMembersMock(...args),
+}))
+
+// Issue #617: "Compartir" pasa de compartir el link crudo a compartir una
+// tarjeta-IMAGEN rasterizada off-screen. La rasterización/Web
+// Share/descarga se REUTILIZAN de features/group/shareLeaderboard (mismo
+// módulo real, aquí solo dobles simples para no tocar html-to-image/canvas
+// en el test — mismo patrón que ChallengeCreatedShare.test.tsx).
+const nodeToPngBlobMock = vi.fn()
+const shareLeaderboardImageMock = vi.fn()
+vi.mock('./shareLeaderboard', () => ({
+  nodeToPngBlob: (...args: unknown[]) => nodeToPngBlobMock(...args),
+  shareDomain: () => 'tabide.app',
+  shareLeaderboardImage: (...args: unknown[]) => shareLeaderboardImageMock(...args),
+}))
+
+// La cascada de portada (explícita → último recuerdo → lugar → mapa nocturno)
+// toca Supabase/Wikipedia: fuera del alcance de este test (cubierto en
+// tripInviteCover.test.ts), fijamos "sin portada" para centrarnos en el modal.
+const resolveTripInviteCoverMock = vi.fn()
+vi.mock('./tripInviteCover', () => ({
+  resolveTripInviteCover: (...args: unknown[]) => resolveTripInviteCoverMock(...args),
 }))
 
 import { InviteModal } from './InviteModal'
@@ -45,37 +63,42 @@ function renderModal(onClose = vi.fn()) {
   return onClose
 }
 
-describe('InviteModal (#607)', () => {
+describe('InviteModal — invitación como tarjeta-imagen (#617)', () => {
   beforeEach(() => {
     trackMock.mockClear()
     getGroupMembersMock.mockReset().mockResolvedValue([])
+    resolveTripInviteCoverMock.mockReset().mockResolvedValue(null)
+    nodeToPngBlobMock.mockReset().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
+    shareLeaderboardImageMock.mockReset()
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
+    // jsdom no implementa createObjectURL/revokeObjectURL.
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
   })
 
-  afterEach(() => {
-    // navigator.share no existe por defecto en jsdom: lo limpiamos entre tests
-    // para que cada uno controle explícitamente si el navegador "tiene" Web Share.
-    Reflect.deleteProperty(navigator, 'share')
-  })
-
-  test('el pie solo tiene "Copiar enlace" y "Compartir" (sin botón dedicado de WhatsApp)', async () => {
+  test('el pie solo tiene "Copiar enlace" y "Compartir" (sin botón dedicado de WhatsApp, #607)', async () => {
     renderModal()
     expect(screen.getByRole('button', { name: 'Copiar enlace' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Compartir' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /compartir/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /whatsapp/i })).not.toBeInTheDocument()
-    // Deja asentar el efecto async del recuento de miembros para no dejar un
-    // act() pendiente al terminar el test.
-    await waitFor(() => expect(getGroupMembersMock).toHaveBeenCalled())
+    // Deja asentar los efectos async (miembros, portada, rasterizado) para no
+    // dejar un act() pendiente al terminar el test.
+    await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
   })
 
-  test('el preview muestra el nombre del viaje y el recuento de retos', async () => {
+  test('resuelve la cascada de portada del viaje y rasteriza la tarjeta; la previa muestra el PNG', async () => {
     renderModal()
-    expect(screen.getByText('Japón en primavera')).toBeInTheDocument()
-    expect(screen.getByText('3 retos')).toBeInTheDocument()
-    await waitFor(() => expect(getGroupMembersMock).toHaveBeenCalled())
+
+    await waitFor(() =>
+      expect(resolveTripInviteCoverMock).toHaveBeenCalledWith('g1', 'Japón en primavera'),
+    )
+    await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalledTimes(1))
+    expect(
+      await screen.findByRole('img', { name: /tarjeta para invitar al viaje/i }),
+    ).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: /compartir/i })).toBeEnabled())
   })
 
-  test('"Copiar enlace" copia mensaje + enlace y avisa con un toast', async () => {
+  test('"Copiar enlace" copia mensaje + enlace y avisa con un toast (intacto)', async () => {
     renderModal()
     await userEvent.click(screen.getByRole('button', { name: 'Copiar enlace' }))
 
@@ -91,18 +114,22 @@ describe('InviteModal (#607)', () => {
     expect(await screen.findByText('Mensaje copiado, pégalo en el chat')).toBeInTheDocument()
   })
 
-  test('"Compartir" usa Web Share cuando existe y cierra el modal', async () => {
-    const shareMock = vi.fn().mockResolvedValue(undefined)
-    Object.assign(navigator, { share: shareMock })
+  test('"Compartir" comparte la tarjeta-imagen (Web Share con files) y cierra el modal', async () => {
+    shareLeaderboardImageMock.mockResolvedValue('shared')
     const onClose = renderModal()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Compartir' }))
+    const shareBtn = await waitFor(() => {
+      const btn = screen.getByRole('button', { name: /compartir/i })
+      expect(btn).toBeEnabled()
+      return btn
+    })
+    await userEvent.click(shareBtn)
 
-    await waitFor(() =>
-      expect(shareMock).toHaveBeenCalledWith(
-        expect.objectContaining({ url: 'https://tabide.app/v/abc123' }),
-      ),
-    )
+    await waitFor(() => expect(shareLeaderboardImageMock).toHaveBeenCalledTimes(1))
+    const [blobArg, captionArg] = shareLeaderboardImageMock.mock.calls[0]
+    expect(blobArg).toBeInstanceOf(Blob)
+    // El enlace SOLO va en el caption, nunca estampado en la imagen.
+    expect(captionArg).toContain('https://tabide.app/v/abc123')
     expect(trackMock).toHaveBeenCalledWith(
       'invite_shared',
       expect.objectContaining({ surface: 'shared', group_id: 'g1' }),
@@ -110,13 +137,30 @@ describe('InviteModal (#607)', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
-  test('"Compartir" sin Web Share (escritorio) cae a copiar con toast, sin cerrar el modal', async () => {
+  test('"Compartir" sin Web Share (escritorio): descarga la imagen y copia el mensaje, sin cerrar el modal', async () => {
+    shareLeaderboardImageMock.mockResolvedValue('downloaded')
     const onClose = renderModal()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Compartir' }))
+    const shareBtn = await waitFor(() => {
+      const btn = screen.getByRole('button', { name: /compartir/i })
+      expect(btn).toBeEnabled()
+      return btn
+    })
+    await userEvent.click(shareBtn)
 
-    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalled())
-    expect(await screen.findByText('Mensaje copiado, pégalo en el chat')).toBeInTheDocument()
+    await waitFor(() => expect(shareLeaderboardImageMock).toHaveBeenCalledTimes(1))
+    expect(
+      await screen.findByText('Imagen descargada y mensaje copiado, pégalos en el chat'),
+    ).toBeInTheDocument()
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  test('si la imagen no se genera, "Compartir" queda deshabilitado (el enlace sigue disponible con "Copiar enlace")', async () => {
+    nodeToPngBlobMock.mockReset().mockRejectedValue(new Error('canvas roto'))
+    renderModal()
+
+    await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
+    expect(screen.getByRole('button', { name: /compartir/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Copiar enlace' })).toBeEnabled()
   })
 })
