@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, MapPin, Target } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
@@ -11,6 +11,8 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
+import { getGroup } from '../../lib/groupData'
+import { supabase } from '../../lib/supabase'
 import {
   AppHeader,
   Badge,
@@ -51,6 +53,77 @@ function todayIso(): string {
   return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10)
 }
 
+// Fecha local (`YYYY-MM-DD`) de un timestamp ISO cualquiera, con el mismo criterio
+// de zona horaria que `todayIso` (evita el desfase de "un día antes" que da
+// `.toISOString()` directo sobre un timestamp UTC cerca de medianoche local).
+function localDateFromIso(isoTimestamp: string): string {
+  const d = new Date(isoTimestamp)
+  const off = d.getTimezoneOffset()
+  return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10)
+}
+
+/**
+ * Fecha por defecto del campo "Fecha" + tope superior del calendario, en cascada
+ * (issue #553 — el dueño de un viaje pasado, sept 2024, tenía que navegar el
+ * calendario desde hoy hasta esa fecha en CADA recuerdo nuevo):
+ *  1. Si el viaje ya tiene momentos → la fecha del MÁS RECIENTE. Mismo criterio que
+ *     usa el diario para ordenar y fechar (`created_at`; ver `Moment.date` en
+ *     `lib/trip.ts`) — no hay columna de fecha propia del recuerdo (la fecha que
+ *     elige el usuario solo queda, si acaso, incrustada en la descripción sin año,
+ *     ver `buildDescription`; no es una fuente fiable para reconstruir un ISO).
+ *  2. Si no hay momentos pero el viaje tiene fechas (`starts_on`/`ends_on`,
+ *     migración 0027) → hoy ACOTADO al rango: si hoy cae dentro, hoy; si el viaje
+ *     es pasado o futuro (hoy fuera del rango), `starts_on`.
+ *  3. Sin momentos ni fechas del viaje → hoy (comportamiento de siempre).
+ * Tope superior: por defecto hoy (no se crean recuerdos "futuros" sueltos). Si el
+ * viaje es FUTURO y tiene `ends_on`, lo ampliamos hasta ahí — si no, `max=hoy`
+ * bloquearía cualquier fecha del propio viaje (planificar recuerdos con antelación
+ * dentro de su rango). Sin `ends_on` nos quedamos en `max=hoy` (no hay tope al que
+ * ampliar). Exportada para testear la cascada sin montar el componente (rompe
+ * fast refresh en este fichero; aceptable, igual que en `react-google-maps.tsx`).
+ */
+/* eslint-disable-next-line react-refresh/only-export-components -- función pura exportada
+   solo para testear la cascada; no vale la pena un fichero aparte para una función pequeña
+   usada solo aquí (mismo criterio que en `react-google-maps.tsx`). */
+export function computeDefaultDate(
+  latestMomentCreatedAt: string | null,
+  startsOn: string | null,
+  endsOn: string | null,
+  today: string,
+): { date: string; max: string } {
+  const isFutureTrip = startsOn != null && startsOn > today
+  const max = isFutureTrip && endsOn ? endsOn : today
+
+  if (latestMomentCreatedAt) {
+    return { date: localDateFromIso(latestMomentCreatedAt), max }
+  }
+  if (startsOn) {
+    const upper = endsOn ?? startsOn
+    const withinRange = today >= startsOn && today <= upper
+    return { date: withinRange ? today : startsOn, max }
+  }
+  return { date: today, max }
+}
+
+/**
+ * El momento (recuerdo o reto) más reciente del viaje por fecha de creación —
+ * mismo criterio que usa el diario para ordenar (`lib/trip.ts`). Consulta mínima
+ * (una columna, una fila): solo ancla la fecha por defecto del formulario, no
+ * duplica el fetch pesado de `getGroupChallenges` (todas las columnas, todo el
+ * viaje) que ya hace la pantalla del viaje.
+ */
+async function fetchLatestMomentCreatedAt(groupId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('challenges')
+    .select('created_at')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data?.created_at ?? null
+}
+
 /**
  * AÑADIR RECUERDO — el camino feliz, limpio (rediseño Oleada 3). Un recuerdo es
  * SOLO foto + lugar + texto: se acabó el toggle "convertirlo en reto" (mezclaba dos
@@ -68,6 +141,12 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState(todayIso)
+  // Tope superior del calendario: hoy por defecto; se amplía a `ends_on` si el
+  // viaje es futuro (ver `computeDefaultDate`). Arranca en hoy y solo cambia tras
+  // resolver la cascada (evita parpadeo: nunca deja elegir MÁS de lo permitido).
+  const [maxDate, setMaxDate] = useState(todayIso)
+  // Si el usuario toca la fecha a mano, la cascada async ya no debe pisarla.
+  const dateTouchedRef = useRef(false)
 
   // Lugar VISIBLE del recuerdo. Sale de la foto (EXIF), del mapa o del GPS.
   const [place, setPlace] = useState<LatLng | null>(null)
@@ -103,6 +182,38 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       })
     }
   }, [])
+
+  // Fecha por defecto en cascada (issue #553): al montar, resolvemos el valor
+  // inicial del campo "Fecha" con dos consultas ligeras en paralelo (el último
+  // momento del viaje + sus fechas). Best-effort: si falla, se queda en "hoy" (el
+  // comportamiento de siempre) sin bloquear el formulario. No pisa la fecha si el
+  // usuario ya la tocó a mano antes de que la consulta responda.
+  useEffect(() => {
+    let cancelled = false
+    async function loadDefaultDate() {
+      try {
+        const [latestCreatedAt, group] = await Promise.all([
+          fetchLatestMomentCreatedAt(groupId),
+          getGroup(groupId),
+        ])
+        if (cancelled) return
+        const { date: defaultDate, max } = computeDefaultDate(
+          latestCreatedAt,
+          group?.starts_on ?? null,
+          group?.ends_on ?? null,
+          todayIso(),
+        )
+        setMaxDate(max)
+        if (!dateTouchedRef.current) setDate(defaultDate)
+      } catch (err) {
+        reportError(err, { area: 'add_moment', stage: 'default_date' })
+      }
+    }
+    void loadDefaultDate()
+    return () => {
+      cancelled = true
+    }
+  }, [groupId])
 
   // Añadir fotos (selección múltiple del móvil). Se anexan al final. Si es la
   // PRIMERA tanda (galería vacía), leemos el GPS de la portada (File ORIGINAL,
@@ -458,9 +569,12 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
               <DatePicker
                 {...fieldProps}
                 value={date}
-                max={todayIso()}
+                max={maxDate}
                 placeholder="Elige el día"
-                onChange={(v) => setDate(v ?? '')}
+                onChange={(v) => {
+                  dateTouchedRef.current = true
+                  setDate(v ?? '')
+                }}
               />
             )}
           </Field>
