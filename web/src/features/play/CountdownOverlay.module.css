@@ -12,9 +12,12 @@
   place-items: center;
   overflow: hidden;
   background: var(--color-bg);
-  /* La cuenta atrás ENTRA con un fundido suave (no aparece de golpe): la transición a
-     jugar deja de ser seca. */
-  animation: countOverlayIn var(--duration-slow) var(--ease-smooth) both;
+  /* La cuenta atrás ENTRA con un fundido corto y decidido (issue #606): el modal
+     "¿Listo para jugar?" no tiene salida propia (se desmonta al instante), así que
+     este fundido es lo único que evita el corte seco intro→cuenta. Corto (dentro
+     de 150–250ms) y con la curva "emphasized" (entra rápido, no plano): se siente
+     ágil, no una pausa. */
+  animation: countOverlayIn var(--motion-duration-base) var(--motion-ease-emphasized) both;
 }
 
 @keyframes countOverlayIn {
@@ -23,6 +26,29 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/* Salida del ÚLTIMO dígito ("1"): el overlay se apaga en los últimos
+   `--motion-duration-base` de su propio tiempo de permanencia (calc con
+   `--countdown-step-ms`, la misma constante STEP_MS del temporizador en JS), así
+   que al desmontarse (onDone → GameScene monta la escena real) ya está
+   prácticamente transparente. Se CRUZA con `.sceneEnter` (el fundido+acercamiento
+   de entrada de la escena, en PlayChallenge.module.css) en vez de cortar en seco
+   — sin alargar la cuenta ni un ms: el desvanecido vive DENTRO del último STEP_MS,
+   no lo añade. `forwards` es seguro aquí porque el nodo se desmonta justo después
+   (sin el problema de residuo del PR #527: no queda en el DOM para heredarlo). */
+.overlayExit {
+  animation: countOverlayOut var(--motion-duration-base) var(--motion-ease-exit) forwards;
+  animation-delay: calc(var(--countdown-step-ms, 1300ms) - var(--motion-duration-base));
+}
+
+@keyframes countOverlayOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -106,6 +132,7 @@
    acaso, sin animación. */
 @media (prefers-reduced-motion: reduce) {
   .overlay,
+  .overlayExit,
   .bgImg,
   .number {
     animation: none;
