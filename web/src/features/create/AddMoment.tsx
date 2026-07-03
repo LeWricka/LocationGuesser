@@ -71,9 +71,17 @@ function localDateFromIso(isoTimestamp: string): string {
  *     `lib/trip.ts`) — no hay columna de fecha propia del recuerdo (la fecha que
  *     elige el usuario solo queda, si acaso, incrustada en la descripción sin año,
  *     ver `buildDescription`; no es una fuente fiable para reconstruir un ISO).
- *  2. Si no hay momentos pero el viaje tiene fechas (`starts_on`/`ends_on`,
- *     migración 0027) → hoy ACOTADO al rango: si hoy cae dentro, hoy; si el viaje
- *     es pasado o futuro (hoy fuera del rango), `starts_on`.
+ *     OJO: `created_at` es solo un PROXY de la fecha elegida, fiable únicamente
+ *     cuando el diario se documenta EN VIVO. Si el viaje tiene fechas y la fecha
+ *     derivada cae FUERA de [starts_on, ends_on ?? starts_on], es un artefacto de
+ *     backfill — el caso real del dueño: viaje de sept 2024 rellenado HOY; el
+ *     primer recuerdo se crea hoy, así que su `created_at` anclaría el SEGUNDO
+ *     recuerdo en hoy y el dolor original reaparecería. En ese caso la ignoramos
+ *     y caemos a la regla 2 (que para un viaje pasado da `starts_on`).
+ *  2. Si no hay momentos (o su `created_at` cayó fuera del rango) pero el viaje
+ *     tiene fechas (`starts_on`/`ends_on`, migración 0027) → hoy ACOTADO al
+ *     rango: si hoy cae dentro, hoy; si el viaje es pasado o futuro (hoy fuera
+ *     del rango), `starts_on`.
  *  3. Sin momentos ni fechas del viaje → hoy (comportamiento de siempre).
  * Tope superior: por defecto hoy (no se crean recuerdos "futuros" sueltos). Si el
  * viaje es FUTURO y tiene `ends_on`, lo ampliamos hasta ahí — si no, `max=hoy`
@@ -95,11 +103,15 @@ export function computeDefaultDate(
   const max = isFutureTrip && endsOn ? endsOn : today
 
   if (latestMomentCreatedAt) {
-    return { date: localDateFromIso(latestMomentCreatedAt), max }
+    const latestDate = localDateFromIso(latestMomentCreatedAt)
+    // Regla 1 solo si la fecha del último momento es plausible: sin fechas del
+    // viaje (nada con qué contrastar) o dentro del rango. Fuera del rango es un
+    // artefacto de backfill (ver comentario de arriba) → cae a la regla 2.
+    const plausible = !startsOn || (latestDate >= startsOn && latestDate <= (endsOn ?? startsOn))
+    if (plausible) return { date: latestDate, max }
   }
   if (startsOn) {
-    const upper = endsOn ?? startsOn
-    const withinRange = today >= startsOn && today <= upper
+    const withinRange = today >= startsOn && today <= (endsOn ?? startsOn)
     return { date: withinRange ? today : startsOn, max }
   }
   return { date: today, max }

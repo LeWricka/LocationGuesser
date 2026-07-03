@@ -196,12 +196,28 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
 describe('computeDefaultDate — fecha por defecto en cascada (#553)', () => {
   const today = '2026-07-03'
 
-  test('1. con momentos → la fecha del más reciente (created_at), gane o no el viaje tenga fechas', () => {
-    // Viaje de sept 2024 (el caso real del dueño): el último momento ya guardado
-    // ancla la fecha, aunque hoy caiga muy lejos de esas fechas.
+  test('1a. con momentos y created_at DENTRO del rango del viaje → la fecha del más reciente', () => {
+    // Diario documentado en vivo: el último momento ancla la fecha.
     expect(
       computeDefaultDate('2024-09-10T12:00:00.000Z', '2024-09-01', '2024-09-15', today),
     ).toEqual({ date: '2024-09-10', max: today })
+  })
+
+  test('1b. con momentos pero SIN fechas del viaje → la fecha del más reciente (nada que contrastar)', () => {
+    expect(computeDefaultDate('2026-06-20T12:00:00.000Z', null, null, today)).toEqual({
+      date: '2026-06-20',
+      max: today,
+    })
+  })
+
+  test('1c. viaje PASADO rellenado hoy (created_at fuera del rango) → se ignora y cae a starts_on', () => {
+    // El caso real del dueño con el SEGUNDO recuerdo: el primero se creó HOY
+    // (backfill de un viaje de sept 2024), así que su created_at NO es la fecha
+    // del viaje sino un artefacto. Si lo usáramos, el dolor original reaparecería
+    // a partir del segundo recuerdo. Fuera del rango → regla 2 → starts_on.
+    expect(computeDefaultDate(`${today}T10:00:00.000Z`, '2024-09-01', '2024-09-15', today)).toEqual(
+      { date: '2024-09-01', max: today },
+    )
   })
 
   test('2a. sin momentos, viaje PASADO con fechas → hoy acotado a starts_on', () => {
