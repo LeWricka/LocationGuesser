@@ -76,9 +76,6 @@ export { MapSkeleton } from './MapSkeleton'
 // utilitario), en vez del spinner genérico único — issue #526.
 export { TripRouteSkeleton, PlayRouteSkeleton, UtilityRouteSkeleton } from './RouteSkeletons'
 
-// Marca: logo de "Tabide" (símbolo + wordmark serif).
-export { Logo } from './Logo'
-
 // Aviso "hay versión nueva" tras un deploy PWA (#549). Se monta en su propio root
 // desde main.tsx, no dentro de `<App/>`; se exporta igual para poder testearlo
 // como cualquier otro componente del kit.

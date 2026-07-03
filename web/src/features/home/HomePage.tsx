@@ -8,7 +8,8 @@ import {
   HomeDashboard,
   HomeEmptyState,
   Icon,
-  Logo,
+  LogoTabide,
+  WordmarkTabide,
   Skeleton,
   Stack,
   Row,
@@ -221,7 +222,8 @@ export function HomePage() {
           overlay={
             <>
               <span className={styles.brand}>
-                <Logo variant="wordmark" size={20} monochrome />
+                <LogoTabide variant="oscuro" size={22} />
+                <WordmarkTabide size={18} />
               </span>
               <button
                 type="button"
