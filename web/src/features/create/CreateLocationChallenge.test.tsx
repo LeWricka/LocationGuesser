@@ -3,9 +3,36 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import type { LatLng } from '../../lib/geo'
+import type { ChallengeForPlay } from '../../lib/challenges'
 
-vi.mock('../../lib/analytics', () => ({ track: vi.fn() }))
+const trackMock = vi.fn()
+vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
 vi.mock('../../lib/observability', () => ({ reportError: vi.fn() }))
+
+const createChallengeMock = vi.fn()
+vi.mock('../../lib/challenges', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/challenges')>()
+  return { ...actual, createChallenge: (...args: unknown[]) => createChallengeMock(...args) }
+})
+
+const uploadImageMock = vi.fn()
+vi.mock('../../lib/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/storage')>()
+  return { ...actual, uploadImage: (...args: unknown[]) => uploadImageMock(...args) }
+})
+
+// La hoja "¡Reto creado!" (ChallengeCreatedShare) genera una tarjeta-imagen
+// (issue #595): fuera del alcance de este test (foto opcional del reto ¿Dónde?),
+// dobles simples para no tocar Supabase/html-to-image reales.
+vi.mock('../group/shareLeaderboard', () => ({
+  nodeToPngBlob: vi.fn().mockResolvedValue(new Blob()),
+  shareDomain: vi.fn(() => 'tabide.app'),
+  shareLeaderboardImage: vi.fn().mockResolvedValue('cancelled'),
+  downloadBlob: vi.fn(),
+}))
+vi.mock('./challengeShareCover', () => ({
+  resolveChallengeShareCover: vi.fn().mockResolvedValue(null),
+}))
 
 // El mapa (Leaflet) es pesado e irrelevante para el flujo de pasos (mismo
 // patrón que AddMoment.test.tsx): el doble expone lo que este test necesita —
@@ -75,7 +102,20 @@ function renderScreen() {
 beforeEach(() => {
   findPanoramaMock.mockReset()
   findPanoramaMock.mockResolvedValue({ panoId: 'pano-1', lat: 41.38, lng: 2.17 })
+  trackMock.mockClear()
+  createChallengeMock.mockReset()
+  uploadImageMock.mockReset()
+  // jsdom no implementa createObjectURL/revokeObjectURL (solo la miniatura de la
+  // foto opcional los usa; irrelevante para los tests de pasos/navegación).
+  Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
 })
+
+// Lleva el flujo hasta el paso 2 con cobertura confirmada (mismo camino que los
+// tests de arriba): tap en el mapa + "Continuar a las reglas".
+async function advanceToRules(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /simular tap/i }))
+  await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+}
 
 // Flujo v3 (issue #592, rediseño de #585): paso 1 = mapa a pantalla completa
 // para elegir el sitio, con la previa de SV (o el aviso de "sin cobertura")
@@ -187,5 +227,64 @@ describe('CreateLocationChallenge — ¿Dónde? v3 (#592)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Atrás' }))
     expect(onBack).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Foto opcional del reto ¿Dónde? (issue #595): un tile más en el paso 2, sin
+// tocar el paso 1 (el sitio lo fija el mapa, no el EXIF de esta foto).
+describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
+  test('sin foto: se lanza el reto sin subir nada a Storage y sin image_path', async () => {
+    createChallengeMock.mockResolvedValue({
+      challenge: {
+        id: 'reto-1',
+        title: '¿Dónde? · Japón 2026',
+        image_path: null,
+      } as ChallengeForPlay,
+      groupId: 'g-1',
+    })
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
+    expect(uploadImageMock).not.toHaveBeenCalled()
+    expect(createChallengeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ imagePath: undefined, photoIsHint: true }),
+    )
+  })
+
+  test('con foto: se sube (comprimida/sin EXIF) y se asocia como PISTA (photo_is_hint=true, sin toggle nuevo)', async () => {
+    uploadImageMock.mockResolvedValue('u-me/foto.jpg')
+    createChallengeMock.mockResolvedValue({
+      challenge: {
+        id: 'reto-2',
+        title: '¿Dónde? · Japón 2026',
+        image_path: 'u-me/foto.jpg',
+      } as ChallengeForPlay,
+      groupId: 'g-1',
+    })
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    const file = new File(['foto'], 'sitio.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Añadir foto del sitio'), file)
+
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
+    expect(uploadImageMock).toHaveBeenCalledWith(file)
+    // Decisión #595: sin toggle nuevo — comportamiento más simple ya existente
+    // en el resto de flujos de crear (default `createChallenge`,
+    // CreateChallengeImmersive, CreateNumberChallenge): pista, nunca sorpresa.
+    expect(createChallengeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ imagePath: 'u-me/foto.jpg', photoIsHint: true }),
+    )
+    expect(trackMock).toHaveBeenCalledWith(
+      'challenge_created',
+      expect.objectContaining({ has_photo: true, photo_is_hint: true }),
+    )
   })
 })

@@ -468,6 +468,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
           groupName={groupName}
           challengeId={created.id}
           challengeTitle={created.title}
+          imagePath={created.image_path}
           onPlay={() => onCreated(created)}
         />
       )}

@@ -253,6 +253,14 @@
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
 }
+/* "opcional" junto al label de la foto (issue #595): sin mayúsculas ni tracking
+   del label que lo envuelve — es una aclaración, no parte del título. */
+.ruleLabel .optional {
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: var(--font-weight-medium);
+  color: var(--ink-400);
+}
 
 /* ─── Footer: CTA fijo (ambos pasos) ────────────────────────────── */
 /* Patrón de CTA fijo del sistema (ShellUtilitario): footer EN EL FLUJO flex

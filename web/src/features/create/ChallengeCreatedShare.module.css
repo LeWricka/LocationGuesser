@@ -1,42 +1,50 @@
-/* Preview de marca del reto recién lanzado dentro de la hoja de compartir: una
-   tarjeta de papel con tinte de acento que da contexto (nombre del reto) en vez de
-   un enlace pelado. Reusa los tokens; sin hardcodear colores. Mismo lenguaje que
-   InviteModal (invitar al viaje). */
+/* Hoja "¡Reto creado!" (issue #595): en vez de un link pelado, se comparte la
+   TARJETA-IMAGEN (misma idea que ShareLeaderboardModal, features/group) — esta
+   previsualiza el PNG ya rasterizado, con sus estados de carga/error. */
 .preview {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-5);
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+}
+
+.previewImg {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background: var(--color-accent-soft);
+  box-shadow: var(--shadow-md);
 }
 
-.eyebrow {
-  display: inline-flex;
+.loading {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-1);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-bold);
-  text-transform: uppercase;
-  letter-spacing: var(--letter-spacing-eyebrow);
-  color: var(--color-accent);
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 
-.title {
+.errorBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  text-align: center;
+}
+.error {
   margin: 0;
-  font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
-  line-height: var(--line-height-tight);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-tight);
-  color: var(--color-text);
-  overflow-wrap: anywhere;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
 }
 
-/* A quién llega el reto: tu grupo del viaje. Voz serif, peso medio: es el mensaje. */
+/* A quién llega el reto: tu grupo del viaje. */
 .audience {
-  margin: var(--space-2) 0 0;
+  margin: var(--space-3) 0 0;
+  text-align: center;
   font-family: var(--font-serif);
   font-size: var(--font-size-lg);
   line-height: var(--line-height-tight);
@@ -44,14 +52,20 @@
   color: var(--color-text);
 }
 
-.tagline {
-  margin: var(--space-1) 0 0;
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-normal);
-  color: var(--color-text-muted);
-}
-
-/* Retorno al viaje, separado del preview para respirar. */
+/* Retorno al viaje, separado de la previa para respirar. */
 .backToTrip {
   margin-top: var(--space-4);
+}
+
+/* Lienzo de captura: la tarjeta vive a tamaño real (1080px) fuera del viewport.
+   No usamos display:none (mediría 0 y html-to-image fallaría) ni visibility:hidden;
+   la sacamos del flujo con posición absoluta y un desplazamiento grande. Mismo
+   patrón que ShareLeaderboardModal `.offscreen`. */
+.offscreen {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 1080px;
+  pointer-events: none;
+  z-index: -1; /* design-lint-allow: lienzo de captura fuera de pantalla, mismo patrón que ShareLeaderboardModal */
 }
