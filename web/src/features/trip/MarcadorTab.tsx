@@ -1,6 +1,12 @@
 import type { CSSProperties } from 'react'
-import { Share2, Target } from 'lucide-react'
-import { Avatar, Button, CountUp, Icon, IconMedalla, IconTrofeo } from '../../ui'
+import { Crown, Share2, Target } from 'lucide-react'
+import { Avatar, Button, CountUp, Icon, IconTrofeo } from '../../ui'
+// `Medal` no está en el barril de `../../ui` (igual que en el podio de temporada de
+// GroupPage/Podium.tsx, que lo importa así): reutilizamos ese mismo componente para
+// el pedestal en vez de un dígito de texto — un SVG de medalla no se confunde con
+// una letra a ningún tamaño (un "1" en fuente sans, en el pedestal más dorado y
+// pequeño, se leyó como una "I" mayúscula en pruebas reales — issue #594).
+import { Medal } from '../../ui/Medal'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import styles from './MarcadorTab.module.css'
 
@@ -17,23 +23,41 @@ interface Props {
   canCreate: boolean
 }
 
+// Orden de ENTRADA del podio: 3º → 2º → 1º (el ganador remata la coreografía).
+// Mapea el rank real (1|2|3) al índice de aparición que alimenta --i (stagger).
+const PODIO_ENTRY_ORDER: Record<1 | 2 | 3, number> = { 3: 0, 2: 1, 1: 2 }
+
 /**
  * Pestaña Marcador del viaje: el tablón de un JUEGO, no una lista administrativa
  * (oleada 3, issue #546 — diagnóstico: tarjetas planas, sin jerarquía, 60% de
- * pantalla vacío).
+ * pantalla vacío). v2 (issue #594): el dueño vio la v1 de barras (#547) y la sintió
+ * "pocha, poco visual" con datos reales (8 jugadores) — la mecánica es un JUEGO con
+ * podio, no una tabla. Sube el listón con dos bloques:
  *
- * Diseño Grafito+teal:
- *  - Cada fila lleva una BARRA proporcional a sus puntos (líder = 100%, resto
- *    relativo) que crece al entrar. Comunica de un vistazo cuánto le falta a
- *    cada uno para alcanzar al líder — la lectura que una lista de números no da.
- *  - Líder (①): barra en degradado oro, anillo dorado sutil alrededor del
- *    avatar y brillo discreto en la medalla. El oro es SOLO del líder — el resto
- *    va en teal, incluida la fila del usuario activo.
- *  - Puntos con count-up al entrar (una vez por visita a la pestaña).
- *  - Filas escalonadas al entrar (--motion-stagger-step).
- *  - Podio (1º–3º): IconMedalla con colores semánticos de medalla.
- *  - Resto de posiciones: nº en sans, tinta suave.
- *  - Fila del usuario activo: borde + fondo teal tenue (solo acento en detalle).
+ *  1. PODIO (top-3): columnas escalonadas (2º–1º–3º) con el mismo lenguaje que el
+ *     podio de temporada de GroupPage (Podium.tsx) — avatar grande con anillo de
+ *     medalla (oro/plata/bronce), corona sobre el líder, nombre + puntos con
+ *     count-up y un PEDESTAL cerrado y teñido por puesto, con altura escalonada
+ *     (la del 1º, la más alta) y el icono `Medal` centrado (no un número: un
+ *     dígito de texto en el pedestal dorado se leyó como una letra en pruebas
+ *     reales). El oro es EXCLUSIVO de la insignia/anillo/pedestal del líder — el
+ *     resto de medallas usan sus propios colores semánticos, nunca oro genérico;
+ *     los puntos del líder van en acento teal (no oro: el oro es solo cromo de
+ *     medalla, igual que en el podio de temporada).
+ *  2. RESTO (4º en adelante): la lista compacta de barras de #547, sin cambios —
+ *     solo deja de dibujar el podio (ya cubierto arriba) y arranca en el puesto 4.
+ *     La fila propia destacada (borde+fondo teal) vive AQUÍ; en el podio, "soy yo"
+ *     se marca con una etiqueta "Tú" ligera junto al nombre — un acento de color
+ *     de página entera ahí competiría con el oro/plata/bronce del puesto.
+ *
+ * Con ≤3 jugadores solo hay podio (sin lista vacía debajo); con 1 jugador, el líder
+ * va solo y centrado (issue #594, punto 3).
+ *
+ * Motion: la columna de cada puesto entra escalonada en el orden 3º→2º→1º
+ * (`PODIO_ENTRY_ORDER` alimenta `--i`); el líder usa un easing "spring" sutil
+ * (`--motion-ease-spring`) para que se note quién ganó. `animation-fill-mode:
+ * backwards` SIEMPRE (nunca `both`/`forwards`, ver gotcha en el .css). Reduced-motion
+ * apaga toda animación (igual que la lista de #547).
  *
  * Si no hay clasificación (nadie ha jugado aún), muestra un estado vacío descriptivo.
  */
@@ -58,101 +82,141 @@ export function MarcadorTab({ leaderboard, myUserId, onInvite, onAddChallenge, c
     )
   }
 
-  // El líder marca el 100% de la barra; el resto es relativo a él (leaderboard
-  // ya viene ordenado desc por puntos — aggregateLeaderboard). Suelo del 8% para
-  // que ningún jugador se quede sin barra visible (mismo criterio que el recap
-  // de fin de viaje en TripWrap).
+  // El líder marca el 100% de la barra de la lista compacta; el resto (4º+) es
+  // relativo a él (leaderboard ya viene ordenado desc por puntos —
+  // aggregateLeaderboard). El podio (1º-3º) no lleva barra: su jerarquía la da la
+  // composición (alturas de peana), no un porcentaje.
   const topPoints = leaderboard[0].points
-  // Con pocos jugadores sobra pantalla: que la lista respire en vez de quedar
-  // pegada arriba (issue #546, "aprovecha el vacío"). No cambia estructura ni CTAs.
-  const listaClasses = [styles.lista, leaderboard.length <= 2 ? styles.listaRespira : '']
+  const podio = leaderboard.slice(0, 3)
+  const resto = leaderboard.slice(3)
+  // Con pocos jugadores en la lista compacta sobra pantalla (issue #546, "aprovecha
+  // el vacío"): más aire arriba y entre filas. El podio ya llena la parte de arriba,
+  // así que el umbral aplica al tamaño de la lista compacta, no al total.
+  const listaClasses = [
+    styles.lista,
+    resto.length > 0 && resto.length <= 2 ? styles.listaRespira : '',
+  ]
     .filter(Boolean)
     .join(' ')
 
   return (
-    <ol className={listaClasses} aria-label="Clasificación del viaje">
-      {leaderboard.map((entry, i) => {
-        const rank = i + 1
-        const esMio = entry.userId === myUserId
-        const esPodio = rank <= 3
-        const esLider = rank === 1
-        const barPct = topPoints > 0 ? Math.max(0.08, entry.points / topPoints) : 0
+    <div className={styles.marcador}>
+      <ol className={styles.podio} aria-label="Podio">
+        {podio.map((entry, i) => {
+          const rank = (i + 1) as 1 | 2 | 3
+          const esMio = entry.userId === myUserId
+          const esLider = rank === 1
+          const rankClass = rank === 1 ? styles.podio1 : rank === 2 ? styles.podio2 : styles.podio3
+          const anilloClass =
+            rank === 1 ? styles.anillo1 : rank === 2 ? styles.anillo2 : styles.anillo3
 
-        return (
-          <li
-            key={entry.userId}
-            className={[styles.fila, esMio ? styles.miPosicion : '', esLider ? styles.lider : '']
-              .filter(Boolean)
-              .join(' ')}
-            style={{ '--i': i } as CSSProperties}
-            aria-current={esMio ? 'true' : undefined}
-          >
-            <div className={styles.filaTop}>
-              {/* Posición: medalla para el podio, nº para el resto. */}
-              <span
-                className={[
-                  styles.posicion,
-                  rank === 1 ? styles.oro : '',
-                  rank === 2 ? styles.plata : '',
-                  rank === 3 ? styles.bronce : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                // role="img": la posición se comunica como medalla/nº. Sin un rol
-                // que admita nombre, aria-label en un span es un atributo prohibido.
-                role="img"
-                aria-label={`Posición ${rank}`}
-              >
-                {esPodio ? <IconMedalla size={22} rank={rank as 1 | 2 | 3} /> : rank}
-              </span>
+          return (
+            <li
+              key={entry.userId}
+              className={[styles.podioItem, rankClass].filter(Boolean).join(' ')}
+              style={{ '--i': PODIO_ENTRY_ORDER[rank] } as CSSProperties}
+              aria-current={esMio ? 'true' : undefined}
+            >
+              {/* Corona SOLO en el líder (igual que Podium.tsx): 2º/3º no llevan
+               * insignia sobre el avatar — su medalla ya vive en el pedestal. */}
+              {esLider && (
+                <span className={styles.corona} aria-hidden="true">
+                  <Icon icon={Crown} size={22} />
+                </span>
+              )}
 
-              {/* Avatar: usa el Avatar del UI kit (animal de línea por defecto). El
-               * líder lleva un anillo dorado sutil alrededor (wrapper propio: no
-               * toca el box-shadow interno del componente Avatar). */}
-              <span className={esLider ? styles.avatarLider : undefined}>
+              {/* Avatar grande con anillo de medalla: mismo componente del UI kit
+               * (tamaño `lg`) escalado por CSS para no tocar Avatar.tsx — el
+               * líder ~72px, 2º/3º ~56px (issue #594, punto 1). */}
+              <span className={[styles.avatarRing, anilloClass].join(' ')}>
                 <Avatar
                   userId={entry.userId}
                   avatarUrl={entry.avatar}
                   name={entry.name}
-                  size="sm"
+                  size="lg"
                 />
               </span>
 
-              {/* Nombre + nº de partidas. */}
-              <div className={styles.info}>
-                <div className={styles.nombre}>{entry.name}</div>
-                <div className={styles.partidas}>
-                  {entry.plays} {entry.plays === 1 ? 'partida' : 'partidas'}
-                </div>
-              </div>
+              <span className={styles.podioNombreFila}>
+                <span className={styles.podioNombre}>{entry.name}</span>
+                {/* "Tú" en vez de teñir toda la columna de teal: en el podio ese
+                 * acento competiría con el oro/plata/bronce del puesto. */}
+                {esMio && <span className={styles.tuTag}>Tú</span>}
+              </span>
 
-              {/* Puntos: count-up al entrar; teal si podio o es el propio usuario.
-               * role="img" con aria-label fija: el número accesible no depende de
-               * en qué punto del count-up esté el render. */}
               <span role="img" aria-label={`${entry.points.toLocaleString('es')} puntos`}>
-                <CountUp
-                  value={entry.points}
-                  className={[styles.puntos, esPodio || esMio ? styles.destaca : '']
-                    .filter(Boolean)
-                    .join(' ')}
-                />
+                <CountUp value={entry.points} className={styles.podioPuntos} />
               </span>
-            </div>
 
-            {/* Barra de puntuación: proporcional al líder, decorativa (los puntos
-             * ya están anunciados arriba). Crece al entrar con la misma cadencia
-             * escalonada que la fila. */}
-            <div className={styles.barraTrack} aria-hidden="true">
-              <div
-                className={[styles.barraFill, esLider ? styles.barraLider : '']
-                  .filter(Boolean)
-                  .join(' ')}
-                style={{ '--bar-pct': barPct } as CSSProperties}
-              />
-            </div>
-          </li>
-        )
-      })}
-    </ol>
+              {/* Pedestal: cerrado y teñido por puesto, con altura escalonada (la
+               * del 1º, la más alta) — el gesto que lee "podio" de un vistazo. El
+               * icono `Medal` (no un número de texto) lleva la posición accesible. */}
+              <div className={styles.podioPeana}>
+                <Medal rank={rank} size={22} />
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+
+      {resto.length > 0 && (
+        <ol className={listaClasses} aria-label="Resto de la clasificación">
+          {resto.map((entry, i) => {
+            const rank = i + 4
+            const esMio = entry.userId === myUserId
+            const barPct = topPoints > 0 ? Math.max(0.08, entry.points / topPoints) : 0
+
+            return (
+              <li
+                key={entry.userId}
+                className={[styles.fila, esMio ? styles.miPosicion : ''].filter(Boolean).join(' ')}
+                style={{ '--i': i } as CSSProperties}
+                aria-current={esMio ? 'true' : undefined}
+              >
+                <div className={styles.filaTop}>
+                  <span className={styles.posicion} role="img" aria-label={`Posición ${rank}`}>
+                    {rank}
+                  </span>
+
+                  <Avatar
+                    userId={entry.userId}
+                    avatarUrl={entry.avatar}
+                    name={entry.name}
+                    size="sm"
+                  />
+
+                  {/* Nombre + nº de partidas. */}
+                  <div className={styles.info}>
+                    <div className={styles.nombre}>{entry.name}</div>
+                    <div className={styles.partidas}>
+                      {entry.plays} {entry.plays === 1 ? 'partida' : 'partidas'}
+                    </div>
+                  </div>
+
+                  {/* Puntos: count-up al entrar; teal si es la propia fila. */}
+                  <span role="img" aria-label={`${entry.points.toLocaleString('es')} puntos`}>
+                    <CountUp
+                      value={entry.points}
+                      className={[styles.puntos, esMio ? styles.destaca : '']
+                        .filter(Boolean)
+                        .join(' ')}
+                    />
+                  </span>
+                </div>
+
+                {/* Barra de puntuación: proporcional al líder del viaje (no solo
+                 * del resto), decorativa (los puntos ya están anunciados arriba). */}
+                <div className={styles.barraTrack} aria-hidden="true">
+                  <div
+                    className={styles.barraFill}
+                    style={{ '--bar-pct': barPct } as CSSProperties}
+                  />
+                </div>
+              </li>
+            )
+          })}
+        </ol>
+      )}
+    </div>
   )
 }
