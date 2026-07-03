@@ -317,6 +317,11 @@ export const cases: GalleryCase[] = [
     // Issue #607: el pie (Copiar enlace / Compartir) desbordaba el panel a
     // ~560px con 3 botones. Caso de galería para poder verificarlo a varios
     // anchos con la captura automática (multiviewport).
+    // Issue #617: "Compartir" ahora genera una tarjeta-imagen (portada del
+    // viaje → mapa nocturno de marca) rasterizada off-screen con
+    // html-to-image; la captura corre en un navegador real (Playwright), así
+    // que la cascada de portada y el rasterizado se resuelven de verdad
+    // contra el mundo sembrado (GROUP.cover_image_path vía el Storage falso).
     id: 'invitar-viaje',
     title: 'Invitar al viaje',
     section: 'Viaje',
