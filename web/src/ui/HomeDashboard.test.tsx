@@ -148,6 +148,18 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
     expect(lastCall.activeTargetId).toBe('a')
   })
 
+  // Issue #632: en la captura del dueño, ninguna tarjeta parecía "la activa" al
+  // cargar (sin que el usuario arrastrara el carrusel). El modelo de opacidad
+  // viejo lo tapaba a simple vista; este test cubre el CONTRATO — `data-active`
+  // debe marcar la tarjeta que urge (ver `sortTrips`) desde el primer render, sin
+  // depender de un scroll del usuario.
+  test('en reposo (recién montada, sin scroll) la tarjeta que urge queda marcada activa', () => {
+    const { container } = render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    expect(container.querySelector('[data-gid="a"] button[data-active="true"]')).not.toBeNull()
+    expect(container.querySelector('[data-gid="b"] button[data-active="false"]')).not.toBeNull()
+    expect(container.querySelector('[data-gid="c"] button[data-active="false"]')).not.toBeNull()
+  })
+
   test('activeTargetId sigue a la tarjeta con el foco (navegación por teclado)', () => {
     homeGlobeSpy.mockClear()
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
