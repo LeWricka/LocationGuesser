@@ -96,7 +96,7 @@
 
 /* Eyebrow editorial con número tabular (los pasos no "bailan"). */
 .eyebrow {
-  color: var(--color-text-faint);
+  color: var(--color-text-muted); /* AA: faint falla contraste (gotcha, 5a mordida — ver #611) */
   font-variant-numeric: tabular-nums;
 }
 
