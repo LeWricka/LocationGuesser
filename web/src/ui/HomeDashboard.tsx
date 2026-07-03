@@ -248,6 +248,12 @@ function PinnedBanner({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => v
 // Tarjeta-portada de un viaje del feed: la FOTO es la tarjeta. Velo inferior, nombre
 // serif sobre el velo, fechas (chip) + estado, corona si es tuyo y mini-cinta de mapa.
 // Tocar abre el viaje. La foto es decorativa (la etiqueta del botón da el nombre).
+//
+// Avatares del grupo (issue #536, punto 5): NO se pintan todavía. `HomeGroup` (y
+// `MyGroup` en lib/membership) no traen miembros/avatares del viaje, solo metadatos
+// del viaje en sí — ampliar esa consulta se sale del área de este cambio (ui/features
+// de home, sin tocar lib/membership). Cuando esa consulta exista, este es el sitio:
+// junto a `.mapChip`, en `.cardTop`.
 function TripCard({
   group,
   onClick,
@@ -296,21 +302,21 @@ function TripCard({
             </span>
           )}
           {live ? (
-            <span className={[styles.chip, styles.chipLive].join(' ')}>
+            <span className={[styles.chip, styles.chipLive, 'lg-glass'].join(' ')}>
               <span className={styles.pulse} aria-hidden="true" />
               {group.status === 'toplay' ? 'Te toca' : 'En curso'}
             </span>
           ) : group.closed ? (
-            <span className={[styles.chip, styles.chipQuiet].join(' ')}>Cerrado</span>
+            <span className={[styles.chip, styles.chipQuiet, 'lg-glass'].join(' ')}>Cerrado</span>
           ) : null}
-          <span className={styles.mapChip} aria-hidden="true">
+          <span className={[styles.mapChip, 'lg-glass'].join(' ')} aria-hidden="true">
             <Icon icon={MapPin} size={13} />
           </span>
         </span>
 
         <span className={styles.name}>{group.name}</span>
         {dates && (
-          <Chip tone="neutral" className={styles.dates}>
+          <Chip tone="neutral" className={[styles.dates, 'lg-glass'].join(' ')}>
             {dates}
           </Chip>
         )}
