@@ -54,6 +54,13 @@ const RECUERDO: Moment = {
   country: { code: 'ES', name: 'ESPAÑA', flag: '🇪🇸' },
 }
 
+// Mismo recuerdo, con una nota de voz ya guardada (issue #648).
+const RECUERDO_CON_AUDIO: Moment = {
+  ...RECUERDO,
+  audioUrl: 'https://example.test/nota.webm',
+  audioPath: 'audio/nota.webm',
+}
+
 // Reto CERRADO ajeno (no lo creé yo): fixture para "Tu resultado" (#580) —
 // jugado / no jugado. El caso "propio" es este mismo reto con `isOwn: true`.
 const RETO_CERRADO: Moment = {
@@ -421,6 +428,38 @@ describe('MomentSheet', () => {
       // "Ver marcador" sí se ofrece al dueño (útil para cualquiera, no solo jugadores).
       expect(screen.getByRole('button', { name: /Ver marcador/i })).toBeInTheDocument()
       expect(getExistingVoteMock).not.toHaveBeenCalled()
+    })
+  })
+
+  // --- Nota de voz en la VISTA (issue #648) -----------------------------------
+  describe('nota de voz (#648)', () => {
+    test('con audio_path muestra el reproductor bajo la descripción', () => {
+      renderSheet({ moment: RECUERDO_CON_AUDIO })
+      expect(screen.getByLabelText(/reproducir nota de voz/i)).toBeInTheDocument()
+    })
+
+    test('sin audio_path no muestra ningún reproductor', () => {
+      renderSheet({ moment: RECUERDO })
+      expect(screen.queryByLabelText(/reproducir nota de voz/i)).not.toBeInTheDocument()
+    })
+
+    test('editar el recuerdo y descartar la nota existente guarda audio_path a null', async () => {
+      const user = userEvent.setup()
+      const onEdited = vi.fn()
+      renderSheet({ moment: RECUERDO_CON_AUDIO, onEdited })
+
+      await user.click(screen.getByRole('button', { name: 'Editar recuerdo' }))
+      // La nota YA guardada se ve como preview reproducible, con "Descartar".
+      expect(screen.getByLabelText(/reproducir nota de voz/i)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /descartar/i }))
+
+      await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+      expect(updateMomentMock).toHaveBeenCalledWith(
+        'c1',
+        expect.objectContaining({ audioPath: null }),
+      )
+      expect(onEdited).toHaveBeenCalledTimes(1)
     })
   })
 })

@@ -1,0 +1,78 @@
+/* Reproductor mínimo (nota de voz, #648): pastilla con play/pausa + barra +
+   duración. Mismo lenguaje que las tarjetas del kit (superficie + hairline),
+   sin colores nuevos. */
+.player {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+}
+
+.toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border: 0;
+  cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.toggle:active {
+  transform: scale(var(--motion-press-scale));
+}
+
+/* Barra de progreso: <input type="range"> nativo, restylado a una línea fina
+   con un pulgar circular — simple a propósito (nada de waveform). */
+.progress {
+  flex: 1 1 auto;
+  min-width: 0;
+  appearance: none;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-border-strong);
+  cursor: pointer;
+}
+.progress::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  cursor: pointer;
+}
+.progress::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  cursor: pointer;
+}
+.progress::-moz-range-progress {
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+
+.time {
+  flex: 0 0 auto;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toggle:active {
+    transform: none;
+  }
+}

@@ -60,6 +60,23 @@
   line-height: var(--line-height-normal);
 }
 
+/* Nota de voz (#648): misma gramática de etiqueta que un `Field` (no
+   `.blockLabel`, pensada para cabecera de sección) — es un campo más del
+   bloque título/descripción/fecha, no una sección propia. */
+.voiceField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.voiceLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
 .placeRow {
   display: flex;
   align-items: center;

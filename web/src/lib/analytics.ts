@@ -57,8 +57,9 @@ export type AnalyticsEvent =
   | 'group_joined'
   | 'challenge_created'
   // Recuerdo creado (momento SIN reto, separación contenido/reto). Props:
-  // group_id, challenge_id, has_photo, has_place, promoted_to_challenge (¿se
-  // convirtió en reto al crearlo?). SIN lat/lng ni nombre del lugar.
+  // group_id, challenge_id, has_photo, has_place, has_audio (nota de voz,
+  // #648), promoted_to_challenge (¿se convirtió en reto al crearlo?). SIN
+  // lat/lng ni nombre del lugar.
   | 'moment_created'
   | 'challenge_played'
   | 'result_revealed'
@@ -119,6 +120,15 @@ export type AnalyticsEvent =
   // ve el slideshow "te invitan". Cierra el embudo: aterrizó → se le saludó.
   // Props: group_id.
   | 'receptor_welcome_shown'
+  // Nota de voz de un momento (issue #648). `voice_note_recorded`: se terminó
+  // de grabar (stop manual o auto-stop a los 60s), en `VoiceRecorder` — antes
+  // de saberse si la subida al guardar el momento tendrá éxito. Props:
+  // duration_seconds. `voice_note_played`: se pulsó play en el reproductor de
+  // la VISTA (`MomentSheet`), solo la primera vez por apertura de la hoja (no
+  // en cada pausa/resume). Props: challenge_id. Ninguno de los dos lleva
+  // contenido del audio ni ubicación.
+  | 'voice_note_recorded'
+  | 'voice_note_played'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

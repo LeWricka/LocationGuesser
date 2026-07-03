@@ -1,0 +1,123 @@
+/* Estado vacío: botón discreto, mismo lenguaje que "Añadir descripción del
+   día" de MomentSheet (borde discontinuo, fondo de superficie hover). */
+.startBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.startBtn:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
+}
+.startBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Grabando: indicador rojo pulsante + contador + tope, con botón de stop. */
+.recording {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-soft);
+  border: 1px solid var(--color-danger);
+}
+.dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  animation: recordPulse 1.2s ease-in-out infinite; /* design-lint-allow: bucle acotado — solo mientras `recording` está montado (como un spinner de carga), no decoración ambiental */
+}
+.timer {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-danger);
+}
+.hint {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.stopBtn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target);
+  height: var(--tap-target);
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: var(--color-on-accent);
+  border: 0;
+  cursor: pointer;
+}
+
+@keyframes recordPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* Preview: el player + regrabar/descartar, mismo patrón de acciones que la
+   confirmación de borrado (descActions de MomentSheet: ghost + peligro). */
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.previewPlayer {
+  width: 100%;
+}
+.previewActions {
+  display: flex;
+  gap: var(--space-4);
+}
+.previewAction {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.previewAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.previewAction.danger {
+  color: var(--color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startBtn:active:not(:disabled) {
+    transform: none;
+  }
+  .dot {
+    animation: none;
+  }
+}

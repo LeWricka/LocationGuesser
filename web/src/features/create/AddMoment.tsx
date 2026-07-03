@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { Check, MapPin, Target } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
+import { VoiceRecorder, type VoiceValue } from './VoiceRecorder'
 import type { LatLng } from '../../lib/geo'
 import { createMoment, type ChallengeForPlay } from '../../lib/challenges'
 import { addMomentImages } from '../../lib/momentImages'
-import { ImageDecodeError, uploadImage } from '../../lib/storage'
+import { ImageDecodeError, uploadAudio, uploadImage } from '../../lib/storage'
 import { readGpsFromExif } from '../../lib/exif'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
@@ -170,6 +171,8 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
   // quitar/desmontar para no fugar memoria.
   const [photos, setPhotos] = useState<DraftPhoto[]>([])
   const [readingExif, setReadingExif] = useState(false)
+  // Nota de voz opcional (≤60s, issue #648): grabada junto a la Descripción.
+  const [voice, setVoice] = useState<VoiceValue>({ kind: 'none' })
   // Ids de fotos que fallaron al subir en el ÚLTIMO intento de guardado (#550):
   // las marcamos en el picker (borde/badge) para que el dueño sepa cuáles
   // quitar o reintentar, en vez de que desaparezcan sin más contexto.
@@ -192,6 +195,20 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         prev.forEach((p) => URL.revokeObjectURL(p.previewUrl))
         return []
       })
+    }
+  }, [])
+
+  // Revoca el object URL de la nota de voz (si es un draft nuevo, no una ya
+  // guardada) al desmontar sin haber guardado. Ref en vez de dependencia
+  // directa: el efecto solo debe correr en el CLEANUP final, no en cada cambio
+  // de `voice` (regrabar/descartar ya revocan el suyo en `VoiceRecorder`).
+  const voiceRef = useRef(voice)
+  useEffect(() => {
+    voiceRef.current = voice
+  }, [voice])
+  useEffect(() => {
+    return () => {
+      if (voiceRef.current.kind === 'draft') URL.revokeObjectURL(voiceRef.current.url)
     }
   }, [])
 
@@ -398,6 +415,21 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       // La portada espeja `image_path` (lo lee la tarjeta del viaje y el mapamundi).
       const coverPath = paths[0]
 
+      // Nota de voz opcional: BEST-EFFORT (patrón #539/#531) — si falla la
+      // subida, el recuerdo se guarda igual (sin nota) y avisamos al final,
+      // igual que con una foto que no sube. No aborta el guardado entero.
+      let audioPath: string | null = null
+      let audioFailed = false
+      if (voice.kind === 'draft') {
+        setStatus('Subiendo la nota de voz…')
+        try {
+          audioPath = await uploadAudio(voice.blob, voice.mimeType)
+        } catch (err) {
+          audioFailed = true
+          reportError(err, { area: 'add_moment', stage: 'upload_audio', groupId })
+        }
+      }
+
       setStatus('Guardando el recuerdo…')
       // Nace como RECUERDO (la unidad mínima). El lugar es VISIBLE.
       const { challenge } = await createMoment({
@@ -408,6 +440,7 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         placeLat: place?.lat ?? null,
         placeLng: place?.lng ?? null,
         imagePath: coverPath ?? null,
+        audioPath,
       })
 
       // Galería del recuerdo: registramos TODAS las fotos en `moment_images` con su
@@ -423,18 +456,23 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         has_photo: paths.length > 0,
         photo_count: paths.length,
         has_place: place != null,
+        has_audio: audioPath != null,
         promoted_to_challenge: false,
         score_scale: null,
       })
-      // Fallo PARCIAL: el recuerdo se guardó igual con las fotos que sí subieron,
-      // pero avisamos cuáles se quedaron fuera (issue #531).
-      if (failedFileNames.length > 0) {
-        toast.show(
-          failedFileNames.length === 1
-            ? `Recuerdo guardado. No se pudo subir «${failedFileNames[0]}».`
-            : `Recuerdo guardado. No se pudieron subir ${failedFileNames.length} fotos (${failedFileNames.join(', ')}).`,
-          { tone: 'neutral' },
-        )
+      // Fallo PARCIAL: el recuerdo se guardó igual con lo que sí subió (fotos
+      // y/o nota de voz), pero avisamos qué se quedó fuera (issue #531/#648).
+      // Los dos mensajes de SOLO fotos son los de siempre (#531); el de audio se
+      // añade como sufijo " ni la nota de voz" solo cuando también falló.
+      if (failedFileNames.length > 0 || audioFailed) {
+        const audioSuffix = audioFailed ? ' ni la nota de voz' : ''
+        const message =
+          failedFileNames.length === 0
+            ? 'Recuerdo guardado. No se pudo subir la nota de voz.'
+            : failedFileNames.length === 1
+              ? `Recuerdo guardado. No se pudo subir «${failedFileNames[0]}»${audioSuffix}.`
+              : `Recuerdo guardado. No se pudieron subir ${failedFileNames.length} fotos (${failedFileNames.join(', ')})${audioSuffix}.`
+        toast.show(message, { tone: 'neutral' })
       }
       // Efecto móvil al guardar: vibración corta. En vez de salir directos al viaje,
       // mostramos el estado "Recuerdo guardado" con "Añadir reto" / "Volver al viaje".
@@ -575,6 +613,15 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
               />
             )}
           </Field>
+
+          {/* NOTA DE VOZ — junto a la descripción (issue #648): otra forma de
+              contar el momento, sin escribir. */}
+          <div className={styles.voiceField}>
+            <span className={styles.voiceLabel}>
+              Nota de voz <span className={styles.optional}>opcional</span>
+            </span>
+            <VoiceRecorder value={voice} onChange={setVoice} disabled={busy} />
+          </div>
 
           <Field label="Fecha">
             {(fieldProps) => (

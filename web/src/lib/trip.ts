@@ -50,6 +50,15 @@ export interface Moment {
   /** Path en Storage de la foto (para re-firmar/lightbox), o null si no hay foto. */
   imagePath: string | null
   /**
+   * URL firmada de la nota de voz (bucket privado), o null si no tiene. Opcional
+   * (`?`) para no obligar a todos los fixtures/constructores de `Moment` ya
+   * existentes (galería visual, tests) a rellenarla: ausente se trata como sin
+   * nota de voz. Migración 0035.
+   */
+  audioUrl?: string | null
+  /** Path en Storage de la nota de voz (para re-firmar), o null/ausente si no hay. */
+  audioPath?: string | null
+  /**
    * Coordenada a pintar en el mapa. Para un RECUERDO es su lugar VISIBLE
    * (`place_lat`/`place_lng`), siempre que lo tenga. Para un RETO es la respuesta:
    * null mientras esté activo (anti-spoiler), visible solo si cerrado/ya jugado.

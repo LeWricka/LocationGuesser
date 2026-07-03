@@ -32,10 +32,37 @@ vi.mock('../../lib/exif', () => ({ readGpsFromExif: async () => null }))
 vi.mock('./MapPicker', () => ({ MapPicker: () => <div data-testid="map-picker" /> }))
 
 const uploadImageMock = vi.fn()
+const uploadAudioMock = vi.fn()
 vi.mock('../../lib/storage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/storage')>()
-  return { ...actual, uploadImage: (...args: unknown[]) => uploadImageMock(...args) }
+  return {
+    ...actual,
+    uploadImage: (...args: unknown[]) => uploadImageMock(...args),
+    uploadAudio: (...args: unknown[]) => uploadAudioMock(...args),
+  }
 })
+
+// La grabadora (MediaRecorder/getUserMedia) tiene su propio test unitario
+// (VoiceRecorder.test.tsx); aquí la sustituimos por un stub que dispara
+// `onChange` con un draft ya "grabado", para probar el CABLEADO del guardado
+// (subida best-effort + `audioPath` a `createMoment`) sin la mecánica del micro.
+vi.mock('./VoiceRecorder', () => ({
+  VoiceRecorder: ({ onChange }: { onChange: (v: unknown) => void }) => (
+    <button
+      type="button"
+      onClick={() =>
+        onChange({
+          kind: 'draft',
+          blob: new Blob(['audio-bytes'], { type: 'audio/webm' }),
+          mimeType: 'audio/webm;codecs=opus',
+          url: 'blob:audio-draft',
+        })
+      }
+    >
+      stub: grabar nota de voz
+    </button>
+  ),
+}))
 
 // Fecha por defecto en cascada (#553): mocks de las dos consultas ligeras que
 // resuelve AddMoment al montar (el último momento del viaje + sus fechas). Por
@@ -101,6 +128,7 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
     createMomentMock.mockReset()
     addMomentImagesMock.mockReset()
     uploadImageMock.mockReset()
+    uploadAudioMock.mockReset()
     // Por defecto, viaje sin momentos ni fechas propias (cae en "hoy").
     getGroupMock.mockReset().mockResolvedValue(null)
     latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
@@ -190,6 +218,70 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
     await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
     expect(uploadImageMock).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('Recuerdo guardado')).toBeInTheDocument()
+  })
+})
+
+describe('AddMoment — nota de voz (#648)', () => {
+  beforeEach(() => {
+    trackMock.mockClear()
+    reportErrorMock.mockClear()
+    createMomentMock.mockReset()
+    addMomentImagesMock.mockReset()
+    uploadAudioMock.mockReset()
+    getGroupMock.mockReset().mockResolvedValue(null)
+    latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
+  })
+
+  test('graba una nota de voz y la sube al guardar: el path llega a createMoment', async () => {
+    uploadAudioMock.mockResolvedValue('audio/nota-1.webm')
+    createMomentMock.mockResolvedValue({
+      challenge: { id: 'm1', title: 'Mi recuerdo' } as ChallengeForPlay,
+      groupId: 'g1',
+    })
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.click(screen.getByRole('button', { name: /stub: grabar nota de voz/i }))
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    expect(uploadAudioMock).toHaveBeenCalledWith(expect.any(Blob), 'audio/webm;codecs=opus')
+    expect(createMomentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ audioPath: 'audio/nota-1.webm' }),
+    )
+    expect(trackMock).toHaveBeenCalledWith(
+      'moment_created',
+      expect.objectContaining({ has_audio: true }),
+    )
+  })
+
+  test('si falla la subida de la nota, el recuerdo se guarda igual (best-effort) y avisa cuál falló', async () => {
+    uploadAudioMock.mockRejectedValue(new Error('network boom'))
+    createMomentMock.mockResolvedValue({
+      challenge: { id: 'm1', title: 'Mi recuerdo' } as ChallengeForPlay,
+      groupId: 'g1',
+    })
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.click(screen.getByRole('button', { name: /stub: grabar nota de voz/i }))
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    // El recuerdo se guarda sin audio (no bloquea el resto del guardado).
+    expect(createMomentMock).toHaveBeenCalledWith(expect.objectContaining({ audioPath: null }))
+    expect(trackMock).toHaveBeenCalledWith(
+      'moment_created',
+      expect.objectContaining({ has_audio: false }),
+    )
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ area: 'add_moment', stage: 'upload_audio' }),
+    )
+    expect(await screen.findByText(/no se pudo subir la nota de voz/i)).toBeInTheDocument()
   })
 })
 

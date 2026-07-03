@@ -37,8 +37,10 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // challenge_answers); `answer_number_src` tampoco (privilegio de columna revocado, 0029).
 // `time_scoring` (0034) tampoco es spoiler: dice si la velocidad puntúa en el
 // reto de lugar (no revela la ubicación). Se sirve al jugar para montar el factor.
+// `audio_path` (0035, nota de voz) tampoco es spoiler: oír la voz de quien creó el
+// momento no revela la ubicación oculta. Se sirve siempre, como `image_path`.
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, time_scoring, created_by, created_at'
+  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, audio_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, time_scoring, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -247,6 +249,8 @@ export interface NewMomentInput {
   placeLng?: number | null
   /** Path en Storage de la imagen (foto opcional, sin EXIF). */
   imagePath?: string | null
+  /** Path en Storage de la nota de voz (≤60s, opcional). Migración 0035. */
+  audioPath?: string | null
   /** Panorama de Street View del lugar (opcional). */
   svPanoId?: string | null
   /** POV inicial del panorama: rumbo en grados. */
@@ -279,6 +283,7 @@ export async function createMoment(
       place_lat: input.placeLat ?? null,
       place_lng: input.placeLng ?? null,
       image_path: input.imagePath ?? null,
+      audio_path: input.audioPath ?? null,
       sv_pano_id: input.svPanoId ?? null,
       sv_heading: input.svHeading ?? null,
       sv_pitch: input.svPitch ?? null,
@@ -607,6 +612,13 @@ export interface UpdateMomentInput {
    * línea de tiempo del diario, que ordena por `created_at`.
    */
   createdAt?: string
+  /**
+   * Path en Storage de la nota de voz (≤60s). `undefined` = no tocarla (deja la
+   * que ya hubiera); `null` la quita (el dueño la descartó sin regrabar). Un path
+   * nuevo sustituye a la anterior sin borrar el objeto viejo del bucket (mismo
+   * criterio que `image_path`: no hay limpieza de huérfanos hoy). Migración 0035.
+   */
+  audioPath?: string | null
 }
 
 /**
@@ -629,6 +641,7 @@ export async function updateMoment(
     patch.description = trimmed === '' ? null : trimmed
   }
   if (input.createdAt !== undefined) patch.created_at = input.createdAt
+  if (input.audioPath !== undefined) patch.audio_path = input.audioPath
   if (input.place !== undefined) {
     if (input.place === null) {
       // Quitar el lugar: fuera del mapa y sin panorama colgando.

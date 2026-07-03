@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ListOrdered, MapPin, Pencil, Target, Trash2, User } from 'lucide-react'
-import { Badge, Button, ChallengePhoto, Icon, Modal, useReducedMotion, useToast } from '../../ui'
+import {
+  AudioPlayer,
+  Badge,
+  Button,
+  ChallengePhoto,
+  Icon,
+  Modal,
+  useReducedMotion,
+  useToast,
+} from '../../ui'
 import type { Moment } from '../../lib/trip'
 import type { LatLng } from '../../lib/geo'
 import { fmtDist, fmtNumber } from '../../lib/geo'
@@ -14,7 +23,11 @@ import { getExistingVote } from '../../lib/votes'
 import type { Vote } from '../../lib/database.types'
 import { deadlineFromMinutes } from '../../lib/time'
 import { lockBodyScroll } from '../../lib/scrollLock'
+import { uploadAudio } from '../../lib/storage'
+import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { MapPicker } from '../create/MapPicker'
+import { type VoiceValue } from '../create/VoiceRecorder'
 import { Countdown } from './Countdown'
 import { EditMomentForm } from './EditMomentForm'
 import { MomentGallery } from './MomentGallery'
@@ -247,6 +260,12 @@ export function MomentSheet({
   const [editPlace, setEditPlace] = useState<LatLng | null>(
     moment?.lat != null && moment.lng != null ? { lat: moment.lat, lng: moment.lng } : null,
   )
+  // Nota de voz del recuerdo (≤60s, issue #648): 'existing' si ya tenía una
+  // (URL firmada), 'none' si no. Se re-siembra al abrir "Editar recuerdo" (ver
+  // el botón más abajo), igual que editTitle/editDate/editPlace.
+  const [editVoice, setEditVoice] = useState<VoiceValue>(
+    moment?.audioUrl ? { kind: 'existing', url: moment.audioUrl } : { kind: 'none' },
+  )
   const [savingMeta, setSavingMeta] = useState(false)
 
   // ── Borrar el momento (recuerdo o reto) con confirmación ────────────────────
@@ -407,18 +426,45 @@ export function MomentSheet({
     }
     setSavingMeta(true)
     try {
+      // Nota de voz: BEST-EFFORT (patrón #539/#531), como una foto que falla al
+      // subir — no aborta el guardado del resto de campos. `undefined` = no
+      // tocar `audio_path` (se quedó como 'existing', sin regrabar); `null` =
+      // quitarla (el dueño la descartó); un path nuevo si regrabó y subió bien.
+      let audioPath: string | null | undefined
+      let audioFailed = false
+      if (editVoice.kind === 'draft') {
+        try {
+          audioPath = await uploadAudio(editVoice.blob, editVoice.mimeType)
+        } catch (err) {
+          audioFailed = true
+          reportError(err, {
+            area: 'edit_moment_form',
+            stage: 'upload_audio',
+            challengeId: moment.challengeId,
+          })
+        }
+      } else if (editVoice.kind === 'none') {
+        audioPath = null
+      }
+
       await updateMoment(moment.challengeId, {
         title: trimmedTitle,
         description,
         createdAt: editDate ? dateInputToIso(editDate, moment.date) : undefined,
         // Lugar: el dueño lo marca/mueve en el mapa; null lo quita del mapa.
         place: editPlace ? { lat: editPlace.lat, lng: editPlace.lng } : null,
+        audioPath,
       })
       setEditingMeta(false)
       // La edición inline de la descripción (el lápiz junto al texto) queda
       // cerrada: el formulario de papel ya guardó lo que hubiera en curso.
       setEditing(false)
-      toast.show('Recuerdo actualizado', { tone: 'success' })
+      toast.show(
+        audioFailed
+          ? 'Recuerdo actualizado. No se pudo subir la nota de voz.'
+          : 'Recuerdo actualizado',
+        { tone: audioFailed ? 'neutral' : 'success' },
+      )
       onEdited?.()
     } catch (err) {
       toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
@@ -692,6 +738,8 @@ export function MomentSheet({
               maxDate={editMaxDate}
               place={editPlace}
               onPlaceChange={setEditPlace}
+              voice={editVoice}
+              onVoiceChange={setEditVoice}
               saving={savingMeta}
               onCancel={() => setEditingMeta(false)}
               onSave={() => void saveMeta()}
@@ -835,6 +883,19 @@ export function MomentSheet({
                         <Icon icon={Pencil} size={14} /> Añadir descripción del día
                       </button>
                     ) : null)}
+
+                  {/* NOTA DE VOZ (issue #648): player del sistema bajo la
+                    descripción — botón play/pausa + barra de progreso simple +
+                    duración (tokens, sin waveform). URL YA firmada por
+                    `useTripData` (mismo bucket/TTL que las fotos, #639). */}
+                  {moment.audioUrl && !promoting && (
+                    <AudioPlayer
+                      src={moment.audioUrl}
+                      onPlay={() =>
+                        track('voice_note_played', { challenge_id: moment.challengeId })
+                      }
+                    />
+                  )}
 
                   {/* GALERÍA "la serie": tira de fotogramas enmarcados (injerto C),
                     solo en un RECUERDO (un reto muestra una sola foto). El componente
@@ -1053,6 +1114,11 @@ export function MomentSheet({
                               moment.lat != null && moment.lng != null
                                 ? { lat: moment.lat, lng: moment.lng }
                                 : null,
+                            )
+                            setEditVoice(
+                              moment.audioUrl
+                                ? { kind: 'existing', url: moment.audioUrl }
+                                : { kind: 'none' },
                             )
                             setEditingMeta(true)
                           }}

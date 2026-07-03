@@ -59,6 +59,7 @@ const numberChallenge: ChallengeForPlay = {
   place_lat: null,
   place_lng: null,
   image_path: null,
+  audio_path: null,
   sv_pano_id: null,
   sv_heading: null,
   sv_pitch: null,
