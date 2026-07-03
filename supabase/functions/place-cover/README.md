@@ -63,4 +63,17 @@ npx supabase functions deploy place-cover --project-ref ykquigyjvgxisgdxryxr --n
 ```
 
 `--no-verify-jwt`: la llama el front sin sesión (como `resolve-maps-url`). No usa la
-key de Maps ni el `service_role`.
+key de Maps ni el `service_role`. El mismo efecto está ahora fijado también en
+`supabase/config.toml` (`[functions.place-cover]` → `verify_jwt = false`), así que
+el flag es cinturón-y-tirantes: aunque se olvide en el comando, el `deploy` lo lee
+del `config.toml`.
+
+> **Incidente #591 (jul 2026):** el `deploy` de esta función nunca llegó a
+> ejecutarse tras mergear #354 — `npx supabase functions list` mostraba solo
+> `resolve-maps-url` y `send-push`. El front la llamaba igualmente y la
+> plataforma respondía `404 NOT_FOUND` al preflight `OPTIONS`; un 404 no es un
+> "HTTP ok" para el navegador, así que el preflight fallaba en bucle y
+> `resolvePlaceCover` (sin cachear el fallo) reintentaba en cada remonte de
+> tarjeta, congelando la web. Tras desplegar, comprobar con:
+> `curl -i -X OPTIONS "$URL/functions/v1/place-cover" -H "Origin: https://www.tabide.app" -H "Access-Control-Request-Method: POST"`
+> — debe responder `204` (no `404` ni `401`).
