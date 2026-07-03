@@ -22,9 +22,17 @@ import { type Route, expect, test } from '@playwright/test'
 // la captura. La escena detrás de la hoja es el propio fondo de escena del shell (oscuro),
 // así que el hueco SÍ se manifiesta si el faldón de papel de la hoja desaparece.
 
-// Caso(s) de home que usan el patrón globo + hoja (GlobeSheet). Si se añade otra home con
-// hoja sobre escena oscura, se añade aquí y queda cubierta.
-const HOME_CASES = ['home-dashboard-lleno']
+// Caso(s) que usan el patrón globo + hoja (GlobeSheet) HOY: la bienvenida sin viajes
+// (HomePage, rama sin grupos) y la landing deslogueada. La home logueada CON viajes
+// (home-dashboard-lleno / home-con-datos) dejó de tener hoja en la home inmersiva
+// (issue #568: escena única, sin papel) — su guardia de reemplazo es el test del dock
+// de abajo. Si se añade otra pantalla con hoja sobre escena oscura, se añade aquí.
+const SHEET_CASES = ['home-vacia', 'landing-generica']
+
+// Caso(s) de la home INMERSIVA (sin hoja, issue #568): la guardia aquí es que el dock
+// del carrusel ("Tus viajes") está visible y la pantalla no desborda a 320px.
+const IMMERSIVE_CASES = ['home-dashboard-lleno', 'home-con-datos', 'home-globo-pines-cercanos']
+const NARROW_VP = { width: 320, height: 568 }
 
 // Viewport ALTO: reproduce el móvil del dueño (1080×2400 ≈ ratio 2.2). deviceScaleFactor 3
 // como su @3x; el muestreo de píxel usa el factor real del PNG (ancho/clientWidth).
@@ -68,7 +76,7 @@ test('integridad de esquina: la hoja no muestra escena oscura en sus esquinas', 
 
   const problems: string[] = []
 
-  for (const caseId of HOME_CASES) {
+  for (const caseId of SHEET_CASES) {
     await page.goto(`/gallery.html?case=${encodeURIComponent(caseId)}`)
     await page.waitForLoadState('networkidle')
     // La galería congela animaciones, pero esperamos a fuentes/paint por robustez.
@@ -187,6 +195,59 @@ test('integridad de esquina: la hoja no muestra escena oscura en sus esquinas', 
     'Integridad de esquina ROTA — la hoja deja ver la escena oscura tras sus esquinas\n' +
       'redondeadas. Sella el triángulo con un faldón de papel detrás de la hoja\n' +
       '(ver .skirt en GlobeSheet). Detalle:\n\n' +
+      problems.join('\n\n'),
+  ).toEqual([])
+})
+
+// Guardia de REEMPLAZO para la home inmersiva (issue #568): esos casos ya no tienen
+// hoja (la escena es única), así que la comprobación de esquina no aplica. Lo que sí
+// debe aguantar es su chrome flotante: el dock del carrusel "Tus viajes" visible (si
+// desapareciera, la home se queda sin navegación a los viajes) y la pantalla sin
+// overflow horizontal ni siquiera a 320px (el carrusel scrollea DENTRO de su propio
+// contenedor; un desborde del documento delataría una tarjeta/capa mal contenida).
+test('home inmersiva: el carrusel de viajes es visible y no desborda a 320px', async ({
+  browser,
+  baseURL,
+}) => {
+  const context = await browser.newContext({ baseURL, viewport: NARROW_VP })
+  await context.route('**/*', blockExternal)
+  const page = await context.newPage()
+
+  const problems: string[] = []
+
+  for (const caseId of IMMERSIVE_CASES) {
+    await page.goto(`/gallery.html?case=${encodeURIComponent(caseId)}`)
+    await page.waitForLoadState('networkidle')
+    await page.evaluate(() => document.fonts?.ready)
+    await expect(page.locator('#root')).not.toBeEmpty()
+
+    // El carrusel: lista con aria-label "Tus viajes" (HomeDashboard). Debe estar
+    // visible con al menos una tarjeta (viaje o "Nuevo viaje").
+    const carousel = page.locator('ul[aria-label="Tus viajes"]')
+    await expect(carousel, `[${caseId}] el carrusel "Tus viajes" debe ser visible`).toBeVisible()
+    const cards = await carousel.locator('li').count()
+    if (cards === 0) {
+      problems.push(`[${caseId}] el carrusel no tiene ninguna tarjeta (ni "Nuevo viaje").`)
+    }
+
+    // Sin overflow horizontal del DOCUMENTO a 320px (el scroll del carrusel es interno).
+    const overflow = await page.evaluate(() => {
+      const el = document.documentElement
+      return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }
+    })
+    if (overflow.scrollWidth > overflow.clientWidth) {
+      problems.push(
+        `[${caseId}] desborda a 320px: scrollWidth=${overflow.scrollWidth} > clientWidth=${overflow.clientWidth}`,
+      )
+    }
+  }
+
+  await context.close()
+
+  expect(
+    problems,
+    'Home inmersiva ROTA — el dock del carrusel debe flotar sobre la escena sin\n' +
+      'desbordar el documento. Detalle:\n\n' +
       problems.join('\n\n'),
   ).toEqual([])
 })

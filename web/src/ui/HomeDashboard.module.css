@@ -1,10 +1,75 @@
-/* Home logueada — patrón GLOBO + HOJA (referencia Polarsteps): el globo héroe y la hoja
-   blanca los aporta GlobeSheet; aquí va el OVERLAY (marca + ajustes + avatar) sobre el
-   globo, el FAB "+", y el CONTENIDO de la hoja: el Banner "Te toca jugar" y el feed de
-   tarjetas-portada (la foto del viaje ES la tarjeta). Quietud: sin auto-movimiento; solo
-   entradas suaves y micro-feedback (respetan reduced-motion). */
+/* Home logueada — ESCENA ÚNICA inmersiva (issue #568): sin hoja blanca, el globo
+   llena la escena a sangre y TODO el chrome flota encima (marca/ajustes/avatar, chip
+   "Te toca jugar", dock con el carrusel de viajes). Misma gramática que la sección
+   Diario del viaje (mapa a sangre + dock inferior flotante, ver TripDiario.module.css).
+   Quietud: sin auto-movimiento decorativo salvo el giro del propio globo; solo
+   entradas suaves y micro-feedback, respetando `prefers-reduced-motion`. */
 
-/* ===== Overlay sobre el globo: marca + ajustes + avatar (tinta de escena) ===== */
+/* ===== Shell de la escena + sus capas (fondo → chrome) ===== */
+.scene {
+  /* A sangre real en el visor: `fixed` lo desliga del padding/`max-width` de
+     `.lg-page` (el contenedor de HomePage), igual que hacía GlobeSheet antes. */
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--scene-bg);
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+}
+
+/* El globo, a sangre detrás de todo. Al ser un `flex item` con z-index propio no
+   necesita `position` para apilarse bajo el resto (mismo mecanismo que ya usa el
+   mapa a sangre del Diario, ver TripDiario.module.css). */
+.globeLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0; /* design-lint-allow: capa local de la escena (globo bajo todo el chrome) */
+}
+.globeLayer > :global(*) {
+  position: absolute;
+  inset: 0;
+}
+
+/* Tinte ambiental (issue #568): halo radial MUY sutil con el color medio de la
+   portada del viaje centrado en el carrusel, o el fallback fijo (`--accent`, teal de
+   marca) si no hay portada o el muestreo con canvas falla. El color en sí llega en
+   runtime vía `--tint-color` (inline style del TSX) — aquí solo lo componemos con
+   `color-mix`, nunca un literal, así que no hay nada que "hardcodear". */
+.tint {
+  position: absolute;
+  inset: 0;
+  z-index: 1; /* design-lint-allow: capa local de la escena (tinte sobre el globo) */
+  pointer-events: none;
+  background: radial-gradient(
+    120% 90% at 50% 18%,
+    color-mix(in srgb, var(--tint-color, var(--accent)) 45%, transparent) 0%,
+    transparent 68%
+  );
+  opacity: 0;
+  /* 600ms: pedido explícito del diseño para el fundido del tinte ambiental (fuera de
+     la escala --motion-* estándar, pensada para transiciones de UI cortas). */
+  transition: opacity 600ms var(--motion-ease-standard); /* design-lint-allow: duracion pedida explicitamente para el tinte ambiental (600ms) */
+}
+.tint[data-visible='true'] {
+  opacity: 0.35;
+}
+
+/* ===== Chrome superior: marca + ajustes + avatar (tinta de escena) ===== */
+.overlay {
+  z-index: 2; /* design-lint-allow: capa local de la escena (chrome sobre el globo) */
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: max(env(safe-area-inset-top), var(--space-4)) var(--space-4) var(--space-4);
+  color: var(--scene-ink);
+  /* Velo alto y firme: la marca/iconos leen AA sobre cualquier zona del satélite
+     (mar claro, nubes) sin parecer recortados (mismo velo que usaba GlobeSheet). */
+  background: linear-gradient(to bottom, var(--scene-veil) 0%, transparent 100%);
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -53,120 +118,199 @@
   transform: scale(0.97);
 }
 
-/* ===== FAB "+" constante (crear viaje) ===== */
-.fab {
-  width: 56px;
-  height: 56px;
+/* Deja respirar la escena entre el chrome y el chip/dock: el globo se ve entero. */
+.spacer {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ===== Chip "Te toca jugar": vidrio flotante, corto, todo el chip es el botón ===== */
+.pinnedChip {
+  z-index: 3; /* design-lint-allow: capa local de la escena (chip sobre el globo) */
+  flex: none;
+  align-self: center;
+  margin: 0 var(--space-4) var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: min(92%, 420px);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
   border-radius: var(--radius-full);
-  border: none;
-  background: var(--gradient-accent);
-  color: var(--color-on-accent);
-  display: grid;
-  place-items: center;
   cursor: pointer;
-  box-shadow: var(--shadow-lg);
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
+  text-align: left;
+  box-shadow: var(--scene-shadow);
+  transition: transform var(--motion-transition-fast);
 }
-.fab:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
+.pinnedChip:hover {
+  transform: translateY(-1px);
 }
-.fab:active {
-  transform: scale(0.95);
+.pinnedChip:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
 }
-.fab:focus-visible {
+.pinnedChip:disabled {
+  cursor: default;
+}
+.pinnedChip:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 3px;
 }
 
-/* ===== Contenido de la hoja (columna de lectura centrada) ===== */
-.content {
-  --gold: #a98643;
-  --gold-soft: rgba(169, 134, 67, 0.16);
-  max-width: 460px;
-  margin: 0 auto;
-  padding-top: var(--space-2);
+.pinnedIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-accent);
+  color: var(--color-on-accent);
+  flex: none;
 }
-
-/* ===== Banner "Te toca jugar" (kit Banner): título + meta + CTA ===== */
-.pinned {
-  margin-bottom: var(--space-5);
+.pinnedBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .pinnedLabel {
-  display: block;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
-  /* tinta secundaria (AA) en vez del ocre: el ocre sobre el banner verde no
-     alcanza 4.5:1 para texto pequeño y axe lo marcaba como violación seria */
-  color: var(--ink-600);
+  color: var(--scene-ink-soft);
 }
 .pinnedTitle {
-  display: block;
   font-family: var(--font-serif);
-  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  line-height: var(--line-height-tight);
-  color: var(--color-text);
+  font-size: var(--font-size-md);
+  color: var(--scene-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .pinnedMeta {
-  display: block;
-  margin-top: 2px;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  color: var(--scene-ink-soft);
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== Encabezado del feed ===== */
-.feed {
-  margin-top: var(--space-2);
+/* ===== Dock inferior: label + carrusel de tarjetas-foto flotando sobre la escena =====
+   El velo de fondo (mismo `color-mix` con `--scene-bg` que el resto del sistema, nunca
+   un rgba suelto) funde el dock con la escena Y de paso tapa el crédito propio del
+   globo ("ⓘ" de HomeGlobe, anclado al fondo de SU contenedor): al llenar ahora el globo
+   TODA la pantalla, ese crédito cae justo bajo el dock; el z-index más alto de `.dock`
+   ya lo pinta encima, y este velo evita que se transparente en los huecos del layout
+   (mismo patrón que usa TripDiario con `--map-bottom-scrim`, adaptado a escena oscura). */
+.dock {
+  position: relative;
+  z-index: 4; /* design-lint-allow: capa local de la escena (dock sobre el globo) */
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--space-4));
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--scene-bg) 88%, transparent) 0%,
+    color-mix(in srgb, var(--scene-bg) 55%, transparent) 60%,
+    transparent 100%
+  );
 }
-.feedHead {
+.dockHead {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  margin: 0 var(--space-1) var(--space-4);
+  padding: 0 var(--space-4);
+  color: var(--scene-ink);
 }
-.feedTitle {
+.dockLabel {
+  margin: 0;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-eyebrow);
-  color: var(--color-text-muted);
-  margin: 0;
+  color: var(--scene-ink);
 }
-.feedCount {
+.dockCount {
   font-size: var(--font-size-sm);
-  /* meta (ink-600, AA): el faint (ink-400) no alcanza el contraste WCAG AA */
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
   font-variant-numeric: tabular-nums;
 }
 
-/* ===== Tarjeta base: portada a sangre (la FOTO es la tarjeta) ===== */
+/* Carrusel horizontal con snap al centro (mismo patrón que `.carousel` del Diario):
+   máscara en los bordes para que la tarjeta vecina asome como un peek intencionado,
+   no un corte a mitad de foto. */
+.carousel {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-1) var(--space-4);
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--space-4),
+    black calc(100% - var(--space-4)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black var(--space-4),
+    black calc(100% - var(--space-4)),
+    transparent 100%
+  );
+}
+.carousel::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tamaño compacto de tarjeta pedido por el diseño (~190×150): deja asomar varias
+   tarjetas vecinas, a diferencia del carrusel casi a pantalla completa del Diario. */
+.slide {
+  flex: 0 0 190px;
+  height: 150px;
+  scroll-snap-align: center;
+}
+
+/* ===== Tarjeta base: portada compacta (la FOTO es la tarjeta) ===== */
 .card {
   position: relative;
   display: block;
   width: 100%;
+  height: 100%;
   border: none;
   text-align: left;
   padding: 0;
-  border-radius: var(--radius-xl);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
   color: var(--color-on-photo);
-  box-shadow: var(--shadow-lg);
-  background: #25303f; /* relleno si la foto no carga */
+  box-shadow:
+    var(--scene-shadow),
+    0 0 0 1px var(--glass-border);
+  background: var(--accent-deep); /* relleno si la foto no carga */
   isolation: isolate;
   -webkit-tap-highlight-color: transparent;
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity var(--motion-transition-base),
+    transform var(--motion-transition-base);
 }
 .card:disabled {
   cursor: default;
 }
-.card + .card {
-  margin-top: var(--space-4);
+
+/* Tarjeta NO centrada: atenuada y algo encogida — la centrada (`data-active`) manda
+   (issue #568). Bajo `prefers-reduced-motion` la transición se apaga (ver abajo). */
+.card[data-active='false'] {
+  opacity: 0.55;
+  transform: scale(0.94);
 }
 
 /* La foto, a sangre detrás del contenido. */
@@ -177,18 +321,11 @@
   background-color: var(--photo-loading-bg);
   background-size: cover;
   background-position: center;
-  transform: scale(1.02);
-  transition: transform var(--duration-slower) var(--ease-emphasized);
-}
-.card:hover:not(:disabled) .cover {
-  transform: scale(1.05);
 }
 
 /* Placeholder de portada (viaje SIN foto): fondo discreto de "mapa nocturno" — un
-   gradiente grafito/teal sobrio con tokens de escena y un halo frío arriba a la derecha
-   que evoca el globo — más un pin a tamaño moderado y baja opacidad. Nada de iniciales
-   gigantes (parecían un bug pisando los chips). Lo bastante oscuro para que el texto
-   blanco del cuerpo + el velo al pie sigan leyendo AA. */
+   gradiente grafito/teal sobrio con tokens de escena y un halo frío arriba a la
+   derecha que evoca el globo — más un pin a tamaño moderado y baja opacidad. */
 .placeholder {
   position: absolute;
   inset: 0;
@@ -207,15 +344,12 @@
 .placeholderIcon {
   color: var(--scene-ink-soft);
   opacity: 0.35;
-  /* Centrado óptico hacia arriba: el velo de lectura al pie pesa abajo. */
-  transform: translateY(-12%);
+  transform: translateY(-8%);
 }
 
 /* Velo de lectura al pie: la foto manda, el texto serif blanco se lee AA encima.
-   Concentrado en el ~58% inferior (issue #536): `color-mix` con `--scene-bg` (la
-   misma tinta de escena del placeholder/globo) en vez de un rgba suelto, así el
-   velo queda atado al sistema de color y no a un literal — design-lint no lo
-   marca como color crudo y si `--scene-bg` se recalibra, el velo lo sigue. */
+   `color-mix` con `--scene-bg` (la misma tinta de escena del placeholder/globo) en
+   vez de un rgba suelto: el velo queda atado al sistema de color, no a un literal. */
 .card::after {
   content: '';
   position: absolute;
@@ -223,10 +357,10 @@
   z-index: -1;
   background: linear-gradient(
     to top,
-    color-mix(in srgb, var(--scene-bg) 82%, transparent) 0%,
-    color-mix(in srgb, var(--scene-bg) 52%, transparent) 28%,
-    color-mix(in srgb, var(--scene-bg) 14%, transparent) 50%,
-    transparent 60%
+    color-mix(in srgb, var(--scene-bg) 88%, transparent) 0%,
+    color-mix(in srgb, var(--scene-bg) 58%, transparent) 32%,
+    color-mix(in srgb, var(--scene-bg) 16%, transparent) 55%,
+    transparent 68%
   );
 }
 
@@ -234,49 +368,50 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  min-height: 240px;
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  height: 100%;
+  padding: var(--space-2) var(--space-3) var(--space-3);
 }
 
-/* Fila superior: corona / chip de estado / mini-mapa. Los chips viven ARRIBA y el
-   título abajo sobre el velo: `margin-bottom: auto` reparte el hueco y `flex-wrap`
-   garantiza que en anchos mínimos los chips envuelvan en vez de pisarse. */
+/* Fila superior: corona / chip de estado / mini-mapa. `margin-bottom: auto` reparte
+   el hueco y el título queda abajo, sobre el velo. */
 .cardTop {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-1);
   margin-bottom: auto;
 }
 
 .name {
   font-family: var(--font-serif);
   font-weight: var(--font-weight-semibold);
-  font-size: 2.1rem;
-  line-height: 1.06;
+  font-size: var(--font-size-lg);
+  line-height: 1.1;
   letter-spacing: var(--letter-spacing-tight);
   margin: 0;
-  text-shadow: 0 1px 18px rgba(18, 24, 32, 0.5);
-  text-wrap: balance;
+  text-shadow: 0 1px 8px var(--photo-text-shadow);
+  /* Recorte a 2 líneas: nombres largos no rompen la tarjeta compacta. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Chip de fechas sobre la foto: mismo vidrio esmerilado que los chips de arriba
-   (tokens --glass-*, clase `lg-glass` en el TSX — issue #536/#541). Aquí solo el
-   posicionamiento; el material (fondo/blur/borde/tinta) lo aporta `lg-glass`. */
+   (tokens --glass-*, clase `lg-glass` en el TSX). Aquí solo el posicionamiento. */
 .dates {
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
   align-self: flex-start;
 }
 
 /* Chip de estado sobre foto: vidrio esmerilado real (`lg-glass` en el TSX, regla
-   dura #537 — chrome sobre FOTO usa vidrio, nunca un blanco/negro sólido a mano).
-   Aquí solo tamaño y tipografía; el material sale de `lg-glass`. */
+   dura #537 — chrome sobre FOTO usa vidrio, nunca un blanco/negro sólido a mano). */
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  height: 28px;
-  padding: 0 var(--space-3);
+  gap: var(--space-1);
+  height: 22px;
+  padding: 0 var(--space-2);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-chrome), var(--ring-contact);
   font-size: var(--font-size-xs);
@@ -285,10 +420,10 @@
   text-transform: uppercase;
 }
 .chipLive .pulse {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--gold);
+  background: var(--route-gold);
   box-shadow: 0 0 0 0 rgba(217, 178, 90, 0.6);
   animation: homePulse 2.2s ease-out infinite;
 }
@@ -298,112 +433,83 @@
   font-weight: var(--font-weight-medium);
 }
 
-/* Corona "es tuyo" — disco oro. */
+/* Corona "es tuyo" — disco oro (tokens de medalla: ya pensados para un disco dorado
+   con tinta oscura encima, mismo lenguaje que el podio del Marcador). */
 .crown {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: linear-gradient(160deg, #c5a05a, var(--gold));
-  color: #2a2110;
-  box-shadow: 0 1px 4px rgba(18, 24, 32, 0.3);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--medal-gold) 65%, white),
+    var(--medal-gold)
+  );
+  color: var(--medal-on-gold);
+  box-shadow: var(--shadow-sm);
   flex: none;
 }
 
-/* Mini-cinta de mapa dentro de la tarjeta: mismo vidrio esmerilado que el resto
-   del chrome sobre la foto (antes un disco blanco sólido — ya no: regla dura
-   #537, todo chrome sobre foto es vidrio). `lg-glass` en el TSX aporta el
-   material; aquí solo tamaño y sombra de contacto. */
+/* Mini-cinta de mapa dentro de la tarjeta: mismo vidrio esmerilado que el resto del
+   chrome sobre la foto (regla dura #537, todo chrome sobre foto es vidrio). */
 .mapChip {
   margin-left: auto;
   display: inline-grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--radius-full);
   color: var(--scene-ink);
   box-shadow: var(--shadow-chrome), var(--ring-contact);
   flex: none;
 }
 
-/* ===== Cierre del feed: empezar un viaje (estado de crecimiento) ===== */
+/* ===== Cierre del carrusel: empezar un viaje (estado de crecimiento) ===== */
 .newCard {
-  margin-top: var(--space-4);
-  border: 1.5px dashed var(--hairline);
-  border-radius: var(--radius-xl);
-  background: var(--surface);
-  color: var(--color-text-muted);
-  min-height: 116px;
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  cursor: pointer;
   width: 100%;
-  text-align: left;
-  transition:
-    border-color var(--transition-base),
-    background var(--transition-base);
-}
-.newCard:hover {
-  border-color: var(--accent);
-  background: var(--color-surface-hover);
-}
-.newIcon {
-  width: 46px;
-  height: 46px;
-  border-radius: var(--radius-md);
-  background: var(--accent-tint);
-  color: var(--accent);
-  display: grid;
-  place-items: center;
-  flex: none;
-}
-.newText {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1.5px dashed var(--scene-hairline);
+  border-radius: var(--radius-lg);
+  background: var(--scene-surface);
+  color: var(--scene-ink);
+  cursor: pointer;
+  opacity: 1;
+  transform: scale(1);
+  transition:
+    opacity var(--motion-transition-base),
+    transform var(--motion-transition-base),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
 }
-.newText strong {
+.newCard:hover {
+  border-color: var(--scene-ink);
+  background: var(--glass-bg-strong);
+}
+.newCard[data-active='false'] {
+  opacity: 0.55;
+  transform: scale(0.94);
+}
+.newIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-accent);
+  color: var(--color-on-accent);
+  display: grid;
+  place-items: center;
+}
+.newText {
   font-family: var(--font-serif);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-  line-height: 1.1;
-}
-.newText span {
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
 }
 
-/* ===== Entrada suave (escalonada) del feed: sin auto-movimiento en bucle ===== */
-.rise {
-  opacity: 0;
-  transform: translateY(14px);
-  animation: homeRise var(--duration-slower) var(--ease-emphasized) forwards;
-}
-.rise:nth-child(1) {
-  animation-delay: 0.02s;
-}
-.rise:nth-child(2) {
-  animation-delay: 0.09s;
-}
-.rise:nth-child(3) {
-  animation-delay: 0.16s;
-}
-.rise:nth-child(4) {
-  animation-delay: 0.23s;
-}
-.rise:nth-child(5) {
-  animation-delay: 0.3s;
-}
-
-@keyframes homeRise {
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
 @keyframes homePulse {
   0% {
     box-shadow: 0 0 0 0 rgba(217, 178, 90, 0.55);
@@ -429,25 +535,21 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rise {
-    animation: none;
-    opacity: 1;
-    transform: none;
+  /* Tinte "fijo": sin fundido animado al cambiar de tarjeta (issue #568). */
+  .tint {
+    transition: none;
+  }
+  /* Tarjetas activa/inactiva "a corte": sin animar opacidad/escala. */
+  .card,
+  .newCard {
+    transition: none;
   }
   .chipLive .pulse {
     animation: none;
   }
-  .cover,
-  .card:hover:not(:disabled) .cover,
-  .fab,
   .sceneButton,
-  .avatarButton {
+  .avatarButton,
+  .pinnedChip {
     transition: none;
-  }
-}
-
-@media (min-width: 480px) {
-  .cardBody {
-    min-height: 280px;
   }
 }

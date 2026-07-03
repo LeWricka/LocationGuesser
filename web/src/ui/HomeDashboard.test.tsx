@@ -1,8 +1,23 @@
 import { describe, test, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HomeDashboard } from './HomeDashboard'
 import type { HomeGroup, HomePinned } from './HomeDashboard'
+import type { GlobePin } from './HomeGlobe'
+
+// Doble de HomeGlobe: la escena inmersiva de HomeDashboard ya no necesita levantar
+// maplibre-gl para probarse (eso lo cubre HomeGlobe.test.tsx). Aquí solo nos importa
+// el CONTRATO — qué props recibe el globo, en particular `activeTargetId` al
+// sincronizar con la tarjeta centrada del carrusel (issue #568, contrato de #567).
+// `vi.mock` se iza (hoist) sobre los imports de arriba, así que esto sustituye al
+// módulo real ya para el `import { HomeDashboard }` de esta misma línea.
+const homeGlobeSpy = vi.fn()
+vi.mock('./HomeGlobe', () => ({
+  HomeGlobe: (props: { activeTargetId?: string | null; pins: GlobePin[] }) => {
+    homeGlobeSpy(props)
+    return null
+  },
+}))
 
 const groups: HomeGroup[] = [
   { id: 'a', name: "Interrail '26", status: 'toplay', owned: true },
@@ -19,16 +34,19 @@ const pinned: HomePinned = {
   coverUrl: null,
 }
 
-describe('HomeDashboard (patrón globo + hoja)', () => {
-  test('el feed lista los viajes y no muestra el lema de marketing', () => {
+describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
+  test('el carrusel lista los viajes y cierra con "Nuevo viaje"', () => {
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
-    // Un solo feed editorial "Tus viajes" dentro de la hoja; el lema de marketing baja.
     expect(screen.getByRole('heading', { name: 'Tus viajes' })).toBeInTheDocument()
-    expect(screen.queryByText(/Guarda tus recuerdos/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Los lugares que viviste/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abrir viaje Finde Lisboa' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Abrir viaje Pirineos' })).toBeInTheDocument()
+    // Tarjeta final "Nuevo viaje": único punto de crear (sin FAB aparte, issue #568).
+    expect(screen.getByRole('button', { name: 'Empezar un viaje nuevo' })).toBeInTheDocument()
+    expect(screen.getByText('Nuevo viaje')).toBeInTheDocument()
   })
 
-  test('cada viaje es una tarjeta-portada que abre el viaje', async () => {
+  test('cada tarjeta del carrusel abre su viaje', async () => {
     const onOpenGroup = vi.fn()
     render(
       <HomeDashboard userId="u1" displayName="Lewis" groups={groups} onOpenGroup={onOpenGroup} />,
@@ -44,27 +62,7 @@ describe('HomeDashboard (patrón globo + hoja)', () => {
     expect(screen.getByText('En curso')).toBeInTheDocument()
   })
 
-  test('NO muestra "cómo funciona" ni el panel de números', () => {
-    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
-    expect(screen.queryByText(/Cómo funciona/i)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Tus números/i)).not.toBeInTheDocument()
-  })
-
-  test('cierre del feed: CTA de empezar un viaje', async () => {
-    const onCreateGroup = vi.fn()
-    render(
-      <HomeDashboard
-        userId="u1"
-        displayName="Lewis"
-        groups={groups}
-        onCreateGroup={onCreateGroup}
-      />,
-    )
-    await userEvent.click(screen.getByRole('button', { name: /Empieza un viaje/ }))
-    expect(onCreateGroup).toHaveBeenCalled()
-  })
-
-  test('el FAB "+" constante crea un viaje', async () => {
+  test('"Nuevo viaje" crea un viaje', async () => {
     const onCreateGroup = vi.fn()
     render(
       <HomeDashboard
@@ -78,7 +76,7 @@ describe('HomeDashboard (patrón globo + hoja)', () => {
     expect(onCreateGroup).toHaveBeenCalled()
   })
 
-  test('el reto fijado "Te toca jugar" se muestra como banner con CTA de jugar', async () => {
+  test('el chip "Te toca jugar" se pinta con reto pendiente y su tap dispara jugar', async () => {
     const onPlayPinned = vi.fn()
     render(
       <HomeDashboard
@@ -91,12 +89,12 @@ describe('HomeDashboard (patrón globo + hoja)', () => {
     )
     expect(screen.getByText('Te toca jugar')).toBeInTheDocument()
     expect(screen.getByText('¿Dónde tomé esta foto?')).toBeInTheDocument()
-    // El CTA del banner ("Jugar") dispara onPlayPinned.
-    await userEvent.click(screen.getByRole('button', { name: /Jugar/ }))
+    // Todo el chip es el botón: un único tap dispara onPlayPinned.
+    await userEvent.click(screen.getByText('¿Dónde tomé esta foto?'))
     expect(onPlayPinned).toHaveBeenCalled()
   })
 
-  test('sin reto fijado no se pinta el banner destacado', () => {
+  test('sin reto fijado, el chip "Te toca jugar" no se pinta', () => {
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} pinned={null} />)
     expect(screen.queryByText('Te toca jugar')).not.toBeInTheDocument()
   })
@@ -123,5 +121,28 @@ describe('HomeDashboard (patrón globo + hoja)', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: 'Abrir tu perfil' }))
     expect(onOpenProfile).toHaveBeenCalled()
+  })
+
+  test('arranca con el primer viaje del carrusel como activeTargetId del globo', () => {
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    // sortTrips pone primero los viajes que piden acción ('a' es 'toplay').
+    const lastCall = homeGlobeSpy.mock.calls.at(-1)?.[0]
+    expect(lastCall.activeTargetId).toBe('a')
+  })
+
+  test('activeTargetId sigue a la tarjeta con el foco (navegación por teclado)', () => {
+    homeGlobeSpy.mockClear()
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    fireEvent.focus(screen.getByRole('button', { name: 'Abrir viaje Finde Lisboa' }))
+    const lastCall = homeGlobeSpy.mock.calls.at(-1)?.[0]
+    expect(lastCall.activeTargetId).toBe('b')
+  })
+
+  test('el foco en "Nuevo viaje" apaga el activeTargetId (sin viaje activo)', () => {
+    homeGlobeSpy.mockClear()
+    render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    fireEvent.focus(screen.getByRole('button', { name: 'Empezar un viaje nuevo' }))
+    const lastCall = homeGlobeSpy.mock.calls.at(-1)?.[0]
+    expect(lastCall.activeTargetId).toBeNull()
   })
 })
