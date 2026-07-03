@@ -1,23 +1,28 @@
 // Datos del MAPAMUNDI de la home (variante A "el globo"): cada viaje (grupo) es su
 // propia CONSTELACIÓN de puntos sobre el globo satélite —sus pines + una mini-ruta
 // que une SOLO sus puntos, nunca a otro viaje—. Es PRESENTACIÓN derivada: aquí solo
-// orquestamos helpers de lib/ (getGroupChallenges, getAnswers, splitByStatus,
-// signedImageUrl) y los traducimos a la forma que consume el mapa de la home.
+// orquestamos `lib/tripCover` (momentos visibles + portada canónica, compartida con
+// la invitación al viaje, #619) y `signedImageUrl`, y lo traducimos a la forma que
+// consume el mapa de la home.
 //
-// REGLA ANTI-SPOILER: un punto solo aparece si su coordenada es VISIBLE —el lugar de
-// un RECUERDO (`place_lat`/`place_lng`) o la respuesta de un reto YA CERRADO (vía
-// `getAnswers`, que la RLS solo sirve para cerrados/ya votados)—. Un reto ABIERTO no
-// aporta punto: revelaría dónde es.
+// REGLA ANTI-SPOILER (aplicada en `lib/tripCover`): un punto solo aparece si su
+// coordenada es VISIBLE —el lugar de un RECUERDO (`place_lat`/`place_lng`) o la
+// respuesta de un reto YA CERRADO (vía `getAnswers`, que la RLS solo sirve para
+// cerrados/ya votados)—. Un reto ABIERTO no aporta punto: revelaría dónde es.
 //
 // REGLA: tolerante a fallo y barato. Cada viaje se resuelve por separado con
 // Promise.allSettled; un viaje que falle (RLS, red) simplemente no aporta puntos
 // (sigue como portada en "Tus viajes"). Nunca rompe la home.
 
 import { useEffect, useState } from 'react'
-import { getGroupChallenges, splitByStatus } from '../../lib/groupData'
-import { getAnswers } from '../../lib/challenges'
+import { resolveVisibleTripMoments, pickTripCoverImagePath } from '../../lib/tripCover'
 import { signedImageUrl } from '../../lib/storage'
 import { haversine } from '../../lib/geo'
+
+// `isValidLatLng` vive ahora en `lib/tripCover` (compartida con la invitación al
+// viaje, #619); se re-exporta aquí para no romper a quien la importe desde este
+// módulo (p.ej. `useWorldTrips.test.ts`).
+export { isValidLatLng } from '../../lib/tripCover'
 
 /** Un punto situado de un viaje (un momento con coordenada visible). */
 export interface TripPoint {
@@ -55,23 +60,6 @@ export interface WorldData {
 
 const EMPTY: WorldData = { trips: [], totalKm: 0, loading: true }
 
-/**
- * Guarda de rangos: lat ∈ [−90, 90] y lng ∈ [−180, 180]. Descarta cualquier par de
- * coordenadas fuera de rango (p.ej. lat/lng intercambiados: lat=135 caería en el mar).
- * Tolerante: un punto inválido simplemente no pinta pin (no revienta el mapa).
- * Exportada para test: permite verificar que el guard opera en los casos límite.
- */
-export function isValidLatLng(lat: number, lng: number): boolean {
-  return (
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    lat >= -90 &&
-    lat <= 90 &&
-    lng >= -180 &&
-    lng <= 180
-  )
-}
-
 /** Firma el path de una foto a URL; null si no hay path o si falla (no rompe el pin). */
 async function signOrNull(imagePath: string | null | undefined): Promise<string | null> {
   if (!imagePath) return null
@@ -93,44 +81,22 @@ async function signOrNull(imagePath: string | null | undefined): Promise<string 
  * sigue listado como portada en "Tus viajes").
  */
 async function resolveTrip(groupId: string, name: string): Promise<WorldTrip | null> {
-  const challenges = await getGroupChallenges(groupId)
-  // `splitByStatus` separa retos ABIERTOS (anti-spoiler: sin coordenada) de los demás.
-  const { past } = splitByStatus(challenges)
-  if (past.length === 0) return null
-
-  // Respuestas de los retos cerrados (la RLS solo sirve las visibles). Los recuerdos
-  // no necesitan respuesta: su lugar visible va en place_lat/place_lng.
-  const challengeIds = past.filter((c) => c.is_challenge).map((c) => c.id)
-  const answers = await getAnswers(challengeIds)
-
-  // `past` viene DESC (más reciente primero). Construimos los puntos en ese orden y
-  // luego ordenamos ASC por fecha para que la mini-ruta los cosa cronológicamente.
-  const raw: { c: (typeof past)[number]; lat: number; lng: number }[] = []
-  for (const c of past) {
-    if (c.is_challenge) {
-      const ans = answers.get(c.id)
-      if (ans && isValidLatLng(ans.lat, ans.lng)) raw.push({ c, lat: ans.lat, lng: ans.lng })
-    } else if (c.place_lat != null && c.place_lng != null) {
-      // Recuerdo con lugar visible (no es spoiler).
-      if (isValidLatLng(c.place_lat, c.place_lng))
-        raw.push({ c, lat: c.place_lat, lng: c.place_lng })
-    }
-  }
+  // `raw` viene DESC (más reciente primero, ver contrato en lib/tripCover).
+  const raw = await resolveVisibleTripMoments(groupId)
   if (raw.length === 0) return null
 
-  // Portada: foto del primer momento situado con foto (el más reciente, orden DESC).
-  const coverSource = raw.find((r) => r.c.image_path)?.c ?? raw[0].c
-  const coverUrl = await signOrNull(coverSource.image_path)
+  // Portada: mismo criterio que usa la invitación al viaje (#619).
+  const coverUrl = await signOrNull(pickTripCoverImagePath(raw))
 
   // Firmamos las miniaturas de los pines en paralelo (cada una tolerante a fallo).
   const points: TripPoint[] = await Promise.all(
     raw.map(async (r) => ({
-      id: r.c.id,
+      id: r.id,
       lat: r.lat,
       lng: r.lng,
-      title: r.c.title,
-      imageUrl: await signOrNull(r.c.image_path),
-      date: r.c.created_at,
+      title: r.title,
+      imageUrl: await signOrNull(r.image_path),
+      date: r.created_at,
     })),
   )
   // Orden cronológico ASC para la mini-ruta (el recorrido del viaje en el tiempo).
