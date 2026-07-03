@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { SceneImage } from './SceneImage'
 import { useReducedMotion } from '../../ui'
 import styles from './CountdownOverlay.module.css'
@@ -59,9 +59,23 @@ export function CountdownOverlay({ photoUrl, onDone }: Props) {
   if (reduced) return null
 
   const value = SEQUENCE[index]
+  // Último dígito (el "1"): en vez de que el overlay desaparezca de golpe cuando
+  // el padre lo desmonta (al llamar onDone → beginPlaying), lo desvanecemos SOBRE
+  // su propio tiempo de permanencia (issue #606): el fundido de salida termina
+  // justo cuando toca desmontar, sin sumar ni un ms a la cuenta. Así se CRUZA con
+  // el fundido de entrada de la escena real (`.sceneEnter` en GameScene) en vez
+  // de cortar en seco. `--countdown-step-ms` viaja como variable inline para que
+  // el CSS calcule el delay del fundido a partir del mismo STEP_MS que gobierna
+  // el temporizador (una sola fuente de verdad para el timing).
+  const isLast = index === SEQUENCE.length - 1
 
   return (
-    <div className={styles.overlay} role="status" aria-label={`Empezando en ${value}`}>
+    <div
+      className={`${styles.overlay} ${isLast ? styles.overlayExit : ''}`}
+      style={{ '--countdown-step-ms': `${STEP_MS}ms` } as CSSProperties}
+      role="status"
+      aria-label={`Empezando en ${value}`}
+    >
       {/* Fondo: la foto del reto a pantalla completa (si la hay) o un degradado
           neutro de la marca. Velo oscuro encima para que los números resalten. */}
       <div className={styles.bg} aria-hidden="true">

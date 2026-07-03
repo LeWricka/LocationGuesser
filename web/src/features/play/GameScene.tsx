@@ -1,13 +1,44 @@
-import { type CSSProperties, type RefObject } from 'react'
+import { useState, type CSSProperties, type RefObject } from 'react'
 import { Compass as CompassIcon, Expand, House, Maximize2 } from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { SceneImage } from './SceneImage'
 import type { LatLng } from '../../lib/geo'
 import { AppHeader } from '../../ui/AppHeader'
-import { Button, CountdownRing, Icon, Lightbox, Modal, Stack } from '../../ui'
+import { Button, CountdownRing, Icon, Lightbox, Modal, Stack, useReducedMotion } from '../../ui'
 import { IconDiana } from '../../ui/icons'
 import styles from './PlayChallenge.module.css'
+
+// Retiene un elemento montado el tiempo de SU fundido de salida al pasar
+// `active` a `false`, en vez de desmontarlo de golpe (issue #606): el mini-mapa
+// esquina↔expandido desaparecía uno mientras el otro aparecía de la nada, un
+// corte seco. El desmontaje real lo dispara `onExitAnimationEnd` (llamar en el
+// `onAnimationEnd` del propio nodo) cuando termina su keyframe de salida; así el
+// saliente se CRUZA con la entrada de lo que ocupa su sitio, sin alargar nada
+// (`active` cambia al instante, solo se retrasa el desmontaje visual). Bajo
+// reduced-motion no hay keyframe que termine, así que desmontamos directo.
+function useExitPresence(active: boolean, reducedMotion: boolean) {
+  const [mounted, setMounted] = useState(active)
+  // Ajustamos el estado DURANTE el render (patrón admitido por React, sin
+  // efecto: evita el "cascading renders" que dispara el lint de hooks) para que
+  // ambos casos se reflejen en el MISMO render que cambia `active`, sin el frame
+  // de retraso que tendría un `useEffect`:
+  // - activarse: si esperásemos a un efecto, el elemento que entra se quedaría
+  //   un frame sin montar mientras el saliente ya muestra su fundido de salida
+  //   — justo el corte que este hook evita.
+  // - reduced-motion al desactivarse: no hay keyframe que dispare
+  //   `onExitAnimationEnd`, así que desmontamos ya, sin fundido que cruzar.
+  if (active && !mounted) setMounted(true)
+  else if (!active && reducedMotion && mounted) setMounted(false)
+  const exiting = mounted && !active
+  return {
+    mounted,
+    exiting,
+    onExitAnimationEnd: () => {
+      if (exiting) setMounted(false)
+    },
+  }
+}
 
 // Escena de Street View del reto (lo que de verdad se monta a pantalla completa).
 interface StreetViewScene {
@@ -122,6 +153,10 @@ export function GameScene({
   const imageUrl = scene.kind === 'photo' ? scene.photoUrl : null
   const hintPhotoUrl = scene.kind === 'streetview' ? scene.hintPhotoUrl : null
   const urgent = remaining != null && remaining <= 10
+  // Cruce esquina↔expandido del mini-mapa (issue #606): ver `useExitPresence`.
+  const reducedMotion = useReducedMotion()
+  const collapsed = useExitPresence(!mapOpen, reducedMotion)
+  const expanded = useExitPresence(sceneReady && mapOpen, reducedMotion)
   // Modelo de viewport: el contenedor se ata al alto VISIBLE real (px) cuando lo
   // conocemos; si no, el CSS cae a `100dvh`. Evita que el chrome/teclado colapse
   // el layout y empuje la escena fuera de pantalla.
@@ -243,11 +278,16 @@ export function GameScene({
           escena del reto, así que mostrarlo antes de Empezar no es spoiler y monta ya
           el mapa (conserva zoom/posición). Lleva etiqueta "Adivinar" visible (no solo
           icono): guía al jugador y da contenido de texto al contenedor inmersivo. */}
-      {!mapOpen && (
+      {collapsed.mounted && (
         <button
           type="button"
-          className={[styles.miniMapa, 'lg-press'].join(' ')}
+          className={[styles.miniMapa, collapsed.exiting ? styles.miniMapaExit : '', 'lg-press']
+            .filter(Boolean)
+            .join(' ')}
           onClick={onOpenMap}
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget) collapsed.onExitAnimationEnd()
+          }}
           aria-label="Abrir el mapa para clavar el tiro"
         >
           <div className={styles.miniMapaScene} aria-hidden="true">
@@ -273,8 +313,15 @@ export function GameScene({
       {/* Estado EXPANDIDO: mapa a pantalla parcial + botón "Clavar tiro".
           Montado como overlay absoluto (no hoja): el SV sigue visible arriba.
           El botón de confirmar DENTRO del mapa (como GeoGuessr). */}
-      {sceneReady && mapOpen && (
-        <div className={styles.mapaExpandido}>
+      {expanded.mounted && (
+        <div
+          className={[styles.mapaExpandido, expanded.exiting ? styles.mapaExpandidoExit : '']
+            .filter(Boolean)
+            .join(' ')}
+          onAnimationEnd={(e) => {
+            if (e.target === e.currentTarget) expanded.onExitAnimationEnd()
+          }}
+        >
           <div className={styles.mapaExpandidoScene}>
             <PlayMap
               guess={guess}
