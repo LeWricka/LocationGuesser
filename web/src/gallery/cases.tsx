@@ -17,7 +17,7 @@ import { PlayChallenge } from '../features/play/PlayChallenge'
 import { PlayNumberChallenge } from '../features/play/PlayNumberChallenge'
 import { CreateGroup } from '../features/create/CreateGroup'
 import { AddMoment } from '../features/create/AddMoment'
-import { CreateChallengeFlow } from '../features/create/CreateChallengeFlow'
+import { CreateNumberChallenge } from '../features/create/CreateNumberChallenge'
 import { CreateLocationChallenge } from '../features/create/CreateLocationChallenge'
 import { EditChallenge } from '../features/group/EditChallenge'
 import { MomentGallery } from '../features/trip/MomentGallery'
@@ -366,11 +366,15 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
+    // Reto ¿Adivinas? de papel (issue #586): antes montaba CreateChallengeFlow
+    // (que arrancaba en el selector de tipo, no en el formulario a verificar).
+    // Va directo al asistente de número, igual que 'crear-donde' con
+    // CreateLocationChallenge — es lo que hay que ver en la captura.
     id: 'crear-adivinas',
-    title: 'Crear ¿Adivinas? (selector de tipo)',
+    title: 'Crear ¿Adivinas? (nombre + pregunta + foto)',
     section: 'Crear',
     render: () => (
-      <CreateChallengeFlow
+      <CreateNumberChallenge
         groupId={GROUP_ID}
         groupName={GROUP.name}
         onBack={noop}
