@@ -39,17 +39,36 @@
 }
 
 /* ============ ETAPAS (contenido de la hoja) ============== */
+/* Dirección del paso (#531): avanzar entra desde la derecha, volver desde la
+   izquierda. `animation-fill-mode: backwards` (NUNCA `forwards`/`both`) deja el
+   elemento sin transform en reposo al terminar — el remate del PR #527 fue justo
+   un transform residual (fill-mode "both") creando un stacking context que tapaba
+   el popover del DatePicker con el CTA fijo. Aquí no queda transform tras animar,
+   así que el popover de fechas del paso 0 sigue por encima del CTA sin más ajuste. */
 .stage {
-  animation: stageIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: stageInForward var(--motion-duration-base) var(--motion-ease-emphasized) backwards;
 }
-@keyframes stageIn {
+.stage.stepBack {
+  animation-name: stageInBackward;
+}
+@keyframes stageInForward {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateX(24px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
+  }
+}
+@keyframes stageInBackward {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 

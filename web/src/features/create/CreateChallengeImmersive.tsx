@@ -119,6 +119,11 @@ export function CreateChallengeImmersive({
   // Origen recuerdo: si trae lugar, arrancamos ya con el pin puesto (saltamos la
   // etapa de "marca el mapa", que pasa a ser 1 = foto). Origen FAB: empieza en 0.
   const [stage, setStage] = useState<Stage>(prefill?.point ? 1 : 0)
+  // Dirección del cambio de paso (#531): avanzar entra desde la derecha, volver
+  // desde la izquierda. `goStage` es el único punto que mueve `stage` (incluidos
+  // los saltos directos desde el resumen a corregir foto/lugar), así que calcular
+  // la dirección ahí lo cubre todo.
+  const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [celebrating, setCelebrating] = useState(false)
   // Reto recién creado: en vez de saltar directo a jugar, mostramos la hoja
@@ -348,6 +353,7 @@ export function CreateChallengeImmersive({
       : STAGE_HEIGHTS[stage]
 
   function goStage(n: Stage) {
+    setDirection(n > stage ? 'forward' : 'backward')
     setStage(n)
   }
 
@@ -479,6 +485,10 @@ export function CreateChallengeImmersive({
   // el mapa full-bleed no acompaña a pasos que no van del mapa (#455 dir. de diseño).
   const mapRecessed = stage !== 0
 
+  // Clase del contenido del paso: dirección del `.stage` (#531). Solo el
+  // CONTENIDO de la hoja anima; el mapa y la cabecera quedan fijos entre pasos.
+  const stageClass = `${styles.stage} ${direction === 'backward' ? styles.stepBack : ''}`.trim()
+
   return (
     <div className={`${styles.root} ${mapRecessed ? styles.mapRecessedRoot : ''}`}>
       {/* MAPA SATÉLITE: protagonista a sangre en la etapa de lugar; recogido a una
@@ -560,7 +570,7 @@ export function CreateChallengeImmersive({
       >
         {/* ETAPA 0 — lugar: marcar el punto Y, junto a él, el Street View (#388). */}
         {stage === 0 && (
-          <section className={styles.stage}>
+          <section className={stageClass}>
             <div className={styles.mark}>
               <span className={styles.markIco}>
                 <TargetIcon size={24} />
@@ -652,7 +662,7 @@ export function CreateChallengeImmersive({
 
         {/* ETAPA 1 — foto. */}
         {stage === 1 && (
-          <section className={styles.stage}>
+          <section className={stageClass}>
             <div className={styles.eyebrow}>
               <i className={styles.dot} /> Paso 1 de 3 · La foto
             </div>
@@ -688,7 +698,7 @@ export function CreateChallengeImmersive({
 
         {/* ETAPA 2 — detalles. */}
         {stage === 2 && (
-          <section className={styles.stage}>
+          <section className={stageClass}>
             <div className={styles.eyebrow}>
               <i className={styles.dot} /> Paso 2 de 3 · Los detalles
             </div>
@@ -784,7 +794,7 @@ export function CreateChallengeImmersive({
 
         {/* ETAPA 3 — resumen + lanzar. */}
         {stage === 3 && (
-          <section className={styles.stage}>
+          <section className={stageClass}>
             <div className={styles.eyebrow}>
               <i className={styles.dot} /> Paso 3 de 3 · Listo
             </div>

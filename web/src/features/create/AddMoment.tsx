@@ -5,7 +5,7 @@ import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
 import type { LatLng } from '../../lib/geo'
 import { createMoment, type ChallengeForPlay } from '../../lib/challenges'
 import { addMomentImages } from '../../lib/momentImages'
-import { uploadImage } from '../../lib/storage'
+import { ImageDecodeError, uploadImage } from '../../lib/storage'
 import { readGpsFromExif } from '../../lib/exif'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
@@ -210,14 +210,41 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
     setBusy(true)
     try {
       // Fotos opcionales: subida comprimida y SIN EXIF, en ORDEN (la 1ª es la
-      // portada). Las paths conservan el orden de la galería.
+      // portada). Las paths conservan el orden de LAS QUE SÍ SUBIERON (remate del
+      // #520): si una foto falla al decodificar (ImageDecodeError, con .fileName),
+      // no abortamos el recuerdo entero — la saltamos y seguimos con las demás. Un
+      // error de infraestructura (red, Storage caído) SÍ aborta: seguir intentando
+      // no ayuda y el mensaje de red del catch de fuera es más útil que el de foto.
       const paths: string[] = []
+      const failedFileNames: string[] = []
       for (let i = 0; i < photos.length; i++) {
         setStatus(
           photos.length > 1 ? `Subiendo fotos… (${i + 1}/${photos.length})` : 'Subiendo la foto…',
         )
-        paths.push(await uploadImage(photos[i].file))
+        try {
+          paths.push(await uploadImage(photos[i].file))
+        } catch (err) {
+          if (!(err instanceof ImageDecodeError)) throw err
+          reportError(err, { area: 'add_moment', stage: 'upload_photo' })
+          failedFileNames.push(err.fileName)
+        }
       }
+
+      // Si había fotos y NINGUNA subió, no guardamos un recuerdo "a medias" sin
+      // avisar: error claro y el formulario (título, lugar, fotos) queda intacto
+      // para reintentar o quitar la foto problemática.
+      if (photos.length > 0 && paths.length === 0) {
+        setStatus(null)
+        setBusy(false)
+        toast.show(
+          failedFileNames.length === 1
+            ? `No se pudo subir «${failedFileNames[0]}». Prueba con otra foto o quítala para guardar sin fotos.`
+            : `No se pudo subir ninguna foto (${failedFileNames.join(', ')}). Prueba con otras o quítalas para guardar sin fotos.`,
+          { tone: 'danger' },
+        )
+        return
+      }
+
       // La portada espeja `image_path` (lo lee la tarjeta del viaje y el mapamundi).
       const coverPath = paths[0]
 
@@ -249,6 +276,16 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         promoted_to_challenge: false,
         score_scale: null,
       })
+      // Fallo PARCIAL: el recuerdo se guardó igual con las fotos que sí subieron,
+      // pero avisamos cuáles se quedaron fuera (issue #531).
+      if (failedFileNames.length > 0) {
+        toast.show(
+          failedFileNames.length === 1
+            ? `Recuerdo guardado. No se pudo subir «${failedFileNames[0]}».`
+            : `Recuerdo guardado. No se pudieron subir ${failedFileNames.length} fotos (${failedFileNames.join(', ')}).`,
+          { tone: 'neutral' },
+        )
+      }
       // Efecto móvil al guardar: vibración corta. En vez de salir directos al viaje,
       // mostramos el estado "Recuerdo guardado" con "Añadir reto" / "Volver al viaje".
       navigator.vibrate?.(30)
