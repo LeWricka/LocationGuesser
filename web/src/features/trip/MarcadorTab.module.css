@@ -2,8 +2,18 @@
  * MarcadorTab — clasificación del viaje integrada en la pestaña Marcador.
  *
  * Diseño Grafito+teal: cada fila es superficie blanca con hairline suave;
- * el acento teal solo destaca la fila del usuario activo. Sin fondos de color
- * en filas genéricas: los tokens de papel mandan.
+ * el acento teal solo destaca la fila del usuario activo. El oro es SOLO del
+ * líder (barra, anillo del avatar, brillo de la medalla) — nunca decoración
+ * genérica. Sin fondos de color en filas que no son ni líder ni "mi posición":
+ * los tokens de papel mandan.
+ *
+ * Motion (issue #546): filas y barras entran escalonadas (--motion-stagger-step
+ * vía --i inline). GOTCHA de este sistema: `animation-fill-mode: backwards`
+ * SIEMPRE (nunca `both`/`forwards`) — con `both` el valor final de la animación
+ * queda pegado como transform inline, creando un stacking context que ya tapó
+ * un popover en otra pantalla (ver ShellUtilitario). Con `backwards`, al acabar
+ * la animación el elemento vuelve a su regla base (idéntica al `to`), así que
+ * no hay salto visual y tampoco transform "fantasma".
  */
 
 .lista {
@@ -12,23 +22,60 @@
   gap: var(--space-2);
 }
 
-/* Fila de clasificación: flex con avatar + info + puntos. */
+/* Con 1-2 jugadores sobra pantalla (issue #546, "aprovecha el vacío"): más aire
+ * arriba y entre filas para que el podio respire en vez de quedar pegado al
+ * borde superior. No cambia estructura de página ni CTAs. */
+.listaRespira {
+  gap: var(--space-4);
+  padding-top: var(--space-5);
+}
+
+/* Fila de clasificación: parte superior (medalla/avatar/info/puntos) + barra de
+ * puntuación a todo el ancho debajo. */
 .fila {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: var(--space-2);
   padding: var(--space-3);
   background: var(--surface);
   border-radius: var(--radius-md);
   border: 1px solid var(--hairline-soft);
   box-shadow: var(--shadow-xs);
   transition: box-shadow var(--motion-transition-fast);
+  animation: mt-fila-entra var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
+}
+@keyframes mt-fila-entra {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.filaTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 /* Fila del usuario actual: borde teal + fondo teal tenue (acento en detalle). */
 .fila.miPosicion {
   border-color: var(--accent);
   background: var(--accent-tint);
+}
+
+/* Fila del líder: anillo dorado sutil. Si coincide con "mi posición", el oro
+ * manda (es la señal más fuerte del tablón: vas ganando). */
+.fila.lider {
+  border-color: var(--medal-gold);
+  background: color-mix(in srgb, var(--medal-gold) 6%, var(--surface));
+  box-shadow:
+    var(--shadow-xs),
+    0 0 0 1px color-mix(in srgb, var(--medal-gold) 35%, transparent);
 }
 
 /* Posición: nº o icono de medalla. Ancho fijo para alinear el contenido. */
@@ -45,15 +92,29 @@
   text-align: center;
 }
 
-/* Icono de medalla del podio (1º–3º): colores semánticos de podio, no de marca. */
+/* Icono de medalla del podio (1º–3º): colores semánticos de podio, no de marca.
+ * El oro (única posición dorada) lleva además un brillo discreto: el líder se
+ * lee de un vistazo sin necesitar leer los puntos. */
 .posicion.oro {
   color: var(--medal-gold);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--medal-gold) 45%, transparent));
 }
 .posicion.plata {
   color: var(--medal-silver);
 }
 .posicion.bronce {
   color: var(--medal-bronze);
+}
+
+/* Anillo dorado sutil alrededor del avatar del líder: wrapper propio (no toca
+ * el box-shadow interno del componente Avatar, que ya usa esa propiedad). */
+.avatarLider {
+  display: inline-flex;
+  border-radius: var(--radius-full);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--medal-gold),
+    0 0 6px 1px color-mix(in srgb, var(--medal-gold) 45%, transparent);
 }
 
 /* Bloque de nombre + partidas. */
@@ -93,6 +154,43 @@
   color: var(--accent);
 }
 
+/* Barra de puntuación: proporcional al líder (100%), resto relativo. Track
+ * neutro; el relleno crece con `scaleX` desde el borde izquierdo al entrar. */
+.barraTrack {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--hairline-soft);
+  overflow: hidden;
+}
+
+.barraFill {
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform: scaleX(var(--bar-pct, 0));
+  transform-origin: left;
+  animation: mt-barra-crece var(--motion-duration-slower) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
+}
+@keyframes mt-barra-crece {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(var(--bar-pct, 1));
+  }
+}
+
+/* Barra del líder: degradado oro (única fila con oro en el relleno). */
+.barraLider {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--medal-gold) 75%, var(--color-text-muted)),
+    var(--medal-gold)
+  );
+}
+
 /* Estado vacío: sin clasificación aún. */
 .vacio {
   text-align: center;
@@ -113,4 +211,14 @@
   justify-content: center;
   gap: var(--space-2);
   margin-top: var(--space-4);
+}
+
+/* Menos movimiento: sin entradas de fila ni crecimiento de barra. La barra
+ * queda directamente a su ancho final (--bar-pct) porque ese valor vive en la
+ * regla base de .barraFill, no solo en el keyframe. */
+@media (prefers-reduced-motion: reduce) {
+  .fila,
+  .barraFill {
+    animation: none;
+  }
 }
