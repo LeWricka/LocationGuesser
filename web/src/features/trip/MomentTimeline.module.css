@@ -14,8 +14,9 @@
   padding-left: var(--space-3);
 }
 
-/* Botón de reproducir el viaje: pastilla de vidrio sobre el mapa, mismo lenguaje
-   que el chrome (livePill / iconPill). Recorre los momentos en orden al darle play. */
+/* Botón de reproducir el viaje: disco de vidrio esmerilado sobre el mapa (regla
+   dura #537), mismo lenguaje que el resto del chrome flotante del diario.
+   Recorre los momentos en orden al darle play. */
 .play {
   flex: 0 0 auto;
   width: 36px;
@@ -24,10 +25,10 @@
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-sm);
-  color: var(--color-text);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
+  color: var(--scene-ink);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-chrome), var(--ring-contact);

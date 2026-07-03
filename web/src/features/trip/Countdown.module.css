@@ -1,24 +1,25 @@
-/* Cuenta atrás viva: pastilla de vidrio con icono + "Cierra en mm:ss". El número
-   es tabular (no baila) y rebota un pelín al cambiar de segundo (lg-count-tick). */
+/* Cuenta atrás viva: pastilla de vidrio esmerilado (flota sobre la foto del
+   momento, regla dura #537) con icono + "Cierra en mm:ss". El número es tabular
+   (no baila) y rebota un pelín al cambiar de segundo (lg-count-tick). */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   padding: 0.4rem 0.7rem;
   border-radius: var(--radius-full);
-  background: var(--map-chrome-bg);
-  -webkit-backdrop-filter: var(--map-chrome-blur);
-  backdrop-filter: var(--map-chrome-blur);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
   box-shadow: var(--shadow-chrome);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
+  color: var(--scene-ink);
   white-space: nowrap;
 }
 
 .label {
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
   font-weight: var(--font-weight-medium);
 }
 
@@ -33,10 +34,15 @@
   font-weight: var(--font-weight-bold);
 }
 
-/* Últimos 30s: urgencia en rojo de peligro (borde, número y "Cierra en"). El
-   micro-rebote ya intensificado (lg-count-tick) refuerza la sensación; bajo
+/* Últimos 30s: urgencia en rojo de peligro. El vidrio (fondo translúcido sobre
+   una foto arbitraria) no garantiza AA para texto en rojo, así que la urgencia
+   rompe a un fondo SÓLIDO tenue (mismo par que el badge "EN JUEGO" del timeline,
+   ~4.9:1 AA) en vez de vidrio — la excepción deliberada de la regla dura: cuando
+   el contraste tiene que ser determinista, gana la legibilidad sobre el vidrio.
+   El micro-rebote ya intensificado (lg-count-tick) refuerza la sensación; bajo
    reduced-motion el color sigue comunicando la urgencia sin movimiento. */
 .urgent {
+  background: var(--color-danger-soft);
   border-color: var(--color-danger);
   color: var(--color-danger);
 }

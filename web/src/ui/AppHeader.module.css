@@ -90,6 +90,14 @@
 .floating .iconButton {
   background: var(--scene-surface);
   border: 1px solid var(--scene-hairline);
+  /* `--scene-blur` no existe por defecto (fallback `none`): en la mayoría de
+     escenas (globo/satélite genérico) el chrome sigue siendo el tinte translúcido
+     de fábrica, sin blur. Pantallas que SÍ flotan sobre una FOTO/MAPA concretos
+     (p.ej. TripPage) definen `--scene-blur` para convertir este mismo botón en
+     vidrio esmerilado real (regla dura #537), sin que el resto de consumidores
+     de `floating` note el cambio. */
+  -webkit-backdrop-filter: var(--scene-blur, none);
+  backdrop-filter: var(--scene-blur, none);
 }
 
 .floating .iconButton:hover {

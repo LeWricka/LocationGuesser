@@ -121,7 +121,10 @@
   border-radius: var(--radius-full);
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
-  color: var(--color-text-muted);
+  /* Flota sobre el globo de la home (escena, no papel): tinta clara, no la tinta
+     oscura de papel que llevaba cuando --glass-bg-strong era un blanco opaco
+     (issue #537, `--glass-bg-strong` pasó a vidrio grafito translúcido). */
+  color: var(--scene-ink-soft);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   text-decoration: none;
@@ -131,7 +134,7 @@
 
 .adminLink:hover {
   opacity: 1;
-  color: var(--color-text);
+  color: var(--scene-ink);
 }
 
 .adminLink:focus-visible {

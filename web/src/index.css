@@ -112,16 +112,29 @@ img {
 /* ----------------------------------------------------------------------
  * Superficie de papel + utilidades editoriales compartidas
  *
- * `lg-glass`: ya NO es vidrio. Es una hoja de papel blanca opaca con hairline
- * y sombra muy sutil (se conserva el nombre de clase para no romper a quien la
- * usa; el lenguaje ahora es "papel, no vidrio").
+ * `lg-glass`: vidrio esmerilado real — SOLO para chrome que flota sobre una
+ * FOTO o un MAPA (regla dura del sistema, issue #537). Sobre papel el vidrio es
+ * ruido: ahí sigue mandando una superficie opaca (`.lg-card`/`--color-surface`,
+ * no esta clase). Composición: tinte grafito translúcido + blur + borde de
+ * contacto blanco tenue, tinta clara encima (el consumidor decide el tamaño/
+ * radio/posición; esta clase solo aporta el material).
+ * Fallback SIN backdrop-filter (Firefox viejo, algún WebView): sin blur no hay
+ * "vidrio" que journal, así que subimos la opacidad del tinte para que el
+ * texto claro siga leyéndose con garantía sobre cualquier imagen.
  * -------------------------------------------------------------------- */
 .lg-glass {
   position: relative;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  color: var(--scene-ink);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .lg-glass {
+    background: var(--glass-bg-strong);
+  }
 }
 
 /* Eyebrow editorial: mayúsculas pequeñas, tracking ancho, en tinta suave

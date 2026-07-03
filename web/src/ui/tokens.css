@@ -6,7 +6,7 @@
  * CSS Modules.
  *
  * Dirección visual (paleta Grafito + teal, aprobada 2 jul 2026):
- *  - CHROME NEUTRO, las FOTOS ponen el color. Fondo papel claro (#F4F5F6),
+ *  - CHROME NEUTRO, las FOTOS ponen el color. Fondo papel cálido (#F4F3EF),
  *    superficies blancas opacas, hairline fino (#E4E7EA) y sombra muy sutil.
  *  - TINTA SOBRE PAPEL: grafito casi negro (#1B2127) por niveles. La jerarquía
  *    la marca el TAMAÑO/PESO/FAMILIA, jamás un fondo de color.
@@ -66,7 +66,7 @@
    * -------------------------------------------------------------------- */
 
   /* Papel / superficies (de fondo a frente). */
-  --paper: #f4f5f6; /* fondo de página — gris muy claro, neutro */
+  --paper: #f4f3ef; /* fondo de página — gris cálido casi blanco, no gris frío */
   --surface: #ffffff; /* hojas/tarjetas (blanco puro) */
 
   /* Textura del papel (capas de `body` en index.css). El blanco plano era soso;
@@ -213,13 +213,20 @@
    * porque ChallengePhoto.placeholder lo usa como relleno; ahora es papel sólido. */
   --gradient-app-bg: var(--paper);
 
-  /* Vidrio → papel opaco. backdrop-filter desactivado (none) para quitar el
-   * glass como lenguaje de tarjeta; el fondo queda blanco opaco. */
-  --glass-bg: var(--surface);
-  --glass-bg-strong: var(--surface);
-  --glass-border: var(--hairline);
+  /* Vidrio esmerilado — SOLO para chrome flotante sobre FOTO o MAPA. Regla dura
+   * del sistema (dirección aprobada, artifact fb5073e7 §IV.2/§IV.4): el vidrio
+   * sobre superficies planas (papel) es ruido; sobre imagen es elegancia. Estos
+   * tokens NUNCA se usan directamente sobre papel — ahí el chrome sigue opaco
+   * (--color-surface / --glass-bg-strong-paper no existe a propósito: usa
+   * --color-surface). Tinte grafito (mismo tono que --scene-bg) al ~38%, borde de
+   * contacto blanco tenue y un blur contenido (10-12px, ni vaho ni transparencia
+   * plana). `--glass-blur` es una LONGITUD pura (no un `blur()`) para que cada
+   * consumidor componga `blur(var(--glass-blur))` junto a otros filtros propios. */
+  --glass-bg: rgba(11, 16, 22, 0.38); /* grafito (--scene-bg) ~38% */
+  --glass-bg-strong: rgba(11, 16, 22, 0.52); /* hover/active: más opaco, sigue vidrio */
+  --glass-border: rgba(255, 255, 255, 0.25); /* borde de contacto blanco tenue */
   --glass-sheen: transparent;
-  --glass-blur: none;
+  --glass-blur: 12px;
 
   /* Medallas del podio (tarjetas rasterizadas) — recalibradas a papel. */
   --medal-gold: #c9a24b;

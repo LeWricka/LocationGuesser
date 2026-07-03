@@ -25,18 +25,31 @@
 }
 
 /* ---- Tokens de escena por sección ----
-   La cabecera (AppHeader floating) y los tabs usan los tokens `--scene-*` para
-   leer sobre el fondo. En DIARIO (mapa satélite) valen los de fábrica (tinta clara
-   + velo oscuro). En MARCADOR (papel) los reescribimos a papel/tinta oscura para
-   que el mismo chrome flotante lea sobre fondo claro sin hardcodear colores. */
+   La cabecera (AppHeader floating), el botón ⋯ y los tabs usan los tokens
+   `--scene-*`/`--segctl-*` para leer sobre el fondo. En DIARIO (mapa satélite) el
+   chrome flotante es VIDRIO ESMERILADO real (regla dura #537: sobre un MAPA,
+   vidrio) — tinte grafito + blur + borde blanco, en vez del tinte blanco sin blur
+   de los tokens de escena por defecto. En MARCADOR (papel) los reescribimos a
+   papel/tinta oscura y SIN blur: sobre papel el vidrio es ruido, el mismo chrome
+   sigue opaco. */
 .sceneDiario {
-  /* tokens de escena por defecto (definidos en tokens.css) */
+  --scene-surface: var(--glass-bg);
+  --scene-hairline: var(--glass-border);
+  --scene-blur: blur(var(--glass-blur));
+  --segctl-bg: var(--glass-bg);
+  --segctl-border: var(--glass-border);
+  --segctl-blur: blur(var(--glass-blur));
+  --segctl-ink: var(--scene-ink-soft);
+  --segctl-ink-hover: var(--scene-ink);
 }
 .scenePaper {
   --scene-ink: var(--color-text);
   --scene-veil: transparent;
   --scene-surface: var(--color-surface);
   --scene-hairline: var(--color-border);
+  --scene-blur: none;
+  /* Sin --segctl-*: sobre papel el SegmentedControl usa sus valores de fábrica
+     (opacos, ver SegmentedControl.module.css) — nada de vidrio aquí. */
 }
 
 /* ---- Cabecera FLOTANTE (AppHeader) ----
@@ -86,9 +99,11 @@
   width: var(--tap-target);
   height: var(--tap-target);
   padding: 0;
-  border: 0;
+  border: 1px solid var(--scene-hairline);
   border-radius: var(--radius-full);
   background: var(--scene-surface);
+  -webkit-backdrop-filter: var(--scene-blur, none);
+  backdrop-filter: var(--scene-blur, none);
   color: inherit;
   cursor: pointer;
   transition: background-color var(--transition-fast);
