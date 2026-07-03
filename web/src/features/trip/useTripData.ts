@@ -46,6 +46,34 @@ export interface ChallengeWinner {
   guessedCount: number
 }
 
+/** Resultado (puntos + distancia + anti-trampa) de UN jugador en UN reto. */
+export interface PastChallengeResult {
+  points: number
+  /** Distancia al objetivo en km; null en un reto de número o un voto de timeout. */
+  distanceKm: number | null
+  /** Salió de la app durante esa jugada (issue #200) — se anuncia con un icono discreto. */
+  leftApp: boolean
+}
+
+/**
+ * Resumen de un reto CERRADO para la sección "Retos anteriores" del Marcador
+ * (issue #608, rescatado de `GroupPage`/PastSection): quién ganó y cómo me fue A
+ * MÍ, sin arrastrar el detalle completo (foto, mapa, listado de votos) — eso vive
+ * en el detalle del reto, al que se llega tocando la fila.
+ */
+export interface PastChallengeSummary {
+  challengeId: string
+  title: string
+  /** Fecha de cierre (deadline) para la fila; cae a la de creación si faltara. */
+  closedAt: string
+  /** Reto CREADO por el usuario en sesión: nunca tiene `myResult` (no se vota lo propio). */
+  isOwn: boolean
+  /** Quien más puntos sacó, o null si el reto se cerró sin ningún voto. */
+  winner: (PastChallengeResult & { name: string }) | null
+  /** Mi resultado en este reto, o null si no jugué (o es mío). */
+  myResult: PastChallengeResult | null
+}
+
 interface TripData {
   group: GroupInfo | null
   /** Momentos en orden cronológico ASCENDENTE (del primero del viaje al último). */
@@ -60,6 +88,8 @@ interface TripData {
   recentTitle: string | null
   /** Ganador y nº de aciertos por reto cerrado (challengeId → resumen). Alimenta el recap. */
   winnersByChallenge: Map<string, ChallengeWinner>
+  /** Retos CERRADOS para "Retos anteriores" del Marcador, del más reciente al más antiguo. */
+  pastChallenges: PastChallengeSummary[]
   loading: boolean
   error: string | null
   refresh: () => Promise<void>
@@ -315,6 +345,44 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
 
   const recentTitle = lastClosed?.title ?? null
 
+  // Retos CERRADOS para "Retos anteriores" del Marcador (issue #608): nombre,
+  // ganador (más puntos, empate roto por nombre asc, mismo criterio estable que
+  // `winnersByChallenge`/`aggregateLeaderboard`) y mi resultado breve. Orden del
+  // más reciente al más antiguo (moments viene ASC, invertimos aquí).
+  const pastChallenges = useMemo<PastChallengeSummary[]>(() => {
+    const closed = moments.filter((m) => m.status === 'closed')
+    return [...closed].reverse().map((m) => {
+      const challengeVotes = (votes ?? []).filter((v) => v.challenge_id === m.challengeId)
+      let winner: (PastChallengeResult & { name: string }) | null = null
+      for (const v of challengeVotes) {
+        if (
+          !winner ||
+          v.points > winner.points ||
+          (v.points === winner.points && v.display_name.localeCompare(winner.name) < 0)
+        ) {
+          winner = {
+            name: v.display_name,
+            points: v.points,
+            distanceKm: v.distance_km,
+            leftApp: v.left_app,
+          }
+        }
+      }
+      const mine = myUserId ? challengeVotes.find((v) => v.user_id === myUserId) : undefined
+      const myResult: PastChallengeResult | null = mine
+        ? { points: mine.points, distanceKm: mine.distance_km, leftApp: mine.left_app }
+        : null
+      return {
+        challengeId: m.challengeId,
+        title: m.title,
+        closedAt: m.deadlineAt ?? m.date,
+        isOwn: m.isOwn,
+        winner,
+        myResult,
+      }
+    })
+  }, [moments, votes, myUserId])
+
   // Ganador (más puntos) y nº de aciertos por reto, derivado de los votos reales.
   // Lo consume el TIMELINE-RESUMEN del recap de cierre: a cada reto le pega su
   // resultado final sin recalcular. Un empate a puntos lo rompe el nombre (asc),
@@ -358,6 +426,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
     recentResults,
     recentTitle,
     winnersByChallenge,
+    pastChallenges,
     loading,
     error,
     refresh,
