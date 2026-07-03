@@ -32,6 +32,13 @@ export interface SubmitVoteResultClient {
   /** Respuesta real para revelar el pin; null en un voto de timeout. */
   answerLat: number | null
   answerLng: number | null
+  /**
+   * Factor de velocidad REALMENTE aplicado por el servidor (issue #628): 1 si no
+   * aplicó ('Libre', `time_scoring` apagado, legacy o sin arranque registrado).
+   * Migración 0034. Se usa para la nota del revelado ("×0,9 por rapidez"), NUNCA
+   * para recalcular puntos — la autoridad es el servidor.
+   */
+  speedFactor: number
 }
 
 /**
@@ -66,7 +73,25 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
     points: row.points,
     answerLat: row.answer_lat,
     answerLng: row.answer_lng,
+    speedFactor: row.speed_factor,
   }
+}
+
+/**
+ * Registra en el SERVIDOR el arranque de la jugada (issue #628, RPC `start_play`):
+ * el cliente la llama al pulsar Empezar, justo antes de la cuenta atrás, para que
+ * `submit_vote` pueda calcular el factor de velocidad contra un reloj que el
+ * jugador no controla. NO re-armable server-side (ON CONFLICT DO NOTHING): una
+ * segunda llamada para el mismo reto no reinicia el cronómetro.
+ *
+ * Best-effort a propósito: el llamador (PlayChallenge) la envuelve con un
+ * reintento corto y, si aun así falla, deja que el juego siga igual — sin
+ * arranque registrado, `submit_vote` aplica factor 1 (degradación honesta, nunca
+ * bloquea la partida).
+ */
+export async function startPlay(challengeId: string): Promise<void> {
+  const { error } = await supabase.rpc('start_play', { p_challenge_id: challengeId })
+  if (error) throw new Error(describeError(error))
 }
 
 export interface SubmitNumberVoteInput {

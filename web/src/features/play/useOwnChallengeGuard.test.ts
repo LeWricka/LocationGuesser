@@ -26,6 +26,7 @@ const baseChallenge: ChallengeForPlay = {
   number_unit: null,
   number_decimals: 0,
   number_tolerance: 'normal',
+  time_scoring: true,
   created_by: 'u-other',
   created_at: '2026-06-19T10:00:00.000Z',
 }

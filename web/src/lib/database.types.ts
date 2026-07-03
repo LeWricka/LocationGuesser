@@ -157,6 +157,10 @@ export interface Database {
           // OJO: `answer_number_src` (la cifra correcta de origen) NO se expone aquí:
           // su privilegio de columna está REVOCADO (anti-spoiler, 0029), igual que
           // lat/lng. La respuesta vive oculta en challenge_answers.answer_number.
+          // LA VELOCIDAD PUNTÚA (0034, issue #628): en el reto de LUGAR, responder
+          // rápido suma y tarde resta, solo con límite por jugada (guess_seconds no
+          // null). Default true (ON). No es spoiler.
+          time_scoring: boolean
           created_by: string
           created_at: string
         }
@@ -193,6 +197,9 @@ export interface Database {
           // privilegio de SELECT está revocado). El trigger la copia a
           // challenge_answers.answer_number. Migración 0029.
           answer_number_src?: number | null
+          // Default true en BD: omitirlo crea un reto con la velocidad activada
+          // (comportamiento por defecto del issue #628). Migración 0034.
+          time_scoring?: boolean
           created_by: string
           created_at?: string
         }
@@ -224,6 +231,8 @@ export interface Database {
           number_tolerance?: 'indulgente' | 'normal' | 'estricto'
           // Spoiler: se escribe, no se lee (privilegio de SELECT revocado). 0029.
           answer_number_src?: number | null
+          // La velocidad puntúa (0034, issue #628).
+          time_scoring?: boolean
           created_by?: string
           created_at?: string
         }
@@ -301,6 +310,10 @@ export interface Database {
           left_app: boolean
           // Segundos que tardó el jugador en votar (null en histórico previo). Migración 0016.
           elapsed_seconds: number | null
+          // Instante en que el servidor registró el arranque (RPC start_play),
+          // copiado aquí al confirmar el voto. Null = sin arranque registrado
+          // (legacy, reto sin límite, o start_play falló). Migración 0034 (#628).
+          play_started_at: string | null
           created_at: string
         }
         Insert: {
@@ -316,6 +329,7 @@ export interface Database {
           points: number
           left_app?: boolean
           elapsed_seconds?: number | null
+          play_started_at?: string | null
           created_at?: string
         }
         Update: {
@@ -331,6 +345,7 @@ export interface Database {
           points?: number
           left_app?: boolean
           elapsed_seconds?: number | null
+          play_started_at?: string | null
           created_at?: string
         }
         Relationships: []
@@ -386,7 +401,20 @@ export interface Database {
           points: number
           answer_lat: number | null
           answer_lng: number | null
+          // Factor de velocidad REALMENTE aplicado (1 = no aplicó: 'Libre',
+          // time_scoring=false, legacy o sin arranque registrado). Migración 0034
+          // (#628); ver `speedFactor` en lib/geo.ts.
+          speed_factor: number
         }[]
+      }
+      // Registra el arranque de la jugada (issue #628): lo llama el cliente al
+      // pulsar Empezar, justo antes de la cuenta atrás. NO re-armable (ON CONFLICT
+      // DO NOTHING server-side): una segunda llamada para el mismo (reto, jugador)
+      // no reinicia el cronómetro. Best-effort: si falla, `submit_vote` aplica
+      // factor 1 (degradación honesta). Migración 0034.
+      start_play: {
+        Args: { p_challenge_id: string }
+        Returns: undefined
       }
       // RPC HERMANA de submit_vote para el reto de NÚMERO (¿Cuánto?): recibe la cifra
       // adivinada (p_guess null = voto de timeout), calcula el error relativo y los

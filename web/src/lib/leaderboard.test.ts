@@ -22,6 +22,7 @@ function vote(
     abs_error: null,
     left_app: false,
     elapsed_seconds: null,
+    play_started_at: null,
     created_at: '2026-06-19T00:00:00.000Z',
     avatar: null,
     ...partial,

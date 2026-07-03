@@ -114,3 +114,26 @@ export function signedRelErrorPct(guess: number, answer: number): string {
   const sign = pct > 0 ? '+' : pct < 0 ? '−' : ''
   return `${sign}${Math.abs(pct)} %`
 }
+
+/** ¿La velocidad puntúa por defecto en un reto de lugar nuevo? Issue #628: ON. */
+export const DEFAULT_TIME_SCORING = true
+
+/**
+ * FACTOR de velocidad del reto de LUGAR (issue #628): premia responder rápido,
+ * penaliza tarde. `factor = 0.5 + 0.5·(1 − elapsed/límite)`, con `elapsed`
+ * ACOTADO a [0, límite] — instantáneo ≈100%, al límite = 50%. Solo aplica con
+ * `timeScoring` activo Y límite por jugada (`guessSeconds` no null; en 'Libre'
+ * no hay nada que medir) Y un `elapsedSeconds` conocido; si falta cualquiera,
+ * factor 1 (sin cambio). REPLICA la RPC `submit_vote` (migración 0034): la
+ * puntuación real la calcula y devuelve el servidor (autoridad de servidor); esta
+ * función es para el texto del revelado ("×0,9 por rapidez"), no para puntuar.
+ */
+export function speedFactor(
+  elapsedSeconds: number | null,
+  guessSeconds: number | null,
+  timeScoring: boolean,
+): number {
+  if (!timeScoring || guessSeconds == null || elapsedSeconds == null) return 1
+  const clamped = Math.max(0, Math.min(guessSeconds, elapsedSeconds))
+  return 0.5 + 0.5 * (1 - clamped / guessSeconds)
+}

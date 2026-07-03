@@ -12,7 +12,7 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
-import type { LatLng } from '../../lib/geo'
+import { DEFAULT_TIME_SCORING, type LatLng } from '../../lib/geo'
 import { AppHeader, SegmentedControl, Spinner, useToast } from '../../ui'
 import { IconGps } from '../../ui/icons/IconGps'
 import { IconCandado } from '../../ui/icons/IconCandado'
@@ -130,6 +130,10 @@ export function CreateLocationChallenge({
 
   const [deadlineIndex, setDeadlineIndex] = useState(DEFAULT_DEADLINE_INDEX)
   const [guessIndex, setGuessIndex] = useState(DEFAULT_GUESS_INDEX)
+  // La velocidad puntúa (issue #628): ON por defecto. Solo tiene sentido con
+  // límite por jugada (el toggle se OCULTA en 'Libre'), pero conservamos el
+  // valor aunque se oculte — al volver a un límite, reaparece con lo elegido.
+  const [timeScoring, setTimeScoring] = useState(DEFAULT_TIME_SCORING)
 
   // Foto opcional del reto (issue #595): puro extra sobre el Street View, que ya
   // es la pista principal. NO se lee su EXIF (el sitio ya lo fija el mapa del
@@ -288,6 +292,9 @@ export function CreateLocationChallenge({
         svPitch: pov.pitch,
         deadlineAt: deadlineFromMinutes(DEADLINE_OPTIONS[deadlineIndex].minutes),
         guessSeconds: GUESS_OPTIONS[guessIndex].value,
+        // La velocidad puntúa (issue #628): inerte sin límite ('Libre'), así que
+        // se manda tal cual sin condicionar aquí (submit_vote ya lo filtra).
+        timeScoring,
         imagePath,
         // Decisión issue #595: sin toggle nuevo, se mantiene el comportamiento
         // MÁS SIMPLE ya existente en el resto de flujos de crear (default de
@@ -305,6 +312,7 @@ export function CreateLocationChallenge({
         has_photo: Boolean(imagePath),
         has_streetview: true,
         guess_seconds: GUESS_OPTIONS[guessIndex].value,
+        time_scoring: timeScoring,
         photo_is_hint: imagePath ? true : null,
         duration_hours: DEADLINE_OPTIONS[deadlineIndex].minutes / 60,
         difficulty: 'streetview',
@@ -487,6 +495,31 @@ export function CreateLocationChallenge({
                   onChange={(v) => setGuessIndex(Number(v))}
                 />
               </div>
+              {/* La velocidad puntúa (issue #628): ON por defecto, SOLO visible
+                  con límite por jugada — sin límite ('Libre') no hay nada que
+                  medir, así que el toggle no aporta nada y se oculta. */}
+              {GUESS_OPTIONS[guessIndex].value != null && (
+                <div className={styles.ruleRow}>
+                  <div className={styles.toggleRow}>
+                    <label className={styles.ruleLabel} htmlFor="time-scoring-toggle">
+                      La velocidad puntúa
+                    </label>
+                    <button
+                      type="button"
+                      id="time-scoring-toggle"
+                      role="switch"
+                      aria-checked={timeScoring}
+                      className={`${styles.toggle} ${timeScoring ? styles.toggleOn : ''}`}
+                      onClick={() => setTimeScoring((v) => !v)}
+                    >
+                      <span className={styles.toggleThumb} />
+                    </button>
+                  </div>
+                  <span className={styles.toggleHint}>
+                    Responder rápido suma puntos; tarde, resta.
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
