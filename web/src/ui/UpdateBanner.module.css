@@ -1,0 +1,73 @@
+/* Pill flotante, mismo recipe que Toast.module.css (papel + hairline + sombra):
+ * el aviso de "hay versión nueva" habla el mismo idioma que el resto de los
+ * avisos flotantes de la app. A diferencia del toast, NO se auto-descarta (la
+ * actualización sigue pendiente hasta que el usuario la aplica o se oculta la
+ * pestaña — ver main.tsx), así que no lleva animación de salida ni temporizador.
+ */
+.banner {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: min(360px, calc(100vw - var(--space-6)));
+
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-lg);
+
+  animation: update-banner-in var(--motion-transition-base);
+}
+
+.icon {
+  flex: none;
+  color: var(--color-accent);
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.action {
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.action:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@keyframes update-banner-in {
+  from {
+    transform: translateX(-50%) translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .banner {
+    animation: none;
+  }
+}
