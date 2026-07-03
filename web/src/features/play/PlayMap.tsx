@@ -23,13 +23,20 @@ const ANSWER_PIN_SIZE = 34
 
 // Target de lucide como data-URI SVG. El color sale del token `--accent` en
 // runtime (Google necesita un literal; no hardcodeamos el color en el repo).
+//
+// Halo blanco por debajo (issue #602): el revelado pasa a satélite siempre, y
+// un trazo fino de acento se funde con tonos oscuros de la tesela (mar,
+// bosque). Se dibuja el mismo trío de aros dos veces — blanco y más grueso
+// debajo, color de acento encima — para que se lea sobre cualquier fondo.
 function answerPinUri(color: string): string {
+  const rings =
+    '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${ANSWER_PIN_SIZE}" height="${ANSWER_PIN_SIZE}" ` +
-    `viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.25" ` +
-    'stroke-linecap="round" stroke-linejoin="round">' +
-    '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/>' +
-    '<circle cx="12" cy="12" r="2"/></svg>'
+    'viewBox="0 0 24 24" fill="none">' +
+    `<g stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">${rings}</g>` +
+    `<g stroke="${color}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">${rings}</g>` +
+    '</svg>'
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
 }
 
@@ -57,10 +64,16 @@ interface Props {
   /** Id del jugador: ancla el avatar por defecto cuando no hay avatar elegido. */
   meUserId: string
   /**
-   * Lienzo del mapa (preset central de `mapPresets`):
-   *  - `jugar` (por defecto): callejero ETIQUETADO tipo GeoGuessr (roadmap de Google
-   *    con calles y nombres) para colocar el pin navegando — el mapa no es ciego.
-   *  - `diario`: satélite con etiquetas (hybrid), por si se quiere la foto aérea.
+   * HISTÓRICO — desde el toggle Satélite/Mapa propio de PlayMap (issue #602) ya
+   * no decide la capa por sí solo:
+   *  - Revelado (`locked`): SIEMPRE satélite (decisión del dueño — separar
+   *    guess/reveal en dos estilos de mapa es artificial si comparten
+   *    componente, así que "aplica a ambos"). El prop se mantiene en la
+   *    interfaz solo por compatibilidad con los llamantes existentes
+   *    (`GameScene`/`PlayChallenge`, fuera del área de este cambio); ya no se lee.
+   *  - Interactivo (adivinando, `!locked`): la capa la elige el jugador con el
+   *    toggle propio de este componente (por defecto satélite, persistido en
+   *    `LAYER_KEY`), independientemente de lo que llegue aquí.
    */
   preset?: MapPreset
   /**
@@ -72,10 +85,60 @@ interface Props {
   fixedCenterPin?: boolean
 }
 
-// El preset elige el tipo de mapa de Google: `jugar` → callejero etiquetado
-// (roadmap, GeoGuessr); `diario` → satélite con etiquetas (hybrid).
-function mapTypeForPreset(preset: MapPreset): string {
-  return preset === 'jugar' ? 'roadmap' : 'hybrid'
+// Capa base del mapa interactivo (issue #602): satélite por defecto, coherente
+// con el Street View del propio reto; callejero como alternativa vía toggle.
+type BaseLayer = 'satellite' | 'street'
+
+const LAYER_LABELS: Record<BaseLayer, string> = {
+  satellite: 'Satélite',
+  street: 'Mapa',
+}
+
+// Misma clave que el toggle de `features/create/MapPicker.tsx` (constante NO
+// exportada allí): aunque el motor de mapas es distinto (Google aquí, Leaflet +
+// Esri en MapPicker), "¿satélite o callejero?" es la MISMA preferencia del
+// jugador, y compartir la clave la hace viajar entre crear y jugar. Duplicada
+// aquí a propósito — extraerla a un módulo común obligaría a tocar MapPicker,
+// fuera del área de este cambio (issue #602).
+const LAYER_KEY = 'lg.mapLayer'
+
+// Satélite por defecto (decisión del dueño, #602). Solo se respeta lo guardado
+// si el jugador ya eligió explícitamente "Mapa"; cualquier otro valor (o
+// ausencia) cae a satélite.
+function readStoredLayer(): BaseLayer {
+  const v = localStorage.getItem(LAYER_KEY)
+  return v === 'street' ? 'street' : 'satellite'
+}
+
+// mapTypeId de Google para cada capa: 'satellite' → hybrid (foto aérea +
+// etiquetas, como el antiguo preset 'diario'); 'street' → roadmap (callejero
+// etiquetado, como el antiguo preset 'jugar').
+function mapTypeForLayer(layer: BaseLayer): string {
+  return layer === 'satellite' ? 'hybrid' : 'roadmap'
+}
+
+// Pastilla Satélite/Mapa (issue #602): mismo patrón visual que el toggle de
+// MapPicker (capa activa = acento sólido + anillo blanco), con las clases y el
+// chrome propios de la escena de juego (`--chrome-*`, ver `.glassBtn` en
+// PlayChallenge.module.css) en vez del chrome de MapPicker (`--map-chrome-*`)
+// — visualmente equivalentes, solo cambia el token de origen para no acoplar
+// este componente al CSS module de otra feature.
+function LayerToggle({ layer, onChoose }: { layer: BaseLayer; onChoose: (l: BaseLayer) => void }) {
+  return (
+    <div className={styles.layerToggle} role="group" aria-label="Estilo de mapa">
+      {(Object.keys(LAYER_LABELS) as BaseLayer[]).map((key) => (
+        <button
+          key={key}
+          type="button"
+          className={key === layer ? styles.layerBtnActive : styles.layerBtn}
+          aria-pressed={key === layer}
+          onClick={() => onChoose(key)}
+        >
+          {LAYER_LABELS[key]}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 /**
@@ -181,13 +244,26 @@ function DrawnLine({ guess, answer }: { guess: LatLng; answer: LatLng }) {
   }, [animate, guess, answer])
 
   return (
-    <Polyline
-      path={path}
-      strokeColor={accentColor()}
-      strokeWeight={3}
-      strokeOpacity={1}
-      clickable={false}
-    />
+    <>
+      {/* Halo blanco (issue #602): igual razón que el pin de la respuesta — con el
+          revelado siempre en satélite, una traza blanca más ancha por debajo
+          separa la línea de acento del terreno (se pierde sobre agua/bosque
+          sin esto). Mismo `path` animado que la línea de encima. */}
+      <Polyline
+        path={path}
+        strokeColor="#ffffff"
+        strokeWeight={6}
+        strokeOpacity={0.9}
+        clickable={false}
+      />
+      <Polyline
+        path={path}
+        strokeColor={accentColor()}
+        strokeWeight={3}
+        strokeOpacity={1}
+        clickable={false}
+      />
+    </>
   )
 }
 
@@ -214,12 +290,28 @@ export function PlayMap({
   onPick,
   meAvatar,
   meUserId,
-  preset = 'jugar',
+  // `preset` ya no decide la capa (ver el JSDoc del prop en `Props`): se
+  // mantiene en la firma solo por compatibilidad con los llamantes existentes
+  // (`GameScene`/`PlayChallenge`, fuera del área de este cambio), que siguen
+  // pasándolo sin que este componente lo lea.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- ver comentario arriba
+  preset: _preset = 'jugar',
   fixedCenterPin = false,
 }: Props) {
   // En modo pin de centro fijo no se ve el pin-avatar (lo sustituye el pin clavado
   // al centro de la pantalla); tampoco se marca tocando, sino moviendo el mapa.
   const centerPinMode = fixedCenterPin && !answer
+
+  // Capa base (issue #602): revelado (`locked`) siempre satélite — decisión del
+  // dueño de aplicarla a ambos, ver JSDoc de `preset`. Adivinando, el jugador
+  // decide con el toggle propio (`LayerToggle`, más abajo), que arranca de la
+  // preferencia guardada (satélite por defecto).
+  const [layer, setLayer] = useState<BaseLayer>(() => (locked ? 'satellite' : readStoredLayer()))
+
+  function chooseLayer(next: BaseLayer) {
+    setLayer(next)
+    localStorage.setItem(LAYER_KEY, next)
+  }
 
   // Estado de carga: mientras el SDK de Google no ha pintado sus teselas, el lienzo
   // se ve oscuro ("parece roto"). Tapamos el hueco con `MapSkeleton` hasta el primer
@@ -239,11 +331,11 @@ export function PlayMap({
         // Un dedo mueve el mapa en móvil (sin el banner "usa dos dedos"), igual que
         // el worldCopyJump/arrastre fluido de antes.
         gestureHandling="greedy"
-        // Tipo de mapa según el PRESET (mapPresets): `jugar` → callejero etiquetado
-        // tipo GeoGuessr (roadmap, calles y nombres para colocar el pin navegando);
-        // `diario` → satélite con etiquetas (hybrid). Sin mapId: Marker clásico, no
-        // AdvancedMarker. Forzamos esquema claro (no seguir el modo oscuro del SO).
-        mapTypeId={mapTypeForPreset(preset)}
+        // Tipo de mapa según la CAPA (issue #602): 'satellite' → satélite con
+        // etiquetas (hybrid); 'street' → callejero etiquetado tipo GeoGuessr
+        // (roadmap). Sin mapId: Marker clásico, no AdvancedMarker. Forzamos
+        // esquema claro (no seguir el modo oscuro del SO).
+        mapTypeId={mapTypeForLayer(layer)}
         colorScheme="LIGHT"
         disableDefaultUI
         zoomControl
@@ -272,6 +364,17 @@ export function PlayMap({
       {!skeletonGone && (
         <MapSkeleton hidden={mapReady} onFadeOutEnd={() => setSkeletonGone(true)} />
       )}
+
+      {/* Toggle Satélite/Mapa (issue #602): solo en modo interactivo (adivinando);
+          el mapa bloqueado (revelado) no lo necesita, su capa es siempre satélite
+          (ver JSDoc de `preset`). Arriba-IZQUIERDA, NO arriba-derecha como en
+          MapPicker: en el mapa expandido de "Adivinar" (GameScene), esa esquina ya
+          la ocupa el botón de cerrar (`mapaExpandidoCerrar`, fuera de este
+          componente) — para no taparlo ("sin tapar controles") se cambia de lado.
+          Se esconde con `@container` en el thumbnail colapsado (128px, PlayMap
+          dentro de `.miniMapaScene`): ahí no cabe ni hace falta, y ese contenedor
+          ya es `pointer-events: none` (solo abre el mapa al tocar). */}
+      {!locked && <LayerToggle layer={layer} onChoose={chooseLayer} />}
 
       {/* Pin de CENTRO FIJO: clavado en el centro de la pantalla mientras el jugador
           mueve el mapa debajo. Decorativo (pointer-events:none) para no robar el
