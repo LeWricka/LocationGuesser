@@ -1,0 +1,114 @@
+/* EDITAR RECUERDO — formulario de PAPEL (issue #571). Misma gramática visual
+   que "Nuevo recuerdo" (`AddMoment.module.css`): cabecera a sangre + cuerpo con
+   gutter en bloques de papel. Se duplica aquí a propósito (features/trip no
+   importa CSS de features/create): son primitivas de formulario, no un
+   componente compartido; extraerlas a un sitio común queda para cuando haya un
+   tercer formulario con esta misma piel. */
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.body {
+  width: 100%;
+  padding: 0 var(--space-4) var(--space-6);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* El popover del DatePicker (position:absolute, z-index alto) vive dentro del
+   stacking context que crea `lg-stagger` en cada bloque directo (issue #521,
+   mismo arreglo que `AddMoment.module.css`): sin esto queda por DEBAJO del CTA
+   "Guardar", que es un hermano posterior en el DOM. */
+.block:has([aria-label='Elegir fecha']) {
+  position: relative;
+  z-index: var(--z-sheet);
+}
+
+.blockLabel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.optional {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-normal);
+}
+
+.placeRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.removePlace {
+  appearance: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  background: transparent;
+  border: 0;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+/* Textarea de descripción: misma piel que los Input del kit (no hardcodear). */
+.textarea {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  resize: vertical;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.textarea::placeholder {
+  color: var(--color-text-faint);
+}
+
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-glow-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .textarea {
+    transition: none;
+  }
+}

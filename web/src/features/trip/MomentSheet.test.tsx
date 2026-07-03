@@ -55,6 +55,7 @@ function renderSheet(props: Partial<Parameters<typeof MomentSheet>[0]> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   updateChallengeDescriptionMock.mockResolvedValue(undefined)
+  updateMomentMock.mockResolvedValue({})
 })
 
 describe('MomentSheet', () => {
@@ -84,6 +85,45 @@ describe('MomentSheet', () => {
     expect(updateChallengeDescriptionMock).toHaveBeenCalledWith('c1', 'Descripción nueva')
     // ...y AVISA al padre para refrescar el viaje (sin esto la edición "no se guardaba").
     expect(onEdited).toHaveBeenCalledTimes(1)
+  })
+
+  test('editar el recuerdo muestra el formulario de papel, sin el héroe (fix #571)', async () => {
+    const user = userEvent.setup()
+    const onEdited = vi.fn()
+    renderSheet({ onEdited })
+
+    await user.click(screen.getByRole('button', { name: 'Editar recuerdo' }))
+
+    // El héroe de la ESCENA (título gigante duplicado, chip de país flotando)
+    // desaparece: editar es una TAREA de papel, no la vista.
+    expect(screen.queryByRole('heading', { name: 'Aguas turquesa' })).not.toBeInTheDocument()
+    // En su lugar, cabecera utilitaria con la misma gramática que "Nuevo recuerdo".
+    expect(screen.getByRole('heading', { name: 'Editar recuerdo' })).toBeInTheDocument()
+    const titleInput = screen.getByLabelText(/título/i)
+    expect(titleInput).toHaveValue('Aguas turquesa')
+
+    await user.clear(titleInput)
+    await user.type(titleInput, 'Aguas turquesa (editado)')
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(updateMomentMock).toHaveBeenCalledWith(
+      'c1',
+      expect.objectContaining({ title: 'Aguas turquesa (editado)' }),
+    )
+    expect(onEdited).toHaveBeenCalledTimes(1)
+    // Guardado: vuelve a la vista (el héroe reaparece).
+    expect(screen.queryByRole('heading', { name: 'Editar recuerdo' })).not.toBeInTheDocument()
+  })
+
+  test('cancelar la edición vuelve a la vista sin guardar (fix #571)', async () => {
+    const user = userEvent.setup()
+    renderSheet()
+
+    await user.click(screen.getByRole('button', { name: 'Editar recuerdo' }))
+    await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+
+    expect(updateMomentMock).not.toHaveBeenCalled()
+    expect(screen.getByRole('heading', { name: 'Aguas turquesa' })).toBeInTheDocument()
   })
 
   test('no se renderiza la hoja con moment null', () => {
