@@ -52,7 +52,7 @@
 }
 
 .dot {
-  color: var(--color-text-faint);
+  color: var(--color-text-muted); /* AA: faint falla contraste (gotcha recurrente) */
 }
 
 .tagline {
@@ -66,7 +66,7 @@
   margin: var(--space-4) 0 0;
   font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
-  color: var(--color-text-faint);
+  color: var(--color-text-muted); /* AA: faint falla contraste (gotcha recurrente) */
 }
 
 /* Pie de acciones (#607): fila que ocupa todo el ancho del footer del Modal y
