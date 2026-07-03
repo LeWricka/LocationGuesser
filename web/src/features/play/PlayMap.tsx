@@ -34,7 +34,7 @@ function answerPinUri(color: string): string {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${ANSWER_PIN_SIZE}" height="${ANSWER_PIN_SIZE}" ` +
     'viewBox="0 0 24 24" fill="none">' +
-    `<g stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">${rings}</g>` +
+    `<g stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">${rings}</g>` + // design-lint-allow: halo del pin en SVG data-URI, no puede leer var(--)
     `<g stroke="${color}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">${rings}</g>` +
     '</svg>'
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
@@ -251,7 +251,7 @@ function DrawnLine({ guess, answer }: { guess: LatLng; answer: LatLng }) {
           sin esto). Mismo `path` animado que la línea de encima. */}
       <Polyline
         path={path}
-        strokeColor="#ffffff"
+        strokeColor="#ffffff" // design-lint-allow: la API de Google Maps exige color literal
         strokeWeight={6}
         strokeOpacity={0.9}
         clickable={false}
