@@ -107,6 +107,14 @@
   outline-offset: -2px;
 }
 
+/* Foto que falló al subir (#550): anillo de peligro. Va DESPUÉS de la regla de
+   portada para ganarle cuando una foto es portada Y ha fallado a la vez (misma
+   especificidad, gana el orden de aparición). */
+.tile[data-error] {
+  outline: 2px solid var(--color-danger);
+  outline-offset: -2px;
+}
+
 .thumb {
   display: block;
   width: 100%;
@@ -131,6 +139,24 @@
   padding: 2px var(--space-2);
   border-radius: var(--radius-full);
   background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Badge de fallo (#550): mismo formato que coverBadge, tono de peligro. Sale
+   en el mismo hueco (una foto no puede mostrar los dos badges a la vez, ver
+   MomentGalleryPicker.tsx). */
+.errorBadge {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
   color: var(--color-on-accent);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);

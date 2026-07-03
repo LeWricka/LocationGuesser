@@ -134,5 +134,33 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
     expect(createMomentMock).not.toHaveBeenCalled()
     // El título sigue ahí: no se perdió el formulario.
     expect(screen.getByLabelText(/título/i)).toHaveValue('Mi recuerdo')
+    // La foto fallida queda MARCADA en el picker (#550), no desaparece sin más:
+    // el dueño ve cuál fue y puede quitarla o reintentar pulsando guardar de nuevo.
+    expect(await screen.findByText('No subida')).toBeInTheDocument()
+  })
+
+  test('reintentar pulsando «Guardar recuerdo» vuelve a intentar la foto marcada como fallida (#550)', async () => {
+    uploadImageMock
+      .mockRejectedValueOnce(new ImageDecodeError('rota.jpg'))
+      .mockResolvedValueOnce('ok/rota.jpg')
+    createMomentMock.mockResolvedValue({
+      challenge: { id: 'm1', title: 'Mi recuerdo' } as ChallengeForPlay,
+      groupId: 'g1',
+    })
+    addMomentImagesMock.mockResolvedValue(undefined)
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [fakeFile('rota.jpg')])
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+    expect(await screen.findByText('No subida')).toBeInTheDocument()
+
+    // Reintento: SIN tocar nada más, vuelve a pulsar guardar y esta vez sube.
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    expect(uploadImageMock).toHaveBeenCalledTimes(2)
+    expect(await screen.findByText('Recuerdo guardado')).toBeInTheDocument()
   })
 })

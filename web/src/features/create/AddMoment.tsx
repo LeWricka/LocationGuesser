@@ -79,6 +79,10 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
   // quitar/desmontar para no fugar memoria.
   const [photos, setPhotos] = useState<DraftPhoto[]>([])
   const [readingExif, setReadingExif] = useState(false)
+  // Ids de fotos que fallaron al subir en el ÚLTIMO intento de guardado (#550):
+  // las marcamos en el picker (borde/badge) para que el dueño sepa cuáles
+  // quitar o reintentar, en vez de que desaparezcan sin más contexto.
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(new Set())
 
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -133,6 +137,13 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       const found = prev.find((p) => p.id === id)
       if (found) URL.revokeObjectURL(found.previewUrl)
       return prev.filter((p) => p.id !== id)
+    })
+    // Ya no tiene sentido seguir marcándola como fallida si se quita.
+    setFailedPhotoIds((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
     })
   }
 
@@ -208,15 +219,23 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
     }
 
     setBusy(true)
+    // Reinicia el marcado de fallos del intento anterior: este intento decide
+    // de cero qué fotos quedan marcadas (si una fallida ya subió esta vez, deja
+    // de estarlo).
+    setFailedPhotoIds(new Set())
     try {
-      // Fotos opcionales: subida comprimida y SIN EXIF, en ORDEN (la 1ª es la
-      // portada). Las paths conservan el orden de LAS QUE SÍ SUBIERON (remate del
-      // #520): si una foto falla al decodificar (ImageDecodeError, con .fileName),
-      // no abortamos el recuerdo entero — la saltamos y seguimos con las demás. Un
-      // error de infraestructura (red, Storage caído) SÍ aborta: seguir intentando
-      // no ayuda y el mensaje de red del catch de fuera es más útil que el de foto.
+      // Fotos opcionales: subida comprimida y SIN EXIF, EN SECUENCIA (una foto
+      // detrás de otra, no en paralelo — la presión de memoria de decodificar
+      // varias fotos de cámara a la vez en un móvil es sospechosa cuando fallan
+      // TODAS, #550) y en ORDEN (la 1ª es la portada). Las paths conservan el
+      // orden de LAS QUE SÍ SUBIERON (remate del #520): si una foto falla al
+      // decodificar (ImageDecodeError, con .fileName), no abortamos el recuerdo
+      // entero — la saltamos y seguimos con las demás. Un error de
+      // infraestructura (red, Storage caído) SÍ aborta: seguir intentando no
+      // ayuda y el mensaje de red del catch de fuera es más útil que el de foto.
       const paths: string[] = []
       const failedFileNames: string[] = []
+      const failedIds: string[] = []
       for (let i = 0; i < photos.length; i++) {
         setStatus(
           photos.length > 1 ? `Subiendo fotos… (${i + 1}/${photos.length})` : 'Subiendo la foto…',
@@ -225,17 +244,25 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
           paths.push(await uploadImage(photos[i].file))
         } catch (err) {
           if (!(err instanceof ImageDecodeError)) throw err
-          reportError(err, { area: 'add_moment', stage: 'upload_photo' })
+          reportError(err, {
+            area: 'add_moment',
+            stage: 'upload_photo',
+            groupId,
+            fileName: err.fileName,
+          })
           failedFileNames.push(err.fileName)
+          failedIds.push(photos[i].id)
         }
       }
 
       // Si había fotos y NINGUNA subió, no guardamos un recuerdo "a medias" sin
-      // avisar: error claro y el formulario (título, lugar, fotos) queda intacto
-      // para reintentar o quitar la foto problemática.
+      // avisar: error claro, marcamos cuáles fallaron en el picker (borde/badge)
+      // y el formulario (título, lugar, fotos) queda intacto para reintentar
+      // pulsando «Guardar recuerdo» de nuevo o quitar la foto problemática.
       if (photos.length > 0 && paths.length === 0) {
         setStatus(null)
         setBusy(false)
+        setFailedPhotoIds(new Set(failedIds))
         toast.show(
           failedFileNames.length === 1
             ? `No se pudo subir «${failedFileNames[0]}». Prueba con otra foto o quítala para guardar sin fotos.`
@@ -365,6 +392,7 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
           <MomentGalleryPicker
             photos={photos}
             loading={readingExif}
+            failedIds={failedPhotoIds}
             onAdd={(files) => void onAddPhotos(files)}
             onRemove={onRemovePhoto}
             onMakeCover={onMakeCover}

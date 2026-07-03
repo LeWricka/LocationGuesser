@@ -1,5 +1,5 @@
 import type { ChangeEvent } from 'react'
-import { Camera, Star, Trash2 } from 'lucide-react'
+import { AlertTriangle, Camera, Star, Trash2 } from 'lucide-react'
 import { Icon, Spinner } from '../../ui'
 import styles from './MomentGalleryPicker.module.css'
 
@@ -17,6 +17,12 @@ interface Props {
   photos: DraftPhoto[]
   /** Lectura del EXIF de la primera foto en curso: muestra spinner y bloquea. */
   loading?: boolean
+  /**
+   * Ids de fotos que fallaron al subir en el último intento de guardado
+   * (#550): se marcan con borde/badge de error para que el dueño sepa cuáles
+   * quitar o reintentar en vez de que desaparezcan sin explicación.
+   */
+  failedIds?: ReadonlySet<string>
   /** Añade fotos (selección múltiple del móvil). */
   onAdd: (files: File[]) => void
   /** Quita una foto por su id local. */
@@ -37,6 +43,7 @@ interface Props {
 export function MomentGalleryPicker({
   photos,
   loading = false,
+  failedIds,
   onAdd,
   onRemove,
   onMakeCover,
@@ -76,18 +83,30 @@ export function MomentGalleryPicker({
       <ul className={styles.strip}>
         {photos.map((photo, i) => {
           const isCover = i === 0
+          const failed = failedIds?.has(photo.id) ?? false
           return (
-            <li key={photo.id} className={styles.tile} data-cover={isCover || undefined}>
+            <li
+              key={photo.id}
+              className={styles.tile}
+              data-cover={isCover || undefined}
+              data-error={failed || undefined}
+            >
               <img className={styles.thumb} src={photo.previewUrl} alt="" />
               {i === 0 && loading && (
                 <span className={styles.thumbBusy} aria-hidden>
                   <Spinner size={20} />
                 </span>
               )}
-              {isCover && (
-                <span className={styles.coverBadge}>
-                  <Icon icon={Star} size={14} fill="currentColor" /> Portada
+              {failed ? (
+                <span className={styles.errorBadge}>
+                  <Icon icon={AlertTriangle} size={14} /> No subida
                 </span>
+              ) : (
+                isCover && (
+                  <span className={styles.coverBadge}>
+                    <Icon icon={Star} size={14} fill="currentColor" /> Portada
+                  </span>
+                )
               )}
               <div className={styles.tileActions}>
                 {!isCover && (
