@@ -1,17 +1,20 @@
-// Mini-simulación CSS de un gesto del producto (issue #625): sustituye al icono
-// estático de las slides por una coreografía sobria del MISMO icono (sin capturas
-// ni assets externos, sin CDNs). Cada `kind` es un gesto reconocible que se repite
-// en varios tutoriales (ver slides.ts): tocar/capturar, guardar, ubicar en el
-// mapa, compartir por enlace, cuenta atrás, o la sorpresa de la bienvenida.
+// Mini-simulación de un gesto del producto (issue #625, imagen real desde #636):
+// una coreografía sobria del icono de la slide (tocar/capturar, guardar, ubicar en
+// el mapa, compartir por enlace, cuenta atrás, o la sorpresa de la bienvenida) SOBRE
+// una imagen real de fondo (captura de producto o foto de viaje, ver slides.ts) —
+// antes era un lienzo liso (`--scene-bg`), que en captura se leía "vacío/triste"
+// (feedback del dueño). La imagen es la ÚNICA parte del escenario que cambia por
+// slide; el gesto animado sigue siendo el mismo vocabulario acotado de siempre.
 //
-// Se monta DENTRO de un "escenario" (tarjeta con marco, patrón de las capturas de
-// producto de la landing — aquí sin imagen, solo el icono animado) para que lea
-// como una demo del producto y no como un simple icono decorativo.
+// Se monta DENTRO de un "escenario" (marco de móvil, patrón de las capturas de
+// producto de la landing — aquí compacto) para que lea como una demo del producto,
+// no como un simple icono decorativo.
 //
 // Toda la animación es de ENTRADA (un ciclo, o como mucho un puñado de pasadas
 // acotadas para el eco del pin/timer) — nunca decorativa en bucle. Se apaga entera
 // con prefers-reduced-motion (ver el módulo CSS).
 
+import type { CSSProperties } from 'react'
 import { Icon } from '../../ui'
 import type { OnboardingSlide } from './slides'
 import styles from './OnboardingVisual.module.css'
@@ -19,11 +22,24 @@ import styles from './OnboardingVisual.module.css'
 interface Props {
   visual: OnboardingSlide['visual']
   icon: OnboardingSlide['icon']
+  /** Imagen real de fondo del marco (ver slides.ts: captura de producto o foto de viaje). */
+  image: OnboardingSlide['image']
 }
 
-export function OnboardingVisual({ visual, icon }: Props) {
+// La imagen llega por CSS custom property (no `style.backgroundImage` directo):
+// así el módulo CSS sigue siendo la única fuente de verdad del resto de capas
+// (escala, posición, velo de contraste) y el TSX solo aporta el dato que varía.
+function stageStyle(image: string): CSSProperties {
+  return { '--stage-image': `url('${image}')` } as CSSProperties
+}
+
+export function OnboardingVisual({ visual, icon, image }: Props) {
   return (
-    <div className={[styles.stage, styles[`stage-${visual}`]].join(' ')} aria-hidden="true">
+    <div
+      className={[styles.stage, styles[`stage-${visual}`]].join(' ')}
+      style={stageStyle(image)}
+      aria-hidden="true"
+    >
       {/* El escenario del pin dibuja una retícula de mapa detrás del icono. */}
       {visual === 'pin' && <span className={styles.grid} />}
       {/* El escenario del timer dibuja el aro de cuenta atrás detrás del icono. */}

@@ -81,7 +81,7 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
             cada paso, no solo al abrir el tutorial. */}
         <div className={styles.slide} key={index}>
           <div className={styles.reveal} style={revealStyle(0)}>
-            <OnboardingVisual visual={slide.visual} icon={slide.icon} />
+            <OnboardingVisual visual={slide.visual} icon={slide.icon} image={slide.image} />
           </div>
           <div className={[styles.heading, styles.reveal].join(' ')} style={revealStyle(1)}>
             {/* Eyebrow editorial con el paso actual (p.ej. "Tabide · 1 de 3"):
