@@ -18,30 +18,49 @@ import path from 'node:path'
 // jsdom no calcula layout real (alturas en píxeles), así que este test monta
 // la hoja de estilos REAL de `MapPicker.module.css` en jsdom (cuyo motor de
 // selectores sí resuelve la cascada) y comprueba, vía `getComputedStyle`, que
-// el PRIMER hijo de `.wrap` (la fila del buscador) queda anclado a su alto
-// natural (`flex: none` → `flex-grow: 0`) mientras `.canvas` sigue creciendo
-// para absorber el resto (`flex-grow: 1`) — mismo patrón que ya usa
+// la fila del buscador (`.searchRow`) queda anclada a su alto natural
+// (`flex: none` → `flex-grow: 0`) mientras `.canvas` sigue creciendo para
+// absorber el resto (`flex-grow: 1`) — mismo patrón que ya usa
 // `PlaceSearch.test.tsx` para su regresión de stacking (#574) y
 // `Toast.test.tsx` para la suya (#552).
+//
+// La regla vivía en `.wrap > :first-child` (genérico); pasó a `.searchRow`
+// (issue #585) porque con la variante 'overlay' del buscador `.canvas` es el
+// ÚNICO/primer hijo de `.wrap` — el selector genérico le habría comido el
+// `flex: 1` propio por más especificidad. Este test comprueba que la clase
+// explícita solo afecta al elemento que de verdad es la fila del buscador.
 describe('MapPicker — el buscador no se reparte el alto con el mapa (#574)', () => {
   function loadRealStylesheet(): void {
     const css = fs.readFileSync(path.resolve(__dirname, './MapPicker.module.css'), 'utf8')
     const style = document.createElement('style')
-    style.textContent = `:root { --space-2: 8px; } ${css}`
+    style.textContent = `:root { --space-2: 8px; --tap-target: 44px; } ${css}`
     document.head.appendChild(style)
   }
 
-  test('el primer hijo de .wrap (fila del buscador) no crece; .canvas sí', () => {
+  test('.searchRow (fila del buscador) no crece; .canvas sí', () => {
     loadRealStylesheet()
     const wrap = document.createElement('div')
     wrap.className = 'wrap'
     const searchRow = document.createElement('div')
+    searchRow.className = 'searchRow'
     const canvas = document.createElement('div')
     canvas.className = 'canvas'
     wrap.append(searchRow, canvas)
     document.body.appendChild(wrap)
 
     expect(getComputedStyle(searchRow).flexGrow).toBe('0')
+    expect(getComputedStyle(canvas).flexGrow).toBe('1')
+  })
+
+  test('variante overlay: .canvas es el único hijo de .wrap y conserva flex-grow: 1', () => {
+    loadRealStylesheet()
+    const wrap = document.createElement('div')
+    wrap.className = 'wrap'
+    const canvas = document.createElement('div')
+    canvas.className = 'canvas'
+    wrap.append(canvas)
+    document.body.appendChild(wrap)
+
     expect(getComputedStyle(canvas).flexGrow).toBe('1')
   })
 })

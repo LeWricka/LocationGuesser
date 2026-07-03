@@ -11,20 +11,27 @@
   min-height: 0;
 }
 
-/* La fila del buscador debe quedarse en su alto NATURAL (issue #574):
-   `PlaceSearch.module.css` define su propio `.wrap` con `flex: 1`, pensado
-   para cuando comparte fila con el botón de cerrar en `.fullscreenTop` (ahí
-   SÍ debe crecer para ocupar el ancho). Pero en ESTE contenedor (columna),
-   ese mismo `flex: 1` compite por ALTO con `.canvas` (también `flex: 1`) y
-   los reparte a partes iguales — en un contenedor de alto definido (p.ej.
-   "¿Dónde?", con `height: 100%` forzado por
+/* La fila del buscador (variante 'above', default) debe quedarse en su alto
+   NATURAL (issue #574): `PlaceSearch.module.css` define su propio `.wrap` con
+   `flex: 1`, pensado para cuando comparte fila con el botón de cerrar en
+   `.fullscreenTop` (ahí SÍ debe crecer para ocupar el ancho). Pero en ESTE
+   contenedor (columna), ese mismo `flex: 1` compite por ALTO con `.canvas`
+   (también `flex: 1`) y los reparte a partes iguales — en un contenedor de
+   alto definido (p.ej. "¿Dónde?", con `height: 100%` forzado por
    CreateLocationChallenge.module.css `.mapArea > :first-child`) el buscador
    se infla a ~345px de hueco muerto bajo el campo y el mapa se comprime a la
    mitad de su alto disponible (medido: 698px de alto total → 345/345 en vez
    de ~54/644). `flex: none` lo ancla a su contenido; `align-items: stretch`
    (valor por defecto, no tocado) ya le da el 100% del ANCHO sin necesitar
-   crecer en el eje principal (vertical) de esta columna. */
-.wrap > :first-child {
+   crecer en el eje principal (vertical) de esta columna.
+   Clase dedicada (`.searchRow`) en vez de `.wrap > :first-child` (issue #585):
+   con la variante 'overlay' el buscador se muda DENTRO de `.canvas` (barra de
+   vidrio flotante) y `.canvas` pasa a ser el único/primer hijo de `.wrap` — un
+   selector genérico de "el primer hijo" le habría aplicado `flex: none` a
+   `.canvas` por más especificidad (`.wrap > :first-child` gana a `.canvas`),
+   dejando el mapa sin alto. Una clase explícita solo afecta al elemento que
+   de verdad es la fila del buscador, nunca a `.canvas`. */
+.searchRow {
   flex: none;
 }
 
@@ -74,6 +81,31 @@
 
 .controls > * {
   pointer-events: auto;
+}
+
+/* Variante 'overlay' (#585): la barra de vidrio del buscador se queda con la
+   franja superior entera, así que estos controles (capa) bajan a abajo-der,
+   apilados por ENCIMA de la atribución colapsada (que vive en esa misma
+   esquina) para no solaparse con ella. */
+.controlsBottom {
+  top: auto;
+  bottom: calc(var(--tap-target) + var(--space-2));
+}
+
+/* Barra de vidrio flotante del buscador DENTRO del lienzo (variante 'overlay',
+   #585): franja superior a todo el ancho (menos el gutter). `display: flex`
+   para que el `flex: 1` propio de `PlaceSearch.module.css .wrap` (pensado
+   para repartir fila con un botón vecino) estire el campo al ancho completo
+   en vez de quedarse en su ancho intrínseco. Los resultados cuelgan de
+   `PlaceSearch` mismo (su `.results` ya lleva `--z-sheet`, por encima del
+   mapa); aquí solo posicionamos la barra. */
+.searchOverlay {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  right: var(--space-2);
+  z-index: var(--z-sticky);
+  display: flex;
 }
 
 /* Selector de capa: pastilla blanca translúcida (chrome Atelier). */

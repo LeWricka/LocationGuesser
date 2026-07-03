@@ -57,5 +57,9 @@ export function StreetViewPreview({ panoId, heading, pitch, onPovChange }: Props
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streetViewLib, panoId])
 
-  return <div ref={ref} className={styles.preview} aria-label="Vista previa de Street View" />
+  // role="img": un div genérico no admite aria-label (axe: aria-prohibited-attr);
+  // como imagen etiquetada, el panorama queda nombrado para lectores de pantalla.
+  return (
+    <div ref={ref} className={styles.preview} role="img" aria-label="Vista previa de Street View" />
+  )
 }
