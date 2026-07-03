@@ -1,6 +1,7 @@
 import { MapPin } from 'lucide-react'
 import { AppHeader, Button, DatePicker, Field, Icon, Input, Stack } from '../../ui'
 import { MapPicker } from '../create/MapPicker'
+import { VoiceRecorder, type VoiceValue } from '../create/VoiceRecorder'
 import { MomentGallery } from './MomentGallery'
 import type { Moment } from '../../lib/trip'
 import type { LatLng } from '../../lib/geo'
@@ -20,6 +21,9 @@ interface Props {
   maxDate: string
   place: LatLng | null
   onPlaceChange: (place: LatLng | null) => void
+  /** Nota de voz del recuerdo (≤60s, issue #648): existente, regrabada o ninguna. */
+  voice: VoiceValue
+  onVoiceChange: (value: VoiceValue) => void
   saving: boolean
   onCancel: () => void
   onSave: () => void
@@ -54,6 +58,8 @@ export function EditMomentForm({
   maxDate,
   place,
   onPlaceChange,
+  voice,
+  onVoiceChange,
   saving,
   onCancel,
   onSave,
@@ -141,6 +147,16 @@ export function EditMomentForm({
               />
             )}
           </Field>
+
+          {/* NOTA DE VOZ — junto a la descripción (issue #648), mismo sitio que
+              en "Nuevo recuerdo". `VoiceRecorder` es controlado: `existing` si el
+              recuerdo ya tenía una, `draft` si se regrabó, `none` si se descartó. */}
+          <div className={styles.voiceField}>
+            <span className={styles.voiceLabel}>
+              Nota de voz <span className={styles.optional}>opcional</span>
+            </span>
+            <VoiceRecorder value={voice} onChange={onVoiceChange} disabled={saving} />
+          </div>
 
           <Field label="Fecha">
             {(fieldProps) => (

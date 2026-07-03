@@ -130,6 +130,10 @@ export interface Database {
           place_lat: number | null
           place_lng: number | null
           image_path: string | null
+          // Nota de voz opcional (≤60s), path en Storage (bucket images, prefijo
+          // audio/<uuid>.<ext>). No es spoiler (como image_path): se sirve siempre.
+          // Null = sin nota de voz. Migración 0035.
+          audio_path: string | null
           sv_pano_id: string | null
           sv_heading: number | null
           sv_pitch: number | null
@@ -176,6 +180,8 @@ export interface Database {
           place_lat?: number | null
           place_lng?: number | null
           image_path?: string | null
+          // Nota de voz opcional (0035); omitirla deja el momento sin nota.
+          audio_path?: string | null
           sv_pano_id?: string | null
           sv_heading?: number | null
           sv_pitch?: number | null
@@ -214,6 +220,8 @@ export interface Database {
           place_lat?: number | null
           place_lng?: number | null
           image_path?: string | null
+          // Nota de voz opcional (0035); null la quita.
+          audio_path?: string | null
           sv_pano_id?: string | null
           sv_heading?: number | null
           sv_pitch?: number | null

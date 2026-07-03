@@ -29,6 +29,8 @@ vi.mock('./observability', () => ({
 
 import {
   uploadImage,
+  uploadAudio,
+  extensionForMime,
   signedImageUrl,
   ImageDecodeError,
   SIGNED_URL_TTL_SECONDS,
@@ -156,6 +158,60 @@ describe('signedImageUrl — TTL por defecto (issue #638)', () => {
   test('si Storage devuelve error, resuelve null en vez de lanzar', async () => {
     createSignedUrl.mockResolvedValue({ data: null, error: new Error('boom') })
     await expect(signedImageUrl('viajes/foto.jpg')).resolves.toBeNull()
+  })
+})
+
+// Nota de voz (issue #648): la extensión sale del MIME REAL que grabó el
+// navegador (opus/webm en Chrome/Firefox, aac/mp4 en Safari) — sin recomprimir
+// ni forzar un único formato.
+describe('extensionForMime — mapeo MIME real de MediaRecorder → extensión (#648)', () => {
+  test('audio/webm;codecs=opus (Chrome/Firefox) → webm', () => {
+    expect(extensionForMime('audio/webm;codecs=opus')).toBe('webm')
+  })
+
+  test('audio/webm sin codecs → webm', () => {
+    expect(extensionForMime('audio/webm')).toBe('webm')
+  })
+
+  test('audio/mp4 (Safari, AAC) → m4a (extensión reconocible para audio-only)', () => {
+    expect(extensionForMime('audio/mp4')).toBe('m4a')
+  })
+
+  test('audio/mp4;codecs=mp4a.40.2 (con codecs) → m4a igual', () => {
+    expect(extensionForMime('audio/mp4;codecs=mp4a.40.2')).toBe('m4a')
+  })
+
+  test('audio/aac → aac (subtipo tal cual, sin mapeo especial)', () => {
+    expect(extensionForMime('audio/aac')).toBe('aac')
+  })
+
+  test('mime vacío o irreconocible → webm por defecto (no revienta)', () => {
+    expect(extensionForMime('')).toBe('webm')
+  })
+})
+
+describe('uploadAudio — sube al bucket images bajo el prefijo audio/ (#648)', () => {
+  test('sube con el path audio/<uuid>.<ext> y el content-type real', async () => {
+    const blob = new Blob(['audio-bytes'], { type: 'audio/webm;codecs=opus' })
+    const path = await uploadAudio(blob, 'audio/webm;codecs=opus')
+
+    expect(path).toMatch(/^audio\/[0-9a-f-]+\.webm$/)
+    expect(upload).toHaveBeenCalledWith(
+      path,
+      blob,
+      expect.objectContaining({ contentType: 'audio/webm;codecs=opus' }),
+    )
+  })
+
+  test('un mimeType Safari (mp4) sube con extensión .m4a', async () => {
+    const blob = new Blob(['audio-bytes'], { type: 'audio/mp4' })
+    const path = await uploadAudio(blob, 'audio/mp4')
+    expect(path).toMatch(/\.m4a$/)
+  })
+
+  test('si Storage devuelve error, lo propaga (no lo traga en silencio)', async () => {
+    upload.mockResolvedValueOnce({ error: new Error('storage boom') })
+    await expect(uploadAudio(new Blob(['x']), 'audio/webm')).rejects.toThrow('storage boom')
   })
 })
 

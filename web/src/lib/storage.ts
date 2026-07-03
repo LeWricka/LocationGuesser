@@ -472,6 +472,38 @@ export async function uploadImage(file: File): Promise<string> {
 }
 
 /**
+ * Extensión de fichero a partir del MIME real que grabó `MediaRecorder` (#648):
+ * Chrome/Firefox graban `audio/webm;codecs=opus`, Safari `audio/mp4` (AAC). No
+ * forzamos un único formato (recomprimir audio en cliente es caro y sin ganancia
+ * real aquí) — cada navegador sube lo que sabe grabar, con su extensión real.
+ * `mp4` → `m4a`: mismo contenedor, pero es la extensión que un jugador/descarga
+ * reconoce para audio-only (un `.mp4` "pelado" confunde). Sin match conocido,
+ * cae al subtipo tal cual (mejor una extensión rara que perder el archivo).
+ */
+export function extensionForMime(mime: string): string {
+  const base = mime.split(';')[0]?.trim().split('/')[1]?.toLowerCase()
+  if (!base) return 'webm'
+  return base === 'mp4' ? 'm4a' : base
+}
+
+/**
+ * Sube una nota de voz (blob de `MediaRecorder`, ≤60s) al MISMO bucket privado
+ * `images`, bajo el prefijo `audio/` — comparte RLS y régimen de URLs firmadas
+ * con las fotos, sin crear un bucket nuevo para un archivo ocasional y pequeño.
+ * Sin recompresión (a diferencia de `uploadImage`): el audio ya sale comprimido
+ * del propio `MediaRecorder`. Devuelve el `path` para `challenges.audio_path`.
+ */
+export async function uploadAudio(blob: Blob, mimeType: string): Promise<string> {
+  const path = `audio/${crypto.randomUUID()}.${extensionForMime(mimeType)}`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+    contentType: mimeType || 'application/octet-stream',
+    cacheControl: '31536000',
+  })
+  if (error) throw error
+  return path
+}
+
+/**
  * TTL por defecto de una URL firmada del bucket privado (issue #638). Antes eran
  * 3600s (1h): de sobra para una visita normal, pero una PWA puede quedar viva en
  * segundo plano mucho más tiempo (pestaña dormida, app en background) — al
@@ -485,11 +517,13 @@ export async function uploadImage(file: File): Promise<string> {
 export const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24
 
 /**
- * URL firmada (temporal) de una imagen del bucket a partir de su `path`. El
- * bucket es PRIVADO (la foto puede revelar el sitio = la respuesta, sobre todo
- * en modo sorpresa), así que no vale `getPublicUrl`: se firma con caducidad y
- * solo un usuario autenticado (miembro) puede generarla (RLS de storage). Null
- * si no se puede firmar. Async: se resuelve en el cliente.
+ * URL firmada (temporal) de un objeto del bucket `images` a partir de su
+ * `path` — sirve tanto para una foto como para una nota de voz (`audio/…`,
+ * #648): ambas comparten bucket y régimen de acceso. El bucket es PRIVADO (el
+ * contenido puede revelar el sitio = la respuesta, sobre todo en modo
+ * sorpresa), así que no vale `getPublicUrl`: se firma con caducidad y solo un
+ * usuario autenticado (miembro) puede generarla (RLS de storage). Null si no
+ * se puede firmar. Async: se resuelve en el cliente.
  */
 export async function signedImageUrl(
   path: string,

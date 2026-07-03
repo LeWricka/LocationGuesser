@@ -241,6 +241,7 @@ const CHALLENGE_ROW = {
   place_lat: null,
   place_lng: null,
   image_path: 'images/hermetic.jpg',
+  audio_path: null,
   sv_pano_id: null,
   sv_heading: null,
   sv_pitch: null,

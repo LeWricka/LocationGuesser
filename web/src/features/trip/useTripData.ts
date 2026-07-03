@@ -133,6 +133,9 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   const [answersById, setAnswersById] = useState<Map<string, LatLng>>(new Map())
   // URL firmada de cada foto, indexada por challenge_id (bucket privado).
   const [imageUrlById, setImageUrlById] = useState<Record<string, string>>({})
+  // URL firmada de cada nota de voz, indexada por challenge_id (mismo bucket
+  // privado, prefijo `audio/`, #648). Mismo patrón que `imageUrlById`.
+  const [audioUrlById, setAudioUrlById] = useState<Record<string, string>>({})
   // País por challenge_id, resuelto de forma escalonada y no bloqueante (abajo).
   // Solo se rellena para CERRADOS con coord; va apareciendo según se resuelve.
   const [countryById, setCountryById] = useState<Record<string, CountryInfo | null>>({})
@@ -169,6 +172,17 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         ),
       )
       setImageUrlById(Object.fromEntries(pairs.filter((p): p is [string, string] => p[1] != null)))
+
+      // Firmar las notas de voz en lote, mismo patrón que las fotos (#648).
+      const withAudio = c.filter((ch) => ch.audio_path)
+      const audioPairs = await Promise.all(
+        withAudio.map(
+          async (ch) => [ch.id, await signedImageUrl(ch.audio_path as string)] as const,
+        ),
+      )
+      setAudioUrlById(
+        Object.fromEntries(audioPairs.filter((p): p is [string, string] => p[1] != null)),
+      )
       lastResolvedAtRef.current = Date.now()
     } catch {
       setError('No hemos podido cargar el viaje. Reintenta en un momento.')
@@ -289,6 +303,8 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         deadlineAt: ch.deadline_at,
         imageUrl: imageUrlById[ch.id] ?? null,
         imagePath: ch.image_path,
+        audioUrl: audioUrlById[ch.id] ?? null,
+        audioPath: ch.audio_path,
         lat: coord.lat,
         lng: coord.lng,
         guessedCount: guessedCountById.get(ch.id)?.size ?? 0,
@@ -301,7 +317,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         country: countryById[ch.id],
       }
     })
-  }, [challenges, answersById, imageUrlById, guessedCountById, countryById, myUserId])
+  }, [challenges, answersById, imageUrlById, audioUrlById, guessedCountById, countryById, myUserId])
 
   // Ruta: los momentos con un lugar VISIBLE en el mapa, en orden cronológico ASC.
   // Entran los RECUERDOS con lugar (place_*) y los RETOS CERRADOS con respuesta

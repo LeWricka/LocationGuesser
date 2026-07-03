@@ -27,6 +27,10 @@ export { useToast } from './toast-context'
 export type { ToastApi, ToastOptions, ToastTone } from './toast-context'
 export { withViewTransition, useReducedMotion } from './motion'
 export { Icon } from './Icon'
+// Reproductor mínimo de audio (nota de voz, #648): play/pausa + progreso +
+// duración. Presentacional (recibe una URL ya resuelta); lo usan el preview de
+// `VoiceRecorder` (features/create) y la vista de `MomentSheet` (features/trip).
+export { AudioPlayer } from './AudioPlayer'
 
 // Fundamentos del rediseño (Oleada 0): cabecera única, hoja inferior formal,
 // control segmentado, número+unidad, chip y banner. Antes existían pero no se
