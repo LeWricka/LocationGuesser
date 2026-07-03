@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -16,6 +16,7 @@ class MockMap {
   handlers: Record<string, Handler[]> = {}
   fitBoundsCalls: unknown[] = []
   easeToCalls: unknown[] = []
+  jumpToCalls: unknown[] = []
   opts: Record<string, unknown>
   constructor(opts: Record<string, unknown>) {
     this.opts = opts
@@ -37,13 +38,16 @@ class MockMap {
   easeTo(opts: unknown) {
     this.easeToCalls.push(opts)
   }
+  jumpTo(opts: unknown) {
+    this.jumpToCalls.push(opts)
+  }
   getCenter() {
     return { lng: 0, lat: 0 }
   }
   setCenter() {}
   stop() {}
   remove() {}
-  /** Dispara los handlers registrados con `on(event, …)` (simula 'load' del mapa real). */
+  /** Dispara los handlers registrados con `on(event, …)` (simula 'load'/'dragstart'/… del mapa real). */
   fire(event: string) {
     for (const h of this.handlers[event] ?? []) h()
   }
@@ -62,6 +66,11 @@ class MockMarker {
   }
   addTo() {
     return this
+  }
+  /** Elemento HTML del marker (real API de maplibre-gl): HomeGlobe lo usa para
+   * alternar la clase "lead" sin reconstruir el marker (ver `applyActiveLead`). */
+  getElement(): HTMLElement {
+    return this.opts.element as HTMLElement
   }
   remove() {}
 }
@@ -107,6 +116,25 @@ function samplePins(): GlobePin[] {
     { id: 'sidney', lat: -33.8688, lng: 151.2093, title: 'Sídney', imageUrl: null, targetId: 't2' },
   ]
 }
+
+// Simula prefers-reduced-motion (mismo patrón que CountUp.test.tsx/TripPage.test.tsx):
+// jsdom no implementa `matchMedia` por defecto.
+function mockReducedMotion(matches: boolean) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }))
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
 
 describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
   test('crea cada Marker con opacityWhenCovered: 0 (oculto en vez de atenuado al 20%)', async () => {
@@ -221,5 +249,122 @@ describe('HomeGlobe — pin "lead" no se sale de position:absolute (#523)', () =
     loadRealStylesheets()
     const el = homePinElement(true)
     expect(getComputedStyle(el).position).toBe('absolute')
+  })
+})
+
+// --- #567: globo reactivo — prop `activeTargetId` -------------------------------
+describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () => {
+  test('cambiar a un targetId con pin: vuela (easeTo) a su centro y le pone "lead", retirándoselo al anterior', async () => {
+    // Sídney arranca "lead" por DATO (`pin.lead`), como el pin más reciente de un
+    // viaje real. Al activar Lisboa por `activeTargetId`, el override debe ganarle
+    // la exclusividad aunque Sídney la trajera horneada desde el propio dato.
+    const pins: GlobePin[] = [
+      { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+      {
+        id: 'sidney',
+        lat: -33.8688,
+        lng: 151.2093,
+        title: 'Sídney',
+        imageUrl: null,
+        targetId: 't2',
+        lead: true,
+      },
+    ]
+    const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(markerInstances).toHaveLength(2))
+
+    const [lisboaEl, sidneyEl] = markerInstances.map((m) => m.getElement())
+    expect(sidneyEl.classList.contains('lg-home-pin--lead')).toBe(true)
+    expect(lisboaEl.classList.contains('lg-home-pin--lead')).toBe(false)
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+
+    rerender(<HomeGlobe pins={pins} activeTargetId="t1" />)
+
+    expect(lisboaEl.classList.contains('lg-home-pin--lead')).toBe(true)
+    expect(sidneyEl.classList.contains('lg-home-pin--lead')).toBe(false)
+    expect(mapInstances[0].easeToCalls).toHaveLength(1)
+    expect(mapInstances[0].easeToCalls[0]).toMatchObject({
+      center: [-9.1393, 38.7223],
+      duration: 700,
+    })
+  })
+
+  test('activeTargetId null/undefined: no vuela y no toca el "lead" (comportamiento actual intacto)', async () => {
+    const pins = samplePins()
+    const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(markerInstances).toHaveLength(2))
+
+    rerender(<HomeGlobe pins={pins} activeTargetId={undefined} />)
+
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+    expect(mapInstances[0].jumpToCalls).toHaveLength(0)
+    for (const marker of markerInstances) {
+      expect(marker.getElement().classList.contains('lg-home-pin--lead')).toBe(false)
+    }
+  })
+
+  test('un targetId sin pin correspondiente es un no-op (ni clase ni cámara)', async () => {
+    const pins = samplePins()
+    const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(markerInstances).toHaveLength(2))
+
+    rerender(<HomeGlobe pins={pins} activeTargetId="no-existe" />)
+
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+    for (const marker of markerInstances) {
+      expect(marker.getElement().classList.contains('lg-home-pin--lead')).toBe(false)
+    }
+  })
+
+  test('prefers-reduced-motion: salto directo (jumpTo), sin easeTo', async () => {
+    mockReducedMotion(true)
+    const pins = samplePins()
+    const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(markerInstances).toHaveLength(2))
+
+    rerender(<HomeGlobe pins={pins} activeTargetId="t2" />)
+
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+    expect(mapInstances[0].jumpToCalls).toHaveLength(1)
+    expect(mapInstances[0].jumpToCalls[0]).toMatchObject({ center: [151.2093, -33.8688] })
+    expect(markerInstances[1].getElement().classList.contains('lg-home-pin--lead')).toBe(true)
+  })
+
+  test('gesto en curso (drag): el resaltado se aplica pero el vuelo se cancela, no se encola', async () => {
+    const pins = samplePins()
+    const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(markerInstances).toHaveLength(2))
+
+    mapInstances[0].fire('dragstart')
+    rerender(<HomeGlobe pins={pins} activeTargetId="t2" />)
+
+    // Con el gesto en curso: "lead" sí, vuelo no (cancelado, no pendiente).
+    expect(markerInstances[1].getElement().classList.contains('lg-home-pin--lead')).toBe(true)
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+
+    mapInstances[0].fire('dragend')
+    // Al soltar NO se relanza sola (era cancelación, no cola): sigue sin volar hasta
+    // que `activeTargetId` cambie de nuevo.
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+
+    rerender(<HomeGlobe pins={pins} activeTargetId="t1" />)
+    expect(mapInstances[0].easeToCalls).toHaveLength(1)
+    expect(markerInstances[0].getElement().classList.contains('lg-home-pin--lead')).toBe(true)
+    expect(markerInstances[1].getElement().classList.contains('lg-home-pin--lead')).toBe(false)
   })
 })
