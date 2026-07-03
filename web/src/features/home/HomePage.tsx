@@ -198,6 +198,10 @@ export function HomePage() {
           onPlayPinned={
             pinned ? () => gotoChallenge(pinned.groupId, pinned.challengeId) : undefined
           }
+          // Recuperación de portadas caducadas (issue #638): si una tarjeta falla al
+          // pintar su foto (URL firmada caducada, PWA viva horas), recargamos la home
+          // por delante en vez de dejarla en blanco.
+          onCoverError={() => void reload()}
         />
       ) : (
         // Recién llegado: mismo patrón globo + hoja. El globo arranca con pines DEMO

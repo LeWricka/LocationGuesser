@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, afterEach } from 'vitest'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HomeDashboard } from './HomeDashboard'
@@ -317,6 +317,76 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Ver todos' }))
       expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument()
       expect(sessionStorage.getItem('lg-home-trip-filter')).toBe('all')
+    })
+  })
+
+  // Issue #638: la captura del dueño mostraba tarjetas en blanco tras ~1h de PWA
+  // viva — la URL firmada había caducado, el `<img>` de precarga fallaba, y el
+  // `onerror` viejo marcaba la portada como "cargada" igualmente (fundido sobre
+  // nada). El fix distingue el fallo del éxito y ofrece una vía de recuperación.
+  describe('portada que falla al precargar (issue #638)', () => {
+    // Doble mínimo de `Image`: dispara SIEMPRE `onerror` al asignar `src` (simula
+    // una URL firmada caducada). Sirve tanto para `useImagePreload` como para
+    // `useAmbientTint` (que también instancia `Image` y ya cae a `null` en su
+    // propio onerror, sin relación con este bug).
+    class FailingImage {
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      crossOrigin = ''
+      complete = false
+      set src(_v: string) {
+        this.onerror?.()
+      }
+    }
+
+    const withCovers: HomeGroup[] = [
+      { id: 'a', name: "Interrail '26", status: 'idle', coverUrl: 'https://x.example/a.jpg' },
+      { id: 'b', name: 'Finde Lisboa', status: 'idle', coverUrl: 'https://x.example/b.jpg' },
+    ]
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.stubGlobal('Image', FailingImage)
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    })
+
+    test('NO finge "cargada": la portada se queda con el tinte/placeholder, no un hueco en blanco', () => {
+      const { container } = render(
+        <HomeDashboard userId="u1" displayName="Lewis" groups={withCovers} />,
+      )
+      const cover = container.querySelector('[data-gid="a"] span[class*="cover"]')
+      expect(cover).not.toBeNull()
+      // Antes del fix: `onerror` marcaba `loaded=true` → clase `lg-photo-in` (fundido
+      // sobre una imagen rota). Ahora se queda oculta, como mientras carga.
+      expect(cover?.className).not.toMatch(/lg-photo-in/)
+    })
+
+    test('dispara onCoverError UNA sola vez, agrupando varias tarjetas que fallan a la vez (debounce)', () => {
+      const onCoverError = vi.fn()
+      render(
+        <HomeDashboard
+          userId="u1"
+          displayName="Lewis"
+          groups={withCovers}
+          onCoverError={onCoverError}
+        />,
+      )
+
+      // Las DOS tarjetas fallaron ya (síncrono, en el propio render): con debounce,
+      // se agrupan en una sola llamada tras la ventana de espera.
+      vi.advanceTimersByTime(500)
+      expect(onCoverError).toHaveBeenCalledTimes(1)
+    })
+
+    test('sin onCoverError, la tarjeta no revienta (recuperación opcional)', () => {
+      expect(() =>
+        render(<HomeDashboard userId="u1" displayName="Lewis" groups={withCovers} />),
+      ).not.toThrow()
+      expect(() => vi.advanceTimersByTime(500)).not.toThrow()
     })
   })
 })

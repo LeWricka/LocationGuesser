@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { GroupInfo } from '../../lib/groupData'
 import { getGroup, getGroupChallenges, isLive, splitByStatus } from '../../lib/groupData'
 import { getAnswers, isPracticeChallenge, type ChallengeForPlay } from '../../lib/challenges'
@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabase'
 import { countryFromCoords, type CountryInfo } from '../../lib/countryFlag'
 import type { LatLng } from '../../lib/geo'
 import type { Moment, MomentStatus, RoutePoint } from '../../lib/trip'
+import { useVisibilityReload } from '../../lib/useVisibilityReload'
 
 // Espera entre peticiones a coords NO cacheadas. Nominatim limita a ~1 req/s;
 // dejamos margen (1.1 s) para no rozar el límite ni en ráfaga.
@@ -136,6 +137,8 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   // Solo se rellena para CERRADOS con coord; va apareciendo según se resuelve.
   const [countryById, setCountryById] = useState<Record<string, CountryInfo | null>>({})
   const [error, setError] = useState<string | null>(null)
+  // Cuándo se resolvió la última carga (issue #638): alimenta `useVisibilityReload`.
+  const lastResolvedAtRef = useRef<number | null>(null)
 
   // Carga conjunta (grupo + retos + votos), reutilizable en el montaje y en cada
   // evento de Realtime. Tras tenerlos, resuelve respuestas e imágenes (asíncrono,
@@ -166,10 +169,19 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         ),
       )
       setImageUrlById(Object.fromEntries(pairs.filter((p): p is [string, string] => p[1] != null)))
+      lastResolvedAtRef.current = Date.now()
     } catch {
       setError('No hemos podido cargar el viaje. Reintenta en un momento.')
     }
   }, [groupId])
+
+  // Re-firma defensiva (issue #638): mismo margen que la home — si la pestaña
+  // vuelve tras estar de fondo con el dato viejo, las fotos del viaje (héroes,
+  // galería) pueden tener la URL firmada caducada; refrescamos por delante.
+  useVisibilityReload(
+    () => lastResolvedAtRef.current,
+    () => void refresh(),
+  )
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh es async: el setState corre tras el fetch, no síncrono

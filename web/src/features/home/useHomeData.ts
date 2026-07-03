@@ -8,11 +8,12 @@
 // pendiente MÁS URGENTE (pendingChallenges ya viene ordenado por deadline) con su
 // foto firmada, para alimentar la tarjeta destacada de la home.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { HomeGroup } from '../../ui'
 import { myGroups, pendingChallenges } from '../../lib/membership'
 import type { MyGroup } from '../../lib/membership'
 import { signedImageUrl } from '../../lib/storage'
+import { useVisibilityReload } from '../../lib/useVisibilityReload'
 
 /** Reto abierto más urgente, ya firmado, para la tarjeta fijada "Te toca jugar". */
 export interface PinnedChallenge {
@@ -107,6 +108,9 @@ async function loadHomeData(userId: string): Promise<HomeData> {
  */
 export function useHomeData(userId: string | undefined) {
   const [state, setState] = useState<State>({ loading: true, error: false, data: EMPTY })
+  // Cuándo se resolvió la última carga (issue #638): NO en el render, sino en un
+  // ref — así `useVisibilityReload` lo lee sin que este hook tenga que reengancharse.
+  const lastResolvedAtRef = useRef<number | null>(null)
 
   const reload = useCallback(async () => {
     if (!userId) {
@@ -115,6 +119,7 @@ export function useHomeData(userId: string | undefined) {
     }
     try {
       const data = await loadHomeData(userId)
+      lastResolvedAtRef.current = Date.now()
       setState({ loading: false, error: false, data })
     } catch {
       setState({ loading: false, error: true, data: EMPTY })
@@ -126,6 +131,15 @@ export function useHomeData(userId: string | undefined) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- carga async, no síncrona
     void reload()
   }, [reload])
+
+  // Re-firma defensiva (issue #638): si la pestaña vuelve tras estar de fondo más
+  // de STALE_RELOAD_MS, las URLs firmadas de portadas/pines pueden haber caducado
+  // (TTL 24h, pero una PWA puede quedar viva más) — recargamos por delante en vez
+  // de esperar a que el usuario vea la home en blanco.
+  useVisibilityReload(
+    () => lastResolvedAtRef.current,
+    () => void reload(),
+  )
 
   return { ...state, reload }
 }
