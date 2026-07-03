@@ -400,9 +400,47 @@
   justify-content: center;
 }
 
-/* Globo del overlay "¿Listo para jugar?": el acento de la marca, tamaño grande. */
-.startGlobe {
+/* Icono del overlay "¿Listo para jugar?" (#545): diana generosa, acento de marca.
+ * Pulso ACOTADO (2 pasadas, nunca infinito — regla dura de motion: entrada o
+ * feedback, jamás decoración en bucle) que anticipa el toque en Empezar. */
+.introIcon {
   color: var(--color-accent);
+  animation: lg-intro-pulse calc(var(--motion-duration-slower) * 2) var(--motion-ease-standard) 2;
+}
+@keyframes lg-intro-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .introIcon {
+    animation: none;
+  }
+}
+
+/* Línea única de anticipación (visual-first: un icono + una frase, no un párrafo). */
+.introLine {
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
+/* Chip del límite de tiempo: un dato (icono + cifra), no una frase. */
+.introTimeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -436,13 +474,87 @@
   }
 }
 
-/* Entrada del bloque de puntuación: aparece con muelle al revelar, en sincronía
- * con el count-up. Se desactiva bajo reduced-motion. `relative` para contener el
- * destello/confeti de la celebración (RevealBurst, posicionado absoluto). */
+/* Contenedor del bloque de puntuación. `relative` para contener el
+ * destello/confeti de la celebración (RevealBurst, posicionado absoluto). El
+ * bloque YA NO aparece de golpe (issue #545): cada hijo tiene su propio tiempo
+ * de entrada (ver .eyebrowIn/.ringIn/.verdictIn/.distIn/.actionsIn más abajo). */
 .scoreReveal {
   position: relative;
   text-align: center;
-  animation: lg-celebrate var(--duration-slower) var(--ease-spring) both;
+}
+
+/*
+ * Coreografía del revelado (#545): el anillo se dibuja SOLO (ScoreRing anima su
+ * trazo ~900ms al montar, en ScoreRing.module.css) mientras los puntos cuentan
+ * (CountUp, ~1200ms). El resto entra EN ORDEN tras el anillo, no junto a él:
+ * titular → anillo (a la vez, t=0) → veredicto (justo cuando el anillo casi ha
+ * terminado de dibujarse) → distancia (poco después) → acciones (al final).
+ *
+ * `backwards` (NUNCA `forwards`/`both`): al terminar, el elemento vuelve a su
+ * estilo normal sin dejar un `transform`/`opacity` residual que lo convierta en
+ * un stacking context permanente (el bug de PR #527, ver convención en
+ * ShellInmersivo.module.css / PR #534).
+ */
+@keyframes lg-reveal-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes lg-reveal-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 1. Titular ("Resultado" / "¡Gran tiro!"): el primero, junto al anillo. */
+.eyebrowIn {
+  animation: lg-reveal-step-in var(--motion-duration-base) var(--motion-ease-standard) backwards;
+}
+
+/* 1. Anillo: entra con un muelle a la vez que el titular; luego dibuja su
+ * trazo por su cuenta (ver comentario arriba). */
+.ringIn {
+  animation: lg-reveal-ring-in var(--motion-duration-slower) var(--motion-ease-spring) backwards;
+}
+
+/* 2. Veredicto cualitativo ("Muy cerca"): sube con fade cuando el anillo ya ha
+ * dibujado casi todo su trazo (~900ms). */
+.verdictIn {
+  animation: lg-reveal-step-in var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 13);
+}
+
+/* 3. Distancia (+ puesto): un paso corto después del veredicto. */
+.distIn {
+  animation: lg-reveal-step-in var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 15);
+}
+
+/* 4. Acciones (compartir, ver Street View/foto, volver a jugar, clasificación):
+ * las últimas, un paso corto tras la distancia. */
+.actionsIn {
+  animation: lg-reveal-step-in var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 17);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eyebrowIn,
+  .ringIn,
+  .verdictIn,
+  .distIn,
+  .actionsIn {
+    animation: none;
+  }
 }
 
 /* Eyebrow del resultado (mayúsculas, tracking ancho). */

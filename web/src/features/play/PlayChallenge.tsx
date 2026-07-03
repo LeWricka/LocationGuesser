@@ -4,9 +4,9 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
-  Globe,
   RotateCcw,
   Share2,
+  Timer,
   TimerOff,
 } from 'lucide-react'
 import { PlayMap } from './PlayMap'
@@ -724,20 +724,24 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             open: phase === 'idle',
             onStart: start,
             onClose: goBack,
+            // Anticipación, no explicación (#545): una diana (el icono ya asociado a
+            // "adivinar" en el mini-mapa/resultado) con un pulso ACOTADO —2 pasadas,
+            // nunca infinito (regla dura de motion: entrada o feedback, no decoración
+            // en bucle)— y UNA línea que dice qué va a pasar. El límite de tiempo, si
+            // lo hay, es un chip (dato), no una frase.
             body: (
               <>
-                <Icon icon={Globe} size={44} className={styles.startGlobe} />
-                <p>
-                  Cuando pulses <strong>Empezar</strong>, podrás{' '}
-                  {hasStreetView ? 'explorar el panorama' : 'ver la foto'} y abrir el mapa para
-                  adivinar.
+                <IconDiana size={64} className={styles.introIcon} />
+                <p className={styles.introLine}>
+                  {hasStreetView
+                    ? 'Explora el panorama y clava tu pin'
+                    : 'Mira la foto y clava tu pin'}
                 </p>
-                {challenge.guess_seconds != null ? (
-                  <p className={styles.status}>
-                    Tendrás {challenge.guess_seconds} segundos para colocar tu pin.
-                  </p>
-                ) : (
-                  <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
+                {challenge.guess_seconds != null && (
+                  <span className={styles.introTimeChip}>
+                    <Icon icon={Timer} size={14} />
+                    {challenge.guess_seconds} s
+                  </span>
                 )}
               </>
             ),
@@ -796,9 +800,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     ni vibra). Va absoluto sobre el bloque, sin capturar toques. */}
                 <RevealBurst active={result.points >= GREAT_SHOT} />
                 {/* Titular de celebración: icono custom + texto cálido si fue gran
-                    tiro; diana neutra si fue un resultado normal. */}
+                    tiro; diana neutra si fue un resultado normal. Entra el primero. */}
                 <span
-                  className={`${styles.scoreEyebrow} ${
+                  className={`${styles.scoreEyebrow} ${styles.eyebrowIn} ${
                     result.points >= GREAT_SHOT ? styles.scoreEyebrowWin : ''
                   }`}
                 >
@@ -815,27 +819,38 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                   )}
                 </span>
                 {/* Anillo de acierto protagonista: % de la puntuación máxima, con
-                    los puntos (count-up) gigantes en el centro. */}
-                <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
-                  <CountUp className={styles.ringPoints} value={result.points} duration={1200} />
-                  <span className={styles.ringUnit}>puntos</span>
-                </ScoreRing>
+                    los puntos (count-up) gigantes en el centro. Coreografía del
+                    revelado (#545): el anillo entra con un muelle y luego DIBUJA su
+                    trazo solo (ScoreRing anima ~900ms al montar); el resto del bloque
+                    (veredicto, distancia, acciones) entra EN ORDEN tras él, no de
+                    golpe — ver los delays de .verdictIn/.distIn/.actionsIn más abajo. */}
+                {/* El anillo entra envuelto (no vía su propio `className`): ScoreRing
+                    ya usa esa prop para `.high` (pulso infinito de gran tiro), que
+                    competiría por la propiedad `animation` con la entrada. */}
+                <div className={styles.ringIn}>
+                  <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
+                    <CountUp className={styles.ringPoints} value={result.points} duration={1200} />
+                    <span className={styles.ringUnit}>puntos</span>
+                  </ScoreRing>
+                </div>
                 <div className={styles.scoreText}>
-                  <span className={styles.scoreLabel}>{distanceLabel(result.km)}</span>
-                  <span className={styles.resultDist}>
+                  <span className={`${styles.scoreLabel} ${styles.verdictIn}`}>
+                    {distanceLabel(result.km)}
+                  </span>
+                  <span className={`${styles.resultDist} ${styles.distIn}`}>
                     a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del objetivo
                   </span>
                   {/* Tu puesto en el reto: pica a mejorar ("3º de 6"). Solo si se
                       pudo calcular con los votos del reto. */}
                   {rank && (
-                    <span className={styles.rank}>
+                    <span className={`${styles.rank} ${styles.distIn}`}>
                       <IconMedalla size={14} />
                       {rank.position}º de {rank.total}
                     </span>
                   )}
                 </div>
                 {saving && (
-                  <Row gap={2} justify="center">
+                  <Row gap={2} justify="center" className={styles.actionsIn}>
                     <Spinner size={16} />
                     <span className={styles.status}>Guardando tu voto…</span>
                   </Row>
@@ -864,6 +879,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 size="lg"
                 onClick={() => void onShareResult()}
                 loading={sharingResult}
+                className={styles.actionsIn}
               >
                 <span className={styles.inlineIcon}>
                   <Icon icon={Share2} size={18} /> Compartir mi resultado
@@ -883,7 +899,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             {/* Street View secundario: oculto tras un botón. Solo si el reto lo
               tiene; los legacy con foto la muestran directa, también plegada. */}
             {(hasStreetView || imageUrl) && (
-              <Stack gap={2} className={styles.secondary}>
+              <Stack gap={2} className={`${styles.secondary} ${styles.actionsIn}`}>
                 <Button
                   variant="secondary"
                   size="sm"
@@ -930,7 +946,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 el juego para retrastear sin SQL; en retos reales NO se monta (rejugar
                 tras ver la respuesta sería trampa). */}
             {isPractice && (
-              <Button variant="secondary" fullWidth onClick={() => void replay()}>
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => void replay()}
+                className={styles.actionsIn}
+              >
                 <span className={styles.inlineIcon}>
                   <Icon icon={RotateCcw} size={16} /> Volver a jugar
                 </span>
@@ -938,7 +959,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             )}
 
             {groupId && (
-              <Row gap={2} justify="end">
+              <Row gap={2} justify="end" className={styles.actionsIn}>
                 <Button
                   variant="secondary"
                   size="sm"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ArrowRight, Hash, Lock, RotateCcw, TimerOff } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Hash, Lock, RotateCcw, Timer, TimerOff } from 'lucide-react'
 import { useVisualViewport } from '../../lib/useVisualViewport'
 import { marcadorGroupHash } from '../../lib/route'
 import { CountdownOverlay } from './CountdownOverlay'
@@ -38,6 +38,7 @@ import {
   useReducedMotion,
   useToast,
 } from '../../ui'
+import { IconDiana } from '../../ui/icons'
 import styles from './PlayNumberChallenge.module.css'
 
 const MAX_POINTS = 5000
@@ -524,19 +525,19 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               </Button>
             }
           >
+            {/* Anticipación, no explicación (#545): diana generosa con un pulso
+                ACOTADO (2 pasadas, nunca infinito) + UNA línea. El límite de tiempo,
+                si lo hay, es un chip (dato), no una frase. Mismo patrón que el reto
+                de lugar (PlayChallenge). */}
             <div className={styles.startBody}>
               <Stack gap={3} align="center">
-                <Icon icon={Hash} size={44} className={styles.startIcon} />
-                <p>
-                  Cuando pulses <strong>Empezar</strong>, verás la pregunta y podrás teclear tu
-                  número.
-                </p>
-                {challenge.guess_seconds != null ? (
-                  <p className={styles.status}>
-                    Tendrás {challenge.guess_seconds} segundos para responder.
-                  </p>
-                ) : (
-                  <p className={styles.status}>Sin límite de tiempo. Tómate lo que necesites.</p>
+                <IconDiana size={64} className={styles.introIcon} />
+                <p className={styles.introLine}>Lee la pregunta y teclea tu número</p>
+                {challenge.guess_seconds != null && (
+                  <span className={styles.introTimeChip}>
+                    <Icon icon={Timer} size={14} />
+                    {challenge.guess_seconds} s
+                  </span>
                 )}
               </Stack>
             </div>
@@ -593,32 +594,37 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               <Stack gap={4} align="center" className={styles.scoreReveal}>
                 <RevealBurst active={result.points >= GREAT_SHOT} />
                 <span
-                  className={`${styles.scoreEyebrow} ${
+                  className={`${styles.scoreEyebrow} ${styles.eyebrowIn} ${
                     result.points >= GREAT_SHOT ? styles.scoreEyebrowWin : ''
                   }`}
                 >
                   {result.points >= GREAT_SHOT ? '¡Casi lo clavas!' : 'Resultado'}
                 </span>
-                <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
-                  <CountUp className={styles.ringPoints} value={result.points} duration={1200} />
-                  <span className={styles.ringUnit}>puntos</span>
-                </ScoreRing>
+                {/* El anillo entra envuelto (no vía su propio `className`): ScoreRing
+                    ya usa esa prop para `.high` (pulso infinito de gran tiro), que
+                    competiría por la propiedad `animation` con la entrada. */}
+                <div className={styles.ringIn}>
+                  <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
+                    <CountUp className={styles.ringPoints} value={result.points} duration={1200} />
+                    <span className={styles.ringUnit}>puntos</span>
+                  </ScoreRing>
+                </div>
                 <div className={styles.scoreText}>
-                  <span className={styles.scoreLabel}>
+                  <span className={`${styles.scoreLabel} ${styles.verdictIn}`}>
                     Dijiste <strong>{fmtNumber(result.guess, decimals, unit)}</strong>
                   </span>
-                  <span className={styles.resultErr}>
+                  <span className={`${styles.resultErr} ${styles.distIn}`}>
                     te fuiste {fmtNumber(result.absError, decimals, unit)} (
                     {signedRelErrorPct(result.guess, result.answer)})
                   </span>
                   {rank && (
-                    <span className={styles.rank}>
+                    <span className={`${styles.rank} ${styles.distIn}`}>
                       {rank.position}º de {rank.total}
                     </span>
                   )}
                 </div>
                 {saving && (
-                  <span className={styles.status}>
+                  <span className={`${styles.status} ${styles.actionsIn}`}>
                     <Spinner size={16} /> Guardando tu voto…
                   </span>
                 )}
@@ -683,7 +689,12 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
 
             {/* Volver a jugar: SOLO en retos de práctica. */}
             {isPractice && (
-              <Button variant="secondary" fullWidth onClick={() => void replay()}>
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => void replay()}
+                className={styles.actionsIn}
+              >
                 <span className={styles.inlineIcon}>
                   <Icon icon={RotateCcw} size={16} /> Volver a jugar
                 </span>
@@ -694,6 +705,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               <Button
                 variant="secondary"
                 size="sm"
+                className={styles.actionsIn}
                 onClick={() => {
                   // Al Marcador (no al Diario): venimos de jugar, lo esperable es
                   // ver la clasificación (#509).

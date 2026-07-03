@@ -173,8 +173,49 @@
   font-size: var(--font-size-md);
   line-height: var(--line-height-normal);
 }
-.startIcon {
+
+/* Icono del overlay "¿Listo para jugar?" (#545): diana generosa, acento de marca.
+ * Pulso ACOTADO (2 pasadas, nunca infinito — regla dura de motion: entrada o
+ * feedback, jamás decoración en bucle) que anticipa el toque en Empezar. Mismo
+ * patrón que PlayChallenge.module.css. */
+.introIcon {
   color: var(--accent);
+  animation: lg-intro-pulse calc(var(--motion-duration-slower) * 2) var(--motion-ease-standard) 2;
+}
+@keyframes lg-intro-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .introIcon {
+    animation: none;
+  }
+}
+
+/* Línea única de anticipación (visual-first: un icono + una frase, no un párrafo). */
+.introLine {
+  font-size: var(--font-size-md);
+  color: var(--ink-900);
+  text-wrap: balance;
+}
+
+/* Chip del límite de tiempo: un dato (icono + cifra), no una frase. */
+.introTimeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--ocean-600);
+  color: var(--ink-600);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Fase REVELADA ── */
@@ -243,6 +284,67 @@
   color: var(--accent);
   font-weight: var(--font-weight-black);
 }
+
+/*
+ * Coreografía del revelado (#545): el anillo se dibuja SOLO (ScoreRing anima su
+ * trazo ~900ms al montar, en ScoreRing.module.css) mientras los puntos cuentan
+ * (CountUp, ~1200ms). El resto entra EN ORDEN tras el anillo: titular → anillo
+ * (a la vez, t=0) → veredicto (cuando el anillo casi ha terminado de dibujarse)
+ * → error/puesto (poco después) → acciones (al final). Mismo patrón que
+ * PlayChallenge.module.css.
+ *
+ * `backwards` (NUNCA `forwards`/`both`): al terminar no deja `transform`/
+ * `opacity` residual (stacking context permanente, el bug de PR #527/#534).
+ */
+@keyframes lg-reveal-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes lg-reveal-ring-in {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.eyebrowIn {
+  animation: lg-reveal-step-in var(--motion-duration-base) var(--motion-ease-standard) backwards;
+}
+.ringIn {
+  animation: lg-reveal-ring-in var(--motion-duration-slower) var(--motion-ease-spring) backwards;
+}
+.verdictIn {
+  animation: lg-reveal-step-in var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 13);
+}
+.distIn {
+  animation: lg-reveal-step-in var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 15);
+}
+.actionsIn {
+  animation: lg-reveal-step-in var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 17);
+}
+@media (prefers-reduced-motion: reduce) {
+  .eyebrowIn,
+  .ringIn,
+  .verdictIn,
+  .distIn,
+  .actionsIn {
+    animation: none;
+  }
+}
+
 .ringPoints {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-black);
