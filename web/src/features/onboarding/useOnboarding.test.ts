@@ -59,3 +59,34 @@ describe('useOnboarding', () => {
     }
   })
 })
+
+// Issue #625: "los tutoriales saltan CADA login". Estos dos casos son el
+// contrato explícito que pidió el dueño: el MISMO usuario no lo vuelve a ver al
+// cerrar y volver a entrar sesión (simulado como dos montajes con el mismo
+// user.id, igual que un logout/login real no cambia el id de una cuenta
+// permanente); un usuario NUEVO en el mismo navegador sí lo ve.
+describe('useOnboarding — persistencia por usuario (#625)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  test('no vuelve a mostrarse tras un logout/login del mismo usuario', () => {
+    const before = renderHook(() => useOnboarding('group', 'user-123'))
+    act(() => before.result.current.markSeen())
+    before.unmount()
+
+    // "Login": nuevo montaje del árbol de React con el MISMO user.id (una cuenta
+    // permanente conserva su id entre sesiones; ver diagnóstico en onboardingFlags.ts).
+    const after = renderHook(() => useOnboarding('group', 'user-123'))
+    expect(after.result.current.shouldShow).toBe(false)
+  })
+
+  test('sí se muestra para un usuario nuevo en el mismo navegador', () => {
+    const owner = renderHook(() => useOnboarding('group', 'user-123'))
+    act(() => owner.result.current.markSeen())
+    owner.unmount()
+
+    const guest = renderHook(() => useOnboarding('group', 'user-456'))
+    expect(guest.result.current.shouldShow).toBe(true)
+  })
+})
