@@ -61,6 +61,51 @@ function showUpdateBanner(onUpdate: () => void) {
   createRoot(container).render(<UpdateBanner onUpdate={onUpdate} />)
 }
 
+// Recarga como mucho una vez, dispare quien dispare (el `controllerchange` real
+// o el cinturón de más abajo).
+let reloaded = false
+function reloadOnce() {
+  if (reloaded) return
+  reloaded = true
+  window.location.reload()
+}
+
+// Solo `true` entre que `onNeedRefresh` avisa de un SW en espera y que lo
+// aplicamos: evita armar el listener/timeout de recarga de más abajo en cada
+// cambio de pestaña si no hay ninguna actualización pendiente.
+let updateAvailable = false
+
+// CAUSA RAÍZ (#627 — "pastilla aparece, Actualizar no hace nada"): el reload
+// automático de `virtual:pwa-register` (workbox-window) depende de un flag
+// `isUpdate` que se fija UNA SOLA VEZ, al registrar el SW, según si
+// `navigator.serviceWorker.controller` YA existía en ese instante. En la
+// PRIMERA visita de la sesión ese controller es `null` (aún no hay SW
+// controlando la pestaña) — y ese flag queda `false` PARA SIEMPRE en esa
+// instancia, incluida cualquier actualización detectada horas después con la
+// MISMA pestaña abierta (el caso normal de Tabide: varios días de viaje sin
+// recargar). El SW nuevo SÍ toma el control (`clientsClaim` en sw.ts + el
+// `controllerchange` SÍ llega — verificado), pero el listener interno de la
+// librería nunca dispara el reload porque comprueba ese flag congelado en
+// `false`. Reproducido con Playwright (build A → preview → build B → tap
+// "Actualizar" en la primera visita, sin recargar entremedias): el título
+// nunca cambiaba a pesar de que `navigator.serviceWorker.controller` ya
+// apuntaba al SW nuevo.
+//
+// Arreglo: no delegamos el reload en ese flag ajeno. Escuchamos
+// `controllerchange` NOSOTROS, armado justo al decidir aplicar la
+// actualización — si llega después de eso es, por construcción, la
+// actualización que acabamos de pedir (acabamos de mandar `SKIP_WAITING`), así
+// que recargamos siempre. CINTURÓN: si a los 1.5 s no ha llegado (algún user
+// agent no lo entrega de forma fiable — el caso que motivó pedirlo en el
+// issue), recargamos igual: más vale una recarga de más que un "Actualizar"
+// que no hace nada.
+function applyUpdate() {
+  updateAvailable = false
+  navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true })
+  setTimeout(reloadOnce, 1500)
+  void updateSW(true)
+}
+
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_swUrl, registration) {
@@ -68,19 +113,20 @@ const updateSW = registerSW({
     setInterval(() => void registration.update(), SW_UPDATE_INTERVAL_MS)
   },
   onNeedRefresh() {
+    updateAvailable = true
     // La pestaña ya está oculta (p.ej. el sondeo de 60 s la encontró mientras el
     // usuario estaba en otra app): nadie mira, la aplicamos ya en vez de esperar
     // a que vuelva y le salte el banner de sorpresa.
-    if (document.hidden) void updateSW(true)
-    else showUpdateBanner(() => void updateSW(true))
+    if (document.hidden) applyUpdate()
+    else showUpdateBanner(applyUpdate)
   },
 })
 
 // Aplica la actualización pendiente en cuanto el usuario deja de mirar la pestaña
 // (la minimiza, cambia de pestaña o de app): el momento en que una recarga es
-// invisible para él. No-op si no hay SW en espera.
+// invisible para él. Solo si hay de verdad una actualización esperando.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) void updateSW(true)
+  if (document.hidden && updateAvailable) applyUpdate()
 })
 
 // Fallback amable cuando un error de render escapa hasta la raíz: la app no se
