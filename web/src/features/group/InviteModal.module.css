@@ -68,3 +68,18 @@
   line-height: var(--line-height-normal);
   color: var(--color-text-faint);
 }
+
+/* Pie de acciones (#607): fila que ocupa todo el ancho del footer del Modal y
+   envuelve si no cabe, en vez de desbordar el panel. min-width:0 deja que cada
+   botón encoja por debajo de su ancho de contenido antes de forzar el wrap. */
+.footerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.footerButton {
+  flex: 1 1 auto;
+  min-width: 0;
+}
