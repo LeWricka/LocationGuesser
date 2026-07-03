@@ -259,7 +259,10 @@
   text-transform: none;
   letter-spacing: normal;
   font-weight: var(--font-weight-medium);
-  color: var(--color-text-muted); /* AA: --ink-400 falla contraste (gotcha .t-label, 3a vez) */
+  /* `muted`, no `faint` (--ink-400 ya es AA tras #611, esto no es por contraste):
+     igual que el resto de badges "opcional" del kit (AddMoment/EditMomentForm),
+     que ya usaban `muted` desde el principio sin ningún problema de AA. */
+  color: var(--color-text-muted);
 }
 
 /* ─── Toggle "La velocidad puntúa" (issue #628) ─────────────────── */

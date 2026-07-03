@@ -66,6 +66,18 @@
 // relacion senal/ruido sin trocear por selector — las mismas tarjetas rasterizadas
 // y los ajustes opticos de 1px generan demasiados falsos positivos. Queda como
 // limpieza manual / posible Fase 2 con scoping por clase (.sheet/.overlay).
+//
+//  9 faint-contrast — issue #611. --ink-400 (alias --color-text-faint) fallaba AA
+//              (4.5:1) y mordio 5 veces: el axe de CI cazaba un USO nuevo cada vez
+//              y se parcheaba a mano a --color-text-muted, pero el token de base
+//              nunca se arreglaba. En vez de vetar el token (perderiamos un nivel
+//              real de la escala tipografica), esta regla recalcula el contraste
+//              del HEX de --ink-400 en tokens.css contra --paper (#F4F3EF) y
+//              blanco (#FFFFFF) en cada build. Si alguien lo vuelve a bajar de AA
+//              sin querer, el build revienta AQUI — no cinco pantallas mas tarde
+//              vía un axe que solo ve usos, nunca el valor del propio token. No
+//              participa del sistema de huellas/baseline (no es un patron que
+//              grandfathering: o el token es AA o no lo es).
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -253,6 +265,67 @@ function lintTsCode(code) {
   return out
 }
 
+// --- centinela de contraste del token "faint" (regla 9, issue #611) ---------
+//
+// Formula WCAG 2.1 de luminancia relativa / ratio de contraste (la misma que usa
+// axe-core), reimplementada aqui en ~15 lineas para no anadir una dependencia
+// solo por esto.
+function srgbChannelToLinear(c8bit) {
+  const c = c8bit / 255
+  return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+}
+function relativeLuminance([r, g, b]) {
+  const [R, G, B] = [r, g, b].map(srgbChannelToLinear)
+  return 0.2126 * R + 0.7152 * G + 0.0722 * B
+}
+function hexToRgb(hex) {
+  const clean = hex.replace('#', '')
+  const full =
+    clean.length === 3
+      ? clean
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : clean
+  const n = parseInt(full, 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+function contrastRatio(hexA, hexB) {
+  const lA = relativeLuminance(hexToRgb(hexA))
+  const lB = relativeLuminance(hexToRgb(hexB))
+  const [hi, lo] = lA > lB ? [lA, lB] : [lB, lA]
+  return (hi + 0.05) / (lo + 0.05)
+}
+
+const AA_NORMAL_TEXT_RATIO = 4.5
+const FAINT_TOKEN_RE = /--ink-400:\s*(#[0-9a-fA-F]{3,8})\s*;/
+const FAINT_BACKGROUNDS = { '--paper (#F4F3EF)': '#f4f3ef', 'blanco (#FFFFFF)': '#ffffff' }
+
+function checkFaintTokenContrast() {
+  const tokensPath = join(webRoot, TOKENS_FILE)
+  const source = readFileSync(tokensPath, 'utf8')
+  const match = source.match(FAINT_TOKEN_RE)
+  if (!match) {
+    return [
+      `design-lint [faint-contrast]: no encuentro "--ink-400: #……;" en ${TOKENS_FILE}. ` +
+        '¿Se renombro o reformateo el token? Actualiza FAINT_TOKEN_RE en scripts/design-lint.mjs.',
+    ]
+  }
+  const hex = match[1]
+  const errors = []
+  for (const [label, bg] of Object.entries(FAINT_BACKGROUNDS)) {
+    const ratio = contrastRatio(hex, bg)
+    if (ratio < AA_NORMAL_TEXT_RATIO) {
+      errors.push(
+        `design-lint [faint-contrast]: --ink-400 (${hex}) da ${ratio.toFixed(2)}:1 sobre ${label} ` +
+          `— por debajo de AA (${AA_NORMAL_TEXT_RATIO}:1). Este es el invariante del issue #611: ` +
+          'si bajas el hex, sube el contraste a la vez (o el gotcha vuelve a morder).',
+      )
+    }
+  }
+  return errors
+}
+
 // --- ejecucion ---------------------------------------------------------------
 
 const cssFiles = walk(srcRoot, ['.css'])
@@ -283,12 +356,21 @@ const scan = (files, lang, lint) => {
 scan(cssFiles, 'css', (path, code) => lintCssCode(path, code))
 scan(tsFiles, 'ts', (_path, code) => lintTsCode(code))
 
+// Regla 9: no es un grep por linea, es un invariante del propio token. Siempre
+// se exige (no entra en el baseline): o el hex de --ink-400 es AA o no lo es.
+const faintContrastErrors = checkFaintTokenContrast()
+
 const updating = process.argv.includes('--update-baseline')
 
 if (updating) {
   const fps = [...new Set(violations.map((v) => v.fp))].sort()
   writeFileSync(baselinePath, JSON.stringify({ fingerprints: fps }, null, 2) + '\n')
   console.log(`design-lint: baseline actualizado con ${fps.length} huellas existentes.`)
+  if (faintContrastErrors.length > 0) {
+    console.error('')
+    faintContrastErrors.forEach((e) => console.error(e))
+    process.exit(1)
+  }
   process.exit(0)
 }
 
@@ -306,19 +388,27 @@ const baseSet = new Set(baseline.fingerprints)
 const fresh = violations.filter((v) => !baseSet.has(v.fp))
 const grandfathered = violations.length - fresh.length
 
-if (fresh.length === 0) {
+if (fresh.length === 0 && faintContrastErrors.length === 0) {
   console.log(
     `design-lint: OK. 0 recaidas nuevas (${grandfathered} violaciones existentes toleradas por baseline).`,
   )
   process.exit(0)
 }
 
-console.error(`design-lint: ${fresh.length} recaida(s) NUEVA(S):\n`)
-for (const v of fresh) {
-  console.error(`  ${v.path}:${v.lineNo}  [${v.ruleId}] ${v.msg}`)
-  console.error(`    ${v.line.trim()}`)
+if (faintContrastErrors.length > 0) {
+  console.error(`design-lint: ${faintContrastErrors.length} violacion(es) de contraste:\n`)
+  faintContrastErrors.forEach((e) => console.error(`  ${e}`))
+  console.error('')
 }
-console.error('\nArreglalo (usa var(--…) / 100dvh / lucide / un solo tab) o, si es legitimo,')
-console.error('anade en la MISMA linea  /* design-lint-allow: motivo */  (o // … en TS/TSX).')
-console.error('NO uses --update-baseline para tapar una recaida.')
+
+if (fresh.length > 0) {
+  console.error(`design-lint: ${fresh.length} recaida(s) NUEVA(S):\n`)
+  for (const v of fresh) {
+    console.error(`  ${v.path}:${v.lineNo}  [${v.ruleId}] ${v.msg}`)
+    console.error(`    ${v.line.trim()}`)
+  }
+  console.error('\nArreglalo (usa var(--…) / 100dvh / lucide / un solo tab) o, si es legitimo,')
+  console.error('anade en la MISMA linea  /* design-lint-allow: motivo */  (o // … en TS/TSX).')
+  console.error('NO uses --update-baseline para tapar una recaida.')
+}
 process.exit(1)

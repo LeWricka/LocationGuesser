@@ -96,7 +96,10 @@
 
 /* Eyebrow editorial con número tabular (los pasos no "bailan"). */
 .eyebrow {
-  color: var(--color-text-muted); /* AA: faint falla contraste (gotcha, 5a mordida — ver #611) */
+  /* `muted`, no `faint`: mismo criterio que el eyebrow de HomeEmptyState (el
+     único otro eyebrow del kit sobre --paper). No es por AA — --ink-400 ya
+     cumple tras #611 (issue que arregló el token de raíz). */
+  color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
 

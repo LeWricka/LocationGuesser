@@ -140,7 +140,26 @@
   /* Tinta (jerarquía de grafito sobre papel). */
   --ink-900: #1b2127; /* titulares, texto principal (grafito, ~15:1 sobre papel, AAA) */
   --ink-600: #575f6c; /* texto secundario / meta (≥5.5:1 AA sobre todos los fondos del sistema) */
-  --ink-400: #9ca3ae; /* ayudas / placeholders / iconos decorativos */
+
+  /* CENTINELA AA (issue #611) — --ink-400 / --color-text-faint.
+   * Hasta jul 2026 este token era #9ca3ae: solo ~2.3:1 sobre --paper y ~2.5:1
+   * sobre blanco, MUY por debajo de AA (4.5:1). Cada pantalla que lo usaba para
+   * texto lo descubría vía el axe de CI (color-contrast) y se parcheaba a mano
+   * a --color-text-muted — pasó 5 veces (etiqueta ".t-label", nota de enlace de
+   * landing, "(opcional)" en crear reto, hint del modal de invitar, eyebrow de
+   * onboarding) porque el token de base nunca se arregló.
+   * Arreglo de raíz: #666b73 SÍ es AA sobre los dos fondos claros del sistema
+   * (ver ratios abajo), con margen sobre el mínimo (no al filo de 4.5, para
+   * absorber redondeos entre esta fórmula y la de axe-core) y sigue leyéndose
+   * más apagado que --ink-600 (mismo salto de tono que antes, solo desplazado
+   * a una zona que ya cumple). Con esto, "decorativo" (icono, placeholder) ya
+   * no implica "sin contraste".
+   * INVARIANTE: el hex de --ink-400 DEBE dar ≥4.5:1 sobre #F4F3EF (--paper) Y
+   * sobre #FFFFFF. `npm run design-lint` recalcula este ratio en cada build
+   * (regla "faint-contrast") y revienta si alguien lo vuelve a bajar sin
+   * enterarse — no confíes solo en el axe de CI, que solo caza USOS nuevos,
+   * nunca el valor del propio token. */
+  --ink-400: #666b73; /* ayudas / placeholders / iconos decorativos — AA: 4.83:1 (paper), 5.36:1 (blanco) */
 
   /* Hairlines — derivadas del grafito (mismo tono que la tinta, opacidad baja). */
   --hairline: rgba(27, 33, 39, 0.1); /* línea estándar */
@@ -655,8 +674,11 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
-  /* Es un rol de ETIQUETA (debe leerse): tinta `muted` (AA en todos los fondos)
-     en vez de `faint`, decorativo y que no cumple contraste a este tamaño. */
+  /* `muted`, no `faint`: es un rol de ETIQUETA que debe leerse con presencia,
+     no un detalle decorativo. Tras #611 `--ink-400`/`faint` ya es AA en todos
+     los fondos, pero se queda un escalón por debajo de `muted` a propósito —
+     `.t-label` quiere ese escalón de más (mismo criterio que el eyebrow de
+     HomeEmptyState y el resto de `.hint` del kit). */
   color: var(--color-text-muted);
 }
 

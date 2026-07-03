@@ -30,7 +30,9 @@
 .error {
   margin: 0;
   text-align: center;
-  color: var(--color-text-muted); /* AA: faint falla contraste (gotcha recurrente) */
+  /* `muted`, no `faint`: mensaje de error, máxima legibilidad. No es por AA
+     (--ink-400 ya cumple tras #611) — un error no debería leerse apagado. */
+  color: var(--color-text-muted);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
 }
@@ -39,7 +41,10 @@
   margin: var(--space-4) 0 0;
   font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
-  color: var(--color-text-muted); /* AA: faint falla contraste (gotcha recurrente) */
+  /* `muted`, no `faint`: coherente con el resto de `.hint` informativos del kit
+     (Field, CreateChallenge, AddMoment…). No es por AA — --ink-400 ya cumple
+     tras #611, pero este texto debe leerse, no quedar en segundo plano. */
+  color: var(--color-text-muted);
 }
 
 /* Pie de acciones (#607): fila que ocupa todo el ancho del footer del Modal y
