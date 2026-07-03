@@ -3,6 +3,7 @@ import type { Challenge, Database } from './database.types'
 import {
   DEFAULT_NUMBER_TOLERANCE,
   DEFAULT_SCORE_SCALE,
+  DEFAULT_TIME_SCORING,
   type LatLng,
   type NumberTolerance,
   type ScoreScale,
@@ -34,8 +35,10 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // PREGUNTA del reto de número (no la cifra). Se sirven al jugar para montar la mecánica.
 // La respuesta del número (`answer_number`) NO está aquí (vive oculta en
 // challenge_answers); `answer_number_src` tampoco (privilegio de columna revocado, 0029).
+// `time_scoring` (0034) tampoco es spoiler: dice si la velocidad puntúa en el
+// reto de lugar (no revela la ubicación). Se sirve al jugar para montar el factor.
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, created_by, created_at'
+  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, time_scoring, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -72,6 +75,12 @@ export interface NewChallengeInput {
    * estricto: pais=300, ciudad=25, barrio=2 km.
    */
   scoreScale?: ScoreScale
+  /**
+   * ¿La velocidad puntúa en este reto? (issue #628). Por defecto true (ON): con
+   * límite por jugada, responder rápido suma y tarde resta. Sin efecto si
+   * `guessSeconds` es null ('Libre'): no hay nada que medir.
+   */
+  timeScoring?: boolean
 }
 
 // Plazo por defecto si el creador no eligió uno: 24 h desde ahora. La duración
@@ -121,6 +130,8 @@ export async function createChallenge(
       deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
       // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
       score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
+      // La velocidad puntúa; true (default) = activada, como pide el issue #628.
+      time_scoring: input.timeScoring ?? DEFAULT_TIME_SCORING,
       created_by: input.createdBy,
     })
     // RETURNING sin lat/lng: tras revocar la columna (0010), pedirlas aquí daría

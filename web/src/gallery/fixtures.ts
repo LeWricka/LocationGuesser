@@ -131,6 +131,7 @@ function baseChallenge(
     number_unit: null,
     number_decimals: 0,
     number_tolerance: 'normal',
+    time_scoring: true,
     created_by: ME_ID,
     created_at: isoFromNow(-5 * DAY),
     ...over,
@@ -250,6 +251,7 @@ function vote(
     abs_error: null,
     left_app: false,
     elapsed_seconds: 18,
+    play_started_at: null,
     created_at: isoFromNow(-2 * DAY + HOUR),
     ...over,
   }

@@ -22,11 +22,14 @@ vi.mock('../../lib/challenges', async (importActual) => {
   }
 })
 
+const startPlayMock = vi.fn<() => Promise<void>>()
+
 vi.mock('../../lib/votes', () => ({
   getExistingVote: () => getExistingVoteMock(),
   getVotes: () => getVotesMock(),
   deleteMyVote: vi.fn(),
   submitVote: vi.fn(),
+  startPlay: () => startPlayMock(),
 }))
 
 vi.mock('../../lib/groupData', () => ({
@@ -82,6 +85,7 @@ const baseChallenge: ChallengeForPlay = {
   number_unit: null,
   number_decimals: 0,
   number_tolerance: 'normal',
+  time_scoring: true,
   created_by: 'u-other',
   created_at: '2026-06-19T10:00:00.000Z',
 }
@@ -113,6 +117,7 @@ beforeEach(() => {
   getExistingVoteMock.mockResolvedValue(null)
   getVotesMock.mockResolvedValue([])
   getGroupMock.mockResolvedValue({ id: 'g1', name: 'Viaje a Iruña' })
+  startPlayMock.mockResolvedValue(undefined)
   localStorage.clear()
 })
 
@@ -151,5 +156,104 @@ describe('PlayChallenge — guarda "es tuyo" (#509)', () => {
 
     expect(await screen.findByRole('button', { name: 'Empezar' })).toBeInTheDocument()
     expect(screen.queryByText('Este reto es tuyo')).not.toBeInTheDocument()
+  })
+})
+
+// Issue #628: la velocidad puntúa en el reto de lugar.
+describe('PlayChallenge — la velocidad puntúa (#628)', () => {
+  test('al pulsar Empezar se registra el arranque server-side (RPC start_play)', async () => {
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 30 })
+    const u = userEvent.setup()
+    renderPlay()
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+
+    // Fire-and-forget desde `start()`: no espera a la cuenta atrás para llamar.
+    expect(startPlayMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('revelado tras recargar un voto ya emitido: "Respondiste en Xs" + nota del factor', async () => {
+    // elapsed=6s de un límite de 30s con time_scoring ON → factor 0,9 (ejemplo
+    // del propio issue: "×0,9 por rapidez").
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 30, time_scoring: true })
+    getExistingVoteMock.mockResolvedValue({
+      id: 'v1',
+      group_id: 'g1',
+      challenge_id: 'c1',
+      user_id: 'u-me',
+      guess_lat: 40,
+      guess_lng: -3,
+      distance_km: 12,
+      guess_number: null,
+      abs_error: null,
+      points: 2000,
+      left_app: false,
+      elapsed_seconds: 6,
+      play_started_at: '2026-06-19T10:00:00.000Z',
+      created_at: '2026-06-19T10:00:06.000Z',
+    })
+    getAnswerMock.mockResolvedValue({ lat: 40.01, lng: -3.01 })
+
+    renderPlay()
+
+    // Texto en un único <span> (icono + tiempo + nota): match EXACTO para no
+    // ambigüar con ancestros que también "contienen" el mismo substring.
+    expect(await screen.findByText('Respondiste en 6s · ×0,9 por rapidez')).toBeInTheDocument()
+  })
+
+  test('sin arranque registrado (play_started_at null): muestra el tiempo, SIN nota de factor', async () => {
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 30, time_scoring: true })
+    getExistingVoteMock.mockResolvedValue({
+      id: 'v1',
+      group_id: 'g1',
+      challenge_id: 'c1',
+      user_id: 'u-me',
+      guess_lat: 40,
+      guess_lng: -3,
+      distance_km: 12,
+      guess_number: null,
+      abs_error: null,
+      points: 2000,
+      left_app: false,
+      elapsed_seconds: 6,
+      // Sin arranque: start_play falló o es legacy — degradación honesta, no se
+      // puede confirmar que aplicó un factor, así que no se estima ninguno.
+      play_started_at: null,
+      created_at: '2026-06-19T10:00:06.000Z',
+    })
+    getAnswerMock.mockResolvedValue({ lat: 40.01, lng: -3.01 })
+
+    renderPlay()
+
+    expect(await screen.findByText('Respondiste en 6s')).toBeInTheDocument()
+    expect(screen.queryByText(/por rapidez/)).not.toBeInTheDocument()
+  })
+
+  test('reto SIN límite ("Libre"): ni tiempo ni nota, aunque haya elapsed_seconds', async () => {
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: null })
+    getExistingVoteMock.mockResolvedValue({
+      id: 'v1',
+      group_id: 'g1',
+      challenge_id: 'c1',
+      user_id: 'u-me',
+      guess_lat: 40,
+      guess_lng: -3,
+      distance_km: 12,
+      guess_number: null,
+      abs_error: null,
+      // Por debajo del umbral de "gran tiro" (75% de 5000): mantiene el titular
+      // "Resultado" (no "¡Gran tiro!"), que es lo que espera este test.
+      points: 2000,
+      left_app: false,
+      elapsed_seconds: 45,
+      play_started_at: '2026-06-19T10:00:00.000Z',
+      created_at: '2026-06-19T10:00:45.000Z',
+    })
+    getAnswerMock.mockResolvedValue({ lat: 40.01, lng: -3.01 })
+
+    renderPlay()
+
+    await screen.findByText('Resultado')
+    expect(screen.queryByText(/Respondiste en/)).not.toBeInTheDocument()
   })
 })

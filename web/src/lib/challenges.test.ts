@@ -102,6 +102,7 @@ const sampleChallenge: Challenge = {
   number_unit: null,
   number_decimals: 0,
   number_tolerance: 'normal',
+  time_scoring: true,
   created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
 }
@@ -207,6 +208,34 @@ describe('createChallenge', () => {
       unknown
     >
     expect(insertArg.score_scale).toBe('ciudad')
+  })
+
+  // Issue #628: la velocidad puntúa, activada por defecto.
+  test('time_scoring por defecto es true (la velocidad puntúa, activada)', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await createChallenge({ title: 'x', lat: 1, lng: 2, createdBy: 'u', groupId: 'g1' })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.time_scoring).toBe(true)
+  })
+
+  test('escribe time_scoring=false cuando el creador lo apaga', async () => {
+    results['challenges'] = { data: sampleChallenge, error: null }
+    await createChallenge({
+      title: 'x',
+      lat: 1,
+      lng: 2,
+      createdBy: 'u',
+      groupId: 'g1',
+      timeScoring: false,
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.time_scoring).toBe(false)
   })
 
   test('SOLO FOTO (sin Street View): sv_pano_id/heading/pitch quedan a null', async () => {

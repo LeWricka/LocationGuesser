@@ -89,6 +89,7 @@ function makeVote(overrides: Partial<Vote> = {}): Vote {
     points: 420,
     left_app: false,
     elapsed_seconds: 30,
+    play_started_at: null,
     created_at: '2026-06-20T12:00:00.000Z',
     ...overrides,
   }

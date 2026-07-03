@@ -26,11 +26,11 @@ import {
   isPracticeChallenge,
   type ChallengeForPlay,
 } from '../../lib/challenges'
-import { deleteMyVote, getExistingVote, getVotes, submitVote } from '../../lib/votes'
+import { deleteMyVote, getExistingVote, getVotes, startPlay, submitVote } from '../../lib/votes'
 import { getGroup } from '../../lib/groupData'
 import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
-import { fmtDist, type LatLng } from '../../lib/geo'
+import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
 import { describeError } from '../../lib/errors'
 import { reportError } from '../../lib/observability'
@@ -120,6 +120,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // propiedad de analítica `rank_in_challenge` y el texto "Nº de N" del resultado.
   // Se calcula con los votos del reto tras revelar (no se conoce antes de votar).
   const [rank, setRank] = useState<{ position: number; total: number } | null>(null)
+  // Tiempo de respuesta + factor de velocidad para el revelado (issue #628). Solo
+  // tiene sentido con límite por jugada (guess_seconds no null): sin límite
+  // ("Libre") no hay contra qué medir. `factor` es null cuando no se puede
+  // confirmar que aplicó (degradación honesta): entonces solo se enseña el
+  // tiempo, sin la nota "×0,9 por rapidez".
+  const [speedInfo, setSpeedInfo] = useState<{ seconds: number; factor: number | null } | null>(
+    null,
+  )
   // Nombre del grupo para la tarjeta de "compartir mi resultado". El componente
   // solo recibe el código del grupo (groupId); el nombre lo leemos aparte. Null
   // hasta resolver (o si no hay grupo / falla): la tarjeta cae a "tu grupo".
@@ -226,6 +234,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         // El servidor devuelve distancia + puntos + la respuesta real para el pin.
         const km = res.distanceKm ?? 0
         setResult({ km, points: res.points })
+        // Tiempo de respuesta + factor de velocidad (issue #628): solo con límite
+        // por jugada (sin límite, "Libre", no hay nada que medir). El factor viene
+        // del SERVIDOR (res.speedFactor): es la verdad de lo que se aplicó, no una
+        // estimación del reloj local (que podría no coincidir si `start_play` falló).
+        if (current.guess_seconds != null && elapsedSeconds != null) {
+          setSpeedInfo({ seconds: elapsedSeconds, factor: res.speedFactor })
+        }
         // Gran acierto: patrón háptico de celebración (si lo soporta y no hay
         // reduced-motion), en sincronía con el destello/confeti del revelado.
         if (res.points >= GREAT_SHOT && !reducedMotionRef.current) haptic([100, 50, 100])
@@ -318,6 +333,21 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           } else {
             setGuess({ lat: existing.guess_lat, lng: existing.guess_lng })
             setResult({ km: existing.distance_km ?? 0, points: existing.points })
+            // Tiempo de respuesta + factor de velocidad (issue #628), reconstruidos
+            // al recargar un voto ya emitido. `play_started_at` es el DATO de verdad
+            // de si el servidor llegó a aplicar un factor (null = seguro que no, ni
+            // se intenta estimar); con él presente, se recalcula el factor con el
+            // MISMO `elapsed_seconds` ya persistido (muy cercano al que usó el
+            // servidor en su momento) — es una nota informativa, no repuntúa nada.
+            if (c.guess_seconds != null && existing.elapsed_seconds != null) {
+              setSpeedInfo({
+                seconds: existing.elapsed_seconds,
+                factor:
+                  existing.play_started_at != null
+                    ? speedFactor(existing.elapsed_seconds, c.guess_seconds, c.time_scoring)
+                    : null,
+              })
+            }
             // Ya votó: tiene derecho a ver la respuesta. La pedimos aparte (no viaja
             // en el payload del reto); la RLS de challenge_answers la sirve por voto.
             const ans = await getAnswer(challengeId)
@@ -428,8 +458,26 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     if (!reducedMotionRef.current) haptic(80)
   }
 
+  // Autoridad de servidor para el factor de velocidad (issue #628): registra el
+  // arranque ANTES de que corra el reloj. Best-effort con UN reintento corto: si
+  // las dos llamadas fallan, el juego sigue igual — sin arranque registrado,
+  // `submit_vote` aplicará factor 1 (degradación honesta, nunca bloquea la
+  // partida). Fire-and-forget desde `start()`: no retrasa la cuenta atrás.
+  async function callStartPlay(id: string) {
+    try {
+      await startPlay(id)
+    } catch {
+      try {
+        await startPlay(id)
+      } catch (err) {
+        reportError(err, { area: 'start_play', challengeId: id })
+      }
+    }
+  }
+
   function start() {
     if (!challenge) return
+    void callStartPlay(challenge.id)
     // Empezar NO arranca el reloj: primero la cuenta atrás 3·2·1 (sobre la foto del
     // reto). El `start_at` se fija al TERMINAR la cuenta (beginPlaying), para que el
     // reloj de la jugada arranque tras el 3-2-1, no durante. Si el jugador recarga
@@ -539,6 +587,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       playStartAtRef.current = null
       setILeftApp(false)
       setRank(null)
+      setSpeedInfo(null)
       setMapOpen(false)
       setShowStreetView(false)
       setSaving(false)
@@ -849,6 +898,26 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     <span className={`${styles.rank} ${styles.distIn}`}>
                       <IconMedalla size={14} />
                       {rank.position}º de {rank.total}
+                    </span>
+                  )}
+                  {/* Tiempo de respuesta + nota del factor de velocidad (issue
+                      #628). La nota solo aparece cuando el factor confirmadamente
+                      aplicó (nunca es una estimación del reloj local) y se aleja
+                      de ×1,0 (sin desviación, no aporta nada nuevo que decir). */}
+                  {speedInfo && (
+                    <span className={`${styles.rank} ${styles.distIn}`}>
+                      <Icon icon={Timer} size={14} />
+                      Respondiste en {speedInfo.seconds}s
+                      {speedInfo.factor != null && Math.round(speedInfo.factor * 10) !== 10 && (
+                        <>
+                          {' · ×'}
+                          {speedInfo.factor.toLocaleString('es-ES', {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 1,
+                          })}{' '}
+                          por rapidez
+                        </>
+                      )}
                     </span>
                   )}
                 </div>

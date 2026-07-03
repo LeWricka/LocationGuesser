@@ -10,6 +10,8 @@ import {
   scoreForNumber,
   NUMBER_DECAY_K,
   DEFAULT_NUMBER_TOLERANCE,
+  speedFactor,
+  DEFAULT_TIME_SCORING,
 } from './geo'
 
 describe('geo', () => {
@@ -69,6 +71,49 @@ describe('geo', () => {
     expect(fmtDist(0.5)).toBe('500 m')
     expect(fmtDist(12.34)).toBe('12.3 km')
     expect(fmtDist(1500)).toBe('1500 km')
+  })
+})
+
+// ── Factor de velocidad (issue #628): premia rápido, penaliza tarde ──────────
+describe('speedFactor', () => {
+  test('por defecto está activada (DEFAULT_TIME_SCORING = true)', () => {
+    expect(DEFAULT_TIME_SCORING).toBe(true)
+  })
+
+  test('respuesta instantánea (elapsed=0) da el factor máximo: 1', () => {
+    expect(speedFactor(0, 30, true)).toBe(1)
+  })
+
+  test('al límite exacto (elapsed=límite) da el factor mínimo: 0.5', () => {
+    expect(speedFactor(30, 30, true)).toBe(0.5)
+  })
+
+  test('a mitad de camino (elapsed=límite/2) da 0.75', () => {
+    expect(speedFactor(15, 30, true)).toBe(0.75)
+  })
+
+  test('ejemplo del issue: 6s de 30s da 0,9', () => {
+    expect(speedFactor(6, 30, true)).toBeCloseTo(0.9)
+  })
+
+  test('ACOTADO: un elapsed mayor que el límite no baja de 0.5', () => {
+    expect(speedFactor(90, 30, true)).toBe(0.5)
+  })
+
+  test('ACOTADO: un elapsed negativo (reloj raro) no sube de 1', () => {
+    expect(speedFactor(-5, 30, true)).toBe(1)
+  })
+
+  test('sin límite por jugada (guessSeconds null, "Libre"): factor 1, no aplica', () => {
+    expect(speedFactor(5, null, true)).toBe(1)
+  })
+
+  test('time_scoring apagado: factor 1 aunque haya límite y elapsed', () => {
+    expect(speedFactor(5, 30, false)).toBe(1)
+  })
+
+  test('sin elapsed conocido (legacy o start_play no registrado): factor 1', () => {
+    expect(speedFactor(null, 30, true)).toBe(1)
   })
 })
 

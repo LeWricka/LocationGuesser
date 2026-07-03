@@ -288,3 +288,68 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
     )
   })
 })
+
+// La velocidad puntúa (issue #628): toggle ON por defecto, solo visible con
+// límite por jugada, y wiring a createChallenge/track.
+describe('CreateLocationChallenge — "La velocidad puntúa" (#628)', () => {
+  function launchResult() {
+    createChallengeMock.mockResolvedValue({
+      challenge: {
+        id: 'reto-3',
+        title: '¿Dónde? · Japón 2026',
+        image_path: null,
+      } as ChallengeForPlay,
+      groupId: 'g-1',
+    })
+  }
+
+  test('visible y activado (ON) por defecto con el límite por defecto (30 s)', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    const toggle = screen.getByRole('switch', { name: 'La velocidad puntúa' })
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('se OCULTA al elegir "Libre" (sin límite, no hay nada que medir)', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    await user.click(screen.getByRole('radio', { name: 'Libre' }))
+
+    expect(screen.queryByRole('switch', { name: 'La velocidad puntúa' })).not.toBeInTheDocument()
+  })
+
+  test('lanzar con el valor por defecto: createChallenge recibe timeScoring=true', async () => {
+    launchResult()
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
+    expect(createChallengeMock).toHaveBeenCalledWith(expect.objectContaining({ timeScoring: true }))
+    expect(trackMock).toHaveBeenCalledWith(
+      'challenge_created',
+      expect.objectContaining({ time_scoring: true }),
+    )
+  })
+
+  test('apagar el toggle: createChallenge recibe timeScoring=false', async () => {
+    launchResult()
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    await user.click(screen.getByRole('switch', { name: 'La velocidad puntúa' }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
+    expect(createChallengeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ timeScoring: false }),
+    )
+  })
+})

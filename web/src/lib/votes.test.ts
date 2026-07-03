@@ -64,6 +64,7 @@ import {
   getVotes,
   getVotesWithNames,
   deleteMyVote,
+  startPlay,
 } from './votes'
 
 const sampleVote: Vote = {
@@ -79,6 +80,7 @@ const sampleVote: Vote = {
   points: 4900,
   left_app: false,
   elapsed_seconds: null,
+  play_started_at: null,
   created_at: '2026-06-19T00:00:00.000Z',
 }
 
@@ -92,7 +94,9 @@ beforeEach(() => {
 describe('submitVote', () => {
   test('llama a la RPC submit_vote con la adivinanza (no calcula puntos en cliente)', async () => {
     rpcResult = {
-      data: [{ distance_km: 12.3, points: 4900, answer_lat: 40.1, answer_lng: -3.1 }],
+      data: [
+        { distance_km: 12.3, points: 4900, answer_lat: 40.1, answer_lng: -3.1, speed_factor: 1 },
+      ],
       error: null,
     }
     const out = await submitVote({ challengeId: 'c1', guessLat: 40, guessLng: -3 })
@@ -106,12 +110,37 @@ describe('submitVote', () => {
       p_elapsed_seconds: null,
     })
     // El cliente NO manda points: el servidor los devuelve y el cliente los usa tal cual.
-    expect(out).toEqual({ distanceKm: 12.3, points: 4900, answerLat: 40.1, answerLng: -3.1 })
+    expect(out).toEqual({
+      distanceKm: 12.3,
+      points: 4900,
+      answerLat: 40.1,
+      answerLng: -3.1,
+      speedFactor: 1,
+    })
+  })
+
+  // Issue #628: la velocidad puntúa — el cliente lee el factor REALMENTE
+  // aplicado por el servidor (nunca lo calcula ni lo pide).
+  test('propaga el speed_factor del servidor tal cual (autoridad de servidor, #628)', async () => {
+    rpcResult = {
+      data: [
+        {
+          distance_km: 12.3,
+          points: 4410,
+          answer_lat: 40.1,
+          answer_lng: -3.1,
+          speed_factor: 0.9,
+        },
+      ],
+      error: null,
+    }
+    const out = await submitVote({ challengeId: 'c1', guessLat: 40, guessLng: -3 })
+    expect(out.speedFactor).toBe(0.9)
   })
 
   test('voto de timeout: manda lat/lng null y no recibe respuesta', async () => {
     rpcResult = {
-      data: [{ distance_km: null, points: 0, answer_lat: null, answer_lng: null }],
+      data: [{ distance_km: null, points: 0, answer_lat: null, answer_lng: null, speed_factor: 1 }],
       error: null,
     }
     const out = await submitVote({ challengeId: 'c1', guessLat: null, guessLng: null })
@@ -122,12 +151,20 @@ describe('submitVote', () => {
       p_left_app: false,
       p_elapsed_seconds: null,
     })
-    expect(out).toEqual({ distanceKm: null, points: 0, answerLat: null, answerLng: null })
+    expect(out).toEqual({
+      distanceKm: null,
+      points: 0,
+      answerLat: null,
+      answerLng: null,
+      speedFactor: 1,
+    })
   })
 
   test('pasa leftApp=true como p_left_app cuando el jugador salió de la app', async () => {
     rpcResult = {
-      data: [{ distance_km: 12.3, points: 4900, answer_lat: 40.1, answer_lng: -3.1 }],
+      data: [
+        { distance_km: 12.3, points: 4900, answer_lat: 40.1, answer_lng: -3.1, speed_factor: 1 },
+      ],
       error: null,
     }
     await submitVote({ challengeId: 'c1', guessLat: 40, guessLng: -3, leftApp: true })
@@ -142,7 +179,9 @@ describe('submitVote', () => {
 
   test('pasa elapsedSeconds como p_elapsed_seconds (tiempo de respuesta, #214)', async () => {
     rpcResult = {
-      data: [{ distance_km: 12.3, points: 4900, answer_lat: 40.1, answer_lng: -3.1 }],
+      data: [
+        { distance_km: 12.3, points: 4900, answer_lat: 40.1, answer_lng: -3.1, speed_factor: 1 },
+      ],
       error: null,
     }
     await submitVote({ challengeId: 'c1', guessLat: 40, guessLng: -3, elapsedSeconds: 37 })
@@ -294,6 +333,20 @@ describe('getVotes', () => {
   test('propaga el error', async () => {
     result = { data: null, error: new Error('boom') }
     await expect(getVotes('c1')).rejects.toThrow('boom')
+  })
+})
+
+// Issue #628: registra el arranque server-side ANTES de que corra el reloj.
+describe('startPlay', () => {
+  test('llama a la RPC start_play con el id del reto', async () => {
+    rpcResult = { data: null, error: null }
+    await startPlay('c1')
+    expect(calls.rpc).toHaveBeenCalledWith('start_play', { p_challenge_id: 'c1' })
+  })
+
+  test('propaga el error de la RPC (el llamador decide el best-effort)', async () => {
+    rpcResult = { data: null, error: new Error('boom') }
+    await expect(startPlay('c1')).rejects.toThrow('boom')
   })
 })
 
