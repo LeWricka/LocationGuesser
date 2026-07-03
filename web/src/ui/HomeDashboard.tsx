@@ -526,6 +526,12 @@ function TripCard({
   const autoCover = useAutoCover(group.coverUrl ? null : group.name)
   const coverUrl = group.coverUrl ?? autoCover
   const hasCover = Boolean(coverUrl)
+  // Fundido de la portada al cargar (issue #623, mismo patrón lg-photo-in de
+  // ChallengePhoto): `.cover` es un `background-image`, sin evento `onLoad`
+  // propio, así que precargamos con un `Image()` de apoyo para saber cuándo el
+  // bitmap ya está listo y activar el fundido — evita el "pop" de golpe sobre el
+  // tinte de carga (`--photo-loading-bg`).
+  const coverLoaded = useImagePreload(coverUrl)
 
   // Elemento foto/placeholder que hace de héroe en la transición (issue #589). El
   // nombre se gestiona SIEMPRE de forma imperativa (ref), nunca en el objeto
@@ -570,9 +576,16 @@ function TripCard({
       aria-label={`Abrir viaje ${group.name}`}
     >
       {hasCover ? (
+        // Fundido al cargar (issue #623, mismo patrón lg-photo-in de ChallengePhoto):
+        // el span SIEMPRE está montado con su `backgroundImage` (así `.card` puede
+        // reservar sitio y una prueba puede leer la URL desde el primer render);
+        // solo la OPACIDAD se retiene hasta que el bitmap decodifica. Mientras
+        // tanto se ve el relleno propio de `.card` (`--accent-deep`), no un hueco
+        // en blanco. `heroRef` sigue en este nodo: es el que lleva el nombre de la
+        // View Transition (issue #589).
         <span
           ref={heroRef}
-          className={styles.cover}
+          className={[styles.cover, coverLoaded ? 'lg-photo-in' : styles.coverHidden].join(' ')}
           style={{ backgroundImage: `url('${coverUrl}')` }}
           aria-hidden="true"
         />
@@ -612,6 +625,39 @@ function TripCard({
       </span>
     </button>
   )
+}
+
+// Precarga de una URL de imagen (issue #623): devuelve `true` en cuanto el bitmap
+// terminó de cargar (o ya estaba en caché — `img.complete`), para poder disparar
+// un fundido de entrada sobre un `background-image` (que no tiene `onLoad`
+// propio). Mismo espíritu que ChallengePhoto, adaptado a portadas por CSS.
+function useImagePreload(url: string | null): boolean {
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!url) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- estado terminal sin url
+      setLoaded(false)
+      return
+    }
+    let cancelled = false
+    const img = new Image()
+    img.onload = () => {
+      if (!cancelled) setLoaded(true)
+    }
+    img.onerror = () => {
+      // Si falla, no dejamos la tarjeta en tinte plano para siempre: se muestra
+      // igual (el navegador ya intentó pintar el background-image real).
+      if (!cancelled) setLoaded(true)
+    }
+    img.src = url
+    if (img.complete) setLoaded(true)
+    return () => {
+      cancelled = true
+    }
+  }, [url])
+
+  return loaded
 }
 
 // Portada AUTOMÁTICA derivada del nombre del lugar (fallback cuando el viaje no tiene

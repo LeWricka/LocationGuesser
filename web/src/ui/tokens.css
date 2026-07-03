@@ -53,6 +53,43 @@
   font-display: swap;
 }
 
+/*
+ * Fallback MÉTRICO de Cormorant Garamond (issue #623): `font-display: swap`
+ * evita bloquear el render, pero por defecto el texto se pinta primero con el
+ * serif de sistema (Georgia/Didot) y RECOLOCA al llegar Cormorant — sus métricas
+ * son bien distintas (más ancha de media, ascent/descent distintos), así que el
+ * salto de layout es real y medible (títulos, nombre del viaje en AppHeader…).
+ *
+ * Esta cara declara Georgia como fuente local pero le impone las métricas
+ * VERTICALES exactas de Cormorant Garamond (ascent/descent/line-gap-override,
+ * como ratio del propio Cormorant: 924/1000, 287/1000, 0/1000 — sacadas con
+ * fontTools de los .woff2 en public/fonts/) y un `size-adjust` que iguala el
+ * ancho medio de carácter de ambas fuentes.
+ *
+ * OJO con `xAvgCharWidth` (campo OS/2): es el atajo obvio pero NO es fiable
+ * entre fundiciones (cada herramienta lo calcula con su propia ponderación) —
+ * con ese campo salía 111% (Cormorant "más ancha"), y en producción ESO
+ * empeoraba el CLS de titulares grandes con `text-wrap: balance` (p.ej. el
+ * título del recuerdo, #623 medición): un 22% de más te hace saltar de 2 a 3
+ * líneas al hacer el swap, un salto mucho más grande que el que se intentaba
+ * evitar. La métrica correcta es la media de anchura de a-z SIN ponderar
+ * (mismo cálculo que usan Capsize/Fontaine/next/font): Cormorant 0.4426em vs
+ * Georgia 0.4991em → Cormorant es más ESTRECHA de media, size-adjust 88.67%.
+ * Resultado: mientras Cormorant carga, el texto ya ocupa (aprox.) el mismo
+ * alto de línea y ancho — al hacer swap el reflow es mínimo. Va ANTES de
+ * 'Didot'/Georgia "crudos" en la pila de `--font-serif`: como su `src` ya
+ * apunta a Georgia, esos nombres solo entran en juego si ni Georgia ni Times
+ * New Roman existen en el sistema.
+ */
+@font-face {
+  font-family: 'Cormorant Garamond Fallback';
+  src: local('Georgia'), local('Times New Roman');
+  ascent-override: 92.4%;
+  descent-override: 28.7%;
+  line-gap-override: 0%;
+  size-adjust: 88.67%;
+}
+
 :root {
   color-scheme: light;
 
@@ -322,7 +359,8 @@
    * Display = Cormorant Garamond (serif). Cuerpo/UI = sans del sistema.
    * Números siempre en sans tabular (no "bailan").
    * -------------------------------------------------------------------- */
-  --font-serif: 'Cormorant Garamond', 'Didot', Georgia, 'Times New Roman', serif;
+  --font-serif:
+    'Cormorant Garamond', 'Cormorant Garamond Fallback', 'Didot', Georgia, 'Times New Roman', serif;
   --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
 

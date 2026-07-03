@@ -13,6 +13,12 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+  /* Reserva el hueco del scrollbar SIEMPRE (issue #623): cuando una pantalla pasa
+   * de "sin scroll" (esqueleto corto) a "con scroll" (datos ya llegados), el
+   * scrollbar clásico de escritorio roba ~15px de ancho y empuja el contenido —
+   * un salto de layout evitable reservando el hueco desde el primer pintado. En
+   * móvil (scrollbars overlay) es un no-op. */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -359,6 +365,31 @@ img {
   animation: lg-photo-in var(--duration-slow) var(--ease-emphasized) both;
 }
 
+/*
+ * Crossfade corto esqueleto→contenido (issue #623): cuando un `role="status"`
+ * (RouteSkeletons, HomeSkeleton, el "Cargando…" de una pantalla) se sustituye por
+ * el contenido real, este entra con un fundido breve en vez de un swap seco.
+ * SOLO opacidad (sin transform, a diferencia de lg-rise/lg-pop): el contenido que
+ * releva a un esqueleto suele vivir en un contenedor que YA usa `transform` para
+ * su propio posicionamiento/centrado (paneles con pista, hojas, capas de escena),
+ * y apilar la animación de entrada ahí arrastraría el "transform residual" que
+ * rompía el centrado (bug de PR #527/#534) — la opacidad no tiene ese riesgo y
+ * tampoco cuenta como layout-shift, así que es segura incluso mientras se mide
+ * CLS. Duración corta (--motion-duration-base): es una transición de estado, no
+ * una entrada dramática.
+ */
+@keyframes lg-content-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.lg-content-in {
+  animation: lg-content-in var(--motion-duration-base) var(--motion-ease-standard) both;
+}
+
 /* Celebración: muelle de escala + halo que crece y se desvanece. Para
  * puntuaciones altas en el resultado (sin pasarse: una sola pasada). */
 @keyframes lg-celebrate {
@@ -553,6 +584,7 @@ img {
   .lg-pop,
   .lg-rise-pop,
   .lg-photo-in,
+  .lg-content-in,
   .lg-stagger > * {
     animation: none;
   }
