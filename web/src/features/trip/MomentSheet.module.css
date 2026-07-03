@@ -4,6 +4,16 @@
  * artículo sobre papel (descripción, galería "tira de fotogramas", tarjeta-mapa,
  * acciones). Sigue siendo una hoja autocontenida que sube desde abajo y se cierra
  * arrastrando, por encima del chrome del viaje, sin tocar el Modal compartido.
+ *
+ * GRAMÁTICA DE ESQUINA (issue #575): la vista es UNA hoja deslizante sobre el
+ * viaje. El radio redondeado vive SOLO en `.panel` (arriba, siempre, con asa) —
+ * es la ÚNICA esquina de toda la escena. Nada de lo que hay dentro (la foto, el
+ * cuerpo de papel que monta sobre ella) lleva su propio border-radius: antes
+ * `.article` tenía uno (para "montar" sobre la foto) y el resultado era una
+ * segunda tarjeta flotando a media altura, con o sin foto — la esquina "rara"
+ * que reportó el dueño. La fusión foto→papel la hace solo el degradado
+ * (`.article::before`), nunca un recorte curvo. Laterales y base van a sangre
+ * hasta el borde del panel.
  */
 .overlay {
   position: fixed;
@@ -32,8 +42,11 @@
   background: var(--color-surface);
   /* Hairline de luz cenital en el borde superior: la hoja "capta luz" al subir. */
   border-top: 1px solid var(--color-surface-sheen);
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
+  /* --radius-xl: MISMO radio que el resto de hojas del sistema (BottomSheet,
+     GlobeSheet, Modal en móvil) — antes esta hoja usaba --radius-lg, una esquina
+     distinta a sus hermanas sin motivo (issue #575). */
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
   /* Sombra proyectada HACIA ARRIBA: la hoja flota sobre el fondo (token del craft). */
   box-shadow: var(--shadow-sheet);
   /* Sube desde abajo con la curva enfatizada (decelera al final). */
@@ -315,9 +328,14 @@
 
 /* ── CUERPO EDITORIAL (papel) ─────────────────────────────────────────────────
    FUSIÓN héroe → hoja (estilo Polarsteps): la foto NO termina en un corte recto. El
-   papel monta sobre la imagen (margin-top negativo amplio + esquinas redondeadas) y,
-   sobre la frontera, un degradado del color de la hoja (opaco abajo → transparente
-   arriba) hace que la foto se DISUELVA dentro del papel en vez de cortarse. */
+   papel monta sobre la imagen (margin-top negativo) y, sobre la frontera, un
+   degradado del color de la hoja (opaco abajo → transparente arriba) hace que la
+   foto se DISUELVA dentro del papel en vez de cortarse.
+   SIN esquinas propias (issue #575): un border-radius aquí dibujaba una SEGUNDA
+   tarjeta flotando a media altura sobre la foto/el fondo de escena — la esquina
+   "rara" del feedback del dueño (mitad tarjeta, mitad escena). La única esquina
+   redondeada de la hoja es la de `.panel`, arriba del todo; aquí el borde es
+   recto y el degradado de abajo es quien disuelve la unión. */
 .article {
   position: relative;
   /* design-lint-allow: capa local (el papel monta sobre la base de la foto) */
@@ -325,12 +343,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  /* Solape sobre la foto + esquinas más redondeadas (curva suave que "monta"). */
+  /* Solape sobre la foto: el papel empieza un poco antes de que la foto acabe. */
   margin-top: calc(-1 * var(--space-5));
   padding: var(--space-5) var(--space-4) var(--space-6);
   background: var(--color-surface);
-  border-top-left-radius: var(--radius-xl);
-  border-top-right-radius: var(--radius-xl);
 }
 /* Puente de degradado: sube por encima del borde del papel y funde la base de la foto
    con la hoja (la imagen se DISUELVE en el papel, no se corta). Opaco (color de la
