@@ -56,7 +56,7 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
         ref={panelRef}
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" className={styles.skip} onClick={onSkip}>
+        <button type="button" className={[styles.skip, 'lg-press'].join(' ')} onClick={onSkip}>
           Saltar
         </button>
 

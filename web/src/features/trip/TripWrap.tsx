@@ -119,7 +119,12 @@ export function TripWrap({
 
   return (
     <div className={styles.screen} role="dialog" aria-modal="true" aria-label="Resumen del viaje">
-      <button type="button" className={styles.close} onClick={onClose} aria-label="Cerrar resumen">
+      <button
+        type="button"
+        className={[styles.close, 'lg-press'].join(' ')}
+        onClick={onClose}
+        aria-label="Cerrar resumen"
+      >
         <Icon icon={X} size={20} />
       </button>
 
@@ -268,7 +273,11 @@ export function TripWrap({
             <Icon icon={Footprints} size={16} />
           </span>
           <p className={styles.footText}>Hasta el próximo viaje.</p>
-          <button type="button" className={styles.footClose} onClick={onClose}>
+          <button
+            type="button"
+            className={[styles.footClose, 'lg-press'].join(' ')}
+            onClick={onClose}
+          >
             Volver al viaje
           </button>
         </footer>

@@ -329,7 +329,7 @@ export function CreateGroup({ onBack }: Props) {
             {/* Descripción (opcional, colapsada para que la hoja respire). */}
             <button
               type="button"
-              className={`${styles.moreBtn} ${moreOpen ? styles.moreOpen : ''}`}
+              className={`${styles.moreBtn} ${moreOpen ? styles.moreOpen : ''} lg-press`}
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen((v) => !v)}
             >

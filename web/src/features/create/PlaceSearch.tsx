@@ -102,7 +102,7 @@ export function PlaceSearch({ onSelect }: Props) {
             <li key={`${r.lat},${r.lng},${i}`}>
               <button
                 type="button"
-                className={styles.resultBtn}
+                className={[styles.resultBtn, 'lg-press'].join(' ')}
                 role="option"
                 aria-selected={false}
                 onClick={() => pick(r)}

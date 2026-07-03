@@ -320,7 +320,7 @@ export function DatePicker({
       {selectedIso && (
         <button
           type="button"
-          className={styles.clearBtn}
+          className={`lg-press ${styles.clearBtn}`}
           aria-label="Quitar la fecha"
           onClick={clear}
         >

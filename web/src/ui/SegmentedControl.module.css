@@ -74,11 +74,17 @@
   white-space: nowrap;
   cursor: pointer;
   /* Solo transiciona el color: el "fondo" seleccionado lo aporta el thumb. */
-  transition: color var(--motion-transition-fast);
+  transition:
+    color var(--motion-transition-fast),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .segment:hover:not(.selected) {
   color: var(--segctl-ink-hover, var(--color-text));
+}
+
+.segment:active {
+  transform: scale(var(--motion-press-scale));
 }
 
 .segment:focus-visible {
@@ -104,5 +110,8 @@
   .segment,
   .thumb {
     transition: none;
+  }
+  .segment:active {
+    transform: none;
   }
 }

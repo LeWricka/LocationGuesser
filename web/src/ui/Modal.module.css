@@ -69,10 +69,14 @@
   color: var(--color-text-muted);
   font-size: var(--font-size-lg);
   cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 .close:hover {
   background: var(--color-surface-hover);
   color: var(--color-text);
+}
+.close:active {
+  transform: scale(var(--motion-press-scale));
 }
 .close:focus-visible {
   outline: var(--focus-ring-width) solid var(--color-focus-ring);
@@ -137,5 +141,8 @@
   }
   .panel {
     transition: none;
+  }
+  .close:active {
+    transform: none;
   }
 }

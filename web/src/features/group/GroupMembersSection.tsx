@@ -145,7 +145,7 @@ export function GroupMembersSection({ groupId, meId, isOwner, onLeft, onTransfer
               chevron lo rota el CSS según [open]. "Salir del grupo" queda fuera del
               <summary> para no entrar/salir del colapso al pulsarlo. */}
           <details className={styles.membersDetails}>
-            <summary className={styles.membersSummary}>
+            <summary className={[styles.membersSummary, 'lg-press'].join(' ')}>
               <span className={styles.sectionTitle}>
                 <Icon icon={Users} size={18} /> Miembros ({members.length})
               </span>

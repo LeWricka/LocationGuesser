@@ -484,7 +484,7 @@ export function HomeGlobe({
             {creditOpen && <span className={styles.creditText}>{MAP_CREDIT}</span>}
             <button
               type="button"
-              className={styles.creditButton}
+              className={[styles.creditButton, 'lg-press'].join(' ')}
               title={MAP_CREDIT}
               aria-label="Créditos del mapa"
               aria-expanded={creditOpen}
