@@ -1,0 +1,53 @@
+/* Wordmark "tabide": serif de marca con el punto de la "i" sustituido por el mini-pin
+   teal del símbolo (issue #538). Todo en `em` para que escale con `font-size` (la única
+   medida que fija el llamador). */
+
+.root {
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: 0.005em;
+  color: inherit; /* el llamador decide el tono (tinta o `--scene-ink` sobre escena) */
+}
+
+/* Oculta la construcción visual a lectores de pantalla: el texto real y accesible vive
+   en .srOnly, así no se anuncia dos veces ni se lee "tab, i sin punto, de". */
+.visual {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+/* Hueco de la "i" sin su punto (glifo "ı", U+0131): el mini-pin ocupa el lugar del punto. */
+.iSlot {
+  position: relative;
+  display: inline-block;
+}
+
+/* Mini-pin teal posicionado donde iría el punto de la i, centrado sobre el asta.
+   Valores afinados a ojo sobre Cormorant 600 (ver issue #538): más alto o más grande
+   y el pin se desprende visualmente de la palabra en vez de leerse como su punto. */
+.iDot {
+  position: absolute;
+  left: 50%;
+  top: -0.2em;
+  width: 0.3em;
+  height: 0.3em;
+  transform: translateX(-50%);
+  overflow: visible;
+}
+
+/* Patrón visually-hidden (igual que Field.module.css .labelHidden): texto real para
+   lectores de pantalla, invisible en pantalla. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
