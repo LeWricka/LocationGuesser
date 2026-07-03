@@ -493,7 +493,6 @@ export function TripPage({
               playing={reducedMotion ? undefined : playing}
               onTogglePlay={reducedMotion ? undefined : togglePlay}
               onSelectFromMap={selectFromMap}
-              onSelectFromCarousel={selectFromCarousel}
               onExpand={(m) => setOpenMoment(m)}
               onPlay={onPlayChallenge}
               onAddMoment={onAddMoment}

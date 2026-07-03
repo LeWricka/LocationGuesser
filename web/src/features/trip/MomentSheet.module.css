@@ -262,7 +262,10 @@
   flex: 0 0 auto;
 }
 
-/* Velo inferior con la info editorial sobre la foto. */
+/* Velo inferior con la info editorial sobre la foto. Relleno inferior a
+   `--space-6` (issue #605, punto 4): con `--space-5` la meta-línea (bandera +
+   país + fecha) quedaba pegada al borde de la foto, sin aire propio ANTES de
+   llegar a la costura con el papel — se leía "estrangulada". */
 .veil {
   position: absolute;
   left: 0;
@@ -270,7 +273,7 @@
   bottom: 0;
   /* design-lint-allow: capa local del hero (info editorial sobre la foto) */
   z-index: 3;
-  padding: var(--space-7) var(--space-5) var(--space-5);
+  padding: var(--space-7) var(--space-5) var(--space-6);
 }
 
 .eyebrow {
@@ -343,9 +346,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  /* Solape sobre la foto: el papel empieza un poco antes de que la foto acabe. */
+  /* Solape sobre la foto: el papel empieza un poco antes de que la foto acabe.
+     El degradado de fusión (`::before` debajo) sigue calibrado sobre este
+     mismo solape — no se toca. */
   margin-top: calc(-1 * var(--space-5));
-  padding: var(--space-5) var(--space-4) var(--space-6);
+  /* Relleno superior a `--space-6` (issue #605, punto 4): un paso más que el
+     solape de arriba, así el PRIMER contenido del papel (p. ej. "Añadir
+     descripción del día") respira un carril propio bajo la costura en vez de
+     nacer justo donde termina la foto — la transición se sentía brusca con
+     `--space-5` (mismo valor que el solape, aire cero). */
+  padding: var(--space-6) var(--space-4) var(--space-6);
   background: var(--color-surface);
 }
 /* Puente de degradado: sube por encima del borde del papel y funde la base de la foto
@@ -426,11 +436,19 @@
 .descEditBtn:active:not(:disabled) {
   transform: scale(var(--motion-press-scale));
 }
+/* "Añadir descripción del día": acción SECUNDARIA (issue #605, punto 4). Con
+   `--color-surface` (igual que el papel de fondo) y el padding ajustado del
+   texto, la pastilla se leía como un contorno suelto flotando sobre el papel
+   en vez de un control asentado — sobre todo justo bajo la costura con el
+   héroe, donde ya era el primer elemento. `--color-surface-hover` le da un
+   fondo propio (mismo token que usan otros controles secundarios del kit) y
+   más relleno le da peso de "asiento" sin dejar de leer como secundaria (sin
+   borde sólido ni color de marca de fondo). */
 .descAdd {
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px dashed var(--color-border-strong);
   border-radius: var(--radius-sm);
-  background: var(--color-surface);
+  background: var(--color-surface-hover);
   align-self: flex-start;
 }
 .descEdit {
