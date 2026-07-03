@@ -24,6 +24,14 @@ interface Props {
   /** Nota de voz del recuerdo (≤60s, issue #648): existente, regrabada o ninguna. */
   voice: VoiceValue
   onVoiceChange: (value: VoiceValue) => void
+  /**
+   * ¿Se va a quitar el clip de vídeo al guardar? (issue #649). v1 SOLO permite
+   * quitar un clip ya existente al editar — grabar/elegir uno nuevo se hace en
+   * "Nuevo recuerdo" (`AddMoment`, con el picker de fotos+vídeo completo); un
+   * segundo picker aquí es sobre-alcance para esta primera versión.
+   */
+  videoRemoved: boolean
+  onRemoveVideo: () => void
   saving: boolean
   onCancel: () => void
   onSave: () => void
@@ -60,6 +68,8 @@ export function EditMomentForm({
   onPlaceChange,
   voice,
   onVoiceChange,
+  videoRemoved,
+  onRemoveVideo,
   saving,
   onCancel,
   onSave,
@@ -85,6 +95,27 @@ export function EditMomentForm({
             onChanged={onGalleryChanged}
           />
         </section>
+
+        {/* CLIP DE VÍDEO (issue #649): solo si el recuerdo ya tenía uno y no se ha
+            marcado para quitar. v1 no permite AÑADIR uno aquí (ver comentario de
+            `videoRemoved` en las Props) — solo verlo y, si acaso, quitarlo. */}
+        {moment.videoUrl && !videoRemoved && (
+          <section className={styles.block}>
+            <span className={styles.blockLabel}>Clip de vídeo</span>
+            <div className={styles.videoRow}>
+              <video
+                className={styles.videoPreview}
+                controls
+                playsInline
+                poster={moment.imageUrl ?? undefined}
+                src={moment.videoUrl}
+              />
+              <button type="button" className={styles.removeVideo} onClick={onRemoveVideo}>
+                Quitar clip
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* SITIO — mismo MapPicker que ya usaba la edición; solo cambia el envoltorio. */}
         <section className={styles.block}>

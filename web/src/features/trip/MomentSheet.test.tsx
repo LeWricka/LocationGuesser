@@ -484,6 +484,59 @@ describe('MomentSheet', () => {
       expect(onEdited).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('clip de vídeo corto (#649)', () => {
+    const RECUERDO_CON_VIDEO: Moment = {
+      ...RECUERDO,
+      videoUrl: 'https://example.test/clip.mp4',
+    }
+
+    test('con videoUrl, pinta el player nativo bajo el héroe con la portada como poster', () => {
+      renderSheet({ moment: RECUERDO_CON_VIDEO })
+      const player = screen.getByTestId('moment-video-player')
+      expect(player).toHaveAttribute('src', 'https://example.test/clip.mp4')
+      expect(player).toHaveAttribute('poster', RECUERDO_CON_VIDEO.imageUrl as string)
+      expect(player).toHaveAttribute('controls')
+    })
+
+    test('sin videoUrl (recuerdo normal o reto), no pinta ningún player', () => {
+      renderSheet({ moment: RECUERDO })
+      expect(screen.queryByTestId('moment-video-player')).not.toBeInTheDocument()
+    })
+
+    test('editar el recuerdo y quitar el clip guarda video_path a null', async () => {
+      const user = userEvent.setup()
+      const onEdited = vi.fn()
+      renderSheet({ moment: RECUERDO_CON_VIDEO, onEdited })
+
+      await user.click(screen.getByRole('button', { name: 'Editar recuerdo' }))
+      expect(screen.getByRole('button', { name: 'Quitar clip' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Quitar clip' }))
+      // Tras quitarlo, el bloque del clip desaparece del formulario.
+      expect(screen.queryByRole('button', { name: 'Quitar clip' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+      expect(updateMomentMock).toHaveBeenCalledWith(
+        'c1',
+        expect.objectContaining({ videoPath: null }),
+      )
+      expect(onEdited).toHaveBeenCalledTimes(1)
+    })
+
+    test('editar SIN tocar el clip no envía videoPath (undefined = no tocarlo)', async () => {
+      const user = userEvent.setup()
+      renderSheet({ moment: RECUERDO_CON_VIDEO })
+
+      await user.click(screen.getByRole('button', { name: 'Editar recuerdo' }))
+      await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+      expect(updateMomentMock).toHaveBeenCalledWith(
+        'c1',
+        expect.objectContaining({ videoPath: undefined }),
+      )
+    })
+  })
 })
 
 // --- Foto sorpresa en el héroe de la hoja (issue #655) -------------------------

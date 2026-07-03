@@ -77,6 +77,34 @@
   color: var(--color-text);
 }
 
+/* Clip de vídeo corto existente (issue #649): preview + "Quitar clip". v1 solo
+   permite QUITAR un clip ya guardado al editar (añadir uno nuevo se hace en
+   "Nuevo recuerdo"); mismo patrón visual que `.placeRow`/`.removePlace`. */
+.videoRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.videoPreview {
+  width: 100%;
+  max-height: 40vh;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--scene-bg);
+}
+.removeVideo {
+  appearance: none;
+  cursor: pointer;
+  align-self: flex-start;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
 .placeRow {
   display: flex;
   align-items: center;

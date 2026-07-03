@@ -267,6 +267,9 @@ export function MomentSheet({
   const [editVoice, setEditVoice] = useState<VoiceValue>(
     moment?.audioUrl ? { kind: 'existing', url: moment.audioUrl } : { kind: 'none' },
   )
+  // ¿Se va a quitar el clip de vídeo al guardar? (issue #649). v1 solo permite
+  // QUITAR un clip existente al editar (ver comentario en `EditMomentForm`).
+  const [editVideoRemoved, setEditVideoRemoved] = useState(false)
   const [savingMeta, setSavingMeta] = useState(false)
 
   // ── Borrar el momento (recuerdo o reto) con confirmación ────────────────────
@@ -455,6 +458,9 @@ export function MomentSheet({
         // Lugar: el dueño lo marca/mueve en el mapa; null lo quita del mapa.
         place: editPlace ? { lat: editPlace.lat, lng: editPlace.lng } : null,
         audioPath,
+        // Vídeo (issue #649): `undefined` = no tocarlo (v1 no permite añadir uno
+        // nuevo aquí, solo quitarlo); `null` solo si el dueño pulsó "Quitar clip".
+        videoPath: editVideoRemoved ? null : undefined,
       })
       setEditingMeta(false)
       // La edición inline de la descripción (el lápiz junto al texto) queda
@@ -745,6 +751,8 @@ export function MomentSheet({
               onPlaceChange={setEditPlace}
               voice={editVoice}
               onVoiceChange={setEditVoice}
+              videoRemoved={editVideoRemoved}
+              onRemoveVideo={() => setEditVideoRemoved(true)}
               saving={savingMeta}
               onCancel={() => setEditingMeta(false)}
               onSave={() => void saveMeta()}
@@ -845,6 +853,28 @@ export function MomentSheet({
                 se renderiza en modo VISTA. Cada sección de abajo se oculta por su
                 cuenta mientras `promoting` (convertir en reto) es el foco. */}
                 <>
+                  {/* CLIP DE VÍDEO CORTO (issue #649): player nativo justo bajo el héroe,
+                    con la MISMA foto de portada como `poster` (el fotograma-portada del
+                    clip ya se sube como esa foto, ver AddMoment/lib/storage). SOLO puede
+                    haberlo en un RECUERDO: `moment.videoUrl` viene de una consulta APARTE
+                    en `useTripData` que filtra `is_challenge = false` — un reto nunca lo
+                    trae, ni siquiera si el recuerdo de origen tenía clip (el MP4 puede
+                    llevar su propio GPS en los metadatos, `promoteToChallenge` lo vacía).
+                    Se oculta durante "Convertir en reto", como el resto de la vista. */}
+                  {moment.videoUrl && !promoting && (
+                    <section className={styles.videoSection}>
+                      <p className={styles.sectionLabel}>El clip</p>
+                      <video
+                        className={styles.videoPlayer}
+                        controls
+                        playsInline
+                        poster={moment.imageUrl ?? undefined}
+                        src={moment.videoUrl}
+                        data-testid="moment-video-player"
+                      />
+                    </section>
+                  )}
+
                   {/* DESCRIPCIÓN: cuerpo de artículo con drop-cap sutil (injerto C).
                     Se muestra a todos; el DUEÑO la edita en línea. Se oculta durante
                     "Convertir en reto" para que ese flujo sea el foco. */}
@@ -1136,6 +1166,7 @@ export function MomentSheet({
                                 ? { kind: 'existing', url: moment.audioUrl }
                                 : { kind: 'none' },
                             )
+                            setEditVideoRemoved(false)
                             setEditingMeta(true)
                           }}
                         >

@@ -507,6 +507,20 @@
   flex-direction: column;
 }
 
+/* ---- Clip de vídeo corto (issue #649): player nativo bajo el héroe ---- */
+.videoSection {
+  display: flex;
+  flex-direction: column;
+}
+.videoPlayer {
+  width: 100%;
+  max-height: 60vh;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--scene-bg);
+  box-shadow: var(--shadow-photo-card);
+}
+
 /* ---- "En el mapa": tarjeta con el mini-mapa REAL (MomentMiniMap) + pie ---- */
 .mapSection {
   display: flex;

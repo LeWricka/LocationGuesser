@@ -6,7 +6,7 @@ import { VoiceRecorder, type VoiceValue } from './VoiceRecorder'
 import type { LatLng } from '../../lib/geo'
 import { createMoment, type ChallengeForPlay } from '../../lib/challenges'
 import { addMomentImages } from '../../lib/momentImages'
-import { ImageDecodeError, uploadAudio, uploadImage } from '../../lib/storage'
+import { ImageDecodeError, uploadAudio, uploadImage, uploadVideo } from '../../lib/storage'
 import { readGpsFromExif } from '../../lib/exif'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
@@ -173,6 +173,15 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
   const [readingExif, setReadingExif] = useState(false)
   // Nota de voz opcional (≤60s, issue #648): grabada junto a la Descripción.
   const [voice, setVoice] = useState<VoiceValue>({ kind: 'none' })
+  // Clip de vídeo corto opcional (v1: uno solo, issue #649). Su fotograma-
+  // portada YA vive como una foto más en `photos` (ver `onAddVideo`); aquí solo
+  // guardamos el archivo del CLIP en sí (se sube aparte al guardar) y el id de
+  // esa foto (`frameId`) para poder soltar el vídeo si el dueño quita la foto.
+  const [videoDraft, setVideoDraft] = useState<{
+    frameId: string
+    file: File
+    mimeType: string
+  } | null>(null)
   // Ids de fotos que fallaron al subir en el ÚLTIMO intento de guardado (#550):
   // las marcamos en el picker (borde/badge) para que el dueño sepa cuáles
   // quitar o reintentar, en vez de que desaparezcan sin más contexto.
@@ -285,6 +294,9 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       next.delete(id)
       return next
     })
+    // Si la foto quitada era el fotograma-portada del clip, el clip se va con
+    // ella (issue #649): no tiene sentido guardar un vídeo sin su portada.
+    setVideoDraft((prev) => (prev?.frameId === id ? null : prev))
   }
 
   // Marca una foto como portada moviéndola al frente (orden estable del resto).
@@ -294,6 +306,20 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       if (!target) return prev
       return [target, ...prev.filter((p) => p.id !== id)]
     })
+  }
+
+  // Se eligió un clip válido en el picker (ya pasó validación + extracción de
+  // fotograma, issue #649): el fotograma entra a la galería como una foto MÁS
+  // (en cabeza, es la portada del clip) y el vídeo en sí queda aparte,
+  // pendiente de subir al guardar.
+  function onAddVideo(file: File, mimeType: string, coverFrame: File) {
+    const frameId = crypto.randomUUID()
+    setPhotos((prev) => [
+      { id: frameId, file: coverFrame, previewUrl: URL.createObjectURL(coverFrame) },
+      ...prev,
+    ])
+    setVideoDraft({ frameId, file, mimeType })
+    toast.show('Clip añadido: su fotograma es ahora la portada.', { tone: 'success' })
   }
 
   function pickPlace(p: LatLng) {
@@ -430,6 +456,22 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         }
       }
 
+      // Clip de vídeo corto opcional: BEST-EFFORT igual que la nota de voz
+      // (issue #649) — su fotograma-portada YA subió arriba como una foto más
+      // (va en `photos`/`paths`), así que si el vídeo en sí falla, el recuerdo
+      // se queda con esa foto como portada pero sin reproductor.
+      let videoPath: string | null = null
+      let videoFailed = false
+      if (videoDraft) {
+        setStatus('Subiendo el vídeo…')
+        try {
+          videoPath = await uploadVideo(videoDraft.file, videoDraft.mimeType)
+        } catch (err) {
+          videoFailed = true
+          reportError(err, { area: 'add_moment', stage: 'upload_video', groupId })
+        }
+      }
+
       setStatus('Guardando el recuerdo…')
       // Nace como RECUERDO (la unidad mínima). El lugar es VISIBLE.
       const { challenge } = await createMoment({
@@ -441,6 +483,7 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         placeLng: place?.lng ?? null,
         imagePath: coverPath ?? null,
         audioPath,
+        videoPath,
       })
 
       // Galería del recuerdo: registramos TODAS las fotos en `moment_images` con su
@@ -457,21 +500,25 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         photo_count: paths.length,
         has_place: place != null,
         has_audio: audioPath != null,
+        has_video: videoPath != null,
         promoted_to_challenge: false,
         score_scale: null,
       })
-      // Fallo PARCIAL: el recuerdo se guardó igual con lo que sí subió (fotos
-      // y/o nota de voz), pero avisamos qué se quedó fuera (issue #531/#648).
-      // Los dos mensajes de SOLO fotos son los de siempre (#531); el de audio se
-      // añade como sufijo " ni la nota de voz" solo cuando también falló.
-      if (failedFileNames.length > 0 || audioFailed) {
-        const audioSuffix = audioFailed ? ' ni la nota de voz' : ''
+      // Fallo PARCIAL: el recuerdo se guardó igual con lo que sí subió (fotos,
+      // nota de voz y/o vídeo), pero avisamos qué se quedó fuera (#531/#648/#649).
+      // Los dos mensajes de SOLO fotos son los de siempre (#531); el sufijo añade
+      // lo que además falló (nota de voz y/o vídeo).
+      if (failedFileNames.length > 0 || audioFailed || videoFailed) {
+        const extras: string[] = []
+        if (audioFailed) extras.push('la nota de voz')
+        if (videoFailed) extras.push('el vídeo')
+        const extraSuffix = extras.length > 0 ? ` ni ${extras.join(' ni ')}` : ''
         const message =
           failedFileNames.length === 0
-            ? 'Recuerdo guardado. No se pudo subir la nota de voz.'
+            ? `Recuerdo guardado. No se pudo subir ${extras.join(' ni ')}.`
             : failedFileNames.length === 1
-              ? `Recuerdo guardado. No se pudo subir «${failedFileNames[0]}»${audioSuffix}.`
-              : `Recuerdo guardado. No se pudieron subir ${failedFileNames.length} fotos (${failedFileNames.join(', ')})${audioSuffix}.`
+              ? `Recuerdo guardado. No se pudo subir «${failedFileNames[0]}»${extraSuffix}.`
+              : `Recuerdo guardado. No se pudieron subir ${failedFileNames.length} fotos (${failedFileNames.join(', ')})${extraSuffix}.`
         toast.show(message, { tone: 'neutral' })
       }
       // Efecto móvil al guardar: vibración corta. En vez de salir directos al viaje,
@@ -545,10 +592,12 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
           </p>
         </div>
 
-        {/* FOTOS — galería del recuerdo (la 1ª es la portada). */}
+        {/* FOTOS Y VÍDEO — galería del recuerdo (la 1ª es la portada). Un clip
+            corto (≤15s) cuenta como una foto más: entra por el mismo picker
+            (issue #649). */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            Fotos <span className={styles.optional}>opcional</span>
+            Fotos o un clip <span className={styles.optional}>opcional</span>
           </span>
           <MomentGalleryPicker
             photos={photos}
@@ -557,6 +606,9 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
             onAdd={(files) => void onAddPhotos(files)}
             onRemove={onRemovePhoto}
             onMakeCover={onMakeCover}
+            hasVideo={videoDraft != null}
+            videoFrameId={videoDraft?.frameId ?? null}
+            onAddVideo={onAddVideo}
           />
         </section>
 

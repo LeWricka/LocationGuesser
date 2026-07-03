@@ -30,7 +30,14 @@ vi.mock('./observability', () => ({
 import {
   uploadImage,
   uploadAudio,
+  uploadVideo,
   extensionForMime,
+  videoExtensionForMime,
+  validateVideoFile,
+  extractVideoCoverFrame,
+  VideoValidationError,
+  MAX_VIDEO_BYTES,
+  MAX_VIDEO_DURATION_SECONDS,
   signedImageUrl,
   ImageDecodeError,
   SIGNED_URL_TTL_SECONDS,
@@ -124,6 +131,84 @@ function stubDecodePipeline() {
   ) {
     cb(new Blob(['jpeg-bytes'], { type: 'image/jpeg' }))
   })
+}
+
+// Fake mínimo de `<video>` (issue #649): jsdom no implementa carga de medios
+// (ni `loadedmetadata`/`seeked` disparan, ni `duration`/`currentTime` hacen
+// nada), así que interceptamos `document.createElement('video')` — el resto de
+// tags (p. ej. 'canvas', que sí usa `stubDecodePipeline` arriba) pasan por la
+// implementación REAL de jsdom sin tocar. Devuelve las instancias creadas para
+// poder inspeccionar, p. ej., a qué `currentTime` hizo seek `extractVideoCoverFrame`.
+class FakeVideoElement {
+  onloadedmetadata: (() => void) | null = null
+  onerror: (() => void) | null = null
+  onseeked: (() => void) | null = null
+  duration: number
+  videoWidth: number
+  videoHeight: number
+  preload = ''
+  muted = false
+  private failsMetadata: boolean
+  private failsSeek: boolean
+  private _currentTime = 0
+  constructor(opts: {
+    duration: number
+    videoWidth: number
+    videoHeight: number
+    failsMetadata: boolean
+    failsSeek: boolean
+  }) {
+    this.duration = opts.duration
+    this.videoWidth = opts.videoWidth
+    this.videoHeight = opts.videoHeight
+    this.failsMetadata = opts.failsMetadata
+    this.failsSeek = opts.failsSeek
+  }
+  set src(_v: string) {
+    queueMicrotask(() => (this.failsMetadata ? this.onerror?.() : this.onloadedmetadata?.()))
+  }
+  get currentTime() {
+    return this._currentTime
+  }
+  set currentTime(v: number) {
+    this._currentTime = v
+    queueMicrotask(() => (this.failsSeek ? this.onerror?.() : this.onseeked?.()))
+  }
+}
+
+function stubVideoElement(
+  opts: {
+    duration?: number
+    videoWidth?: number
+    videoHeight?: number
+    failsMetadata?: boolean
+    failsSeek?: boolean
+  } = {},
+): FakeVideoElement[] {
+  const {
+    duration = 10,
+    videoWidth = 640,
+    videoHeight = 360,
+    failsMetadata = false,
+    failsSeek = false,
+  } = opts
+  const instances: FakeVideoElement[] = []
+  const realCreateElement = document.createElement.bind(document)
+  vi.spyOn(document, 'createElement').mockImplementation(((tag: string) => {
+    if (tag === 'video') {
+      const el = new FakeVideoElement({
+        duration,
+        videoWidth,
+        videoHeight,
+        failsMetadata,
+        failsSeek,
+      })
+      instances.push(el)
+      return el as unknown as HTMLElement
+    }
+    return realCreateElement(tag)
+  }) as typeof document.createElement)
+  return instances
 }
 
 beforeEach(() => {
@@ -477,5 +562,130 @@ describe('uploadImage — el reporte a Sentry agrupa bajo el mismo error que ve 
     const [, context] = reportError.mock.calls[0] as [unknown, Record<string, unknown>]
     expect(context).not.toHaveProperty('batchSize')
     expect(context).not.toHaveProperty('msSinceSelection')
+  })
+})
+
+// Clip corto (issue #649): duración ≤15s y tamaño ≤40MB, validados ANTES de
+// aceptar el archivo (nunca al subir). Sin recompresión posible (a diferencia
+// de una foto), así que estos dos límites son la ÚNICA guarda.
+describe('validateVideoFile — límites v1 (issue #649)', () => {
+  test('un vídeo de más de 40MB se rechaza por TAMAÑO, sin llegar a leer metadata', async () => {
+    const instances = stubVideoElement()
+    const big = new File(['x'], 'grande.mp4', { type: 'video/mp4' })
+    Object.defineProperty(big, 'size', { value: MAX_VIDEO_BYTES + 1 })
+
+    const err = await validateVideoFile(big).catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(VideoValidationError)
+    expect((err as VideoValidationError).reason).toBe('size')
+    expect((err as Error).message).toMatch(/40 MB/)
+    // Ni siquiera se creó el <video> oculto: el tamaño es más barato de mirar.
+    expect(instances).toHaveLength(0)
+  })
+
+  test('un vídeo de más de 15s se rechaza por DURACIÓN', async () => {
+    stubVideoElement({ duration: 20 })
+    const file = new File(['x'], 'largo.mp4', { type: 'video/mp4' })
+
+    const err = await validateVideoFile(file).catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(VideoValidationError)
+    expect((err as VideoValidationError).reason).toBe('duration')
+    expect((err as Error).message).toMatch(new RegExp(`${MAX_VIDEO_DURATION_SECONDS}s`))
+  })
+
+  test('un vídeo dentro de los límites (≤15s, ≤40MB) pasa y devuelve sus metadatos', async () => {
+    stubVideoElement({ duration: 8, videoWidth: 1080, videoHeight: 1920 })
+    const file = new File(['x'], 'corto.mp4', { type: 'video/mp4' })
+
+    await expect(validateVideoFile(file)).resolves.toEqual({
+      durationSeconds: 8,
+      width: 1080,
+      height: 1920,
+    })
+  })
+
+  test('un vídeo justo en el límite de duración (15s exactos) SÍ pasa', async () => {
+    stubVideoElement({ duration: MAX_VIDEO_DURATION_SECONDS })
+    const file = new File(['x'], 'justo.mp4', { type: 'video/mp4' })
+
+    await expect(validateVideoFile(file)).resolves.toMatchObject({
+      durationSeconds: MAX_VIDEO_DURATION_SECONDS,
+    })
+  })
+
+  test('si el navegador no puede leer el vídeo, lanza VideoValidationError con reason "unreadable"', async () => {
+    stubVideoElement({ failsMetadata: true })
+    const file = new File(['x'], 'roto.mp4', { type: 'video/mp4' })
+
+    const err = await validateVideoFile(file).catch((e: unknown) => e)
+
+    expect(err).toBeInstanceOf(VideoValidationError)
+    expect((err as VideoValidationError).reason).toBe('unreadable')
+    expect((err as Error).message).toMatch(/roto\.mp4/)
+  })
+})
+
+describe('extractVideoCoverFrame — fotograma-portada del clip (issue #649)', () => {
+  test('seek a 0.5s, dibuja el frame en canvas y exporta JPEG por la MISMA tubería que una foto', async () => {
+    const instances = stubVideoElement({ duration: 10, videoWidth: 640, videoHeight: 360 })
+    const file = new File(['x'], 'clip.mp4', { type: 'video/mp4' })
+
+    const frame = await extractVideoCoverFrame(file)
+
+    expect(frame.name).toBe('clip-portada.jpg')
+    expect(frame.type).toBe('image/jpeg')
+    expect(instances[0].currentTime).toBe(0.5)
+  })
+
+  test('un clip MÁS CORTO que 1s hace seek a la MITAD de su duración, no a 0.5s fijo', async () => {
+    const instances = stubVideoElement({ duration: 0.6 })
+    const file = new File(['x'], 'clip-cortisimo.mp4', { type: 'video/mp4' })
+
+    await extractVideoCoverFrame(file)
+
+    expect(instances[0].currentTime).toBe(0.3)
+  })
+
+  test('si el navegador no puede leer el vídeo, propaga el error (sin subir nada)', async () => {
+    stubVideoElement({ failsMetadata: true })
+    const file = new File(['x'], 'roto.mp4', { type: 'video/mp4' })
+
+    await expect(extractVideoCoverFrame(file)).rejects.toThrow()
+  })
+})
+
+describe('videoExtensionForMime — SIN el mapeo audio-only mp4→m4a (issue #649)', () => {
+  test('video/mp4 → mp4 (a diferencia de extensionForMime, que lo mapea a m4a para audio)', () => {
+    expect(videoExtensionForMime('video/mp4')).toBe('mp4')
+  })
+
+  test('video/webm → webm', () => {
+    expect(videoExtensionForMime('video/webm')).toBe('webm')
+  })
+
+  test('mime vacío o irreconocible → mp4 por defecto', () => {
+    expect(videoExtensionForMime('')).toBe('mp4')
+  })
+})
+
+describe('uploadVideo — sube al bucket images bajo el prefijo video/ (issue #649)', () => {
+  test('sube SIN transcodificar, con el path video/<uuid>.<ext> y el content-type real', async () => {
+    const file = new File(['bytes'], 'clip.mp4', { type: 'video/mp4' })
+
+    const path = await uploadVideo(file, 'video/mp4')
+
+    expect(path).toMatch(/^video\/[0-9a-f-]+\.mp4$/)
+    expect(upload).toHaveBeenCalledWith(
+      path,
+      file,
+      expect.objectContaining({ contentType: 'video/mp4' }),
+    )
+  })
+
+  test('si Storage devuelve error, lo propaga (no lo traga en silencio)', async () => {
+    upload.mockResolvedValueOnce({ error: new Error('storage boom') })
+    const file = new File(['x'], 'a.mp4', { type: 'video/mp4' })
+    await expect(uploadVideo(file, 'video/mp4')).rejects.toThrow('storage boom')
   })
 })

@@ -446,7 +446,13 @@ function scaledSize(w: number, h: number): { width: number; height: number } {
   return { width: Math.round(w * scale), height: Math.round(h * scale) }
 }
 
-function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
+/**
+ * Exportada (además de usarla `compressAndStripExif`/`squareCropToJpeg`):
+ * `extractVideoCoverFrame` (issue #649) la reutiliza para el fotograma-portada
+ * de un clip, así el frame sale con la MISMA calidad/pipeline que cualquier
+ * otra foto del kit, sin duplicar la llamada a `canvas.toBlob`.
+ */
+export function canvasToJpeg(canvas: HTMLCanvasElement): Promise<Blob> {
   return new Promise((resolve, reject) => {
     canvas.toBlob(
       (blob) => (blob ? resolve(blob) : reject(new Error('No se pudo comprimir la imagen.'))),
@@ -497,6 +503,163 @@ export async function uploadAudio(blob: Blob, mimeType: string): Promise<string>
   const path = `audio/${crypto.randomUUID()}.${extensionForMime(mimeType)}`
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     contentType: mimeType || 'application/octet-stream',
+    cacheControl: '31536000',
+  })
+  if (error) throw error
+  return path
+}
+
+// ── CLIP CORTO (SHORTS) — issue #649 ────────────────────────────────────────
+// Un momento admite UN clip de vídeo corto (v1): elegido de la galería del
+// móvil, SIN transcodificar — el H.264 que ya graba cualquier móvil reproduce
+// en todos los navegadores, así que no hace falta la maquinaria pesada (wasm)
+// que sí justifica recomprimir una FOTO. Sin recompresión posible en cliente,
+// el tope de TAMAÑO hace de única guarda de peso; el tope de DURACIÓN evita
+// que "corto" deje de serlo. Ambos se validan ANTES de aceptar el archivo (en
+// el picker), nunca al subir.
+export const MAX_VIDEO_DURATION_SECONDS = 15
+export const MAX_VIDEO_BYTES = 40 * 1024 * 1024
+
+/** Metadatos del vídeo leídos del propio archivo, sin subir nada. */
+export interface VideoMetadata {
+  durationSeconds: number
+  width: number
+  height: number
+}
+
+/**
+ * El vídeo elegido no pasa los límites de v1 (tamaño o duración) o no se pudo
+ * leer. `reason` deja que el picker decida el mensaje/la UI sin parsear el
+ * texto del error; `message` ya es el texto legible para el toast.
+ */
+export class VideoValidationError extends Error {
+  readonly reason: 'size' | 'duration' | 'unreadable'
+  constructor(reason: 'size' | 'duration' | 'unreadable', message: string) {
+    super(message)
+    this.name = 'VideoValidationError'
+    this.reason = reason
+  }
+}
+
+/**
+ * Duración/resolución REALES del vídeo, leyéndolo en un `<video>` oculto —
+ * nunca insertado en el DOM, basta crear el elemento y esperar a que resuelva
+ * sus metadatos (misma idea que `loadImageElement` para fotos, pero con
+ * `loadedmetadata` en vez de `load`). No sube ni reproduce nada.
+ */
+function readVideoMetadata(file: File): Promise<VideoMetadata> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.onloadedmetadata = () => {
+      const { duration, videoWidth, videoHeight } = video
+      URL.revokeObjectURL(url)
+      resolve({ durationSeconds: duration, width: videoWidth, height: videoHeight })
+    }
+    video.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('El navegador no pudo leer el vídeo'))
+    }
+    video.src = url
+  })
+}
+
+/**
+ * Valida el clip ANTES de aceptarlo en el picker (issue #649): el TAMAÑO
+ * primero (barato, sin I/O) y la DURACIÓN después (exige cargar metadatos, más
+ * caro). Lanza `VideoValidationError` con un mensaje ya listo para el toast;
+ * si pasa, devuelve los metadatos (el picker los reutiliza sin releer el
+ * vídeo, p. ej. para decidir el punto de fotograma en `extractVideoCoverFrame`).
+ */
+export async function validateVideoFile(file: File): Promise<VideoMetadata> {
+  if (file.size > MAX_VIDEO_BYTES) {
+    const mb = (file.size / (1024 * 1024)).toFixed(1)
+    throw new VideoValidationError(
+      'size',
+      `El vídeo pesa ${mb} MB; el máximo es 40 MB. Elige un clip más corto o más comprimido.`,
+    )
+  }
+  let meta: VideoMetadata
+  try {
+    meta = await readVideoMetadata(file)
+  } catch {
+    throw new VideoValidationError(
+      'unreadable',
+      `No se pudo leer «${file.name}». Prueba con otro vídeo.`,
+    )
+  }
+  if (meta.durationSeconds > MAX_VIDEO_DURATION_SECONDS) {
+    throw new VideoValidationError(
+      'duration',
+      `El vídeo dura ${Math.round(meta.durationSeconds)}s; el máximo es ${MAX_VIDEO_DURATION_SECONDS}s. Recorta el clip antes de subirlo.`,
+    )
+  }
+  return meta
+}
+
+/**
+ * Fotograma-portada del clip (issue #649): seek a 0.5s (o a la mitad si el
+ * clip dura menos, para no pedir un instante fuera de rango) → se dibuja el
+ * frame en un `<canvas>` → se exporta a JPEG por la MISMA tubería que una foto
+ * normal (`canvasToJpeg`, misma `JPEG_QUALITY`). El resultado se trata como
+ * UNA FOTO MÁS del recuerdo (se sube con `uploadImage` y se inserta en
+ * `moment_images`, igual que cualquier otra) — no hay un campo aparte para "la
+ * foto del vídeo"; así la portada del clip ya sale gratis en tarjetas/galería.
+ */
+export async function extractVideoCoverFrame(file: File): Promise<File> {
+  const url = URL.createObjectURL(file)
+  try {
+    const video = document.createElement('video')
+    video.preload = 'auto'
+    video.muted = true
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve()
+      video.onerror = () => reject(new Error('El navegador no pudo leer el vídeo'))
+      video.src = url
+    })
+    const seekTo = video.duration > 0 ? Math.min(0.5, video.duration / 2) : 0
+    await new Promise<void>((resolve, reject) => {
+      video.onseeked = () => resolve()
+      video.onerror = () => reject(new Error('El navegador no pudo leer el fotograma del vídeo'))
+      video.currentTime = seekTo
+    })
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth || 640
+    canvas.height = video.videoHeight || 360
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('No se pudo procesar el fotograma del vídeo.')
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const blob = await canvasToJpeg(canvas)
+    return new File([blob], 'clip-portada.jpg', { type: 'image/jpeg' })
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/**
+ * Extensión de fichero del vídeo a partir de su MIME real. HERMANA de
+ * `extensionForMime` pero SIN su mapeo audio-only `mp4 → m4a`: un vídeo
+ * `video/mp4` debe quedarse en `.mp4` (un `.m4a` confundiría a cualquier
+ * reproductor/descarga, que esperan vídeo, no audio-only).
+ */
+export function videoExtensionForMime(mime: string): string {
+  const base = mime.split(';')[0]?.trim().split('/')[1]?.toLowerCase()
+  return base || 'mp4'
+}
+
+/**
+ * Sube el clip — SIN transcodificar, el H.264 del móvil ya reproduce en
+ * cualquier navegador — al MISMO bucket privado `images`, prefijo `video/`:
+ * comparte RLS y régimen de URLs firmadas con fotos y audio (migración 0036,
+ * simétrica a `audio_path` de 0035). Devuelve el `path` para
+ * `challenges.video_path`. El llamador ya validó tamaño/duración con
+ * `validateVideoFile` antes de llegar aquí.
+ */
+export async function uploadVideo(file: File, mimeType: string): Promise<string> {
+  const path = `video/${crypto.randomUUID()}.${videoExtensionForMime(mimeType)}`
+  const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    contentType: mimeType || 'video/mp4',
     cacheControl: '31536000',
   })
   if (error) throw error

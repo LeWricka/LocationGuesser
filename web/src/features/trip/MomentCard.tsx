@@ -1,4 +1,4 @@
-import { Target, User } from 'lucide-react'
+import { Play, Target, User } from 'lucide-react'
 import { Badge, Button, ChallengePhoto, Icon, IconCandado } from '../../ui'
 import { resolveMomentPhoto, type Moment } from '../../lib/trip'
 import styles from './MomentCard.module.css'
@@ -86,6 +86,18 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
         onClick={onExpand}
         className={styles.photo}
       />
+
+      {/* Badge ▶ (issue #649): el momento tiene un clip de vídeo — su fotograma-
+          portada ya ES la foto de la tarjeta (ver AddMoment), así que basta con
+          señalarlo encima. `moment.videoUrl` solo llega en un RECUERDO (nunca en
+          un reto, ver `lib/trip.ts`), así que no hace falta comprobar `isRecuerdo`
+          aparte. No interactivo: tocar la tarjeta ya abre el detalle (con el
+          player), como cualquier otra foto. */}
+      {moment.videoUrl && (
+        <div className={styles.videoBadge} data-testid="video-badge" aria-hidden="true">
+          <Icon icon={Play} size={16} fill="currentColor" />
+        </div>
+      )}
 
       {/* Bandera del país en disco de vidrio, esquina sup-izq (estilo Polarsteps).
           Solo aparece cuando el país ya se ha resuelto (CERRADOS con coord); si aún

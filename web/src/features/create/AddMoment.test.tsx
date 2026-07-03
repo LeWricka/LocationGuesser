@@ -33,12 +33,18 @@ vi.mock('./MapPicker', () => ({ MapPicker: () => <div data-testid="map-picker" /
 
 const uploadImageMock = vi.fn()
 const uploadAudioMock = vi.fn()
+const uploadVideoMock = vi.fn()
+const validateVideoFileMock = vi.fn()
+const extractVideoCoverFrameMock = vi.fn()
 vi.mock('../../lib/storage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/storage')>()
   return {
     ...actual,
     uploadImage: (...args: unknown[]) => uploadImageMock(...args),
     uploadAudio: (...args: unknown[]) => uploadAudioMock(...args),
+    uploadVideo: (...args: unknown[]) => uploadVideoMock(...args),
+    validateVideoFile: (...args: unknown[]) => validateVideoFileMock(...args),
+    extractVideoCoverFrame: (...args: unknown[]) => extractVideoCoverFrameMock(...args),
   }
 })
 
@@ -92,7 +98,7 @@ vi.mock('../../lib/supabase', () => ({
 // Import DESPUÉS de los vi.mock (hoisted igualmente, pero así queda claro el orden
 // de lectura: primero qué se mockea, luego qué se prueba).
 import { AddMoment, computeDefaultDate } from './AddMoment'
-import { ImageDecodeError } from '../../lib/storage'
+import { ImageDecodeError, VideoValidationError } from '../../lib/storage'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
 
@@ -129,6 +135,9 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
     addMomentImagesMock.mockReset()
     uploadImageMock.mockReset()
     uploadAudioMock.mockReset()
+    uploadVideoMock.mockReset()
+    validateVideoFileMock.mockReset()
+    extractVideoCoverFrameMock.mockReset()
     // Por defecto, viaje sin momentos ni fechas propias (cae en "hoy").
     getGroupMock.mockReset().mockResolvedValue(null)
     latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
@@ -282,6 +291,114 @@ describe('AddMoment — nota de voz (#648)', () => {
       expect.objectContaining({ area: 'add_moment', stage: 'upload_audio' }),
     )
     expect(await screen.findByText(/no se pudo subir la nota de voz/i)).toBeInTheDocument()
+  })
+})
+
+describe('AddMoment — clip corto de vídeo (#649)', () => {
+  beforeEach(() => {
+    trackMock.mockClear()
+    reportErrorMock.mockClear()
+    createMomentMock.mockReset()
+    addMomentImagesMock.mockReset()
+    uploadImageMock.mockReset()
+    uploadVideoMock.mockReset()
+    validateVideoFileMock.mockReset()
+    extractVideoCoverFrameMock.mockReset()
+    getGroupMock.mockReset().mockResolvedValue(null)
+    latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
+  })
+
+  function fakeVideoFile(name = 'clip.mp4'): File {
+    return new File(['video-bytes'], name, { type: 'video/mp4' })
+  }
+
+  test('elige un vídeo válido: su fotograma sube como foto (portada) y el clip llega a createMoment', async () => {
+    validateVideoFileMock.mockResolvedValue({ durationSeconds: 8, width: 640, height: 360 })
+    extractVideoCoverFrameMock.mockResolvedValue(
+      new File(['frame'], 'clip-portada.jpg', { type: 'image/jpeg' }),
+    )
+    uploadImageMock.mockResolvedValue('ok/clip-portada.jpg')
+    uploadVideoMock.mockResolvedValue('video/clip-1.mp4')
+    createMomentMock.mockResolvedValue({
+      challenge: { id: 'm1', title: 'Mi recuerdo' } as ChallengeForPlay,
+      groupId: 'g1',
+    })
+    addMomentImagesMock.mockResolvedValue(undefined)
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [fakeVideoFile()])
+    await waitFor(() => expect(validateVideoFileMock).toHaveBeenCalledTimes(1))
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    expect(uploadImageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'clip-portada.jpg' }),
+    )
+    expect(uploadVideoMock).toHaveBeenCalledWith(expect.any(File), 'video/mp4')
+    expect(createMomentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ videoPath: 'video/clip-1.mp4', imagePath: 'ok/clip-portada.jpg' }),
+    )
+    expect(addMomentImagesMock).toHaveBeenCalledWith('m1', ['ok/clip-portada.jpg'])
+    expect(trackMock).toHaveBeenCalledWith(
+      'moment_created',
+      expect.objectContaining({ has_video: true }),
+    )
+  })
+
+  test('un vídeo que no pasa la validación no entra: aviso claro, sin extraer fotograma ni tocar el guardado', async () => {
+    validateVideoFileMock.mockRejectedValue(
+      new VideoValidationError(
+        'duration',
+        'El vídeo dura 20s; el máximo es 15s. Recorta el clip antes de subirlo.',
+      ),
+    )
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [fakeVideoFile()])
+
+    expect(await screen.findByText(/el vídeo dura 20s; el máximo es 15s/i)).toBeInTheDocument()
+    expect(extractVideoCoverFrameMock).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    expect(createMomentMock).toHaveBeenCalledWith(expect.objectContaining({ videoPath: null }))
+    expect(uploadVideoMock).not.toHaveBeenCalled()
+  })
+
+  test('si falla la subida del vídeo, el recuerdo se guarda igual (best-effort) con la portada del fotograma', async () => {
+    validateVideoFileMock.mockResolvedValue({ durationSeconds: 5, width: 640, height: 360 })
+    extractVideoCoverFrameMock.mockResolvedValue(
+      new File(['frame'], 'clip-portada.jpg', { type: 'image/jpeg' }),
+    )
+    uploadImageMock.mockResolvedValue('ok/clip-portada.jpg')
+    uploadVideoMock.mockRejectedValue(new Error('network boom'))
+    createMomentMock.mockResolvedValue({
+      challenge: { id: 'm1', title: 'Mi recuerdo' } as ChallengeForPlay,
+      groupId: 'g1',
+    })
+    addMomentImagesMock.mockResolvedValue(undefined)
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [fakeVideoFile()])
+    await waitFor(() => expect(validateVideoFileMock).toHaveBeenCalledTimes(1))
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    expect(createMomentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ videoPath: null, imagePath: 'ok/clip-portada.jpg' }),
+    )
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ area: 'add_moment', stage: 'upload_video' }),
+    )
+    expect(await screen.findByText(/no se pudo subir el vídeo/i)).toBeInTheDocument()
   })
 })
 

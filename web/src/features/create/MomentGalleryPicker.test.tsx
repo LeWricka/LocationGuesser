@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -5,18 +6,32 @@ import { ToastProvider } from '../../ui'
 
 // Espiamos `markFileSelection` (storage.ts) sin arrastrar el resto del
 // pipeline de subida — este picker solo necesita marcar la copia, no
-// comprimir/subir nada.
+// comprimir/subir nada. El vídeo (#649) se mockea aparte: cada test de esa
+// sección fija su propio comportamiento de validación/extracción.
 const markFileSelectionMock = vi.fn()
-vi.mock('../../lib/storage', () => ({
-  markFileSelection: (...args: unknown[]) => markFileSelectionMock(...args),
-}))
+const validateVideoFileMock = vi.fn()
+const extractVideoCoverFrameMock = vi.fn()
+vi.mock('../../lib/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/storage')>()
+  return {
+    // `VideoValidationError` viene del módulo REAL: el picker hace
+    // `instanceof` con ella, así que debe ser la misma clase que usan los
+    // mocks de abajo al rechazar/lanzar.
+    VideoValidationError: actual.VideoValidationError,
+    markFileSelection: (...args: unknown[]) => markFileSelectionMock(...args),
+    validateVideoFile: (...args: unknown[]) => validateVideoFileMock(...args),
+    extractVideoCoverFrame: (...args: unknown[]) => extractVideoCoverFrameMock(...args),
+  }
+})
 
 import { MomentGalleryPicker } from './MomentGalleryPicker'
+import { VideoValidationError } from '../../lib/storage'
 
-function renderPicker() {
+function renderPicker(extraProps: Partial<ComponentProps<typeof MomentGalleryPicker>> = {}) {
   const onAdd = vi.fn()
   const onRemove = vi.fn()
   const onMakeCover = vi.fn()
+  const onAddVideo = vi.fn()
   render(
     <ToastProvider>
       <MomentGalleryPicker
@@ -24,14 +39,20 @@ function renderPicker() {
         onAdd={onAdd}
         onRemove={onRemove}
         onMakeCover={onMakeCover}
+        onAddVideo={onAddVideo}
+        {...extraProps}
       />
     </ToastProvider>,
   )
-  return { onAdd, onRemove, onMakeCover }
+  return { onAdd, onRemove, onMakeCover, onAddVideo }
 }
 
 function fakeFile(name: string, content = 'contenido'): File {
   return new File([content], name, { type: 'image/jpeg' })
+}
+
+function fakeVideoFile(name = 'clip.mp4', content = 'video-bytes'): File {
+  return new File([content], name, { type: 'video/mp4' })
 }
 
 function deferred<T>() {
@@ -133,5 +154,64 @@ describe('MomentGalleryPicker — fallo al leer al seleccionar (#642)', () => {
     const [copies] = onAdd.mock.calls[0] as [File[]]
     expect(copies.map((f) => f.name)).toEqual(['buena.jpg'])
     expect(await screen.findByText('rota.jpg')).toBeInTheDocument()
+  })
+})
+
+describe('MomentGalleryPicker — clip de vídeo corto (issue #649)', () => {
+  beforeEach(() => {
+    markFileSelectionMock.mockClear()
+    validateVideoFileMock.mockReset()
+    extractVideoCoverFrameMock.mockReset()
+  })
+
+  test('un vídeo válido: valida, extrae el fotograma y avisa al padre con ambos', async () => {
+    validateVideoFileMock.mockResolvedValue({ durationSeconds: 8, width: 640, height: 360 })
+    const frame = new File(['frame-bytes'], 'clip-portada.jpg', { type: 'image/jpeg' })
+    extractVideoCoverFrameMock.mockResolvedValue(frame)
+    const { onAddVideo, onAdd } = renderPicker()
+
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [fakeVideoFile()])
+
+    await waitFor(() => expect(onAddVideo).toHaveBeenCalledTimes(1))
+    const [file, mimeType, coverFrame] = onAddVideo.mock.calls[0] as [File, string, File]
+    expect(file.name).toBe('clip.mp4')
+    expect(mimeType).toBe('video/mp4')
+    expect(coverFrame).toBe(frame)
+    expect(validateVideoFileMock).toHaveBeenCalledTimes(1)
+    // El vídeo NUNCA entra por `onAdd` (esa vía es solo para fotos sueltas).
+    expect(onAdd).not.toHaveBeenCalled()
+  })
+
+  test('un vídeo que no pasa la validación (p.ej. dura más de 15s) no entra: aviso claro, sin extraer fotograma', async () => {
+    validateVideoFileMock.mockRejectedValue(
+      new VideoValidationError('duration', 'El vídeo dura 20s; el máximo es 15s.'),
+    )
+    const { onAddVideo } = renderPicker()
+
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [fakeVideoFile()])
+
+    expect(await screen.findByText('El vídeo dura 20s; el máximo es 15s.')).toBeInTheDocument()
+    expect(extractVideoCoverFrameMock).not.toHaveBeenCalled()
+    expect(onAddVideo).not.toHaveBeenCalled()
+  })
+
+  test('un segundo vídeo se rechaza cuando ya hay un clip (UN clip por recuerdo, v1)', async () => {
+    const { onAddVideo } = renderPicker({ hasVideo: true })
+
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [fakeVideoFile()])
+
+    expect(await screen.findByText(/ya hay un clip en este recuerdo/i)).toBeInTheDocument()
+    expect(validateVideoFileMock).not.toHaveBeenCalled()
+    expect(onAddVideo).not.toHaveBeenCalled()
+  })
+
+  test('el fotograma-portada del clip se pinta con el badge ▶ en la tira', () => {
+    renderPicker({
+      photos: [{ id: 'frame-1', file: fakeFile('clip-portada.jpg'), previewUrl: 'blob:frame' }],
+      videoFrameId: 'frame-1',
+      hasVideo: true,
+    })
+
+    expect(screen.getByLabelText('Quitar clip')).toBeInTheDocument()
   })
 })
