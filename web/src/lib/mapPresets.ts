@@ -81,10 +81,13 @@ export const MAP_PRESETS: Record<MapPreset, { base: TileLayerSpec; labels: TileL
 
 // ── Encuadre de pines (compartido por el plano y el globo del diario para que se
 // vean igual sea cual sea el motor). ──
-/** Un solo punto → zoom de ciudad (ni continente ni calle). */
-export const SINGLE_ZOOM = 11
-/** Techo al encuadrar varios pines: no acercarse de más si están muy juntos. */
-export const FIT_MAX_ZOOM = 12
+/** Un solo punto → zoom de pueblo/barrio (que se reconozca el sitio, no la región). */
+export const SINGLE_ZOOM = 12.5
+/** Techo al encuadrar varios pines: con un cluster compacto (mismo pueblo, p.ej.
+ * Salento) el encuadre debe acercarse hasta que el lugar se lea — feedback del
+ * dueño (#643): «si hay varios puntos cerca, hacer más zoom». El padding del
+ * fitBounds sigue mandando cuando los pines están lejos. */
+export const FIT_MAX_ZOOM = 13.5
 /** Zoom mínimo al volar a un pin seleccionado: ciudad. */
 export const SELECT_ZOOM = 11
 
