@@ -1,20 +1,213 @@
 /*
  * MarcadorTab — clasificación del viaje integrada en la pestaña Marcador.
  *
- * Diseño Grafito+teal: cada fila es superficie blanca con hairline suave;
- * el acento teal solo destaca la fila del usuario activo. El oro es SOLO del
- * líder (barra, anillo del avatar, brillo de la medalla) — nunca decoración
- * genérica. Sin fondos de color en filas que no son ni líder ni "mi posición":
- * los tokens de papel mandan.
+ * v2 (issue #594): PODIO (1º-3º) arriba + lista compacta del resto (4º+) debajo.
+ * El dueño vio la v1 de solo barras (#547) con datos reales (8 jugadores) y la
+ * sintió "pocha, poco visual" — la mecánica es un JUEGO con podio, no una tabla.
  *
- * Motion (issue #546): filas y barras entran escalonadas (--motion-stagger-step
- * vía --i inline). GOTCHA de este sistema: `animation-fill-mode: backwards`
- * SIEMPRE (nunca `both`/`forwards`) — con `both` el valor final de la animación
- * queda pegado como transform inline, creando un stacking context que ya tapó
- * un popover en otra pantalla (ver ShellUtilitario). Con `backwards`, al acabar
- * la animación el elemento vuelve a su regla base (idéntica al `to`), así que
- * no hay salto visual y tampoco transform "fantasma".
+ * El oro es EXCLUSIVO del líder (anillo, corona, tarjeta, peana) — nunca
+ * decoración genérica. Plata/bronce en el 2º/3º con sus propios colores
+ * semánticos. La lista compacta (4º+) sigue el lenguaje Grafito+teal de #547:
+ * superficie blanca + hairline suave, acento teal solo en la fila propia.
+ *
+ * Motion (issues #546/#594): tarjetas y barras entran escalonadas
+ * (--motion-stagger-step vía --i inline); el podio entra en el orden 3º→2º→1º
+ * (--i lo fija PODIO_ENTRY_ORDER en el TSX, no el índice del array) y el 1º usa
+ * un easing "spring" sutil para que se note quién ganó. GOTCHA de este sistema:
+ * `animation-fill-mode: backwards` SIEMPRE (nunca `both`/`forwards`) — con
+ * `both` el valor final de la animación queda pegado como transform inline,
+ * creando un stacking context que ya tapó un popover en otra pantalla (ver
+ * ShellUtilitario). Con `backwards`, al acabar la animación el elemento vuelve
+ * a su regla base (idéntica al `to`), así que no hay salto visual y tampoco
+ * transform "fantasma".
  */
+
+.marcador {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ───────────────────────── Podio (1º-3º) ───────────────────────── */
+
+/* 3 columnas centradas; `order` por puesto compone 2º-1º-3º de izquierda a
+ * derecha aunque el DOM siga el orden de ranking (mejor para lectura de foco/
+ * lector de pantalla: 1º, 2º, 3º). `align-items: flex-end` es lo que permite
+ * que las peanas escalonadas "asienten" todas en la misma línea de suelo. */
+.podio {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 0;
+}
+
+.podioItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 112px;
+  animation: mt-podio-entra var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
+}
+@keyframes mt-podio-entra {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.podio1 {
+  order: 2;
+}
+.podio2 {
+  order: 1;
+}
+.podio3 {
+  order: 3;
+}
+
+/* El líder entra con un rebote sutil (easing "spring"): remata la coreografía
+ * 3º→2º→1º y se nota de un vistazo quién ganó sin depender de leer los puntos. */
+.podio1 {
+  animation-name: mt-podio-entra-lider;
+  animation-duration: var(--motion-duration-slower);
+  animation-timing-function: var(--motion-ease-spring);
+}
+@keyframes mt-podio-entra-lider {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Corona SOLO sobre el avatar del líder (mismo criterio que Podium.tsx/GroupPage:
+ * 2º/3º no llevan insignia encima — su medalla ya vive en el pedestal). */
+.corona {
+  display: inline-flex;
+  margin-bottom: calc(-1 * var(--space-1));
+  color: var(--medal-gold);
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--medal-gold) 55%, transparent));
+}
+
+/* Avatar grande con anillo de medalla: el componente Avatar del UI kit en su
+ * tamaño más grande (`lg`, 64px) escalado por transform para no tocar
+ * Avatar.tsx (fuera de área) — el líder ~72px, 2º/3º ~56px (issue #594, punto
+ * 1). Escalar el mismo tamaño fuente (en vez de mezclar `lg`/`md`) mantiene el
+ * grosor de trazo del avatar de línea proporcional entre los tres puestos. */
+.avatarRing {
+  display: inline-flex;
+  border-radius: var(--radius-full);
+}
+.anillo1 {
+  transform: scale(1.125);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 4px var(--medal-gold),
+    0 0 8px 2px color-mix(in srgb, var(--medal-gold) 45%, transparent);
+}
+.anillo2 {
+  transform: scale(0.875);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3px var(--medal-silver);
+}
+.anillo3 {
+  transform: scale(0.875);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 0 0 3px var(--medal-bronze);
+}
+
+.podioNombreFila {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-width: 0;
+  margin-top: var(--space-2);
+}
+
+.podioNombre {
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* "Tú" en vez de teñir toda la columna de teal (issue #594, punto 2): en el
+ * podio ese acento de página entera competiría con el oro/plata/bronce del
+ * puesto — aquí es un detalle de texto, no un bloque de color. */
+.tuTag {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent);
+}
+
+.podioPuntos {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+}
+/* Puntos del líder en acento teal, NO oro: el oro es cromo de medalla (anillo,
+ * corona, pedestal), nunca texto — mismo criterio que el podio de temporada
+ * (GroupPage.module.css, .placeFirst .podiumPoints). */
+.podio1 .podioPuntos {
+  color: var(--accent);
+}
+
+/* Pedestal: cerrado y teñido por puesto, con altura escalonada (la del 1º, la
+ * más alta) — el gesto que lee "podio" de un vistazo, sin depender de comparar
+ * puntos. El icono `Medal` centrado lleva la posición accesible por su cuenta
+ * (role="img" + aria-label propios); nunca un dígito de texto — un "1" en el
+ * pedestal dorado se leyó como una "I" mayúscula en pruebas reales (issue #594).
+ */
+.podioPeana {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--hairline-soft);
+}
+
+.podio1 .podioPeana {
+  height: 60px;
+  background: color-mix(in srgb, var(--medal-gold) 16%, transparent);
+  border-color: var(--medal-gold);
+}
+.podio2 .podioPeana {
+  height: 48px;
+  background: color-mix(in srgb, var(--medal-silver) 16%, transparent);
+  border-color: var(--medal-silver);
+}
+.podio3 .podioPeana {
+  height: 40px;
+  background: color-mix(in srgb, var(--medal-bronze) 16%, transparent);
+  border-color: var(--medal-bronze);
+}
+
+/* ───────────────────────── Resto (4º en adelante) ───────────────────────── */
 
 .lista {
   display: flex;
@@ -22,16 +215,16 @@
   gap: var(--space-2);
 }
 
-/* Con 1-2 jugadores sobra pantalla (issue #546, "aprovecha el vacío"): más aire
- * arriba y entre filas para que el podio respire en vez de quedar pegado al
- * borde superior. No cambia estructura de página ni CTAs. */
+/* Con la lista compacta muy corta sobra pantalla (issue #546, "aprovecha el
+ * vacío"): más aire arriba y entre filas. El podio ya llena la parte de
+ * arriba, así que esto solo afecta al respiro de la lista misma. */
 .listaRespira {
   gap: var(--space-4);
-  padding-top: var(--space-5);
+  padding-top: var(--space-3);
 }
 
-/* Fila de clasificación: parte superior (medalla/avatar/info/puntos) + barra de
- * puntuación a todo el ancho debajo. */
+/* Fila de clasificación: parte superior (posición/avatar/info/puntos) + barra
+ * de puntuación a todo el ancho debajo. */
 .fila {
   display: flex;
   flex-direction: column;
@@ -68,17 +261,8 @@
   background: var(--accent-tint);
 }
 
-/* Fila del líder: anillo dorado sutil. Si coincide con "mi posición", el oro
- * manda (es la señal más fuerte del tablón: vas ganando). */
-.fila.lider {
-  border-color: var(--medal-gold);
-  background: color-mix(in srgb, var(--medal-gold) 6%, var(--surface));
-  box-shadow:
-    var(--shadow-xs),
-    0 0 0 1px color-mix(in srgb, var(--medal-gold) 35%, transparent);
-}
-
-/* Posición: nº o icono de medalla. Ancho fijo para alinear el contenido. */
+/* Posición: nº en sans, tinta suave. Ancho fijo para alinear el contenido
+ * (nunca lleva medalla: el podio, ya cubierto arriba, empieza en el puesto 4). */
 .posicion {
   flex-shrink: 0;
   width: 28px;
@@ -90,31 +274,6 @@
   font-weight: var(--font-weight-bold);
   color: var(--color-text-muted);
   text-align: center;
-}
-
-/* Icono de medalla del podio (1º–3º): colores semánticos de podio, no de marca.
- * El oro (única posición dorada) lleva además un brillo discreto: el líder se
- * lee de un vistazo sin necesitar leer los puntos. */
-.posicion.oro {
-  color: var(--medal-gold);
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--medal-gold) 45%, transparent));
-}
-.posicion.plata {
-  color: var(--medal-silver);
-}
-.posicion.bronce {
-  color: var(--medal-bronze);
-}
-
-/* Anillo dorado sutil alrededor del avatar del líder: wrapper propio (no toca
- * el box-shadow interno del componente Avatar, que ya usa esa propiedad). */
-.avatarLider {
-  display: inline-flex;
-  border-radius: var(--radius-full);
-  box-shadow:
-    0 0 0 2px var(--surface),
-    0 0 0 4px var(--medal-gold),
-    0 0 6px 1px color-mix(in srgb, var(--medal-gold) 45%, transparent);
 }
 
 /* Bloque de nombre + partidas. */
@@ -139,7 +298,7 @@
   color: var(--color-text-muted);
 }
 
-/* Puntos: teal en el podio y en la fila propia; grafito para el resto. */
+/* Puntos: teal en la fila propia; grafito para el resto. */
 .puntos {
   flex-shrink: 0;
   font-family: var(--font-sans);
@@ -154,8 +313,9 @@
   color: var(--accent);
 }
 
-/* Barra de puntuación: proporcional al líder (100%), resto relativo. Track
- * neutro; el relleno crece con `scaleX` desde el borde izquierdo al entrar. */
+/* Barra de puntuación: proporcional al líder del viaje (100%), resto relativo.
+ * Track neutro; el relleno crece con `scaleX` desde el borde izquierdo al
+ * entrar. */
 .barraTrack {
   height: 6px;
   border-radius: var(--radius-full);
@@ -182,16 +342,8 @@
   }
 }
 
-/* Barra del líder: degradado oro (única fila con oro en el relleno). */
-.barraLider {
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--medal-gold) 75%, var(--color-text-muted)),
-    var(--medal-gold)
-  );
-}
+/* ───────────────────────── Estado vacío ───────────────────────── */
 
-/* Estado vacío: sin clasificación aún. */
 .vacio {
   text-align: center;
   padding: var(--space-7) var(--space-4);
@@ -213,10 +365,11 @@
   margin-top: var(--space-4);
 }
 
-/* Menos movimiento: sin entradas de fila ni crecimiento de barra. La barra
- * queda directamente a su ancho final (--bar-pct) porque ese valor vive en la
- * regla base de .barraFill, no solo en el keyframe. */
+/* Menos movimiento: sin entradas de tarjeta/fila ni crecimiento de barra. La
+ * barra queda directamente a su ancho final (--bar-pct) porque ese valor vive
+ * en la regla base de .barraFill, no solo en el keyframe. */
 @media (prefers-reduced-motion: reduce) {
+  .podioItem,
   .fila,
   .barraFill {
     animation: none;
