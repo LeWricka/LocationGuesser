@@ -49,8 +49,9 @@ describe('Landing (email-first, issue #506)', () => {
     ).toBeInTheDocument()
     // El showcase ENSEÑA capturas reales del producto.
     expect(screen.getByRole('heading', { name: 'Todo el viaje en un globo' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Cada momento, en su sitio' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Adivina dónde es' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Gana quien más se acerca' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Un marcador que os une' })).toBeInTheDocument()
     expect(screen.getByAltText(/Pantalla de inicio de Tabide/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Así funciona Tabide' })).toBeInTheDocument()
     // CTA único: "Empieza a compartir". SIN dos CTAs separados.
