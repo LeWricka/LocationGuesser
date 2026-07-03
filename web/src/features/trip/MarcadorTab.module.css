@@ -22,10 +22,19 @@
  * transform "fantasma".
  */
 
+/* Ancho acotado y CENTRADO a cualquier ancho de pantalla (issue #608): el podio
+ * ya centraba sus columnas (`justify-content:center`), pero nada limitaba el
+ * ancho del bloque entero — en un viewport ancho (tablet, o el "ancho" de la
+ * galería) la composición podía leerse pegada a un lado. `margin: 0 auto` sobre
+ * un `max-width` fijo la deja centrada siempre, igual que el resto de pantallas
+ * de lectura del producto. */
 .marcador {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
 }
 
 /* ───────────────────────── Podio (1º-3º) ───────────────────────── */
@@ -175,11 +184,37 @@
   color: var(--accent);
 }
 
+/* Chip de premio del puesto (issue #123/#608, rescatado de GroupPage): dato
+ * descriptivo bajo los puntos, truncado a una línea (la columna del podio es
+ * angosta, máx. 112px — envolver aquí rompería la altura escalonada). */
+.podioPremio {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  margin-top: var(--space-1);
+  color: var(--color-text-muted);
+}
+.podioPremio > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.podioPremioTexto {
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Pedestal: cerrado y teñido por puesto, con altura escalonada (la del 1º, la
  * más alta) — el gesto que lee "podio" de un vistazo, sin depender de comparar
- * puntos. El icono `Medal` centrado lleva la posición accesible por su cuenta
- * (role="img" + aria-label propios); nunca un dígito de texto — un "1" en el
- * pedestal dorado se leyó como una "I" mayúscula en pruebas reales (issue #594).
+ * puntos. Lleva un ORDINAL DE TEXTO ("1º"/"2º"/"3º"), nunca un icono ni un
+ * dígito bare (issue #608): el icono `Medal` que llevaba antes, a este tamaño y
+ * solo dentro de una peana de color, se leía como una carita/avatar fantasma
+ * (hallazgo del dueño con datos reales); un "1" bare se había leído como una "I"
+ * mayúscula (issue #594). El símbolo de grado (º) desambigua ambos casos.
  */
 .podioPeana {
   display: flex;
@@ -189,6 +224,24 @@
   margin-top: var(--space-2);
   border-radius: var(--radius-md);
   border: 1px solid var(--hairline-soft);
+}
+
+.podioPeanaTexto {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.podio1 .podioPeanaTexto {
+  font-size: var(--font-size-lg);
+  color: var(--medal-gold);
+}
+.podio2 .podioPeanaTexto {
+  font-size: var(--font-size-md);
+  color: var(--medal-silver);
+}
+.podio3 .podioPeanaTexto {
+  font-size: var(--font-size-md);
+  color: var(--medal-bronze);
 }
 
 .podio1 .podioPeana {
@@ -298,6 +351,37 @@
   color: var(--color-text-muted);
 }
 
+/* Chip de premio del puesto (issue #123/#608, rescatado de GroupPage): dato
+ * descriptivo bajo nombre/partidas — se etiqueta "Premio" para no confundirse
+ * con un botón (hallazgo del test original: la pastilla parecía pulsable). */
+.filaPremio {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 var(--space-1);
+  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.filaPremio > svg {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--accent);
+}
+.filaPremioLabel {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+}
+.filaPremioTexto {
+  min-width: 0;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
 /* Puntos: teal en la fila propia; grafito para el resto. */
 .puntos {
   flex-shrink: 0;
@@ -373,5 +457,173 @@
   .fila,
   .barraFill {
     animation: none;
+  }
+}
+
+/* ───────────────────── Editar premios (issue #123/#608) ───────────────────── */
+
+/* Botón discreto arriba del todo (dueño únicamente): invita a añadir premios si
+ * aún no hay, o a editarlos. Mismo look que GroupPage.module.css .editPrizesBtn. */
+.editPrizesBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--motion-transition-fast),
+    border-color var(--motion-transition-fast);
+}
+.editPrizesBtn:hover {
+  background: var(--accent-tint);
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* Campos del modal "Premios del viaje": etiqueta del puesto sobre el Input. */
+.prizeHint {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.prizeField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.prizeFieldLabel {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+/* ───────────────────── Retos anteriores (issue #608) ───────────────────── */
+
+.anteriores {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.anterioresTitulo {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.anterioresLista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  /* Los otros `<ol>` de este fichero (.podio, .lista) suprimen el marcador porque
+   * ponen `display:flex` en el propio <li>; aquí el flex vive en el <button> de
+   * dentro, así que el <li> se queda en su `display:list-item` por defecto y el
+   * navegador pintaba "1." "2." delante de cada fila. */
+  list-style: none;
+}
+
+/* Fila-botón: pulsable entera (tap abre el detalle del reto por su hash). */
+.anteriorFila {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow var(--motion-transition-fast);
+}
+.anteriorFila:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.anteriorTitulo {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+}
+
+.anteriorGanador,
+.anteriorResultado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* Aviso anti-trampa (issue #200, rescatado de GroupPage:965/1230): icono
+ * discreto con title+aria-label — nunca solo color (no depende de verlo). */
+.leftAppFlag {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-danger);
+  cursor: help;
+}
+
+/* ───────────────────── Compartir clasificación (issue #608) ───────────────────── */
+
+/* FAB fijo abajo-IZQUIERDA (rescatado de GroupPage): la derecha la ocupa el FAB
+ * "＋" de crear del viaje (TripPage), así que se separan para no chocar. */
+.shareFab {
+  position: fixed;
+  left: calc(var(--space-4) + env(safe-area-inset-left));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  z-index: var(--z-sticky);
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+
+  height: 48px;
+  padding: 0 var(--space-4);
+
+  border: none;
+  border-radius: var(--radius-full);
+  background-color: var(--accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+
+  transition:
+    transform var(--motion-transition-fast),
+    box-shadow var(--motion-transition-base),
+    background-color var(--motion-transition-base);
+}
+.shareFab:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+.shareFab:active {
+  transform: scale(0.95);
+}
+@media (prefers-reduced-motion: reduce) {
+  .shareFab {
+    transition: none;
+  }
+  .shareFab:hover,
+  .shareFab:active {
+    transform: none;
   }
 }

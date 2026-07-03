@@ -33,6 +33,27 @@ vi.mock('../../lib/groupData', async (importOriginal) => {
   }
 })
 
+function makeVote(overrides: Partial<VoteWithName>): VoteWithName {
+  return {
+    id: 'v1',
+    group_id: 'g1',
+    challenge_id: 'c1',
+    user_id: 'u-otro',
+    display_name: 'Otro',
+    avatar: null,
+    points: 0,
+    distance_km: null,
+    guess_lat: null,
+    guess_lng: null,
+    guess_number: null,
+    abs_error: null,
+    left_app: false,
+    elapsed_seconds: null,
+    created_at: '2026-07-01T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
 const getGroupVotesMock = vi.fn<(groupId: string) => Promise<VoteWithName[]>>()
 vi.mock('../../lib/leaderboard', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/leaderboard')>()
@@ -196,5 +217,81 @@ describe('useTripData — visibilidad de pines por estado (issue #593)', () => {
     expect(result.current.moments[0].lat).toBeNull()
     expect(result.current.moments[0].lng).toBeNull()
     expect(result.current.route).toHaveLength(0)
+  })
+})
+
+// Issue #608: "Retos anteriores" del Marcador (rescatado de GroupPage/PastSection)
+// necesita, por reto CERRADO, quién ganó y cómo me fue A MÍ — derivado de los
+// votos reales, sin volver a pedir nada a Supabase.
+describe('useTripData — pastChallenges (issue #608)', () => {
+  test('gana quien más puntos saca; mi resultado y el aviso anti-trampa se derivan de mi voto', async () => {
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({ id: 'c1', title: 'Bosque de bambú' }),
+    ])
+    getGroupVotesMock.mockResolvedValue([
+      makeVote({ id: 'v1', challenge_id: 'c1', user_id: 'u-me', points: 3100, left_app: false }),
+      makeVote({
+        id: 'v2',
+        challenge_id: 'c1',
+        user_id: 'u-otro',
+        display_name: 'Marta',
+        points: 4880,
+        left_app: true,
+      }),
+    ])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.pastChallenges).toHaveLength(1))
+
+    const [summary] = result.current.pastChallenges
+    expect(summary.title).toBe('Bosque de bambú')
+    expect(summary.winner).toEqual({
+      name: 'Marta',
+      points: 4880,
+      distanceKm: null,
+      leftApp: true,
+    })
+    expect(summary.myResult).toEqual({ points: 3100, distanceKm: null, leftApp: false })
+    expect(summary.isOwn).toBe(false)
+  })
+
+  test('reto cerrado sin votos: winner y myResult null', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1' })])
+    getGroupVotesMock.mockResolvedValue([])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.pastChallenges).toHaveLength(1))
+
+    expect(result.current.pastChallenges[0].winner).toBeNull()
+    expect(result.current.pastChallenges[0].myResult).toBeNull()
+  })
+
+  test('reto propio: isOwn = true (nadie vota su propio reto, así que myResult queda null)', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1', created_by: 'u-me' })])
+    getGroupVotesMock.mockResolvedValue([
+      makeVote({ id: 'v1', challenge_id: 'c1', user_id: 'u-otro', points: 4200 }),
+    ])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.pastChallenges).toHaveLength(1))
+
+    expect(result.current.pastChallenges[0].isOwn).toBe(true)
+    expect(result.current.pastChallenges[0].myResult).toBeNull()
+  })
+
+  test('orden: mismo orden (más reciente primero) que sirve getGroupChallenges', async () => {
+    // getGroupChallenges sirve DESC (más nuevo primero, ver comentario de
+    // `moments`); pastChallenges invierte `moments` (ASC) de vuelta a DESC, así
+    // que el resultado neto conserva el orden de entrada del servidor.
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({ id: 'c-nuevo', title: 'Nuevo' }),
+      closedChallenge({ id: 'c-viejo', title: 'Viejo' }),
+    ])
+    getGroupVotesMock.mockResolvedValue([])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.pastChallenges).toHaveLength(2))
+
+    expect(result.current.pastChallenges.map((c) => c.title)).toEqual(['Nuevo', 'Viejo'])
   })
 })

@@ -98,8 +98,17 @@ export function TripPage({
   onBack,
 }: Props) {
   const { user, profile } = useSession()
-  const { group, moments, route, leaderboard, winnersByChallenge, loading, error, refresh } =
-    useTripData(groupId, user?.id ?? null)
+  const {
+    group,
+    moments,
+    route,
+    leaderboard,
+    winnersByChallenge,
+    pastChallenges,
+    loading,
+    error,
+    refresh,
+  } = useTripData(groupId, user?.id ?? null)
   const reducedMotion = useReducedMotion()
   const toast = useToast()
 
@@ -516,6 +525,15 @@ export function TripPage({
               onInvite={() => setInviting(true)}
               onAddChallenge={onAddChallenge}
               canCreate={canCreate}
+              groupId={groupId}
+              groupName={title}
+              prizes={group?.prizes ?? null}
+              pastChallenges={pastChallenges}
+              // Mismo hash `#g=…&c=…` que "Adivina"/"Ya jugaste" (issue #608): un
+              // reto cerrado con voto propio reabre su revelado; sin voto, entra
+              // al reto (que ya rechaza jugar fuera de plazo).
+              onOpenChallenge={onPlayChallenge}
+              onPrizesSaved={() => void refresh()}
             />
           </section>
         )}

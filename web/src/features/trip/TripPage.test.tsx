@@ -16,6 +16,7 @@ vi.mock('./useTripData', () => ({
     recentResults: [],
     recentTitle: null,
     winnersByChallenge: new Map(),
+    pastChallenges: [],
     loading: false,
     error: null,
     refresh: async () => {},
@@ -27,9 +28,6 @@ vi.mock('./TripWrap', () => ({ TripWrap: () => <div data-testid="wrap" /> }))
 vi.mock('./MomentSheet', () => ({ MomentSheet: () => null }))
 vi.mock('../group/EditChallenge', () => ({ EditChallenge: () => null }))
 vi.mock('../group/GroupSettingsModal', () => ({ GroupSettingsModal: () => null }))
-// El marcador es la GroupPage incrustada; en este test solo verificamos la cabecera,
-// así que la sustituimos por un stub para no arrastrar sus fetches a Supabase.
-vi.mock('../group/GroupPage', () => ({ GroupPage: () => <div data-testid="marcador" /> }))
 
 vi.mock('../../lib/membership', () => ({
   isMember: async () => true,
