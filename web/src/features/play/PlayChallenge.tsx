@@ -37,6 +37,8 @@ import { reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { useVisualViewport } from '../../lib/useVisualViewport'
+import { useOwnChallengeGuard } from './useOwnChallengeGuard'
+import { describeChallengeClosure } from './challengeClosure'
 // Rasterización + compartir reutilizadas de la tarjeta de clasificación (import
 // READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
@@ -122,10 +124,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // solo recibe el código del grupo (groupId); el nombre lo leemos aparte. Null
   // hasta resolver (o si no hay grupo / falla): la tarjeta cae a "tu grupo".
   const [groupName, setGroupName] = useState<string | null>(null)
-  // Recuento de votos del reto, solo para la guarda "es tuyo" (#509): el creador
-  // ve cuánta gente ha jugado ya, sin entrar al juego. Null hasta resolver o si
-  // el reto no es propio (no se usa en el resto de fases).
-  const [ownVoteCount, setOwnVoteCount] = useState<number | null>(null)
+  // Guarda "es tuyo" (#509), compartida con PlayNumberChallenge (#579): el
+  // creador ve cuánta gente ha jugado ya, sin entrar al juego.
+  const { ownVoteCount, checkOwn } = useOwnChallengeGuard(getVotes)
   // Compartir mi resultado: estado del PNG. `sharingResult` deshabilita el botón
   // mientras se rasteriza/comparte; el ref apunta a la tarjeta montada fuera del
   // viewport para el snapshot (mismo patrón que ShareLeaderboardModal).
@@ -292,13 +293,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         // llegue por un enlace directo (el flujo normal ya no lo manda aquí tras
         // crear). Corta ANTES de mirar el tipo: aplica a lugar Y a número, sin
         // llegar a delegar en PlayNumberChallenge.
-        if (user && c.created_by === user.id) {
-          try {
-            const votes = await getVotes(c.id)
-            if (!cancelled) setOwnVoteCount(votes.length)
-          } catch {
-            // Sin recuento: el estado se muestra igual, sin la cifra.
-          }
+        if (await checkOwn(c, user?.id, { isCancelled: () => cancelled })) {
           if (!cancelled) setPhase('own')
           return
         }
@@ -363,7 +358,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [challengeId, user])
+  }, [challengeId, user, checkOwn])
 
   // Nombre del grupo para la tarjeta de compartir. Solo si venimos de un grupo
   // (deep link con groupId). Falla en silencio: la tarjeta cae a "tu grupo".
@@ -577,49 +572,57 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
 
   // Guarda "es tuyo" (#509): el creador no juega su propio reto. Va ANTES del
   // despacho por tipo (lugar/número): no llegamos a montar ningún juego.
+  // Hallazgo #4 (auditoría de retos, #579): antes la tarjeta quedaba pegada
+  // arriba con 2/3 de pantalla en blanco. El "atrás" queda anclado arriba (como
+  // en el resto de la app); el bloque informativo se centra en el espacio
+  // restante y se enriquece con un mini-resumen del estado (cierra en X /
+  // cerrado), además del recuento de jugadas que ya tenía.
   if (phase === 'own' && challenge) {
     const backLabelOwn = groupId ? 'Volver al viaje' : 'Inicio'
     return (
-      <main className="lg-page">
-        <Stack gap={4}>
-          <BackHomeButton onClick={goBack} label={backLabelOwn} />
-          <Stack gap={2} className={styles.header}>
-            <h1 className={styles.title}>{challenge.title}</h1>
-          </Stack>
-          <Card padding="md" raised>
-            <Stack gap={3} align="center">
-              <IconTrofeo size={40} />
-              <strong>Este reto es tuyo</strong>
-              <p className={styles.status}>
-                Lo creaste tú: ya conoces la respuesta, así que no puedes jugarlo.
-              </p>
-              {ownVoteCount != null && (
-                <p className={styles.status}>
-                  {ownVoteCount === 0
-                    ? 'Nadie ha votado todavía.'
-                    : `${ownVoteCount} ${ownVoteCount === 1 ? 'persona ha votado' : 'personas han votado'}.`}
-                </p>
-              )}
-              {groupId && (
-                <Button
-                  fullWidth
-                  size="lg"
-                  onClick={() => {
-                    location.hash = marcadorGroupHash(groupId)
-                  }}
-                >
-                  <span className={styles.inlineIcon}>
-                    <IconTrofeo size={18} />
-                    Ver marcador
-                  </span>
-                </Button>
-              )}
-              <Button variant="secondary" fullWidth onClick={goBack}>
-                Volver al viaje
-              </Button>
+      <main className={`lg-page ${styles.ownPage}`}>
+        <BackHomeButton onClick={goBack} label={backLabelOwn} />
+        <div className={styles.ownCenter}>
+          <Stack gap={4} align="center">
+            <Stack gap={2} className={styles.header} align="center">
+              <h1 className={styles.title}>{challenge.title}</h1>
             </Stack>
-          </Card>
-        </Stack>
+            <Card padding="md" raised>
+              <Stack gap={3} align="center">
+                <IconTrofeo size={40} />
+                <strong>Este reto es tuyo</strong>
+                <p className={styles.status}>
+                  Lo creaste tú: ya conoces la respuesta, así que no puedes jugarlo.
+                </p>
+                <p className={styles.status}>{describeChallengeClosure(challenge.deadline_at)}</p>
+                {ownVoteCount != null && (
+                  <p className={styles.status}>
+                    {ownVoteCount === 0
+                      ? 'Nadie ha votado todavía.'
+                      : `${ownVoteCount} ${ownVoteCount === 1 ? 'persona ha votado' : 'personas han votado'}.`}
+                  </p>
+                )}
+                {groupId && (
+                  <Button
+                    fullWidth
+                    size="lg"
+                    onClick={() => {
+                      location.hash = marcadorGroupHash(groupId)
+                    }}
+                  >
+                    <span className={styles.inlineIcon}>
+                      <IconTrofeo size={18} />
+                      Ver marcador
+                    </span>
+                  </Button>
+                )}
+                <Button variant="secondary" fullWidth onClick={goBack}>
+                  Volver al viaje
+                </Button>
+              </Stack>
+            </Card>
+          </Stack>
+        </div>
       </main>
     )
   }

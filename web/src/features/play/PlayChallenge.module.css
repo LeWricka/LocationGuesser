@@ -345,6 +345,24 @@
 }
 
 /* ==========================================================================
+ * Guarda "es tuyo" (#509/#579) — hallazgo #4 de la auditoría: la tarjeta
+ * quedaba pegada arriba con 2/3 de pantalla en blanco. El "atrás" se queda
+ * arriba (patrón del resto de la app); el bloque informativo se centra en el
+ * espacio restante de la página.
+ * ======================================================================== */
+.ownPage {
+  display: flex;
+  flex-direction: column;
+}
+
+.ownCenter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ==========================================================================
  * Fase REVELADA — vuelve al layout de página (lg-page).
  * ======================================================================== */
 .header {

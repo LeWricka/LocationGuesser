@@ -32,6 +32,7 @@ import {
   CHALLENGES,
   CH_ACTIVE,
   CH_CLOSED,
+  CH_CLOSED_OTHER,
   CH_MEMORY,
   CH_NUMBER,
   GALLERY_NOW,
@@ -420,8 +421,20 @@ export const cases: GalleryCase[] = [
     render: () => <PlayNumberChallenge challengeId={CH_NUMBER} groupId={GROUP_ID} />,
   },
   {
+    // Reto cerrado AJENO (creado por Marta) con tu voto: el revelado REAL
+    // (mapa + resultado), no la guarda "es tuyo" (#579 — antes este caso usaba
+    // CH_CLOSED, propio + auto-voto imposible, y enseñaba la guarda por error).
     id: 'detalle-reto-cerrado',
     title: 'Detalle del reto (cerrado, ya jugado)',
+    section: 'Jugar',
+    render: () => <PlayChallenge challengeId={CH_CLOSED_OTHER} groupId={GROUP_ID} />,
+  },
+  {
+    // Guarda "es tuyo" (#509) a propósito: CH_CLOSED es TU reto (creado por
+    // ME_ID) → PlayChallenge corta antes de jugar y muestra el estado
+    // enriquecido (#579: centrado + mini-resumen "cierra en X / cerrado").
+    id: 'reto-es-tuyo',
+    title: 'Reto es tuyo (guarda, no se puede jugar)',
     section: 'Jugar',
     render: () => <PlayChallenge challengeId={CH_CLOSED} groupId={GROUP_ID} />,
   },

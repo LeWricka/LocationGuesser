@@ -21,6 +21,8 @@ import { describeError } from '../../lib/errors'
 import { reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
+import { useOwnChallengeGuard } from './useOwnChallengeGuard'
+import { describeChallengeClosure } from './challengeClosure'
 import { AppHeader } from '../../ui/AppHeader'
 import {
   Avatar,
@@ -97,9 +99,9 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
   const [saving, setSaving] = useState(false)
   const [votes, setVotes] = useState<VoteWithName[]>([])
   const [rank, setRank] = useState<{ position: number; total: number } | null>(null)
-  // Recuento de votos, solo para la guarda "es tuyo" (#509). Null hasta resolver
-  // o si el reto no es propio.
-  const [ownVoteCount, setOwnVoteCount] = useState<number | null>(null)
+  // Guarda "es tuyo" (#509), compartida con PlayChallenge (#579): el creador
+  // ve cuánta gente ha jugado ya, sin entrar al juego.
+  const { ownVoteCount, checkOwn } = useOwnChallengeGuard(getVotesWithNames)
 
   const toast = useToast()
   const { user } = useSession()
@@ -217,13 +219,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
         // Guarda defensiva (#509): el creador no juega su propio reto. En el flujo
         // real, PlayChallenge ya corta antes de delegar aquí; esto cubre el caso de
         // llegar a este componente directamente (sin ese guard por delante).
-        if (user && c.created_by === user.id) {
-          try {
-            const vs = await getVotesWithNames(c.id)
-            if (!cancelled) setOwnVoteCount(vs.length)
-          } catch {
-            // Sin recuento: el estado se muestra igual, sin la cifra.
-          }
+        if (await checkOwn(c, user?.id, { isCancelled: () => cancelled })) {
           if (!cancelled) setPhase('own')
           return
         }
@@ -275,7 +271,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
     return () => {
       cancelled = true
     }
-  }, [challengeId, user, preloaded])
+  }, [challengeId, user, preloaded, checkOwn])
 
   // Inicio del cronómetro de respuesta (wall-clock desde el start_at persistido).
   useEffect(() => {
@@ -384,13 +380,17 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
     )
   }
 
-  // Guarda "es tuyo" (#509): el creador no juega su propio reto.
+  // Guarda "es tuyo" (#509): el creador no juega su propio reto. Hallazgo #4
+  // (auditoría de retos, #579): antes la tarjeta quedaba pegada arriba con 2/3
+  // de pantalla en blanco. El "atrás" queda anclado arriba; el bloque
+  // informativo se centra en el espacio restante y suma un mini-resumen del
+  // estado (cierra en X / cerrado), además del recuento de jugadas que ya tenía.
   if (phase === 'own' && challenge) {
     const backLabelOwn = groupId ? 'Volver al viaje' : 'Inicio'
     return (
-      <main className="lg-page">
-        <Stack gap={4}>
-          <BackHomeButton onClick={goBack} label={backLabelOwn} />
+      <main className={`lg-page ${styles.ownPage}`}>
+        <BackHomeButton onClick={goBack} label={backLabelOwn} />
+        <div className={styles.ownCenter}>
           <Card padding="md" raised>
             <Stack gap={3} align="center">
               <Icon icon={Hash} size={40} />
@@ -398,6 +398,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               <p className={styles.status}>
                 Lo creaste tú: ya conoces la respuesta, así que no puedes jugarlo.
               </p>
+              <p className={styles.status}>{describeChallengeClosure(challenge.deadline_at)}</p>
               {ownVoteCount != null && (
                 <p className={styles.status}>
                   {ownVoteCount === 0
@@ -421,7 +422,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               </Button>
             </Stack>
           </Card>
-        </Stack>
+        </div>
       </main>
     )
   }

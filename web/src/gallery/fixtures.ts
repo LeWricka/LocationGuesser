@@ -139,8 +139,15 @@ function baseChallenge(
 
 // Reto EN JUEGO (deadline futura): el que toca jugar.
 export const CH_ACTIVE = 'ch-active-fushimi'
-// Reto CERRADO de lugar (deadline pasada): muestra respuesta y resultados.
+// Reto CERRADO de lugar, PROPIO (created_by = ME_ID): SOLO para demostrar
+// "editar reto" y la guarda "es tuyo" (#579) — nadie vota su propio reto, así
+// que este fixture NO lleva ningún voto de ME_ID (ver VOTES más abajo).
 export const CH_CLOSED = 'ch-closed-arashiyama'
+// Reto CERRADO de lugar, AJENO (created_by de OTRO miembro) con tu voto: el
+// estado real y jugable en prod para "ya jugué esto, cerrado" (#579). Antes
+// `detalle-reto-cerrado` usaba CH_CLOSED (propio + auto-voto imposible), lo que
+// disparaba la guarda "es tuyo" en vez del revelado real — separado aquí.
+export const CH_CLOSED_OTHER = 'ch-closed-kinkakuji'
 // Recuerdo puro (sin juego): foto + lugar visible, sin plazo.
 export const CH_MEMORY = 'ch-memory-ramen'
 // Reto de NÚMERO cerrado: ¿cuánto costó?
@@ -173,6 +180,22 @@ export const CHALLENGES: ChallengeRow[] = [
     deadline_at: isoFromNow(-2 * DAY),
     created_by: ME_ID,
     created_at: isoFromNow(-3 * DAY),
+  }),
+  // Reto cerrado AJENO con tu voto (#579): lo creó Marta, TÚ (ME_ID) jugaste y
+  // votaste — el estado real que enseña `detalle-reto-cerrado` (mapa + resultado
+  // revelados), no la guarda "es tuyo".
+  baseChallenge({
+    id: CH_CLOSED_OTHER,
+    title: 'El Pabellón Dorado',
+    description: 'Se refleja entero en el estanque si no hay viento.',
+    image_path: 'photo-kinkakuji.jpg',
+    place_lat: 35.0394,
+    place_lng: 135.7292,
+    lat: 35.0394,
+    lng: 135.7292,
+    deadline_at: isoFromNow(-1 * DAY),
+    created_by: 'user-marta-0001',
+    created_at: isoFromNow(-2 * DAY),
   }),
   baseChallenge({
     id: CH_NUMBER,
@@ -208,6 +231,7 @@ export const CHALLENGES: ChallengeRow[] = [
 // (anti-spoiler), igual que la RLS de challenge_answers en prod.
 export const ANSWERS: Record<string, { lat: number; lng: number }> = {
   [CH_CLOSED]: { lat: 35.0095, lng: 135.6716 },
+  [CH_CLOSED_OTHER]: { lat: 35.0394, lng: 135.7292 },
 }
 export const NUMBER_ANSWERS: Record<string, number> = {
   [CH_NUMBER]: 285,
@@ -232,11 +256,14 @@ function vote(
 }
 
 export const VOTES: Vote[] = [
-  // Reto cerrado de lugar: tres jugadores con distintas distancias.
+  // Reto cerrado PROPIO (CH_CLOSED, creado por ME_ID): solo para "editar reto"
+  // (el conteo de votos bloquea ciertos campos). Nadie vota su propio reto, así
+  // que estos tres votos son de otros miembros (#579) — antes uno era de ME_ID,
+  // un estado imposible en prod.
   vote({
     id: 'v1',
     challenge_id: CH_CLOSED,
-    user_id: ME_ID,
+    user_id: 'user-iker-0002',
     points: 4200,
     distance_km: 8,
     guess_lat: 35.02,
@@ -259,6 +286,36 @@ export const VOTES: Vote[] = [
     distance_km: 42,
     guess_lat: 35.3,
     guess_lng: 135.5,
+  }),
+  // Reto cerrado AJENO (CH_CLOSED_OTHER, creado por Marta) CON tu voto: el
+  // estado real de "detalle-reto-cerrado" (#579) — TÚ (ME_ID) jugaste y
+  // quedaste 2º de 3, con el revelado real (mapa + resultado), no la guarda.
+  vote({
+    id: 'v7',
+    challenge_id: CH_CLOSED_OTHER,
+    user_id: ME_ID,
+    points: 4200,
+    distance_km: 8,
+    guess_lat: 35.05,
+    guess_lng: 135.7,
+  }),
+  vote({
+    id: 'v8',
+    challenge_id: CH_CLOSED_OTHER,
+    user_id: 'user-noa-0003',
+    points: 4880,
+    distance_km: 1.2,
+    guess_lat: 35.04,
+    guess_lng: 135.73,
+  }),
+  vote({
+    id: 'v9',
+    challenge_id: CH_CLOSED_OTHER,
+    user_id: 'user-iker-0002',
+    points: 3100,
+    distance_km: 42,
+    guess_lat: 34.9,
+    guess_lng: 135.9,
   }),
   // Reto de número cerrado.
   vote({
@@ -298,6 +355,7 @@ export const PHOTO_LABELS: Record<string, string> = {
   'cover-japon.jpg': 'Kioto',
   'photo-fushimi.jpg': 'Fushimi Inari',
   'photo-arashiyama.jpg': 'Arashiyama',
+  'photo-kinkakuji.jpg': 'Kinkaku-ji',
   'photo-shinkansen.jpg': 'Shinkansen',
   'photo-ramen.jpg': 'Ramen',
   'photo-ramen-2.jpg': 'La barra',
