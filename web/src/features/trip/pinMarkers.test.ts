@@ -1,6 +1,5 @@
 import { describe, test, expect, afterEach, vi } from 'vitest'
 import {
-  buildActivePinElement,
   buildHomePinElement,
   buildPinElement,
   isUsablePinImage,
@@ -274,15 +273,6 @@ describe('buildPinElement (mapa de Viaje + home, camino único)', () => {
   test('featured (seleccionado en el mapa): aro dorado, sin foto de golpe', () => {
     const el = buildPinElement({ title: 'Nápoles', imageUrl: 'https://cdn/x.jpg', featured: true })
     expect(el.classList.contains('lg-trip-pin--featured')).toBe(true)
-  })
-})
-
-describe('buildActivePinElement (momento en juego)', () => {
-  test('disco rojo pulsante con "?", sin foto ni inicial', () => {
-    const el = buildActivePinElement()
-    expect(el.classList.contains('lg-trip-pin--active')).toBe(true)
-    expect(el.querySelector('.lg-trip-pin__disc')?.innerHTML).toContain('<svg')
-    expect(el.querySelector('.lg-trip-pin__initial')).toBeNull()
   })
 })
 

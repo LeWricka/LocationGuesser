@@ -8,7 +8,6 @@ import type {
   SkySpecification,
   StyleSpecification,
 } from 'maplibre-gl'
-import type { RoutePoint } from '../../lib/trip'
 import {
   ESRI_REFERENCE_LABELS,
   ESRI_SATELLITE,
@@ -20,7 +19,7 @@ import {
 import { Icon } from '../../ui/Icon'
 import { MapSkeleton } from '../../ui/MapSkeleton'
 import type { TripMapProps as Props } from './TripMap.types'
-import { buildActivePinElement, buildPinElement } from './pinMarkers'
+import { buildPinElement } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapGlobe.module.css'
@@ -45,9 +44,25 @@ const WORLD_ZOOM = 1.4
 // globo y fallback coincidan). FIT_PADDING deja hueco al chrome (arriba) y al
 // carrusel (abajo); top y bottom mayores que los lados.
 const FIT_PADDING = { top: 88, bottom: 220, left: 48, right: 48 }
-// Suelo de zoom para que el satélite llene el lienzo (sin esfera flotando en el espacio).
-// ~3.2 cubre el alto de un móvil en retrato con la proyección globo.
-const MIN_FILL_ZOOM = 3.2
+
+// Suelo de zoom para que el satélite llene el lienzo (sin esfera flotando en cielo
+// oscuro): CALIBRADO contra el alto de un móvil en retrato (844px, viewport
+// "compacto" de la galería). REGRESIÓN #593: un suelo FIJO solo cubre esa relación
+// de aspecto — en un viewport DESKTOP ANCHO (más ancho que alto, al revés que un
+// móvil) el mismo zoom deja la esfera más pequeña que el lienzo y asoma el cielo
+// nocturno de `SCENE_GLOBE` (#0d1722, casi negro) a los lados. Zoom es una escala
+// logarítmica (cada +1 dobla el tamaño en pantalla), así que compensamos el lado
+// MAYOR del contenedor (el que manda en un ancho panorámico) con
+// `log2(maxDim / MIN_FILL_REFERENCE_PX)`.
+const MIN_FILL_ZOOM_BASE = 3.2
+const MIN_FILL_REFERENCE_PX = 844
+
+/** Suelo de zoom que garantiza esfera-a-sangre para un contenedor `w×h` dado. */
+function computeMinFillZoom(width: number, height: number): number {
+  const maxDim = Math.max(width, height)
+  if (!Number.isFinite(maxDim) || maxDim <= 0) return MIN_FILL_ZOOM_BASE
+  return MIN_FILL_ZOOM_BASE + Math.max(0, Math.log2(maxDim / MIN_FILL_REFERENCE_PX))
+}
 
 // Entrada cinematográfica (Fase 2): arrancamos un punto MÁS lejos que WORLD_ZOOM
 // (vista de globo entero) y "aterrizamos" en el encuadre de la ruta. Duración corta
@@ -67,8 +82,6 @@ const ROUTE_SRC = 'lg-route'
 const ROUTE_LINE = 'lg-route-line'
 const PENDING_SRC = 'lg-route-pending'
 const PENDING_LINE = 'lg-route-pending-line'
-const DASH_SRC = 'lg-route-dash'
-const DASH_LINE = 'lg-route-dash-line'
 
 // Estilo base mínimo: sin sprite/glyphs (no usamos labels) y solo el raster Esri.
 // Vacío de capas; el raster se añade tras `load` para poder activar el globo antes.
@@ -78,33 +91,18 @@ const BASE_STYLE: StyleSpecification = {
   layers: [],
 }
 
-/**
- * Posición FLOTANTE del momento activo (anti-spoiler): el centroide de los
- * cerrados, o el centro del mundo si aún no hay ninguno. IDÉNTICO criterio que el
- * mapa plano (`TripMapLeaflet`), para que globo y fallback coincidan.
- */
-function floatingActivePos(route: RoutePoint[]): [number, number] {
-  if (route.length === 0) return WORLD_CENTER
-  const lat = route.reduce((s, p) => s + p.lat, 0) / route.length
-  const lng = route.reduce((s, p) => s + p.lng, 0) / route.length
-  return [lng, lat]
-}
-
-/** Crea el ELEMENTO DOM de un pin-foto (cerrado o activo) para el Marker de MapLibre.
- * Reusa los builders compartidos (`pinMarkers`) y las clases del plano (`lg-trip-pin*`)
- * para que el look —miniatura redonda + borde + puntita + pulso— sea idéntico en ambos
- * motores; el color del borde lo gobiernan los tokens, no se hardcodea. El pin CERRADO
- * pasa por `buildPinElement`, que precarga la foto y solo la sube si carga de verdad
- * (una URL firmada caducada/404 cae a la inicial en vez de dejar un recuadro oscuro). */
+/** Crea el ELEMENTO DOM de un pin-foto CERRADO para el Marker de MapLibre. Reusa los
+ * builders compartidos (`pinMarkers`) y las clases del plano (`lg-trip-pin*`) para
+ * que el look —miniatura redonda + borde + puntita— sea idéntico en ambos motores;
+ * el color del borde lo gobiernan los tokens, no se hardcodea. Pasa por
+ * `buildPinElement`, que precarga la foto y solo la sube si carga de verdad (una URL
+ * firmada caducada/404 cae a la inicial en vez de dejar un recuadro oscuro). */
 function pinElement(opts: {
   imageUrl: string | null
   title?: string | null
-  active: boolean
   featured?: boolean
 }): HTMLDivElement {
-  return opts.active
-    ? buildActivePinElement()
-    : buildPinElement({ imageUrl: opts.imageUrl, title: opts.title, featured: opts.featured })
+  return buildPinElement({ imageUrl: opts.imageUrl, title: opts.title, featured: opts.featured })
 }
 
 /**
@@ -113,8 +111,10 @@ function pinElement(opts: {
  * (`TripMapLeaflet`) queda de red de seguridad y `TripMap` decide cuál montar.
  * Mismo contrato de Props que el plano:
  *  - pin-foto clavado por momento cerrado (anillo blanco);
- *  - momento activo FLOTANDO sobre el centroide (anillo cálido pulsante, anti-spoiler);
- *  - ruta: línea continua entre cerrados + tramo discontinuo hacia el activo;
+ *  - ruta: línea continua entre cerrados;
+ *  - el momento EN JUEGO NUNCA aparece aquí (issue #593): mientras dura, su
+ *    respuesta es secreta y el diario solo lo muestra en el timeline/carrusel;
+ *    al cerrarse entra en `route` con su pin real;
  *  - fitBounds inicial, flyTo al cambiar la selección, click → onSelectMoment.
  *
  * Cualquier fallo de runtime se propaga al ErrorBoundary del selector, que cae al
@@ -170,7 +170,6 @@ function applySky(map: MapLibreMap): void {
 
 export function TripMapGlobe({
   route,
-  activeMoment,
   selectedChallengeId,
   playing = false,
   onSelectMoment,
@@ -208,13 +207,11 @@ export function TripMapGlobe({
   // closures obsoletas si los datos cambian antes de que el estilo cargue. La
   // escritura va en un efecto (no en render) para no romper la regla de hooks.
   const routeRef = useRef(route)
-  const activeRef = useRef(activeMoment)
   const selectedRef = useRef(selectedChallengeId)
   const playingRef = useRef(playing)
   const onSelectRef = useRef(onSelectMoment)
   useEffect(() => {
     routeRef.current = route
-    activeRef.current = activeMoment
     selectedRef.current = selectedChallengeId
     playingRef.current = playing
     onSelectRef.current = onSelectMoment
@@ -227,19 +224,19 @@ export function TripMapGlobe({
     const gl = glRef.current
     if (!map || !gl || !readyRef.current) return
     const pts = routeRef.current
-    const active = activeRef.current
 
     for (const m of markersRef.current) m.remove()
     markersRef.current = []
 
     // Pines de cerrados, clavados en su lat/lng real. `anchor: 'bottom'` ancla la
     // PUNTA del pin a la coordenada (el círculo queda arriba), igual que el plano.
+    // El momento EN JUEGO NO tiene pin aquí (issue #593): mientras dura, su lugar es
+    // secreto y no aparece en el mapa en absoluto (ni clavado ni flotando).
     const selected = selectedRef.current
     for (const p of pts) {
       const el = pinElement({
         imageUrl: p.imageUrl,
         title: p.title,
-        active: false,
         featured: p.challengeId === selected,
       })
       el.addEventListener('click', () => onSelectRef.current(p.challengeId))
@@ -248,21 +245,10 @@ export function TripMapGlobe({
       )
     }
 
-    // Pin del momento activo: FLOTANDO sobre el centroide (nunca su sitio real).
-    if (active) {
-      const el = pinElement({ imageUrl: null, active: true })
-      el.addEventListener('click', () => onSelectRef.current(active.challengeId))
-      markersRef.current.push(
-        new gl.Marker({ element: el, anchor: 'bottom' })
-          .setLngLat(floatingActivePos(pts))
-          .addTo(map),
-      )
-    }
-
     // Ruta en ORO (token): el oro marca el recorrido "vivo". El paint WebGL no entiende
     // `var(--token)`, así que resolvemos el token a color concreto leyendo la variable
     // computada (mismo valor que usa el plano por CSS). El fallback solo aplica si el
-    // token faltara. Dos colores: oro sólido (recorrido) y oro tenue (pendiente/activo).
+    // token faltara. Dos colores: oro sólido (recorrido) y oro tenue (pendiente).
     const css = getComputedStyle(map.getContainer())
     const goldColor = css.getPropertyValue('--route-gold').trim() || '#d9b25a'
     const goldSoft = css.getPropertyValue('--route-gold-soft').trim() || 'rgba(217,178,90,0.5)'
@@ -274,27 +260,20 @@ export function TripMapGlobe({
     const drawn = closed.slice(0, drawnCount)
     const pending = drawnCount < closed.length ? closed.slice(Math.max(drawnCount - 1, 0)) : []
 
-    // Tramo discontinuo del último cerrado hacia el activo flotante.
-    const dash: [number, number][] | null =
-      active && pts.length > 0
-        ? [[pts[pts.length - 1].lng, pts[pts.length - 1].lat], floatingActivePos(pts)]
-        : null
-
     upsertLine(map, ROUTE_SRC, ROUTE_LINE, drawn.length >= 2 ? drawn : [], { color: goldColor })
     upsertLine(map, PENDING_SRC, PENDING_LINE, pending.length >= 2 ? pending : [], {
       color: goldSoft,
       dash: [2, 4],
     })
-    upsertLine(map, DASH_SRC, DASH_LINE, dash ?? [], { color: goldSoft, dash: [2, 2.5] })
   }, [])
 
-  // Encuadra todos los pines (cerrados + posición flotante del activo).
+  // Encuadra todos los pines (momentos cerrados). El momento EN JUEGO nunca entra
+  // aquí (issue #593): no aparece en el mapa, así que no puede influir en el encuadre.
   const fitToPins = useCallback(() => {
     const map = mapRef.current
     const gl = glRef.current
     if (!map || !gl) return
     const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
-    if (activeRef.current) pts.push(floatingActivePos(routeRef.current))
     if (pts.length === 0) return
     const duration = prefersReducedMotion() ? 0 : 600
     if (pts.length === 1) {
@@ -323,7 +302,6 @@ export function TripMapGlobe({
       return true
     }
     const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
-    if (activeRef.current) pts.push(floatingActivePos(routeRef.current))
     if (pts.length === 0) {
       // Viaje vacío: no hay destino. Igual hacemos un acercamiento sutil al globo
       // para que la entrada no sea estática, sin reencuadrar nada.
@@ -358,6 +336,9 @@ export function TripMapGlobe({
     const container = containerRef.current
     if (!container) return
     let disposed = false
+    // Reasignado tras crear el mapa (dentro del IIFE async); la clausura de cleanup
+    // ve el valor final porque solo se ejecuta al desmontar, después de la asignación.
+    let onResize: (() => void) | null = null
 
     void (async () => {
       try {
@@ -368,16 +349,21 @@ export function TripMapGlobe({
         if (disposed) return
         glRef.current = gl
 
+        // Suelo de zoom calibrado contra el TAMAÑO REAL del contenedor en vez de la
+        // constante fija (regresión #593, ver `computeMinFillZoom`): así un viewport
+        // desktop ancho (más ancho que el móvil de referencia) sube el suelo lo
+        // necesario para que el satélite siga llenando el lienzo a sangre, sin
+        // asomar el cielo nocturno de `SCENE_GLOBE` a los lados.
+        const rect = container.getBoundingClientRect()
         const map = new gl.Map({
           container,
           style: BASE_STYLE,
           center: WORLD_CENTER,
           zoom: WORLD_ZOOM,
-          // Suelo de zoom: que el satélite SIEMPRE llene el lienzo a sangre (Polarsteps),
-          // sin alejarse tanto que aparezca el globo entero flotando en cielo oscuro. Si
-          // un viaje tiene puntos muy dispersos, fitBounds clampa aquí y centra (raro en
-          // un viaje real, casi siempre regional). El intro cinematográfico también clampa.
-          minZoom: MIN_FILL_ZOOM,
+          // Si un viaje tiene puntos muy dispersos, fitBounds clampa aquí y centra
+          // (raro en un viaje real, casi siempre regional). El intro cinematográfico
+          // también clampa.
+          minZoom: computeMinFillZoom(rect.width, rect.height),
           // SIN control de atribución de MapLibre: su modo compacto no ocultaba el texto
           // de Esri en prod (salía como banda, ver #363/#382). Sin control = imposible que
           // aparezca la banda; el crédito lo damos con nuestro propio "ⓘ" (ver render).
@@ -386,6 +372,16 @@ export function TripMapGlobe({
           fadeDuration: prefersReducedMotion() ? 0 : 300,
         })
         mapRef.current = map
+
+        // Recalcula el suelo de zoom si el contenedor cambia de tamaño (p.ej. al
+        // redimensionar la ventana de escritorio): sin esto, el suelo calibrado al
+        // montar quedaría obsoleto y el cielo nocturno podría volver a asomar (#593).
+        onResize = () => {
+          if (disposed) return
+          const r = container.getBoundingClientRect()
+          map.setMinZoom(computeMinFillZoom(r.width, r.height))
+        }
+        window.addEventListener('resize', onResize)
 
         // OJO: NO escuchamos `map.on('error')`. MapLibre lo dispara por fallos
         // transitorios (un tile Esri que da 404), que NO deben tumbar el globo. Solo
@@ -453,6 +449,7 @@ export function TripMapGlobe({
     return () => {
       disposed = true
       readyRef.current = false
+      if (onResize) window.removeEventListener('resize', onResize)
       if (readyFallbackRef.current != null) {
         window.clearTimeout(readyFallbackRef.current)
         readyFallbackRef.current = null
@@ -469,20 +466,17 @@ export function TripMapGlobe({
   // hasta que el estilo cargó; el handler `load` hace el primer pintado.
   useEffect(() => {
     repaint()
-  }, [route, activeMoment, selectedChallengeId, playing, repaint])
+  }, [route, selectedChallengeId, playing, repaint])
 
   // ── Vuela al pin seleccionado (sin re-encuadrar todo). ──
   useEffect(() => {
     const map = mapRef.current
     if (!map || !readyRef.current || !selectedChallengeId) return
-    // El momento activo no está clavado (anti-spoiler): si lo seleccionan, volamos
-    // a su posición FLOTANTE (centroide), no a una coordenada real que no existe.
+    // El momento EN JUEGO no tiene pin (issue #593): si lo seleccionan desde el
+    // carrusel, no hay a dónde volar y el mapa se queda quieto.
     const target = route.find((p) => p.challengeId === selectedChallengeId)
-    const isActiveSelected = activeRef.current?.challengeId === selectedChallengeId
-    if (target == null && !isActiveSelected) return
-    const center: [number, number] = target
-      ? [target.lng, target.lat]
-      : floatingActivePos(routeRef.current)
+    if (target == null) return
+    const center: [number, number] = [target.lng, target.lat]
     // Tocar = ZOOM al punto (no solo pan): garantizamos al menos nivel ciudad.
     const zoom = Math.max(map.getZoom(), SELECT_ZOOM)
     // Con reduced-motion saltamos sin vuelo (jumpTo); si no, vuelo suave.

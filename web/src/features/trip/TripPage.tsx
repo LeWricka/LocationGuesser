@@ -488,7 +488,6 @@ export function TripPage({
               groupId={groupId}
               moments={moments}
               route={route}
-              activeMoment={activeMoment}
               selectedId={selectedId}
               canCreate={canCreate}
               playing={reducedMotion ? undefined : playing}

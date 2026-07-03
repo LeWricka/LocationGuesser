@@ -1,11 +1,16 @@
 import { useState } from 'react'
-import { ImageOff } from 'lucide-react'
-import { Icon } from './Icon'
+import { IconCamara } from './icons'
 import { Lightbox } from './Lightbox'
 import styles from './ChallengePhoto.module.css'
 
 type Ratio = 'square' | 'photo' | 'wide'
 type Size = 'sm' | 'md' | 'lg'
+
+// Tamaño del icono de marca del placeholder, por tamaño de marco: discreto en una
+// miniatura de tira (sm), algo más presente en el héroe de la hoja (lg). Issue #593:
+// sustituye el icono "imagen rota" (ImageOff) por el placeholder de marca — mismo
+// patrón "mapa nocturno" de `HomeDashboard` (gradiente de escena + icono translúcido).
+const PLACEHOLDER_ICON_SIZE: Record<Size, number> = { sm: 18, md: 28, lg: 36 }
 
 interface Props {
   /** URL de la foto del reto. Si falta, se muestra un placeholder. */
@@ -81,8 +86,10 @@ export function ChallengePhoto({
           />
         </>
       ) : (
+        // Sin foto: placeholder de MARCA (gradiente grafito/teal de escena + icono
+        // de cámara translúcido), nunca un icono de "imagen rota" (issue #593).
         <span className={styles.placeholder} aria-label={alt} role="img">
-          <Icon icon={ImageOff} size={40} />
+          <IconCamara size={PLACEHOLDER_ICON_SIZE[size]} className={styles.placeholderIcon} />
         </span>
       )}
       {caption && (

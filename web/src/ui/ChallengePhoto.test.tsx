@@ -48,4 +48,17 @@ describe('ChallengePhoto', () => {
     const { container } = render(<ChallengePhoto src="/f.jpg" ratio="wide" />)
     expect((container.firstElementChild as HTMLElement).className).toMatch(/ratio-wide/)
   })
+
+  // Issue #593: el placeholder sin foto pasa de un icono "imagen rota" (ImageOff) a
+  // uno de MARCA (IconCamara, gradiente de escena) — mismo patrón que el "mapa
+  // nocturno" de HomeDashboard. El SVG de lucide `ImageOff` no lleva `viewBox`
+  // "0 0 24 24" con esa forma concreta; en vez de acoplar el test al markup interno
+  // del icono, fijamos el contrato observable: sigue siendo un `role="img"`
+  // accesible (sin regresión de a11y) y SIGUE sin ser pulsable (sin foto que ampliar).
+  test('sin foto: el placeholder es de marca, no un icono de imagen rota', () => {
+    render(<ChallengePhoto alt="Reto sin foto" />)
+    const placeholder = screen.getByRole('img', { name: 'Reto sin foto' })
+    expect(placeholder.querySelector('svg')).toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
 })
