@@ -2,25 +2,29 @@
 // más a menos específica:
 //   1. Portada EXPLÍCITA del viaje (`cover_image_path`, la que el dueño fijó a
 //      mano en los ajustes).
-//   2. Foto del ÚLTIMO recuerdo (reto) con imagen — el mismo circuito que ya
-//      usa `ShareLeaderboardModal` (`lib/lastChallengeImage`).
+//   2. La MISMA foto que la home enseña como portada del viaje: el momento
+//      visible más reciente con foto (criterio CANÓNICO, ver contrato en
+//      `lib/tripCover` — lo comparte `useWorldTrips.resolveTrip`). Antes de
+//      #619 este paso resolvía por su cuenta (`lastChallengeImageDataUrl`, el
+//      ÚLTIMO reto/recuerdo con foto, sin filtrar por "visible") y podía
+//      discrepar de lo que el dueño ve en su propia home.
 //   3. Portada derivada del NOMBRE del viaje vía `resolvePlaceCover`
 //      (Wikipedia, sin API key) — mismo fallback que usa la home.
 //   4. `null` — la tarjeta cae a su fondo de marca (mapa nocturno), sin
 //      bloquear la invitación por no tener foto.
 //
 // Reutiliza las piezas ya existentes en vez de duplicarlas: `getGroup` (grupo),
-// `lastChallengeImageDataUrl` (recuerdo), `resolvePlaceCover` (lugar) y la
-// conversión a data URL de `features/create/challengeShareCover` (mismo motivo
-// que allí: Storage/Wikipedia son otro origen y un <img> remoto deja el canvas
-// de html-to-image "tainted", en blanco al rasterizar).
+// `lib/tripCover` (momento canónico, compartido con la home), `resolvePlaceCover`
+// (lugar) y la conversión a data URL de `features/create/challengeShareCover`
+// (mismo motivo que allí: Storage/Wikipedia son otro origen y un <img> remoto
+// deja el canvas de html-to-image "tainted", en blanco al rasterizar).
 //
 // Best-effort en cada paso: un fallo de red/permiso NUNCA lanza, solo hace caer
 // al siguiente nivel de la cascada (o a null). Invitar al viaje no debe
 // bloquearse porque Wikipedia o el Storage tengan un mal día.
 
 import { getGroup } from '../../lib/groupData'
-import { lastChallengeImageDataUrl } from '../../lib/lastChallengeImage'
+import { resolveVisibleTripMoments, pickTripCoverImagePath } from '../../lib/tripCover'
 import { resolvePlaceCover } from '../../lib/placeCover'
 import { storagePathToDataUrl, urlToDataUrl } from '../create/challengeShareCover'
 
@@ -44,9 +48,17 @@ export async function resolveTripInviteCover(
     // Sigue al recuerdo/lugar igualmente.
   }
 
-  // 2. Foto del último recuerdo (reto) con imagen.
-  const lastMemory = await lastChallengeImageDataUrl(groupId)
-  if (lastMemory) return lastMemory
+  // 2. Foto del momento visible más reciente — el mismo que usa la home (#619).
+  try {
+    const moments = await resolveVisibleTripMoments(groupId)
+    const coverPath = pickTripCoverImagePath(moments)
+    if (coverPath) {
+      const cover = await storagePathToDataUrl(coverPath)
+      if (cover) return cover
+    }
+  } catch {
+    // Sigue al lugar igualmente.
+  }
 
   // 3. Portada derivada del nombre del viaje.
   const placeCover = await resolvePlaceCover(groupName)
