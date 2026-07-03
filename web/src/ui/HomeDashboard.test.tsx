@@ -1,4 +1,4 @@
-import { describe, test, expect, vi } from 'vitest'
+import { describe, test, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { HomeDashboard } from './HomeDashboard'
@@ -35,6 +35,13 @@ const pinned: HomePinned = {
 }
 
 describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
+  // La transición héroe (issue #589) usa sessionStorage como puente entre montajes
+  // (ver HomeDashboard.tsx); sin limpiarlo, un test que "toca" una tarjeta dejaría
+  // un id pendiente que un test posterior consumiría por error.
+  afterEach(() => {
+    sessionStorage.clear()
+  })
+
   test('el carrusel lista los viajes y cierra con "Nuevo viaje"', () => {
     render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
     expect(screen.getByRole('heading', { name: 'Tus viajes' })).toBeInTheDocument()
@@ -144,5 +151,45 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
     fireEvent.focus(screen.getByRole('button', { name: 'Empezar un viaje nuevo' }))
     const lastCall = homeGlobeSpy.mock.calls.at(-1)?.[0]
     expect(lastCall.activeTargetId).toBeNull()
+  })
+
+  // Transición héroe home→diario (issue #589): view-transition-name compartido con
+  // TripDiario. Debe ser ÚNICO en pantalla, así que solo la tarjeta TOCADA lo lleva.
+  describe('transición héroe (issue #589)', () => {
+    // La foto/placeholder héroe vive dentro de la tarjeta (`li[data-gid]`), como
+    // `.cover` (con portada) o `.placeholder` (sin portada, caso de estas fixtures).
+    const heroNameOf = (container: HTMLElement, groupId: string) =>
+      container.querySelector<HTMLElement>(
+        `[data-gid="${groupId}"] span[class*="cover"], [data-gid="${groupId}"] span[class*="placeholder"]`,
+      )?.style.viewTransitionName
+
+    test('al tocar una tarjeta, solo ella reclama el nombre compartido', async () => {
+      const onOpenGroup = vi.fn()
+      const { container } = render(
+        <HomeDashboard userId="u1" displayName="Lewis" groups={groups} onOpenGroup={onOpenGroup} />,
+      )
+
+      await userEvent.click(screen.getByRole('button', { name: 'Abrir viaje Finde Lisboa' }))
+
+      expect(heroNameOf(container, 'b')).toBe('trip-hero-b')
+      // Las NO tocadas se quedan sin nombre (única en pantalla).
+      expect(heroNameOf(container, 'a')).toBeFalsy()
+      expect(heroNameOf(container, 'c')).toBeFalsy()
+    })
+
+    test('al volver del diario, la tarjeta de ese viaje reclama el nombre al montar', () => {
+      // Simula la "vuelta": HomeDashboard.tsx guardó este id en sessionStorage al
+      // salir hacia el viaje 'c'; ahora la Home se remonta de cero.
+      sessionStorage.setItem('lg-hero-trip-id', 'c')
+
+      const { container } = render(
+        <HomeDashboard userId="u1" displayName="Lewis" groups={groups} />,
+      )
+
+      expect(heroNameOf(container, 'c')).toBe('trip-hero-c')
+      expect(heroNameOf(container, 'a')).toBeFalsy()
+      // Consumo único: no debe quedar pendiente para una vuelta futura sin relación.
+      expect(sessionStorage.getItem('lg-hero-trip-id')).toBeNull()
+    })
   })
 })

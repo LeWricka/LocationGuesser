@@ -485,6 +485,7 @@ export function TripPage({
           >
             <TripDiario
               ref={carouselRef}
+              groupId={groupId}
               moments={moments}
               route={route}
               activeMoment={activeMoment}

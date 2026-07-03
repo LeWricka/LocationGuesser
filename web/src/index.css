@@ -454,6 +454,25 @@ img {
  * Chromium y Safari 18+ (~92% del tráfico en 2026); donde no exista, el cambio
  * es instantáneo sin romper nada.
  */
+/*
+ * Par héroe home→diario (issue #589): HomeDashboard.tsx (tarjeta tocada) y
+ * TripDiario.tsx (mapa a sangre) comparten `view-transition-name: trip-hero-<id>`
+ * — un nombre DINÁMICO por viaje, así que no hay un selector CSS que los agrupe
+ * por nombre literal. `*` es el único selector de la spec para "cualquier grupo
+ * con nombre"; como también matchea `root`, esta regla debe declararse ANTES de
+ * la de `root` de abajo — con igual especificidad, gana la última en cascada, y
+ * queremos que sea la de `root` la que decida su propia duración corta. El resto
+ * de la pantalla sigue el cross-fade de siempre; solo el par héroe pide más
+ * recorrido (--motion-duration-slower + emphasized) para leerse como un
+ * crecimiento/contracción, no como un parpadeo.
+ */
+::view-transition-group(*),
+::view-transition-old(*),
+::view-transition-new(*) {
+  animation-duration: var(--motion-duration-slower);
+  animation-timing-function: var(--motion-ease-emphasized);
+}
+
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: var(--duration-base);

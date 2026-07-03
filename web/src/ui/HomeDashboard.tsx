@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Crown, MapPin, Play, Plus, Settings } from 'lucide-react'
 import { Avatar } from './Avatar'
@@ -10,6 +10,48 @@ import type { GlobePin } from './HomeGlobe'
 import { IconPin, LogoTabide, WordmarkTabide } from './icons'
 import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
 import styles from './HomeDashboard.module.css'
+
+/*
+ * Transición héroe home↔diario (issue #589): la foto de la tarjeta TOCADA crece
+ * hasta ser el mapa-héroe del Diario (TripDiario aplica el mismo nombre a su
+ * capa de mapa, ver ese fichero); al volver, se contrae de vuelta. El nombre
+ * debe ser ÚNICO en pantalla, así que NUNCA se pone de forma estática en el JSX
+ * de todas las tarjetas — solo se asigna, de forma imperativa, sobre la tarjeta
+ * que se toca (ver TripCard más abajo).
+ *
+ * La "vuelta" es el caso difícil: App.tsx desmonta la Home entera al navegar a
+ * un viaje (router por hash) y la vuelve a montar de cero al volver, así que un
+ * simple useState no sobrevive ese viaje de ida y vuelta. sessionStorage sí:
+ * guardamos solo el id del viaje tocado y lo consumimos (leer + borrar) una
+ * única vez al montar, para reclamar el nombre en la tarjeta correcta antes de
+ * que la View Transition capture el estado "new" de esta pantalla.
+ */
+const HERO_TRIP_KEY = 'lg-hero-trip-id'
+
+function heroTransitionName(groupId: string): string {
+  return `trip-hero-${groupId}`
+}
+
+/** Lee y BORRA el id pendiente (consumo único): una vuelta futura sin relación
+ * con este viaje no debe reclamar el nombre por error. */
+function takeHeroReturnId(): string | null {
+  try {
+    const id = sessionStorage.getItem(HERO_TRIP_KEY)
+    if (id) sessionStorage.removeItem(HERO_TRIP_KEY)
+    return id
+  } catch {
+    return null // Storage no disponible (privado/bloqueado): sin restauración; no rompe nada.
+  }
+}
+
+function rememberHeroTrip(groupId: string): void {
+  try {
+    sessionStorage.setItem(HERO_TRIP_KEY, groupId)
+  } catch {
+    // Sin storage: la vuelta no reclamará el nombre, pero la ida (más abajo, en el
+    // propio click) sigue funcionando igual.
+  }
+}
 
 export interface HomeGroup {
   id: string
@@ -148,6 +190,11 @@ export function HomeDashboard({
   const activeTrip = feed.find((g) => g.id === activeId) ?? null
   const tint = useAmbientTint(activeTrip?.coverUrl ?? null)
 
+  // Transición héroe (issue #589), mitad de "vuelta": se consume UNA vez al montar
+  // (el initializer de useState solo corre en el mount, no en re-renders) para que
+  // la tarjeta del viaje del que venimos reclame el nombre compartido.
+  const [heroReturnId] = useState<string | null>(() => takeHeroReturnId())
+
   // Scroll-sync del carrusel (mismo patrón que TripPage/TripDiario): tras cada
   // scroll, con un pequeño reposo (140ms) para no recalcular en cada frame,
   // seleccionamos la tarjeta más cercana al centro del visor.
@@ -261,6 +308,7 @@ export function HomeDashboard({
               <TripCard
                 group={group}
                 active={group.id === activeId}
+                isReturningHero={group.id === heroReturnId}
                 onFocus={() => setActiveId(group.id)}
                 onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
               />
@@ -330,11 +378,15 @@ function PinnedChip({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => voi
 function TripCard({
   group,
   active,
+  isReturningHero,
   onClick,
   onFocus,
 }: {
   group: HomeGroup
   active: boolean
+  /** Venimos de este viaje (issue #589): reclama el nombre de la transición
+   * héroe en cuanto se monta, para que la foto se contraiga de vuelta sobre ella. */
+  isReturningHero?: boolean
   onClick?: () => void
   onFocus?: () => void
 }) {
@@ -347,18 +399,50 @@ function TripCard({
   const coverUrl = group.coverUrl ?? autoCover
   const hasCover = Boolean(coverUrl)
 
+  // Elemento foto/placeholder que hace de héroe en la transición (issue #589). El
+  // nombre se gestiona SIEMPRE de forma imperativa (ref), nunca en el objeto
+  // `style` de React: así no compite con los re-renders (React solo reconcilia las
+  // propiedades que él mismo puso) y podemos asignarlo en el instante exacto que
+  // hace falta (ver los dos sitios de abajo).
+  const heroRef = useRef<HTMLSpanElement>(null)
+
+  useLayoutEffect(() => {
+    // Vuelta (issue #589): el diario YA lleva puesto este nombre en su mapa
+    // mientras existe (TripDiario, siempre activo), así que hace de "old" en el
+    // instante en que se navega de vuelta. Aquí reclamamos el "new": debe pasar en
+    // un layout effect (antes de pintar) para llegar a tiempo al snapshot que
+    // toma la View Transition ya en marcha (arrancada por App.tsx al cambiar el
+    // hash, ver ui/motion.ts).
+    if (isReturningHero && heroRef.current) {
+      heroRef.current.style.viewTransitionName = heroTransitionName(group.id)
+    }
+  }, [isReturningHero, group.id])
+
+  const handleActivate = () => {
+    if (!onClick) return
+    // Ida (issue #589): el nombre debe ser ÚNICO en pantalla, así que solo la
+    // tarjeta TOCADA lo lleva — se asigna aquí, antes de navegar, porque el
+    // hashchange (y con él el startViewTransition de App.tsx) llega en una tarea
+    // aparte: para cuando el navegador tome el snapshot "old", este nodo ya debe
+    // tener el nombre puesto.
+    rememberHeroTrip(group.id)
+    if (heroRef.current) heroRef.current.style.viewTransitionName = heroTransitionName(group.id)
+    onClick()
+  }
+
   return (
     <button
       type="button"
       className={['lg-press', styles.card].join(' ')}
       data-active={active}
-      onClick={onClick}
+      onClick={handleActivate}
       onFocus={onFocus}
       disabled={!isButton}
       aria-label={`Abrir viaje ${group.name}`}
     >
       {hasCover ? (
         <span
+          ref={heroRef}
           className={styles.cover}
           style={{ backgroundImage: `url('${coverUrl}')` }}
           aria-hidden="true"
@@ -366,7 +450,7 @@ function TripCard({
       ) : (
         // Sin portada todavía: fondo discreto de "mapa nocturno" (gradiente grafito/teal
         // con tokens de escena) más un pin a tamaño moderado y baja opacidad.
-        <span className={styles.placeholder} aria-hidden="true">
+        <span ref={heroRef} className={styles.placeholder} aria-hidden="true">
           <IconPin size={32} className={styles.placeholderIcon} />
         </span>
       )}
