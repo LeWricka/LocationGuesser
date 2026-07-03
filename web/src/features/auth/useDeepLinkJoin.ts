@@ -43,11 +43,30 @@ export function useDeepLinkJoin(userId: string | undefined) {
         if (!alreadyMember) {
           track('group_joined', { group_id: route.group })
         }
-        // Restaurar el destino: el router por hash repinta a JUGAR (si hay #c) o
-        // a la página del grupo. Normalizamos a `#g=…(&c=…)`.
-        const normalized = normalizeGroupHash(route.group, route.challenge)
-        if (window.location.hash !== normalized) {
-          window.location.hash = normalized
+        // Restaurar el destino: el router por hash repinta la pantalla correcta a
+        // partir del hash de ENTRADA tal cual, SIN reconstruirlo. `hash` ya viene
+        // completo desde los dos únicos llamantes (App.tsx): o es literalmente
+        // `window.location.hash` (Flujo C, auto-join al abrir/recargar un `#g=…`
+        // con sesión), o es el destino que guardamos en `localStorage` con ese
+        // mismo `window.location.hash` antes de salir al email (Flujo A/B,
+        // `setNextDestination`/`takeNextDestination`). En ambos casos ya tiene el
+        // formato final; no hace falta — ni conviene — reconstruirlo.
+        //
+        // Antes reconstruíamos con `#g=…(&c=…)` a partir de `route.group` y
+        // `route.challenge` (los dos únicos campos que este hook necesita para el
+        // join), lo que DESCARTABA en silencio cualquier otro parámetro reconocido
+        // del hash (`add=reto`/`add=recuerdo`, `v=marcador`, `from=…`, ver
+        // route.ts). En el Flujo C eso reescribía sobre sí mismo el hash actual
+        // quitándole esos parámetros en CADA remontaje del efecto (cualquier F5,
+        // recarga del Service Worker o volver de segundo plano estando en
+        // `#g=X&add=reto`), tirando al usuario a la home del viaje y perdiendo el
+        // formulario a medias (#556). Usar `hash` tal cual preserva siempre lo que
+        // ya estaba, y comparar contra `window.location.hash` evita además
+        // reescrituras innecesarias: en el Flujo C ambos son el mismo string, así
+        // que este `if` nunca dispara.
+        const target = hash.startsWith('#') ? hash : `#${hash}`
+        if (window.location.hash !== target) {
+          window.location.hash = target
         }
       } finally {
         inFlight.current = null
@@ -57,10 +76,4 @@ export function useDeepLinkJoin(userId: string | undefined) {
   )
 
   return joinIfGroup
-}
-
-function normalizeGroupHash(group: string, challenge?: string): string {
-  const params = new URLSearchParams({ g: group })
-  if (challenge) params.set('c', challenge)
-  return `#${params.toString()}`
 }
