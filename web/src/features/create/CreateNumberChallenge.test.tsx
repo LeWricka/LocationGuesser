@@ -27,6 +27,19 @@ vi.mock('../../lib/storage', async (importOriginal) => {
   return { ...actual, uploadImage: (...args: unknown[]) => uploadImageMock(...args) }
 })
 
+// La hoja "¡Reto creado!" (ChallengeCreatedShare) genera una tarjeta-imagen
+// (issue #595): fuera del alcance de este test (que cubre el formulario de
+// número), así que dobles simples para no tocar Supabase/html-to-image reales.
+vi.mock('../group/shareLeaderboard', () => ({
+  nodeToPngBlob: vi.fn().mockResolvedValue(new Blob()),
+  shareDomain: vi.fn(() => 'tabide.app'),
+  shareLeaderboardImage: vi.fn().mockResolvedValue('cancelled'),
+  downloadBlob: vi.fn(),
+}))
+vi.mock('./challengeShareCover', () => ({
+  resolveChallengeShareCover: vi.fn().mockResolvedValue(null),
+}))
+
 import { CreateNumberChallenge } from './CreateNumberChallenge'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
@@ -144,7 +157,8 @@ describe('CreateNumberChallenge — formulario de papel en 2 pasos (#586)', () =
     )
     // Sin foto no se sube nada a Storage.
     expect(uploadImageMock).not.toHaveBeenCalled()
-    // El destino de crear es la hoja de Compartir, no saltar a jugar.
-    expect(await screen.findByRole('button', { name: /compartir enlace/i })).toBeInTheDocument()
+    // El destino de crear es la hoja de Compartir (tarjeta-imagen, #595), no saltar a jugar.
+    expect(await screen.findByText('¡Reto creado!')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /compartir/i })).toBeInTheDocument()
   })
 })

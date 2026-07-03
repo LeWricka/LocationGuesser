@@ -2,10 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRight, MapPin } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
+import { PhotoDropzone } from './PhotoDropzone'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import { createChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes } from '../../lib/time'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
+import { uploadImage } from '../../lib/storage'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
@@ -129,6 +131,13 @@ export function CreateLocationChallenge({
   const [deadlineIndex, setDeadlineIndex] = useState(DEFAULT_DEADLINE_INDEX)
   const [guessIndex, setGuessIndex] = useState(DEFAULT_GUESS_INDEX)
 
+  // Foto opcional del reto (issue #595): puro extra sobre el Street View, que ya
+  // es la pista principal. NO se lee su EXIF (el sitio ya lo fija el mapa del
+  // paso 1) — solo se comprime y se le estripa el EXIF al subir, misma tubería
+  // que el resto de flujos (lib/storage).
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
   const [created, setCreated] = useState<ChallengeForPlay | null>(null)
@@ -184,6 +193,21 @@ export function CreateLocationChallenge({
       setPanoState({ kind: 'ready', pano: match })
     }
   }, [])
+
+  // Limpia el object URL de la foto al desmontar o al cambiarla (no fugar memoria).
+  useEffect(() => {
+    return () => {
+      if (photoPreview) URL.revokeObjectURL(photoPreview)
+    }
+  }, [photoPreview])
+
+  function pickPhoto(file: File | null) {
+    setPhotoPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return file ? URL.createObjectURL(file) : null
+    })
+    setPhotoFile(file)
+  }
 
   const hasPano = panoState.kind === 'ready'
 
@@ -241,6 +265,16 @@ export function CreateLocationChallenge({
     const pano = panoState.pano
     setBusy(true)
     try {
+      let imagePath: string | undefined
+      if (photoFile) {
+        // Foto opcional: se sube comprimida y sin EXIF (misma tubería que el
+        // resto de flujos de crear, lib/storage). Si falla, el catch de fuera
+        // aborta el lanzamiento entero con un mensaje genérico — es la misma
+        // política que CreateNumberChallenge/CreateChallengeImmersive.
+        setStatus('Subiendo la foto…')
+        imagePath = await uploadImage(photoFile)
+      }
+
       setStatus('Lanzando el reto…')
       const title = groupName ? `¿Dónde? · ${groupName}` : '¿Dónde?'
       const { challenge } = await createChallenge({
@@ -254,7 +288,13 @@ export function CreateLocationChallenge({
         svPitch: pov.pitch,
         deadlineAt: deadlineFromMinutes(DEADLINE_OPTIONS[deadlineIndex].minutes),
         guessSeconds: GUESS_OPTIONS[guessIndex].value,
-        // Sin foto: el SV es el contenido completo.
+        imagePath,
+        // Decisión issue #595: sin toggle nuevo, se mantiene el comportamiento
+        // MÁS SIMPLE ya existente en el resto de flujos de crear (default de
+        // `createChallenge`, CreateChallengeImmersive, CreateNumberChallenge) —
+        // con foto, se enseña como PISTA junto al Street View, nunca sorpresa.
+        // `PlayChallenge` ya sabe pintarla así (hintPhotoUrl) sin cambios ahí.
+        photoIsHint: true,
         // Ciudad como escala default (el GeoGuessr de la calle pide precisión de zona).
         scoreScale: 'ciudad',
       })
@@ -262,10 +302,10 @@ export function CreateLocationChallenge({
       track('challenge_created', {
         group_id: groupId,
         challenge_id: challenge.id,
-        has_photo: false,
+        has_photo: Boolean(imagePath),
         has_streetview: true,
         guess_seconds: GUESS_OPTIONS[guessIndex].value,
-        photo_is_hint: null,
+        photo_is_hint: imagePath ? true : null,
         duration_hours: DEADLINE_OPTIONS[deadlineIndex].minutes / 60,
         difficulty: 'streetview',
         score_scale: 'ciudad',
@@ -413,6 +453,17 @@ export function CreateLocationChallenge({
           <div className={styles.previaBody}>
             <div className={styles.rules}>
               <div className={styles.ruleRow}>
+                <label className={styles.ruleLabel}>
+                  Foto <span className={styles.optional}>opcional</span>
+                </label>
+                <PhotoDropzone
+                  preview={photoPreview}
+                  onPick={pickPhoto}
+                  onClear={() => pickPhoto(null)}
+                  label="Añadir foto (opcional)"
+                />
+              </div>
+              <div className={styles.ruleRow}>
                 <label className={styles.ruleLabel}>Plazo</label>
                 <SegmentedControl
                   label="Plazo para jugar"
@@ -485,6 +536,7 @@ export function CreateLocationChallenge({
           groupName={groupName}
           challengeId={created.id}
           challengeTitle={created.title}
+          imagePath={created.image_path}
           onPlay={() => onCreated(created)}
         />
       )}

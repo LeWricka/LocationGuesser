@@ -895,14 +895,15 @@ export function CreateChallengeImmersive({
         )}
       </ImmersiveSheet>
 
-      {/* Tras la celebración, hoja "comparte el enlace": el creador reparte el reto
-          en caliente (Web Share / copiar / WhatsApp) o salta a verlo/jugarlo. */}
+      {/* Tras la celebración, hoja de compartir: el creador reparte el reto en
+          caliente como tarjeta-imagen (issue #595) o salta a verlo/jugarlo. */}
       {created && (
         <ChallengeCreatedShare
           groupId={groupId}
           groupName={groupName}
           challengeId={created.id}
           challengeTitle={created.title}
+          imagePath={created.image_path}
           onPlay={() => onCreated(created)}
         />
       )}
