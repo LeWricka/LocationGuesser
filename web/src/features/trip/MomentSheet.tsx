@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, MapPin, Pencil, Target, Trash2, User } from 'lucide-react'
+import { ArrowLeft, ListOrdered, MapPin, Pencil, Target, Trash2, User } from 'lucide-react'
 import { Badge, Button, ChallengePhoto, Icon, Modal, useReducedMotion, useToast } from '../../ui'
 import type { Moment } from '../../lib/trip'
 import type { LatLng } from '../../lib/geo'
+import { fmtDist, fmtNumber } from '../../lib/geo'
 import {
   deleteChallenge,
   promoteToChallenge,
   updateChallengeDescription,
   updateMoment,
 } from '../../lib/challenges'
+import { getExistingVote } from '../../lib/votes'
+import type { Vote } from '../../lib/database.types'
 import { deadlineFromMinutes } from '../../lib/time'
 import { lockBodyScroll } from '../../lib/scrollLock'
 import { MapPicker } from '../create/MapPicker'
@@ -23,6 +26,13 @@ interface Props {
   moment: Moment | null
   /** El usuario es dueño del viaje: puede editar la descripción y convertir en reto. */
   canEdit?: boolean
+  /**
+   * Id del usuario que mira la hoja, o null sin sesión resuelta. Solo se usa para
+   * "Tu resultado" (#580): consulta MI voto en un reto cerrado (no el marcador
+   * entero). Sin id no se consulta nada (el bloque cae a "Cargando…" indefinido,
+   * caso que no debería darse en producción con sesión activa).
+   */
+  myUserId?: string | null
   /**
    * Fechas del viaje (si las tiene, migración 0027): acotan el tope superior del
    * calendario al editar un recuerdo, mismo criterio que "Nuevo recuerdo" (#565).
@@ -39,6 +49,11 @@ interface Props {
   onClose: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
+  /**
+   * CTA "Ver marcador" en un reto CERRADO (#580): salta a la pestaña Marcador
+   * del viaje. Sin esta prop el botón no se muestra (p. ej. en la galería visual).
+   */
+  onViewMarcador?: () => void
   /** Tras convertir un recuerdo en reto: refresca el viaje (recarga datos). */
   onPromoted?: () => void
   /**
@@ -157,11 +172,13 @@ const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
 export function MomentSheet({
   moment,
   canEdit = false,
+  myUserId = null,
   tripStartsOn = null,
   tripEndsOn = null,
   initialEditing = false,
   onClose,
   onPlay,
+  onViewMarcador,
   onPromoted,
   onEdited,
   onEditChallenge,
@@ -214,6 +231,37 @@ export function MomentSheet({
   const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
   const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
   const [promoteBusy, setPromoteBusy] = useState(false)
+
+  // ── "Tu resultado" en un reto CERRADO (#580) ────────────────────────────────
+  // Mi voto en ESTE reto: undefined = cargando/no aplica, null = no jugué. Consulta
+  // ligera de UNA fila (getExistingVote), no el marcador entero — solo cuando el
+  // reto está cerrado y NO es mío (`isOwn`, #582: quién CREÓ este reto en concreto,
+  // no si soy el dueño del viaje — un miembro cualquiera puede crear un reto). El
+  // creador ve el recuento, no un resultado fingido. Depende de campos PRIMITIVOS
+  // de `moment` (no de su referencia): el objeto se recrea en cada refresco de
+  // votos del viaje (Realtime), y no queremos relanzar la consulta ni parpadear a
+  // "Cargando…" por un voto ajeno.
+  const [myVote, setMyVote] = useState<Vote | null | undefined>(undefined)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset síncrono al cambiar de momento (evita enseñar el resultado del anterior mientras carga el nuevo)
+    setMyVote(undefined)
+    if (!moment) return
+    const isClosedChallenge =
+      moment.isChallenge && moment.status !== 'recuerdo' && moment.status !== 'active'
+    if (!isClosedChallenge || moment.isOwn || !myUserId) return
+    let cancelled = false
+    getExistingVote(moment.challengeId, myUserId)
+      .then((vote) => {
+        if (!cancelled) setMyVote(vote)
+      })
+      .catch(() => {
+        if (!cancelled) setMyVote(null)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps primitivas a propósito, ver comentario arriba
+  }, [moment?.challengeId, moment?.isChallenge, moment?.status, moment?.isOwn, myUserId])
 
   // Cierra la hoja CON ANIMACIÓN DE SALIDA (continuidad de movimiento, §6): en vez
   // de desaparecer de golpe, marca `closing` para que el panel caiga hacia abajo
@@ -665,8 +713,12 @@ export function MomentSheet({
 
                   {/* Social ligero: contador real de PARTICIPACIÓN (derivado de votos);
                     solo tiene sentido en un reto. Es un recuento de quién JUGÓ, no de
-                    aciertos, así que el copy dice "participó / participaron". */}
-                  {(isReto || isActive) && !promoting ? (
+                    aciertos, así que el copy dice "participó / participaron". En un
+                    reto CERRADO que no es mío, este recuento cede el protagonismo al
+                    bloque "Tu resultado" de abajo (#580): aquí solo se muestra si el
+                    reto sigue EN JUEGO o si lo creé YO (`isOwn`, #582 — no si soy el
+                    dueño del viaje: un miembro cualquiera puede crear un reto). */}
+                  {(isActive || (isReto && moment.isOwn)) && !promoting ? (
                     <p className={styles.social}>
                       <span className={styles.socialIcon} aria-hidden="true">
                         <Icon icon={User} size={15} />
@@ -675,6 +727,54 @@ export function MomentSheet({
                       {moment.guessedCount === 1 ? 'persona participó' : 'personas participaron'}
                     </p>
                   ) : null}
+
+                  {/* "Tu resultado" (#580): en un reto CERRADO que no es mío, la hoja
+                    antes solo enseñaba sello/descripción/lugar/participantes — nada de
+                    cómo me fue. Puntos (+ distancia, o cifra en un reto de número) con
+                    la tipografía de datos (tabular) si jugué; "No participaste" si no.
+                    Nunca para quien lo creó (`isOwn`): fingir un resultado sería falso. */}
+                  {isReto && !isActive && !moment.isOwn && !promoting && (
+                    <section className={styles.resultSection}>
+                      <p className={styles.sectionLabel}>Tu resultado</p>
+                      {myVote === undefined ? (
+                        <p className={styles.resultNone}>Cargando…</p>
+                      ) : myVote === null ? (
+                        <p className={styles.resultNone}>No participaste</p>
+                      ) : (
+                        <p className={styles.resultValue}>
+                          <span className={styles.resultPoints}>
+                            {myVote.points}
+                            <span className={styles.resultUnit}>pts</span>
+                          </span>
+                          {myVote.distance_km != null && (
+                            <span className={styles.resultExtra}>
+                              {fmtDist(myVote.distance_km)}
+                            </span>
+                          )}
+                          {myVote.guess_number != null && (
+                            <span className={styles.resultExtra}>
+                              {fmtNumber(myVote.guess_number)}
+                            </span>
+                          )}
+                        </p>
+                      )}
+                    </section>
+                  )}
+
+                  {/* CTA "Ver marcador" (#580): un reto CERRADO no llevaba a ningún
+                    sitio para ver "cómo quedó" el grupo. Para cualquiera (dueño o
+                    jugador), no solo para quien jugó. */}
+                  {isReto && !isActive && !promoting && onViewMarcador && (
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      fullWidth
+                      onClick={onViewMarcador}
+                      className={styles.cta}
+                    >
+                      <Icon icon={ListOrdered} size={16} /> Ver marcador
+                    </Button>
+                  )}
 
                   {/* CTA "Adivina dónde es →": el gancho del reto en juego. */}
                   {isActive && onPlay && !promoting && (

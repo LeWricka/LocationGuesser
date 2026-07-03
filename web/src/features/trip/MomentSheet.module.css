@@ -522,6 +522,48 @@
   font-size: var(--font-size-lg);
 }
 
+/* ---- "Tu resultado" en un reto cerrado (#580) ---- */
+.resultSection {
+  display: flex;
+  flex-direction: column;
+}
+.resultValue {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+/* Puntos: el número de dato, en tabular + unidad "pts" pequeña que no compite
+   (mismo patrón que el marcador). */
+.resultPoints {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-black);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-accent);
+}
+.resultUnit {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.resultExtra {
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* "No participaste" / "Cargando…": sobrio, sin fingir un dato. */
+.resultNone {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}
+
 .cta {
   margin-top: var(--space-1);
 }

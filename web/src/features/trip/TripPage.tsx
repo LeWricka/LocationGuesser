@@ -19,6 +19,7 @@ import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
+import { marcadorGroupHash } from '../../lib/route'
 import type { Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
@@ -652,6 +653,7 @@ export function TripPage({
       <MomentSheet
         moment={openMoment}
         canEdit={canCreate}
+        myUserId={user?.id ?? null}
         tripStartsOn={group?.starts_on ?? null}
         tripEndsOn={group?.ends_on ?? null}
         onClose={() => setOpenMoment(null)}
@@ -660,6 +662,15 @@ export function TripPage({
             ? () => onPlayChallenge(openMoment.challengeId)
             : undefined
         }
+        // "Ver marcador" (#580): cierra la hoja y salta a la pestaña Marcador. El
+        // salto real es `setSection` (misma instancia de TripPage, igual que el
+        // menú ⋯ → "Marcador"); actualizamos también el hash con `marcadorGroupHash`
+        // (patrón de #513) para que la URL quede coherente si se comparte/recarga.
+        onViewMarcador={() => {
+          setOpenMoment(null)
+          setSection('marcador')
+          location.hash = marcadorGroupHash(groupId)
+        }}
         onPromoted={() => void refresh()}
         onEdited={() => void refresh()}
         onEditChallenge={(challengeId) => void openChallengeEditor(challengeId)}
