@@ -162,9 +162,11 @@ export async function leaveGroup(groupId: string, userId: string): Promise<void>
 }
 
 /**
- * Expulsar a un miembro (solo el dueño). El RLS `group_members_delete` permite al
- * dueño del grupo borrar filas ajenas. No comprobamos rol en cliente; un miembro
- * recibiría 0 filas. La UI esconde la acción a los no-dueños.
+ * Expulsar a un miembro (dueños). El RLS `group_members_delete` (migración 0033)
+ * permite al CREADOR raíz borrar cualquier fila ajena y a un CO-DUEÑO solo filas
+ * de miembros (role='member') — ni al creador ni a otro co-dueño. No comprobamos
+ * permisos en cliente; una expulsión no autorizada recibiría 0 filas. La UI
+ * esconde la acción según esas mismas reglas (ver MembersModal).
  */
 export async function kickMember(groupId: string, userId: string): Promise<void> {
   const { error } = await supabase

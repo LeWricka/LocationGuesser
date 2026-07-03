@@ -45,9 +45,10 @@ type View =
  * Qué respalda el RLS real (la UI solo pinta lo que la BD permite):
  *   · Hacer/quitar co-dueño → `group_members_update_owner` (0026): cualquier
  *     dueño (creador raíz o co-dueño); el WITH CHECK impide degradar al creador.
- *   · Expulsar → `group_members_delete` (0004): filas ajenas SOLO las borra el
- *     CREADOR (`groups.created_by`). Un co-dueño no puede expulsar (recibiría 0
- *     filas), así que la acción solo se le ofrece al creador raíz.
+ *   · Expulsar → `group_members_delete` (0033): el CREADOR raíz
+ *     (`groups.created_by`) expulsa a cualquiera menos a sí mismo; un CO-DUEÑO
+ *     solo expulsa filas de MIEMBROS (nunca a otro dueño ni al creador — 0
+ *     filas si lo intenta). La UI solo pinta lo que cada rol puede.
  *   · Salir → `group_members_delete` (0004): la fila propia siempre; el creador
  *     no sale sin transferir antes (lo respalda también lib/membership).
  *   · Transferir → `groups_transfer_owner` (0009): solo el `created_by` actual,
@@ -109,7 +110,8 @@ export function MembersModal({ groupId, meId, onClose, onLeft, onChanged }: Prop
       onChanged()
     })
 
-  // Expulsar (RLS group_members_delete, 0004: solo el creador borra filas ajenas).
+  // Expulsar (RLS group_members_delete, 0033: creador → cualquiera menos él;
+  // co-dueño → solo miembros).
   const kick = (member: GroupMemberInfo) =>
     run(async () => {
       await kickMember(groupId, member.userId)
@@ -255,10 +257,10 @@ export function MembersModal({ groupId, meId, onClose, onLeft, onChanged }: Prop
                           Quitar co-dueño
                         </Button>
                       )}
-                      {/* Expulsar: SOLO el creador raíz (es lo único que respalda la RLS
-                          group_members_delete; un co-dueño recibiría 0 filas). A un
-                          co-dueño se le quita antes el rol. */}
-                      {meIsCreator && !m.isOwner && !isMe && (
+                      {/* Expulsar (RLS group_members_delete, 0033): el creador raíz
+                          expulsa a cualquiera menos a sí mismo; un co-dueño solo a
+                          filas de miembros (nunca a otro dueño ni al creador). */}
+                      {meIsOwner && !isMe && (meIsCreator || !m.isOwner) && (
                         <Button
                           variant="ghost"
                           size="sm"
