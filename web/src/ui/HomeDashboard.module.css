@@ -206,8 +206,11 @@
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding-bottom: calc(env(safe-area-inset-bottom) + var(--space-4));
+  /* Gap/padding-bottom un punto más ceñidos que antes (issue #573): la tarjeta
+     crece, así que el hueco muerto del dock cede ese alto — el globo (`.spacer`)
+     no tiene por qué encogerse tanto como crece la tarjeta. */
+  gap: var(--space-1);
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--space-3));
   background: linear-gradient(
     to top,
     color-mix(in srgb, var(--scene-bg) 88%, transparent) 0%,
@@ -269,11 +272,16 @@
   display: none;
 }
 
-/* Tamaño compacto de tarjeta pedido por el diseño (~190×150): deja asomar varias
-   tarjetas vecinas, a diferencia del carrusel casi a pantalla completa del Diario. */
+/* Foto-first (issue #573): la tarjeta pasa de ~190×150 (compacta) a protagonista —
+   ~72% del ancho del viewport (con techo/suelo razonables para no reventar en
+   tablet ni encogerse de más en móviles pequeños) y alto proporcional 3:2 vía
+   `aspect-ratio` (en vez de un alto fijo en px, así escala igual de bien a
+   390×844 que a 1080×2400). La vecina sigue asomando (peek): con la tarjeta más
+   ancha basta con el mismo `gap`/padding del carrusel para que el snap al
+   centro se lea limpio. */
 .slide {
-  flex: 0 0 190px;
-  height: 150px;
+  flex: 0 0 clamp(240px, 72vw, 340px);
+  aspect-ratio: 3 / 2;
   scroll-snap-align: center;
 }
 

@@ -111,11 +111,20 @@
 
 /*
  * El marco de ChallengePhoto cubre toda la tarjeta: anulamos su ancho máximo y su
- * borde/radio para que la foto sea a sangre. La proporción 16:9 del marco define
- * la altura de la tarjeta (el carrusel no impone alto fijo).
+ * borde/radio para que la foto sea a sangre. Antes la proporción 16:9 del marco
+ * (más ancha/baja que la tarjeta) definía una altura mayor que la del `.slide`
+ * fijo y el `overflow: hidden` de `.card` recortaba el sobrante — sin gap.
+ * Con `.slide` ahora en 3:2 (issue #573, tarjeta más alta) esa relación se
+ * invierte: 16:9 da una foto MÁS BAJA que la tarjeta, dejando un hueco vacío al
+ * pie. `position: absolute; inset: 0` fija la foto a sangre real del contenedor
+ * (el `object-fit: cover` de `.img` en ChallengePhoto hace el resto) en vez de
+ * depender de que su aspect-ratio propio siempre "gane" por ser más alto.
  */
 .photo {
+  position: absolute;
+  inset: 0;
   width: 100%;
+  height: 100%;
   max-width: none;
   border: 0;
   border-radius: var(--radius-lg);
