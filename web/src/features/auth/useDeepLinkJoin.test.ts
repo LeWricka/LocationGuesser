@@ -68,4 +68,42 @@ describe('useDeepLinkJoin', () => {
     expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
     expect(track).not.toHaveBeenCalled()
   })
+
+  // Regresión #556: App.tsx llama joinIfGroup(window.location.hash) en cada
+  // remontaje/recarga mientras haya `route.group && user?.id` (Flujo C). Si el
+  // hash actual trae `add=reto` (o `add=recuerdo`, `v=marcador`, `from=…`), un F5,
+  // la recarga del Service Worker o volver de segundo plano NO debe perder esos
+  // parámetros: antes se reescribía a `#g=…(&c=…)` a secas y el router te sacaba
+  // del formulario a medio rellenar.
+  test('regresión #556: hash con add=reto sobrevive a un remontaje/joinIfGroup', async () => {
+    window.location.hash = '#g=ABC&add=reto'
+    const { result } = renderHook(() => useDeepLinkJoin('u1'))
+    await result.current(window.location.hash)
+    expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+    expect(window.location.hash).toBe('#g=ABC&add=reto')
+  })
+
+  test('regresión #556: hash con add=recuerdo y v=marcador también sobrevive', async () => {
+    window.location.hash = '#g=ABC&v=marcador'
+    const { result } = renderHook(() => useDeepLinkJoin('u1'))
+    await result.current(window.location.hash)
+    expect(window.location.hash).toBe('#g=ABC&v=marcador')
+  })
+
+  test('regresión #556: reto nacido de un recuerdo (from) sobrevive al remontaje', async () => {
+    window.location.hash = '#g=ABC&add=reto&from=momento-1'
+    const { result } = renderHook(() => useDeepLinkJoin('u1'))
+    await result.current(window.location.hash)
+    expect(window.location.hash).toBe('#g=ABC&add=reto&from=momento-1')
+  })
+
+  test('restaurar destino guardado (Flujo A/B) con add=reto: se aplica el hash completo', async () => {
+    // window.location.hash arranca distinto (p.ej. la home tras volver del email);
+    // el destino guardado por setNextDestination SÍ debe aplicarse tal cual.
+    window.location.hash = ''
+    const { result } = renderHook(() => useDeepLinkJoin('u1'))
+    await result.current('#g=ABC&add=reto&from=momento-1')
+    expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+    expect(window.location.hash).toBe('#g=ABC&add=reto&from=momento-1')
+  })
 })
