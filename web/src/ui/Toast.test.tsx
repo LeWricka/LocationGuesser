@@ -1,6 +1,8 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import fs from 'node:fs'
+import path from 'node:path'
 import { ToastProvider } from './ToastProvider'
 import { useToast } from './toast-context'
 
@@ -83,5 +85,61 @@ describe('Toast', () => {
       })
       expect(screen.getByText('Persistente')).toBeInTheDocument()
     })
+  })
+})
+
+// --- Regresión #552: el toast desbordaba el viewport a la derecha -----------------
+//
+// Causa raíz REAL: no era el posicionamiento de `.region` (ya usaba insets, no
+// `right` sin `left`), sino que `.message` es un ítem flex y por defecto
+// `min-width` de un ítem flex es `auto`: eso le IMPIDE encoger por debajo del
+// ancho de su propio contenido. Un mensaje sin espacios naturales (una lista de
+// nombres de fichero separados por comas, típica de un error de subida) hacía
+// que `.message` — y con él `.toast`/`.region`, que no recortan overflow — se
+// ensanchara más allá del borde derecho del viewport, lo que en un navegador
+// móvil real se traduce en scroll/zoom horizontal ("se amplía la pantalla").
+//
+// jsdom no calcula layout real (no hay `scrollWidth`/`getBoundingClientRect`
+// fiables aquí — la reproducción visual con scrollWidth se hizo aparte con
+// Playwright), así que este test monta la hoja de estilos REAL de
+// `Toast.module.css` en jsdom (cuyo motor de selectores sí resuelve la cascada)
+// y comprueba, vía `getComputedStyle`, las propiedades que evitan el
+// desbordamiento: `.region` con `left`/`right` fijados (no `auto`) y un
+// `max-width` acotado al viewport, y `.message` con `min-width: 0` +
+// `overflow-wrap: anywhere`. Sin el fix, `min-width` de `.message` vuelve a
+// ser `auto` y `overflow-wrap` a `normal`.
+describe('Toast — el toast no desborda el viewport (#552)', () => {
+  function loadRealStylesheet(): void {
+    const css = fs.readFileSync(path.resolve(__dirname, './Toast.module.css'), 'utf8')
+    const style = document.createElement('style')
+    // Variables mínimas que usan las declaraciones bajo prueba (el resto de
+    // tokens no afectan a las propiedades que comprobamos).
+    style.textContent = `:root { --space-4: 1rem; --z-toast: 1100; } ${css}`
+    document.head.appendChild(style)
+  }
+
+  test('.region fija left/right (insets seguros) y acota max-width al viewport', () => {
+    loadRealStylesheet()
+    const region = document.createElement('div')
+    region.className = 'region'
+    document.body.appendChild(region)
+
+    const cs = getComputedStyle(region)
+    expect(cs.left).not.toBe('auto')
+    expect(cs.right).not.toBe('auto')
+    // La región nunca debe depender de un ancho fijo en px: tiene que ceder ante
+    // el viewport (100vw) para no poder sobresalir en pantallas estrechas.
+    expect(cs.maxWidth).toContain('100vw')
+  })
+
+  test('.message permite encoger (min-width: 0) y rompe cadenas largas (overflow-wrap: anywhere)', () => {
+    loadRealStylesheet()
+    const message = document.createElement('span')
+    message.className = 'message'
+    document.body.appendChild(message)
+
+    const cs = getComputedStyle(message)
+    expect(cs.minWidth).toBe('0')
+    expect(cs.overflowWrap).toBe('anywhere')
   })
 })

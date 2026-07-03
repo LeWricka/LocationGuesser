@@ -1,13 +1,20 @@
 .region {
   position: fixed;
-  left: 50%;
-  bottom: var(--space-4);
-  transform: translateX(-50%);
+  /* Insets laterales seguros (no `right` sin `left`, ni ancho fijo): con los dos
+   * bordes fijados el navegador resuelve el ancho a "viewport - insets", así que
+   * la región NUNCA puede sobresalir por la derecha aunque el contenido interno
+   * intente ensancharla. `max-width` + `margin-inline: auto` mantienen el toast
+   * centrado y compacto en pantallas anchas en vez de estirarse a todo el ancho. */
+  left: max(var(--space-4), env(safe-area-inset-left));
+  right: max(var(--space-4), env(safe-area-inset-right));
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  width: min(420px, calc(100vw - var(--space-6)));
+  width: auto;
+  max-width: min(28rem, calc(100vw - 2 * var(--space-4)));
+  margin-inline: auto;
   pointer-events: none;
 }
 
@@ -29,6 +36,16 @@
 
 .message {
   flex: 1;
+  /* Causa raíz del desbordamiento (#552): por defecto un ítem flex tiene
+   * `min-width: auto`, que le impide encoger por debajo del ancho de su
+   * contenido. Un mensaje sin espacios naturales (p.ej. una lista de nombres de
+   * fichero separados por comas) empuja el toast fuera de los límites de
+   * `.region` sin que ningún `max-width` del contenedor lo evite. `min-width: 0`
+   * permite encoger; `overflow-wrap: anywhere` rompe la cadena larga en vez de
+   * desbordar.
+   */
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-size-sm);
 }
 
