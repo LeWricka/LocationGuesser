@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Crown, MapPin, Play, Plus, Settings } from 'lucide-react'
+import { Crown, MapPin, Play, Plus } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { Chip } from './Chip'
 import { Icon } from './Icon'
@@ -319,7 +319,9 @@ export function HomeDashboard({
         aria-hidden="true"
       />
 
-      {/* Chrome superior: marca + ajustes + avatar, igual que antes (tinta de escena). */}
+      {/* Chrome superior: marca + avatar (tinta de escena). Un solo acceso al perfil
+          (issue #616): antes el engranaje duplicaba el mismo destino que el avatar —
+          patrón universal, el avatar basta. */}
       <div className={styles.overlay}>
         <span className={styles.brand}>
           {/* Variante `oscuro`: el símbolo lleva su paleta propia (papel + oro + teal)
@@ -327,14 +329,6 @@ export function HomeDashboard({
           <LogoTabide variant="oscuro" size={22} />
           <WordmarkTabide size={18} />
         </span>
-        <button
-          type="button"
-          className={styles.sceneButton}
-          onClick={onOpenProfile}
-          aria-label="Abrir tus ajustes"
-        >
-          <Icon icon={Settings} size={20} />
-        </button>
         <button
           type="button"
           className={styles.avatarButton}

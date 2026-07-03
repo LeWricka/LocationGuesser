@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Flag,
   Globe,
@@ -10,6 +10,7 @@ import {
   Share2,
   Target,
   Trash2,
+  Users,
 } from 'lucide-react'
 import { EmptyState, Icon, useReducedMotion, useToast } from '../../ui'
 import { AppHeader } from '../../ui/AppHeader'
@@ -23,6 +24,7 @@ import { marcadorGroupHash } from '../../lib/route'
 import type { Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
+import { MembersModal } from '../group/MembersModal'
 import { GroupSettingsModal, type SettingsSection } from '../group/GroupSettingsModal'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
@@ -83,7 +85,7 @@ const PLAYBACK_INTERVAL_MS = 1100
  * aterrizan en la pestaña Marcador (compatibilidad).
  *
  * Un solo chrome: la cabecera es el `AppHeader` (atrás · nombre del viaje · ⋯). El
- * menú ⋯ tiene contenido FIJO (Invitar · Marcador · Ajustes · Cerrar viaje · Borrar)
+ * menú ⋯ tiene contenido FIJO (Invitar · Miembros · Marcador · Ajustes · Cerrar viaje · Borrar)
  * y el FAB "＋" es el ÚNICO punto de crear (Recuerdo / Reto).
  *
  * La lógica de selección carrusel↔mapa y de reproducción del recorrido vive aquí
@@ -145,6 +147,10 @@ export function TripPage({
   // Invitar al viaje: hoja de compartir (reusa InviteModal). Cuelga del menú ⋯ y
   // es SIEMPRE accesible (P0): cualquier miembro puede repartir el enlace.
   const [inviting, setInviting] = useState(false)
+  // Miembros del viaje (#616): lista + gestión (co-dueños, expulsar, salir,
+  // transferir). Cuelga del menú ⋯ y la ve CUALQUIER miembro (las acciones de
+  // gestión ya se filtran dentro según el rol).
+  const [membersOpen, setMembersOpen] = useState(false)
   // Ajustes del viaje (renombrar / cerrar temporada / borrar): solo dueño. La
   // sección viaja aparte: "Ajustes", "Cerrar/Reabrir viaje" y "Borrar viaje" abren
   // el mismo modal pero cada uno debe aterrizar en SU sección, no en el formulario
@@ -181,26 +187,27 @@ export function TripPage({
     }
   }, [isClosed, groupId])
 
-  // Permisos + miembros (tolerante: si falla, no bloquea ver el viaje).
-  useEffect(() => {
+  // Permisos + miembros (tolerante: si falla, no bloquea ver el viaje). En
+  // useCallback para poder RE-cargar tras gestionar miembros desde el modal
+  // "Miembros" (#616): expulsar/transferir cambian la línea de gente y mis
+  // propios permisos (canCreate) sin cambiar groupId/user.
+  const reloadMembership = useCallback(async () => {
     if (!user) return
-    let cancelled = false
-    void (async () => {
-      try {
-        const member = await isMember(groupId, user.id)
-        if (cancelled || !member) return
-        const [mine, members] = await Promise.all([myGroups(user.id), getGroupMembers(groupId)])
-        if (cancelled) return
-        setCanCreate(mine.find((g) => g.id === groupId)?.isOwner ?? false)
-        setMemberNames(members.map((m) => m.name))
-      } catch {
-        // Permisos/miembros no resueltos: tratamos como miembro sin gestión.
-      }
-    })()
-    return () => {
-      cancelled = true
+    try {
+      const member = await isMember(groupId, user.id)
+      if (!member) return
+      const [mine, members] = await Promise.all([myGroups(user.id), getGroupMembers(groupId)])
+      setCanCreate(mine.find((g) => g.id === groupId)?.isOwner ?? false)
+      setMemberNames(members.map((m) => m.name))
+    } catch {
+      // Permisos/miembros no resueltos: tratamos como miembro sin gestión.
     }
   }, [groupId, user])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reloadMembership es async: setState corre tras el fetch, no síncrono
+    void reloadMembership()
+  }, [reloadMembership])
 
   const activeMoment = useMemo(() => moments.find((m) => m.status === 'active') ?? null, [moments])
   // Nº de RETOS (no recuerdos) para el preview de la hoja de invitar.
@@ -589,9 +596,9 @@ export function TripPage({
         </div>
       )}
 
-      {/* Menú ⋯ del viaje: hoja inferior con contenido FIJO. Invitar · Marcador ·
-          Ajustes · Cerrar viaje · Borrar. Ajustes/Cerrar/Borrar viven dentro del
-          modal de ajustes (solo dueño); aquí enlazamos a él. */}
+      {/* Menú ⋯ del viaje: hoja inferior con contenido FIJO. Invitar · Miembros ·
+          Marcador · Ajustes · Cerrar viaje · Borrar. Ajustes/Cerrar/Borrar viven
+          dentro del modal de ajustes (solo dueño); aquí enlazamos a él. */}
       <BottomSheet
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
@@ -611,6 +618,21 @@ export function TripPage({
               <Icon icon={Share2} size={18} />
             </span>
             Invitar
+          </button>
+          {/* Miembros (#616): quién está en el viaje y su gestión (co-dueños,
+              expulsar, salir, transferir). Visible para cualquier miembro. */}
+          <button
+            type="button"
+            className={[styles.menuItem, 'lg-press'].join(' ')}
+            onClick={() => {
+              setMenuOpen(false)
+              setMembersOpen(true)
+            }}
+          >
+            <span className={styles.menuItemIcon}>
+              <Icon icon={Users} size={18} />
+            </span>
+            Miembros
           </button>
           <button
             type="button"
@@ -693,6 +715,22 @@ export function TripPage({
         onEditChallenge={(challengeId) => void openChallengeEditor(challengeId)}
         onDeleted={() => void refresh()}
       />
+
+      {/* Miembros del viaje (#616): lista + gestión según rol. Tras salir, a la
+          home; tras cambiar roles/expulsar/transferir, recargamos permisos
+          (canCreate puede cambiar al transferir) y el viaje. */}
+      {membersOpen && (
+        <MembersModal
+          groupId={groupId}
+          meId={user?.id ?? null}
+          onClose={() => setMembersOpen(false)}
+          onLeft={onBack}
+          onChanged={() => {
+            void reloadMembership()
+            void refresh()
+          }}
+        />
+      )}
 
       {/* Ajustes del viaje (solo dueño): renombrar, cerrar/reabrir temporada y borrar.
           Reutiliza el modal de la GroupPage; al cambiar algo refrescamos el viaje. */}

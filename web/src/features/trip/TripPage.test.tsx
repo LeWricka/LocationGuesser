@@ -40,6 +40,14 @@ vi.mock('../group/InviteModal', () => ({
     open ? <div data-testid="invite-modal">{link}</div> : null,
 }))
 
+// La gestión de miembros (#616) se prueba en MembersModal.test.tsx; aquí solo
+// la conexión menú ⋯ → "Miembros" → modal.
+vi.mock('../group/MembersModal', () => ({
+  MembersModal: ({ groupId }: { groupId: string }) => (
+    <div data-testid="members-modal">{groupId}</div>
+  ),
+}))
+
 import { TripPage } from './TripPage'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
@@ -92,5 +100,14 @@ describe('TripPage — invitar desde el menú ⋯', () => {
     await userEvent.click(screen.getByRole('button', { name: /^invitar$/i }))
     const modal = await screen.findByTestId('invite-modal')
     expect(modal).toHaveTextContent('/v/g1')
+  })
+
+  test('⋯ → "Miembros" abre el modal de gestión de miembros (#616)', async () => {
+    renderTrip()
+    expect(screen.queryByTestId('members-modal')).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: /más opciones del viaje/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^miembros$/i }))
+    const modal = await screen.findByTestId('members-modal')
+    expect(modal).toHaveTextContent('g1')
   })
 })

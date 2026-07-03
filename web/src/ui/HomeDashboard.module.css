@@ -74,31 +74,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  margin-right: auto; /* empuja ajustes/avatar a la derecha */
+  margin-right: auto; /* empuja el avatar a la derecha */
   color: var(--scene-ink);
-}
-
-/* Botón de chrome translúcido sobre escena (ajustes): pastilla con tinta clara. */
-.sceneButton {
-  width: var(--tap-target);
-  height: var(--tap-target);
-  border-radius: var(--radius-full);
-  border: 1px solid var(--scene-hairline);
-  background: var(--scene-surface);
-  color: var(--scene-ink);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  flex: none;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  transition: transform var(--transition-fast);
-}
-.sceneButton:hover {
-  transform: translateY(-1px);
-}
-.sceneButton:active {
-  transform: scale(0.96);
 }
 
 .avatarButton {
@@ -610,7 +587,6 @@
 }
 
 /* Foco visible y accesible. */
-.sceneButton:focus-visible,
 .avatarButton:focus-visible,
 .newCard:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -634,7 +610,6 @@
   .chipLive .pulse {
     animation: none;
   }
-  .sceneButton,
   .avatarButton,
   .pinnedChip {
     transition: none;

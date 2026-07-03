@@ -226,6 +226,11 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
       <p className={styles.hint}>
         Comparte la tarjeta en el chat del grupo. Quien la abra entra directo al viaje.
       </p>
+      {/* Descubribilidad (#616): quien invita suele querer también repartir la
+          gestión; el sitio para eso es la vista Miembros, no esta hoja. */}
+      <p className={styles.hint}>
+        ¿Quieres que también administre el viaje? Hazlo co-dueño desde «Miembros» (menú ⋯).
+      </p>
 
       {/* La tarjeta real, a tamaño completo, montada fuera del viewport para que
           html-to-image la mida y rasterice bien (display:none daría 0×0). Solo
