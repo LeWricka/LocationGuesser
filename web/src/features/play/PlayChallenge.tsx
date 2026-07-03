@@ -13,6 +13,7 @@ import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { GameScene, type GameSceneData } from './GameScene'
 import { CountdownOverlay } from './CountdownOverlay'
+import { ExitConfirmModal } from './ExitConfirmModal'
 import { sceneMedium } from './sceneMedium'
 import { PlayNumberChallenge } from './PlayNumberChallenge'
 import { ResultCard } from './ResultCard'
@@ -151,6 +152,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // así que ofrecemos verla COMPLETA y poder ampliarla en un visor a pantalla
   // completa (zoom + pan). Sin esto la foto se ve cortada y no se puede inspeccionar.
   const [photoExpanded, setPhotoExpanded] = useState(false)
+  // Confirmación de "salir mientras juegas" (issue #663): sustituye window.confirm
+  // por el modal del UI kit (ver ExitConfirmModal).
+  const [confirmingExit, setConfirmingExit] = useState(false)
   const toast = useToast()
   // Anti-trampa (issue #200): si el jugador cambia de pestaña/app MIENTRAS el reloj
   // corre (fase `playing`, antes de votar), lo marcamos. Ref (no estado) porque el
@@ -517,14 +521,16 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   }
 
   // Salir DURANTE la jugada: el reloj NO se pausa (el reto sigue corriendo y al
-  // reentrar se reanuda, nunca reinicia). Lo confirmamos para que el jugador
-  // sepa que salir no le da un reinicio limpio ni congela el tiempo.
+  // reentrar se reanuda, nunca reinicia). Lo confirmamos (modal, no window.confirm)
+  // para que el jugador sepa que salir no le da un reinicio limpio ni congela el
+  // tiempo. El mensaje exacto vive en ExitConfirmModal.
   function goBackWhilePlaying() {
-    const timed = challenge?.guess_seconds != null
-    const msg = timed
-      ? 'El tiempo sigue corriendo aunque salgas. Al volver seguirás donde lo dejaste, no se reinicia. ¿Salir?'
-      : 'Al volver seguirás en este reto, no se reinicia. ¿Salir?'
-    if (window.confirm(msg)) goBack()
+    setConfirmingExit(true)
+  }
+
+  function confirmExit() {
+    setConfirmingExit(false)
+    goBack()
   }
 
   // Compartir MI resultado (apuesta viral): rasteriza la tarjeta (montada fuera
@@ -805,6 +811,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             fondo. Al terminar arranca el juego y, con él, el reloj de la jugada.
             Bajo reduced-motion el overlay entra directo a `playing` sin pausa. */}
         {phase === 'countdown' && <CountdownOverlay photoUrl={photoUrl} onDone={beginPlaying} />}
+
+        <ExitConfirmModal
+          open={confirmingExit}
+          timed={challenge.guess_seconds != null}
+          onConfirm={confirmExit}
+          onCancel={() => setConfirmingExit(false)}
+        />
       </>
     )
   }
