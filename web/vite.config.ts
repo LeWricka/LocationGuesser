@@ -66,11 +66,15 @@ export default defineConfig({
     // Dobles de la galería (solo con GALLERY=1; si no, no hace nada).
     ...(galleryMode ? [galleryDoublesPlugin()] : []),
     // PWA ADITIVA: hace la app instalable y registra el service worker que
-    // precachea el app-shell. `autoUpdate` = el SW nuevo toma el control en
-    // cuanto está listo, sin pedir nada al usuario (clientsClaim + skipWaiting).
-    // No rompe nada en el navegador normal: si el SW no se registra, la app va
-    // igual. `cleanupOutdatedCaches` borra precachés viejos para que un deploy
-    // nuevo no quede servido desde caché obsoleta.
+    // precachea el app-shell. `prompt` (antes `autoUpdate`, #549): el SW nuevo se
+    // queda EN ESPERA hasta que main.tsx decide aplicarlo (banner "Actualizar" o,
+    // en silencio, al ocultarse la pestaña) — NUNCA se auto-activa. Con
+    // `autoUpdate` cualquier deploy tomaba el control y recargaba de golpe TODAS
+    // las pestañas abiertas, aunque hubiera un formulario a medias (#498 → #549:
+    // 18 deploys en una noche = formularios perdidos). No rompe nada en el
+    // navegador normal: si el SW no se registra, la app va igual.
+    // `cleanupOutdatedCaches` borra precachés viejos para que un deploy nuevo no
+    // quede servido desde caché obsoleta.
     //
     // injectManifest: usamos NUESTRO propio service worker (`src/sw.ts`) en vez
     // del que autogenera Workbox, porque necesitamos manejar los eventos `push` y
@@ -80,7 +84,7 @@ export default defineConfig({
     // encima. El build sigue 100% estático en Vercel (emite `sw.js` + manifest a
     // `dist/`); no introduce backend.
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       // Registro MANUAL del SW (en main.tsx) en vez de auto-inyectado: necesitamos
       // el callback `onRegisteredSW` para SONDEAR actualizaciones periódicamente. Un
       // SPA no navega, así que sin ese sondeo un deploy nuevo no se detecta y el

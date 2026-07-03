@@ -134,6 +134,29 @@ Diseño completo: [docs/estrategia/pwa-push.md](estrategia/pwa-push.md). Piezas:
 cliente (`web/src/lib/push.ts` + service worker `web/src/sw.ts`), tabla
 `push_subscriptions` (migración `0014`) y Edge Function `send-push`.
 
+### 5.0 Actualizaciones de la PWA — nunca auto-recargar (#549)
+
+Tabide sondea `registration.update()` cada 60 s (`web/src/main.tsx`) porque es un
+SPA: sin ese sondeo, un deploy nuevo no se detecta hasta una recarga manual y el
+usuario se queda en la versión cacheada. Pero el SW **nunca aplica la
+actualización solo**: `registerType: 'prompt'` (vite-plugin-pwa) + `web/src/sw.ts`
+sin `skipWaiting()` incondicional hacen que el SW nuevo se quede EN ESPERA hasta
+que `main.tsx` lo pide explícitamente. Antes (#498, `autoUpdate` +
+`skipWaiting`/`clientsClaim`), cualquier deploy recargaba de golpe TODAS las
+pestañas abiertas, incluso con un formulario a medias — con varios deploys en una
+misma noche, se perdían formularios de crear reto/momento.
+
+Comportamiento tras un deploy:
+
+- **Usuario con la pestaña oculta** (minimizada, cambió de pestaña/app) cuando se
+  detecta la versión nueva: se aplica en silencio (`visibilitychange` →
+  `updateSW(true)`); al volver, ve la versión nueva sin haber notado nada.
+- **Usuario activo mirando la pantalla**: aparece un banner discreto ("Hay una
+  versión nueva · Actualizar", `web/src/ui/UpdateBanner.tsx`) y espera a que
+  pulse, o a que oculte la pestaña (lo que ocurra antes).
+
+Nunca hay una recarga sorpresa con el usuario mirando y sin haberla pedido.
+
 > **La app NO se rompe si esto no está configurado.** Sin `VITE_VAPID_PUBLIC_KEY`, el
 > control de avisos del perfil informa "los avisos aún no están disponibles" y no
 > ofrece activarlos; el resto de la app funciona igual. El envío solo ocurre cuando

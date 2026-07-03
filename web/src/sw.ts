@@ -45,9 +45,19 @@ registerRoute(
   }),
 )
 
-// autoUpdate: el SW nuevo activa y toma el control en cuanto está listo, sin pedir
-// nada al usuario. Equivale a `skipWaiting` + `clientsClaim` de la config previa.
-self.skipWaiting()
+// prompt (#549): el SW nuevo se queda EN ESPERA (`waiting`) — NO llama a
+// `skipWaiting()` al instalar. Antes (#498) lo hacía incondicionalmente: cualquier
+// deploy tomaba el control y recargaba de golpe TODAS las pestañas abiertas,
+// incluso con un formulario a medias. Ahora solo activa cuando main.tsx lo pide
+// explícitamente (banner "Actualizar" o, en silencio, al ocultarse la pestaña),
+// mandando `{ type: 'SKIP_WAITING' }` — es el mensaje que envía
+// `Workbox#messageSkipWaiting()` de vite-plugin-pwa/workbox-window.
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting()
+})
+// clientsClaim en el activate no cambia: una vez decidido aplicar la
+// actualización, el SW nuevo toma el control de los clientes ya abiertos sin
+// esperar a que naveguen (irrelevante en un SPA, que no navega entre páginas).
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
