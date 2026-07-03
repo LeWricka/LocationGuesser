@@ -62,7 +62,7 @@ describe('PlaceSearch', () => {
     expect(searchPlacesMock).toHaveBeenCalledWith('Bog')
   })
 
-  test('pinta hasta 5 resultados (nombre + detalle) y elegir uno centra y cierra', async () => {
+  test('pinta hasta 5 resultados (nombre + detalle) y elegir uno centra, cierra la lista y CONSERVA el nombre en el campo', async () => {
     searchPlacesMock.mockResolvedValue([
       { lat: 4.71, lng: -74.07, name: 'Bogotá', detail: 'Colombia' },
       { lat: 41.9, lng: 12.49, name: 'Roma', detail: 'Italia' },
@@ -79,9 +79,34 @@ describe('PlaceSearch', () => {
     await user.click(bogota)
 
     expect(onSelect).toHaveBeenCalledWith({ lat: 4.71, lng: -74.07 })
-    // Al elegir, se limpia la búsqueda y se cierra la lista.
+    // Al elegir, se cierra la lista pero el campo CONSERVA el nombre del sitio
+    // elegido (issue #592 punto 2 — antes se vaciaba).
     await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
-    expect(screen.getByRole('combobox', { name: /busca un sitio/i })).toHaveValue('')
+    expect(screen.getByRole('combobox', { name: /busca un sitio/i })).toHaveValue('Bogotá')
+  })
+
+  test('tras elegir, el campo NO reabre la lista sola; editar sí vuelve a buscar', async () => {
+    searchPlacesMock.mockResolvedValue([
+      { lat: 4.71, lng: -74.07, name: 'Bogotá', detail: 'Colombia' },
+    ])
+    const user = userEvent.setup()
+    renderSearch()
+
+    await user.type(screen.getByRole('combobox', { name: /busca un sitio/i }), 'Bo')
+    const bogota = await screen.findByRole('option', { name: /bogotá/i })
+    await user.click(bogota)
+
+    // El texto elegido ('Bogotá', 7 caracteres) supera el umbral mínimo, pero
+    // NO debe reabrir la lista ni relanzar la búsqueda por sí solo.
+    expect(searchPlacesMock).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+
+    // Editar el campo SÍ es una búsqueda nueva del usuario: reabre la lista.
+    searchPlacesMock.mockResolvedValue([{ lat: 1, lng: 2, name: 'Bogotá Norte', detail: '' }])
+    await user.type(screen.getByRole('combobox', { name: /busca un sitio/i }), ' Norte')
+
+    expect(await screen.findByRole('option', { name: /bogotá norte/i })).toBeInTheDocument()
+    expect(searchPlacesMock).toHaveBeenCalledTimes(2)
   })
 
   test('muestra "Sin resultados" cuando la búsqueda no encuentra nada', async () => {

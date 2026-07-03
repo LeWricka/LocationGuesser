@@ -27,6 +27,10 @@ export function PlaceSearch({ onSelect }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<PlaceResult[]>([])
   const [searching, setSearching] = useState(false)
+  // Tras elegir un resultado (issue #592): el campo se queda con su nombre en
+  // vez de vaciarse, pero NO debe reabrir la lista con una búsqueda de ese
+  // mismo texto. Solo una edición REAL del usuario (`onChange`) la reactiva.
+  const [suppressDropdown, setSuppressDropdown] = useState(false)
   const resultsId = useId()
   // Descarta respuestas que llegan tarde (p.ej. la búsqueda de una tecla
   // anterior que resuelve después de la última): solo pinta si su id sigue
@@ -34,13 +38,14 @@ export function PlaceSearch({ onSelect }: Props) {
   const requestIdRef = useRef(0)
 
   const trimmed = query.trim()
-  const showDropdown = trimmed.length >= SEARCH_MIN_CHARS
+  const showDropdown = trimmed.length >= SEARCH_MIN_CHARS && !suppressDropdown
 
   useEffect(() => {
-    // Query demasiado corta: no hay nada que pedir a la red. NO reseteamos
-    // `results`/`searching` aquí (sería setState síncrono derivado del propio
-    // query, mejor calculado en el render vía `showDropdown` más abajo); el
-    // efecto simplemente no dispara ninguna búsqueda.
+    // Query demasiado corta (o recién elegida, ver `suppressDropdown`): no hay
+    // nada que pedir a la red. NO reseteamos `results`/`searching` aquí (sería
+    // setState síncrono derivado del propio query, mejor calculado en el
+    // render vía `showDropdown` más abajo); el efecto simplemente no dispara
+    // ninguna búsqueda.
     if (!showDropdown) return
 
     const id = ++requestIdRef.current
@@ -56,11 +61,14 @@ export function PlaceSearch({ onSelect }: Props) {
     return () => clearTimeout(timer)
   }, [trimmed, showDropdown])
 
-  // Elegir un resultado: avisa al caller y cierra la lista.
+  // Elegir un resultado: avisa al caller, cierra la lista y DEJA el nombre del
+  // sitio elegido en el campo (issue #592 punto 2 — antes se vaciaba). Queda
+  // editable: solo una edición real (`onChange`) reabre la búsqueda.
   function pick(r: PlaceResult) {
     onSelect({ lat: r.lat, lng: r.lng })
-    setQuery('')
+    setQuery(r.name)
     setResults([])
+    setSuppressDropdown(true)
   }
 
   // Derivados del render: si la query es demasiado corta, no hay lista ni
@@ -82,7 +90,10 @@ export function PlaceSearch({ onSelect }: Props) {
           aria-controls={resultsId}
           aria-autocomplete="list"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setSuppressDropdown(false)
+            setQuery(e.target.value)
+          }}
         />
         {visibleSearching && <Spinner size={15} className={styles.spinner} />}
       </div>

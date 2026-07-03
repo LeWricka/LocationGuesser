@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import type { LatLng } from '../../lib/geo'
@@ -77,50 +77,115 @@ beforeEach(() => {
   findPanoramaMock.mockResolvedValue({ panoId: 'pano-1', lat: 41.38, lng: 2.17 })
 })
 
-// Flujo en DOS PASOS (#585): paso 1 = mapa a pantalla completa para elegir y
-// afinar (CTA "Confirmar sitio" al haber pin); paso 2 = previa SV + reglas +
-// "Cambiar sitio" (vuelve al paso 1 CONSERVANDO el pin) + Lanzar.
-describe('CreateLocationChallenge — ¿Dónde? en dos pasos (#585)', () => {
-  test('paso 1: mapa con buscador en overlay y sin CTA hasta que hay pin', () => {
+// Flujo v3 (issue #592, rediseño de #585): paso 1 = mapa a pantalla completa
+// para elegir el sitio, con la previa de SV (o el aviso de "sin cobertura")
+// EN UNA TARJETA FLOTANTE sobre el propio mapa — nunca cambia de paso para
+// eso. El CTA "Continuar" solo se habilita con cobertura y lleva al paso 2,
+// que queda SOLO con las reglas (plazo/tiempo) + Lanzar.
+describe('CreateLocationChallenge — ¿Dónde? v3 (#592)', () => {
+  test('paso 1: mapa con buscador en overlay y sin CTA ni tarjeta SV hasta que hay pin', () => {
     renderScreen()
 
-    // El buscador va DENTRO del mapa (variante overlay de MapPicker), no encima.
     expect(screen.getByTestId('map-picker')).toHaveAttribute('data-placement', 'overlay')
-    // Sin pin todavía: ni CTA de confirmar ni contenido del paso 2.
-    expect(screen.queryByRole('button', { name: /confirmar este sitio/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /continuar/i })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sv-preview')).not.toBeInTheDocument()
     expect(screen.queryByText('Plazo')).not.toBeInTheDocument()
   })
 
-  test('paso 1 → paso 2: confirmar el sitio muestra la previa y las reglas', async () => {
+  test('al marcar el pin CON cobertura: tarjeta SV inline en el paso 1 y CTA "Continuar" habilitado', async () => {
     const user = userEvent.setup()
     renderScreen()
 
     await user.click(screen.getByRole('button', { name: /simular tap/i }))
-    // Con pin: aparece el CTA fijo "Confirmar sitio".
-    const confirm = await screen.findByRole('button', { name: /confirmar este sitio/i })
-    await user.click(confirm)
 
-    // Paso 2: el mapa se va; la previa de SV y las reglas mandan.
-    expect(screen.queryByTestId('map-picker')).not.toBeInTheDocument()
+    // La previa aparece EN EL MAPA (paso 1 sigue montado, no hay cambio de paso).
     expect(await screen.findByTestId('sv-preview')).toBeInTheDocument()
+    expect(screen.getByTestId('map-picker')).toBeInTheDocument()
+    const continueBtn = screen.getByRole('button', { name: /continuar a las reglas/i })
+    expect(continueBtn).toBeEnabled()
+  })
+
+  test('al marcar el pin SIN cobertura: aviso "Sin Street View aquí" inline y CTA deshabilitado, sin cambiar de paso', async () => {
+    findPanoramaMock.mockResolvedValue(null)
+    const user = userEvent.setup()
+    renderScreen()
+
+    await user.click(screen.getByRole('button', { name: /simular tap/i }))
+
+    expect(await screen.findByText(/sin street view aquí/i)).toBeInTheDocument()
+    expect(screen.getByTestId('map-picker')).toBeInTheDocument()
+    const continueBtn = screen.getByRole('button', {
+      name: /elige un punto con cobertura de street view/i,
+    })
+    expect(continueBtn).toBeDisabled()
+  })
+
+  test('paso 1 → paso 2: "Continuar" con cobertura muestra SOLO las reglas (sin mapa ni previa)', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+
+    await user.click(screen.getByRole('button', { name: /simular tap/i }))
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+
+    // Paso 2: el mapa y la previa se van; solo quedan las reglas + Lanzar.
+    expect(screen.queryByTestId('map-picker')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sv-preview')).not.toBeInTheDocument()
     expect(screen.getByText('Plazo')).toBeInTheDocument()
     expect(screen.getByText('Tiempo por jugada')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /lanzar el reto al grupo/i })).toBeInTheDocument()
   })
 
-  test('paso 2 → "Cambiar sitio" vuelve al paso 1 CONSERVANDO el pin', async () => {
+  test('paso 2 → flecha "Atrás" de la cabecera vuelve al paso 1 CONSERVANDO el pin (sin repetir la búsqueda)', async () => {
     const user = userEvent.setup()
     renderScreen()
 
     await user.click(screen.getByRole('button', { name: /simular tap/i }))
-    await user.click(await screen.findByRole('button', { name: /confirmar este sitio/i }))
-    await user.click(screen.getByRole('button', { name: /cambiar sitio/i }))
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+    await user.click(screen.getByRole('button', { name: 'Atrás' }))
 
-    // De vuelta en el paso 1: el pin sigue puesto (el picker lo recibe como
-    // `value`) y el CTA de confirmar sigue disponible sin volver a tocar.
+    // De vuelta en el paso 1: el pin sigue puesto y la tarjeta SV ya lista,
+    // sin volver a llamar a `findPanorama`.
+    await waitFor(() => expect(screen.getByTestId('map-picker')).toBeInTheDocument())
     expect(screen.getByTestId('map-picker')).toHaveAttribute('data-pin', '41.38,2.17')
-    expect(screen.getByRole('button', { name: /confirmar este sitio/i })).toBeInTheDocument()
-    // Y NO se relanza la búsqueda de panorama (el resultado se conserva).
+    expect(screen.getByTestId('sv-preview')).toBeInTheDocument()
     expect(findPanoramaMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('paso 2 → el atrás DEL NAVEGADOR también vuelve al paso 1 (issue #592 punto 4)', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+
+    await user.click(screen.getByRole('button', { name: /simular tap/i }))
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+    expect(screen.getByText('Plazo')).toBeInTheDocument()
+
+    // Simula el botón atrás del navegador (no el de la cabecera): el paso 2
+    // empujó su propia entrada de historial al entrar, así que retrocede al
+    // paso 1 en vez de saltárselo.
+    window.history.back()
+
+    await waitFor(() => expect(screen.getByTestId('map-picker')).toBeInTheDocument())
+    expect(screen.queryByText('Plazo')).not.toBeInTheDocument()
+    expect(screen.getByTestId('map-picker')).toHaveAttribute('data-pin', '41.38,2.17')
+  })
+
+  test('paso 1 → la flecha "Atrás" de la cabecera sale del flujo (llama a onBack)', async () => {
+    const onBack = vi.fn()
+    const user = userEvent.setup()
+    render(
+      <SessionContext.Provider value={session}>
+        <ToastProvider>
+          <CreateLocationChallenge
+            groupId="g-1"
+            groupName="Japón 2026"
+            onBack={onBack}
+            onCreated={() => {}}
+          />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Atrás' }))
+    expect(onBack).toHaveBeenCalledTimes(1)
   })
 })
