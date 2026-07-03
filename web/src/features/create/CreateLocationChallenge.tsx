@@ -359,6 +359,7 @@ export function CreateLocationChallenge({
         lead="back"
         onLead={step === 'previa' ? backToSitio : onBack}
         leadLabel="Atrás"
+        kicker={groupName ?? undefined}
         title="¿Dónde?"
         action={
           step === 'sitio' ? (

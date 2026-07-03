@@ -125,6 +125,18 @@
     transparent 55%
   );
 
+  /* Degradado de las pantallas de tarea (issue #659, demo "5B · papel con
+   * alma"): la franja superior (~180px, donde vive AppHeader) fría→cálida,
+   * fundiendo a --paper. Reutiliza --accent (teal) vía color-mix en vez de un
+   * hex nuevo, para que siga coherente si la paleta cambia. Un único degradado
+   * lineal con parada en longitud fija: por debajo de 180px queda como
+   * --paper liso (ShellUtilitario lo aplica de raíz, sin repetir --paper aparte). */
+  --paper-dawn: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 7%, var(--paper)) 0%,
+    var(--paper) 180px
+  );
+
   /* Tinta (jerarquía de grafito sobre papel). */
   --ink-900: #1b2127; /* titulares, texto principal (grafito, ~15:1 sobre papel, AAA) */
   --ink-600: #575f6c; /* texto secundario / meta (≥5.5:1 AA sobre todos los fondos del sistema) */

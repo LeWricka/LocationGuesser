@@ -1,6 +1,7 @@
-/* Cabecera de tres ranuras: [atrás/cerrar] · [título centrado] · [acción]. Las
- * ranuras laterales tienen ancho mínimo igual (tap target) para que el título
- * quede ópticamente centrado aunque solo haya control en un lado. */
+/* Cabecera: en variant="floating" es la fila de tres ranuras de siempre
+ * ([atrás/cerrar] · [título centrado] · [acción]); en variant="plain" (por
+ * defecto) es una COLUMNA — fila de controles arriba, bloque de título
+ * editorial debajo (ver .controls/.titleBlock, issue #659). */
 .header {
   position: relative;
   z-index: var(--z-header);
@@ -24,7 +25,9 @@
   margin-left: auto;
 }
 
-/* Título serif, una sola línea, truncado con elipsis para nombres largos. */
+/* Título serif. En variant="floating" es la única línea, centrada y truncada
+ * (nombres largos no rompen el layout). En variant="plain" .plain .title lo
+ * reescala/realinea para el bloque editorial (ver más abajo). */
 .title {
   flex: 1;
   min-width: 0;
@@ -71,11 +74,100 @@
   outline-offset: var(--focus-ring-offset);
 }
 
-/* ---- Variante plain: sobre papel, hairline inferior ---- */
+/* ---- Variante plain: "5B · papel con alma" (issue #659) ----
+ * Fuera la barra blanca con borde: transparente sobre el papel (el degradado
+ * --paper-dawn de ShellUtilitario hace de fondo detrás). Layout en COLUMNA:
+ * fila de controles (atrás fantasma + acción) arriba, bloque de título
+ * editorial debajo — ver .controls/.titleBlock. */
 .plain {
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  background: transparent;
   color: var(--color-text);
+}
+
+/* Fila de controles: solo se pinta si hay atrás y/o acción (AppHeader.tsx la
+ * omite entera si no hay ninguno, para no dejar una franja de 44px vacía en
+ * cabeceras de solo-título, p.ej. "Recuerdo guardado"). */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Atrás fantasma (issue #659): antes transparente puro, ahora un anillo
+ * hairline sobre papel — se lee como control incluso sin hover, sin dejar de
+ * ser "fantasma" (mismo tono que el fondo, no un chip sólido). */
+.plain .iconButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+.plain .iconButton:hover {
+  background: var(--color-surface-hover);
+}
+
+/* Bloque de título editorial: kicker (si lo hay) + título serif grande +
+ * hilo punteado, alineados a la izquierda como un titular de revista — ya no
+ * centrados entre dos slots (issue #659). */
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  /* align-items por defecto (stretch): kicker/título ocupan el ancho completo
+   * de la cabecera para que el título pueda partir a una 2ª línea en vez de
+   * desbordar; `text-align: left` en .plain .title mantiene la alineación
+   * visual pese a la caja a ancho completo. */
+  gap: var(--space-1);
+  padding-left: var(--space-1); /* respiro óptico alineado con el icon-button */
+}
+
+/* Kicker: contexto (nombre del viaje) en versalitas teal. Tinta de ACENTO, no
+ * `muted`/`faint` (gotcha #5 del proyecto): var(--color-accent) da ~4.9:1
+ * sobre --paper, AA para texto normal — un kicker que no se lee no sirve. */
+.kicker {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+/* Título del bloque editorial: más grande que el título centrado de
+ * "floating", alineado a la izquierda, permite dos líneas cortas (nombres de
+ * viaje largos) en vez de truncar de golpe. */
+.plain .title {
+  flex: initial;
+  text-align: left;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Hilo punteado dorado con punto teal final: firma discreta bajo el título
+ * (issue #659), la misma idea de "camino" de LogoTabide en miniatura. Opacidad
+ * <1 para quedar como detalle, no como otro elemento que compite. */
+.thread {
+  display: block;
+  /* Ancho fijo (issue #659: "~140px"): sin esto, el `stretch` por defecto de
+   * .titleBlock lo estiraría al ancho completo de la cabecera y distorsionaría
+   * el trazo (el viewBox escala con `width`). */
+  width: 140px;
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  opacity: 0.7;
+}
+.threadPath {
+  stroke: var(--medal-gold);
+  stroke-width: 2;
+  stroke-dasharray: 0.5 7;
+}
+.threadDot {
+  fill: var(--color-accent);
 }
 
 /* ---- Variante floating: sobre escena inmersiva (mapa/foto a sangre) ----
