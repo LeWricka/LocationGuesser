@@ -1,3 +1,36 @@
+/* Pantalla completa (ShellUtilitario, issue #596): mismo patrón que CreateGroup
+ * (position: fixed a pantalla entera + z-index de overlay vía token). */
+.root {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  isolation: isolate;
+}
+
+/* Cabecera visual del cuerpo: avatar grande + una línea de ayuda. El título ya
+ * vive en el AppHeader ("Tu perfil"); aquí no se repite. */
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+
+/* Acciones secundarias al pie del contenido (NO en el footer fijo, que es solo
+ * para el CTA "Guardar"; NO junto al "atrás", que vive en la cabecera). Mismo
+ * lenguaje que la "zona peligrosa" de Ajustes del viaje: separador + espaciado. */
+.secondaryActions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
 /* Sección de foto de perfil: etiqueta, control de subida y nota de ayuda. */
 .photoSection {
   display: flex;

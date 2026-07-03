@@ -10,9 +10,12 @@ import {
   updateGroupTripData,
   type TripPhoto,
 } from '../../lib/groupData'
+import { getGroupMembers, setMemberRole, type GroupMemberInfo } from '../../lib/membership'
 import { track } from '../../lib/analytics'
-import { Check, Flag, Image as ImageIcon, LockOpen, Settings } from 'lucide-react'
+import { Check, Crown, Flag, Image as ImageIcon, LockOpen, Settings, Users } from 'lucide-react'
 import {
+  Avatar,
+  Badge,
   Button,
   DatePicker,
   Field,
@@ -80,6 +83,13 @@ export function GroupSettingsModal({
   const [coverPath, setCoverPath] = useState<string | null>(null)
   const [photos, setPhotos] = useState<TripPhoto[]>([])
   const [loadingPhotos, setLoadingPhotos] = useState(true)
+  // Miembros del viaje (issue #596): quien abre Ajustes ya es dueño/co-dueño (el
+  // menú "···" solo ofrece esta entrada a `canCreate`), así que la acción "Hacer
+  // co-dueño" no necesita distinguir "soy dueño" aparte: basta con `!m.isOwner`
+  // (un dueño nunca se ve a sí mismo en esa lista).
+  const [members, setMembers] = useState<GroupMemberInfo[] | null>(null)
+  const [membersError, setMembersError] = useState(false)
+  const [promotingId, setPromotingId] = useState<string | null>(null)
 
   const [busy, setBusy] = useState(false)
   // Confirmación fuerte de borrado: el dueño teclea el nombre (o el código si no
@@ -143,6 +153,47 @@ export function GroupSettingsModal({
       cancelled = true
     }
   }, [groupId])
+
+  // Miembros del viaje, para la sección "Miembros" (avatar + nombre + corona si
+  // dueño). Tolerante a fallo: si falla, la sección simplemente no se muestra (no
+  // bloquea el resto de Ajustes, igual que el resto de fetches del modal).
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const list = await getGroupMembers(groupId)
+        if (!cancelled) setMembers(list)
+      } catch {
+        if (!cancelled) setMembersError(true)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [groupId])
+
+  // Promover a co-dueño: gana los permisos de dueño (editar el viaje, retos,
+  // premios, imágenes, y a su vez promover a otros). Lo respalda la RLS
+  // `group_members_update_owner` (migración 0026): un UPDATE, no un INSERT, y solo
+  // lo puede ejecutar quien ya sea dueño (el `canCreate` que gatea este modal).
+  async function promote(member: GroupMemberInfo) {
+    if (!confirm(`¿Hacer a ${member.name} co-dueño del viaje? Podrá gestionarlo como tú.`)) return
+    setPromotingId(member.userId)
+    try {
+      await setMemberRole(groupId, member.userId, 'owner')
+      track('member_role_changed', { group_id: groupId, role: 'owner' })
+      setMembers((prev) =>
+        (prev ?? []).map((m) => (m.userId === member.userId ? { ...m, isOwner: true } : m)),
+      )
+      toast.show(`${member.name} ya es co-dueño`, { tone: 'success' })
+    } catch (err) {
+      toast.show(`No se pudo promover: ${err instanceof Error ? err.message : String(err)}`, {
+        tone: 'danger',
+      })
+    } finally {
+      setPromotingId(null)
+    }
+  }
 
   // Lo que hay que teclear para borrar: el nombre si lo hay, si no el código.
   const deleteTarget = currentName?.trim() || groupId
@@ -447,6 +498,49 @@ export function GroupSettingsModal({
               </>
             )}
           </div>
+
+          {/* Miembros: quién forma parte del viaje y quién lo administra (corona =
+              dueño/co-dueño). Solo aquí (Ajustes es ya de por sí exclusivo de
+              dueños) se ofrece "Hacer co-dueño" por miembro, con confirmación. */}
+          {!membersError && (members === null || members.length > 0) && (
+            <div className={styles.settingsSection}>
+              <p className={styles.settingsSectionLabel}>
+                <Icon icon={Users} size={14} /> Miembros
+              </p>
+              {members === null ? (
+                <Row gap={2} align="center" className={styles.coverLoading}>
+                  <Spinner size={18} /> <span>Cargando miembros…</span>
+                </Row>
+              ) : (
+                <ul className={styles.memberList}>
+                  {members.map((m) => (
+                    <li key={m.userId} className={styles.memberRow}>
+                      <span className={styles.memberName}>
+                        <Avatar userId={m.userId} name={m.name} size="sm" />
+                        {m.name}
+                      </span>
+                      <Row gap={2} align="center">
+                        {m.isOwner ? (
+                          <Badge tone="accent">
+                            <Icon icon={Crown} size={14} /> Dueño
+                          </Badge>
+                        ) : (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            loading={promotingId === m.userId}
+                            onClick={() => void promote(m)}
+                          >
+                            <Icon icon={Crown} size={14} /> Hacer co-dueño
+                          </Button>
+                        )}
+                      </Row>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {/* Fin de temporada: cerrar congela el viaje (solo-lectura); reabrir lo
               reactiva. Reversible, por eso va separado de la zona peligrosa. */}

@@ -1,20 +1,18 @@
 // Pantalla de perfil (`#perfil`, cuentas-y-home.md §3.1/§3.5): editar el
 // display_name, elegir avatar (animal del set) y cerrar sesión. Wiring sobre
 // `lib/profile` y `lib/auth`; UI del kit.
+//
+// Migrada a ShellUtilitario + AppHeader (issue #596, patrón CreateGroup post-#494):
+// antes vivía en AuthScreen (tarjeta centrada, "atrás" apretado junto a "Cerrar
+// sesión" en el footer). Ahora es una pantalla de tarea (papel, no tarjeta
+// flotante): atrás arriba-izquierda en la cabecera, Guardar como CTA fijo al
+// fondo, y "Cerrar sesión" como acción secundaria separada al final del
+// contenido (NO pegada al atrás). La lógica de guardado/avatar no cambia.
 
 import { useState } from 'react'
 import { Check, Wrench } from 'lucide-react'
-import {
-  AuthScreen,
-  Avatar,
-  BackHomeButton,
-  Button,
-  Field,
-  Icon,
-  Input,
-  Stack,
-  useToast,
-} from '../../ui'
+import { AppHeader, Avatar, Button, Field, Icon, Input, Stack, useToast } from '../../ui'
+import { ShellUtilitario } from '../../ui/shells'
 import { upsertProfile } from '../../lib/profile'
 import { signOut } from '../../lib/auth'
 import { PushNotificationsControl } from './PushNotificationsControl'
@@ -117,31 +115,33 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
   }
 
   return (
-    <AuthScreen
-      icon={<Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="lg" />}
-      title="Tu perfil"
-      subtitle="Cambia tu nombre, sube una foto o elige tu animal."
-      footer={
-        <Stack gap={3} align="center">
-          {onOpenAdmin && (
-            <Button variant="secondary" size="sm" onClick={onOpenAdmin}>
-              <Icon icon={Wrench} size={16} /> Vista de administración
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={handleSignOut}>
-            Cerrar sesión
+    <div className={styles.root}>
+      <ShellUtilitario
+        header={<AppHeader lead="back" onLead={onBack} leadLabel="Volver" title="Tu perfil" />}
+        footer={
+          <Button
+            type="button"
+            size="lg"
+            fullWidth
+            loading={loading}
+            disabled={uploading}
+            onClick={() => void handleSave()}
+          >
+            {saved ? (
+              <>
+                Guardado <Icon icon={Check} size={16} />
+              </>
+            ) : (
+              'Guardar'
+            )}
           </Button>
-          <BackHomeButton onClick={onBack} />
-        </Stack>
-      }
-    >
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          void handleSave()
-        }}
-        noValidate
+        }
       >
+        <div className={styles.hero}>
+          <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="lg" />
+          <p className="t-caption">Cambia tu nombre, sube una foto o elige tu animal.</p>
+        </div>
+
         <Stack gap={4}>
           <Field label="Tu nombre" error={error}>
             {(fieldProps) => (
@@ -155,6 +155,14 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
                 onChange={(e) => {
                   setDisplayName(e.target.value)
                   setSaved(false)
+                }}
+                onKeyDown={(e) => {
+                  // Enter guarda directamente (antes lo hacía el submit del
+                  // <form>; sin form nativo, lo replicamos aquí).
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void handleSave()
+                  }
                 }}
                 disabled={loading}
                 maxLength={40}
@@ -200,21 +208,25 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
             </div>
           </fieldset>
 
-          <Button type="submit" size="lg" fullWidth loading={loading} disabled={uploading}>
-            {saved ? (
-              <>
-                Guardado <Icon icon={Check} size={16} />
-              </>
-            ) : (
-              'Guardar'
-            )}
-          </Button>
-
           {/* Avisos del grupo (PWA): control aparte del guardado del perfil. Solo
               se renderiza si el navegador soporta push y hay VAPID configurada. */}
           <PushNotificationsControl userId={userId} />
         </Stack>
-      </form>
-    </AuthScreen>
+
+        {/* Acciones secundarias, separadas del formulario y del "atrás" (que ya
+            vive en la cabecera): vista de administración (si aplica) y cerrar
+            sesión, al pie del contenido. */}
+        <div className={styles.secondaryActions}>
+          {onOpenAdmin && (
+            <Button variant="secondary" size="sm" onClick={onOpenAdmin}>
+              <Icon icon={Wrench} size={16} /> Vista de administración
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => void handleSignOut()}>
+            Cerrar sesión
+          </Button>
+        </div>
+      </ShellUtilitario>
+    </div>
   )
 }
