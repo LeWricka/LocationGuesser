@@ -1,5 +1,8 @@
-/* CreateLocationChallenge — mapa primero + previa de Street View.
-   Layout: cabecera → mapa (mitad superior) → panel inferior (SV + reglas + CTA).
+/* CreateLocationChallenge — ¿Dónde? en DOS PASOS (issue #585).
+   Paso 1 (el sitio): cabecera → mapa a TODO el alto disponible (el buscador es
+   una barra de vidrio DENTRO del mapa) → CTA fijo "Confirmar sitio" al haber pin.
+   Paso 2 (la previa y las reglas): cabecera → previa SV grande + chips de
+   plazo/tiempo → CTA fijo (Cambiar sitio + Lanzar).
    Tokens Grafito+teal del sistema de diseño (tokens.css). */
 
 .root {
@@ -15,9 +18,48 @@
   color: var(--ink-900);
 }
 
-/* ─── Área del mapa (mitad superior) ────────────────────────────── */
-/* El mapa ocupa el espacio libre entre la cabecera y el panel inferior.
-   flex: 1 + min-height: 0 para que no desborde al crecer el panel. */
+/* ─── Pasos: contenedor + transición direccional (patrón #539) ──── */
+/* Solo se monta el paso ACTIVO (nunca los dos a la vez — bug raíz de
+   solapamiento de paneles); anima la ENTRADA del que llega: avanzar entra
+   desde la derecha, volver ("Cambiar sitio") desde la izquierda. `fill-mode:
+   backwards` (nunca forwards/both): al terminar la animación el paso queda sin
+   transform residual, que crearía un stacking context permanente capaz de
+   atrapar popovers bajo el CTA fijo (gotcha PR #527). */
+.step {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  animation: stepInForward var(--motion-duration-base) var(--motion-ease-emphasized) backwards;
+}
+.step.stepBack {
+  animation-name: stepInBackward;
+}
+@keyframes stepInForward {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes stepInBackward {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ─── Paso 1: área del mapa (todo el alto bajo la cabecera) ─────── */
+/* flex: 1 + min-height: 0: el mapa absorbe TODO el hueco disponible (ya no es
+   una tarjeta a media pantalla); solo cede el alto del footer cuando aparece
+   el CTA "Confirmar sitio" (footer en flujo, nunca superpuesto al mapa). */
 .mapArea {
   position: relative;
   flex: 1;
@@ -89,29 +131,17 @@
   opacity: 0.6;
 }
 
-/* ─── Panel inferior ────────────────────────────────────────────── */
-/* Área de contenido bajo el mapa: estado + previa SV + reglas + CTA.
-   overflow-y: auto para que en móvil pequeño sea desplazable. */
-.panel {
-  flex-shrink: 0;
-  max-height: 55vh;
+/* ─── Paso 2: cuerpo de la previa ───────────────────────────────── */
+/* Previa SV (protagonista, crece) + reglas, con scroll propio en móvil
+   pequeño. El footer (CTA fijo) queda fuera, anclado abajo. */
+.previaBody {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  background: var(--surface);
-  border-top: 1px solid var(--hairline);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: var(--space-4) var(--space-5);
-  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
-}
-
-/* Lede cuando no hay punto elegido. */
-.idleLede {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  color: var(--ink-600);
-  line-height: var(--line-height-snug);
-  padding: var(--space-2) 0;
+  padding: var(--space-4) var(--space-5) var(--space-3);
 }
 
 /* ─── Estado: buscando panorama ────────────────────────────────── */
@@ -152,14 +182,21 @@
   line-height: var(--line-height-snug);
 }
 
-/* ─── Previa de Street View ─────────────────────────────────────── */
-/* Contenedor relativo para el chip de privacidad superpuesto. */
+/* ─── Previa de Street View (protagonista del paso 2) ───────────── */
+/* Contenedor relativo para el chip de privacidad superpuesto. GRANDE (#585):
+   crece para absorber el alto libre del paso (el mapa ya no compite — está en
+   el paso 1), con un mínimo digno en pantallas bajas. */
 .svPreviewWrap {
   position: relative;
   border-radius: var(--radius-md);
   overflow: hidden;
-  flex-shrink: 0;
-  /* La previa hereda height de StreetViewPreview.module.css (260px). */
+  flex: 1;
+  min-height: 260px;
+}
+/* La previa interna llena el contenedor (pisa el height fijo de 260px que trae
+   StreetViewPreview.module.css, pensado para su uso compacto). */
+.svPreviewWrap > :first-child {
+  height: 100%;
 }
 
 /* Chip de privacidad flotante sobre la previa de SV. */
@@ -173,7 +210,9 @@
   gap: 5px;
   padding: 4px 10px;
   border-radius: var(--radius-full);
-  background: rgba(18, 26, 36, 0.56); /* design-lint-allow: chip de escena oscura sobre SV */
+  /* 0.72 (antes 0.56): con la previa vacía o una escena clara detrás, el tinte
+     al 56% no llegaba al contraste AA del texto blanco (axe, #585). */
+  background: rgba(18, 26, 36, 0.72); /* design-lint-allow: chip de escena oscura sobre SV */
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   color: #fff; /* design-lint-allow: texto blanco sobre chip oscuro traslúcido */
@@ -202,11 +241,59 @@
   letter-spacing: var(--letter-spacing-wide);
 }
 
-/* ─── Footer (privacidad + CTA) ─────────────────────────────────── */
+/* ─── Footer: CTA fijo (ambos pasos) ────────────────────────────── */
+/* Patrón de CTA fijo del sistema (ShellUtilitario): footer EN EL FLUJO flex
+   (nunca absoluto — no tapa el mapa ni el contenido), hairline arriba,
+   superficie opaca y respeto al safe-area. */
 .footer {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--hairline);
+  background: var(--surface);
+}
+
+/* Fila de acciones del paso 2: "Cambiar sitio" (secundario) + Lanzar (primario). */
+.footerActions {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.footerActions .launchBtn {
+  flex: 1;
+  width: auto;
+}
+
+/* Botón secundario "Cambiar sitio": vuelve al paso 1 conservando el pin. */
+.changeBtn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  background: transparent;
+  color: var(--ink-700);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--motion-transition-fast);
+}
+.changeBtn:hover {
+  background: var(--surface-raised);
+}
+.changeBtn:active {
+  background: var(--surface-sunken);
+}
+.changeBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* Fila de estado (spinner + mensaje). */

@@ -6,6 +6,7 @@ import {
   MapContainer,
   Marker,
   TileLayer,
+  ZoomControl,
   useMap,
   useMapEvents,
 } from 'react-leaflet'
@@ -73,6 +74,19 @@ interface Props {
   center: LatLng
   zoom: number
   onPick: (p: LatLng) => void
+  /**
+   * Dónde vive el buscador de sitios (issue #585):
+   *  - 'above' (default): fila propia ENCIMA del lienzo, en flujo — el picker
+   *    COMPACTO que usan AddMoment/EditMomentForm (#574); NO cambia con esto.
+   *  - 'overlay': barra de vidrio FLOTANDO dentro del lienzo (arriba), para
+   *    cuando el propio mapa ya ocupa toda la pantalla (paso 1 de ¿Dónde?) y no
+   *    hay "encima" que gastar en el buscador. Recoloca el zoom de Leaflet
+   *    (arriba-izq → abajo-izq) y el selector de capa (arriba-der → abajo-der,
+   *    apilado sobre la atribución) para dejar libre la franja superior; el
+   *    botón "Ampliar a pantalla completa" desaparece (el mapa YA es grande,
+   *    no tiene sentido ampliar algo que ya está a pantalla completa).
+   */
+  searchPlacement?: 'above' | 'overlay'
 }
 
 function ClickHandler({ onPick }: { onPick: (p: LatLng) => void }) {
@@ -148,7 +162,15 @@ function LayerToggle({ layer, onChoose }: { layer: BaseLayer; onChoose: (l: Base
   )
 }
 
-export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
+export function MapPicker({
+  value,
+  flyTo,
+  center,
+  zoom,
+  onPick,
+  searchPlacement = 'above',
+}: Props) {
+  const overlaySearch = searchPlacement === 'overlay'
   const [layer, setLayer] = useState<BaseLayer>(readStoredLayer)
 
   // flyTo INTERNO del buscador (issue #522), independiente del `flyTo` que
@@ -218,20 +240,29 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
     <div className={styles.wrap}>
       {/* Buscador FUERA del lienzo (issue #551): antes flotaba dentro del mapa y
           tapaba los controles de zoom +/-; ahora es la primera fila del propio
-          picker, a todo el ancho, en flujo normal. */}
-      <PlaceSearch onSelect={onSearchSelect} />
+          picker, a todo el ancho, en flujo normal. Variante 'overlay' (#585): el
+          buscador se mueve DENTRO del lienzo (ver más abajo) — este NO se pinta. */}
+      {!overlaySearch && (
+        <div className={styles.searchRow}>
+          <PlaceSearch onSelect={onSearchSelect} />
+        </div>
+      )}
       <div className={styles.canvas}>
         <MapContainer
           center={[initialCenter.lat, initialCenter.lng]}
           zoom={initialZoom}
           className={`lg-map ${styles.map}`}
           attributionControl={false}
+          zoomControl={!overlaySearch}
         >
           {/* Atribución (obligatoria) COLAPSADA: un botón "ⓘ" discreto en la esquina
               en vez de la banda "Leaflet | Tiles © Esri…" a sangre. El glifo "ⓘ" es el
               prefix; el CSS oculta los créditos en reposo y los revela en hover/focus
               (mismo patrón que los mapas del viaje). */}
           <AttributionControl position="bottomright" prefix="ⓘ" />
+          {/* Variante 'overlay': el buscador ocupa la franja superior, así que el
+              zoom +/- de Leaflet (por defecto arriba-izq) se recoloca abajo-izq. */}
+          {overlaySearch && <ZoomControl position="bottomleft" />}
           {/* keepBuffer + updateWhenZooming reducen el parpadeo gris al hacer
               zoom (mismo motivo que en PlayMap). Sin `subdomains` porque la capa
               satélite (Esri) no usa el placeholder {s}. */}
@@ -275,17 +306,29 @@ export function MapPicker({ value, flyTo, center, zoom, onPick }: Props) {
             />
           )}
         </MapContainer>
-        <div className={styles.controls}>
+        {/* Barra de vidrio flotante DENTRO del lienzo (variante 'overlay', #585):
+            mismo chrome translúcido que PlaceSearch ya trae (`--map-chrome-bg`),
+            solo cambia dónde vive — encima del mapa en vez de en su propia fila. */}
+        {overlaySearch && (
+          <div className={styles.searchOverlay}>
+            <PlaceSearch onSelect={onSearchSelect} />
+          </div>
+        )}
+        <div className={`${styles.controls} ${overlaySearch ? styles.controlsBottom : ''}`.trim()}>
           <LayerToggle layer={layer} onChoose={chooseLayer} />
-          <button
-            type="button"
-            className={styles.expandBtn}
-            onClick={() => setExpanded(true)}
-            aria-label="Ampliar mapa a pantalla completa"
-            title="Ampliar mapa"
-          >
-            <Icon icon={Expand} size={18} />
-          </button>
+          {/* "Ampliar a pantalla completa" no tiene sentido cuando el mapa YA
+              ocupa toda la pantalla (variante 'overlay', #585): se oculta. */}
+          {!overlaySearch && (
+            <button
+              type="button"
+              className={styles.expandBtn}
+              onClick={() => setExpanded(true)}
+              aria-label="Ampliar mapa a pantalla completa"
+              title="Ampliar mapa"
+            >
+              <Icon icon={Expand} size={18} />
+            </button>
+          )}
         </div>
       </div>
 

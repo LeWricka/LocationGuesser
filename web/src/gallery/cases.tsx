@@ -383,13 +383,13 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
-    // Flujo "GeoGuessr puro" (origen FAB, sin recuerdo): mapa + buscador para
-    // elegir el punto, luego previa de Street View. No tenía caso propio en la
-    // galería (issue #574) — necesario para verificar que el buscador de
-    // PlaceSearch aparece y funciona también aquí (comparte `MapPicker` con
-    // "Añadir recuerdo", ver CreateLocationChallenge.tsx).
+    // Flujo "GeoGuessr puro" (origen FAB, sin recuerdo), PASO 1 de 2 (#585):
+    // mapa a todo el alto con el buscador como barra de vidrio DENTRO del mapa
+    // (variante `searchPlacement="overlay"` de MapPicker — verificar aquí que
+    // no tapa el zoom ni el toggle de capa, y que "Añadir recuerdo" conserva
+    // su buscador encima del mapa, la variante por defecto).
     id: 'crear-donde',
-    title: 'Crear ¿Dónde? (elegir punto en el mapa)',
+    title: 'Crear ¿Dónde? · Paso 1 (el sitio)',
     section: 'Crear',
     render: () => (
       <CreateLocationChallenge
@@ -397,6 +397,28 @@ export const cases: GalleryCase[] = [
         groupName={GROUP.name}
         onBack={noop}
         onCreated={noop}
+      />
+    ),
+  },
+  {
+    // PASO 2 de 2 (#585): previa de Street View grande + plazo/tiempo por
+    // jugada + "Cambiar sitio" + Lanzar. `initialPreview` siembra pin y
+    // panorama (el SDK de Maps está stubeado en galería: la previa se ve como
+    // lienzo vacío enmarcado, pero el LAYOUT — protagonismo, chips, CTA fijo —
+    // es el real).
+    id: 'crear-donde-previa',
+    title: 'Crear ¿Dónde? · Paso 2 (la previa y las reglas)',
+    section: 'Crear',
+    render: () => (
+      <CreateLocationChallenge
+        groupId={GROUP_ID}
+        groupName={GROUP.name}
+        onBack={noop}
+        onCreated={noop}
+        initialPreview={{
+          point: { lat: 35.0036, lng: 135.7788 },
+          pano: { panoId: 'pano-galeria', lat: 35.0036, lng: 135.7788 },
+        }}
       />
     ),
   },

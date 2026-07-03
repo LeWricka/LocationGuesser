@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MapPin } from 'lucide-react'
+import { ArrowLeft, MapPin } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
@@ -25,6 +25,12 @@ interface Props {
   onBack: () => void
   /** Reto creado: el viaje vuelve a la lista y ofrece su enlace. */
   onCreated: (challenge: ChallengeForPlay) => void
+  /**
+   * SOLO galería/tests (#585): arranca ya en el paso 2 (la previa) con el pin
+   * y el panorama resueltos, sin red ni SDK de Maps — permite capturar la
+   * previa de forma determinista. En producción no se pasa nunca.
+   */
+  initialPreview?: { point: LatLng; pano: PanoramaMatch }
 }
 
 // Plazo del reto: duración relativa en minutos.
@@ -61,18 +67,39 @@ type PanoState =
 // Estado del GPS (solo para centrar el mapa, no es la respuesta).
 type GpsState = 'idle' | 'locating' | 'done' | 'error'
 
+// Los DOS pasos del flujo (issue #585): el mapa manda en el paso de elegir
+// sitio (necesita TODO el alto para afinar bien); la previa de Street View
+// manda en el paso de reglas (el mapa ya no aporta nada ahí, así que se
+// oculta en vez de competir por espacio con la previa).
+type Step = 'sitio' | 'previa'
+
 // Reto ¿Dónde? con selección MANUAL del punto en el mapa.
 //
-// Flujo:
-//  1. Mapa (Leaflet) — el usuario toca para elegir el sitio.
-//  2. Al elegir el punto: se busca el panorama de Street View más cercano.
-//  3. Si hay cobertura → previa de SV del punto elegido + CTA "Lanzar".
-//     Si no hay cobertura → aviso inline, CTA deshabilitado.
-//  4. "Usar mi ubicación" (GPS, botón secundario) vuela el mapa a tu posición.
-//  5. CTA crea el reto con lat/lng del panorama + panoId + POV.
-export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated }: Props) {
+// Flujo EN DOS PASOS (issue #585 — antes era una sola pantalla mapa+panel,
+// donde afinar el pin con la previa de SV ya montada dejaba el mapa enano):
+//  1. EL SITIO — mapa a pantalla completa (buscador integrado como barra de
+//     vidrio flotante, GPS, tap/re-tap) para elegir Y AFINAR el punto sin
+//     estrecheces. Al marcar el pin: se busca el panorama de SV más cercano
+//     en paralelo (no bloquea "Confirmar sitio"). CTA fijo "Confirmar sitio".
+//  2. LA PREVIA Y LAS REGLAS — el mapa se oculta (ya cumplió su función) y la
+//     previa de SV pasa a protagonista, junto con plazo/tiempo por jugada.
+//     "Cambiar sitio" vuelve al paso 1 CONSERVANDO el pin (vuela el mapa de
+//     vuelta a él); el CTA "Lanzar" crea el reto con lat/lng del panorama +
+//     panoId + POV.
+// Transición direccional entre pasos (mismo patrón que #531/#539).
+export function CreateLocationChallenge({
+  groupId,
+  groupName,
+  onBack,
+  onCreated,
+  initialPreview,
+}: Props) {
+  const [step, setStep] = useState<Step>(initialPreview ? 'previa' : 'sitio')
+  // Dirección del cambio de paso: avanzar entra desde la derecha, volver
+  // ("Cambiar sitio") desde la izquierda — mismo criterio que #531/#539.
+  const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   // Punto elegido por el usuario en el mapa (pin).
-  const [pickedPoint, setPickedPoint] = useState<LatLng | null>(null)
+  const [pickedPoint, setPickedPoint] = useState<LatLng | null>(initialPreview?.point ?? null)
   // flyTo: coordenadas a las que debe volar el mapa (GPS o nada).
   const [flyTo, setFlyTo] = useState<LatLng | null>(null)
   // Centro inicial del mapa: actualizado con GPS si llega antes de que el usuario interactúe.
@@ -80,7 +107,9 @@ export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated 
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
 
   // Estado de la búsqueda de panorama.
-  const [panoState, setPanoState] = useState<PanoState>({ kind: 'idle' })
+  const [panoState, setPanoState] = useState<PanoState>(
+    initialPreview ? { kind: 'ready', pano: initialPreview.pano } : { kind: 'idle' },
+  )
   // POV capturado de la previa (encuadre inicial para los jugadores).
   const [pov, setPov] = useState({ heading: 0, pitch: 0 })
 
@@ -162,6 +191,25 @@ export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated 
     }
   }, [])
 
+  // Paso 1 → 2: el pin ya existe, no hace falta esperar a que termine la
+  // búsqueda de SV (el paso 2 muestra su propio estado de "buscando…").
+  function confirmSitio() {
+    if (!pickedPoint) return
+    setDirection('forward')
+    setStep('previa')
+  }
+
+  // "Cambiar sitio": vuelve al paso 1 CONSERVANDO el pin (no lo borra ni
+  // reinicia la búsqueda de SV) y vuela el mapa de vuelta a él — al volver, el
+  // picker REMONTA (se desmonta al ocultar el paso 1) y arrancaría centrado en
+  // `mapCenter`/`mapZoom` de siempre si no le indicamos explícitamente a dónde
+  // volar.
+  function changeSitio() {
+    if (pickedPoint) setFlyTo(pickedPoint)
+    setDirection('backward')
+    setStep('sitio')
+  }
+
   async function save() {
     if (!user) {
       toast.show('Inicia sesión para crear un reto.', { tone: 'danger' })
@@ -231,9 +279,15 @@ export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated 
   const canLaunch = hasPano && !busy
   const isGpsLocating = gpsState === 'locating'
 
+  // Clase de dirección del paso (mismo patrón que #531/#539): solo el
+  // CONTENIDO del paso activo anima; header/celebración/hoja de compartir
+  // quedan fijos entre pasos.
+  const stepClass = `${styles.step} ${direction === 'backward' ? styles.stepBack : ''}`.trim()
+
   return (
     <div className={styles.root}>
-      {/* Cabecera: atrás + título + botón GPS secundario. */}
+      {/* Cabecera: atrás + título + botón GPS secundario (solo en el paso 1,
+          donde hay mapa que centrar). */}
       <AppHeader
         variant="plain"
         lead="back"
@@ -241,112 +295,135 @@ export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated 
         leadLabel="Atrás"
         title="¿Dónde?"
         action={
-          <button
-            type="button"
-            className={styles.gpsBtn}
-            aria-label="Usar mi ubicación"
-            title="Centrar el mapa en mi posición"
-            onClick={useGpsLocation}
-            disabled={isGpsLocating}
-          >
-            {isGpsLocating ? <Spinner size={18} /> : <IconGps size={20} />}
-          </button>
+          step === 'sitio' ? (
+            <button
+              type="button"
+              className={styles.gpsBtn}
+              aria-label="Usar mi ubicación"
+              title="Centrar el mapa en mi posición"
+              onClick={useGpsLocation}
+              disabled={isGpsLocating}
+            >
+              {isGpsLocating ? <Spinner size={18} /> : <IconGps size={20} />}
+            </button>
+          ) : undefined
         }
       />
 
-      {/* Área principal: mapa de selección. */}
-      <div className={styles.mapArea}>
-        <MapPicker
-          value={pickedPoint}
-          flyTo={flyTo}
-          center={mapCenter}
-          zoom={mapZoom}
-          onPick={(p) => void handlePick(p)}
-        />
-        {/* Hint inicial: solo cuando no hay punto elegido. */}
-        {!pickedPoint && (
-          <div className={styles.mapHint} aria-live="polite">
-            <MapPin size={15} strokeWidth={1.8} aria-hidden />
-            Toca el mapa para elegir el sitio
-          </div>
-        )}
-      </div>
-
-      {/* Panel inferior: estado del SV + reglas + CTA. */}
-      <div className={styles.panel}>
-        {/* ── Sin punto elegido: lede explicativo ── */}
-        {!pickedPoint && (
-          <p className={styles.idleLede}>
-            Elige el sitio exacto en el mapa arriba. Los demás adivinarán dónde es.
-          </p>
-        )}
-
-        {/* ── Buscando panorama ── */}
-        {isSearching && (
-          <div className={styles.searchingState} role="status">
-            <Spinner size={20} />
-            <span>Buscando Street View…</span>
-          </div>
-        )}
-
-        {/* ── Sin cobertura de SV ── */}
-        {noCoverage && (
-          <div className={styles.noCoverageState} role="alert">
-            <MapPin size={18} strokeWidth={1.5} className={styles.noCoverageIco} aria-hidden />
-            <div>
-              <p className={styles.noCoverageTitle}>Sin Street View aquí</p>
-              <p className={styles.noCoverageSub}>
-                Mueve el pin a una calle con cobertura para poder lanzar el reto.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Panorama listo: previa interactiva + reglas ── */}
-        {hasPano && panoState.kind === 'ready' && (
-          <>
-            <div className={styles.svPreviewWrap}>
-              <StreetViewPreview
-                panoId={panoState.pano.panoId}
-                heading={pov.heading}
-                pitch={pov.pitch}
-                onPovChange={setPov}
-              />
-              {/* Chip de privacidad sobre la previa. */}
-              <div className={styles.privacyChip} aria-hidden>
-                <IconCandado size={12} />
-                Tu sitio queda oculto
+      {/* ── PASO 1 — EL SITIO: mapa a pantalla completa ── */}
+      {step === 'sitio' && (
+        <div className={stepClass}>
+          <div className={styles.mapArea}>
+            <MapPicker
+              value={pickedPoint}
+              flyTo={flyTo}
+              center={mapCenter}
+              zoom={mapZoom}
+              onPick={(p) => void handlePick(p)}
+              searchPlacement="overlay"
+            />
+            {/* Hint inicial: solo cuando no hay punto elegido. */}
+            {!pickedPoint && (
+              <div className={styles.mapHint} aria-live="polite">
+                <MapPin size={15} strokeWidth={1.8} aria-hidden />
+                Toca el mapa para elegir el sitio
               </div>
-            </div>
+            )}
+          </div>
 
-            <div className={styles.rules}>
-              <div className={styles.ruleRow}>
-                <label className={styles.ruleLabel}>Plazo</label>
-                <SegmentedControl
-                  label="Plazo para jugar"
-                  options={DEADLINE_OPTIONS.map((opt, i) => ({
-                    value: String(i),
-                    label: opt.label,
-                  }))}
-                  value={String(deadlineIndex)}
-                  onChange={(v) => setDeadlineIndex(Number(v))}
-                />
-              </div>
-              <div className={styles.ruleRow}>
-                <label className={styles.ruleLabel}>Tiempo por jugada</label>
-                <SegmentedControl
-                  label="Tiempo por jugada"
-                  options={GUESS_OPTIONS.map((opt, i) => ({ value: String(i), label: opt.label }))}
-                  value={String(guessIndex)}
-                  onChange={(v) => setGuessIndex(Number(v))}
-                />
-              </div>
+          {/* CTA fijo (footer en el flujo flex, NO absoluto — no tapa el
+              mapa): solo aparece al haber pin. No espera a que termine la
+              búsqueda de SV; el paso 2 ya muestra ese estado. */}
+          {pickedPoint && (
+            <div className={styles.footer}>
+              <button
+                type="button"
+                className={styles.launchBtn}
+                onClick={confirmSitio}
+                aria-label="Confirmar este sitio y seguir a la previa"
+              >
+                <MapPin size={17} strokeWidth={2} aria-hidden />
+                Confirmar sitio
+              </button>
             </div>
-          </>
-        )}
+          )}
+        </div>
+      )}
 
-        {/* CTA y nota de privacidad — aparecen solo cuando hay punto elegido. */}
-        {pickedPoint && (
+      {/* ── PASO 2 — LA PREVIA Y LAS REGLAS: SV a protagonista ── */}
+      {step === 'previa' && (
+        <div className={stepClass}>
+          <div className={styles.previaBody}>
+            {/* ── Buscando panorama ── */}
+            {isSearching && (
+              <div className={styles.searchingState} role="status">
+                <Spinner size={20} />
+                <span>Buscando Street View…</span>
+              </div>
+            )}
+
+            {/* ── Sin cobertura de SV ── */}
+            {noCoverage && (
+              <div className={styles.noCoverageState} role="alert">
+                <MapPin size={18} strokeWidth={1.5} className={styles.noCoverageIco} aria-hidden />
+                <div>
+                  <p className={styles.noCoverageTitle}>Sin Street View aquí</p>
+                  <p className={styles.noCoverageSub}>
+                    Cambia el sitio y prueba con una calle con cobertura.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Panorama listo: previa interactiva + reglas ── */}
+            {hasPano && panoState.kind === 'ready' && (
+              <>
+                <div className={styles.svPreviewWrap}>
+                  <StreetViewPreview
+                    panoId={panoState.pano.panoId}
+                    heading={pov.heading}
+                    pitch={pov.pitch}
+                    onPovChange={setPov}
+                  />
+                  {/* Chip de privacidad sobre la previa. */}
+                  <div className={styles.privacyChip} aria-hidden>
+                    <IconCandado size={12} />
+                    Tu sitio queda oculto
+                  </div>
+                </div>
+
+                <div className={styles.rules}>
+                  <div className={styles.ruleRow}>
+                    <label className={styles.ruleLabel}>Plazo</label>
+                    <SegmentedControl
+                      label="Plazo para jugar"
+                      options={DEADLINE_OPTIONS.map((opt, i) => ({
+                        value: String(i),
+                        label: opt.label,
+                      }))}
+                      value={String(deadlineIndex)}
+                      onChange={(v) => setDeadlineIndex(Number(v))}
+                    />
+                  </div>
+                  <div className={styles.ruleRow}>
+                    <label className={styles.ruleLabel}>Tiempo por jugada</label>
+                    <SegmentedControl
+                      label="Tiempo por jugada"
+                      options={GUESS_OPTIONS.map((opt, i) => ({
+                        value: String(i),
+                        label: opt.label,
+                      }))}
+                      value={String(guessIndex)}
+                      onChange={(v) => setGuessIndex(Number(v))}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* CTA fijo (footer en el flujo flex): nota de privacidad + volver a
+              elegir sitio (conserva el pin) + lanzar. */}
           <div className={styles.footer}>
             {status && (
               <div className={styles.statusRow}>
@@ -360,25 +437,34 @@ export function CreateLocationChallenge({ groupId, groupName, onBack, onCreated 
                 <span>Tu posición en el mapa queda oculta hasta que todos jueguen.</span>
               </div>
             )}
-            <button
-              type="button"
-              className={styles.launchBtn}
-              disabled={!canLaunch}
-              onClick={() => void save()}
-              aria-label={
-                noCoverage
-                  ? 'Sin Street View — elige otro punto en el mapa'
-                  : 'Este es mi sitio: lanzar el reto al grupo'
-              }
-            >
-              {busy ? <Spinner size={18} /> : <RocketIcon />}
-              {noCoverage
-                ? 'Sin Street View — elige otro punto'
-                : 'Este es mi sitio · Lanzar el reto'}
-            </button>
+            <div className={styles.footerActions}>
+              <button
+                type="button"
+                className={styles.changeBtn}
+                onClick={changeSitio}
+                disabled={busy}
+              >
+                <ArrowLeft size={16} aria-hidden />
+                Cambiar sitio
+              </button>
+              <button
+                type="button"
+                className={styles.launchBtn}
+                disabled={!canLaunch}
+                onClick={() => void save()}
+                aria-label={
+                  noCoverage
+                    ? 'Sin Street View — cambia el sitio'
+                    : 'Este es mi sitio: lanzar el reto al grupo'
+                }
+              >
+                {busy ? <Spinner size={18} /> : <RocketIcon />}
+                {noCoverage ? 'Sin Street View' : 'Lanzar el reto'}
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Microcelebración al lanzar. */}
       {celebrating && (
