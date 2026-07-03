@@ -211,7 +211,11 @@
   transform: translateY(-12%);
 }
 
-/* Velo de lectura al pie: la foto manda, el texto serif blanco se lee AA encima. */
+/* Velo de lectura al pie: la foto manda, el texto serif blanco se lee AA encima.
+   Concentrado en el ~58% inferior (issue #536): `color-mix` con `--scene-bg` (la
+   misma tinta de escena del placeholder/globo) en vez de un rgba suelto, así el
+   velo queda atado al sistema de color y no a un literal — design-lint no lo
+   marca como color crudo y si `--scene-bg` se recalibra, el velo lo sigue. */
 .card::after {
   content: '';
   position: absolute;
@@ -219,10 +223,10 @@
   z-index: -1;
   background: linear-gradient(
     to top,
-    rgba(18, 24, 32, 0.78) 0%,
-    rgba(18, 24, 32, 0.42) 30%,
-    rgba(18, 24, 32, 0.08) 58%,
-    transparent 78%
+    color-mix(in srgb, var(--scene-bg) 82%, transparent) 0%,
+    color-mix(in srgb, var(--scene-bg) 52%, transparent) 28%,
+    color-mix(in srgb, var(--scene-bg) 14%, transparent) 50%,
+    transparent 60%
   );
 }
 
@@ -256,19 +260,17 @@
   text-wrap: balance;
 }
 
-/* Chip de fechas sobre la foto: pastilla translúcida clara (tono neutro del kit Chip,
-   recoloreada para leer sobre la foto oscura). */
+/* Chip de fechas sobre la foto: mismo vidrio esmerilado que los chips de arriba
+   (tokens --glass-*, clase `lg-glass` en el TSX — issue #536/#541). Aquí solo el
+   posicionamiento; el material (fondo/blur/borde/tinta) lo aporta `lg-glass`. */
 .dates {
   margin-top: var(--space-2);
   align-self: flex-start;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  color: #fff;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
 }
 
-/* Chip de estado sobre foto (pastilla translúcida). */
+/* Chip de estado sobre foto: vidrio esmerilado real (`lg-glass` en el TSX, regla
+   dura #537 — chrome sobre FOTO usa vidrio, nunca un blanco/negro sólido a mano).
+   Aquí solo tamaño y tipografía; el material sale de `lg-glass`. */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -276,11 +278,7 @@
   height: 28px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  color: #fff;
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-wide);
@@ -295,8 +293,6 @@
   animation: homePulse 2.2s ease-out infinite;
 }
 .chipQuiet {
-  background: rgba(18, 24, 32, 0.4);
-  border-color: rgba(255, 255, 255, 0.18);
   text-transform: none;
   letter-spacing: var(--letter-spacing-tight);
   font-weight: var(--font-weight-medium);
@@ -315,7 +311,10 @@
   flex: none;
 }
 
-/* Mini-cinta de mapa (pin) dentro de la tarjeta: pastilla blanca con un icono de pin. */
+/* Mini-cinta de mapa dentro de la tarjeta: mismo vidrio esmerilado que el resto
+   del chrome sobre la foto (antes un disco blanco sólido — ya no: regla dura
+   #537, todo chrome sobre foto es vidrio). `lg-glass` en el TSX aporta el
+   material; aquí solo tamaño y sombra de contacto. */
 .mapChip {
   margin-left: auto;
   display: inline-grid;
@@ -323,9 +322,8 @@
   width: 30px;
   height: 30px;
   border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--accent);
-  box-shadow: var(--shadow-sm);
+  color: var(--scene-ink);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
   flex: none;
 }
 
