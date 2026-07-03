@@ -69,6 +69,15 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
     expect(screen.getByText('En curso')).toBeInTheDocument()
   })
 
+  test('las tarjetas propias llevan la corona y la señal data-owned; las de amigos no', () => {
+    const { container } = render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+    // Solo 'a' es propio en la fixture.
+    const ownedCard = container.querySelector('[data-gid="a"] button[data-owned="true"]')
+    expect(ownedCard).not.toBeNull()
+    expect(container.querySelector('[data-gid="b"] button[data-owned]')).toBeNull()
+    expect(container.querySelector('[data-gid="c"] button[data-owned]')).toBeNull()
+  })
+
   test('"Nuevo viaje" crea un viaje', async () => {
     const onCreateGroup = vi.fn()
     render(
@@ -190,6 +199,110 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
       expect(heroNameOf(container, 'a')).toBeFalsy()
       // Consumo único: no debe quedar pendiente para una vuelta futura sin relación.
       expect(sessionStorage.getItem('lg-hero-trip-id')).toBeNull()
+    })
+  })
+
+  // Filtro Míos/De amigos sobre el carrusel (issue #609). `groups` ya trae mezcla
+  // (a=propio, b y c=de amigos), así que los chips aparecen por defecto en este bloque.
+  describe('filtro Todos · Míos · De amigos (issue #609)', () => {
+    const onlyMine: HomeGroup[] = [
+      { id: 'a', name: "Interrail '26", status: 'toplay', owned: true },
+      { id: 'c', name: 'Pirineos', status: 'idle', owned: true },
+    ]
+    const onlyFriends: HomeGroup[] = [
+      { id: 'b', name: 'Finde Lisboa', status: 'live' },
+      { id: 'c', name: 'Pirineos', status: 'idle' },
+    ]
+
+    test('con mezcla de propios y de amigos, los chips se pintan y "Todos" arranca activo', () => {
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+      const todos = screen.getByRole('button', { name: 'Todos' })
+      expect(todos).toBeInTheDocument()
+      expect(todos).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: 'Míos' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'De amigos' })).toBeInTheDocument()
+    })
+
+    test('si todos los viajes son propios, los chips se ocultan (no aportan)', () => {
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={onlyMine} />)
+      expect(screen.queryByRole('button', { name: 'Todos' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Míos' })).not.toBeInTheDocument()
+      // Sin filtro que aplicar: los dos viajes se ven igualmente.
+      expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Abrir viaje Pirineos' })).toBeInTheDocument()
+    })
+
+    test('si todos los viajes son de amigos, los chips se ocultan (no aportan)', () => {
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={onlyFriends} />)
+      expect(screen.queryByRole('button', { name: 'De amigos' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Abrir viaje Finde Lisboa' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Abrir viaje Pirineos' })).toBeInTheDocument()
+    })
+
+    test('"Míos" deja solo los viajes propios; "De amigos" solo los ajenos', async () => {
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'Míos' }))
+      expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Abrir viaje Finde Lisboa' }),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Abrir viaje Pirineos' })).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'De amigos' }))
+      expect(
+        screen.queryByRole('button', { name: "Abrir viaje Interrail '26" }),
+      ).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Abrir viaje Finde Lisboa' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Abrir viaje Pirineos' })).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Todos' }))
+      expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Abrir viaje Finde Lisboa' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Abrir viaje Pirineos' })).toBeInTheDocument()
+    })
+
+    test('cambiar de filtro salta el activeTargetId del globo al primer viaje visible', async () => {
+      homeGlobeSpy.mockClear()
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'De amigos' }))
+      // sortTrips prioriza 'live' sobre 'idle': 'b' (live) antes que 'c' (idle).
+      const lastCall = homeGlobeSpy.mock.calls.at(-1)?.[0]
+      expect(lastCall.activeTargetId).toBe('b')
+    })
+
+    test('la elección de filtro se recuerda en sessionStorage entre montajes', async () => {
+      const { unmount } = render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+      await userEvent.click(screen.getByRole('button', { name: 'Míos' }))
+      expect(sessionStorage.getItem('lg-home-trip-filter')).toBe('mine')
+      unmount()
+
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={groups} />)
+      expect(screen.getByRole('button', { name: 'Míos' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: 'Abrir viaje Finde Lisboa' }),
+      ).not.toBeInTheDocument()
+    })
+
+    test('filtro sin resultados: aviso corto + botón para volver a "Todos"', async () => {
+      // Filtro guardado de una sesión con mezcla, pero los viajes actuales ya no la
+      // tienen (p.ej. los viajes de amigos desaparecieron): los chips se ocultan
+      // (mismo criterio de "no aporta"), pero el filtro sigue aplicado — el
+      // carrusel quedaría vacío sin este aviso.
+      sessionStorage.setItem('lg-home-trip-filter', 'friends')
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={onlyMine} />)
+
+      expect(screen.queryByRole('button', { name: 'De amigos' })).not.toBeInTheDocument()
+      expect(screen.getByText('No tienes viajes de amigos con este filtro.')).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: "Abrir viaje Interrail '26" }),
+      ).not.toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: 'Ver todos' }))
+      expect(screen.getByRole('button', { name: "Abrir viaje Interrail '26" })).toBeInTheDocument()
+      expect(sessionStorage.getItem('lg-home-trip-filter')).toBe('all')
     })
   })
 })
