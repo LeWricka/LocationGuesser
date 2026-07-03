@@ -1,7 +1,12 @@
 /* Showcase de la landing deslogueada (issue #462): CAPTURAS REALES del producto en
  * marcos de móvil dibujados en CSS, estilo Polarsteps (imagen de producto real sobre
  * composición editorial). Sin imágenes externas ni CDNs: el teléfono es puro CSS.
- * Móvil-first, sin overflow a 320px, con tokens del sistema "Atelier/Pizarra". */
+ * Móvil-first, sin overflow a 320px, con tokens del sistema "Atelier/Pizarra".
+ *
+ * REDISEÑO INMERSIVO (issue #622): vive sobre la escena oscura continua de la
+ * landing (--scene-bg), no sobre papel — tinta `--scene-ink*` y la tarjeta del
+ * bucle final en vidrio (`.lg-glass`, regla dura #537: chrome sobre foto/escena
+ * usa vidrio, nunca un bloque opaco a mano). */
 
 .root {
   width: 100%;
@@ -35,7 +40,9 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
-  color: var(--color-accent);
+  /* Teal ACLARADO (no `--color-accent`, pensado para chrome sobre PAPEL): sobre
+   * `--scene-bg` no llega a 4.5:1. Mezclado con blanco sigue atado al token. */
+  color: color-mix(in srgb, var(--accent) 55%, white);
 }
 
 .title {
@@ -46,7 +53,7 @@
   line-height: var(--line-height-tight);
   letter-spacing: var(--letter-spacing-tight);
   text-wrap: balance;
-  color: var(--color-text);
+  color: var(--scene-ink);
 }
 
 .lede {
@@ -54,7 +61,7 @@
   max-width: 40ch;
   font-size: var(--font-size-md);
   line-height: var(--line-height-normal);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
   text-wrap: pretty;
 }
 
@@ -71,6 +78,10 @@
   padding: var(--space-2);
   border-radius: var(--radius-xl);
   background: var(--ink-900);
+  /* Borde de contacto tenue (issue #622): sobre la escena oscura continua el bezel
+   * oscuro se fundía con el fondo sin este canto — mismo `--glass-border` que usa
+   * el resto del chrome flotante sobre escena. */
+  border: 1px solid var(--glass-border);
   box-shadow: var(--scene-shadow);
 }
 
@@ -116,13 +127,15 @@
 }
 
 /* ── Relato del bucle + CTA ──────────────────────────────────────────────────── */
+/* Vidrio (issue #622, regla dura #537): flota sobre la escena oscura continua;
+ * el material (fondo/blur/borde/tinta) lo aporta `.lg-glass` en el TSX, aquí solo
+ * forma/espaciado. */
 .loopSection {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   padding: var(--space-6) var(--space-5);
   border-radius: var(--radius-lg);
-  background: var(--color-accent-soft);
   text-align: center;
 }
 
@@ -133,7 +146,7 @@
   font-size: var(--font-size-xl);
   line-height: var(--line-height-tight);
   letter-spacing: var(--letter-spacing-tight);
-  color: var(--color-text);
+  color: var(--scene-ink);
 }
 
 .loop {
@@ -170,13 +183,13 @@
 .loopText {
   font-size: var(--font-size-md);
   line-height: var(--line-height-snug);
-  color: var(--color-text);
+  color: var(--scene-ink);
 }
 
 .loopFoot {
   margin: 0;
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
 }
 
 /* Desktop: título con más aire y la diapositiva pasa a dos columnas (texto | móvil),

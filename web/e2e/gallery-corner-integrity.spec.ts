@@ -23,15 +23,23 @@ import { type Route, expect, test } from '@playwright/test'
 // así que el hueco SÍ se manifiesta si el faldón de papel de la hoja desaparece.
 
 // Caso(s) que usan el patrón globo + hoja (GlobeSheet) HOY: la bienvenida sin viajes
-// (HomePage, rama sin grupos) y la landing deslogueada. La home logueada CON viajes
-// (home-dashboard-lleno / home-con-datos) dejó de tener hoja en la home inmersiva
-// (issue #568: escena única, sin papel) — su guardia de reemplazo es el test del dock
-// de abajo. Si se añade otra pantalla con hoja sobre escena oscura, se añade aquí.
-const SHEET_CASES = ['home-vacia', 'landing-generica']
+// (HomePage, rama sin grupos). La home logueada CON viajes (home-dashboard-lleno /
+// home-con-datos) dejó de tener hoja en la home inmersiva (issue #568: escena única,
+// sin papel) — su guardia de reemplazo es el test del dock de abajo. La landing
+// deslogueada dejó IGUALMENTE de tener hoja (issue #622: escena única, sin papel,
+// misma regla que #568) — su guardia de reemplazo es el test de la landing inmersiva
+// más abajo. Si se añade otra pantalla con hoja sobre escena oscura, se añade aquí.
+const SHEET_CASES = ['home-vacia']
 
 // Caso(s) de la home INMERSIVA (sin hoja, issue #568): la guardia aquí es que el dock
 // del carrusel ("Tus viajes") está visible y la pantalla no desborda a 320px.
 const IMMERSIVE_CASES = ['home-dashboard-lleno', 'home-con-datos', 'home-globo-pines-cercanos']
+
+// Caso(s) de la LANDING inmersiva (sin hoja, issue #622): la guardia es que el CTA
+// principal está visible y la pantalla no desborda a 320px (mismo criterio que la
+// home inmersiva, adaptado — la landing no tiene carrusel).
+const LANDING_IMMERSIVE_CASES = ['landing-generica', 'landing-por-invitacion']
+
 const NARROW_VP = { width: 320, height: 568 }
 
 // Viewport ALTO: reproduce el móvil del dueño (1080×2400 ≈ ratio 2.2). deviceScaleFactor 3
@@ -248,6 +256,50 @@ test('home inmersiva: el carrusel de viajes es visible y no desborda a 320px', a
     problems,
     'Home inmersiva ROTA — el dock del carrusel debe flotar sobre la escena sin\n' +
       'desbordar el documento. Detalle:\n\n' +
+      problems.join('\n\n'),
+  ).toEqual([])
+})
+
+// Guardia de REEMPLAZO para la landing inmersiva (issue #622): la landing dejó de
+// tener hoja de papel (escena oscura continua, misma regla que #568). Lo que debe
+// aguantar es el CTA principal visible (sin él no hay forma de entrar) y que la
+// pantalla no desborde a 320px (el héroe a sangre + el scroll continuo no deben
+// generar overflow horizontal del documento).
+test('landing inmersiva: el CTA es visible y no desborda a 320px', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ baseURL, viewport: NARROW_VP })
+  await context.route('**/*', blockExternal)
+  const page = await context.newPage()
+
+  const problems: string[] = []
+
+  for (const caseId of LANDING_IMMERSIVE_CASES) {
+    await page.goto(`/gallery.html?case=${encodeURIComponent(caseId)}`)
+    await page.waitForLoadState('networkidle')
+    await page.evaluate(() => document.fonts?.ready)
+    await expect(page.locator('#root')).not.toBeEmpty()
+
+    // El CTA principal ("Empieza a compartir" / "Únete al viaje") debe verse.
+    const cta = page.getByTestId('open-auth')
+    await expect(cta, `[${caseId}] el CTA principal debe ser visible`).toBeVisible()
+
+    // Sin overflow horizontal del DOCUMENTO a 320px.
+    const overflow = await page.evaluate(() => {
+      const el = document.documentElement
+      return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth }
+    })
+    if (overflow.scrollWidth > overflow.clientWidth) {
+      problems.push(
+        `[${caseId}] desborda a 320px: scrollWidth=${overflow.scrollWidth} > clientWidth=${overflow.clientWidth}`,
+      )
+    }
+  }
+
+  await context.close()
+
+  expect(
+    problems,
+    'Landing inmersiva ROTA — el héroe/escena no debe desbordar el documento.\n' +
+      'Detalle:\n\n' +
       problems.join('\n\n'),
   ).toEqual([])
 })

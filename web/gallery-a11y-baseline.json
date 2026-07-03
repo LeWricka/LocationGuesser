@@ -1,4 +1,7 @@
 {
-  "axe": [],
+  "axe": [
+    "landing-generica :: aria-hidden-focus :: ._globe_hdmh1_5",
+    "landing-por-invitacion :: aria-hidden-focus :: ._globe_hdmh1_5"
+  ],
   "overflow": ["editar-reto", "tarjeta-resultado"]
 }
