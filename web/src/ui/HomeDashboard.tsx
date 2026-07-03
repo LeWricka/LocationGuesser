@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties } from 'react'
 import { Crown, MapPin, Play, Plus, Settings } from 'lucide-react'
 import { Avatar } from './Avatar'
-import { Banner } from './Banner'
-import { Button } from './Button'
 import { Chip } from './Chip'
 import { Icon } from './Icon'
 import type { GroupStatus } from './GroupCard'
-import { GlobeSheet } from './GlobeSheet'
+import { HomeGlobe } from './HomeGlobe'
 import type { GlobePin } from './HomeGlobe'
 import { IconPin, LogoTabide, WordmarkTabide } from './icons'
 import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
@@ -30,11 +29,11 @@ export interface HomeGroup {
   createdAt?: string
 }
 
-/** Reto abierto fijado arriba ("Te toca jugar"): foto + cuenta atrás + CTA jugar. */
+/** Reto abierto fijado ("Te toca jugar"): foto + cuenta atrás + CTA jugar. */
 export interface HomePinned {
   groupId: string
   challengeId: string
-  /** Título del reto (encabezado de la tarjeta destacada). */
+  /** Título del reto (la pregunta corta del chip). */
   title: string
   /** Nombre del viaje al que pertenece (subtítulo). */
   groupName: string | null
@@ -44,9 +43,9 @@ export interface HomePinned {
   coverUrl?: string | null
 }
 
-// Orden del feed: PRIMERO los viajes que piden acción (te toca → en juego), luego el
-// resto por más reciente. Así lo que urge sube en la lista (el reto concreto, además,
-// va fijado arriba como banner).
+// Orden del carrusel: PRIMERO los viajes que piden acción (te toca → en juego), luego
+// el resto por más reciente. Así lo que urge queda más a mano (el reto concreto,
+// además, va fijado en el chip de vidrio flotante).
 function actionRank(status: GroupStatus): number {
   if (status === 'toplay') return 0 // te toca jugar
   if (status === 'live') return 1 // hay reto abierto
@@ -105,7 +104,7 @@ interface Props {
   groups?: HomeGroup[]
   /** Pines-foto de los viajes para el globo héroe (los situados; los compone HomePage). */
   pins?: GlobePin[]
-  /** Reto abierto a fijar arriba ("Te toca jugar"). Sin reto → no se fija nada. */
+  /** Reto abierto a fijar en el chip ("Te toca jugar"). Sin reto → no se pinta nada. */
   pinned?: HomePinned | null
   onOpenProfile?: () => void
   onCreateGroup?: () => void
@@ -115,12 +114,18 @@ interface Props {
   className?: string
 }
 
-// Layout presentacional de la home logueada — patrón GLOBO + HOJA (referencia
-// Polarsteps): globo héroe a sangre arriba (con los pines-foto de tus viajes, tocables) y
-// una HOJA BLANCA debajo con el contenido legible: un Banner "Te toca jugar" si hay reto
-// pendiente, la sección "Tus viajes" con tarjetas-portada y el FAB "+" constante. La
-// marca "Tabide" y los ajustes flotan en un overlay mínimo sobre el globo. El feed va EN
-// la hoja (legible), no sobre el globo oscuro.
+/** Id sentinela de la tarjeta "Nuevo viaje" (no es un viaje real: sin targetId). */
+const NEW_TRIP_SENTINEL = ''
+
+// Layout presentacional de la home logueada — ESCENA ÚNICA inmersiva (issue #568,
+// sin hoja blanca): el globo llena la pantalla a sangre (misma gramática que la
+// sección Diario del viaje: mapa a sangre + dock inferior flotante) y TODO el
+// chrome —marca, ajustes, chip "Te toca jugar", carrusel de viajes— flota encima con
+// vidrio/tinta de escena. La tarjeta CENTRADA del carrusel manda: su id enciende el
+// pin del globo (`activeTargetId`, contrato de #567) y su portada tiñe la escena de
+// ambiente (`useAmbientTint`). Antes había una hoja de papel debajo del globo (#536);
+// la regla de sistema nueva es ESCENA = inmersivo oscuro, TAREA = papel — esta
+// pantalla es pura escena.
 export function HomeDashboard({
   userId,
   displayName,
@@ -135,119 +140,186 @@ export function HomeDashboard({
   className,
 }: Props) {
   const feed = sortTrips(groups)
+  const carouselRef = useRef<HTMLUListElement>(null)
+
+  // Tarjeta centrada del carrusel: arranca en el primer viaje (el que más urge, ver
+  // sortTrips). '' = la tarjeta "Nuevo viaje" está centrada (sin viaje activo).
+  const [activeId, setActiveId] = useState<string>(feed[0]?.id ?? NEW_TRIP_SENTINEL)
+  const activeTrip = feed.find((g) => g.id === activeId) ?? null
+  const tint = useAmbientTint(activeTrip?.coverUrl ?? null)
+
+  // Scroll-sync del carrusel (mismo patrón que TripPage/TripDiario): tras cada
+  // scroll, con un pequeño reposo (140ms) para no recalcular en cada frame,
+  // seleccionamos la tarjeta más cercana al centro del visor.
+  useEffect(() => {
+    const el = carouselRef.current
+    if (!el) return
+    let settleTimer: number | null = null
+
+    const syncToCenteredCard = () => {
+      const center = el.scrollLeft + el.clientWidth / 2
+      let closestId = NEW_TRIP_SENTINEL
+      let closestDist = Infinity
+      for (const slide of el.querySelectorAll<HTMLElement>('[data-gid]')) {
+        const slideCenter = slide.offsetLeft + slide.offsetWidth / 2
+        const dist = Math.abs(slideCenter - center)
+        if (dist < closestDist) {
+          closestDist = dist
+          closestId = slide.dataset.gid ?? NEW_TRIP_SENTINEL
+        }
+      }
+      setActiveId(closestId)
+    }
+
+    const onScroll = () => {
+      if (settleTimer != null) window.clearTimeout(settleTimer)
+      settleTimer = window.setTimeout(syncToCenteredCard, 140)
+    }
+
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (settleTimer != null) window.clearTimeout(settleTimer)
+    }
+  }, [feed])
 
   return (
-    <GlobeSheet
-      pins={pins}
-      onOpenPin={onOpenGroup}
-      sheetLabel="Tus viajes"
-      fab={
+    <div className={[styles.scene, className].filter(Boolean).join(' ')}>
+      {/* Globo A SANGRE: llena la escena entera (protagonista, misma gramática que el
+          Diario). El pin del viaje centrado en el carrusel se enciende vía
+          `activeTargetId` — #567 añade esta prop a HomeGlobe (vuelo suave + anillo
+          "lead"); aquí ya la consumimos según el contrato acordado entre ambas piezas. */}
+      <div className={styles.globeLayer}>
+        <HomeGlobe
+          pins={pins}
+          onOpenPin={onOpenGroup}
+          framing="pins"
+          activeTargetId={activeId || null}
+        />
+      </div>
+
+      {/* Tinte ambiental: color medio de la portada del viaje centrado (o el fallback
+          teal fijo si no hay portada o el canvas queda "tainted" por CORS). Sutil,
+          radial, se funde 600ms al cambiar de tarjeta. */}
+      <div
+        className={styles.tint}
+        style={tint ? ({ '--tint-color': tint } as CSSProperties) : undefined}
+        data-visible={activeTrip ? 'true' : undefined}
+        aria-hidden="true"
+      />
+
+      {/* Chrome superior: marca + ajustes + avatar, igual que antes (tinta de escena). */}
+      <div className={styles.overlay}>
+        <span className={styles.brand}>
+          {/* Variante `oscuro`: el símbolo lleva su paleta propia (papel + oro + teal)
+              sobre la escena oscura del globo, en vez de aplanarse a un solo tono. */}
+          <LogoTabide variant="oscuro" size={22} />
+          <WordmarkTabide size={18} />
+        </span>
         <button
           type="button"
-          className={styles.fab}
-          onClick={onCreateGroup}
-          aria-label="Empezar un viaje nuevo"
+          className={styles.sceneButton}
+          onClick={onOpenProfile}
+          aria-label="Abrir tus ajustes"
         >
-          <Icon icon={Plus} size={26} />
+          <Icon icon={Settings} size={20} />
         </button>
-      }
-      overlay={
-        <>
-          <span className={styles.brand}>
-            {/* Variante `oscuro`: el símbolo lleva su paleta propia (papel + oro + teal)
-                sobre la escena oscura del globo, en vez de aplanarse a un solo tono. */}
-            <LogoTabide variant="oscuro" size={22} />
-            <WordmarkTabide size={18} />
+        <button
+          type="button"
+          className={styles.avatarButton}
+          onClick={onOpenProfile}
+          aria-label="Abrir tu perfil"
+        >
+          <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
+        </button>
+      </div>
+
+      {/* Deja respirar la escena entre el chrome y el chip/dock (el globo se ve). */}
+      <div className={styles.spacer} aria-hidden="true" />
+
+      {/* Reto fijado: chip de vidrio flotante y corto (la pregunta del reto), tap →
+          jugar. Sustituye al Banner ancho de la hoja de papel; sin reto pendiente no
+          se pinta nada. */}
+      {pinned && <PinnedChip pinned={pinned} onPlay={onPlayPinned} />}
+
+      {/* Dock inferior: label "Tus viajes" + carrusel de tarjetas-foto flotando sobre
+          la escena (misma gramática que el dock del Diario). Snap al centro; la
+          tarjeta activa manda (globo + tinte). Cierra con "Nuevo viaje" — SIN FAB
+          aparte: sería un "+" redundante con esta tarjeta (mismo criterio que ya usa
+          la bienvenida sin viajes, ver HomePage). */}
+      <div className={styles.dock}>
+        <div className={styles.dockHead}>
+          <h2 className={styles.dockLabel}>Tus viajes</h2>
+          <span className={styles.dockCount}>
+            {feed.length === 1 ? '1 viaje' : `${feed.length} viajes`}
           </span>
-          <button
-            type="button"
-            className={styles.sceneButton}
-            onClick={onOpenProfile}
-            aria-label="Abrir tus ajustes"
-          >
-            <Icon icon={Settings} size={20} />
-          </button>
-          <button
-            type="button"
-            className={styles.avatarButton}
-            onClick={onOpenProfile}
-            aria-label="Abrir tu perfil"
-          >
-            <Avatar userId={userId} name={displayName} avatarUrl={avatarUrl} size="sm" />
-          </button>
-        </>
-      }
-    >
-      <div className={[styles.content, className].filter(Boolean).join(' ')}>
-        {/* Reto fijado arriba: lo urgente, como Banner del kit. Sin reto → nada. */}
-        {pinned && <PinnedBanner pinned={pinned} onPlay={onPlayPinned} />}
+        </div>
 
-        {/* Feed de viajes: una portada por fila, scroll de la hoja. */}
-        <section aria-label="Tus viajes" className={styles.feed}>
-          <div className={styles.feedHead}>
-            <h2 className={styles.feedTitle}>Tus viajes</h2>
-            <span className={styles.feedCount}>
-              {feed.length === 1 ? '1 viaje' : `${feed.length} viajes`}
-            </span>
-          </div>
-
+        <ul ref={carouselRef} className={styles.carousel} aria-label="Tus viajes">
           {feed.map((group) => (
-            <TripCard
-              key={group.id}
-              group={group}
-              className={styles.rise}
-              onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
-            />
+            <li key={group.id} className={styles.slide} data-gid={group.id}>
+              <TripCard
+                group={group}
+                active={group.id === activeId}
+                onFocus={() => setActiveId(group.id)}
+                onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+              />
+            </li>
           ))}
 
-          {/* Cierre del feed: empezar un viaje (estado de crecimiento). */}
-          <button
-            type="button"
-            className={[styles.newCard, 'lg-press'].join(' ')}
-            onClick={onCreateGroup}
-          >
-            <span className={styles.newIcon} aria-hidden="true">
-              <Icon icon={Plus} size={22} />
-            </span>
-            <span className={styles.newText}>
-              <strong>Empieza un viaje</strong>
-              <span>Comparte tus momentos de una forma diferente.</span>
-            </span>
-          </button>
-        </section>
+          {/* Cierre del carrusel: empezar un viaje (estado de crecimiento). */}
+          <li className={styles.slide} data-gid={NEW_TRIP_SENTINEL}>
+            <button
+              type="button"
+              className={['lg-press', styles.newCard].join(' ')}
+              data-active={activeId === NEW_TRIP_SENTINEL}
+              onFocus={() => setActiveId(NEW_TRIP_SENTINEL)}
+              onClick={onCreateGroup}
+              aria-label="Empezar un viaje nuevo"
+            >
+              <span className={styles.newIcon} aria-hidden="true">
+                <Icon icon={Plus} size={22} />
+              </span>
+              <span className={styles.newText}>Nuevo viaje</span>
+            </button>
+          </li>
+        </ul>
       </div>
-    </GlobeSheet>
+    </div>
   )
 }
 
-// Banner "Te toca jugar": aviso ancho con el título del reto, su viaje + cuenta atrás y un
-// CTA primario "Jugar". Usa el componente Banner del kit (tono oferta = lo urgente, oro).
-function PinnedBanner({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => void }) {
+// Chip "Te toca jugar": vidrio flotante y corto, la pregunta del reto + CTA implícito
+// (todo el chip es el botón). Countdown solo si hay plazo (recuerdo → sin plazo, se
+// omite).
+function PinnedChip({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => void }) {
   const countdown = useCountdown(pinned.deadlineAt)
-  const meta = [pinned.groupName ? `Viaje a ${pinned.groupName}` : null, countdown]
-    .filter(Boolean)
-    .join(' · ')
+  const meta = [pinned.groupName, countdown].filter(Boolean).join(' · ')
 
   return (
-    <Banner
-      tone="oferta"
-      className={[styles.pinned, styles.rise].join(' ')}
-      action={
-        <Button size="sm" onClick={onPlay} disabled={typeof onPlay !== 'function'}>
-          <Icon icon={Play} size={16} /> Jugar
-        </Button>
-      }
+    <button
+      type="button"
+      className={[styles.pinnedChip, 'lg-glass', 'lg-press'].join(' ')}
+      onClick={onPlay}
+      disabled={typeof onPlay !== 'function'}
     >
-      <span className={styles.pinnedLabel}>Te toca jugar</span>
-      <span className={styles.pinnedTitle}>{pinned.title}</span>
-      {meta && <span className={styles.pinnedMeta}>{meta}</span>}
-    </Banner>
+      <span className={styles.pinnedIcon} aria-hidden="true">
+        <Icon icon={Play} size={16} />
+      </span>
+      <span className={styles.pinnedBody}>
+        <span className={styles.pinnedLabel}>Te toca jugar</span>
+        <span className={styles.pinnedTitle}>{pinned.title}</span>
+        {meta && <span className={styles.pinnedMeta}>{meta}</span>}
+      </span>
+    </button>
   )
 }
 
-// Tarjeta-portada de un viaje del feed: la FOTO es la tarjeta. Velo inferior, nombre
-// serif sobre el velo, fechas (chip) + estado, corona si es tuyo y mini-cinta de mapa.
-// Tocar abre el viaje. La foto es decorativa (la etiqueta del botón da el nombre).
+// Tarjeta-portada de un viaje del carrusel: la FOTO es la tarjeta, tamaño compacto
+// (~190×148, ver `.slide`). Velo inferior, nombre serif sobre el velo, fechas (chip) +
+// estado, corona si es tuyo y mini-cinta de mapa. Tocar abre el viaje; la tarjeta
+// CENTRADA (`active`) va a opacidad/escala plenas, las demás atenuadas (issue #568,
+// sin animar bajo `prefers-reduced-motion`: transición "a corte").
 //
 // Avatares del grupo (issue #536, punto 5): NO se pintan todavía. `HomeGroup` (y
 // `MyGroup` en lib/membership) no traen miembros/avatares del viaje, solo metadatos
@@ -256,12 +328,14 @@ function PinnedBanner({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => v
 // junto a `.mapChip`, en `.cardTop`.
 function TripCard({
   group,
+  active,
   onClick,
-  className,
+  onFocus,
 }: {
   group: HomeGroup
+  active: boolean
   onClick?: () => void
-  className?: string
+  onFocus?: () => void
 }) {
   const isButton = typeof onClick === 'function'
   const dates = formatTripDates(group.startsOn, group.endsOn)
@@ -275,8 +349,10 @@ function TripCard({
   return (
     <button
       type="button"
-      className={[styles.card, 'lg-press', className].filter(Boolean).join(' ')}
+      className={['lg-press', styles.card].join(' ')}
+      data-active={active}
       onClick={onClick}
+      onFocus={onFocus}
       disabled={!isButton}
       aria-label={`Abrir viaje ${group.name}`}
     >
@@ -288,17 +364,16 @@ function TripCard({
         />
       ) : (
         // Sin portada todavía: fondo discreto de "mapa nocturno" (gradiente grafito/teal
-        // con tokens de escena) más un pin a tamaño moderado y baja opacidad. Antes iba
-        // una inicial gigante como marca de agua: parecía un bug y pisaba los chips.
+        // con tokens de escena) más un pin a tamaño moderado y baja opacidad.
         <span className={styles.placeholder} aria-hidden="true">
-          <IconPin size={44} className={styles.placeholderIcon} />
+          <IconPin size={32} className={styles.placeholderIcon} />
         </span>
       )}
       <span className={styles.cardBody}>
         <span className={styles.cardTop}>
           {group.owned && (
             <span className={styles.crown} title="Es tu viaje" aria-hidden="true">
-              <Icon icon={Crown} size={15} />
+              <Icon icon={Crown} size={12} />
             </span>
           )}
           {live ? (
@@ -310,7 +385,7 @@ function TripCard({
             <span className={[styles.chip, styles.chipQuiet, 'lg-glass'].join(' ')}>Cerrado</span>
           ) : null}
           <span className={[styles.mapChip, 'lg-glass'].join(' ')} aria-hidden="true">
-            <Icon icon={MapPin} size={13} />
+            <Icon icon={MapPin} size={11} />
           </span>
         </span>
 
@@ -349,8 +424,72 @@ function useAutoCover(name: string | null): string | null {
   return resolved && resolved.name === name ? resolved.url : null
 }
 
+/**
+ * Tinte ambiental de la escena: color medio de la portada del viaje CENTRADO,
+ * muestreado con canvas (imagen pequeña, `crossOrigin="anonymous"`). Si el canvas
+ * queda "tainted" (CORS) o la imagen falla al cargar, devuelve `null` en silencio —
+ * el CSS cae entonces al fallback fijo (`--accent`, teal cálido de marca). Nunca
+ * lanza ni bloquea el render de la escena.
+ */
+function useAmbientTint(coverUrl: string | null): string | null {
+  const [color, setColor] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!coverUrl) {
+      // Sin portada: estado terminal (fallback fijo vía CSS), no un ciclo de sync.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- estado terminal sin portada
+      setColor(null)
+      return
+    }
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      if (cancelled) return
+      try {
+        const size = 12
+        const canvas = document.createElement('canvas')
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        ctx.drawImage(img, 0, 0, size, size)
+        const { data } = ctx.getImageData(0, 0, size, size)
+        let r = 0
+        let g = 0
+        let b = 0
+        let n = 0
+        for (let i = 0; i < data.length; i += 4) {
+          r += data[i]
+          g += data[i + 1]
+          b += data[i + 2]
+          n += 1
+        }
+        if (n === 0 || cancelled) return
+        const channel = (sum: number) =>
+          Math.round(sum / n)
+            .toString(16)
+            .padStart(2, '0')
+        setColor(`#${channel(r)}${channel(g)}${channel(b)}`)
+      } catch {
+        // Canvas "tainted" (CORS) u otro fallo de lectura de píxeles: fallback silencioso.
+        if (!cancelled) setColor(null)
+      }
+    }
+    img.onerror = () => {
+      if (!cancelled) setColor(null)
+    }
+    img.src = coverUrl
+    return () => {
+      cancelled = true
+    }
+  }, [coverUrl])
+
+  return color
+}
+
 // Cuenta atrás VIVA del plazo del reto fijado: refresca cada minuto. Sin plazo
-// (recuerdo) → null: el banner omite la cuenta atrás.
+// (recuerdo) → null: el chip omite la cuenta atrás.
 function useCountdown(deadlineIso: string | null): string | null {
   const [now, setNow] = useState(() => Date.now())
 
