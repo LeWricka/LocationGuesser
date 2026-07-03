@@ -1,12 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Tabide">
   <!-- Maskable: el SO recorta a círculo/squircle. Fondo de acento a sangre y el
-       símbolo en papel dentro de la safe zone central (~80%). -->
+       símbolo (issue #538) en su variante oscuro dentro de la safe zone central (~80%). -->
   <rect width="512" height="512" fill="#34506b"/>
-  <g transform="translate(256 256) scale(8.6) translate(-16 -15.5)">
-    <path fill="#f6f7f9" fill-rule="evenodd"
-      d="M16 2.5c-5.06 0-9.16 4.04-9.16 9.02 0 3.2 1.9 6.18 4.05 8.52 2.16 2.35 4.6 4.07 5.11 4.42a1 1 0 0 0 1.14 0c.51-.35 2.95-2.07 5.11-4.42 2.15-2.34 4.05-5.32 4.05-8.52 0-4.98-4.1-9.02-9.16-9.02Zm0 5.42a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2Z"/>
-    <circle cx="26.7" cy="5.3" r="1.6" fill="#f6f7f9"/>
-    <circle cx="5.4" cy="24.6" r="1.25" fill="#f6f7f9" opacity="0.7"/>
-    <circle cx="25.6" cy="23.4" r="1" fill="#f6f7f9" opacity="0.55"/>
+  <g transform="translate(256 256) scale(4.1) translate(-32 -32)">
+    <path
+      d="M32 4C19.3 4 9 14.1 9 26.6 9 42 32 60 32 60s23-18 23-33.4C55 14.1 44.7 4 32 4Z"
+      fill="#FBFBF9"
+    />
+    <path
+      d="M20 40 C20 30, 30 34, 32 26 C34 19, 40 20, 42 15"
+      fill="none"
+      stroke="#B98A2F"
+      stroke-width="3.4"
+      stroke-linecap="round"
+      stroke-dasharray="0.5 7.5"
+    />
+    <circle cx="43" cy="14" r="4.6" fill="#0F766E" stroke="#1F2A30" stroke-width="2"/>
   </g>
 </svg>

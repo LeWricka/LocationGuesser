@@ -5,11 +5,10 @@ import { Banner } from './Banner'
 import { Button } from './Button'
 import { Chip } from './Chip'
 import { Icon } from './Icon'
-import { Logo } from './Logo'
 import type { GroupStatus } from './GroupCard'
 import { GlobeSheet } from './GlobeSheet'
 import type { GlobePin } from './HomeGlobe'
-import { IconPin } from './icons'
+import { IconPin, LogoTabide, WordmarkTabide } from './icons'
 import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
 import styles from './HomeDashboard.module.css'
 
@@ -155,7 +154,10 @@ export function HomeDashboard({
       overlay={
         <>
           <span className={styles.brand}>
-            <Logo variant="wordmark" size={20} monochrome />
+            {/* Variante `oscuro`: el símbolo lleva su paleta propia (papel + oro + teal)
+                sobre la escena oscura del globo, en vez de aplanarse a un solo tono. */}
+            <LogoTabide variant="oscuro" size={22} />
+            <WordmarkTabide size={18} />
           </span>
           <button
             type="button"

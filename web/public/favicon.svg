@@ -1,23 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Tabide">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Tabide">
   <!--
-    Marca "Tabide": un pin/gota de mapa con el centro hueco (un "lugar"
-    señalado) acompañado de tres puntos en constelación = lugares compartidos.
-    Sobrio y editorial. Acento azul pizarra (#34506b). Sin dependencias externas.
+    Marca "Tabide": el símbolo "el camino dentro del pin" (issue #538, geometría
+    máster del dueño) — variante FAVICON, con trazos engordados para legibilidad
+    a 16-32px. Pin grafito, ruta punteada en oro hasta un destino teal.
   -->
-  <defs>
-    <linearGradient id="lg-pin" x1="16" y1="2.5" x2="16" y2="29" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#3d5c7a" />
-      <stop offset="1" stop-color="#2a4256" />
-    </linearGradient>
-  </defs>
-  <!-- Pin: gota simétrica con punta inferior. Centro hueco (regla par-impar). -->
   <path
-    fill="url(#lg-pin)"
-    fill-rule="evenodd"
-    d="M16 2.5c-5.06 0-9.16 4.04-9.16 9.02 0 3.2 1.9 6.18 4.05 8.52 2.16 2.35 4.6 4.07 5.11 4.42a1 1 0 0 0 1.14 0c.51-.35 2.95-2.07 5.11-4.42 2.15-2.34 4.05-5.32 4.05-8.52 0-4.98-4.1-9.02-9.16-9.02Zm0 5.42a3.6 3.6 0 1 1 0 7.2 3.6 3.6 0 0 1 0-7.2Z"
+    d="M32 3C18.7 3 8 13.6 8 26.7 8 42.8 32 61 32 61s24-18.2 24-34.3C56 13.6 45.3 3 32 3Z"
+    fill="#1F2A30"
   />
-  <!-- Constelación: tres puntos satélite (lugares compartidos), en arco. -->
-  <circle cx="26.7" cy="5.3" r="1.6" fill="#34506b" />
-  <circle cx="5.4" cy="24.6" r="1.25" fill="#34506b" opacity="0.7" />
-  <circle cx="25.6" cy="23.4" r="1" fill="#34506b" opacity="0.5" />
+  <path
+    d="M20 41 C20 30, 30 34, 32 26 C34 18.5, 40 20, 42.5 14.5"
+    fill="none"
+    stroke="#D9B96A"
+    stroke-width="5"
+    stroke-linecap="round"
+    stroke-dasharray="0.5 9"
+  />
+  <circle cx="44" cy="13.5" r="6.2" fill="#0F766E" stroke="#FBFBF9" stroke-width="2.4" />
 </svg>

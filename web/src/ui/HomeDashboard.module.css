@@ -8,6 +8,7 @@
 .brand {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   margin-right: auto; /* empuja ajustes/avatar a la derecha */
   color: var(--scene-ink);
 }
