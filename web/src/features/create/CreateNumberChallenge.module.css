@@ -1,166 +1,202 @@
-/* Crear reto de NÚMERO ("¿Cuánto?", #323). Mismo lenguaje que el flujo inmersivo
-   de lugar (foto-hero + hoja que crece por etapas) pero SIN mapa: la "respuesta"
-   es una cifra que queda oculta. Reutiliza la hoja de CreateChallengeImmersive
-   (clases `sheet.*`); aquí solo el hero y lo específico del número. */
+/* Crear reto de NÚMERO ("¿Adivinas?", #586). ShellUtilitario (hoja limpia sobre
+   --paper): sin backdrop oscuro, sin zona muerta — es un formulario, no una
+   escena con protagonista visual. Mismo lenguaje que CreateGroup.module.css
+   (progreso por puntos, dirección de paso, campos de papel), pero con tokens
+   del sistema (nada hardcodeado: design-lint en verde de fábrica). */
 
 .root {
   position: fixed;
   inset: 0;
-  z-index: 1000;
-  overflow: hidden;
-  background: #0b1016;
+  z-index: var(--z-modal);
   isolation: isolate;
   font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
   color: var(--ink-900);
 }
 
-/* ── Foto-hero ── */
-.hero {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: calc(env(safe-area-inset-top, 0px) + 16px) 18px 0;
-}
-.heroImg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 0;
-}
-/* Sin foto: degradado neutro de la marca (cálido, distinto del satélite del lugar). */
-.heroNeutral {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: linear-gradient(150deg, #34506b 0%, #233646 55%, #18202b 100%);
-}
-.heroVeil {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.42) 0%,
-    rgba(0, 0, 0, 0.12) 28%,
-    rgba(0, 0, 0, 0.55) 100%
-  );
-}
-
-.heroTop {
-  position: relative;
-  z-index: 2;
+/* ---- indicador de progreso ---------------------------------------- */
+.progress {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  margin-bottom: var(--space-4, 16px);
 }
-.iconBtn {
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  background: rgba(18, 26, 36, 0.42);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  color: #fff;
+.progressDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--hairline-soft);
+  transition: background var(--motion-transition-base);
 }
-.iconBtn svg {
-  width: 20px;
-  height: 20px;
+.progressActive {
+  background: var(--accent);
 }
-.kindChip {
+
+/* ============ ETAPAS (contenido de la hoja) ============== */
+/* Dirección del paso (#531): avanzar entra desde la derecha, volver desde la
+   izquierda. `animation-fill-mode: backwards` (NUNCA `forwards`/`both`) deja el
+   elemento sin transform en reposo al terminar. */
+.stage {
+  animation: stageInForward var(--motion-duration-base) var(--motion-ease-emphasized) backwards;
+}
+.stage.stepBack {
+  animation-name: stageInBackward;
+}
+@keyframes stageInForward {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes stageInBackward {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 11px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(169, 134, 67, 0.85);
-  color: #fff;
-  font-size: 12px;
+  gap: 7px;
+  font-size: var(--font-size-xs);
   font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--accent);
 }
-.topTitle {
-  margin-left: auto;
-  text-align: right;
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
 }
-.topTitle small {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 11px;
-  text-shadow: 0 1px 6px rgba(11, 16, 22, 0.6);
+.h {
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-tight);
+  margin: 8px 0 4px;
+}
+.sub {
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  color: var(--ink-600);
+  margin: 0 0 16px;
 }
 
-/* La pregunta montada sobre la foto, justo encima de la hoja. */
-.heroQuestion {
-  position: relative;
-  z-index: 2;
-  /* Deja sitio para la hoja más alta (430px) + respiro. */
-  margin-bottom: 446px;
+/* ---- campos ----------------------------------------------------- */
+.field {
+  margin-bottom: 16px;
 }
-.heroAsk {
-  margin: 0;
-  color: #fff;
-  font-size: 24px;
-  line-height: 1.18;
-  font-weight: 600;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+.label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  margin-bottom: 7px;
+  color: var(--ink-900);
 }
-/* Placeholder del hero cuando aún no hay nombre ni pregunta (no "queda aquí…"
-   de relleno: invita a escribir). Tinta clara tenue sobre la escena. */
-.heroHint {
-  margin: 0;
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 17px;
-  line-height: 1.3;
+.label span {
   font-weight: 500;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+  color: var(--ink-600);
+}
+.input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 13px 14px;
+  /* >16px efectivos (--font-size-md): evita el zoom automático de iOS al enfocar. */
+  font-size: var(--font-size-md);
+  font-family: inherit;
+  color: var(--ink-900);
+  background: var(--color-surface-hover);
+  outline: none;
+  transition:
+    border-color var(--motion-transition-base),
+    background var(--motion-transition-base);
+}
+.input:focus {
+  border-color: var(--accent);
+  background: var(--color-surface);
+}
+.input::placeholder {
+  color: var(--ink-400);
+}
+.hint {
+  font-size: var(--font-size-xs);
+  color: var(--ink-600);
+  margin: 6px 0 0;
+  line-height: 1.4;
+}
+.warnHint {
+  font-size: var(--font-size-xs);
+  color: var(--color-warning);
+  margin: 6px 0 0;
+  line-height: 1.4;
 }
 
-/* ── Respuesta numérica (el número grande + unidad lo pone el UnitInput) ── */
+/* Nota "queda oculta hasta que voten", junto a la etiqueta de la respuesta. */
 .lock {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #8a6d34;
   font-weight: 700;
+  color: var(--color-warning);
 }
 .lock svg {
   width: 11px;
   height: 11px;
 }
+
 .errHint {
   margin: 7px 0 0;
-  font-size: 12px;
-  color: #c0563a;
+  font-size: var(--font-size-xs);
+  color: var(--color-danger);
 }
 .customUnit {
   margin-top: 8px;
 }
 
-/* Lectura en vivo de la estrictez. */
-.scaleRead {
-  margin: 9px 0 0;
-  font-size: 12.5px;
+/* ---- avisos y estado de guardado ---------------------------------- */
+.warning {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: var(--font-size-xs);
   line-height: 1.4;
-  color: var(--ink-600);
+  margin-bottom: 14px;
 }
-.scaleRead b {
-  color: var(--ink-900);
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--font-size-sm);
+  color: var(--ink-600);
+  margin: 4px 0 14px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .root *,
   .root *::before,
   .root *::after {
+    /* design-lint-allow: apagar animaciones bajo prefers-reduced-motion pide tiempos literales */
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
+    /* design-lint-allow: apagar transiciones bajo prefers-reduced-motion pide tiempos literales */
     transition-duration: 0.06s !important;
   }
 }

@@ -1,29 +1,32 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, Hash } from 'lucide-react'
 import { PhotoDropzone } from './PhotoDropzone'
-import { ImmersiveSheet } from './ImmersiveSheet'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import { createNumberChallenge, type ChallengeForPlay } from '../../lib/challenges'
-import {
-  DEFAULT_NUMBER_TOLERANCE,
-  fmtNumber,
-  scoreForNumber,
-  type NumberTolerance,
-} from '../../lib/geo'
+import { DEFAULT_NUMBER_TOLERANCE } from '../../lib/geo'
 import { deadlineFromMinutes } from '../../lib/time'
 import { uploadImage } from '../../lib/storage'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
-import { Icon, SegmentedControl, Spinner, UnitInput, type Unit, useToast } from '../../ui'
-import sheet from './CreateChallengeImmersive.module.css'
+import {
+  AppHeader,
+  Button,
+  Icon,
+  SegmentedControl,
+  Spinner,
+  UnitInput,
+  type Unit,
+  useToast,
+} from '../../ui'
+import { ShellUtilitario } from '../../ui/shells'
 import styles from './CreateNumberChallenge.module.css'
 
 interface Props {
   /** Grupo (el viaje) al que se añade el reto. */
   groupId: string
-  /** Nombre del viaje para la píldora de cabecera. */
+  /** Nombre del viaje para el contexto del eyebrow. */
   groupName?: string | null
   /** Sale del flujo sin crear (vuelve al selector de tipo). */
   onBack: () => void
@@ -63,14 +66,6 @@ const UNIT_OPTIONS: readonly Unit[] = [
 ]
 const UNIT_MAX = 8
 
-// Estrictez del scoring (number_tolerance). Misma curva que la RPC; el texto en
-// vivo se calcula con geo.scoreForNumber para que cuadre con el servidor.
-const TOLERANCE_OPTIONS = [
-  { value: 'indulgente' as const, label: 'Indulgente' },
-  { value: 'normal' as const, label: 'Normal' },
-  { value: 'estricto' as const, label: 'Estricto' },
-]
-
 // El símbolo que se guarda/muestra para una clave de unidad (vacío = sin unidad).
 function symbolFor(unitKey: string, custom: string): string {
   if (unitKey === 'custom') return custom.trim()
@@ -78,11 +73,13 @@ function symbolFor(unitKey: string, custom: string): string {
   return UNIT_OPTIONS.find((u) => u.value === unitKey)?.symbol ?? ''
 }
 
-// Etapas de la hoja, en el orden corregido del rediseño:
-//  0 = nombre + pregunta · 1 = respuesta + unidad (juntas) · 2 = reglas.
-type Stage = 0 | 1 | 2
-const TOTAL_STAGES = 3
-const STAGE_HEIGHTS: Record<Stage, number> = { 0: 440, 1: 460, 2: 470 }
+// Etapas del formulario (issue #586 — de 3 pasos a 2, proceso con sentido):
+//  0 = la pregunta (nombre + pregunta + foto opcional).
+//  1 = respuesta y reglas (cifra + unidad + plazo + tiempo por jugada).
+// La estrictez del conteo ya no se pregunta: se fija a "normal" (antes exponía
+// una tercera decisión que no aportaba al proceso de crear el reto).
+type Stage = 0 | 1
+const TOTAL_STAGES = 2
 
 /**
  * Parsea la respuesta escrita (formato es-ES: coma decimal) a número, infiriendo
@@ -101,12 +98,13 @@ function parseAnswer(raw: string): { value: number; decimals: number } | null {
   return { value, decimals: Math.min(decPart.length, 4) }
 }
 
-// Reto de NÚMERO ("¿Adivinas?"): pregunta + cifra oculta + unidad + estrictez. Sin
-// mapa ni Street View. Orden del rediseño (Oleada 3): primero el NOMBRE y la
-// PREGUNTA, luego la RESPUESTA con la UNIDAD al lado (el número manda, la unidad lo
-// acompaña vía UnitInput), y por último las REGLAS. Al crear NO salta a jugar:
-// muestra la hoja de Compartir (el destino común de los flujos de crear reto). El
-// hero pinta la pregunta REAL que se va escribiendo (no un placeholder de relleno).
+// Reto de NÚMERO ("¿Adivinas?"): pregunta + cifra oculta + unidad. Sin mapa ni
+// Street View: es un FORMULARIO, no una escena con protagonista visual (issue
+// #586 — el shell inmersivo dejaba un backdrop oscuro vacío con el título del
+// fondo asomando recortado tras la hoja). Vive en ShellUtilitario, igual que
+// CreateGroup y CreateChallengeKindPicker: hoja limpia sobre --paper, cabecera
+// fija con atrás, CTA como footer. Al crear NO salta a jugar: muestra la hoja de
+// Compartir (el destino común de los flujos de crear reto).
 export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }: Props) {
   const [stage, setStage] = useState<Stage>(0)
   // Dirección del cambio de paso (#531): avanzar entra desde la derecha, volver
@@ -121,7 +119,9 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
   const [answerRaw, setAnswerRaw] = useState('')
   const [unitKey, setUnitKey] = useState('eur')
   const [customUnit, setCustomUnit] = useState('')
-  const [tolerance, setTolerance] = useState<NumberTolerance>(DEFAULT_NUMBER_TOLERANCE)
+  // Estrictez del conteo: fija a "normal" (ya no es una decisión del formulario,
+  // ver comentario del tipo `Stage`). Misma curva que la RPC del servidor.
+  const tolerance = DEFAULT_NUMBER_TOLERANCE
 
   const [deadlineIndex, setDeadlineIndex] = useState(DEFAULT_DEADLINE_INDEX)
   const [guessIndex, setGuessIndex] = useState(DEFAULT_GUESS_INDEX)
@@ -134,6 +134,13 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
 
   const toast = useToast()
   const { user } = useSession()
+
+  // Al cambiar de etapa el cuerpo vuelve arriba (cada etapa empieza por su título;
+  // mismo patrón que CreateGroup).
+  const bodyRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.scrollTop = 0
+  }, [stage])
 
   // Limpia el object URL de la foto al desmontar (no fugar memoria).
   useEffect(() => {
@@ -155,24 +162,12 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
   const parsed = parseAnswer(answerRaw)
   const guessSeconds = GUESS_OPTIONS[guessIndex].value
 
-  // Lectura en vivo de la estrictez: "±10% (≈ X) ≈ N pts · clavarlo = 5.000".
-  const liveRead = useMemo(() => {
-    if (!parsed) return null
-    const tenPct = parsed.value * 0.1
-    const pts = scoreForNumber(tenPct, parsed.value, tolerance)
-    return {
-      tenPct: fmtNumber(tenPct, parsed.decimals, effectiveUnit || null),
-      pts: pts.toLocaleString('es-ES'),
-    }
-  }, [parsed, tolerance, effectiveUnit])
-
-  // Gating de avance por etapa, en el orden nuevo:
-  //  0 (nombre + pregunta): exige ambos.
-  //  1 (respuesta + unidad): exige cifra válida y, si es unidad libre, que tenga texto.
+  // Gating de avance por etapa:
+  //  0 (la pregunta): exige nombre y pregunta.
+  //  1 (respuesta y reglas): etapa final, el CTA crea directamente.
   const canAdvanceFromStage: Record<Stage, boolean> = {
     0: title.trim().length > 0 && question.trim().length > 0,
-    1: parsed != null && (!usingCustomUnit || customUnit.trim().length > 0),
-    2: false,
+    1: false,
   }
 
   const readyToCreate =
@@ -195,10 +190,10 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
     setStage(n)
   }
   function advance() {
-    if (stage < 2 && canAdvanceFromStage[stage]) goStage((stage + 1) as Stage)
+    if (stage === 0 && canAdvanceFromStage[0]) goStage(1)
   }
   function retreat() {
-    if (stage > 0) goStage((stage - 1) as Stage)
+    if (stage > 0) goStage(0)
   }
 
   async function save() {
@@ -255,73 +250,92 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
     }
   }
 
-  // Clase del contenido del paso: dirección del `.stage` (#531, tokens compartidos
-  // en CreateChallengeImmersive.module.css vía `sheet`). Solo el CONTENIDO de la
-  // hoja anima; el hero de foto y la cabecera quedan fijos entre pasos.
-  const stageClass = `${sheet.stage} ${direction === 'backward' ? sheet.stepBack : ''}`.trim()
+  // Clase del contenido del paso: dirección del `.stage` (#531). Solo el CONTENIDO
+  // anima; la cabecera/footer de ShellUtilitario quedan fijos entre pasos.
+  const stageClass = `${styles.stage} ${direction === 'backward' ? styles.stepBack : ''}`.trim()
+
+  // Footer CTA: varía según la etapa y el estado de carga (mismo patrón que
+  // CreateGroup: solo el botón vive en el footer, avisos y estado quedan en el
+  // cuerpo que scrollea).
+  const footer =
+    stage === 0 ? (
+      <Button
+        type="button"
+        size="lg"
+        fullWidth
+        disabled={!canAdvanceFromStage[0]}
+        onClick={advance}
+        aria-label="Siguiente: respuesta y reglas"
+      >
+        Siguiente: la respuesta
+        <ArrowRight />
+      </Button>
+    ) : (
+      <Button
+        type="button"
+        size="lg"
+        fullWidth
+        disabled={!readyToCreate || busy}
+        onClick={() => void save()}
+        aria-label="Crear el reto"
+      >
+        {busy ? <Spinner size={18} /> : <Rocket />}
+        Crear el reto
+      </Button>
+    )
 
   return (
     <div className={styles.root}>
-      {/* Foto-hero: la imagen (si la hay) llena la cabecera; encima, chip de tipo
-          y la pregunta REAL que se va escribiendo. Sin foto, un degradado neutro. */}
-      <div className={styles.hero}>
-        {photoPreview ? (
-          <img className={styles.heroImg} src={photoPreview} alt="" aria-hidden />
-        ) : (
-          <div className={styles.heroNeutral} aria-hidden />
-        )}
-        <div className={styles.heroVeil} aria-hidden />
-        <div className={styles.heroTop}>
-          <button
-            type="button"
-            className={[styles.iconBtn, 'lg-press'].join(' ')}
-            aria-label="Atrás"
-            onClick={onBack}
-          >
-            <BackArrow />
-          </button>
-          <span className={styles.kindChip}>
-            <Icon icon={Hash} size={13} /> ¿Adivinas?
-          </span>
-          <div className={styles.topTitle}>
-            {groupName ? <small>Viaje · {groupName}</small> : <small>Nuevo reto</small>}
-          </div>
-        </div>
-        <div className={styles.heroQuestion}>
-          {question.trim() ? (
-            <p className={styles.heroAsk}>{question.trim()}</p>
-          ) : title.trim() ? (
-            <p className={styles.heroAsk}>{title.trim()}</p>
-          ) : (
-            <p className={styles.heroHint}>Escribe el nombre y la pregunta del reto.</p>
-          )}
-        </div>
-      </div>
-
-      <ImmersiveSheet
-        stage={stage}
-        total={TOTAL_STAGES}
-        height={STAGE_HEIGHTS[stage]}
-        canAdvance={canAdvanceFromStage[stage]}
-        onAdvance={advance}
-        onRetreat={retreat}
+      <ShellUtilitario
+        header={
+          <AppHeader
+            variant="plain"
+            lead="back"
+            onLead={stage === 0 ? onBack : retreat}
+            leadLabel={stage === 0 ? 'Atrás' : 'Paso anterior'}
+            title="Nuevo reto · ¿Adivinas?"
+          />
+        }
+        footer={footer}
       >
-        {/* ETAPA 0 — nombre + pregunta (primero, como pide el rediseño). */}
+        {/* Indicador de progreso: puntos teal (activo) vs neutro. */}
+        <div
+          className={styles.progress}
+          role="progressbar"
+          aria-valuenow={stage + 1}
+          aria-valuemin={1}
+          aria-valuemax={TOTAL_STAGES}
+          aria-label={`Paso ${stage + 1} de ${TOTAL_STAGES}`}
+        >
+          {Array.from({ length: TOTAL_STAGES }, (_, i) => (
+            <span
+              key={i}
+              className={`${styles.progressDot} ${i <= stage ? styles.progressActive : ''}`}
+            />
+          ))}
+        </div>
+
+        {/* Referencia de scroll para volver arriba al cambiar etapa. */}
+        <div ref={bodyRef} />
+
+        {/* ETAPA 0 — la pregunta: nombre + pregunta + foto opcional. */}
         {stage === 0 && (
           <section className={stageClass}>
-            <div className={sheet.eyebrow}>
-              <i className={sheet.dot} /> Paso 1 de 3 · La pregunta
+            {/* Sin el nombre del viaje aquí: envolvía el eyebrow a dos líneas en
+                móvil y descolocaba el punto (el contexto ya lo da la navegación). */}
+            <div className={styles.eyebrow}>
+              <i className={styles.dot} /> Paso 1 de 2 · La pregunta
             </div>
-            <h1 className={sheet.h}>¿Qué adivinan?</h1>
-            <p className={sheet.sub}>Ponle nombre y lanza la pregunta de cifra a tu grupo.</p>
+            <h1 className={styles.h}>¿Qué adivinan?</h1>
+            <p className={styles.sub}>Ponle nombre y lanza la pregunta de cifra a tu grupo.</p>
 
-            <div className={sheet.field}>
-              <label className={sheet.label} htmlFor="cn-title">
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="cn-title">
                 Nombre del reto
               </label>
               <input
                 id="cn-title"
-                className={sheet.input}
+                className={styles.input}
                 type="text"
                 placeholder="p. ej. La cuenta de la cena"
                 value={title}
@@ -329,13 +343,13 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
               />
             </div>
 
-            <div className={sheet.field}>
-              <label className={sheet.label} htmlFor="cn-question">
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="cn-question">
                 Tu pregunta
               </label>
               <input
                 id="cn-question"
-                className={sheet.input}
+                className={styles.input}
                 type="text"
                 placeholder="p. ej. ¿Cuánto costó la cena del grupo?"
                 value={question}
@@ -343,49 +357,50 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
               />
             </div>
 
-            <PhotoDropzone
-              preview={photoPreview}
-              onPick={pickPhoto}
-              onClear={() => pickPhoto(null)}
-              label="Añadir foto (opcional)"
-            />
+            <div className={styles.field}>
+              <label className={styles.label}>
+                Foto <span>· opcional</span>
+              </label>
+              <PhotoDropzone
+                preview={photoPreview}
+                onPick={pickPhoto}
+                onClear={() => pickPhoto(null)}
+                label="Añadir foto (opcional)"
+              />
+            </div>
 
-            <button
-              className={sheet.cta}
-              type="button"
-              disabled={!canAdvanceFromStage[0]}
-              onClick={advance}
-            >
-              Siguiente: la respuesta
-              <ArrowRight />
-            </button>
+            {!canAdvanceFromStage[0] && (title.trim() || question.trim()) && (
+              <p className={styles.warnHint}>Falta {title.trim() ? 'la pregunta' : 'el nombre'}.</p>
+            )}
           </section>
         )}
 
-        {/* ETAPA 1 — respuesta + unidad JUNTAS (UnitInput: número grande + unidad). */}
+        {/* ETAPA 1 — respuesta y reglas: cifra + unidad + plazo + tiempo por jugada. */}
         {stage === 1 && (
           <section className={stageClass}>
-            <div className={sheet.eyebrow}>
-              <i className={sheet.dot} /> Paso 2 de 3 · La respuesta
+            <div className={styles.eyebrow}>
+              <i className={styles.dot} /> Paso 2 de 2 · Respuesta y reglas
             </div>
-            <h1 className={sheet.h}>La cifra correcta</h1>
-            <p className={sheet.sub}>Queda oculta hasta que todos voten.</p>
+            <h1 className={styles.h}>La cifra correcta</h1>
+            <p className={styles.sub}>Y cuándo cierra el reto.</p>
 
-            <div className={sheet.field}>
-              <label className={sheet.label} htmlFor="cn-answer">
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="cn-answer">
                 Respuesta correcta{' '}
                 <span className={styles.lock}>
                   <Icon icon={Hash} size={11} /> oculta hasta que voten
                 </span>
               </label>
               {/* Número + selector de unidad al lado: el número manda, la unidad lo
-                  acompaña (no se elige en otra pantalla). NO solo €. */}
+                  acompaña (no se elige en otra pantalla). NO solo €. Placeholder
+                  normal (ejemplo de formato), no un "0" gris gigante fantasma. */}
               <UnitInput
                 value={answerRaw}
                 onValueChange={setAnswerRaw}
                 units={UNIT_OPTIONS}
                 unit={unitKey}
                 onUnitChange={setUnitKey}
+                placeholder="84,50"
                 label="Respuesta correcta"
               />
               {answerRaw.length > 0 && !parsed && (
@@ -393,7 +408,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
               )}
               {usingCustomUnit && (
                 <input
-                  className={`${sheet.input} ${styles.customUnit}`}
+                  className={`${styles.input} ${styles.customUnit}`}
                   type="text"
                   maxLength={UNIT_MAX}
                   placeholder="p. ej. pts"
@@ -404,48 +419,8 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
               )}
             </div>
 
-            <button
-              className={sheet.cta}
-              type="button"
-              disabled={!canAdvanceFromStage[1]}
-              onClick={advance}
-            >
-              Siguiente: las reglas
-              <ArrowRight />
-            </button>
-          </section>
-        )}
-
-        {/* ETAPA 2 — reglas (estrictez, plazo, tiempo) + crear → Compartir. */}
-        {stage === 2 && (
-          <section className={stageClass}>
-            <div className={sheet.eyebrow}>
-              <i className={sheet.dot} /> Paso 3 de 3 · Las reglas
-            </div>
-            <h1 className={sheet.h}>Afina el reto</h1>
-            <p className={sheet.sub}>Lo estricto del conteo y los plazos.</p>
-
-            <div className={sheet.field}>
-              <label className={sheet.label}>
-                Estrictez <span>· cómo cae la puntuación</span>
-              </label>
-              <SegmentedControl
-                label="Estrictez del conteo"
-                options={TOLERANCE_OPTIONS}
-                value={tolerance}
-                onChange={setTolerance}
-              />
-              {liveRead ? (
-                <p className={styles.scaleRead}>
-                  Fallar ±10 % (≈ {liveRead.tenPct}) ≈ <b>{liveRead.pts} pts</b> · clavarlo = 5.000
-                </p>
-              ) : (
-                <p className={sheet.segHint}>El error se mide en relativo a la respuesta.</p>
-              )}
-            </div>
-
-            <div className={sheet.field}>
-              <label className={sheet.label}>
+            <div className={styles.field}>
+              <label className={styles.label}>
                 Plazo para jugar <span>· cuándo cierra</span>
               </label>
               <SegmentedControl
@@ -456,8 +431,8 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
               />
             </div>
 
-            <div className={sheet.field}>
-              <label className={sheet.label}>
+            <div className={styles.field}>
+              <label className={styles.label}>
                 Tiempo por jugada <span>· cuenta atrás</span>
               </label>
               <SegmentedControl
@@ -469,31 +444,21 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
             </div>
 
             {!readyToCreate && missing && (
-              <div className={sheet.warning}>
+              <div className={styles.warning}>
                 <Icon icon={AlertTriangle} size={18} />
                 <span>{missing}</span>
               </div>
             )}
 
             {status && (
-              <div className={sheet.statusRow}>
+              <div className={styles.statusRow}>
                 <Spinner size={16} />
                 <span>{status}</span>
               </div>
             )}
-
-            <button
-              className={sheet.cta}
-              type="button"
-              disabled={!readyToCreate || busy}
-              onClick={() => void save()}
-            >
-              {busy ? <Spinner size={18} /> : <Rocket />}
-              Crear el reto
-            </button>
           </section>
         )}
-      </ImmersiveSheet>
+      </ShellUtilitario>
 
       {/* Tras crear, hoja de Compartir: qué se comparte, a quién, y cómo volver al
           viaje (el reto aparece ya en su sitio). Es el destino de crear un reto. */}
@@ -507,14 +472,6 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
         />
       )}
     </div>
-  )
-}
-
-function BackArrow() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>
-      <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   )
 }
 
