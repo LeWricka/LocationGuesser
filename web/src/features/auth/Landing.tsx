@@ -1,28 +1,30 @@
 // Landing pública para visitantes SIN sesión (issue #175; portada visual #183;
 // patrón globo + hoja #343; flujo email-first #506).
 //
-// Patrón GLOBO + HOJA (referencia Polarsteps): un globo a sangre arriba con pines-foto
-// de datos demo curados (el wow y la identidad) y una HOJA BLANCA que sube debajo con el
-// mensaje y el CTA (la legibilidad).
+// REDISEÑO INMERSIVO (issue #622): la landing es la ESCENA DE PROMESA — regla de
+// sistema "escena = inmersivo" (misma gramática que la home logueada #568/#570).
+// Fuera el patrón globo + HOJA BLANCA: el héroe (100dvh) es una escena oscura
+// continua —el globo de pines-foto ocupa la parte alta, marca + claim + CTA +
+// hint de enlace viven DEBAJO, en la propia escena (tokens --scene-*), sin
+// costura a papel—. El scroll sigue sobre la MISMA escena oscura (sin salto de
+// fondo): "cómo funciona" + el showcase de capturas, en tarjetas de vidrio
+// (`.lg-glass`, ver LandingShowcase). El acento en cursiva del claim usa un
+// teal ACLARADO (no el `--accent` de sistema, pensado para chrome sobre PAPEL)
+// para leer AA sobre el fondo oscuro (ver `.accent` en el CSS module).
 //
 // La política es passwordless puro: sin contraseñas (cuentas-y-home.md §1.2).
 // MODELO EMAIL-FIRST (issue #506): un único CTA lleva a LoginFlow (email → código OTP).
 // Nuevo y recurrente usan el mismo flujo: Supabase detecta si existe la cuenta.
 //
-// Cambios respecto al diseño anterior (#495):
-//  - CTA único: "Empieza a compartir" → LoginFlow (email-first con código OTP).
-//  - ELIMINADO: separación signup/login (ya no hay "Crear tu viaje" vs "Ya tengo cuenta").
-//  - ELIMINADO: "Tengo un código" (los viajes van por enlace, no por código manual).
-//  - Conservada: nota "¿Te han pasado un enlace? Ábrelo y entras directo."
-//  - Conservado: showcase del producto en acción dentro de la hoja.
-//
 // Reutiliza:
-//  - `features/home/GlobeSheet` para el patrón globo + hoja.
+//  - `ui/HomeGlobe` (el mismo motor que la home logueada) como protagonista del héroe,
+//    en vez del shell `GlobeSheet` (ese patrón queda para pantallas CON hoja de papel,
+//    p.ej. la bienvenida sin viajes de HomePage).
 //  - `LoginFlow` para el flujo de entrada (email → código OTP → sesión).
-//  - `LandingShowcase` para enseñar el producto en acción dentro de la hoja.
+//  - `LandingShowcase` para enseñar el producto en acción, ahora en vidrio sobre la escena.
 
 import { useEffect, useState } from 'react'
-import { Button, GlobeSheet, LogoTabide, Stack, WordmarkTabide, useToast } from '../../ui'
+import { Button, HomeGlobe, LogoTabide, Stack, WordmarkTabide, useToast } from '../../ui'
 import { takeLegacySessionNotice } from '../../lib/auth'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { LandingShowcase } from './LandingShowcase'
@@ -70,28 +72,50 @@ export function Landing({ groupName, redirectTo }: Props) {
 
   return (
     <main className={styles.page}>
-      <GlobeSheet
-        pins={HOME_DEMO_PINS}
-        // Pines DECORATIVOS: vista mundo fija (sin fit) → el globo héroe se ve SIEMPRE
-        // esférico, nunca aplanado por un encuadre cercano de pines agrupados.
-        framing="world"
-        // Tocar un pin demo en la landing = invitar a crear (no hay viaje real).
-        onOpenPin={() => setShowAuth(true)}
-        sheetLabel="Empieza a compartir"
-        overlay={
+      {/* ── Héroe (100dvh): escena oscura continua ─────────────────────────────
+          Arriba, el globo héroe (protagonista visual); debajo, EN LA MISMA escena
+          (sin hoja de papel), la marca, el claim y el CTA. La zona de contenido es
+          SIEMPRE fondo plano `--scene-bg` (nunca se superpone al globo): así el
+          contraste del titular/CTA/hint es AA garantizado, pase lo que pase con
+          el satélite de fondo (issue #622, gotcha de contraste sobre foto). */}
+      <section className={styles.hero}>
+        {/* NOTA (issue #622): `HomeGlobe` envuelve su credito "ⓘ" en un
+            `aria-hidden="true"` que también contiene ese botón real y enfocable —
+            defecto preexistente del componente compartido (`ui/HomeGlobe.tsx`, fuera
+            del área de este cambio), IDÉNTICO en `home-dashboard-lleno` (nunca lo vio
+            axe ahí; sí lo ve aquí por la altura/orden de scan de esta página). Sin
+            regresión real de accesibilidad — mismo comportamiento en todo sitio que usa
+            el globo—. Tolerado en `gallery-a11y-baseline.json`; el fix correcto (mover
+            `aria-hidden` solo al lienzo del mapa, dejando el botón de crédito fuera)
+            vive en HomeGlobe y queda para un follow-up. */}
+        <div className={styles.heroGlobe}>
+          <HomeGlobe
+            pins={HOME_DEMO_PINS}
+            // Pines DECORATIVOS: vista mundo fija (sin fit) → el globo héroe se ve SIEMPRE
+            // esférico, nunca aplanado por un encuadre cercano de pines agrupados.
+            framing="world"
+            // Tocar un pin demo en la landing = invitar a crear (no hay viaje real).
+            onOpenPin={() => setShowAuth(true)}
+          />
+        </div>
+
+        {/* Marca sobre el globo: mismo velo/tinta de escena que la home logueada. */}
+        <div className={styles.heroChrome}>
           <span className={styles.brand}>
             {/* Variante `oscuro`: paleta propia (papel + oro + teal) sobre la escena
                 oscura del globo héroe, en vez de aplanarse a un solo tono (#557). */}
             <LogoTabide variant="oscuro" size={22} />
             <WordmarkTabide size={18} />
           </span>
-        }
-      >
-        <div className={styles.hero}>
+        </div>
+
+        {/* Contenido del héroe: fondo PLANO de escena (no foto) — el titular serif, el
+            CTA y el hint del enlace nunca compiten con el satélite de fondo. */}
+        <div className={styles.heroContent}>
           {joining ? (
             <>
-              <p className={styles.eyebrow}>Te han invitado</p>
-              <h1 className={styles.headline}>
+              <p className={[styles.eyebrow, 't-label'].join(' ')}>Te han invitado</p>
+              <h1 className={[styles.headline, 't-hero'].join(' ')}>
                 Vive los viajes de <span className={styles.accent}>{groupName}</span>
               </h1>
               <p className={styles.lead}>
@@ -100,7 +124,7 @@ export function Landing({ groupName, redirectTo }: Props) {
             </>
           ) : (
             <>
-              <h1 className={styles.headline}>
+              <h1 className={[styles.headline, 't-hero'].join(' ')}>
                 Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
               </h1>
               <p className={styles.lead}>
@@ -110,7 +134,8 @@ export function Landing({ groupName, redirectTo }: Props) {
           )}
 
           <Stack gap={2} className={styles.actions}>
-            {/* CTA único: email-first (nuevo y recurrente, mismo flujo). */}
+            {/* CTA único: email-first (nuevo y recurrente, mismo flujo). Variante
+                `primary` = teal sólido (token `--color-accent`, ver Button.module.css). */}
             <Button size="lg" fullWidth onClick={() => setShowAuth(true)} data-testid="open-auth">
               {joining ? 'Únete al viaje' : 'Empieza a compartir'}
             </Button>
@@ -123,13 +148,18 @@ export function Landing({ groupName, redirectTo }: Props) {
             </p>
           )}
         </div>
+      </section>
 
-        {/* Showcase de un VIAJE DE EJEMPLO (diario + reto + marcador): el visitante ve el
-            producto en acción de un vistazo, dentro de la hoja (scrolleable). No lo
-            mostramos en el flujo de invitación (ya vienen a un viaje concreto): ahí el hero
-            + CTA bastan y el showcase distraería del "únete a <grupo>". */}
-        {!joining && <LandingShowcase className={styles.how} onStart={() => setShowAuth(true)} />}
-      </GlobeSheet>
+      {/* ── Scroll continuo, MISMA escena oscura (sin salto a papel) ───────────
+          Showcase de un VIAJE DE EJEMPLO (diario + reto + marcador): el visitante ve el
+          producto en acción de un vistazo, en tarjetas de vidrio sobre la escena. No lo
+          mostramos en el flujo de invitación (ya vienen a un viaje concreto): ahí el hero
+          + CTA bastan y el showcase distraería del "únete a <grupo>". */}
+      {!joining && (
+        <section className={styles.below}>
+          <LandingShowcase className={styles.how} onStart={() => setShowAuth(true)} />
+        </section>
+      )}
     </main>
   )
 }

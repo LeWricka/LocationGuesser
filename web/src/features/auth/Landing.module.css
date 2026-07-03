@@ -1,11 +1,69 @@
-/* Landing pública (issue #175; portada visual #183; patrón globo + hoja #343):
- * móvil-first. El héroe es el globo (GlobeSheet); aquí va el contenido de la HOJA
- * blanca (hero + CTA + cómo funciona) con tokens del sistema "Atelier". */
+/*
+ * Landing pública — REDISEÑO INMERSIVO (issue #622): escena oscura continua, sin
+ * hoja de papel (regla de sistema "escena = inmersivo", misma gramática que la
+ * home logueada #568/#570). Estructura:
+ *
+ *   .page
+ *     .hero            ← primera pantalla (100dvh)
+ *       .heroGlobe     ← globo héroe a sangre, parte alta (flex: crece)
+ *       .heroChrome    ← marca flotando sobre el globo (velo de escena)
+ *       .heroContent   ← fondo PLANO --scene-bg (titular + CTA + hint), parte baja
+ *     .below           ← scroll continuo, MISMA --scene-bg (cómo funciona + showcase)
+ *
+ * Nunca se corta a papel: `.hero` y `.below` comparten el mismo `--scene-bg`, así
+ * que el scroll pasa de la escena del héroe a la del showcase sin salto de fondo.
+ */
 .page {
   min-height: 100dvh;
+  background: var(--scene-bg);
+  overflow-x: hidden; /* red de seguridad: nada debe desbordar el documento */
 }
 
-/* Marca en el overlay sobre el globo: tinta de escena clara (hereda --scene-ink).
+/* ── Héroe (100dvh): globo arriba + contenido plano abajo, misma escena ──────────
+ * `min-height` (NO `height` fija): en compactos/estrechos con copy largo (p.ej. el
+ * de invitación, o textos que envuelven a más líneas), el contenido NUNCA debe
+ * recortarse — si no cabe en un viewport, el héroe crece más allá de 100dvh y el
+ * usuario scrollea un pelín más antes de "cómo funciona", en vez de perder el CTA
+ * bajo un `overflow: hidden` con altura fija (issue #622, guardarraíl de 320×568). */
+.hero {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  isolation: isolate;
+  background: var(--scene-bg);
+}
+
+/* Zona del globo: crece para ocupar todo el alto que el contenido no necesita —
+ * en pantallas muy altas (p.ej. 1080×2400) el globo domina la escena; en compactas
+ * cede espacio al contenido sin que este quede recortado. Suelo para que el globo
+ * nunca desaparezca del todo si el contenido (copy de invitación) es más largo. */
+.heroGlobe {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: min(320px, 42dvh);
+  z-index: 0; /* design-lint-allow: capa local del héroe (globo bajo la marca) */
+  animation: landingGlobeIn var(--motion-duration-slow) var(--motion-ease-standard) backwards;
+}
+
+/* Marca flotando SOBRE el globo: mismo velo/tinta de escena que la home logueada
+ * (issue #568). `pointer-events: none` deja pasar el gesto de paneo del globo bajo
+ * la franja; la propia marca no es interactiva aquí, así que no necesita reactivarlo. */
+.heroChrome {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2; /* design-lint-allow: capa local del héroe (marca sobre el globo) */
+  display: flex;
+  align-items: center;
+  padding: max(env(safe-area-inset-top), var(--space-4)) var(--space-4) var(--space-4);
+  background: linear-gradient(to bottom, var(--scene-veil) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+/* Marca en el chrome sobre el globo: tinta de escena clara (hereda --scene-ink).
  * `gap`: separa el símbolo LogoTabide del wordmark (#557; antes un solo nodo Logo). */
 .brand {
   display: inline-flex;
@@ -14,14 +72,42 @@
   color: var(--scene-ink);
 }
 
-/* ── Hero dentro de la hoja: titular serif + subtítulo + acciones ──────────────── */
-.hero {
+/* Contenido del héroe: fondo PLANO de escena (nunca sobre el globo) — el titular,
+ * el CTA y el hint del enlace leen AA garantizado pase lo que pase con el satélite
+ * de fondo (issue #622, evita el gotcha de contraste sobre foto arbitraria). */
+.heroContent {
+  position: relative;
+  flex: none;
+  z-index: 1; /* design-lint-allow: capa local del héroe (contenido sobre el globo) */
   display: flex;
   flex-direction: column;
   width: 100%;
   max-width: var(--container-max);
   margin: 0 auto;
-  padding-top: var(--space-3);
+  padding: var(--space-6) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
+  background: var(--scene-bg);
+  animation: landingContentIn var(--motion-duration-slower) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * 2);
+}
+
+/* Hijos directos del contenido (titular/eyebrow + subtítulo + CTA + hint): entran
+ * escalonados mientras el bloque aún sube (mismo patrón que los shells inmersivos,
+ * issue #534/#525). El número de hijos varía según la variante (con/sin invitación),
+ * así que se ordena por posición, no por rol. */
+.heroContent > * {
+  animation: landingChildIn var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+}
+.heroContent > *:nth-child(1) {
+  animation-delay: calc(var(--motion-stagger-step) * 3);
+}
+.heroContent > *:nth-child(2) {
+  animation-delay: calc(var(--motion-stagger-step) * 4);
+}
+.heroContent > *:nth-child(3) {
+  animation-delay: calc(var(--motion-stagger-step) * 5);
+}
+.heroContent > *:nth-child(n + 4) {
+  animation-delay: calc(var(--motion-stagger-step) * 6);
 }
 
 .eyebrow {
@@ -29,32 +115,33 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--letter-spacing-eyebrow);
   text-transform: uppercase;
-  color: var(--color-text-muted);
+  /* `soft` (no `--color-text-muted`, pensado para papel): AA sobre --scene-bg. */
+  color: var(--scene-ink-soft);
   /* Un escalón más de aire bajo el eyebrow para que no se pegue al titular en compacto. */
   margin-bottom: var(--space-3);
 }
 
-/* Frase ancla en serif (la voz editorial), peso medio que respira. */
+/* Frase ancla en serif a sangre (rol `.t-hero`, issue #622: la portada inmersiva usa
+ * el mayor peldaño de la escala, `--font-size-3xl`, en vez del `.t-display` de la
+ * hoja de papel). Tinta clara explícita: `.t-hero` no fija color (lo decide cada
+ * contexto) y aquí vivimos sobre escena oscura, no papel. */
 .headline {
-  font-family: var(--font-serif);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--letter-spacing-tight);
-  line-height: var(--line-height-tight);
-  text-wrap: balance;
+  color: var(--scene-ink);
   margin: 0;
 }
 
-/* La parte que "canta": cursiva en acento (gesto de la maqueta). */
+/* La parte que "canta": cursiva en acento. Sobre escena oscura el `--color-accent`
+ * de sistema (pensado para chrome sobre PAPEL) no llega a 4.5:1 — lo aclaramos
+ * mezclándolo con blanco (no un literal: sigue atado al token de acento). */
 .accent {
   font-style: italic;
-  color: var(--color-accent);
+  color: color-mix(in srgb, var(--accent) 55%, white);
 }
 
 .lead {
   margin: var(--space-3) 0 0;
   max-width: 38ch;
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
   font-size: var(--font-size-md);
   line-height: var(--line-height-normal);
   text-wrap: balance;
@@ -64,20 +151,81 @@
   margin-top: var(--space-5);
 }
 
-/* Nota de ayuda: "¿Te han pasado un enlace? Ábrelo y entras directo."
- * Discreta (faint) para no competir con los CTAs pero siempre visible. */
+/* Nota de ayuda: "¿Te han pasado un enlace? Ábrelo y entras directo." */
 .linkHint {
   margin-top: var(--space-3);
   text-align: center;
-  /* `muted` (AA), no `faint`: es texto informativo que debe leerse (axe: color-contrast). */
-  color: var(--color-text-muted);
+  /* `soft` (AA sobre escena): es texto informativo que debe leerse (axe: color-contrast). */
+  color: var(--scene-ink-soft);
 }
 
-/* "Cómo funciona" dentro de la hoja: separación del bloque del hero. */
+/* ── Scroll continuo tras el héroe: MISMA escena oscura, sin salto a papel ──────── */
+.below {
+  background: var(--scene-bg);
+  padding: var(--space-9) var(--space-4);
+  overflow-x: hidden;
+}
+
 .how {
-  margin-top: var(--space-7);
   width: 100%;
   max-width: var(--container-max);
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0 auto;
+}
+
+@media (min-width: 480px) {
+  .heroContent {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
+  .below {
+    padding-left: var(--space-5);
+    padding-right: var(--space-5);
+  }
+}
+
+/*
+ * ── Coreografía de entrada al montar (issue #622, patrón shells #534/#525) ──────
+ * Globo → contenido → hijos escalonados, SOLO `backwards` (nunca `forwards`): al
+ * terminar, ningún nodo queda con un `transform` residual que lo convierta en un
+ * stacking context permanente (el bug de #527). La galería fuerza
+ * `animation-duration: 0s` (ver gallery/determinism.ts), así las capturas son
+ * deterministas sin desactivar nada aquí.
+ */
+@keyframes landingGlobeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes landingContentIn {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes landingChildIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroGlobe,
+  .heroContent,
+  .heroContent > * {
+    animation: none;
+  }
 }

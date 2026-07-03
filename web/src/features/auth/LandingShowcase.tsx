@@ -54,7 +54,12 @@ export function LandingShowcase({ onStart, className }: Props) {
       ))}
 
       {/* ── Relato del bucle + CTA ─────────────────────────────────────────────── */}
-      <section className={styles.loopSection} aria-labelledby="showcase-bucle">
+      {/* Tarjeta de VIDRIO (issue #622, regla dura #537): flota sobre la escena
+          oscura continua, no un bloque de papel opaco. */}
+      <section
+        className={[styles.loopSection, 'lg-glass'].join(' ')}
+        aria-labelledby="showcase-bucle"
+      >
         <h2 id="showcase-bucle" className={styles.loopTitle}>
           Así funciona Tabide
         </h2>
