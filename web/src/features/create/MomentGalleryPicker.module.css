@@ -122,6 +122,38 @@
   object-fit: cover;
 }
 
+/* Tile de un fichero que no se pudo LEER al seleccionarlo (#642): nunca llegó
+   a decodificarse, así que no hay miniatura — solo un aviso centrado con el
+   nombre. El anillo de peligro lo pone la regla `.tile[data-error]` de arriba. */
+.unreadable {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-3);
+  color: var(--color-danger);
+  text-align: center;
+  background: var(--color-danger-soft);
+}
+
+.unreadableName {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.unreadableHint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
 .thumbBusy {
   position: absolute;
   inset: 0;

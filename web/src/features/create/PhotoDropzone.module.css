@@ -35,6 +35,13 @@
   cursor: progress;
 }
 
+/* Fallo de lectura al SELECCIONAR (#642): el `File` no se pudo copiar (p.ej.
+   Android con el content-URI ya muerto). Sigue siendo un <label> — tocarlo
+   reintenta —, solo cambia el tono a peligro. */
+.empty[data-error] {
+  border-color: var(--color-danger);
+}
+
 /* Disco de icono: cámara grande con un "+" superpuesto. La forma comunica
    "añadir foto" sin depender del texto. */
 .icon {
@@ -47,6 +54,11 @@
   border-radius: var(--radius-full);
   background: var(--color-accent-soft);
   font-size: var(--font-size-xl);
+}
+
+.icon[data-error] {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
 }
 
 .plus {
