@@ -38,6 +38,21 @@ export function CountUp({ value, duration = 900, locale = 'es-ES', className }: 
   // easeOutCubic: arranca rápido y desacelera al llegar (sensación física).
   const eased = 1 - Math.pow(1 - progress, 3)
   const display = reduced ? value : Math.round(value * eased)
+  const finalText = value.toLocaleString(locale)
 
-  return <span className={className}>{display.toLocaleString(locale)}</span>
+  // Ancho reservado al del valor FINAL (issue #623): mientras cuenta, el número de
+  // dígitos crece (0 → 1 → 12 → 123…) y, centrado como suele ir, cada salto de
+  // dígito recentra el bloque y empuja lo de al lado — un layout-shift real y
+  // repetido durante el conteo. Un `min-width` al ancho final (en `ch`, ya que
+  // `ringPoints`/similares usan `font-variant-numeric: tabular-nums`, dígitos de
+  // ancho uniforme) fija el hueco desde el primer frame; solo crece si el
+  // contenido lo pidiera (nunca lo hace, el final es el máximo).
+  return (
+    <span
+      className={className}
+      style={{ display: 'inline-block', minWidth: `${finalText.length}ch`, textAlign: 'center' }}
+    >
+      {display.toLocaleString(locale)}
+    </span>
+  )
 }

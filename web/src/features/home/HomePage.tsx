@@ -181,7 +181,9 @@ export function HomePage() {
     : null
 
   return (
-    <main className="lg-page">
+    // lg-content-in (issue #623): crossfade corto al relevar a HomeSkeleton, en
+    // vez de un swap seco.
+    <main className="lg-page lg-content-in">
       {hasGroups ? (
         <HomeDashboard
           userId={userId}

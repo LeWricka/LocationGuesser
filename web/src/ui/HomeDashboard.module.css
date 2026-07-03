@@ -386,6 +386,12 @@
   background-size: cover;
   background-position: center;
 }
+/* Antes de cargar (issue #623): opacidad a cero — se ve el relleno propio de
+   `.card` (`--accent-deep`) en vez de la imagen a medio decodificar o un hueco en
+   blanco. `TripCard` la cambia a `lg-photo-in` en cuanto el bitmap está listo. */
+.coverHidden {
+  opacity: 0;
+}
 
 /* Placeholder de portada (viaje SIN foto): fondo discreto de "mapa nocturno" — un
    gradiente grafito/teal sobrio con tokens de escena y un halo frío arriba a la

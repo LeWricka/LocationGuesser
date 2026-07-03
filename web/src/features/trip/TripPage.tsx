@@ -396,8 +396,14 @@ export function TripPage({
   }
 
   if (loading) {
+    // `key="loading"` (issue #623): sin él, React reconcilia este `<div>` contra el
+    // de la carga siguiente (mismo tipo host en la misma posición) y REUTILIZA el
+    // nodo `.panel.panelMarcador` de abajo para pintar `.tabs` encima —de una
+    // superficie a pantalla completa a una píldora flotante en el mismo frame, el
+    // salto de layout más grande medido en esta pantalla (CLS ~0.066, ver PR). La
+    // key fuerza un desmontaje/montaje limpio entre esqueleto y contenido real.
     return (
-      <div className={styles.screen} role="status" aria-label="Cargando el viaje">
+      <div key="loading" className={styles.screen} role="status" aria-label="Cargando el viaje">
         <header className={`${styles.overlay} ${styles.overlayLight}`} aria-hidden="true">
           <span className={`${styles.skelPill} ${styles.skelIcon} lg-shimmer-surface`} />
           <span className={`${styles.skelPill} ${styles.skelTitle} lg-shimmer-surface`} />
@@ -413,7 +419,7 @@ export function TripPage({
 
   if (error) {
     return (
-      <main className={styles.center}>
+      <main key="error" className={styles.center}>
         <EmptyState
           tone="danger"
           icon={<Icon icon={Globe} size={32} />}
@@ -427,7 +433,10 @@ export function TripPage({
   const onDiario = section === 'diario'
 
   return (
-    <div className={`${styles.screen} ${onDiario ? styles.sceneDiario : styles.scenePaper}`}>
+    <div
+      key="trip"
+      className={`${styles.screen} ${onDiario ? styles.sceneDiario : styles.scenePaper} lg-content-in`}
+    >
       {/* Cabecera ÚNICA del producto (AppHeader floating): atrás · nombre del viaje
           · menú ⋯. Flota SIEMPRE sobre el contenido (overlay absoluto, layout estable
           entre secciones). Sobre el mapa satélite (Diario) lee con tinta clara + velo;
