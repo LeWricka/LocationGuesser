@@ -25,6 +25,7 @@ import { MomentSheet } from '../features/trip/MomentSheet'
 import { GroupSettingsModal } from '../features/group/GroupSettingsModal'
 import { InviteModal } from '../features/group/InviteModal'
 import { ResultCard } from '../features/play/ResultCard'
+import { OnboardingSlideshow, getSlides } from '../features/onboarding'
 import { HomeDashboard, LoginScreen, type HomeGroup, type HomePinned } from '../ui'
 import type { GlobePin } from '../ui'
 import type { ChallengeForPlay } from '../lib/challenges'
@@ -570,6 +571,46 @@ export const cases: GalleryCase[] = [
         points={4880}
         distanceKm={1.2}
         domain="tabide.app"
+      />
+    ),
+  },
+  // Rediseño visual-first del onboarding (issue #625): los 3 gestos clave del
+  // tutorial del viaje, cada uno con su mini-simulación CSS (ver
+  // OnboardingVisual). Los pasos 2 y 3 se aíslan como slideshow de un único paso
+  // para poder capturarlos sin tener que interactuar (Playwright solo monta).
+  {
+    id: 'onboarding-comparte-momento',
+    title: 'Onboarding · paso 1 (comparte un momento)',
+    section: 'Onboarding',
+    render: () => (
+      <OnboardingSlideshow slides={getSlides('group')} onSkip={noop} onComplete={noop} />
+    ),
+  },
+  {
+    id: 'onboarding-invita-grupo',
+    title: 'Onboarding · paso 2 (invita al grupo)',
+    section: 'Onboarding',
+    render: () => (
+      <OnboardingSlideshow slides={[getSlides('group')[1]]} onSkip={noop} onComplete={noop} />
+    ),
+  },
+  {
+    id: 'onboarding-juega-reto',
+    title: 'Onboarding · paso 3 (juega un reto)',
+    section: 'Onboarding',
+    render: () => (
+      <OnboardingSlideshow slides={[getSlides('group')[2]]} onSkip={noop} onComplete={noop} />
+    ),
+  },
+  {
+    id: 'onboarding-bienvenida-receptor',
+    title: 'Onboarding · bienvenida del receptor (adaptada al viaje)',
+    section: 'Onboarding',
+    render: () => (
+      <OnboardingSlideshow
+        slides={getSlides('welcome', { tripName: 'Japón 2026' })}
+        onSkip={noop}
+        onComplete={noop}
       />
     ),
   },

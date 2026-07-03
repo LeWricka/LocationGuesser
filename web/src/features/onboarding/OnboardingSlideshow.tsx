@@ -1,13 +1,22 @@
-// Slideshow de onboarding: overlay modal con varias slides (icono/título/texto)
-// y controles Saltar / Siguiente / Empezar. Presentacional: recibe las slides y
-// los callbacks; quién lo muestra y la persistencia los decide OnboardingGate.
+// Slideshow de onboarding: overlay modal con varias slides (mini-simulación +
+// título/texto) y controles Saltar / Siguiente / Empezar. Presentacional: recibe
+// las slides y los callbacks; quién lo muestra y la persistencia los decide
+// OnboardingGate.
 //
 // Accesibilidad: role=dialog + aria-modal, foco al panel al abrir, cierre con
 // Esc (= saltar). Móvil-first, usando el UI kit y los tokens (no hardcodea).
+//
+// Coreografía de entrada (issue #625): cada bloque del paso (escenario, titular,
+// cuerpo, puntos, CTA) entra escalonado (var(--i) + animation-fill-mode:
+// backwards, ver .module.css) — y se repite en CADA paso porque la `key` del
+// bloque cambia con `index` (remonta el DOM, no solo actualiza el texto). Saltar
+// queda FUERA de la coreografía a propósito: siempre visible e interactuable
+// desde el primer frame.
 
-import { useEffect, useRef, useState } from 'react'
-import { Button, Icon } from '../../ui'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { Button } from '../../ui'
 import type { OnboardingSlide } from './slides'
+import { OnboardingVisual } from './OnboardingVisual'
 import styles from './OnboardingSlideshow.module.css'
 
 interface Props {
@@ -16,6 +25,13 @@ interface Props {
   onSkip: () => void
   /** Completar el tutorial (botón Empezar en la última slide). */
   onComplete: () => void
+}
+
+// Índice de la coreografía → variable CSS `--i` que consume el retraso escalonado
+// (ver `.reveal` en el módulo CSS). Tipado con un cast puntual: las custom
+// properties no forman parte de CSSProperties.
+function revealStyle(i: number): CSSProperties {
+  return { '--i': i } as CSSProperties
 }
 
 export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
@@ -60,11 +76,14 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
           Saltar
         </button>
 
-        <div className={styles.slide}>
-          <span className={styles.icon}>
-            <Icon icon={slide.icon} size={30} strokeWidth={1.5} />
-          </span>
-          <div className={styles.heading}>
+        {/* `key={index}`: cada paso es un montaje NUEVO, así la coreografía de
+            entrada (escenario → titular → cuerpo → puntos → CTA) se repite en
+            cada paso, no solo al abrir el tutorial. */}
+        <div className={styles.slide} key={index}>
+          <div className={styles.reveal} style={revealStyle(0)}>
+            <OnboardingVisual visual={slide.visual} icon={slide.icon} />
+          </div>
+          <div className={[styles.heading, styles.reveal].join(' ')} style={revealStyle(1)}>
             {/* Eyebrow editorial con el paso actual (p.ej. "Tabide · 1 de 3"):
                 ubica al usuario en el recorrido sin robar peso al titular. */}
             <span className={`t-label ${styles.eyebrow}`}>
@@ -74,21 +93,29 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
               {slide.title}
             </h2>
           </div>
-          <p className={`t-body ${styles.body}`}>{slide.body}</p>
-        </div>
+          <p className={[`t-body ${styles.body}`, styles.reveal].join(' ')} style={revealStyle(2)}>
+            {slide.body}
+          </p>
 
-        <div className={styles.dots} aria-hidden="true">
-          {slides.map((_, i) => (
-            <span
-              key={i}
-              className={i === index ? `${styles.dot} ${styles.dotActive}` : styles.dot}
-            />
-          ))}
-        </div>
+          <div
+            className={[styles.dots, styles.reveal].join(' ')}
+            style={revealStyle(3)}
+            aria-hidden="true"
+          >
+            {slides.map((_, i) => (
+              <span
+                key={i}
+                className={i === index ? `${styles.dot} ${styles.dotActive}` : styles.dot}
+              />
+            ))}
+          </div>
 
-        <Button fullWidth onClick={next}>
-          {isLast ? 'Empezar' : 'Siguiente'}
-        </Button>
+          <div className={styles.reveal} style={revealStyle(4)}>
+            <Button fullWidth onClick={next}>
+              {isLast ? 'A viajar' : 'Siguiente'}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )

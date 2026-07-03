@@ -1,0 +1,204 @@
+/* Mini-simulación CSS de un gesto del producto (issue #625). El "escenario" toma
+ * prestados los tokens de ESCENA (--scene-*) que ya usa el resto del sistema para
+ * componer sobre fondos oscuros tipo foto/mapa (ver HowItWorksImmersive,
+ * LandingShowcase): así el mini-demo lee como una pantalla real, no como un
+ * icono suelto. Sin imágenes ni CDNs, solo CSS + el icono de la slide. */
+
+.stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(58%, 168px);
+  aspect-ratio: 4 / 5;
+  margin-inline: auto;
+  border-radius: var(--radius-lg);
+  background: var(--scene-bg);
+  box-shadow: var(--scene-shadow);
+  overflow: hidden;
+  /* Reserva de espacio inherente vía var(--i) para la coreografía de entrada:
+     el escenario SIEMPRE es el primer bloque revelado (ver OnboardingSlideshow). */
+}
+
+/* Pastilla superior: el mismo guiño de "marco de móvil" que la landing, sin
+   necesitar el bezel completo (el escenario ya es más pequeño que una pantalla). */
+.stage::before {
+  content: '';
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 28%;
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--scene-hairline);
+}
+
+/* ── Escenario del pin: retícula de mapa detrás del icono ─────────────────────── */
+.grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--scene-hairline) 1px, transparent 1px),
+    linear-gradient(90deg, var(--scene-hairline) 1px, transparent 1px);
+  background-size: 22px 22px;
+  opacity: 0.6;
+}
+
+/* ── Escenario del timer: aro de cuenta atrás detrás del icono ────────────────── */
+.ring {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  border: 3px solid var(--scene-hairline);
+}
+
+/* ── El icono (badge) ─────────────────────────────────────────────────────────── */
+.badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-full);
+  background: var(--scene-surface);
+  color: var(--scene-ink);
+  animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
+}
+
+.badge-card {
+  animation: ov-rise var(--motion-duration-slower) var(--motion-ease-spring) both;
+}
+.badge-link {
+  animation: ov-slide-in var(--motion-duration-slower) var(--motion-ease-spring) both;
+}
+.badge-spark {
+  animation: ov-pop var(--motion-duration-slower) var(--motion-ease-spring) both;
+}
+.badge-tap {
+  animation: ov-press var(--motion-duration-slow) var(--motion-ease-spring) both;
+}
+.badge-pin {
+  animation: ov-drop var(--motion-duration-slower) var(--motion-ease-spring) both;
+}
+.badge-timer {
+  animation: ov-pop var(--motion-duration-slower) var(--motion-ease-spring) both;
+}
+
+/* ── Eco de contacto: pin aterriza, tap se pulsa, timer cuenta atrás ──────────── */
+.echo {
+  position: absolute;
+  width: var(--space-8);
+  height: var(--space-8);
+  border-radius: var(--radius-full);
+  border: 2px solid var(--scene-ink-soft);
+  opacity: 0;
+  animation-delay: calc(var(--motion-stagger-step) * var(--i, 0) + var(--motion-duration-slower));
+}
+.echo-pin {
+  animation: ov-echo var(--motion-duration-slower) ease-out both;
+}
+.echo-tap {
+  animation: ov-echo var(--motion-duration-base) ease-out both;
+}
+.echo-timer {
+  /* Dos pasadas (no bucle): la cuenta atrás "hace tic" dos veces y para. */
+  animation: ov-echo var(--motion-duration-slower) ease-out
+    calc(var(--motion-stagger-step) * var(--i, 0) + var(--motion-duration-slower)) 2;
+}
+
+@keyframes ov-rise {
+  from {
+    opacity: 0;
+    transform: translateY(60%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ov-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-46%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes ov-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ov-press {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.14);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes ov-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-160%);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(10%);
+  }
+  82% {
+    transform: translateY(-6%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ov-echo {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+/* Menos movimiento: el icono queda quieto y visible, sin ecos ni entrada. */
+@media (prefers-reduced-motion: reduce) {
+  .badge,
+  .echo {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+  .echo {
+    display: none;
+  }
+}

@@ -60,16 +60,30 @@
   padding-top: var(--space-5);
 }
 
-/* Icono en disco de acento tenue: presencia editorial, ≥44px, icono de línea. */
-.icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-8);
-  height: var(--space-8);
-  border-radius: var(--radius-full);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+/* Coreografía de entrada (issue #625): cada bloque del paso entra escalonado.
+   `--i` (fijado inline por cada bloque) multiplica el paso de stagger del
+   sistema; `backwards` mantiene el bloque invisible ANTES de su turno en vez de
+   parpadear con su estado final. Se repite en cada paso porque `.slide` remonta
+   (key={index} en el componente). */
+.reveal {
+  /* Ancho completo A PROPÓSITO: `.slide` centra sus hijos (align-items: center),
+     así que sin esto cada bloque se encogería a su contenido (ajuste al
+     contenido) y el `min(58%, 168px)` del escenario (OnboardingVisual) no tendría
+     un ancho de referencia del que sacar el porcentaje — colapsaba a 0. */
+  width: 100%;
+  animation: onboarding-reveal var(--motion-duration-base) var(--motion-ease-standard) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
+}
+
+@keyframes onboarding-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* El titular serif y el cuerpo respiran algo más juntos: sub-agrupación visual. */
@@ -82,7 +96,7 @@
 
 /* Eyebrow editorial con número tabular (los pasos no "bailan"). */
 .eyebrow {
-  color: var(--color-text-faint);
+  color: var(--color-text-muted); /* AA: faint falla contraste (gotcha, 5a mordida — ver #611) */
   font-variant-numeric: tabular-nums;
 }
 
@@ -157,7 +171,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .overlay,
-  .panel {
+  .panel,
+  .reveal {
     animation: none;
   }
 }
