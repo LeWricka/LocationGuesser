@@ -1,6 +1,8 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import fs from 'node:fs'
+import path from 'node:path'
 import type { PlaceResult } from '../../lib/geocode'
 
 const searchPlacesMock = vi.fn<(query: string) => Promise<PlaceResult[]>>()
@@ -117,5 +119,48 @@ describe('PlaceSearch', () => {
 
     expect(screen.queryByRole('option', { name: /primero/i })).not.toBeInTheDocument()
     expect(screen.getByRole('option', { name: /segundo/i })).toBeInTheDocument()
+  })
+})
+
+// --- Regresión #574: la lista de resultados quedaba pintada DEBAJO del mapa ---
+//
+// Causa raíz REAL: `.lg-map` (index.css) aísla la escalada interna de z-index de
+// Leaflet (`isolation: isolate`, paneles/controles hasta ~1000) para que no se
+// coma a hermanos con z-index EXPLÍCITO (p.ej. `.controls` de MapPicker, z:100).
+// Pero esa unidad aislada sigue participando ELLA MISMA al nivel "auto" (0) del
+// stacking context de `MapPicker` — y en un empate a nivel 0 gana el que va
+// DESPUÉS en el DOM: `.canvas` (con el mapa dentro) va detrás de este buscador
+// en el árbol, así que sin z-index propio `.results` perdía el empate y quedaba
+// pintada debajo del mapa aunque visualmente se superponga.
+//
+// jsdom no calcula stacking/pintado real (la reproducción visual se hizo aparte
+// con la galería + Playwright, ver PR), así que este test monta la hoja de
+// estilos REAL de `PlaceSearch.module.css` en jsdom (cuyo motor de selectores sí
+// resuelve la cascada) y comprueba, vía `getComputedStyle`, que `.results` fija
+// un `z-index` explícito (no `auto`) al piso `--z-sheet` — el mismo patrón que
+// ya usa `Toast.test.tsx` para su regresión #552.
+describe('PlaceSearch — la lista de resultados no queda debajo del mapa (#574)', () => {
+  function loadRealStylesheet(): void {
+    const css = fs.readFileSync(path.resolve(__dirname, './PlaceSearch.module.css'), 'utf8')
+    const style = document.createElement('style')
+    // Variables mínimas que usan las declaraciones bajo prueba (el resto de
+    // tokens no afecta a la propiedad que comprobamos).
+    style.textContent = `:root { --z-sheet: 500; } ${css}`
+    document.head.appendChild(style)
+  }
+
+  test('.results fija un z-index explícito (no "auto") al piso --z-sheet', () => {
+    loadRealStylesheet()
+    const results = document.createElement('ul')
+    results.className = 'results'
+    document.body.appendChild(results)
+
+    const cs = getComputedStyle(results)
+    // jsdom no resuelve `var()` en propiedades enteras como `z-index` (a
+    // diferencia de otras, como `max-width`, que sí lo hace parcialmente);
+    // el valor computado se queda como el propio `var(...)` sin evaluar. Basta
+    // para la regresión: si se quita el `z-index` de `.results`, cae a `auto`.
+    expect(cs.zIndex).not.toBe('auto')
+    expect(cs.zIndex).toBe('var(--z-sheet)')
   })
 })

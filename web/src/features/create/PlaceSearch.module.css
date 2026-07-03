@@ -65,12 +65,27 @@
 }
 
 /* Lista de resultados: tarjeta sólida (no chrome translúcido, para que se lea
-   con claridad sobre cualquier tile) colgando justo debajo del campo. */
+   con claridad sobre cualquier tile) colgando justo debajo del campo.
+   `z-index` explícito (issue #574): el lienzo de Leaflet (`.lg-map`, en
+   index.css) lleva `isolation: isolate` para CONTENER su escalada interna de
+   z-index (paneles/controles hasta ~1000), pero eso solo evita que esa
+   escalada se coma a hermanos con z-index explícito (p.ej. `.controls` de
+   MapPicker, z:100) — la unidad aislada del mapa sigue participando ELLA
+   MISMA al nivel "auto" (0) del stacking context de `MapPicker` (`.wrap`).
+   En un empate a nivel 0 gana el que va DESPUÉS en el DOM, y `.canvas` (con
+   el mapa dentro) va detrás de este buscador — así que sin z-index propio
+   esta lista perdía el empate y quedaba pintada DEBAJO del mapa aunque
+   visualmente se superponga. `--z-sheet` gana ese empate (y queda por
+   encima de `.controls`, z:100) en los tres consumidores de `PlaceSearch`:
+   `MapPicker` compacto, su vista expandida (portal) y dentro de bloques con
+   transform residual de `lg-stagger` (ver AddMoment.module.css `.block`),
+   donde compite dentro del stacking context local del bloque, no del global. */
 .results {
   position: absolute;
   top: calc(100% + var(--space-2));
   left: 0;
   right: 0;
+  z-index: var(--z-sheet);
   margin: 0;
   padding: var(--space-1);
   list-style: none;

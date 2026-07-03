@@ -11,6 +11,23 @@
   min-height: 0;
 }
 
+/* La fila del buscador debe quedarse en su alto NATURAL (issue #574):
+   `PlaceSearch.module.css` define su propio `.wrap` con `flex: 1`, pensado
+   para cuando comparte fila con el botón de cerrar en `.fullscreenTop` (ahí
+   SÍ debe crecer para ocupar el ancho). Pero en ESTE contenedor (columna),
+   ese mismo `flex: 1` compite por ALTO con `.canvas` (también `flex: 1`) y
+   los reparte a partes iguales — en un contenedor de alto definido (p.ej.
+   "¿Dónde?", con `height: 100%` forzado por
+   CreateLocationChallenge.module.css `.mapArea > :first-child`) el buscador
+   se infla a ~345px de hueco muerto bajo el campo y el mapa se comprime a la
+   mitad de su alto disponible (medido: 698px de alto total → 345/345 en vez
+   de ~54/644). `flex: none` lo ancla a su contenido; `align-items: stretch`
+   (valor por defecto, no tocado) ya le da el 100% del ANCHO sin necesitar
+   crecer en el eje principal (vertical) de esta columna. */
+.wrap > :first-child {
+  flex: none;
+}
+
 /* `.wrap` puede recibir `height: 100%` desde fuera (pantalla "¿Dónde?", ver
    CreateLocationChallenge.module.css `.mapArea > :first-child`); sin
    `flex: 1; min-height: 0` en `.canvas` ese alto no llegaría al mapa. */

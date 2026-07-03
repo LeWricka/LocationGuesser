@@ -18,6 +18,7 @@ import { PlayNumberChallenge } from '../features/play/PlayNumberChallenge'
 import { CreateGroup } from '../features/create/CreateGroup'
 import { AddMoment } from '../features/create/AddMoment'
 import { CreateChallengeFlow } from '../features/create/CreateChallengeFlow'
+import { CreateLocationChallenge } from '../features/create/CreateLocationChallenge'
 import { EditChallenge } from '../features/group/EditChallenge'
 import { MomentGallery } from '../features/trip/MomentGallery'
 import { MomentSheet } from '../features/trip/MomentSheet'
@@ -368,6 +369,24 @@ export const cases: GalleryCase[] = [
     section: 'Crear',
     render: () => (
       <CreateChallengeFlow
+        groupId={GROUP_ID}
+        groupName={GROUP.name}
+        onBack={noop}
+        onCreated={noop}
+      />
+    ),
+  },
+  {
+    // Flujo "GeoGuessr puro" (origen FAB, sin recuerdo): mapa + buscador para
+    // elegir el punto, luego previa de Street View. No tenía caso propio en la
+    // galería (issue #574) — necesario para verificar que el buscador de
+    // PlaceSearch aparece y funciona también aquí (comparte `MapPicker` con
+    // "Añadir recuerdo", ver CreateLocationChallenge.tsx).
+    id: 'crear-donde',
+    title: 'Crear ¿Dónde? (elegir punto en el mapa)',
+    section: 'Crear',
+    render: () => (
+      <CreateLocationChallenge
         groupId={GROUP_ID}
         groupName={GROUP.name}
         onBack={noop}
