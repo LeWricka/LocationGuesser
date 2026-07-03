@@ -8,14 +8,16 @@
  *  - SIN backdrop: ningún nodo oscuro de fondo. El ShellInmersivo tiene
  *    protagonista; si no lo hay, usar este shell evita el vacío negro.
  *  - SIN caption flotante: sin protagonista no hay contexto para el caption.
- *  - SIN vacío negro: el fondo es siempre --paper (papel claro). Si aparece
- *    oscuro es que el caller está usando el shell equivocado.
+ *  - SIN vacío negro: el fondo es siempre --paper, vía --paper-dawn (degradado
+ *    frío→cálido en los ~180px superiores que funde a --paper liso, issue
+ *    #659). Si aparece oscuro es que el caller está usando el shell equivocado.
  *  - CTA fijo abajo: footer en el flujo flex, NUNCA absoluto (evita que tape el
  *    contenido scrolleable cuando el teclado virtual sube).
  *
  * Estructura:
  *   .root
- *     .header   ← cabecera con botón atrás + chip de título (AppHeader plain)
+ *     .header   ← cabecera transparente: atrás fantasma + bloque de título
+ *                 editorial (AppHeader plain, issue #659)
  *     .body     ← contenido principal con scroll propio
  *     .footer   ← CTA fijo anclado al fondo (border-top hairline + safe-area)
  */
@@ -27,8 +29,12 @@
   display: flex;
   flex-direction: column;
   /* Siempre papel claro. Nunca oscuro: si el fondo es negro, el caller usa
-   * ShellInmersivo en vez de este (o falta el protagonista). */
-  background: var(--paper);
+   * ShellInmersivo en vez de este (o falta el protagonista). --paper-dawn
+   * (issue #659, demo "5B · papel con alma") es un degradado sutil frío→cálido
+   * en los ~180px superiores (donde vive AppHeader, ahora transparente) que
+   * funde a --paper liso para el resto — sigue siendo "hoja de papel", solo
+   * respira un poco arriba. */
+  background: var(--paper-dawn);
   overflow: hidden;
 }
 

@@ -293,6 +293,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
             lead="back"
             onLead={stage === 0 ? onBack : retreat}
             leadLabel={stage === 0 ? 'Atrás' : 'Paso anterior'}
+            kicker={groupName ?? undefined}
             title="Nuevo reto · ¿Adivinas?"
           />
         }
