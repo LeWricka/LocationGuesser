@@ -28,6 +28,45 @@ import styles from './HomeDashboard.module.css'
  */
 const HERO_TRIP_KEY = 'lg-hero-trip-id'
 
+/*
+ * Filtro Míos/De amigos (issue #609): sessionStorage para "recordar" la elección
+ * dentro de la sesión (mismo patrón que el puente de la transición héroe de
+ * arriba) — un login nuevo no debe arrastrar el filtro de otra persona/sesión.
+ *
+ * A propósito NO se resetea el filtro cuando cambia la composición de `groups`
+ * (p.ej. tras un realtime reload): si el usuario tenía "De amigos" activo y esos
+ * viajes desaparecen, los chips se ocultan (ya no aportan, ver `showFilterChips`
+ * en el componente) pero el filtro sigue aplicado — de ahí que el carrusel pueda
+ * quedar vacío sin que haya chip visible para arreglarlo. Es justo el caso que
+ * cubre el aviso de "sin resultados" más abajo: mensaje corto + botón para volver
+ * a "Todos", en vez de un carrusel vacío sin explicación.
+ */
+type TripFilter = 'all' | 'mine' | 'friends'
+const TRIP_FILTER_KEY = 'lg-home-trip-filter'
+
+function readStoredFilter(): TripFilter {
+  try {
+    const value = sessionStorage.getItem(TRIP_FILTER_KEY)
+    return value === 'mine' || value === 'friends' ? value : 'all'
+  } catch {
+    return 'all' // Storage no disponible: arrancamos sin filtro, no rompe nada.
+  }
+}
+
+function storeFilter(value: TripFilter): void {
+  try {
+    sessionStorage.setItem(TRIP_FILTER_KEY, value)
+  } catch {
+    // Sin storage: el filtro no sobrevive a un remount, pero sigue funcionando ahora.
+  }
+}
+
+function matchesFilter(group: HomeGroup, filter: TripFilter): boolean {
+  if (filter === 'mine') return Boolean(group.owned)
+  if (filter === 'friends') return !group.owned
+  return true
+}
+
 function heroTransitionName(groupId: string): string {
   return `trip-hero-${groupId}`
 }
@@ -184,11 +223,36 @@ export function HomeDashboard({
   const feed = sortTrips(groups)
   const carouselRef = useRef<HTMLUListElement>(null)
 
-  // Tarjeta centrada del carrusel: arranca en el primer viaje (el que más urge, ver
-  // sortTrips). '' = la tarjeta "Nuevo viaje" está centrada (sin viaje activo).
-  const [activeId, setActiveId] = useState<string>(feed[0]?.id ?? NEW_TRIP_SENTINEL)
-  const activeTrip = feed.find((g) => g.id === activeId) ?? null
+  // Chips de filtro (issue #609): solo aportan si hay AMBOS tipos de viaje — si
+  // el usuario solo tiene propios (o solo de amigos), un filtro no distingue nada
+  // y solo sería ruido, así que se ocultan.
+  const hasOwnTrips = feed.some((g) => g.owned)
+  const hasFriendTrips = feed.some((g) => !g.owned)
+  const showFilterChips = hasOwnTrips && hasFriendTrips
+
+  const [filter, setFilter] = useState<TripFilter>(() => readStoredFilter())
+  const visibleFeed = feed.filter((g) => matchesFilter(g, filter))
+  const noResults = filter !== 'all' && visibleFeed.length === 0
+
+  // Tarjeta centrada del carrusel: arranca en el primer viaje VISIBLE (el que más
+  // urge, ver sortTrips). '' = la tarjeta "Nuevo viaje" está centrada (sin viaje
+  // activo, o filtro sin resultados).
+  const [activeId, setActiveId] = useState<string>(visibleFeed[0]?.id ?? NEW_TRIP_SENTINEL)
+  const activeTrip = visibleFeed.find((g) => g.id === activeId) ?? null
   const tint = useAmbientTint(activeTrip?.coverUrl ?? null)
+
+  // Cambiar de chip salta a la primera tarjeta del resultado filtrado (el globo la
+  // sigue vía `activeTargetId`, ya cableado más abajo) y devuelve el carrusel al
+  // inicio: el scroll anterior ya no corresponde al nuevo contenido.
+  function handleFilterChange(next: TripFilter) {
+    setFilter(next)
+    storeFilter(next)
+    const nextFeed = feed.filter((g) => matchesFilter(g, next))
+    setActiveId(nextFeed[0]?.id ?? NEW_TRIP_SENTINEL)
+    // Asignación directa (no `scrollTo`, que jsdom no implementa en los tests): el
+    // contenido cambia por completo, así que el scroll anterior ya no corresponde.
+    if (carouselRef.current) carouselRef.current.scrollLeft = 0
+  }
 
   // Transición héroe (issue #589), mitad de "vuelta": se consume UNA vez al montar
   // (el initializer de useState solo corre en el mount, no en re-renders) para que
@@ -228,7 +292,7 @@ export function HomeDashboard({
       el.removeEventListener('scroll', onScroll)
       if (settleTimer != null) window.clearTimeout(settleTimer)
     }
-  }, [feed])
+  }, [visibleFeed])
 
   return (
     <div className={[styles.scene, className].filter(Boolean).join(' ')}>
@@ -298,42 +362,112 @@ export function HomeDashboard({
         <div className={styles.dockHead}>
           <h2 className={styles.dockLabel}>Tus viajes</h2>
           <span className={styles.dockCount}>
-            {feed.length === 1 ? '1 viaje' : `${feed.length} viajes`}
+            {visibleFeed.length === 1 ? '1 viaje' : `${visibleFeed.length} viajes`}
           </span>
         </div>
 
-        <ul ref={carouselRef} className={styles.carousel} aria-label="Tus viajes">
-          {feed.map((group) => (
-            <li key={group.id} className={styles.slide} data-gid={group.id}>
-              <TripCard
-                group={group}
-                active={group.id === activeId}
-                isReturningHero={group.id === heroReturnId}
-                onFocus={() => setActiveId(group.id)}
-                onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
-              />
-            </li>
-          ))}
+        {/* Chips Todos · Míos · De amigos (issue #609): solo si distinguen algo (ver
+            `showFilterChips`). Vidrio compacto, un único filtro activo a la vez. */}
+        {showFilterChips && (
+          <div
+            className={[styles.filterChips, 'lg-glass'].join(' ')}
+            role="group"
+            aria-label="Filtrar tus viajes"
+          >
+            <FilterChip
+              label="Todos"
+              active={filter === 'all'}
+              onClick={() => handleFilterChange('all')}
+            />
+            <FilterChip
+              label="Míos"
+              active={filter === 'mine'}
+              onClick={() => handleFilterChange('mine')}
+            />
+            <FilterChip
+              label="De amigos"
+              active={filter === 'friends'}
+              onClick={() => handleFilterChange('friends')}
+            />
+          </div>
+        )}
 
-          {/* Cierre del carrusel: empezar un viaje (estado de crecimiento). */}
-          <li className={styles.slide} data-gid={NEW_TRIP_SENTINEL}>
+        {noResults ? (
+          // Filtro sin resultados (p.ej. el filtro guardado ya no encaja con tus
+          // viajes actuales, ver comentario de `TRIP_FILTER_KEY` arriba): aviso corto
+          // + salida directa a "Todos", en vez de un carrusel vacío sin explicación.
+          <div className={styles.emptyFilter}>
+            <p className={styles.emptyFilterText}>
+              {filter === 'mine'
+                ? 'No tienes viajes propios con este filtro.'
+                : 'No tienes viajes de amigos con este filtro.'}
+            </p>
             <button
               type="button"
-              className={['lg-press', styles.newCard].join(' ')}
-              data-active={activeId === NEW_TRIP_SENTINEL}
-              onFocus={() => setActiveId(NEW_TRIP_SENTINEL)}
-              onClick={onCreateGroup}
-              aria-label="Empezar un viaje nuevo"
+              className={['lg-press', 'lg-glass', styles.emptyFilterButton].join(' ')}
+              onClick={() => handleFilterChange('all')}
             >
-              <span className={styles.newIcon} aria-hidden="true">
-                <Icon icon={Plus} size={22} />
-              </span>
-              <span className={styles.newText}>Nuevo viaje</span>
+              Ver todos
             </button>
-          </li>
-        </ul>
+          </div>
+        ) : (
+          <ul ref={carouselRef} className={styles.carousel} aria-label="Tus viajes">
+            {visibleFeed.map((group) => (
+              <li key={group.id} className={styles.slide} data-gid={group.id}>
+                <TripCard
+                  group={group}
+                  active={group.id === activeId}
+                  isReturningHero={group.id === heroReturnId}
+                  onFocus={() => setActiveId(group.id)}
+                  onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+                />
+              </li>
+            ))}
+
+            {/* Cierre del carrusel: empezar un viaje (estado de crecimiento). */}
+            <li className={styles.slide} data-gid={NEW_TRIP_SENTINEL}>
+              <button
+                type="button"
+                className={['lg-press', styles.newCard].join(' ')}
+                data-active={activeId === NEW_TRIP_SENTINEL}
+                onFocus={() => setActiveId(NEW_TRIP_SENTINEL)}
+                onClick={onCreateGroup}
+                aria-label="Empezar un viaje nuevo"
+              >
+                <span className={styles.newIcon} aria-hidden="true">
+                  <Icon icon={Plus} size={22} />
+                </span>
+                <span className={styles.newText}>Nuevo viaje</span>
+              </button>
+            </li>
+          </ul>
+        )}
       </div>
     </div>
+  )
+}
+
+// Chip de filtro individual: vidrio compacto, `aria-pressed` marca el activo (un
+// único filtro a la vez, no checkboxes independientes).
+function FilterChip({
+  label,
+  active,
+  onClick,
+}: {
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      className={['lg-press', styles.filterChip].join(' ')}
+      data-active={active}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      {label}
+    </button>
   )
 }
 
@@ -435,6 +569,7 @@ function TripCard({
       type="button"
       className={['lg-press', styles.card].join(' ')}
       data-active={active}
+      data-owned={group.owned ? 'true' : undefined}
       onClick={handleActivate}
       onFocus={onFocus}
       disabled={!isButton}

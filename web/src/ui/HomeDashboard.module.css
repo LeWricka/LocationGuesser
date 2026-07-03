@@ -239,6 +239,74 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ===== Chips de filtro Todos · Míos · De amigos (issue #609) =====
+   Segmentado compacto en vidrio, sobre el carrusel y junto al label del dock (mismo
+   `lg-glass` que el resto del chrome sobre foto/escena — regla dura #537). Solo se
+   pinta cuando distingue algo (`showFilterChips` en el TSX): con un único tipo de
+   viaje, un filtro no aporta y sería puro ruido. */
+.filterChips {
+  align-self: flex-start;
+  display: inline-flex;
+  gap: 2px;
+  margin: 0 var(--space-4);
+  padding: 3px;
+  border-radius: var(--radius-full);
+}
+.filterChip {
+  border: none;
+  background: transparent;
+  color: var(--scene-ink-soft);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+.filterChip[data-active='true'] {
+  background: var(--glass-bg-strong);
+  color: var(--scene-ink);
+}
+.filterChip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ===== Aviso "sin resultados" del filtro (issue #609) =====
+   Sustituye al carrusel cuando el filtro guardado ya no encaja con los viajes
+   actuales (ver comentario de `TRIP_FILTER_KEY` en el TSX): mensaje corto + salida
+   directa a "Todos", nunca un carrusel vacío sin explicación. */
+.emptyFilter {
+  margin: var(--space-3) var(--space-4) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--scene-ink);
+}
+.emptyFilterText {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--scene-ink-soft);
+}
+.emptyFilterButton {
+  /* Sin `border` propio: hereda el borde de contacto de `.lg-glass` (declarar
+     `border: none` aquí lo pisaría — misma cascada, pero esta regla va después). */
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--scene-ink);
+  cursor: pointer;
+}
+.emptyFilterButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 /* Carrusel horizontal con snap al centro (mismo patrón que `.carousel` del Diario):
    máscara en los bordes para que la tarjeta vecina asome como un peek intencionado,
    no un corte a mitad de foto. */
@@ -312,6 +380,17 @@
 }
 .card:disabled {
   cursor: default;
+}
+
+/* Señal extra de "es tuyo" (issue #609): borde dorado tenue, ADEMÁS de la corona
+   (`.crown`), para leer de un vistazo qué tarjetas son propias sin depender solo
+   del icono pequeño. `inset` para no competir con el aro de contacto (`--glass-
+   border`) del `box-shadow` base — se apilan, no se sustituyen. */
+.card[data-owned='true'] {
+  box-shadow:
+    var(--scene-shadow),
+    0 0 0 1px var(--glass-border),
+    inset 0 0 0 1.5px color-mix(in srgb, var(--medal-gold) 55%, transparent);
 }
 
 /* Tarjeta NO centrada: atenuada y algo encogida — la centrada (`data-active`) manda
