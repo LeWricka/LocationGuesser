@@ -37,9 +37,34 @@ vi.mock('../../lib/storage', async (importOriginal) => {
   return { ...actual, uploadImage: (...args: unknown[]) => uploadImageMock(...args) }
 })
 
+// Fecha por defecto en cascada (#553): mocks de las dos consultas ligeras que
+// resuelve AddMoment al montar (el último momento del viaje + sus fechas). Por
+// defecto no hay ni lo uno ni lo otro (cae en "hoy", el comportamiento previo);
+// cada test de la cascada los sobreescribe.
+const getGroupMock = vi.fn()
+vi.mock('../../lib/groupData', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/groupData')>()
+  return { ...actual, getGroup: (...args: unknown[]) => getGroupMock(...args) }
+})
+
+const latestMomentMock = vi.fn()
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn(() => ({ maybeSingle: latestMomentMock })),
+          })),
+        })),
+      })),
+    })),
+  },
+}))
+
 // Import DESPUÉS de los vi.mock (hoisted igualmente, pero así queda claro el orden
 // de lectura: primero qué se mockea, luego qué se prueba).
-import { AddMoment } from './AddMoment'
+import { AddMoment, computeDefaultDate } from './AddMoment'
 import { ImageDecodeError } from '../../lib/storage'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
@@ -76,6 +101,9 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
     createMomentMock.mockReset()
     addMomentImagesMock.mockReset()
     uploadImageMock.mockReset()
+    // Por defecto, viaje sin momentos ni fechas propias (cae en "hoy").
+    getGroupMock.mockReset().mockResolvedValue(null)
+    latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
     // jsdom no implementa createObjectURL/revokeObjectURL; el componente los usa
     // solo para la miniatura de la galería, irrelevante para este caso.
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
@@ -162,5 +190,87 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
     await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
     expect(uploadImageMock).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('Recuerdo guardado')).toBeInTheDocument()
+  })
+})
+
+describe('computeDefaultDate — fecha por defecto en cascada (#553)', () => {
+  const today = '2026-07-03'
+
+  test('1a. con momentos y created_at DENTRO del rango del viaje → la fecha del más reciente', () => {
+    // Diario documentado en vivo: el último momento ancla la fecha.
+    expect(
+      computeDefaultDate('2024-09-10T12:00:00.000Z', '2024-09-01', '2024-09-15', today),
+    ).toEqual({ date: '2024-09-10', max: today })
+  })
+
+  test('1b. con momentos pero SIN fechas del viaje → la fecha del más reciente (nada que contrastar)', () => {
+    expect(computeDefaultDate('2026-06-20T12:00:00.000Z', null, null, today)).toEqual({
+      date: '2026-06-20',
+      max: today,
+    })
+  })
+
+  test('1c. viaje PASADO rellenado hoy (created_at fuera del rango) → se ignora y cae a starts_on', () => {
+    // El caso real del dueño con el SEGUNDO recuerdo: el primero se creó HOY
+    // (backfill de un viaje de sept 2024), así que su created_at NO es la fecha
+    // del viaje sino un artefacto. Si lo usáramos, el dolor original reaparecería
+    // a partir del segundo recuerdo. Fuera del rango → regla 2 → starts_on.
+    expect(computeDefaultDate(`${today}T10:00:00.000Z`, '2024-09-01', '2024-09-15', today)).toEqual(
+      { date: '2024-09-01', max: today },
+    )
+  })
+
+  test('2a. sin momentos, viaje PASADO con fechas → hoy acotado a starts_on', () => {
+    expect(computeDefaultDate(null, '2024-09-01', '2024-09-15', today)).toEqual({
+      date: '2024-09-01',
+      max: today,
+    })
+  })
+
+  test('2b. sin momentos, viaje FUTURO con fechas → starts_on, y el max se amplía a ends_on', () => {
+    expect(computeDefaultDate(null, '2026-08-01', '2026-08-15', today)).toEqual({
+      date: '2026-08-01',
+      max: '2026-08-15',
+    })
+  })
+
+  test('2c. sin momentos, hoy DENTRO del rango del viaje → hoy (max se queda en hoy)', () => {
+    expect(computeDefaultDate(null, '2026-07-01', '2026-07-10', today)).toEqual({
+      date: today,
+      max: today,
+    })
+  })
+
+  test('3. sin momentos ni fechas del viaje → hoy (comportamiento de siempre)', () => {
+    expect(computeDefaultDate(null, null, null, today)).toEqual({ date: today, max: today })
+  })
+
+  test('viaje futuro SIN ends_on → starts_on, pero el max no se amplía (nada a lo que ampliar)', () => {
+    expect(computeDefaultDate(null, '2026-08-01', null, today)).toEqual({
+      date: '2026-08-01',
+      max: today,
+    })
+  })
+})
+
+describe('AddMoment — fecha por defecto pre-rellenada (#553)', () => {
+  test('preselecciona la fecha del recuerdo más reciente y el calendario abre en su mes', async () => {
+    latestMomentMock.mockResolvedValue({
+      data: { created_at: '2024-09-10T12:00:00.000Z' },
+      error: null,
+    })
+
+    renderAddMoment()
+
+    // El campo llega con "hoy" (mientras resuelve la cascada) y se actualiza solo,
+    // sin que el usuario toque nada, en cuanto llega el último momento del viaje.
+    const trigger = await screen.findByLabelText('Fecha')
+    await waitFor(() => expect(trigger).toHaveTextContent('10 de septiembre de 2024'))
+
+    // Al abrir el calendario, el mes visible es el de la fecha pre-rellenada (sept
+    // 2024), no el de hoy: DatePicker recalcula el mes visible en el gesto de abrir
+    // (`toggleOpen`), así que no hace falta ninguna prop nueva de "mes inicial".
+    await userEvent.click(trigger)
+    expect(screen.getByRole('dialog')).toHaveTextContent('septiembre 2024')
   })
 })
