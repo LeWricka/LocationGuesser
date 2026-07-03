@@ -109,6 +109,10 @@ function parseAnswer(raw: string): { value: number; decimals: number } | null {
 // hero pinta la pregunta REAL que se va escribiendo (no un placeholder de relleno).
 export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }: Props) {
   const [stage, setStage] = useState<Stage>(0)
+  // Dirección del cambio de paso (#531): avanzar entra desde la derecha, volver
+  // desde la izquierda. `goStage` es el único punto que mueve `stage`, así que
+  // calcular la dirección ahí cubre avanzar y retroceder.
+  const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   // Reto recién creado: en vez de saltar a jugar, mostramos la hoja de Compartir.
   const [created, setCreated] = useState<ChallengeForPlay | null>(null)
 
@@ -186,11 +190,15 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
     return null
   })()
 
+  function goStage(n: Stage) {
+    setDirection(n > stage ? 'forward' : 'backward')
+    setStage(n)
+  }
   function advance() {
-    if (stage < 2 && canAdvanceFromStage[stage]) setStage((stage + 1) as Stage)
+    if (stage < 2 && canAdvanceFromStage[stage]) goStage((stage + 1) as Stage)
   }
   function retreat() {
-    if (stage > 0) setStage((stage - 1) as Stage)
+    if (stage > 0) goStage((stage - 1) as Stage)
   }
 
   async function save() {
@@ -247,6 +255,11 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
     }
   }
 
+  // Clase del contenido del paso: dirección del `.stage` (#531, tokens compartidos
+  // en CreateChallengeImmersive.module.css vía `sheet`). Solo el CONTENIDO de la
+  // hoja anima; el hero de foto y la cabecera quedan fijos entre pasos.
+  const stageClass = `${sheet.stage} ${direction === 'backward' ? sheet.stepBack : ''}`.trim()
+
   return (
     <div className={styles.root}>
       {/* Foto-hero: la imagen (si la hay) llena la cabecera; encima, chip de tipo
@@ -290,7 +303,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
       >
         {/* ETAPA 0 — nombre + pregunta (primero, como pide el rediseño). */}
         {stage === 0 && (
-          <section className={sheet.stage}>
+          <section className={stageClass}>
             <div className={sheet.eyebrow}>
               <i className={sheet.dot} /> Paso 1 de 3 · La pregunta
             </div>
@@ -346,7 +359,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
 
         {/* ETAPA 1 — respuesta + unidad JUNTAS (UnitInput: número grande + unidad). */}
         {stage === 1 && (
-          <section className={sheet.stage}>
+          <section className={stageClass}>
             <div className={sheet.eyebrow}>
               <i className={sheet.dot} /> Paso 2 de 3 · La respuesta
             </div>
@@ -400,7 +413,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
 
         {/* ETAPA 2 — reglas (estrictez, plazo, tiempo) + crear → Compartir. */}
         {stage === 2 && (
-          <section className={sheet.stage}>
+          <section className={stageClass}>
             <div className={sheet.eyebrow}>
               <i className={sheet.dot} /> Paso 3 de 3 · Las reglas
             </div>

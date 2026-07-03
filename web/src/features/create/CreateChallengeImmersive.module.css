@@ -336,17 +336,36 @@
   width: 0;
 }
 
+/* Dirección del paso (#531): compartida por CreateChallengeImmersive (¿Dónde?) y
+   CreateNumberChallenge (¿Adivinas?, importa este módulo como `sheet`). Avanzar
+   entra desde la derecha, volver desde la izquierda. `animation-fill-mode:
+   backwards` (nunca `forwards`/`both`) es lo que evita el transform residual del
+   gotcha de PR #527 (un stacking context que tapaba un popover con el CTA fijo):
+   al terminar la animación el elemento vuelve a su reposo sin transform. */
 .stage {
-  animation: stageIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  animation: stageInForward var(--motion-duration-base) var(--motion-ease-emphasized) backwards;
 }
-@keyframes stageIn {
+.stage.stepBack {
+  animation-name: stageInBackward;
+}
+@keyframes stageInForward {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateX(24px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateX(0);
+  }
+}
+@keyframes stageInBackward {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
   }
 }
 

@@ -39,6 +39,10 @@ const START_DATE_TRIGGER_ID = 'cg-starts-on'
 // nombre hace falta para avanzar.
 export function CreateGroup({ onBack }: Props) {
   const [stage, setStage] = useState<Stage>(0)
+  // Dirección del cambio de paso (#531): avanzar entra desde la derecha, volver
+  // desde la izquierda. `goStage` es el único punto que mueve `stage`, así que
+  // calcular la dirección ahí cubre avanzar y retroceder.
+  const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   const [name, setName] = useState('')
   const [startsOn, setStartsOn] = useState('')
   const [endsOn, setEndsOn] = useState('')
@@ -83,6 +87,7 @@ export function CreateGroup({ onBack }: Props) {
   }
 
   function goStage(n: Stage) {
+    setDirection(n > stage ? 'forward' : 'backward')
     setStage(n)
   }
 
@@ -159,6 +164,10 @@ export function CreateGroup({ onBack }: Props) {
     }
   }
 
+  // Clase del contenido del paso: dirección del `.stage` (#531). Solo el CONTENIDO
+  // anima; la cabecera/footer de ShellUtilitario quedan fijos entre pasos.
+  const stageClass = `${styles.stage} ${direction === 'backward' ? styles.stepBack : ''}`.trim()
+
   // Footer CTA: varía según la etapa y el estado de carga.
   const footer =
     stage === 0 ? (
@@ -224,7 +233,7 @@ export function CreateGroup({ onBack }: Props) {
         {/* ETAPA 0 — el viaje: nombre · fechas · gente (todo en una hoja que respira;
             el campo de acompañantes vive solo aquí, sin duplicar). */}
         {stage === 0 && (
-          <section className={styles.stage}>
+          <section className={stageClass}>
             <div className={styles.eyebrow}>
               <i className={styles.dot} /> Paso 1 de 2 · El viaje
             </div>
@@ -348,7 +357,7 @@ export function CreateGroup({ onBack }: Props) {
 
         {/* ETAPA 1 — resumen + crear. */}
         {stage === 1 && (
-          <section className={styles.stage}>
+          <section className={stageClass}>
             <div className={styles.eyebrow}>
               <i className={styles.dot} /> Paso 2 de 2 · Listo
             </div>
