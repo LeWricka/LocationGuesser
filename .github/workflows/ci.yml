@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# Dieta de minutos (#657): un push nuevo a la misma rama/PR cancela el run de CI
+# anterior, que ya quedó obsoleto. No toca otros workflows (DB migrate, Smoke
+# logueado), que tienen su propio grupo de concurrencia.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     name: Lint, types, test y build
@@ -62,8 +69,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
+      - name: Resolver versión de Playwright (clave de caché)
+        id: pw-version
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+
+      # Cachea los binarios de navegador (~/.cache/ms-playwright), keyed por la
+      # versión exacta de @playwright/test. Las dependencias de SO (apt) NO se
+      # cachean aquí: el runner es una VM efímera y no persiste paquetes apt
+      # entre runs, así que siempre hace falta `install-deps`.
+      - name: Caché de navegadores Playwright
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright Chromium (+ deps del SO)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Instalar solo deps del SO (navegador en caché)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       # El smoke es HERMÉTICO: no hace login ni escribe en BD; solo comprueba que
       # la SPA monta y muestra el login. El cliente de Supabase se construye al
@@ -96,8 +123,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
+      - name: Resolver versión de Playwright (clave de caché)
+        id: pw-version
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de navegadores Playwright
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright Chromium (+ deps del SO)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Instalar solo deps del SO (navegador en caché)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       # E2E HERMÉTICO del bucle de crear reto (#443/#456). Su config propia
       # (playwright.hermetic.config.ts) corre contra el BUILD de prod servido por
@@ -134,8 +177,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Install Playwright Chromium
+      - name: Resolver versión de Playwright (clave de caché)
+        id: pw-version
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de navegadores Playwright
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright Chromium (+ deps del SO)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chromium
+
+      - name: Instalar solo deps del SO (navegador en caché)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
 
       # Guardarraíles HERMÉTICOS de la galería (GALLERY=1: fixtures, sin login ni red;
       # cada spec bloquea toda red externa). `npm run a11y` corre dos specs:
