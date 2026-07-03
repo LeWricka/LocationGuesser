@@ -101,6 +101,8 @@ export {
   IconCandado,
   IconConfeti,
   IconGps,
+  LogoTabide,
+  WordmarkTabide,
 } from './icons'
 
 // Shells de pantalla: la capa de composición que codifica las reglas duras de

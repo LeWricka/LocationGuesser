@@ -22,7 +22,7 @@
 //  - `LandingShowcase` para enseñar el producto en acción dentro de la hoja.
 
 import { useEffect, useState } from 'react'
-import { Button, GlobeSheet, Logo, Stack, useToast } from '../../ui'
+import { Button, GlobeSheet, LogoTabide, Stack, WordmarkTabide, useToast } from '../../ui'
 import { takeLegacySessionNotice } from '../../lib/auth'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { LandingShowcase } from './LandingShowcase'
@@ -80,7 +80,10 @@ export function Landing({ groupName, redirectTo }: Props) {
         sheetLabel="Empieza a compartir"
         overlay={
           <span className={styles.brand}>
-            <Logo variant="wordmark" size={20} monochrome />
+            {/* Variante `oscuro`: paleta propia (papel + oro + teal) sobre la escena
+                oscura del globo héroe, en vez de aplanarse a un solo tono (#557). */}
+            <LogoTabide variant="oscuro" size={22} />
+            <WordmarkTabide size={18} />
           </span>
         }
       >

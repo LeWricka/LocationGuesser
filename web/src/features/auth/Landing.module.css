@@ -5,10 +5,12 @@
   min-height: 100dvh;
 }
 
-/* Marca en el overlay sobre el globo: tinta de escena clara (hereda --scene-ink). */
+/* Marca en el overlay sobre el globo: tinta de escena clara (hereda --scene-ink).
+ * `gap`: separa el símbolo LogoTabide del wordmark (#557; antes un solo nodo Logo). */
 .brand {
   display: inline-flex;
   align-items: center;
+  gap: var(--space-2);
   color: var(--scene-ink);
 }
 

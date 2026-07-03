@@ -4,7 +4,7 @@ import { BackHomeButton } from './BackHomeButton'
 import { Button } from './Button'
 import { Field } from './Field'
 import { Input } from './Input'
-import { Logo } from './Logo'
+import { LogoTabide } from './icons'
 import { Stack } from './Stack'
 import styles from './LoginScreen.module.css'
 
@@ -54,7 +54,9 @@ export function LoginScreen({
   return (
     <AuthScreen
       className={className}
-      icon={<Logo variant="mark" size={40} />}
+      /* Variante `claro`: pin grafito sobre el disco cálido de --color-accent-soft
+         (fondo papel/claro de esta pantalla), no la escena oscura del globo (#557). */
+      icon={<LogoTabide variant="claro" size={40} />}
       title={joining ? 'Únete para jugar este reto' : 'Entra a Tabide'}
       header={onBack ? <BackHomeButton onClick={onBack} label="Atrás" /> : undefined}
       subtitle={
