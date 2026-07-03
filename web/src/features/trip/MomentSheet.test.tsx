@@ -1,5 +1,5 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Moment } from '../../lib/trip'
 import type { Vote } from '../../lib/database.types'
@@ -184,6 +184,79 @@ describe('MomentSheet', () => {
       </ToastProvider>,
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  // --- Regresión #605: la hoja se quedaba atascada en `closing` ------------------
+  //
+  // Causa raíz REAL (no era red ni un `animationend` que no llegara): `closing`
+  // solo se ponía a `true`, nunca volvía a `false` por sí solo, y este
+  // componente no se desmonta entre aperturas (el padre siempre renderiza
+  // `<MomentSheet moment={openMoment} .../>`, alternando `moment` entre un
+  // valor y `null`). Así, tras el PRIMER cierre, el SIGUIENTE momento abierto
+  // heredaba `closing=true` desde su primer render: nacía ya en la posición
+  // final de salida (sin transición que disparar `onTransitionEnd`) y
+  // `close()` cortaba en seco cualquier reintento (`if (closing) return`) sin
+  // programar un temporizador nuevo — el overlay quedaba bloqueando la app
+  // para siempre. jsdom tampoco emite `transitionend`, así que estos tests
+  // ejercitan también el camino de seguridad (el timeout) sin depender de él.
+  describe('cierre de la hoja (#605)', () => {
+    beforeEach(() => vi.useFakeTimers())
+    afterEach(() => vi.useRealTimers())
+
+    test('sin transitionend (jsdom no lo emite): el timeout de seguridad fuerza onClose', () => {
+      const onClose = vi.fn()
+      renderSheet({ onClose })
+
+      // El overlay (fondo) es el padre del panel con role="dialog"; clicarlo
+      // dispara `close()` sin pasar por el asa de arrastre.
+      const overlay = screen.getByRole('dialog').parentElement as HTMLElement
+      fireEvent.click(overlay)
+      expect(onClose).not.toHaveBeenCalled()
+
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
+    test('reabrir OTRO momento tras cerrar no deja el overlay bloqueado', () => {
+      const onClose = vi.fn()
+      const { rerender } = render(
+        <ToastProvider>
+          <MomentSheet moment={RECUERDO} onClose={onClose} />
+        </ToastProvider>,
+      )
+
+      // Cierra el primer momento (se resuelve por el timeout de seguridad).
+      fireEvent.click(screen.getByRole('dialog').parentElement as HTMLElement)
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+
+      // El padre reacciona a `onClose` poniendo `moment=null`...
+      rerender(
+        <ToastProvider>
+          <MomentSheet moment={null} onClose={onClose} />
+        </ToastProvider>,
+      )
+      // ...y más tarde abre OTRO momento distinto.
+      rerender(
+        <ToastProvider>
+          <MomentSheet moment={RETO_CERRADO} onClose={onClose} />
+        </ToastProvider>,
+      )
+
+      // El overlay del momento NUEVO debe responder al primer toque: si
+      // `closing` hubiera quedado pegado a `true` desde el cierre anterior,
+      // este clic no haría nada (guard de `close()`) y el overlay se quedaría
+      // bloqueando la app para siempre — el bug real reportado en #605.
+      fireEvent.click(screen.getByRole('dialog').parentElement as HTMLElement)
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(onClose).toHaveBeenCalledTimes(2)
+    })
   })
 
   describe('reto cerrado · "Tu resultado" (#580)', () => {

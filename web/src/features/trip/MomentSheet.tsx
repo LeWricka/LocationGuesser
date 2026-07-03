@@ -127,11 +127,14 @@ function computeEditMaxDate(startsOn: string | null, endsOn: string | null): str
 // la hoja vuelve a su sitio (gesto cancelado).
 const DRAG_CLOSE_PX = 110
 
-// Duración (ms) de la animación de SALIDA de la hoja: espejo del token
-// `--motion-duration-base` (200ms) que usa el CSS. Tras este tiempo desmontamos
-// (llamamos a onClose). Se mantiene en sync con el token a mano porque no hay una
-// vía barata de leer un custom property desde JS sin tocar el DOM del panel.
-const EXIT_MS = 200
+// Timeout de SEGURIDAD (ms) para el cierre: si `transitionend` no llega —
+// `prefers-reduced-motion` detectado distinto entre CSS y JS, un remontaje a
+// media caída, o cualquier otro borde de la animación de salida (`--motion-
+// duration-base`, 200ms) — este temporizador fuerza igualmente el desmontaje.
+// ~2× la transición esperada: no compite con `onTransitionEnd` en el camino
+// feliz (que resuelve antes y lo cancela), solo actúa cuando de verdad hace
+// falta (issue #605: el overlay se quedaba bloqueando la app para siempre).
+const CLOSE_SAFETY_MS = 400
 
 // Duración del reto al convertir: mismas paradas que el asistente de "Añadir
 // recuerdo" para coherencia. El plazo se calcula relativo a AHORA al guardar.
@@ -276,7 +279,7 @@ export function MomentSheet({
       return
     }
     setClosing(true)
-    closeTimer.current = window.setTimeout(onClose, EXIT_MS)
+    closeTimer.current = window.setTimeout(onClose, CLOSE_SAFETY_MS)
   }
 
   // Si el momento desaparece (padre desmonta) limpiamos el temporizador pendiente.
@@ -285,6 +288,33 @@ export function MomentSheet({
       if (closeTimer.current !== null) window.clearTimeout(closeTimer.current)
     }
   }, [])
+
+  // Resetea el estado transitorio del CIERRE al abrir un momento (nuevo o el
+  // mismo tras cerrar). CAUSA RAÍZ del bug #605: `closing` solo se ponía a
+  // `true` (nunca volvía a `false` por sí solo) y este componente NUNCA se
+  // desmonta entre aperturas — TripPage siempre renderiza `<MomentSheet
+  // moment={openMoment} .../>`, alternando `moment` entre un valor y `null`,
+  // así que el estado de React sobrevive. Resultado: tras el PRIMER cierre, el
+  // siguiente momento abierto heredaba `closing=true` desde el primer render,
+  // el panel (recién montado por `key`) nacía ya en su posición final de
+  // salida sin transición que disparar (`onTransitionEnd` nunca llega) y sin
+  // temporizador nuevo (el guard `if (closing) return` de `close()` corta en
+  // seco cualquier reintento) — el overlay quedaba bloqueando la app para
+  // siempre, con consola y red limpias.
+  useEffect(() => {
+    if (!moment) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset síncrono al abrir, ver comentario arriba
+    setClosing(false)
+    setDragY(0)
+    setDragging(false)
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current)
+      closeTimer.current = null
+    }
+    // Solo el id primitivo: no queremos re-disparar el reset si el objeto
+    // `moment` se recrea (Realtime) sin cambiar de momento abierto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moment?.challengeId])
 
   // Cerrar con Escape mientras la hoja está abierta.
   useEffect(() => {
@@ -494,10 +524,17 @@ export function MomentSheet({
         style={panelStyle}
         // El panel no propaga el click al overlay (que cierra).
         onClick={(e) => e.stopPropagation()}
-        // Fin de la caída de salida → desmontar. El temporizador de `close` es el
-        // respaldo si la transición no llega a emitirse.
+        // Fin de la caída de salida → desmontar (camino feliz). Cancela el
+        // temporizador de seguridad de `close()`: ya no hace falta, y sin esto
+        // un segundo `onClose()` fantasma podía llegar 400ms tarde si el padre
+        // había vuelto a abrir OTRO momento mientras tanto.
         onTransitionEnd={(e) => {
-          if (closing && e.propertyName === 'transform') onClose()
+          if (!closing || e.propertyName !== 'transform') return
+          if (closeTimer.current !== null) {
+            window.clearTimeout(closeTimer.current)
+            closeTimer.current = null
+          }
+          onClose()
         }}
       >
         {/* Asa de arrastre: zona de gesto para cerrar tirando hacia abajo. Solo en

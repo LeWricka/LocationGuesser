@@ -30,7 +30,6 @@ interface Props {
   playing?: boolean
   onTogglePlay?: () => void
   onSelectFromMap: (challengeId: string) => void
-  onSelectFromCarousel: (challengeId: string) => void
   onExpand: (moment: Moment) => void
   onPlay: (challengeId: string) => void
   onAddMoment: () => void
@@ -59,7 +58,6 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
     playing,
     onTogglePlay,
     onSelectFromMap,
-    onSelectFromCarousel,
     onExpand,
     onPlay,
     onAddMoment,
@@ -108,9 +106,22 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
                 <MomentCard
                   moment={m}
                   selected={m.challengeId === selectedId}
+                  // Tocar una tarjeta que NO es la activa: solo SELECCIONA — mismo
+                  // camino que un pin del mapa o un punto del timeline
+                  // (`onSelectFromMap`), NO el de "ya se centró sola al soltar el
+                  // swipe" (`selectFromCarousel`, en TripPage): así el efecto de
+                  // TripPage que centra la tarjeta seleccionada en el carrusel SÍ
+                  // dispara (`scrollCardIntoView`), reutilizando su guard existente
+                  // (`programmaticScroll`) para que el scroll programático no se pelee
+                  // con el scroll-snap nativo. Tocar la YA activa abre el detalle
+                  // (issue #605, punto 2 — antes un solo toque hacía las dos cosas a
+                  // la vez y "abrir el detalle" tapaba el vuelo del mapa).
                   onExpand={() => {
-                    onSelectFromCarousel(m.challengeId)
-                    onExpand(m)
+                    if (m.challengeId === selectedId) {
+                      onExpand(m)
+                    } else {
+                      onSelectFromMap(m.challengeId)
+                    }
                   }}
                   // El propio reto activo no ofrece "Adivina →" (el creador no puede
                   // jugar su reto, guarda #513): MomentCard pinta el recuento de
