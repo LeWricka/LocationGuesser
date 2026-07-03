@@ -39,6 +39,7 @@ const RECUERDO: Moment = {
   lat: 39.9,
   lng: 3.9,
   guessedCount: 0,
+  isOwn: true,
   guessSeconds: null,
   svPanoId: null,
   country: { code: 'ES', name: 'ESPAÑA', flag: '🇪🇸' },

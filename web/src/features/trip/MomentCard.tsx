@@ -40,6 +40,12 @@ function formatMomentDate(value: string): string | null {
  *  - un RETO lleva chip "🎯 Reto" para distinguirlo; si está EN JUEGO añade el badge
  *    "EN JUEGO" y la única acción cálida "Adivina →" (regla del pivote: jugar es
  *    capa, no peaje — un reto ya cerrado se ve y ya).
+ *
+ * RETO PROPIO EN JUEGO (issue #578): el creador no puede jugar su propio reto (guarda
+ * "Este reto es tuyo", #513), así que su tarjeta NUNCA ofrece "Adivina →" — sería un
+ * botón que promete algo imposible. Mantiene el badge "EN JUEGO" (sigue en curso) pero
+ * el hueco del CTA pasa a informar del recuento real de jugadas ("N han jugado" /
+ * "Esperando jugadas" si aún nadie jugó). Tocar la tarjeta sigue abriendo el detalle.
  */
 export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
   const isActive = moment.status === 'active'
@@ -118,13 +124,25 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
         </div>
       </div>
 
-      {/* CTA cálido SOLO si está en juego. Va por encima del overlay para ser
-          pulsable; el resto de la tarjeta sigue seleccionando. */}
-      {isActive && onPlay && (
+      {/* CTA cálido SOLO si está en juego Y no es mío. Va por encima del overlay
+          para ser pulsable; el resto de la tarjeta sigue seleccionando. */}
+      {isActive && !moment.isOwn && onPlay && (
         <div className={styles.cta}>
           <Button size="sm" onClick={onPlay}>
             Adivina →
           </Button>
+        </div>
+      )}
+
+      {/* Reto propio EN JUEGO: sin CTA (no puedo adivinar mi propio reto, #513) —
+          en su lugar, el recuento real de jugadas. No es un botón: no promete
+          ninguna acción, solo informa. */}
+      {isActive && moment.isOwn && (
+        <div className={styles.cta}>
+          <span className={styles.ownStatus}>
+            <Icon icon={User} size={14} />
+            {moment.guessedCount > 0 ? `${moment.guessedCount} han jugado` : 'Esperando jugadas'}
+          </span>
         </div>
       )}
     </article>

@@ -58,6 +58,13 @@ export interface Moment {
   lng: number | null
   /** Nº de jugadores distintos que ya han adivinado este momento (real, derivado de votos). */
   guessedCount: number
+  /**
+   * ¿Lo creó el usuario de la sesión actual (`created_by === user.id`)? Derivado en
+   * `useTripData`, NUNCA leído directo de BD aquí. Gobierna el CTA "Adivina →" de un
+   * reto EN JUEGO: el creador no puede jugar su propio reto (guarda de #513), así
+   * que en un momento propio la tarjeta no promete esa acción (issue #578).
+   */
+  isOwn: boolean
   /** Segundos por jugada del reto; null = sin límite. */
   guessSeconds: number | null
   /** Panorama de Street View encajado al momento, o null si no tiene. */

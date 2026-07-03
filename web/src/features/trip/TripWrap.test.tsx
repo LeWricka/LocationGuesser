@@ -30,6 +30,7 @@ function moment(overrides: Partial<Moment>): Moment {
     lat: 41.4,
     lng: 2.1,
     guessedCount: 0,
+    isOwn: false,
     guessSeconds: null,
     svPanoId: null,
     country: null,
