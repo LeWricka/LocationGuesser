@@ -72,6 +72,7 @@ const baseChallenge: ChallengeForPlay = {
   place_lng: null,
   image_path: null,
   audio_path: null,
+  video_path: null,
   sv_pano_id: null,
   sv_heading: null,
   sv_pitch: null,

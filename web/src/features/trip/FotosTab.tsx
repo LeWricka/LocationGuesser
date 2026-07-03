@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { ChallengePhoto, EmptyState, IconCamara } from '../../ui'
+import { Play } from 'lucide-react'
+import { ChallengePhoto, EmptyState, Icon, IconCamara } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
 import { listGroupMomentImages } from '../../lib/momentImages'
 import { signedImageUrl } from '../../lib/storage'
@@ -28,7 +29,14 @@ interface Props {
 // se resuelve todo en un único array antes de repartir en `ready`/`toSign`.
 type Pending =
   | { kind: 'ready'; photo: GalleryPhoto }
-  | { kind: 'sign'; path: string; momentId: string; momentTitle: string; date: string }
+  | {
+      kind: 'sign'
+      path: string
+      momentId: string
+      momentTitle: string
+      date: string
+      hasVideo?: boolean
+    }
 
 /**
  * Pestaña FOTOS del viaje (issue #645): TODAS las imágenes visibles de los
@@ -62,19 +70,25 @@ export function FotosTab({ groupId, moments, canCreate, onAddMoment, onOpenMomen
         for (const m of visible) {
           const gallery = !m.isChallenge ? galleryByMoment.get(m.challengeId) : undefined
           if (gallery && gallery.length > 0) {
-            // Recuerdo con galería propia: TODAS sus fotos (a firmar aquí).
-            for (const img of gallery) {
+            // Recuerdo con galería propia: TODAS sus fotos (a firmar aquí). Solo
+            // la PORTADA (la primera, `i === 0`) lleva el badge ▶ si el momento
+            // tiene clip (issue #649) — es la única que representa "este momento
+            // tiene un vídeo" en la rejilla; el resto son fotos sueltas.
+            gallery.forEach((img, i) => {
               pending.push({
                 kind: 'sign',
                 path: img.image_path,
                 momentId: m.challengeId,
                 momentTitle: m.title,
                 date: m.date,
+                hasVideo: i === 0 && m.videoUrl != null,
               })
-            }
+            })
           } else if (m.imageUrl) {
             // Reto (nunca lleva galería), o recuerdo legado sin filas en
-            // `moment_images`: su única foto, YA firmada por `useTripData`.
+            // `moment_images`: su única foto, YA firmada por `useTripData`. Un
+            // reto nunca tiene `videoUrl` (ver `lib/trip.ts`), así que el badge
+            // solo puede encenderse en un recuerdo legado con clip.
             pending.push({
               kind: 'ready',
               photo: {
@@ -82,6 +96,7 @@ export function FotosTab({ groupId, moments, canCreate, onAddMoment, onOpenMomen
                 momentId: m.challengeId,
                 momentTitle: m.title,
                 date: m.date,
+                hasVideo: m.videoUrl != null,
               },
             })
           }
@@ -97,7 +112,13 @@ export function FotosTab({ groupId, moments, canCreate, onAddMoment, onOpenMomen
           out.push(
             p.kind === 'ready'
               ? p.photo
-              : { src, momentId: p.momentId, momentTitle: p.momentTitle, date: p.date },
+              : {
+                  src,
+                  momentId: p.momentId,
+                  momentTitle: p.momentTitle,
+                  date: p.date,
+                  hasVideo: p.hasVideo,
+                },
           )
         })
         if (!cancelled) setPhotos(out)
@@ -156,6 +177,14 @@ export function FotosTab({ groupId, moments, canCreate, onAddMoment, onOpenMomen
                     className={styles.cell}
                     onClick={() => setLightboxAt(photo.flatIndex)}
                   />
+                  {/* Badge ▶ (issue #649): esta portada representa un momento con
+                      clip de vídeo. El clip en sí se ve abriendo el momento
+                      ("Ver el momento" del lightbox), no en esta rejilla. */}
+                  {photo.hasVideo && (
+                    <div className={styles.videoBadge} data-testid="video-badge" aria-hidden="true">
+                      <Icon icon={Play} size={14} fill="currentColor" />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

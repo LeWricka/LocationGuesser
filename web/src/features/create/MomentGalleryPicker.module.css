@@ -194,6 +194,29 @@
   font-weight: var(--font-weight-bold);
 }
 
+/* Badge ▶ del fotograma-portada del clip (issue #649): disco de vidrio
+   centrado, mismo lenguaje "glass" que el resto del chrome flotante sobre
+   foto (ver MomentCard/.flag). No es interactivo (aria-hidden): la acción de
+   quitar el clip ya vive en `.tileActions`. */
+.videoBadge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  color: var(--color-on-photo);
+  pointer-events: none;
+}
+
 .tileActions {
   position: absolute;
   left: 0;

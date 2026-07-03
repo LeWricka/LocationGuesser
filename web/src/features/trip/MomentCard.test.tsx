@@ -139,3 +139,31 @@ describe('MomentCard — foto sorpresa (issue #655, spoiler del carrusel)', () =
     expect(screen.queryByRole('img', { name: SORPRESA_LABEL })).not.toBeInTheDocument()
   })
 })
+
+describe('MomentCard — badge de clip de vídeo (issue #649)', () => {
+  test('con videoUrl, pinta el badge ▶ sobre la portada', () => {
+    render(
+      <MomentCard
+        moment={activeChallenge({
+          status: 'recuerdo',
+          isChallenge: false,
+          videoUrl: 'https://firmada.example/clip.mp4',
+        })}
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(screen.getByTestId('video-badge')).toBeInTheDocument()
+  })
+
+  test('sin videoUrl (recuerdo sin clip o reto), no pinta el badge', () => {
+    render(
+      <MomentCard
+        moment={activeChallenge({ status: 'recuerdo', isChallenge: false, videoUrl: null })}
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(screen.queryByTestId('video-badge')).not.toBeInTheDocument()
+  })
+})

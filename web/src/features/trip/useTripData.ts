@@ -136,6 +136,17 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   // URL firmada de cada nota de voz, indexada por challenge_id (mismo bucket
   // privado, prefijo `audio/`, #648). Mismo patrón que `imageUrlById`.
   const [audioUrlById, setAudioUrlById] = useState<Record<string, string>>({})
+  // URL firmada de cada clip de vídeo corto, indexada por challenge_id (mismo
+  // bucket privado, prefijo `video/`, issue #649). A diferencia de
+  // `imageUrlById`/`audioUrlById` (que solo firman lo que YA viene en `c`,
+  // porque `image_path`/`audio_path` sí están en `CHALLENGE_COLUMNS_NO_ANSWER`),
+  // `video_path` NO viaja en `c` a propósito (ver el comentario de esa
+  // constante en `lib/challenges.ts`): un MP4 puede llevar su propio GPS en los
+  // metadatos del contenedor, así que nunca debe formar parte del mismo select
+  // que alimenta JUGAR un reto. Por eso aquí hace falta una consulta APARTE,
+  // solo sobre los RECUERDOS del lote (`is_challenge = false`) — un reto no
+  // puede tener vídeo (`promoteToChallenge` lo vacía), así que ni se pregunta.
+  const [videoUrlById, setVideoUrlById] = useState<Record<string, string>>({})
   // País por challenge_id, resuelto de forma escalonada y no bloqueante (abajo).
   // Solo se rellena para CERRADOS con coord; va apareciendo según se resuelve.
   const [countryById, setCountryById] = useState<Record<string, CountryInfo | null>>({})
@@ -183,6 +194,31 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
       setAudioUrlById(
         Object.fromEntries(audioPairs.filter((p): p is [string, string] => p[1] != null)),
       )
+
+      // Vídeo (#649): consulta APARTE, solo sobre los ids de RECUERDO del lote
+      // (nunca un reto — ver el comentario de `videoUrlById` de arriba). Patrón
+      // dos-consultas, igual que `listGroupMomentImages`: `challenges` no se
+      // puede filtrar por columna revocada/excluida en el mismo select que ya
+      // trajo `c`, así que se pide de nuevo, mínima (dos columnas).
+      const recuerdoIds = c.filter((ch) => !ch.is_challenge).map((ch) => ch.id)
+      if (recuerdoIds.length > 0) {
+        const { data: videoRows, error: videoError } = await supabase
+          .from('challenges')
+          .select('id, video_path')
+          .in('id', recuerdoIds)
+          .not('video_path', 'is', null)
+        if (videoError) throw videoError
+        const videoPairs = await Promise.all(
+          (videoRows ?? []).map(
+            async (row) => [row.id, await signedImageUrl(row.video_path as string)] as const,
+          ),
+        )
+        setVideoUrlById(
+          Object.fromEntries(videoPairs.filter((p): p is [string, string] => p[1] != null)),
+        )
+      } else {
+        setVideoUrlById({})
+      }
       lastResolvedAtRef.current = Date.now()
     } catch {
       setError('No hemos podido cargar el viaje. Reintenta en un momento.')
@@ -305,6 +341,9 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         imagePath: ch.image_path,
         audioUrl: audioUrlById[ch.id] ?? null,
         audioPath: ch.audio_path,
+        // Solo se rellena para recuerdos (`videoUrlById` solo consulta esos ids,
+        // ver arriba); en un reto siempre queda null, nunca se sirve el vídeo.
+        videoUrl: videoUrlById[ch.id] ?? null,
         lat: coord.lat,
         lng: coord.lng,
         guessedCount: guessedCountById.get(ch.id)?.size ?? 0,
@@ -320,7 +359,16 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         photoIsHint: ch.photo_is_hint,
       }
     })
-  }, [challenges, answersById, imageUrlById, audioUrlById, guessedCountById, countryById, myUserId])
+  }, [
+    challenges,
+    answersById,
+    imageUrlById,
+    audioUrlById,
+    videoUrlById,
+    guessedCountById,
+    countryById,
+    myUserId,
+  ])
 
   // Ruta: los momentos con un lugar VISIBLE en el mapa, en orden cronológico ASC.
   // Entran los RECUERDOS con lugar (place_*) y los RETOS CERRADOS con respuesta

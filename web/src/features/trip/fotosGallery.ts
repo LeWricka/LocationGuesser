@@ -14,6 +14,13 @@ export interface GalleryPhoto {
   /** Fecha del MOMENTO (no de la foto individual): agrupa por día como el
    * Diario — todas las fotos de un mismo recuerdo caen bajo su mismo día. */
   date: string
+  /**
+   * ¿Esta foto es la PORTADA de un momento que tiene clip de vídeo? (issue
+   * #649). Solo la portada la lleva (aunque el momento tenga más fotos en su
+   * galería): es la única con badge ▶ en la rejilla — el clip en sí se ve
+   * abriendo el momento (`onOpenMoment`), no en el lightbox de fotos.
+   */
+  hasVideo?: boolean
 }
 
 export interface DayGroup {

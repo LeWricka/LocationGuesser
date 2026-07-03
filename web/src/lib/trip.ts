@@ -59,6 +59,15 @@ export interface Moment {
   /** Path en Storage de la nota de voz (para re-firmar), o null/ausente si no hay. */
   audioPath?: string | null
   /**
+   * URL firmada del clip de vídeo corto (v1: uno solo), o null/ausente si no
+   * tiene. Migración 0036. SOLO se rellena para RECUERDOS (`useTripData` la
+   * consulta aparte, filtrando `is_challenge = false`): un reto nunca la
+   * lleva, ni siquiera si el recuerdo de origen tenía clip
+   * (`promoteToChallenge` lo vacía) — un MP4 puede llevar su propio GPS en los
+   * metadatos del contenedor, así que nunca debe llegar al contexto de jugar.
+   */
+  videoUrl?: string | null
+  /**
    * Coordenada a pintar en el mapa. Para un RECUERDO es su lugar VISIBLE
    * (`place_lat`/`place_lng`), siempre que lo tenga. Para un RETO es la respuesta:
    * null mientras esté activo (anti-spoiler), visible solo si cerrado/ya jugado.

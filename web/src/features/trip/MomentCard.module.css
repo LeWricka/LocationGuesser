@@ -233,6 +233,34 @@
   pointer-events: none;
 }
 
+/* Badge ▶ del momento con clip de vídeo (issue #649): mismo lenguaje "glass"
+   que `.flag`/`.surprise`, centrado sobre la foto (afordancia típica de "esto
+   reproduce"). No colisiona con el sello "Sorpresa": un clip solo existe en un
+   RECUERDO (nunca en un reto), y la foto-sorpresa solo en un RETO en juego.
+   Mismo motivo de z-index que `.flag`: sin él, `.overlay` (que viene después
+   en el DOM) lo taparía. */
+.videoBadge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  /* design-lint-allow: capa local de la tarjeta (chrome flotante sobre la foto) */
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  color: var(--color-on-photo);
+  pointer-events: none;
+}
+
 /* Chip de estado ("EN JUEGO" / "🎯 Reto") sobre el título, dentro del pie. En flujo
    (no absoluto) para no chocar con la bandera (sup-izq) ni el botón expandir (sup-der). */
 .chip {

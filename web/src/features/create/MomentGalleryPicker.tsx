@@ -1,7 +1,12 @@
 import { useState, type ChangeEvent } from 'react'
-import { AlertTriangle, Camera, Star, Trash2 } from 'lucide-react'
+import { AlertTriangle, Camera, Play, Star, Trash2 } from 'lucide-react'
 import { Icon, Spinner, useToast } from '../../ui'
-import { markFileSelection } from '../../lib/storage'
+import {
+  extractVideoCoverFrame,
+  markFileSelection,
+  validateVideoFile,
+  VideoValidationError,
+} from '../../lib/storage'
 import styles from './MomentGalleryPicker.module.css'
 
 /** Una foto en preparación: el File a subir y su object URL para la miniatura. */
@@ -30,6 +35,25 @@ interface Props {
   onRemove: (id: string) => void
   /** Marca una foto como portada (la mueve al frente). */
   onMakeCover: (id: string) => void
+  /**
+   * ¿Ya hay un clip de vídeo elegido? (issue #649). UN clip por recuerdo en v1:
+   * con `true`, un vídeo nuevo se rechaza con aviso en vez de sustituir el
+   * actual (el dueño primero quita el que hay).
+   */
+  hasVideo?: boolean
+  /**
+   * Id (dentro de `photos`) de la foto que es el FOTOGRAMA-PORTADA del clip
+   * (issue #649): se pinta con el badge ▶ para distinguirla de una foto suelta.
+   * `null`/ausente si no hay clip.
+   */
+  videoFrameId?: string | null
+  /**
+   * Se eligió un vídeo válido (issue #649): ya pasó `validateVideoFile`
+   * (duración ≤15s, tamaño ≤40MB) y se extrajo su fotograma-portada. El
+   * llamador decide cómo guardarlo (el fotograma entra como una foto más vía
+   * `onAdd`-like; el vídeo en sí se sube aparte al guardar).
+   */
+  onAddVideo?: (file: File, mimeType: string, coverFrame: File) => void
 }
 
 /**
@@ -60,20 +84,21 @@ export function MomentGalleryPicker({
   onAdd,
   onRemove,
   onMakeCover,
+  hasVideo = false,
+  videoFrameId = null,
+  onAddVideo,
 }: Props) {
   // Progreso de lectura EN CURSO (#642): mientras copiamos los bytes de cada
   // File recién elegido, secuencialmente, ANTES de que nada entre a `photos`.
   // Con lotes grandes, mostrar "leídas N/M" evita que el picker parezca colgado.
   const [reading, setReading] = useState<{ done: number; total: number } | null>(null)
   const [unreadable, setUnreadable] = useState<UnreadableTile[]>([])
+  // Validación/extracción de fotograma del CLIP en curso (issue #649): ambas
+  // exigen cargar metadatos/pintar un frame, así que no son instantáneas.
+  const [processingVideo, setProcessingVideo] = useState(false)
   const toast = useToast()
 
-  async function handleChange(e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
-    // Permite re-elegir los mismos ficheros (de lo contrario onChange no dispara).
-    e.target.value = ''
-    if (files.length === 0) return
-
+  async function handleImages(files: File[]) {
     setReading({ done: 0, total: files.length })
     const copies: File[] = []
     const failedNames: string[] = []
@@ -117,12 +142,71 @@ export function MomentGalleryPicker({
     if (copies.length > 0) onAdd(copies)
   }
 
+  // UN clip por recuerdo (v1, issue #649): copia-de-bytes (#644, mismo motivo
+  // que las fotos) → valida tamaño/duración → extrae el fotograma-portada. Si
+  // algo falla, NO entra nada (ni el vídeo ni un fotograma a medias) — aviso
+  // claro y listo, el dueño puede intentarlo de nuevo con otro archivo.
+  async function handleVideo(file: File, pickedCount: number) {
+    if (hasVideo) {
+      toast.show(
+        'Ya hay un clip en este recuerdo (solo se admite uno). Quítalo antes de añadir otro.',
+        { tone: 'danger' },
+      )
+      return
+    }
+    if (pickedCount > 1) {
+      toast.show('Solo se admite un clip de vídeo por recuerdo: se ignoran los demás.', {
+        tone: 'neutral',
+      })
+    }
+    setProcessingVideo(true)
+    try {
+      const buf = await file.arrayBuffer()
+      const copy = new File([buf], file.name, { type: file.type, lastModified: file.lastModified })
+      await validateVideoFile(copy)
+      const coverFrame = await extractVideoCoverFrame(copy)
+      onAddVideo?.(copy, copy.type || file.type, coverFrame)
+    } catch (err) {
+      const message =
+        err instanceof VideoValidationError
+          ? err.message
+          : `No se pudo leer «${file.name}». Prueba con otro vídeo.`
+      toast.show(message, { tone: 'danger' })
+    } finally {
+      setProcessingVideo(false)
+    }
+  }
+
+  async function handleChange(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    // Permite re-elegir los mismos ficheros (de lo contrario onChange no dispara).
+    e.target.value = ''
+    if (files.length === 0) return
+
+    // El picker acepta fotos Y vídeo en el mismo input (issue #649): se separan
+    // por MIME. Las fotos siguen su tubería de siempre; el vídeo (como mucho
+    // uno, ver `handleVideo`) su propia validación/extracción.
+    const imageFiles = files.filter((f) => !f.type.startsWith('video/'))
+    const videoFiles = files.filter((f) => f.type.startsWith('video/'))
+
+    if (imageFiles.length > 0) await handleImages(imageFiles)
+    if (videoFiles.length > 0) await handleVideo(videoFiles[0], videoFiles.length)
+  }
+
   function dismissUnreadable(id: string) {
     setUnreadable((prev) => prev.filter((u) => u.id !== id))
   }
 
-  const busy = loading || reading !== null
-  const emptyLabel = reading ? `Leyendo… (${reading.done}/${reading.total})` : 'Sube fotos del día'
+  const busy = loading || reading !== null || processingVideo
+  // Acepta imagen Y vídeo corto en el MISMO input (issue #649): `handleChange`
+  // separa por MIME. `video/quicktime` cubre el .mov que graba un iPhone si el
+  // usuario no lo deja re-codificar a mp4 al compartir.
+  const acceptAttr = 'image/*,video/mp4,video/webm,video/quicktime'
+  const emptyLabel = processingVideo
+    ? 'Comprobando el vídeo…'
+    : reading
+      ? `Leyendo… (${reading.done}/${reading.total})`
+      : 'Sube fotos del día'
 
   // Sin fotos ni errores: tile autoexplicativo (cámara con "+"), todo el bloque es el <label>.
   if (photos.length === 0 && unreadable.length === 0) {
@@ -135,7 +219,7 @@ export function MomentGalleryPicker({
         <span className={styles.emptyLabel}>{busy ? emptyLabel : 'Sube fotos del día'}</span>
         <input
           type="file"
-          accept="image/*"
+          accept={acceptAttr}
           multiple
           aria-label="Añadir fotos del día"
           disabled={busy}
@@ -153,6 +237,10 @@ export function MomentGalleryPicker({
         {photos.map((photo, i) => {
           const isCover = i === 0
           const failed = failedIds?.has(photo.id) ?? false
+          // Fotograma-portada del clip (issue #649): misma tira, mismo tile —
+          // solo cambia el badge (▶ en vez de/junto a "Portada") y la etiqueta
+          // de "quitar" (quitar la foto TAMBIÉN suelta el clip, ver AddMoment).
+          const isVideoFrame = videoFrameId != null && photo.id === videoFrameId
           return (
             <li
               key={photo.id}
@@ -164,6 +252,11 @@ export function MomentGalleryPicker({
               {i === 0 && loading && (
                 <span className={styles.thumbBusy} aria-hidden>
                   <Spinner size={20} />
+                </span>
+              )}
+              {isVideoFrame && (
+                <span className={styles.videoBadge} aria-hidden>
+                  <Icon icon={Play} size={16} fill="currentColor" />
                 </span>
               )}
               {failed ? (
@@ -192,7 +285,7 @@ export function MomentGalleryPicker({
                   type="button"
                   className={styles.remove}
                   onClick={() => onRemove(photo.id)}
-                  aria-label="Quitar foto"
+                  aria-label={isVideoFrame ? 'Quitar clip' : 'Quitar foto'}
                 >
                   <Icon icon={Trash2} size={18} />
                 </button>
@@ -225,11 +318,11 @@ export function MomentGalleryPicker({
               +
             </span>
             <span className={styles.addText}>
-              {reading ? `${reading.done}/${reading.total}` : 'Añadir'}
+              {processingVideo ? 'Vídeo…' : reading ? `${reading.done}/${reading.total}` : 'Añadir'}
             </span>
             <input
               type="file"
-              accept="image/*"
+              accept={acceptAttr}
               multiple
               aria-label="Añadir más fotos"
               disabled={busy}
@@ -241,6 +334,7 @@ export function MomentGalleryPicker({
       </ul>
       <span className={styles.count}>
         {photos.length} {photos.length === 1 ? 'foto' : 'fotos'} · la 1ª es la portada
+        {hasVideo && ' · con clip'}
       </span>
     </div>
   )

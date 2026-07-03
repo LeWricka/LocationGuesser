@@ -89,6 +89,7 @@ const sampleChallenge: Challenge = {
   place_lng: null,
   image_path: null,
   audio_path: null,
+  video_path: null,
   sv_pano_id: 'PANO123',
   sv_heading: 0,
   sv_pitch: 0,

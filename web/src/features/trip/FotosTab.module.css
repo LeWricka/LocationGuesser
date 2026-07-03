@@ -53,6 +53,10 @@
  * `ChallengePhoto` no acepta `style` — el `--i` vive aquí, en el elemento que
  * controla la pantalla, siguiendo el mismo patrón que el podio de MarcadorTab). */
 .cellWrap {
+  /* Ancla el badge ▶ (issue #649), que es un HERMANO de `ChallengePhoto`, no un
+     hijo suyo — sin esto, su `position: absolute` se anclaría a un antepasado
+     posicionado más lejano en vez de a esta celda. */
+  position: relative;
   animation: fotos-cell-in var(--motion-duration-base) var(--motion-ease-emphasized) backwards;
   /* Tope de retardo (issue #645): con decenas de fotos, un stagger sin límite
    * tardaría segundos en llegar a la última celda. `min()` lo clampa a 12 pasos
@@ -76,6 +80,27 @@
 .cell {
   border: none;
   border-radius: 0;
+}
+
+/* Badge ▶ (issue #649): disco de vidrio centrado, mismo lenguaje que
+   MomentCard/.videoBadge — señala que la portada de este momento tiene clip. */
+.videoBadge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  color: var(--color-on-photo);
+  pointer-events: none;
 }
 
 .skeletonCell {

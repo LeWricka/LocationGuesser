@@ -175,6 +175,68 @@ describe('FotosTab — galería multi-foto de un recuerdo', () => {
   })
 })
 
+describe('FotosTab — badge ▶ del clip de vídeo (issue #649)', () => {
+  test('la portada de un recuerdo con videoUrl pinta el badge ▶', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-clip',
+        title: 'Con clip',
+        videoUrl: 'https://firmada.example/clip.mp4',
+      }),
+    ]
+    renderTab(moments)
+
+    const cell = await screen.findByRole('button', { name: 'Con clip' })
+    expect(within(cell.parentElement as HTMLElement).getByTestId('video-badge')).toBeInTheDocument()
+  })
+
+  test('un recuerdo sin videoUrl no pinta el badge', async () => {
+    const moments = [moment({ challengeId: 'c-sin-clip', title: 'Sin clip', videoUrl: null })]
+    renderTab(moments)
+
+    await screen.findByRole('button', { name: 'Sin clip' })
+    expect(screen.queryByTestId('video-badge')).not.toBeInTheDocument()
+  })
+
+  test('en una galería multi-foto, SOLO la portada (primera) lleva el badge', async () => {
+    listGroupMomentImagesMock.mockResolvedValue(
+      new Map([
+        [
+          'c-ramen',
+          [
+            {
+              id: 'i1',
+              challenge_id: 'c-ramen',
+              image_path: 'ramen-1.jpg',
+              sort_order: 0,
+              created_at: '2026-06-15T10:00:00.000Z',
+            },
+            {
+              id: 'i2',
+              challenge_id: 'c-ramen',
+              image_path: 'ramen-2.jpg',
+              sort_order: 1,
+              created_at: '2026-06-15T10:00:00.000Z',
+            },
+          ],
+        ],
+      ]),
+    )
+    const moments = [
+      moment({
+        challengeId: 'c-ramen',
+        title: 'El mejor ramen',
+        videoUrl: 'https://firmada.example/clip.mp4',
+      }),
+    ]
+    renderTab(moments)
+
+    const cells = await screen.findAllByRole('button', { name: 'El mejor ramen' })
+    expect(cells).toHaveLength(2)
+    expect(screen.getAllByTestId('video-badge')).toHaveLength(1)
+  })
+})
+
 describe('FotosTab — estado vacío', () => {
   test('dueño: mensaje + CTA "Añadir momento"', async () => {
     renderTab([])

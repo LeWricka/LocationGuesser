@@ -39,6 +39,18 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // reto de lugar (no revela la ubicación). Se sirve al jugar para montar el factor.
 // `audio_path` (0035, nota de voz) tampoco es spoiler: oír la voz de quien creó el
 // momento no revela la ubicación oculta. Se sirve siempre, como `image_path`.
+//
+// OJO — `video_path` (0036, clip corto) NO está en esta lista A PROPÓSITO, a
+// diferencia de `image_path`/`audio_path`: este `const` alimenta TANTO la
+// lectura de un recuerdo (`getGroupChallenges`, `useTripData`) COMO la lectura
+// PARA JUGAR un reto (`getChallenge`, `ChallengeForPlay`). Un contenedor MP4
+// puede llevar sus propias coordenadas GPS en los metadatos (a diferencia del
+// JPEG que servimos, ya recomprimido en cliente sin EXIF) — si `video_path`
+// viajara aquí, un reto promovido desde un recuerdo-con-vídeo podría filtrar la
+// respuesta oculta al jugador. El vídeo SOLO se lee en el contexto de recuerdo,
+// con una consulta APARTE que filtra `is_challenge = false` (ver
+// `useTripData.ts`); `promoteToChallenge`, además, vacía `video_path` como
+// defensa en profundidad.
 export const CHALLENGE_COLUMNS_NO_ANSWER =
   'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, audio_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, time_scoring, created_by, created_at'
 
@@ -251,6 +263,12 @@ export interface NewMomentInput {
   imagePath?: string | null
   /** Path en Storage de la nota de voz (≤60s, opcional). Migración 0035. */
   audioPath?: string | null
+  /**
+   * Path en Storage del clip de vídeo corto (v1: uno solo, ≤15s, ≤40MB,
+   * opcional). Migración 0036. SOLO para recuerdos: `promoteToChallenge` lo
+   * vacía al convertir en reto (ver comentario de `CHALLENGE_COLUMNS_NO_ANSWER`).
+   */
+  videoPath?: string | null
   /** Panorama de Street View del lugar (opcional). */
   svPanoId?: string | null
   /** POV inicial del panorama: rumbo en grados. */
@@ -284,6 +302,7 @@ export async function createMoment(
       place_lng: input.placeLng ?? null,
       image_path: input.imagePath ?? null,
       audio_path: input.audioPath ?? null,
+      video_path: input.videoPath ?? null,
       sv_pano_id: input.svPanoId ?? null,
       sv_heading: input.svHeading ?? null,
       sv_pitch: input.svPitch ?? null,
@@ -356,6 +375,13 @@ export async function promoteToChallenge(
     sv_lock_rotate: input.svLockRotate ?? false,
     // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
     score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
+    // PRIVACIDAD (issue #649, defensa en profundidad): un reto NUNCA lleva vídeo,
+    // aunque el recuerdo de origen tuviera un clip — un MP4 puede llevar su propio
+    // GPS en los metadatos del contenedor, y `video_path` no debe sobrevivir a la
+    // promoción por si algún día una consulta lo sirve fuera del contexto de
+    // recuerdo (hoy ya no se sirve, ver `CHALLENGE_COLUMNS_NO_ANSWER`). La foto y
+    // la nota de voz SÍ sobreviven (no son spoiler); el vídeo, no.
+    video_path: null,
   }
   if (input.photoIsHint !== undefined) patch.photo_is_hint = input.photoIsHint
 
@@ -619,6 +645,13 @@ export interface UpdateMomentInput {
    * criterio que `image_path`: no hay limpieza de huérfanos hoy). Migración 0035.
    */
   audioPath?: string | null
+  /**
+   * Path en Storage del clip de vídeo corto (v1: uno solo). `undefined` = no
+   * tocarlo; `null` lo quita (el dueño lo descartó en la edición). Migración
+   * 0036. Solo aplica a un recuerdo: no hay flujo para editar el vídeo de un
+   * reto (nunca lo tiene, ver `promoteToChallenge`).
+   */
+  videoPath?: string | null
 }
 
 /**
@@ -642,6 +675,7 @@ export async function updateMoment(
   }
   if (input.createdAt !== undefined) patch.created_at = input.createdAt
   if (input.audioPath !== undefined) patch.audio_path = input.audioPath
+  if (input.videoPath !== undefined) patch.video_path = input.videoPath
   if (input.place !== undefined) {
     if (input.place === null) {
       // Quitar el lugar: fuera del mapa y sin panorama colgando.
