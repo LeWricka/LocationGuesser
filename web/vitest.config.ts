@@ -1,8 +1,20 @@
 import { defineConfig } from 'vitest/config'
+import { fileURLToPath } from 'node:url'
 
 // Config de tests separada de vite.config.ts para evitar el choque de tipos
 // entre Vite 8 (rolldown) y la copia de Vite que trae Vitest.
 export default defineConfig({
+  resolve: {
+    alias: {
+      // `virtual:pwa-register` lo provee vite-plugin-pwa (solo en build real,
+      // ver vite.config.ts); aquí no hay plugin que lo resuelva, así que sin
+      // este alias `main.test.ts` (#647) no puede ni importar `main.tsx`. Los
+      // tests sustituyen el stub con `vi.mock('virtual:pwa-register', …)`.
+      'virtual:pwa-register': fileURLToPath(
+        new URL('./src/test/virtualPwaRegisterStub.ts', import.meta.url),
+      ),
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,

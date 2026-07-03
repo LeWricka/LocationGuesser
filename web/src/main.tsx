@@ -7,6 +7,7 @@ import { RootErrorBoundary } from './lib/RootErrorBoundary'
 import { initAnalytics } from './lib/analytics'
 import { initObservability } from './lib/observability'
 import { applyCleanRoute } from './lib/cleanRoute'
+import { isSafeUpdateRoute } from './lib/safeUpdateRoute'
 import { registerSW } from 'virtual:pwa-register'
 
 // Observabilidad + analítica: init idempotente antes de montar la app (no-op en
@@ -44,6 +45,18 @@ void applyCleanRoute()
 //       UpdateBanner más abajo) y esperamos a que el usuario decida.
 // No-op en dev (SW desactivado) y en tests (este entrypoint no se importa). El
 // módulo `virtual:pwa-register` lo provee vite-plugin-pwa en build.
+//
+// #647: la vía (a) tenía un agujero — hoy, con la cadencia de deploys, casi
+// SIEMPRE hay una actualización pendiente, así que CADA vuelta al navegador
+// (ocultar y volver a mostrar la pestaña) dispara la recarga silenciosa. Si el
+// usuario salió a mitad de un FORMULARIO (crear reto/momento, editar perfil…)
+// o de una PARTIDA en curso, esa recarga se lo lleva por delante. Ahora (a)
+// solo aplica si `location.hash` es una ruta "segura" (`isSafeUpdateRoute`,
+// en `lib/safeUpdateRoute.ts`); si no, la actualización queda pendiente y solo
+// la pastilla manual (b) sigue disponible — el usuario manda. Para que esa
+// actualización no se quede pendiente eternamente si el usuario "vive" en
+// rutas no seguras, un listener de `hashchange` la aplica en cuanto navega a
+// una ruta segura (mismo camino `applyUpdate`).
 const SW_UPDATE_INTERVAL_MS = 60_000
 
 // El banner vive en su PROPIO root de React, fuera del árbol de `<App/>`: en este
@@ -124,9 +137,21 @@ const updateSW = registerSW({
 
 // Aplica la actualización pendiente en cuanto el usuario deja de mirar la pestaña
 // (la minimiza, cambia de pestaña o de app): el momento en que una recarga es
-// invisible para él. Solo si hay de verdad una actualización esperando.
+// invisible para él. Solo si hay de verdad una actualización esperando Y la
+// ruta actual es segura (#647) — si no, la pastilla manual sigue disponible y
+// esperamos a que el usuario navegue a una ruta segura (ver el listener de
+// `hashchange` de abajo) o decida él mismo.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && updateAvailable) applyUpdate()
+  if (document.hidden && updateAvailable && isSafeUpdateRoute(window.location.hash)) {
+    applyUpdate()
+  }
+})
+
+// Si la actualización se quedó pendiente por estar en una ruta no segura, se
+// aplica en cuanto el usuario navega (por hash) a una ruta segura: así no se
+// queda pendiente eternamente mientras "vive" en formularios o partidas.
+window.addEventListener('hashchange', () => {
+  if (updateAvailable && isSafeUpdateRoute(window.location.hash)) applyUpdate()
 })
 
 // Fallback amable cuando un error de render escapa hasta la raíz: la app no se
