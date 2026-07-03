@@ -1,6 +1,7 @@
-import type { ChangeEvent } from 'react'
+import { useState, type ChangeEvent } from 'react'
 import { AlertTriangle, Camera, Star, Trash2 } from 'lucide-react'
-import { Icon, Spinner } from '../../ui'
+import { Icon, Spinner, useToast } from '../../ui'
+import { markFileSelection } from '../../lib/storage'
 import styles from './MomentGalleryPicker.module.css'
 
 /** Una foto en preparación: el File a subir y su object URL para la miniatura. */
@@ -32,6 +33,18 @@ interface Props {
 }
 
 /**
+ * Fichero elegido que no se pudo LEER al seleccionarlo (#642): en Android, el
+ * content-URI del selector (Google Photos u otro) puede estar ya muerto o
+ * apuntar a algo aún no descargado. NUNCA entra a `photos` — no tiene sentido
+ * dejar que el dueño intente subir algo que ni siquiera se pudo leer al
+ * elegirlo — así que vive como estado LOCAL, transitorio, de este picker.
+ */
+interface UnreadableTile {
+  id: string
+  name: string
+}
+
+/**
  * Selector de GALERÍA para un RECUERDO en el flujo de crear: varias fotos del
  * móvil, con miniaturas y una PORTADA (la primera). El dueño puede marcar otra
  * como portada o quitarla antes de guardar. La subida (comprimir + estripar EXIF)
@@ -48,36 +61,92 @@ export function MomentGalleryPicker({
   onRemove,
   onMakeCover,
 }: Props) {
-  function handleChange(e: ChangeEvent<HTMLInputElement>) {
+  // Progreso de lectura EN CURSO (#642): mientras copiamos los bytes de cada
+  // File recién elegido, secuencialmente, ANTES de que nada entre a `photos`.
+  // Con lotes grandes, mostrar "leídas N/M" evita que el picker parezca colgado.
+  const [reading, setReading] = useState<{ done: number; total: number } | null>(null)
+  const [unreadable, setUnreadable] = useState<UnreadableTile[]>([])
+  const toast = useToast()
+
+  async function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
     // Permite re-elegir los mismos ficheros (de lo contrario onChange no dispara).
     e.target.value = ''
-    if (files.length > 0) onAdd(files)
+    if (files.length === 0) return
+
+    setReading({ done: 0, total: files.length })
+    const copies: File[] = []
+    const failedNames: string[] = []
+    // SECUENCIAL, no en paralelo (mismo criterio que la subida, #550): leer
+    // varias fotos de cámara a la vez de golpe es sospechoso de presión de
+    // memoria en móvil; secuencial también hace fiel el progreso done/total.
+    for (const file of files) {
+      try {
+        const buf = await file.arrayBuffer()
+        // Copia PROPIA: el `File` original del selector de Android puede morir
+        // (content-URI revocado con el tiempo/presión de memoria) mucho antes
+        // de guardar; esta copia ya no depende de él, ni para la miniatura ni
+        // para la subida — causa raíz del #550, fix definitivo en #642.
+        const copy = new File([buf], file.name, {
+          type: file.type,
+          lastModified: file.lastModified,
+        })
+        markFileSelection(copy, files.length)
+        copies.push(copy)
+      } catch {
+        // No se pudo leer YA al seleccionarla: no entra al estado del
+        // formulario (padre), solo a este aviso local transitorio.
+        failedNames.push(file.name)
+      }
+      setReading((prev) => (prev ? { done: prev.done + 1, total: prev.total } : prev))
+    }
+    setReading(null)
+
+    if (failedNames.length > 0) {
+      setUnreadable((prev) => [
+        ...prev,
+        ...failedNames.map((name) => ({ id: crypto.randomUUID(), name })),
+      ])
+      toast.show(
+        failedNames.length === 1
+          ? `«${failedNames[0]}» no se pudo leer — ¿está descargada?`
+          : `${failedNames.length} fotos no se pudieron leer — ¿están descargadas?`,
+        { tone: 'danger' },
+      )
+    }
+    if (copies.length > 0) onAdd(copies)
   }
 
-  // Sin fotos: tile autoexplicativo (cámara con "+"), todo el bloque es el <label>.
-  if (photos.length === 0) {
+  function dismissUnreadable(id: string) {
+    setUnreadable((prev) => prev.filter((u) => u.id !== id))
+  }
+
+  const busy = loading || reading !== null
+  const emptyLabel = reading ? `Leyendo… (${reading.done}/${reading.total})` : 'Sube fotos del día'
+
+  // Sin fotos ni errores: tile autoexplicativo (cámara con "+"), todo el bloque es el <label>.
+  if (photos.length === 0 && unreadable.length === 0) {
     return (
-      <label className={styles.empty} aria-busy={loading || undefined}>
+      <label className={styles.empty} aria-busy={busy || undefined}>
         <span className={styles.icon} aria-hidden>
-          {loading ? <Spinner size={28} /> : <Icon icon={Camera} size={28} />}
-          {!loading && <span className={styles.plus}>+</span>}
+          {busy ? <Spinner size={28} /> : <Icon icon={Camera} size={28} />}
+          {!busy && <span className={styles.plus}>+</span>}
         </span>
-        <span className={styles.emptyLabel}>{loading ? 'Leyendo…' : 'Sube fotos del día'}</span>
+        <span className={styles.emptyLabel}>{busy ? emptyLabel : 'Sube fotos del día'}</span>
         <input
           type="file"
           accept="image/*"
           multiple
           aria-label="Añadir fotos del día"
-          disabled={loading}
+          disabled={busy}
           className={styles.input}
-          onChange={handleChange}
+          onChange={(e) => void handleChange(e)}
         />
       </label>
     )
   }
 
-  // Con fotos: tira de miniaturas + tile final para añadir más.
+  // Con fotos y/o errores: tira de miniaturas + tiles de error + tile final para añadir más.
   return (
     <div className={styles.gallery}>
       <ul className={styles.strip}>
@@ -131,20 +200,41 @@ export function MomentGalleryPicker({
             </li>
           )
         })}
+        {unreadable.map((u) => (
+          <li key={u.id} className={styles.tile} data-error>
+            <div className={styles.unreadable}>
+              <Icon icon={AlertTriangle} size={22} />
+              <span className={styles.unreadableName}>{u.name}</span>
+              <span className={styles.unreadableHint}>No se pudo leer</span>
+            </div>
+            <div className={styles.tileActions}>
+              <button
+                type="button"
+                className={styles.remove}
+                onClick={() => dismissUnreadable(u.id)}
+                aria-label={`Descartar «${u.name}»`}
+              >
+                <Icon icon={Trash2} size={18} />
+              </button>
+            </div>
+          </li>
+        ))}
         <li className={styles.addTile}>
-          <label className={styles.addLabel} aria-busy={loading || undefined}>
+          <label className={styles.addLabel} aria-busy={busy || undefined}>
             <span className={styles.addIcon} aria-hidden>
               +
             </span>
-            <span className={styles.addText}>Añadir</span>
+            <span className={styles.addText}>
+              {reading ? `${reading.done}/${reading.total}` : 'Añadir'}
+            </span>
             <input
               type="file"
               accept="image/*"
               multiple
               aria-label="Añadir más fotos"
-              disabled={loading}
+              disabled={busy}
               className={styles.input}
-              onChange={handleChange}
+              onChange={(e) => void handleChange(e)}
             />
           </label>
         </li>

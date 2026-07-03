@@ -275,7 +275,15 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
     await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
-    expect(uploadImageMock).toHaveBeenCalledWith(file)
+    // NO es el mismo `File` (#642, `PhotoDropzone` copia los bytes al
+    // seleccionar para no depender del `File` original del selector, que en
+    // Android puede morir con el tiempo) — mismo nombre/tipo/contenido.
+    expect(uploadImageMock).toHaveBeenCalledTimes(1)
+    const uploaded = uploadImageMock.mock.calls[0][0] as File
+    expect(uploaded).not.toBe(file)
+    expect(uploaded.name).toBe(file.name)
+    expect(uploaded.type).toBe(file.type)
+    await expect(uploaded.text()).resolves.toBe('foto')
     // Decisión #595: sin toggle nuevo — comportamiento más simple ya existente
     // en el resto de flujos de crear (default `createChallenge`,
     // CreateChallengeImmersive, CreateNumberChallenge): pista, nunca sorpresa.

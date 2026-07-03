@@ -32,16 +32,63 @@ interface DecodedImage {
  */
 export class ImageDecodeError extends Error {
   readonly fileName: string
+  /**
+   * Mismo detalle NO sensible que se reporta a Sentry (`reportAndThrow`, #642),
+   * colgado del propio error para que un llamador aguas abajo que capture este
+   * `ImageDecodeError` y quiera reportarlo TAMBIÉN (p.ej. el formulario que
+   * marca la foto como fallida) pueda incluirlo sin tener que reconstruirlo.
+   */
+  readonly diagnostics?: Record<string, unknown>
 
-  constructor(fileName: string, options?: ErrorOptions & { message?: string }) {
-    const { message, ...errorOptions } = options ?? {}
+  constructor(
+    fileName: string,
+    options?: ErrorOptions & { message?: string; diagnostics?: Record<string, unknown> },
+  ) {
+    const { message, diagnostics, ...errorOptions } = options ?? {}
     super(
       message ?? `No se pudo leer la imagen «${fileName}». Prueba con otra foto (JPEG o PNG).`,
       errorOptions,
     )
     this.name = 'ImageDecodeError'
     this.fileName = fileName
+    this.diagnostics = diagnostics
   }
+}
+
+/**
+ * Metadatos de SELECCIÓN (#642): los pickers (`MomentGalleryPicker`,
+ * `PhotoDropzone`) los anotan en la COPIA propia del `File` justo al leerlo del
+ * input — no en el `File` original del selector de Android, que puede llevar
+ * ya un rato muerto para cuando se sube. Van como propiedades NO estándar en
+ * la propia instancia: es la vía más simple de llevarlos desde el picker hasta
+ * `uploadImage`/`uploadAvatar` sin enhebrar el dato por cada pantalla
+ * intermedia que reenvía el `File` (AddMoment, CreateLocationChallenge…).
+ */
+interface FileWithSelectionMeta extends File {
+  __selectedAt?: number
+  __batchSize?: number
+}
+
+/**
+ * Llamar justo tras crear la copia del `File` en el picker, con el tamaño del
+ * LOTE elegido (`files.length`). Si decodificar falla más tarde, el detalle
+ * reportado a Sentry incluye `batchSize` y `msSinceSelection` (tiempo desde
+ * esta llamada): confirman si el fallo se correlaciona con el tiempo
+ * transcurrido desde la selección — la teoría de Android que revoca el
+ * content-URI del picker con el tiempo/presión de memoria.
+ */
+export function markFileSelection(file: File, batchSize: number): void {
+  const f = file as FileWithSelectionMeta
+  f.__selectedAt = Date.now()
+  f.__batchSize = batchSize
+}
+
+function selectionMeta(file: File): { batchSize?: number; msSinceSelection?: number } {
+  const f = file as FileWithSelectionMeta
+  const meta: { batchSize?: number; msSinceSelection?: number } = {}
+  if (typeof f.__batchSize === 'number') meta.batchSize = f.__batchSize
+  if (typeof f.__selectedAt === 'number') meta.msSinceSelection = Date.now() - f.__selectedAt
+  return meta
 }
 
 /** Detalle NO sensible (nunca contenido) de un error para telemetría: solo name/message. */
@@ -254,32 +301,59 @@ async function decodeImage(file: File): Promise<DecodedImage> {
 }
 
 /**
- * Reporta a observabilidad el fallo de `decodeImage` —con el detalle de cada
- * vía intentada del `DecodeFailure` (#550), si lo hay— y lo convierte en el
- * `ImageDecodeError` legible para el usuario. Punto ÚNICO para no duplicar
- * esta lógica entre `compressAndStripExif` y `squareCropToJpeg`. `never`: no
- * retorna, así que el llamador no necesita un `return`/`else` tras invocarla.
+ * Reporta a observabilidad Y lanza el `ImageDecodeError` legible para el
+ * usuario. Punto ÚNICO para no duplicar esta lógica entre `compressAndStripExif`
+ * y `squareCropToJpeg` (fallo de HEIC o de `decodeImage`, #550/#642).
+ *
+ * OJO (#642): reportamos el `ImageDecodeError` FINAL — no el error interno
+ * (`err`, un `DecodeFailure` u otro `Error` genérico) — como excepción
+ * capturada por Sentry (`err` queda como `.cause`, así la cadena se conserva).
+ * Antes se reportaba `err`, así que este fallo generaba en Sentry un evento
+ * "DecodeFailure"/"Error" con el detalle rico, DISTINTO del `ImageDecodeError`
+ * que de verdad ven y vuelven a reportar los llamadores (p.ej. `AddMoment` al
+ * marcar la foto como fallida) — ese segundo reporte, con mucho menos
+ * contexto, era el evento que de verdad se veía en producción (issue
+ * 131926979: "solo area/fileName/stage"). Reportando el mismo tipo de error
+ * que acaba viendo la app, ambos reportes agrupan en el MISMO issue de Sentry
+ * y el rico llega ahí. `never`: no retorna, así el llamador no necesita
+ * `return`/`else` tras invocarla.
  */
-function reportAndThrowDecodeFailure(err: unknown, file: File): never {
-  const detail = err instanceof DecodeFailure ? err.detail : undefined
-  reportError(err, {
+function reportAndThrow(
+  err: unknown,
+  file: File,
+  stage: 'decode' | 'heic_convert',
+  extra?: Record<string, unknown>,
+  message?: string,
+): never {
+  const diagnostics = {
     area: 'image_decode',
-    stage: 'decode',
+    stage,
     fileType: file.type || '(vacío)',
     fileSizeKb: Math.round(file.size / 1024),
     fileName: file.name,
     fileLastModified: file.lastModified,
-    ...detail,
-  })
+    ...extra,
+    ...selectionMeta(file),
+  }
+  const imageError = new ImageDecodeError(file.name, { cause: err, message, diagnostics })
+  reportError(imageError, diagnostics)
+  throw imageError
+}
+
+/**
+ * `decodeImage` falló por completo (ni `<img>` ni el fallback de `createImageBitmap`
+ * pudieron con el archivo, #550). Envuelve `reportAndThrow` con el detalle del
+ * `DecodeFailure`, si lo hay, y el mensaje accionable para el caso de 0 bytes.
+ */
+function reportAndThrowDecodeFailure(err: unknown, file: File): never {
+  const detail = err instanceof DecodeFailure ? err.detail : undefined
   // Caso específico (#550): archivo de 0 bytes, típico de una foto de Google
   // Photos que vive solo en la nube. Mensaje accionable en vez del genérico.
-  if (detail?.reason === 'empty_file') {
-    throw new ImageDecodeError(file.name, {
-      cause: err,
-      message: `«${file.name}» parece no estar descargada en el dispositivo (fotos de Google Photos guardadas solo en la nube). Descárgala y vuelve a intentarlo.`,
-    })
-  }
-  throw new ImageDecodeError(file.name, { cause: err })
+  const message =
+    detail?.reason === 'empty_file'
+      ? `«${file.name}» parece no estar descargada en el dispositivo (fotos de Google Photos guardadas solo en la nube). Descárgala y vuelve a intentarlo.`
+      : undefined
+  reportAndThrow(err, file, 'decode', detail, message)
 }
 
 /**
@@ -298,15 +372,7 @@ async function compressAndStripExif(file: File): Promise<Blob> {
     } catch (err) {
       // La conversión falló: reportamos metadatos NO sensibles (sin subir la
       // imagen) y lanzamos el error legible para el toast.
-      reportError(err, {
-        area: 'image_decode',
-        stage: 'heic_convert',
-        fileType: file.type || '(vacío)',
-        fileSizeKb: Math.round(file.size / 1024),
-        fileName: file.name,
-        fileLastModified: file.lastModified,
-      })
-      throw new ImageDecodeError(file.name, { cause: err })
+      reportAndThrow(err, file, 'heic_convert')
     }
   }
 
@@ -345,15 +411,7 @@ async function squareCropToJpeg(file: File): Promise<Blob> {
     try {
       decodable = await heicToJpeg(file)
     } catch (err) {
-      reportError(err, {
-        area: 'image_decode',
-        stage: 'heic_convert',
-        fileType: file.type || '(vacío)',
-        fileSizeKb: Math.round(file.size / 1024),
-        fileName: file.name,
-        fileLastModified: file.lastModified,
-      })
-      throw new ImageDecodeError(file.name, { cause: err })
+      reportAndThrow(err, file, 'heic_convert')
     }
   }
 

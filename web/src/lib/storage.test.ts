@@ -27,7 +27,13 @@ vi.mock('./observability', () => ({
   reportError,
 }))
 
-import { uploadImage, signedImageUrl, ImageDecodeError, SIGNED_URL_TTL_SECONDS } from './storage'
+import {
+  uploadImage,
+  signedImageUrl,
+  ImageDecodeError,
+  SIGNED_URL_TTL_SECONDS,
+  markFileSelection,
+} from './storage'
 
 // Fake mínimo de `<img>`: el nuevo `decodeImage` (storage.ts) carga SIEMPRE un
 // `<img>` primero (la misma vía que pinta la miniatura del picker, ver #520)
@@ -367,5 +373,53 @@ describe('uploadImage — guardas y fallbacks del #550 (fotos de galería en And
         dataUrlError: expect.objectContaining({ message: expect.stringMatching(/filereader/i) }),
       }),
     )
+  })
+})
+
+describe('uploadImage — el reporte a Sentry agrupa bajo el mismo error que ve la app (#642)', () => {
+  // Antes se reportaba el error INTERNO (DecodeFailure/Error genérico) y se
+  // lanzaba un `ImageDecodeError` DISTINTO — dos tipos de excepción para el
+  // mismo fallo, así que el evento con el detalle rico y el que de verdad ven
+  // (y vuelven a reportar) los llamadores aguas abajo caían en issues
+  // DIFERENTES de Sentry. Ahora se reporta el propio `ImageDecodeError` (con
+  // el error interno como `.cause`), para que agrupen juntos.
+  test('reporta el ImageDecodeError final (no el error interno) con el detalle rico como .cause', async () => {
+    vi.stubGlobal('Image', fakeImageClass({ fails: true }))
+    vi.stubGlobal('createImageBitmap', vi.fn())
+    const jpeg = new File(['x'], 'agrupa.jpg', { type: 'image/jpeg' })
+
+    await expect(uploadImage(jpeg)).rejects.toBeInstanceOf(ImageDecodeError)
+
+    expect(reportError).toHaveBeenCalledTimes(1)
+    const [reportedError] = reportError.mock.calls[0] as [Error]
+    expect(reportedError).toBeInstanceOf(ImageDecodeError)
+    expect(reportedError.cause).toBeInstanceOf(Error)
+    expect((reportedError.cause as Error).name).toBe('DecodeFailure')
+  })
+
+  test('si el picker marcó el File con markFileSelection, el reporte añade batchSize y msSinceSelection', async () => {
+    vi.stubGlobal('Image', fakeImageClass({ fails: true }))
+    vi.stubGlobal('createImageBitmap', vi.fn())
+    const jpeg = new File(['x'], 'con-meta.jpg', { type: 'image/jpeg' })
+    markFileSelection(jpeg, 7)
+
+    await uploadImage(jpeg).catch(() => {})
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ batchSize: 7, msSinceSelection: expect.any(Number) }),
+    )
+  })
+
+  test('sin markFileSelection (p.ej. un avatar, que no pasa por ningún picker de galería) no inventa esos campos', async () => {
+    vi.stubGlobal('Image', fakeImageClass({ fails: true }))
+    vi.stubGlobal('createImageBitmap', vi.fn())
+    const jpeg = new File(['x'], 'sin-meta.jpg', { type: 'image/jpeg' })
+
+    await uploadImage(jpeg).catch(() => {})
+
+    const [, context] = reportError.mock.calls[0] as [unknown, Record<string, unknown>]
+    expect(context).not.toHaveProperty('batchSize')
+    expect(context).not.toHaveProperty('msSinceSelection')
   })
 })
