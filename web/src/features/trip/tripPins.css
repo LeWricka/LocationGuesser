@@ -140,17 +140,3 @@
   line-height: 1;
   letter-spacing: 0.01em;
 }
-
-/* Momento ACTIVO: disco rojo (en juego) con "?" + halo que respira (lg-pulse-glow).
-   El rojo lo separa de los pines-foto cerrados y lo ata a la livePill del chrome. */
-.lg-trip-pin--active .lg-trip-pin__disc {
-  background-color: var(--color-danger);
-  color: var(--color-on-accent);
-  animation: lg-pulse-glow 2.4s var(--ease-emphasized, ease-in-out) infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lg-trip-pin--active .lg-trip-pin__disc {
-    animation: none;
-  }
-}

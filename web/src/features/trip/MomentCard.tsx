@@ -89,62 +89,73 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
         </div>
       )}
 
-      {/* Overlay + contenido sobre la foto. aria-hidden: el contenido textual ya
-          vive accesible vía el alt de la foto-botón y los controles tienen label. */}
-      <div className={styles.overlay} aria-hidden="true">
-        <div className={styles.body}>
-          {/* Chip de estado, sobre el título (no colisiona con la bandera sup-izq ni
-              el botón expandir sup-der). Un reto EN JUEGO lleva "EN JUEGO" (cálido,
-              pulsa); un reto cerrado/práctica, el chip "🎯 Reto" que lo distingue del
-              recuerdo. Un recuerdo no lleva chip: lee como contenido, no como juego. */}
-          {isActive ? (
-            <span className={styles.chip}>
-              <Badge tone="live" dot>
-                EN JUEGO
-              </Badge>
-            </span>
-          ) : isReto ? (
-            <span className={styles.chip}>
-              <Badge tone="accent">
-                <Icon icon={Target} size={13} /> Reto
-              </Badge>
-            </span>
-          ) : null}
-          {/* Nombre del lugar como EYEBROW (versalita) sobre la pregunta. Solo si ya
-              lo conocemos; si no, la pregunta manda sola. Un único bloque apilado
-              (eyebrow + título) sobre el velo del pie: nunca dos textos sueltos. */}
-          {placeName && <p className={styles.place}>{placeName}</p>}
-          <p className={styles.title}>{moment.title}</p>
-          <div className={styles.meta}>
-            {date && <span className={styles.date}>{date}</span>}
-            <span className={styles.social}>
-              <Icon icon={User} size={14} /> {moment.guessedCount}
-            </span>
+      {/* Overlay sobre la foto: contenedor a sangre + velo de legibilidad, sin
+          gestos propios (el CTA de dentro es la única excepción interactiva). */}
+      <div className={styles.overlay}>
+        {/* Fila del pie: bloque de texto + CTA/pill EN JUEGO en la MISMA fila flex
+            (issue #593, tarjeta EN JUEGO desordenada). Antes el CTA vivía absoluto
+            en la esquina y el texto ocupaba el ancho completo por su cuenta: un
+            título de 2 líneas podía extenderse bajo la pill. Con flex + `min-width:
+            0` en `.body`, el texto SIEMPRE reserva el hueco del CTA — nunca se pisan. */}
+        <div className={styles.foot}>
+          {/* aria-hidden: el contenido textual ya vive accesible vía el alt de la
+              foto-botón; el CTA de al lado SÍ queda en el árbol de accesibilidad
+              (no hereda este aria-hidden, es un hermano). */}
+          <div className={styles.body} aria-hidden="true">
+            {/* Chip de estado, sobre el título (no colisiona con la bandera sup-izq ni
+                el botón expandir sup-der). Un reto EN JUEGO lleva "EN JUEGO" (cálido,
+                pulsa); un reto cerrado/práctica, el chip "🎯 Reto" que lo distingue del
+                recuerdo. Un recuerdo no lleva chip: lee como contenido, no como juego. */}
+            {isActive ? (
+              <span className={styles.chip}>
+                <Badge tone="live" dot>
+                  EN JUEGO
+                </Badge>
+              </span>
+            ) : isReto ? (
+              <span className={styles.chip}>
+                <Badge tone="accent">
+                  <Icon icon={Target} size={13} /> Reto
+                </Badge>
+              </span>
+            ) : null}
+            {/* Nombre del lugar como EYEBROW (versalita) sobre la pregunta. Solo si ya
+                lo conocemos; si no, la pregunta manda sola. Un único bloque apilado
+                (eyebrow + título) sobre el velo del pie: nunca dos textos sueltos. */}
+            {placeName && <p className={styles.place}>{placeName}</p>}
+            <p className={styles.title}>{moment.title}</p>
+            <div className={styles.meta}>
+              {date && <span className={styles.date}>{date}</span>}
+              <span className={styles.social}>
+                <Icon icon={User} size={14} /> {moment.guessedCount}
+              </span>
+            </div>
           </div>
+
+          {/* CTA cálido SOLO si está en juego Y no es mío. */}
+          {isActive && !moment.isOwn && onPlay && (
+            <div className={styles.ctaSlot}>
+              <Button size="sm" onClick={onPlay}>
+                Adivina →
+              </Button>
+            </div>
+          )}
+
+          {/* Reto propio EN JUEGO: sin CTA (no puedo adivinar mi propio reto, #513) —
+              en su lugar, el recuento real de jugadas. No es un botón: no promete
+              ninguna acción, solo informa. */}
+          {isActive && moment.isOwn && (
+            <div className={styles.ctaSlot}>
+              <span className={styles.ownStatus}>
+                <Icon icon={User} size={14} />
+                {moment.guessedCount > 0
+                  ? `${moment.guessedCount} han jugado`
+                  : 'Esperando jugadas'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* CTA cálido SOLO si está en juego Y no es mío. Va por encima del overlay
-          para ser pulsable; el resto de la tarjeta sigue seleccionando. */}
-      {isActive && !moment.isOwn && onPlay && (
-        <div className={styles.cta}>
-          <Button size="sm" onClick={onPlay}>
-            Adivina →
-          </Button>
-        </div>
-      )}
-
-      {/* Reto propio EN JUEGO: sin CTA (no puedo adivinar mi propio reto, #513) —
-          en su lugar, el recuento real de jugadas. No es un botón: no promete
-          ninguna acción, solo informa. */}
-      {isActive && moment.isOwn && (
-        <div className={styles.cta}>
-          <span className={styles.ownStatus}>
-            <Icon icon={User} size={14} />
-            {moment.guessedCount > 0 ? `${moment.guessedCount} han jugado` : 'Esperando jugadas'}
-          </span>
-        </div>
-      )}
     </article>
   )
 }

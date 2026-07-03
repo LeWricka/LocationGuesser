@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, ImageOff, Plus, Star, Trash2, X } from 'lucide-react'
-import { Icon, Spinner, useToast } from '../../ui'
+import { Check, Plus, Star, Trash2, X } from 'lucide-react'
+import { Icon, IconCamara, Spinner, useToast } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
 import {
   addMomentImages,
@@ -142,7 +142,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
             <img className={styles.photo} src={initialCoverUrl} alt="" />
           ) : (
             <span className={styles.placeholder} aria-hidden>
-              <Icon icon={ImageOff} size={40} />
+              <IconCamara size={28} className={styles.placeholderIcon} />
             </span>
           )}
         </div>
@@ -156,7 +156,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
         {images.length === 0 ? (
           <li className={styles.slide}>
             <span className={styles.placeholder} aria-hidden>
-              <Icon icon={ImageOff} size={40} />
+              <IconCamara size={28} className={styles.placeholderIcon} />
             </span>
           </li>
         ) : (
@@ -173,7 +173,7 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
                 </button>
               ) : (
                 <span className={styles.placeholder} aria-hidden>
-                  <Icon icon={ImageOff} size={40} />
+                  <IconCamara size={28} className={styles.placeholderIcon} />
                 </span>
               )}
               {i === 0 && (

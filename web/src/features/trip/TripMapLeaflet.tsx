@@ -21,7 +21,7 @@ import {
   SINGLE_ZOOM,
 } from '../../lib/mapPresets'
 import type { TripMapProps as Props } from './TripMap.types'
-import { buildActivePinElement, buildPinElement, PIN_SIZE, PIN_TAIL } from './pinMarkers'
+import { buildPinElement, PIN_SIZE, PIN_TAIL } from './pinMarkers'
 import { drawnRouteCount } from './routeDraw'
 import './tripPins.css'
 import styles from './TripMapLeaflet.module.css'
@@ -47,18 +47,6 @@ const FIT_PAD_BOTTOM_RIGHT: L.PointTuple = [48, 220]
 // "spinner desnudo"). Pasado este margen, lo damos por listo igual.
 const MAP_READY_FALLBACK_MS = 4000
 
-/**
- * Posición FLOTANTE del momento activo: nunca su coordenada real (spoiler), sino
- * el centroide de los puntos cerrados (o el centro del mapa si aún no hay ninguno).
- * Es la implementación del principio nº3 del diseño.
- */
-function floatingActivePos(route: RoutePoint[]): L.LatLngExpression {
-  if (route.length === 0) return WORLD
-  const lat = route.reduce((s, p) => s + p.lat, 0) / route.length
-  const lng = route.reduce((s, p) => s + p.lng, 0) / route.length
-  return [lat, lng]
-}
-
 // Ancla del divIcon en la PUNTA del pin (centro-x, base): el círculo va arriba y la
 // puntita apunta al lugar. El alto incluye el tallo bajo el círculo (PIN_TAIL).
 const PIN_ICON_SIZE: L.PointTuple = [PIN_SIZE, PIN_SIZE + PIN_TAIL]
@@ -79,32 +67,17 @@ function closedPinIcon(point: RoutePoint, featured: boolean): L.DivIcon {
   })
 }
 
-// Pin del momento ACTIVO: disco rojo pulsante + icono "?" (no clavado en su sitio).
-function activePinIcon(): L.DivIcon {
-  return L.divIcon({
-    className: '',
-    html: buildActivePinElement(),
-    iconSize: PIN_ICON_SIZE,
-    iconAnchor: PIN_ICON_ANCHOR,
-  })
-}
-
 /**
- * Encuadra TODOS los pines (cerrados + posición flotante del activo) una vez tras
- * montar. Con un solo punto, centra con zoom medio. Reusa el patrón fitBounds de
- * AllGuessesMap pero en Leaflet.
+ * Encuadra TODOS los pines (momentos cerrados) una vez tras montar. Con un solo
+ * punto, centra con zoom medio. Reusa el patrón fitBounds de AllGuessesMap pero
+ * en Leaflet. El momento EN JUEGO nunca entra aquí: mientras dura no aparece en
+ * el mapa en absoluto (ni clavado ni flotando — issue #593), así que no puede
+ * influir en el encuadre.
  */
-function FitToPins({
-  route,
-  activePos,
-}: {
-  route: RoutePoint[]
-  activePos: L.LatLngExpression | null
-}) {
+function FitToPins({ route }: { route: RoutePoint[] }) {
   const map = useMap()
   useEffect(() => {
     const pts: L.LatLngExpression[] = route.map((p) => [p.lat, p.lng])
-    if (activePos) pts.push(activePos)
     if (pts.length === 0) return
     if (pts.length === 1) {
       // Un solo punto: zoom de ciudad (no de país), igual que el globo.
@@ -119,39 +92,30 @@ function FitToPins({
     // Solo al montar / cambiar el conjunto de puntos; el pan por selección lo
     // gestiona PanToSelected, que no debe re-encuadrar todo.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route, activePos])
+  }, [route])
   return null
 }
 
 /**
  * Al cambiar la selección, vuela con ZOOM al pin elegido (no solo pan): tocar una
- * tarjeta debe ACERCAR al punto. Si el seleccionado es el momento activo (sin
- * coordenada real), volamos a su posición flotante; si no, a su lat/lng real.
+ * tarjeta debe ACERCAR al punto. El momento EN JUEGO no tiene pin (issue #593): si
+ * lo seleccionan desde el carrusel, no hay a dónde volar y el mapa se queda quieto.
  */
 function PanToSelected({
   selectedChallengeId,
   route,
-  activeChallengeId,
-  activePos,
 }: {
   selectedChallengeId: string | null
   route: RoutePoint[]
-  activeChallengeId: string | null
-  activePos: L.LatLngExpression | null
 }) {
   const map = useMap()
   useEffect(() => {
     if (!selectedChallengeId) return
     const target = route.find((p) => p.challengeId === selectedChallengeId)
-    const center: L.LatLngExpression | null = target
-      ? [target.lat, target.lng]
-      : selectedChallengeId === activeChallengeId
-        ? activePos
-        : null
-    if (!center) return
+    if (!target) return
     // Zoom a nivel ciudad como mínimo; conservamos el actual si ya está más cerca.
-    map.flyTo(center, Math.max(map.getZoom(), SELECT_ZOOM), { duration: 0.6 })
-  }, [selectedChallengeId, route, activeChallengeId, activePos, map])
+    map.flyTo([target.lat, target.lng], Math.max(map.getZoom(), SELECT_ZOOM), { duration: 0.6 })
+  }, [selectedChallengeId, route, map])
   return null
 }
 
@@ -159,13 +123,13 @@ function PanToSelected({
  * Mapa PLANO de la ruta del viaje (Leaflet + satélite Esri por defecto) — el "suelo"
  * garantizado del pivote (el globo 3D/MapLibre es otra tarea). Pinta:
  *  - un pin-foto circular por momento cerrado, clavado en su lat/lng;
- *  - el momento activo FLOTANDO sobre el centroide de los cerrados (anti-spoiler),
- *    con anillo cálido pulsante;
- *  - la ruta: línea continua entre cerrados + tramo discontinuo hacia el activo.
+ *  - la ruta: línea continua entre cerrados.
+ *  - el momento EN JUEGO NUNCA aparece aquí (issue #593): mientras dura, su
+ *    respuesta es secreta y el diario solo lo muestra en el timeline/carrusel;
+ *    al cerrarse, entra en `route` con su pin real.
  */
 export function TripMapLeaflet({
   route,
-  activeMoment,
   selectedChallengeId,
   playing = false,
   onSelectMoment,
@@ -189,11 +153,6 @@ export function TripMapLeaflet({
     return () => window.clearTimeout(timer)
   }, [])
 
-  const activePos = useMemo<L.LatLngExpression | null>(
-    () => (activeMoment ? floatingActivePos(route) : null),
-    [activeMoment, route],
-  )
-
   // Línea ORO que cose los momentos cerrados en orden cronológico.
   const closedLine = useMemo<L.LatLngExpression[]>(() => route.map((p) => [p.lat, p.lng]), [route])
 
@@ -216,14 +175,6 @@ export function TripMapLeaflet({
     () => (drawnCount < closedLine.length ? closedLine.slice(Math.max(drawnCount - 1, 0)) : []),
     [closedLine, drawnCount],
   )
-
-  // Tramo discontinuo del último cerrado a la posición flotante del activo (aún
-  // "no clavado"): la ruta no termina en su sitio real, solo apunta hacia él.
-  const dashLine = useMemo<L.LatLngExpression[] | null>(() => {
-    if (!activePos || route.length === 0) return null
-    const last = route[route.length - 1]
-    return [[last.lat, last.lng], activePos]
-  }, [activePos, route])
 
   return (
     <div className={styles.wrap}>
@@ -298,14 +249,6 @@ export function TripMapLeaflet({
           />
         )}
 
-        {/* Tramo discontinuo hacia el activo flotante (oro tenue). */}
-        {dashLine && (
-          <Polyline
-            positions={dashLine}
-            pathOptions={{ color: 'var(--route-gold-soft)', weight: 3, dashArray: '6 8' }}
-          />
-        )}
-
         {/* Pines-foto de los momentos cerrados, clavados en su sitio real. */}
         {route.map((p) => (
           <Marker
@@ -316,22 +259,12 @@ export function TripMapLeaflet({
           />
         ))}
 
-        {/* Pin del momento activo: flotando, nunca en su coordenada real. */}
-        {activeMoment && activePos && (
-          <Marker
-            position={activePos}
-            icon={activePinIcon()}
-            eventHandlers={{ click: () => onSelectMoment(activeMoment.challengeId) }}
-          />
-        )}
+        {/* El momento EN JUEGO NO lleva pin (issue #593): mientras dura, su lugar es
+            secreto y el mapa no lo revela ni siquiera flotando; solo vive en el
+            timeline/carrusel. Al cerrarse entra en `route` con su pin real arriba. */}
 
-        <FitToPins route={route} activePos={activePos} />
-        <PanToSelected
-          selectedChallengeId={selectedChallengeId}
-          route={route}
-          activeChallengeId={activeMoment?.challengeId ?? null}
-          activePos={activePos}
-        />
+        <FitToPins route={route} />
+        <PanToSelected selectedChallengeId={selectedChallengeId} route={route} />
       </MapContainer>
 
       {/* Estado de carga: tapa el lienzo hasta que la capa base carga sus teselas

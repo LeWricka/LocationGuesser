@@ -156,6 +156,19 @@
   background: var(--photo-scrim-card);
 }
 
+/* Fila del pie (issue #593): bloque de texto + CTA/pill EN JUEGO en la MISMA fila
+   flex, en vez de un CTA absoluto flotando sobre el texto. `align-items: flex-end`
+   ata ambos a la base (mismo criterio visual que antes); `justify-content:
+   space-between` empuja el CTA a la esquina cuando existe, sin reservarle hueco
+   cuando no (recuerdo/cerrado: `.body` ocupa todo el ancho igual que antes). */
+.foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 /* Bandera del país: disco de vidrio esmerilado arriba a la izquierda (estilo
    Polarsteps, regla dura #537: flota sobre la foto). Mismo lenguaje que el botón
    "expandir" para que la tarjeta lea coherente. */
@@ -192,16 +205,19 @@
   margin-bottom: var(--space-1);
 }
 
-/* Bloque de texto pegado al pie: eyebrow (lugar) + pregunta apilados como un solo
-   bloque ordenado sobre el velo del pie (nunca dos textos flotando en la misma
-   franja). Se ancla abajo y no crece más allá de su contenido: el título se limita a
-   2 líneas y el eyebrow a 1, de modo que el bloque nunca trepa hacia el centro de la
-   foto, donde antes colisionaba con el nombre del lugar. */
+/* Bloque de texto en la fila del pie (`.foot`): eyebrow (lugar) + pregunta apilados
+   como un solo bloque ordenado sobre el velo del pie (nunca dos textos flotando en
+   la misma franja). El título se limita a 2 líneas y el eyebrow a 1, de modo que el
+   bloque nunca trepa hacia el centro de la foto, donde antes colisionaba con el
+   nombre del lugar. `flex: 1 1 auto` + `min-width: 0` (issue #593): en la fila junto
+   al CTA/pill, el bloque de texto CEDE ancho en vez de desbordar por debajo — el
+   título/eyebrow truncan dentro de su hueco real, nunca se pisan con la pill. */
 .body {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* Nombre del lugar como EYEBROW: versalita pequeña con tracking, en su propio
@@ -259,11 +275,13 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* CTA cálido del momento en juego: sobre el overlay y SÍ interactivo. */
-.cta {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
+/* CTA/pill del momento en juego: hueco de la fila del pie (`.foot`), NO absoluto
+   (issue #593) — así el bloque de texto vecino (`.body`) reserva su ancho real en
+   vez de dejar que el CTA se pise con un título de 2 líneas. `flex: 0 0 auto`
+   conserva su ancho natural; `pointer-events: auto` lo hace pulsable pese al
+   `pointer-events: none` del `.overlay` que lo envuelve. */
+.ctaSlot {
+  flex: 0 0 auto;
   pointer-events: auto;
 }
 

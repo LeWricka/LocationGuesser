@@ -1,6 +1,6 @@
 import { useEffect, type CSSProperties } from 'react'
-import { Camera, Flag, Footprints, ImageOff, Target, Users, X } from 'lucide-react'
-import { Avatar, Icon } from '../../ui'
+import { Camera, Flag, Footprints, Target, Users, X } from 'lucide-react'
+import { Avatar, Icon, IconCamara } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import type { Moment, RoutePoint } from '../../lib/trip'
@@ -142,12 +142,7 @@ export function TripWrap({
         {/* Mapa con TODA la ruta del viaje (sin reto activo: no hay spoiler). */}
         {route.length > 0 && (
           <section className={styles.mapWrap} aria-label="Mapa del viaje">
-            <TripMap
-              route={route}
-              activeMoment={null}
-              selectedChallengeId={null}
-              onSelectMoment={() => {}}
-            />
+            <TripMap route={route} selectedChallengeId={null} onSelectMoment={() => {}} />
           </section>
         )}
 
@@ -231,7 +226,7 @@ export function TripWrap({
                         <img src={m.imageUrl} alt="" loading="lazy" />
                       ) : (
                         <span className={styles.tlThumbFallback}>
-                          <Icon icon={ImageOff} size={22} />
+                          <IconCamara size={18} />
                         </span>
                       )}
                     </span>

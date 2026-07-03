@@ -2,7 +2,21 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
 import type { ChallengeForPlay } from '../../lib/challenges'
 import type { GroupInfo } from '../../lib/groupData'
+import type { LatLng } from '../../lib/geo'
 import type { VoteWithName } from '../../lib/leaderboard'
+
+// Issue #593: `getAnswers` (lib/challenges) es quien decide qué respuestas sirve la
+// RLS. Mockeamos solo esa función (importOriginal conserva el resto: `isPractice
+// Challenge`, etc.) para fijar exactamente qué mapa lat/lng "llega del servidor" en
+// cada test, sin montar Supabase — así podemos simular tanto el caso real (un
+// ACTIVO nunca se pide: `refresh` solo llama a `getAnswers` con los CERRADOS) como
+// el de un CERRADO de NÚMERO (la propia `getAnswers` filtra sus lat/lng a null, así
+// que nunca aporta fila aquí).
+const getAnswersMock = vi.fn<(ids: string[]) => Promise<Map<string, LatLng>>>()
+vi.mock('../../lib/challenges', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/challenges')>()
+  return { ...actual, getAnswers: (ids: string[]) => getAnswersMock(ids) }
+})
 
 // Issue #578: `useTripData` deriva `isOwn` (created_by === myUserId) para que la
 // tarjeta del reto NUNCA ofrezca "Adivina →" sobre un reto propio. Mockeamos solo
@@ -72,6 +86,15 @@ function activeChallenge(overrides: Partial<ChallengeForPlay>): ChallengeForPlay
   } as unknown as ChallengeForPlay
 }
 
+// Mismo reto que `activeChallenge` pero con plazo YA VENCIDO (cerrado): entra en
+// `splitByStatus(...).past`, así que `refresh` SÍ pide su respuesta a `getAnswers`.
+function closedChallenge(overrides: Partial<ChallengeForPlay>): ChallengeForPlay {
+  return activeChallenge({
+    deadline_at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    ...overrides,
+  })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   getGroupMock.mockResolvedValue({
@@ -86,6 +109,7 @@ beforeEach(() => {
     cover_image_path: null,
   })
   getGroupVotesMock.mockResolvedValue([])
+  getAnswersMock.mockResolvedValue(new Map())
 })
 
 describe('useTripData — isOwn (issue #578)', () => {
@@ -114,5 +138,63 @@ describe('useTripData — isOwn (issue #578)', () => {
     await waitFor(() => expect(result.current.moments).toHaveLength(1))
 
     expect(result.current.moments[0].isOwn).toBe(false)
+  })
+})
+
+// Issue #593: hallazgo de seguridad — ¿viaja la respuesta de un reto EN JUEGO al
+// cliente? NO: `refresh` solo pide `getAnswers` de los CERRADOS (`splitByStatus(...)
+// .past`), así que un ACTIVO nunca tiene entrada en el mapa devuelto y su
+// `lat`/`lng` quedan `null` a propósito (comentario "REGLA ANTI-SPOILER" en
+// `lib/trip.ts`). Estos tests fijan ese contrato para que un cambio futuro no lo
+// rompa en silencio, y cubren el reto de NÚMERO (cifra): su respuesta tampoco es
+// una coordenada, así que nunca puede aportar un pin al mapa.
+describe('useTripData — visibilidad de pines por estado (issue #593)', () => {
+  test('reto EN JUEGO: lat/lng quedan null y no entra en la ruta del mapa', async () => {
+    getGroupChallengesMock.mockResolvedValue([activeChallenge({ id: 'c1' })])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(1))
+
+    // `getAnswers` ni siquiera se llama con el id del activo: RLS no lo serviría.
+    expect(getAnswersMock).not.toHaveBeenCalledWith(expect.arrayContaining(['c1']))
+    expect(result.current.moments[0].status).toBe('active')
+    expect(result.current.moments[0].lat).toBeNull()
+    expect(result.current.moments[0].lng).toBeNull()
+    expect(result.current.route).toHaveLength(0)
+  })
+
+  test('reto CERRADO de lugar: su respuesta (ya servida por RLS) entra en la ruta', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1' })])
+    getAnswersMock.mockResolvedValue(new Map([['c1', { lat: 40.4, lng: -3.7 }]]))
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(1))
+
+    expect(result.current.moments[0].status).toBe('closed')
+    expect(result.current.moments[0].lat).toBe(40.4)
+    expect(result.current.moments[0].lng).toBe(-3.7)
+    expect(result.current.route).toHaveLength(1)
+    expect(result.current.route[0].challengeId).toBe('c1')
+  })
+
+  test('reto CERRADO de NÚMERO (cifra): timeline sí, mapa nunca (no tiene coordenada)', async () => {
+    // Un reto de número no tiene lat/lng que revelar: `getAnswers` real ya filtra a
+    // null sus filas (challenges.test.ts), así que aquí simulamos ESE resultado
+    // (mapa sin entrada para 'c1') en vez de reimplementar el filtro.
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({ id: 'c1', challenge_kind: 'number', number_question: '¿Cuánto costó?' }),
+    ])
+    getAnswersMock.mockResolvedValue(new Map())
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(1))
+
+    // Timeline/carrusel: el momento SÍ aparece (issue #593, punto 2).
+    expect(result.current.moments[0].status).toBe('closed')
+    expect(result.current.moments[0].title).toBeTruthy()
+    // Mapa: sin coordenada, nunca entra en la ruta.
+    expect(result.current.moments[0].lat).toBeNull()
+    expect(result.current.moments[0].lng).toBeNull()
+    expect(result.current.route).toHaveLength(0)
   })
 })

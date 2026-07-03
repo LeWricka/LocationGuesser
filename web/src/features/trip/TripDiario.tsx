@@ -23,7 +23,6 @@ interface Props {
   groupId: string
   moments: Moment[]
   route: RoutePoint[]
-  activeMoment: Moment | null
   selectedId: string | null
   /** ¿Puede el usuario añadir momentos? (dueño) — gobierna el CTA del vacío. */
   canCreate: boolean
@@ -55,7 +54,6 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
     groupId,
     moments,
     route,
-    activeMoment,
     selectedId,
     canCreate,
     playing,
@@ -86,7 +84,6 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
       <div className={styles.map} style={{ viewTransitionName: heroTransitionName(groupId) }}>
         <TripMap
           route={route}
-          activeMoment={activeMoment}
           selectedChallengeId={selectedId}
           playing={playing}
           onSelectMoment={onSelectFromMap}

@@ -9,10 +9,6 @@
 export const PIN_MARKER_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>'
 
-/** Glifo lucide `HelpCircle`: reto en juego cuya respuesta está oculta. */
-export const HELP_MARKER_SVG =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>'
-
 // Lado del círculo del pin-foto en px (lo consumen Leaflet `iconSize`/`iconAnchor`).
 // Centralizado para que ambos motores claven el ancla en el mismo sitio.
 export const PIN_SIZE = 48
@@ -80,26 +76,12 @@ export function photoPinHtml({ imageUrl, title, featured = false }: PhotoPinOpti
   return `<div class="${cls.join(' ')}"><span class="lg-trip-pin__disc">${inner}</span></div>`
 }
 
-/** HTML del pin del momento ACTIVO (en juego): disco rojo pulsante con "?" — no se
- * clava en su sitio real (anti-spoiler), lo coloca el motor sobre el centroide. */
-export function activePinHtml(): string {
-  return `<div class="lg-trip-pin lg-trip-pin--active"><span class="lg-trip-pin__disc">${HELP_MARKER_SVG}</span></div>`
-}
-
 /** Convierte un string de markup de pin en su ELEMENTO DOM raíz (`.lg-trip-pin`). */
 function elementFromHtml(html: string): HTMLDivElement {
   const wrapper = document.createElement('div')
   wrapper.innerHTML = html
   // El primer (único) hijo es el `.lg-trip-pin`; lo devolvemos como raíz del marcador.
   return wrapper.firstElementChild as HTMLDivElement
-}
-
-/** ELEMENTO DOM del pin del momento ACTIVO (disco rojo pulsante con "?"). Los motores
- * (Leaflet `divIcon`/MapLibre `Marker`) aceptan un HTMLElement como contenido, así que
- * todos los pines se construyen como ELEMENTO (no string) para poder colgar la red de
- * seguridad de precarga de foto de forma uniforme. El activo no lleva foto. */
-export function buildActivePinElement(): HTMLDivElement {
-  return elementFromHtml(activePinHtml())
 }
 
 /** ¿Es una URL de imagen USABLE como fondo de pin? Aceptamos lo que un navegador
