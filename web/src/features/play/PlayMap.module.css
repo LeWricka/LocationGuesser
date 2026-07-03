@@ -11,6 +11,10 @@
   /* Sin contenedor con alto explícito (uso fuera de la hoja), el mapa cae a su alto
      por defecto (.lg-map ya define 340/420px); el wrap solo lo envuelve. */
   min-height: inherit;
+  /* Contenedor de tamaño (issue #602): permite que `.layerToggle` se esconda por
+     `@container` cuando este `.wrap` es diminuto (el thumbnail colapsado de
+     128px de GameScene), en vez de necesitar un prop nuevo para distinguirlo. */
+  container-type: inline-size;
 }
 
 /*
@@ -31,4 +35,91 @@
   /* drop-shadow admite una sola sombra (no el box-shadow de dos capas de --shadow-pin):
      usamos el color de velo (token) para que el pin se despegue del mapa. */
   filter: drop-shadow(0 4px 8px var(--color-scrim));
+}
+
+/*
+ * Toggle Satélite/Mapa (issue #602): pastilla de vidrio, mismo patrón que el
+ * selector de capa de MapPicker (`.layers`/`.layer`/`.layerActive` en
+ * MapPicker.module.css) pero con el chrome propio de la escena de juego
+ * (`--chrome-*`, igual que `.glassBtn` de PlayChallenge.module.css) en vez del
+ * `--map-chrome-*` de MapPicker — visualmente equivalentes.
+ *
+ * Arriba-IZQUIERDA (no arriba-derecha, ver comentario en PlayMap.tsx): esa
+ * esquina la ocupa el botón de cerrar del mapa expandido, ajeno a este
+ * componente.
+ */
+.layerToggle {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  z-index: var(--z-sticky);
+  display: flex;
+  gap: var(--space-1);
+  background: var(--chrome-bg);
+  -webkit-backdrop-filter: var(--chrome-blur);
+  backdrop-filter: var(--chrome-blur);
+  border-radius: var(--radius-full);
+  padding: var(--space-1);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+}
+
+.layerBtn,
+.layerBtnActive {
+  border: none;
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  min-height: var(--tap-target);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.layerBtn:active,
+.layerBtnActive:active {
+  transform: scale(var(--motion-press-scale));
+}
+
+.layerBtn {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.layerBtn:hover {
+  color: var(--color-text);
+}
+
+/* Capa activa: sólida en acento + anillo blanco, igual que MapPicker (se
+   confundiría con el terreno satélite sin el anillo). */
+.layerBtnActive {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow:
+    0 0 0 2px var(--color-on-accent),
+    var(--shadow-sm);
+}
+
+.layerBtn:focus-visible,
+.layerBtnActive:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* En el thumbnail colapsado (128px, `.miniMapaScene` de GameScene) el toggle no
+   cabe ni hace falta: ese contenedor ya es `pointer-events: none` (solo abre el
+   mapa al tocar), así que mostrar una pastilla inerte sería ruido visual. */
+@container (max-width: 180px) {
+  .layerToggle {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layerBtn:active,
+  .layerBtnActive:active {
+    transform: none;
+  }
 }
