@@ -125,7 +125,7 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
     expect(screen.queryByText('P')).not.toBeInTheDocument()
   })
 
-  test('el avatar abre el perfil', async () => {
+  test('el avatar abre el perfil y es el ÚNICO acceso (sin engranaje duplicado, #616)', async () => {
     const onOpenProfile = vi.fn()
     render(
       <HomeDashboard
@@ -137,6 +137,8 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
     )
     await userEvent.click(screen.getByRole('button', { name: 'Abrir tu perfil' }))
     expect(onOpenProfile).toHaveBeenCalled()
+    // El engranaje llevaba al MISMO destino que el avatar (duplicado confuso).
+    expect(screen.queryByRole('button', { name: 'Abrir tus ajustes' })).not.toBeInTheDocument()
   })
 
   test('arranca con el primer viaje del carrusel como activeTargetId del globo', () => {

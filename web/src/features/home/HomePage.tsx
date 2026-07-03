@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Settings } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import {
   Avatar,
   Card,
@@ -225,14 +225,8 @@ export function HomePage() {
                 <LogoTabide variant="oscuro" size={22} />
                 <WordmarkTabide size={18} />
               </span>
-              <button
-                type="button"
-                className={styles.sceneButton}
-                onClick={gotoProfile}
-                aria-label="Abrir tus ajustes"
-              >
-                <Icon icon={Settings} size={20} />
-              </button>
+              {/* Un solo acceso al perfil (issue #616): antes el engranaje duplicaba el
+                  mismo destino que el avatar — patrón universal, el avatar basta. */}
               <button
                 type="button"
                 className={styles.avatarButton}

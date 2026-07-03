@@ -1,0 +1,44 @@
+/* Lista de miembros del modal "Miembros" (#616). No reutiliza .memberRow de
+   GroupPage.module.css porque aquí una fila puede llevar hasta DOS acciones
+   (co-dueño + expulsar) además del badge: a 390px eso desborda una fila rígida
+   de space-between. Estas filas ENVUELVEN: nombre + rol en la primera línea y,
+   si no caben, las acciones bajan a una segunda línea alineadas a la derecha. */
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+/* margin-right:auto empuja rol y acciones a la derecha mientras quepan. */
+.name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: auto;
+  min-width: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Acciones de la fila: a la derecha; con poco ancho bajan de línea enteras. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin-left: auto;
+}

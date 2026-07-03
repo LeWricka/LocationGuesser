@@ -85,6 +85,12 @@ describe('InviteModal — invitación como tarjeta-imagen (#617)', () => {
     await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
   })
 
+  test('apunta a "Miembros" para dar la gestión (descubribilidad de co-dueños, #616)', async () => {
+    renderModal()
+    expect(screen.getByText(/Hazlo co-dueño desde «Miembros»/)).toBeInTheDocument()
+    await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
+  })
+
   test('resuelve la cascada de portada del viaje y rasteriza la tarjeta; la previa muestra el PNG', async () => {
     renderModal()
 
