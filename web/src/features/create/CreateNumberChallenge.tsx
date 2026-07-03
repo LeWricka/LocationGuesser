@@ -272,7 +272,12 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
         )}
         <div className={styles.heroVeil} aria-hidden />
         <div className={styles.heroTop}>
-          <button type="button" className={styles.iconBtn} aria-label="Atrás" onClick={onBack}>
+          <button
+            type="button"
+            className={[styles.iconBtn, 'lg-press'].join(' ')}
+            aria-label="Atrás"
+            onClick={onBack}
+          >
             <BackArrow />
           </button>
           <span className={styles.kindChip}>

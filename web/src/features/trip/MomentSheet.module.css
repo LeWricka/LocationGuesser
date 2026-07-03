@@ -405,6 +405,10 @@
   background: transparent;
   border: 0;
   padding: 0;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.descEditBtn:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
 }
 .descAdd {
   padding: var(--space-2) var(--space-3);
@@ -641,6 +645,9 @@
   .heroClose,
   .panel {
     transition: none;
+  }
+  .descEditBtn:active:not(:disabled) {
+    transform: none;
   }
 }
 

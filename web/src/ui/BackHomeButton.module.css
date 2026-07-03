@@ -15,11 +15,17 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
 
-  transition: color var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .back:hover {
   color: var(--color-text);
+}
+
+.back:active {
+  transform: scale(var(--motion-press-scale));
 }
 
 /* El icono Lucide hereda el color por currentColor; aquí solo el micro-desliz al
@@ -37,7 +43,8 @@
   .back {
     transition: none;
   }
-  .back:hover .arrow {
+  .back:hover .arrow,
+  .back:active {
     transform: none;
   }
 }

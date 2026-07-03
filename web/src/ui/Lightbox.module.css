@@ -40,9 +40,13 @@
   color: var(--color-on-photo);
   font-size: var(--font-size-lg);
   cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 .close:hover {
   background: rgba(0, 0, 0, 0.7);
+}
+.close:active {
+  transform: scale(var(--motion-press-scale));
 }
 .close:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -68,9 +72,15 @@
   font-size: var(--font-size-xl);
   line-height: 1;
   cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 .nav:hover {
   background: rgba(0, 0, 0, 0.7);
+}
+.nav:active {
+  /* Combina con el centrado vertical de base (translateY): un `transform` nuevo
+   * lo sustituiría y el botón saltaría de sitio. */
+  transform: translateY(-50%) scale(var(--motion-press-scale));
 }
 .nav:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -162,5 +172,11 @@
   }
   .img {
     transition: none;
+  }
+  .close:active {
+    transform: none;
+  }
+  .nav:active {
+    transform: translateY(-50%);
   }
 }

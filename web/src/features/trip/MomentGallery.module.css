@@ -49,6 +49,11 @@
   border: 0;
   background: none;
   cursor: zoom-in;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.photoBtn:active {
+  transform: scale(var(--motion-press-scale));
 }
 
 .photo {
@@ -101,12 +106,17 @@
   color: var(--scene-ink);
   font-size: var(--font-size-md);
   cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .action:hover,
 .action:focus-visible {
   background: var(--scene-bg);
   border-color: var(--scene-ink);
+}
+
+.action:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
 }
 
 .action:disabled {
@@ -183,6 +193,11 @@
   .dot {
     transition: none;
   }
+  .photoBtn:active,
+  .action:active:not(:disabled),
+  .addRow:active:not([aria-busy='true']) {
+    transform: none;
+  }
 }
 
 /* Fila "añadir más fotos" (solo dueño): discreta, bajo el carrusel. */
@@ -199,12 +214,17 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .addRow:hover,
 .addRow:focus-within {
   border-color: var(--color-accent);
   background: var(--color-surface-hover);
+}
+
+.addRow:active:not([aria-busy='true']) {
+  transform: scale(var(--motion-press-scale));
 }
 
 .addRow[aria-busy='true'] {

@@ -150,7 +150,7 @@ export function GameScene({
         ) : imageUrl ? (
           <button
             type="button"
-            className={styles.photoSceneButton}
+            className={[styles.photoSceneButton, 'lg-press'].join(' ')}
             onClick={onExpandPhoto}
             aria-label="Ampliar la foto del reto"
           >
@@ -192,7 +192,7 @@ export function GameScene({
       {sceneReady && hintPhotoUrl && (
         <button
           type="button"
-          className={styles.hintFloat}
+          className={[styles.hintFloat, 'lg-press'].join(' ')}
           onClick={onExpandPhoto}
           aria-label="Ampliar la foto del reto"
         >
@@ -246,7 +246,7 @@ export function GameScene({
       {!mapOpen && (
         <button
           type="button"
-          className={styles.miniMapa}
+          className={[styles.miniMapa, 'lg-press'].join(' ')}
           onClick={onOpenMap}
           aria-label="Abrir el mapa para clavar el tiro"
         >

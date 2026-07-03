@@ -121,12 +121,23 @@
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
-    border-color var(--transition-fast);
+    border-color var(--transition-fast),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .editPrizesBtn:hover {
   background: var(--color-accent-soft);
   border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.editPrizesBtn:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editPrizesBtn:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 /* Campo del editor (en el modal): etiqueta del puesto (medalla + «1º»…) sobre el

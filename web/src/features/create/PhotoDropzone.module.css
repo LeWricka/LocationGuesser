@@ -17,13 +17,18 @@
   cursor: pointer;
   transition:
     border-color var(--transition-fast),
-    background var(--transition-fast);
+    background var(--transition-fast),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 .empty:hover,
 .empty:focus-within {
   border-color: var(--color-accent);
   background: var(--color-surface-hover);
+}
+
+.empty:active:not([aria-busy='true']) {
+  transform: scale(var(--motion-press-scale));
 }
 
 .empty[aria-busy='true'] {
@@ -123,6 +128,7 @@
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
 }
 
 /* "Quitar" solo lleva icono: cuadrado para que sea claramente un botón aparte. */
@@ -139,6 +145,11 @@
   border-color: var(--color-on-photo);
 }
 
+.change:active:not(:has(.input:disabled)),
+.remove:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
+}
+
 /* Input de archivo oculto pero accesible (visually-hidden). */
 .input {
   position: absolute;
@@ -150,4 +161,12 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .empty:active:not([aria-busy='true']),
+  .change:active:not(:has(.input:disabled)),
+  .remove:active:not(:disabled) {
+    transform: none;
+  }
 }

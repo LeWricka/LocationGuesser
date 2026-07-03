@@ -58,7 +58,7 @@ export function ToastProvider({ children }: Props) {
             <span className={styles.message}>{t.message}</span>
             <button
               type="button"
-              className={styles.close}
+              className={[styles.close, 'lg-press'].join(' ')}
               onClick={() => dismiss(t.id)}
               aria-label="Cerrar aviso"
             >

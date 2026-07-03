@@ -440,7 +440,12 @@ export function MomentSheet({
             </div>
 
             {/* Cerrar: chip flotante arriba-izquierda (toca el velo del mapa de A). */}
-            <button type="button" className={styles.heroClose} onClick={close} aria-label="Volver">
+            <button
+              type="button"
+              className={[styles.heroClose, 'lg-press'].join(' ')}
+              onClick={close}
+              aria-label="Volver"
+            >
               <Icon icon={ArrowLeft} size={20} />
             </button>
 
@@ -620,7 +625,7 @@ export function MomentSheet({
                   ) : canEdit ? (
                     <button
                       type="button"
-                      className={styles.descAdd}
+                      className={[styles.descAdd, 'lg-press'].join(' ')}
                       onClick={() => setEditing(true)}
                     >
                       <Icon icon={Pencil} size={14} /> Añadir descripción del día
@@ -784,7 +789,7 @@ export function MomentSheet({
                     {isRecuerdo ? (
                       <button
                         type="button"
-                        className={styles.ownerAction}
+                        className={[styles.ownerAction, 'lg-press'].join(' ')}
                         onClick={() => {
                           setEditTitle(moment.title)
                           setEditDate(dateInputValue(moment.date))
@@ -801,7 +806,7 @@ export function MomentSheet({
                     ) : onEditChallenge ? (
                       <button
                         type="button"
-                        className={styles.ownerAction}
+                        className={[styles.ownerAction, 'lg-press'].join(' ')}
                         onClick={() => onEditChallenge(moment.challengeId)}
                       >
                         <Icon icon={Pencil} size={15} /> Editar reto
@@ -809,7 +814,9 @@ export function MomentSheet({
                     ) : null}
                     <button
                       type="button"
-                      className={`${styles.ownerAction} ${styles.ownerActionDanger}`}
+                      className={[styles.ownerAction, styles.ownerActionDanger, 'lg-press'].join(
+                        ' ',
+                      )}
                       onClick={() => setConfirmingDelete(true)}
                     >
                       <Icon icon={Trash2} size={15} /> Borrar

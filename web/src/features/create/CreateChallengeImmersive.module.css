@@ -263,6 +263,10 @@
   background: var(--scene-surface);
   color: var(--scene-ink);
   cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.gpsBtn:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
 }
 .gpsBtn:disabled {
   opacity: 0.6;
@@ -637,6 +641,10 @@
   cursor: pointer;
   text-align: left;
   font-family: inherit;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.toggleRow:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
 }
 .toggleRow:disabled {
   opacity: 0.55;
@@ -710,6 +718,9 @@
   cursor: pointer;
   font-family: inherit;
   transition: all 0.18s ease;
+}
+.seg button:active {
+  transform: scale(var(--motion-press-scale));
 }
 .segSel {
   background: var(--accent) !important;

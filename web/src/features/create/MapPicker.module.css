@@ -61,7 +61,13 @@
   cursor: pointer;
   transition:
     background var(--transition-fast),
-    color var(--transition-fast);
+    color var(--transition-fast),
+    transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.layer:active,
+.layerActive:active {
+  transform: scale(var(--motion-press-scale));
 }
 
 .layer {
@@ -126,4 +132,11 @@
 
 .wrap :global(.leaflet-control-attribution a) {
   color: var(--color-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layer:active,
+  .layerActive:active {
+    transform: none;
+  }
 }

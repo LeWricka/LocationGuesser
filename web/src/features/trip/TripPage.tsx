@@ -431,7 +431,7 @@ export function TripPage({
         action={
           <button
             type="button"
-            className={styles.menuButton}
+            className={[styles.menuButton, 'lg-press'].join(' ')}
             onClick={() => setMenuOpen(true)}
             aria-label="Más opciones del viaje"
             aria-haspopup="dialog"
@@ -583,7 +583,7 @@ export function TripPage({
         <nav className={styles.menu} aria-label="Opciones del viaje">
           <button
             type="button"
-            className={styles.menuItem}
+            className={[styles.menuItem, 'lg-press'].join(' ')}
             onClick={() => {
               setMenuOpen(false)
               setInviting(true)
@@ -596,7 +596,7 @@ export function TripPage({
           </button>
           <button
             type="button"
-            className={styles.menuItem}
+            className={[styles.menuItem, 'lg-press'].join(' ')}
             onClick={() => {
               setMenuOpen(false)
               setSection('marcador')
@@ -613,7 +613,7 @@ export function TripPage({
             <>
               <button
                 type="button"
-                className={styles.menuItem}
+                className={[styles.menuItem, 'lg-press'].join(' ')}
                 onClick={() => openSettings('settings')}
               >
                 <span className={styles.menuItemIcon}>
@@ -623,7 +623,7 @@ export function TripPage({
               </button>
               <button
                 type="button"
-                className={styles.menuItem}
+                className={[styles.menuItem, 'lg-press'].join(' ')}
                 onClick={() => openSettings('season')}
               >
                 <span className={styles.menuItemIcon}>
@@ -633,7 +633,7 @@ export function TripPage({
               </button>
               <button
                 type="button"
-                className={`${styles.menuItem} ${styles.menuItemDanger}`}
+                className={[styles.menuItem, styles.menuItemDanger, 'lg-press'].join(' ')}
                 onClick={() => openSettings('danger')}
               >
                 <span className={styles.menuItemIcon}>

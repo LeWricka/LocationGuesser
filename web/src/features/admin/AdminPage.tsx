@@ -266,7 +266,7 @@ function GroupRow({ group }: { group: AdminGroup }) {
     <Card padding="none">
       <button
         type="button"
-        className={styles.disclosure}
+        className={[styles.disclosure, 'lg-press'].join(' ')}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -390,7 +390,7 @@ function ChallengeRow({ challenge }: { challenge: AdminGroupChallenge }) {
     <div className={styles.challenge}>
       <button
         type="button"
-        className={styles.challengeHead}
+        className={[styles.challengeHead, 'lg-press'].join(' ')}
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
