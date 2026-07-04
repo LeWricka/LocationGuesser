@@ -33,6 +33,11 @@
   overflow: hidden;
   isolation: isolate;
   background: var(--scene-bg);
+  /* Zona de solape globo↔contenido (reporte del dueño, 4 jul): sin ella la
+   * esfera moría en un corte recto donde empezaba el bloque del titular. El
+   * globo se FUNDE a transparente a lo largo de esta franja y el contenido se
+   * superpone encima con su propio degradado — la esfera nunca "termina". */
+  --hero-overlap: clamp(56px, 12dvh, 128px);
 }
 
 /* Zona del globo: crece para ocupar todo el alto que el contenido no necesita —
@@ -45,6 +50,21 @@
   min-height: min(320px, 42dvh);
   z-index: 0; /* design-lint-allow: capa local del héroe (globo bajo la marca) */
   animation: landingGlobeIn var(--motion-duration-slow) var(--motion-ease-standard) backwards;
+  /* El globo se extiende POR DEBAJO del contenido (margen negativo) y se funde
+   * a transparente en esa franja: el corte recto desaparece y el titular pisa
+   * una zona donde el satélite queda a ≤15% de opacidad sobre --scene-bg — el
+   * AA del texto sigue garantizado por construcción (gotcha #622 intacto). */
+  margin-bottom: calc(-1 * var(--hero-overlap));
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    black calc(100% - var(--hero-overlap) - 48px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    black calc(100% - var(--hero-overlap) - 48px),
+    transparent 100%
+  );
 }
 
 /* Marca flotando SOBRE el globo: mismo velo/tinta de escena que la home logueada
@@ -84,8 +104,16 @@
   width: 100%;
   max-width: var(--container-max);
   margin: 0 auto;
-  padding: var(--space-6) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom));
-  background: var(--scene-bg);
+  padding: calc(var(--space-4) + var(--hero-overlap) * 0.5) var(--space-4)
+    calc(var(--space-6) + env(safe-area-inset-bottom));
+  /* Degradado en vez de fondo plano: la mitad alta del bloque deja entrever el
+   * globo ya fundido (ver .heroGlobe) y alcanza --scene-bg sólido antes de la
+   * primera línea del titular. El texto nunca pisa satélite a más del ~15%. */
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--scene-bg) calc(var(--hero-overlap) * 0.72)
+  );
   animation: landingContentIn var(--motion-duration-slower) var(--motion-ease-emphasized) backwards;
   animation-delay: calc(var(--motion-stagger-step) * 2);
 }
