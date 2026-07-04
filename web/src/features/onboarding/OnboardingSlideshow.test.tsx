@@ -10,7 +10,7 @@ describe('OnboardingSlideshow — render de pasos (#625)', () => {
 
     expect(screen.getByRole('heading', { name: slides[0].title })).toBeInTheDocument()
     expect(screen.getByText(slides[0].body)).toBeInTheDocument()
-    expect(screen.getByText(`Tabide · 1 de ${slides.length}`)).toBeInTheDocument()
+    expect(screen.getByText(`Momentu · 1 de ${slides.length}`)).toBeInTheDocument()
     // El "Saltar" está siempre visible desde el primer frame (issue #625).
     expect(screen.getByRole('button', { name: 'Saltar' })).toBeInTheDocument()
   })

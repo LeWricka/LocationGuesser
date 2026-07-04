@@ -1,0 +1,55 @@
+/* Wordmark "momentu" (rebrand Tabide → Momentu, issue #691): serif de marca con el
+   mini-pin teal del símbolo haciendo de punto final de la palabra. Todo en `em` para
+   que escale con `font-size` (la única medida que fija el llamador). */
+
+.root {
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-semibold, 600);
+  letter-spacing: 0.005em;
+  color: inherit; /* el llamador decide el tono (tinta o `--scene-ink` sobre escena) */
+}
+
+/* Oculta la construcción visual a lectores de pantalla: el texto real y accesible vive
+   en .srOnly, así no se anuncia dos veces ni se lee "momentu, pin teal". */
+.visual {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+/* Hueco tras la "u" final donde se apoya el pin-punto: separado con el espaciado
+   óptico de un punto tipográfico (~0.08em), no pegado a la letra. */
+.dotSlot {
+  position: relative;
+  display: inline-block;
+  width: 0.32em;
+  height: 0.32em;
+  margin-left: 0.08em;
+  /* Línea de base ligeramente elevada (como un "·" con cuerpo): un punto pegado a la
+     base leería como una mancha bajo la palabra, no como cierre de la marca. */
+  transform: translateY(-0.06em);
+  overflow: visible;
+}
+
+.pinDot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Patrón visually-hidden (igual que Field.module.css .labelHidden): texto real para
+   lectores de pantalla, invisible en pantalla. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

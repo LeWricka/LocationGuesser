@@ -1,4 +1,4 @@
-// Barril de iconos custom de marca Tabide.
+// Barril de iconos custom de marca Momentu.
 //
 // Set propio con carácter: trazo rounded, stroke-width 1.8, viewBox 24×24.
 // currentColor para el cuerpo (el llamador controla vía CSS `color`).
@@ -18,5 +18,5 @@ export { IconCandado } from './IconCandado'
 export { IconConfeti } from './IconConfeti'
 export { IconGps } from './IconGps'
 export { IconCalendario } from './IconCalendario'
-export { LogoTabide } from './LogoTabide'
-export { WordmarkTabide } from './WordmarkTabide'
+export { LogoMomentu } from './LogoMomentu'
+export { WordmarkMomentu } from './WordmarkMomentu'

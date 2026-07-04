@@ -43,16 +43,16 @@ describe('tripInviteMetaLine', () => {
 // lo estampa nunca. Función pura.
 describe('buildInviteCaption', () => {
   test('lleva el gancho del viaje + el enlace, en líneas separadas', () => {
-    const text = buildInviteCaption('Iker', 'Japón en primavera', 'https://tabide.app/v/abc123')
+    const text = buildInviteCaption('Iker', 'Japón en primavera', 'https://momentu.art/v/abc123')
     expect(text).toContain('Iker te invita a vivir su viaje')
     expect(text).toContain('«Japón en primavera»')
-    expect(text.endsWith('https://tabide.app/v/abc123')).toBe(true)
+    expect(text.endsWith('https://momentu.art/v/abc123')).toBe(true)
   })
 
   test('el enlace va SIEMPRE al final, en su propia línea', () => {
-    const text = buildInviteCaption('Ana', 'Lisboa', 'https://tabide.app/v/xyz')
+    const text = buildInviteCaption('Ana', 'Lisboa', 'https://momentu.art/v/xyz')
     const lines = text.split('\n')
     expect(lines).toHaveLength(2)
-    expect(lines[1]).toBe('https://tabide.app/v/xyz')
+    expect(lines[1]).toBe('https://momentu.art/v/xyz')
   })
 })

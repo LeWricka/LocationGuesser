@@ -62,7 +62,7 @@ export default defineConfig({
   },
   // Viewport ALTO: la hoja inmersiva de crear (mapa + hoja que crece + footer) mide
   // ~860px; con el alto por defecto (720) el CTA cae fuera del viewport y no se puede
-  // pulsar. Tabide es móvil-first pero el flujo necesita alto; damos 1000px.
+  // pulsar. Momentu es móvil-first pero el flujo necesita alto; damos 1000px.
   projects: [
     {
       name: 'chromium',

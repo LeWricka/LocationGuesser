@@ -1,4 +1,4 @@
-# UI kit — Tabide
+# UI kit — Momentu
 
 Sistema de diseño del proyecto: **design tokens** + un conjunto pequeño de
 componentes React (CSS Modules, sin librerías externas). Tema oscuro,

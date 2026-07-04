@@ -91,7 +91,7 @@ export { UpdateBanner } from './UpdateBanner'
 
 // ── Fase 1 del rediseño ────────────────────────────────────────────────────
 
-// Iconos custom de marca Tabide. Set propio con carácter (pin, globo, diana,
+// Iconos custom de marca Momentu. Set propio con carácter (pin, globo, diana,
 // trofeo, cámara, reto, medalla, candado, confeti, GPS, calendario). Acento teal
 // en detalles con significado semántico. Fase 2 (issue #686): ya sustituye a
 // lucide en varios sitios de cara al usuario (ver `IconCalendario`).
@@ -107,8 +107,8 @@ export {
   IconConfeti,
   IconGps,
   IconCalendario,
-  LogoTabide,
-  WordmarkTabide,
+  LogoMomentu,
+  WordmarkMomentu,
 } from './icons'
 
 // Shells de pantalla: la capa de composición que codifica las reglas duras de

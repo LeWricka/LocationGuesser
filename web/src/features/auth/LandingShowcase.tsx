@@ -61,7 +61,7 @@ export function LandingShowcase({ onStart, className }: Props) {
         aria-labelledby="showcase-bucle"
       >
         <h2 id="showcase-bucle" className={styles.loopTitle}>
-          Así funciona Tabide
+          Así funciona Momentu
         </h2>
         <ol className={styles.loop}>
           {SHOWCASE_LOOP.map((line, i) => (

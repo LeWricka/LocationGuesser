@@ -1,5 +1,6 @@
-// LogoTabide — símbolo de marca "el camino dentro del pin": un pin relleno con una ruta
+// LogoMomentu — símbolo de marca "el camino dentro del pin": un pin relleno con una ruta
 // punteada en oro que serpentea hasta un destino teal (el viaje, y adónde llega).
+// Renombrado de LogoTabide en el rebrand Tabide → Momentu (issue #691); el dibujo NO cambia.
 //
 // Geometría máster validada (issue #538, comentario del dueño): se usa TAL CUAL, sin
 // reinterpretar el trazo. A diferencia del resto de iconos del set (currentColor), este
@@ -32,7 +33,7 @@ const PALETTE: Record<
   oscuro: { pin: '#FBFBF9', route: '#B98A2F', dest: '#0F766E', destRing: '#1F2A30' }, // design-lint-allow: paleta fija de marca (issue #538, geometría máster), no tokens de UI
 }
 
-export function LogoTabide({ variant = 'claro', size = 32, className, title = 'Tabide' }: Props) {
+export function LogoMomentu({ variant = 'claro', size = 32, className, title = 'Momentu' }: Props) {
   const isMono = variant === 'mono'
   const colors = isMono ? null : PALETTE[variant]
 

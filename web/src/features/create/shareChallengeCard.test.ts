@@ -5,16 +5,16 @@ import { buildShareCaption } from './shareChallengeCard'
 // lo estampa nunca. Función pura.
 describe('buildShareCaption', () => {
   test('lleva el gancho del reto + el enlace, en líneas separadas', () => {
-    const text = buildShareCaption('Iker', 'https://tabide.app/j/abc123')
+    const text = buildShareCaption('Iker', 'https://momentu.art/j/abc123')
     expect(text).toContain('¿adivinas dónde está esta foto?')
     expect(text).toContain('Iker te reta')
-    expect(text.endsWith('https://tabide.app/j/abc123')).toBe(true)
+    expect(text.endsWith('https://momentu.art/j/abc123')).toBe(true)
   })
 
   test('el enlace va SIEMPRE al final, en su propia línea', () => {
-    const text = buildShareCaption('Ana', 'https://tabide.app/j/xyz')
+    const text = buildShareCaption('Ana', 'https://momentu.art/j/xyz')
     const lines = text.split('\n')
     expect(lines).toHaveLength(2)
-    expect(lines[1]).toBe('https://tabide.app/j/xyz')
+    expect(lines[1]).toBe('https://momentu.art/j/xyz')
   })
 })

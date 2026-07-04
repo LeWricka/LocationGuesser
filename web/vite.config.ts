@@ -106,10 +106,9 @@ export default defineConfig({
         enabled: false,
       },
       manifest: {
-        name: 'Tabide',
-        short_name: 'Tabide',
-        description:
-          'Comparte tus viajes de una forma diferente: una foto, y los tuyos adivinan dónde es.',
+        name: 'Momentu',
+        short_name: 'Momentu',
+        description: 'Guarda los momentos de tu viaje para siempre y compártelos con tu gente.',
         lang: 'es',
         display: 'standalone',
         start_url: '/',

@@ -52,8 +52,8 @@ describe('Landing (email-first, issue #506)', () => {
     expect(screen.getByRole('heading', { name: 'Cada momento, en su sitio' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Adivina dónde es' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Gana quien más se acerca' })).toBeInTheDocument()
-    expect(screen.getByAltText(/Pantalla de inicio de Tabide/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Así funciona Tabide' })).toBeInTheDocument()
+    expect(screen.getByAltText(/Pantalla de inicio de Momentu/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Así funciona Momentu' })).toBeInTheDocument()
     // CTA único: "Empieza a compartir". SIN dos CTAs separados.
     expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
     // Ya NO hay separación signup/login.

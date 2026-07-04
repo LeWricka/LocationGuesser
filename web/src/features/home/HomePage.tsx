@@ -8,8 +8,8 @@ import {
   HomeDashboard,
   HomeEmptyState,
   Icon,
-  LogoTabide,
-  WordmarkTabide,
+  LogoMomentu,
+  WordmarkMomentu,
   Skeleton,
   Stack,
   Row,
@@ -228,8 +228,8 @@ export function HomePage() {
           overlay={
             <>
               <span className={styles.brand}>
-                <LogoTabide variant="oscuro" size={22} />
-                <WordmarkTabide size={18} />
+                <LogoMomentu variant="oscuro" size={22} />
+                <WordmarkMomentu size={18} />
               </span>
               {/* Un solo acceso al perfil (issue #616): antes el engranaje duplicaba el
                   mismo destino que el avatar — patrón universal, el avatar basta. */}
