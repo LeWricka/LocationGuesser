@@ -1,5 +1,4 @@
-import { MapPin } from 'lucide-react'
-import { AppHeader, Button, DatePicker, Field, Icon, Input, Stack } from '../../ui'
+import { AppHeader, Button, DatePicker, Field, IconPin, Input, Stack } from '../../ui'
 import { MapPicker } from '../create/MapPicker'
 import { VoiceRecorder, type VoiceValue } from '../create/VoiceRecorder'
 import { MomentGallery } from './MomentGallery'
@@ -120,7 +119,7 @@ export function EditMomentForm({
         {/* SITIO — mismo MapPicker que ya usaba la edición; solo cambia el envoltorio. */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            <Icon icon={MapPin} size={16} /> Sitio del recuerdo{' '}
+            <IconPin size={16} /> Sitio del recuerdo{' '}
             <span className={styles.optional}>opcional</span>
           </span>
           <Stack gap={3}>

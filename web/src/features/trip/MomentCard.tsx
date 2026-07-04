@@ -1,5 +1,5 @@
-import { Play, Target, User } from 'lucide-react'
-import { Badge, Button, ChallengePhoto, Icon, IconCandado } from '../../ui'
+import { Play, User } from 'lucide-react'
+import { Badge, Button, ChallengePhoto, Icon, IconCandado, IconDiana } from '../../ui'
 import { resolveMomentPhoto, type Moment } from '../../lib/trip'
 import { parseMomentDate } from '../../lib/time'
 import styles from './MomentCard.module.css'
@@ -153,7 +153,7 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
             ) : isReto ? (
               <span className={styles.chip}>
                 <Badge tone="accent">
-                  <Icon icon={Target} size={13} /> Reto
+                  <IconDiana size={13} /> Reto
                 </Badge>
               </span>
             ) : null}

@@ -1,5 +1,5 @@
-import { Hash, MapPin } from 'lucide-react'
-import { AppHeader, Icon } from '../../ui'
+import { Hash } from 'lucide-react'
+import { AppHeader, Icon, IconPin } from '../../ui'
 import { ShellUtilitario } from '../../ui/shells'
 import type { ChallengeKind } from '../../lib/challenges'
 import styles from './CreateChallengeKindPicker.module.css'
@@ -49,7 +49,7 @@ export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) 
               aria-label="Crear reto ¿Dónde?: adivinar el lugar en el mapa"
             >
               <span className={`${styles.optIco} ${styles.optIcoLocation}`}>
-                <Icon icon={MapPin} size={28} />
+                <IconPin size={28} />
               </span>
               <span className={styles.optTxt}>
                 <b>¿Dónde?</b>

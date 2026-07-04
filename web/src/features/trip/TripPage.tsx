@@ -8,11 +8,10 @@ import {
   Plus,
   Settings,
   Share2,
-  Target,
   Trash2,
   Users,
 } from 'lucide-react'
-import { EmptyState, Icon, useReducedMotion, useToast } from '../../ui'
+import { EmptyState, Icon, IconDiana, useReducedMotion, useToast } from '../../ui'
 import { AppHeader } from '../../ui/AppHeader'
 import { BottomSheet } from '../../ui/BottomSheet'
 import { SegmentedControl } from '../../ui/SegmentedControl'
@@ -622,7 +621,7 @@ export function TripPage({
                 }}
               >
                 <span className={styles.fabItemIcon}>
-                  <Icon icon={Target} size={18} />
+                  <IconDiana size={18} />
                 </span>
                 Reto
               </button>

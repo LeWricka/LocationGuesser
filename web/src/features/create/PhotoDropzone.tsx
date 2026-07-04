@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
-import { AlertTriangle, Camera, Repeat, Trash2 } from 'lucide-react'
-import { Icon, Spinner, useToast } from '../../ui'
+import { AlertTriangle, Repeat, Trash2 } from 'lucide-react'
+import { Icon, IconCamara, Spinner, useToast } from '../../ui'
 import { markFileSelection } from '../../lib/storage'
 import styles from './PhotoDropzone.module.css'
 
@@ -124,7 +124,7 @@ export function PhotoDropzone({ preview, loading = false, onPick, onClear, label
   return (
     <label className={styles.empty} aria-busy={busy || undefined}>
       <span className={styles.icon} aria-hidden>
-        {busy ? <Spinner size={28} /> : <Icon icon={Camera} size={28} />}
+        {busy ? <Spinner size={28} /> : <IconCamara size={28} />}
         {!busy && <span className={styles.plus}>+</span>}
       </span>
       <span className={styles.emptyLabel}>{busy ? 'Leyendo…' : (label ?? 'Añadir foto')}</span>
