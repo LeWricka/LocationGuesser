@@ -22,7 +22,7 @@ import {
 } from '../../lib/challenges'
 import { getExistingVote } from '../../lib/votes'
 import type { Vote } from '../../lib/database.types'
-import { deadlineFromMinutes } from '../../lib/time'
+import { deadlineFromMinutes, parseMomentDate } from '../../lib/time'
 import { lockBodyScroll } from '../../lib/scrollLock'
 import { uploadAudio } from '../../lib/storage'
 import { track } from '../../lib/analytics'
@@ -85,26 +85,17 @@ interface Props {
   onDeleted?: () => void
 }
 
-// Fecha del momento (created_at ISO) → valor `YYYY-MM-DD` para el <input type="date">.
-function dateInputValue(iso: string): string {
-  const d = new Date(iso)
+// Fecha del momento (`Moment.date`: `happened_on` puro o `created_at` ISO,
+// ver `parseMomentDate`) → valor `YYYY-MM-DD` para el DatePicker de edición.
+// Local, no UTC: el dueño piensa en su día, no en el huso del servidor —
+// `parseMomentDate` ya deja el `Date` en componentes LOCALES para los dos casos.
+function dateInputValue(value: string): string {
+  const d = parseMomentDate(value)
   if (Number.isNaN(d.getTime())) return ''
-  // Local, no UTC: el dueño piensa en su día, no en el huso del servidor.
   const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   return `${yyyy}-${mm}-${dd}`
-}
-
-// `YYYY-MM-DD` del input → ISO conservando la hora original del momento (para no
-// perder el orden relativo entre momentos del mismo día al re-guardar la fecha).
-function dateInputToIso(value: string, originalIso: string): string {
-  const original = new Date(originalIso)
-  const [y, m, d] = value.split('-').map(Number)
-  if (!y || !m || !d) return originalIso
-  const next = new Date(original)
-  next.setFullYear(y, m - 1, d)
-  return next.toISOString()
 }
 
 // Fecha larga legible del momento ("8 de abril de 2026"). Null si no es válida.
@@ -114,7 +105,7 @@ const dateFmt = new Intl.DateTimeFormat('es-ES', {
   year: 'numeric',
 })
 function formatMomentDate(value: string): string | null {
-  const date = new Date(value)
+  const date = parseMomentDate(value)
   if (Number.isNaN(date.getTime())) return null
   return dateFmt.format(date)
 }
@@ -454,7 +445,10 @@ export function MomentSheet({
       await updateMoment(moment.challengeId, {
         title: trimmedTitle,
         description,
-        createdAt: editDate ? dateInputToIso(editDate, moment.date) : undefined,
+        // Fecha ELEGIDA (happened_on, #566/migración 0037): `editDate` ya viene en
+        // `YYYY-MM-DD` (DatePicker), se guarda tal cual — sin hora que preservar,
+        // a diferencia del viejo hack que repurposeaba `created_at`.
+        happenedOn: editDate || undefined,
         // Lugar: el dueño lo marca/mueve en el mapa; null lo quita del mapa.
         place: editPlace ? { lat: editPlace.lat, lng: editPlace.lng } : null,
         audioPath,

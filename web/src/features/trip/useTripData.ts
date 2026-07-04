@@ -97,6 +97,17 @@ interface TripData {
 }
 
 /**
+ * Instante (ms) para ordenar momentos cronológicamente: `happened_on` (fecha
+ * ELEGIDA por el dueño, migración 0037/issue #566) si existe; si no, `created_at`
+ * (proxy de siempre para momentos legado sin fecha propia). Para ORDENAR da igual
+ * local vs UTC (solo importa el orden relativo, nunca qué día se PINTA — eso lo
+ * resuelve `parseMomentDate` al formatear, `lib/time.ts`).
+ */
+function momentSortValue(ch: Pick<ChallengeForPlay, 'happened_on' | 'created_at'>): number {
+  return new Date(ch.happened_on ?? ch.created_at).getTime()
+}
+
+/**
  * Estado de un momento sin mirar lat/lng. Un RECUERDO (`is_challenge = false`) no
  * tiene juego ni plazo → `recuerdo`, antes de mirar nada más. Para los RETOS:
  * práctica > activo > cerrado.
@@ -316,11 +327,22 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
     return byChallenge
   }, [votes])
 
-  // Momentos en orden cronológico ASC (getGroupChallenges viene DESC → invertir).
+  // Momentos en orden cronológico ASC: ordenamos por `happened_on` (con fallback
+  // `created_at` para momentos legado, `momentSortValue`) en vez de solo invertir
+  // el DESC de `getGroupChallenges` (issue #566) — un recuerdo backfilleado días
+  // después del viaje puede tener `happened_on` muy anterior a su `created_at`
+  // (cuándo se subió), así que el orden de subida ya no basta. Empate en el MISMO
+  // día elegido (frecuente: `happened_on` solo tiene granularidad de día) se
+  // rompe por `created_at` real, para conservar el orden de entrada dentro del día.
   const moments = useMemo<Moment[]>(() => {
     if (!challenges) return []
     const now = new Date()
-    return [...challenges].reverse().map((ch) => {
+    const sorted = [...challenges].sort((a, b) => {
+      const primary = momentSortValue(a) - momentSortValue(b)
+      if (primary !== 0) return primary
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
+    return sorted.map((ch) => {
       const status = statusOf(ch, now)
       const answer = answersById.get(ch.id)
       // Coordenada a pintar: el lugar VISIBLE del recuerdo (place_*) si es recuerdo;
@@ -335,7 +357,9 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         description: ch.description,
         status,
         isChallenge: ch.is_challenge,
-        date: ch.created_at,
+        // Fecha ELEGIDA (`happened_on`, #566) si existe; si no, `created_at` como
+        // proxy (momento legado). Mismo criterio que ordena arriba.
+        date: ch.happened_on ?? ch.created_at,
         deadlineAt: ch.deadline_at,
         imageUrl: imageUrlById[ch.id] ?? null,
         imagePath: ch.image_path,

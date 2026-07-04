@@ -105,6 +105,7 @@ const sampleChallenge: Challenge = {
   number_decimals: 0,
   number_tolerance: 'normal',
   time_scoring: true,
+  happened_on: null,
   created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
 }
@@ -403,6 +404,33 @@ describe('createMoment', () => {
     expect(insertArg.place_lat).toBeNull()
     expect(insertArg.place_lng).toBeNull()
   })
+
+  // Issue #566: la fecha ELEGIDA por el dueño se guarda en happened_on, no solo
+  // incrustada en la descripción.
+  test('guarda la fecha elegida en happened_on', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await createMoment({
+      title: 'Cena en el puerto',
+      createdBy: 'u',
+      groupId: 'g1',
+      happenedOn: '2026-04-08',
+    })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.happened_on).toBe('2026-04-08')
+  })
+
+  test('sin fecha elegida, happened_on queda null', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await createMoment({ title: 'Solo foto', createdBy: 'u', groupId: 'g1' })
+    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
+      string,
+      unknown
+    >
+    expect(insertArg.happened_on).toBeNull()
+  })
 })
 
 describe('promoteToChallenge', () => {
@@ -628,13 +656,19 @@ describe('updateChallenge', () => {
 })
 
 describe('updateMoment', () => {
-  test('edita título y fecha del recuerdo (created_at)', async () => {
+  test('edita título y fecha del recuerdo (happened_on, #566)', async () => {
     results['challenges'] = { data: sampleMoment, error: null }
-    await updateMoment('m1', { title: 'Nuevo título', createdAt: '2026-04-08T10:00:00.000Z' })
+    await updateMoment('m1', { title: 'Nuevo título', happenedOn: '2026-04-08' })
     expect(calls.update).toHaveBeenCalledWith('challenges', {
       title: 'Nuevo título',
-      created_at: '2026-04-08T10:00:00.000Z',
+      happened_on: '2026-04-08',
     })
+  })
+
+  test('happenedOn null limpia la fecha (cae a created_at)', async () => {
+    results['challenges'] = { data: sampleMoment, error: null }
+    await updateMoment('m1', { happenedOn: null })
+    expect(calls.update).toHaveBeenCalledWith('challenges', { happened_on: null })
   })
 
   test('descripción vacía se guarda como null', async () => {

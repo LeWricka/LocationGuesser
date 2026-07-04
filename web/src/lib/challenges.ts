@@ -39,6 +39,10 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // reto de lugar (no revela la ubicación). Se sirve al jugar para montar el factor.
 // `audio_path` (0035, nota de voz) tampoco es spoiler: oír la voz de quien creó el
 // momento no revela la ubicación oculta. Se sirve siempre, como `image_path`.
+// `happened_on` (0037, issue #566) tampoco es spoiler: la fecha ELEGIDA por el
+// dueño de cuándo OCURRIÓ el momento no dice nada de dónde es. Se sirve siempre,
+// tanto al leer un recuerdo (ordena el diario, `useTripData`) como al jugar un
+// reto (aunque ahí no se use hoy, no hace daño exponerla).
 //
 // OJO — `video_path` (0036, clip corto) NO está en esta lista A PROPÓSITO, a
 // diferencia de `image_path`/`audio_path`: este `const` alimenta TANTO la
@@ -52,7 +56,7 @@ export type ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>
 // `useTripData.ts`); `promoteToChallenge`, además, vacía `video_path` como
 // defensa en profundidad.
 export const CHALLENGE_COLUMNS_NO_ANSWER =
-  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, audio_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, time_scoring, created_by, created_at'
+  'id, group_id, title, description, is_challenge, place_lat, place_lng, image_path, audio_path, sv_pano_id, sv_heading, sv_pitch, sv_lock_move, sv_lock_rotate, guess_seconds, deadline_at, photo_is_hint, score_scale, challenge_kind, number_question, number_unit, number_decimals, number_tolerance, time_scoring, happened_on, created_by, created_at'
 
 export interface NewChallengeInput {
   title: string
@@ -275,6 +279,12 @@ export interface NewMomentInput {
   svHeading?: number | null
   /** POV inicial del panorama: inclinación en grados. */
   svPitch?: number | null
+  /**
+   * Fecha ELEGIDA por el dueño (`YYYY-MM-DD`, sin hora ni huso): cuándo OCURRIÓ
+   * el recuerdo, no cuándo se sube. `null`/`undefined` = sin fecha propia (el
+   * diario cae a `created_at`). Migración 0037 (issue #566).
+   */
+  happenedOn?: string | null
 }
 
 /**
@@ -308,6 +318,7 @@ export async function createMoment(
       sv_pitch: input.svPitch ?? null,
       // Un recuerdo no caduca: sin plazo ni cronómetro.
       deadline_at: null,
+      happened_on: input.happenedOn ?? null,
       created_by: input.createdBy,
     })
     // RETURNING sin lat/lng (columna revocada en 0010); place_lat/place_lng e
@@ -613,10 +624,13 @@ export async function updateChallengeDescription(id: string, description: string
 /**
  * Campos editables de un RECUERDO (momento sin capa de reto). A diferencia de un
  * reto, el lugar de un recuerdo es VISIBLE (`place_lat`/`place_lng`) y se puede
- * cambiar SIEMPRE (no hay respuesta oculta ni votos que romper). La "fecha" del
- * momento es su `created_at` (no hay columna de fecha aparte: el diario ordena por
- * ahí), así que editarla mueve el momento en la línea de tiempo. Todos los campos
- * son opcionales: solo se aplican los presentes (patch parcial).
+ * cambiar SIEMPRE (no hay respuesta oculta ni votos que romper). La fecha del
+ * momento vive en `happened_on` (columna propia, migración 0037/#566): editarla
+ * mueve el momento en la línea de tiempo del diario, que ordena por
+ * `happened_on` con fallback a `created_at` para momentos legado. ANTES de
+ * 0037 esto repurposeaba `created_at` (no había otra columna); ya no hace
+ * falta el hack: `created_at` vuelve a significar solo "cuándo se subió".
+ * Todos los campos son opcionales: solo se aplican los presentes (patch parcial).
  */
 export interface UpdateMomentInput {
   title?: string
@@ -634,10 +648,10 @@ export interface UpdateMomentInput {
     svPitch?: number | null
   } | null
   /**
-   * Fecha del momento en ISO (se guarda en `created_at`). Mueve el momento en la
-   * línea de tiempo del diario, que ordena por `created_at`.
+   * Fecha ELEGIDA del momento (`YYYY-MM-DD`, sin hora ni huso). `undefined` = no
+   * tocarla; `null` la limpia (el diario cae a `created_at`). Migración 0037.
    */
-  createdAt?: string
+  happenedOn?: string | null
   /**
    * Path en Storage de la nota de voz (≤60s). `undefined` = no tocarla (deja la
    * que ya hubiera); `null` la quita (el dueño la descartó sin regrabar). Un path
@@ -673,7 +687,7 @@ export async function updateMoment(
     const trimmed = input.description?.trim() ?? ''
     patch.description = trimmed === '' ? null : trimmed
   }
-  if (input.createdAt !== undefined) patch.created_at = input.createdAt
+  if (input.happenedOn !== undefined) patch.happened_on = input.happenedOn
   if (input.audioPath !== undefined) patch.audio_path = input.audioPath
   if (input.videoPath !== undefined) patch.video_path = input.videoPath
   if (input.place !== undefined) {

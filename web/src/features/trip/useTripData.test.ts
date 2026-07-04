@@ -283,10 +283,14 @@ describe('useTripData — pastChallenges (issue #608)', () => {
   test('orden: mismo orden (más reciente primero) que sirve getGroupChallenges', async () => {
     // getGroupChallenges sirve DESC (más nuevo primero, ver comentario de
     // `moments`); pastChallenges invierte `moments` (ASC) de vuelta a DESC, así
-    // que el resultado neto conserva el orden de entrada del servidor.
+    // que el resultado neto conserva el orden cronológico real (sin happened_on,
+    // `created_at` decide — momentos legado). Timestamps DISTINTOS a propósito:
+    // dos filas con el MISMO created_at sería un caso patológico que no se da en
+    // la práctica (ver test de desempate más abajo para el caso SÍ real: mismo
+    // happened_on, distinto created_at).
     getGroupChallengesMock.mockResolvedValue([
-      closedChallenge({ id: 'c-nuevo', title: 'Nuevo' }),
-      closedChallenge({ id: 'c-viejo', title: 'Viejo' }),
+      closedChallenge({ id: 'c-nuevo', title: 'Nuevo', created_at: '2026-07-02T10:00:00.000Z' }),
+      closedChallenge({ id: 'c-viejo', title: 'Viejo', created_at: '2026-07-01T10:00:00.000Z' }),
     ])
     getGroupVotesMock.mockResolvedValue([])
 
@@ -294,5 +298,83 @@ describe('useTripData — pastChallenges (issue #608)', () => {
     await waitFor(() => expect(result.current.pastChallenges).toHaveLength(2))
 
     expect(result.current.pastChallenges.map((c) => c.title)).toEqual(['Nuevo', 'Viejo'])
+  })
+})
+
+// Issue #566 / migración 0037: el diario ordena por `happened_on` (fecha
+// ELEGIDA) con fallback a `created_at` para momentos legado sin fecha propia —
+// ya no basta con invertir el orden de subida (`getGroupChallenges`, DESC).
+describe('useTripData — orden por happened_on con fallback a created_at (issue #566)', () => {
+  test('un recuerdo SUBIDO más tarde pero OCURRIDO antes se ordena por su happened_on', async () => {
+    // Caso real del issue: backfill. Ambos se SUBEN el mismo día (created_at muy
+    // cercanos), pero "Playa" ocurrió DESPUÉS que "Cena" según la fecha elegida.
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({
+        id: 'c-playa',
+        title: 'Playa',
+        happened_on: '2026-06-15',
+        created_at: '2026-07-01T10:00:00.000Z',
+      }),
+      closedChallenge({
+        id: 'c-cena',
+        title: 'Cena',
+        happened_on: '2026-06-10',
+        created_at: '2026-07-01T10:01:00.000Z',
+      }),
+    ])
+    getGroupVotesMock.mockResolvedValue([])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(2))
+
+    // ASC: Cena (10 jun) antes que Playa (15 jun), aunque se subió después.
+    expect(result.current.moments.map((m) => m.title)).toEqual(['Cena', 'Playa'])
+  })
+
+  test('mezcla de legado (sin happened_on) y nuevo (con happened_on) intercala por fecha efectiva', async () => {
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({
+        id: 'c-legado',
+        title: 'Legado',
+        happened_on: null,
+        created_at: '2026-06-12T10:00:00.000Z',
+      }),
+      closedChallenge({
+        id: 'c-nuevo',
+        title: 'Nuevo con fecha',
+        happened_on: '2026-06-20',
+        created_at: '2026-07-01T10:00:00.000Z',
+      }),
+    ])
+    getGroupVotesMock.mockResolvedValue([])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(2))
+
+    // El legado (created_at 12 jun) va antes que el nuevo (happened_on 20 jun).
+    expect(result.current.moments.map((m) => m.title)).toEqual(['Legado', 'Nuevo con fecha'])
+  })
+
+  test('empate en el MISMO happened_on se desempata por created_at (orden de entrada real)', async () => {
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({
+        id: 'c-tarde',
+        title: 'Subido tarde',
+        happened_on: '2026-06-15',
+        created_at: '2026-07-01T10:05:00.000Z',
+      }),
+      closedChallenge({
+        id: 'c-temprano',
+        title: 'Subido temprano',
+        happened_on: '2026-06-15',
+        created_at: '2026-07-01T10:00:00.000Z',
+      }),
+    ])
+    getGroupVotesMock.mockResolvedValue([])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(2))
+
+    expect(result.current.moments.map((m) => m.title)).toEqual(['Subido temprano', 'Subido tarde'])
   })
 })

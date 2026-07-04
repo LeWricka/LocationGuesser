@@ -63,23 +63,35 @@ function localDateFromIso(isoTimestamp: string): string {
   return new Date(d.getTime() - off * 60_000).toISOString().slice(0, 10)
 }
 
+// `latestMomentDate` (más abajo) puede ser un `happened_on` PURO (`YYYY-MM-DD`,
+// migración 0037/#566: ya es el día exacto elegido, sin hora ni huso) o, para un
+// momento legado sin fecha propia, un `created_at` ISO completo (con hora y huso,
+// necesita `localDateFromIso`). Pasar un `happened_on` por `localDateFromIso`
+// sería un error: lo interpretaría como medianoche UTC y, en husos AL OESTE de
+// UTC, restaría un día.
+function toLocalDateOnly(value: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : localDateFromIso(value)
+}
+
 /**
  * Fecha por defecto del campo "Fecha" + tope superior del calendario, en cascada
  * (issue #553 — el dueño de un viaje pasado, sept 2024, tenía que navegar el
  * calendario desde hoy hasta esa fecha en CADA recuerdo nuevo):
- *  1. Si el viaje ya tiene momentos → la fecha del MÁS RECIENTE. Mismo criterio que
- *     usa el diario para ordenar y fechar (`created_at`; ver `Moment.date` en
- *     `lib/trip.ts`) — no hay columna de fecha propia del recuerdo (la fecha que
- *     elige el usuario solo queda, si acaso, incrustada en la descripción sin año,
- *     ver `buildDescription`; no es una fuente fiable para reconstruir un ISO).
- *     OJO: `created_at` es solo un PROXY de la fecha elegida, fiable únicamente
- *     cuando el diario se documenta EN VIVO. Si el viaje tiene fechas y la fecha
+ *  1. Si el viaje ya tiene momentos → la fecha del MÁS RECIENTE (`happened_on` si
+ *     lo tiene —migración 0037, la fuente REAL de la fecha elegida— o su
+ *     `created_at` como proxy en momentos legado; ver `fetchLatestMomentDate` y
+ *     `Moment.date` en `lib/trip.ts`, mismo criterio que ordena el diario).
+ *     OJO: el proxy `created_at` (solo momentos legado) es fiable únicamente
+ *     cuando el diario se documentó EN VIVO. Si el viaje tiene fechas y la fecha
  *     derivada cae FUERA de [starts_on, ends_on ?? starts_on], es un artefacto de
  *     backfill — el caso real del dueño: viaje de sept 2024 rellenado HOY; el
- *     primer recuerdo se crea hoy, así que su `created_at` anclaría el SEGUNDO
- *     recuerdo en hoy y el dolor original reaparecería. En ese caso la ignoramos
- *     y caemos a la regla 2 (que para un viaje pasado da `starts_on`).
- *  2. Si no hay momentos (o su `created_at` cayó fuera del rango) pero el viaje
+ *     primer recuerdo (legado, sin `happened_on`) se crea hoy, así que su
+ *     `created_at` anclaría el SEGUNDO recuerdo en hoy y el dolor original
+ *     reaparecería. En ese caso la ignoramos y caemos a la regla 2 (que para un
+ *     viaje pasado da `starts_on`). Con `happened_on` (momentos nuevos) este
+ *     artefacto ya no debería darse, pero el guardarraíl no estorba y cubre el
+ *     viaje mixto (legado + nuevo).
+ *  2. Si no hay momentos (o su fecha cayó fuera del rango) pero el viaje
  *     tiene fechas (`starts_on`/`ends_on`, migración 0027) → hoy ACOTADO al
  *     rango: si hoy cae dentro, hoy; si el viaje es pasado o futuro (hoy fuera
  *     del rango), `starts_on`.
@@ -95,7 +107,7 @@ function localDateFromIso(isoTimestamp: string): string {
    solo para testear la cascada; no vale la pena un fichero aparte para una función pequeña
    usada solo aquí (mismo criterio que en `react-google-maps.tsx`). */
 export function computeDefaultDate(
-  latestMomentCreatedAt: string | null,
+  latestMomentDate: string | null,
   startsOn: string | null,
   endsOn: string | null,
   today: string,
@@ -103,8 +115,8 @@ export function computeDefaultDate(
   const isFutureTrip = startsOn != null && startsOn > today
   const max = isFutureTrip && endsOn ? endsOn : today
 
-  if (latestMomentCreatedAt) {
-    const latestDate = localDateFromIso(latestMomentCreatedAt)
+  if (latestMomentDate) {
+    const latestDate = toLocalDateOnly(latestMomentDate)
     // Regla 1 solo si la fecha del último momento es plausible: sin fechas del
     // viaje (nada con qué contrastar) o dentro del rango. Fuera del rango es un
     // artefacto de backfill (ver comentario de arriba) → cae a la regla 2.
@@ -119,22 +131,24 @@ export function computeDefaultDate(
 }
 
 /**
- * El momento (recuerdo o reto) más reciente del viaje por fecha de creación —
- * mismo criterio que usa el diario para ordenar (`lib/trip.ts`). Consulta mínima
- * (una columna, una fila): solo ancla la fecha por defecto del formulario, no
- * duplica el fetch pesado de `getGroupChallenges` (todas las columnas, todo el
- * viaje) que ya hace la pantalla del viaje.
+ * Fecha del momento (recuerdo o reto) más reciente del viaje — mismo criterio que
+ * usa el diario para ordenar y fechar (`happened_on` con fallback `created_at`,
+ * migración 0037/#566; ver `Moment.date` en `lib/trip.ts`). Consulta mínima (dos
+ * columnas, una fila): solo ancla la fecha por defecto del formulario, no duplica
+ * el fetch pesado de `getGroupChallenges` (todas las columnas, todo el viaje) que
+ * ya hace la pantalla del viaje.
  */
-async function fetchLatestMomentCreatedAt(groupId: string): Promise<string | null> {
+async function fetchLatestMomentDate(groupId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from('challenges')
-    .select('created_at')
+    .select('happened_on, created_at')
     .eq('group_id', groupId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
   if (error) throw error
-  return data?.created_at ?? null
+  if (!data) return null
+  return data.happened_on ?? data.created_at
 }
 
 /**
@@ -230,13 +244,13 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
     let cancelled = false
     async function loadDefaultDate() {
       try {
-        const [latestCreatedAt, group] = await Promise.all([
-          fetchLatestMomentCreatedAt(groupId),
+        const [latestDate, group] = await Promise.all([
+          fetchLatestMomentDate(groupId),
           getGroup(groupId),
         ])
         if (cancelled) return
         const { date: defaultDate, max } = computeDefaultDate(
-          latestCreatedAt,
+          latestDate,
           group?.starts_on ?? null,
           group?.ends_on ?? null,
           todayIso(),
@@ -358,19 +372,17 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
   const titleValid = title.trim().length > 0
   const canSave = titleValid && !locating && !readingExif
 
-  // Texto del recuerdo: si el usuario eligió una fecha distinta de hoy, la
-  // anteponemos a la descripción (no hay columna de fecha en el modelo; el orden
-  // del diario va por `created_at`). Así la fecha del recuerdo no se pierde sin
-  // tocar la capa de datos. Si la fecha es hoy, no añadimos nada.
+  // Texto del recuerdo: SOLO la descripción. Antes de la migración 0037 (#566) no
+  // había columna de fecha propia, así que la fecha elegida se anteponía como
+  // texto libre (`📅 8 de abril · ...`) para no perderla del todo — un hack de
+  // solo-escritura, nada la volvía a leer como dato. Ahora vive en `happened_on`
+  // (columna real, ver `save`) y se muestra donde toca (`Moment.date`), así que ya
+  // no hace falta duplicarla aquí: seguir haciéndolo dejaría dos fuentes que
+  // podrían desincronizarse si se edita solo una. Los recuerdos ANTIGUOS que ya
+  // llevan la fecha incrustada conservan ese texto tal cual (dato ya guardado, no
+  // se toca ni se parsea de vuelta).
   function buildDescription(): string | null {
     const body = description.trim()
-    if (date && date !== todayIso()) {
-      const human = new Date(`${date}T00:00:00`).toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-      })
-      return body ? `📅 ${human} · ${body}` : `📅 ${human}`
-    }
     return body || null
   }
 
@@ -484,6 +496,9 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         imagePath: coverPath ?? null,
         audioPath,
         videoPath,
+        // Fecha ELEGIDA en el campo "Fecha" (issue #566, migración 0037): fuente
+        // real de la fecha del recuerdo, ya no un hack de texto (ver `buildDescription`).
+        happenedOn: date,
       })
 
       // Galería del recuerdo: registramos TODAS las fotos en `moment_images` con su

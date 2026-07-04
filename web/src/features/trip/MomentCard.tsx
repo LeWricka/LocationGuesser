@@ -1,6 +1,7 @@
 import { Play, Target, User } from 'lucide-react'
 import { Badge, Button, ChallengePhoto, Icon, IconCandado } from '../../ui'
 import { resolveMomentPhoto, type Moment } from '../../lib/trip'
+import { parseMomentDate } from '../../lib/time'
 import styles from './MomentCard.module.css'
 
 interface Props {
@@ -17,7 +18,9 @@ interface Props {
 // cabecera ya da contexto. Devuelve null si la fecha no es válida (no rompe nada).
 const dateFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
 function formatMomentDate(value: string): string | null {
-  const date = new Date(value)
+  // `parseMomentDate` (lib/time.ts) distingue `happened_on` (fecha pura, #566) de
+  // `created_at` (instante ISO legado) para no desplazar el día en husos al oeste.
+  const date = parseMomentDate(value)
   if (Number.isNaN(date.getTime())) return null
   // Intl añade un punto al mes abreviado ("8 abr."); lo quitamos para el compacto.
   return dateFmt.format(date).replace('.', '')

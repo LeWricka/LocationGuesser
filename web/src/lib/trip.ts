@@ -38,7 +38,14 @@ export interface Moment {
    * para decidir badge "🎯 Reto", "Adivina →" y la acción "Convertir en reto". 0022.
    */
   isChallenge: boolean
-  /** Fecha del momento en ISO (usamos `created_at`: cuándo se añadió al viaje). */
+  /**
+   * Fecha del momento: `happened_on` (fecha ELEGIDA por el dueño, `YYYY-MM-DD`,
+   * sin hora ni huso — migración 0037, issue #566) si existe; si no,
+   * `created_at` (ISO completo, proxy de siempre para momentos legado sin
+   * fecha propia). El diario ORDENA por este mismo criterio (ver `useTripData`);
+   * quien la formatee debe distinguir los dos formatos (`parseMomentDate`,
+   * `lib/time.ts`) para no desplazar el día en husos horarios al oeste de UTC.
+   */
   date: string
   /**
    * Instante de cierre del reto en ISO (`deadline_at`): alimenta la cuenta atrás.

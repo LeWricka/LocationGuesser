@@ -1,6 +1,7 @@
 import { Pause, Play } from 'lucide-react'
 import { Icon } from '../../ui'
 import type { Moment } from '../../lib/trip'
+import { parseMomentDate } from '../../lib/time'
 import styles from './MomentTimeline.module.css'
 
 interface Props {
@@ -24,7 +25,9 @@ interface Props {
 // caemos a un guion para no romper la franja.
 const dateFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
 function shortDate(value: string): string {
-  const date = new Date(value)
+  // `parseMomentDate` distingue `happened_on` (fecha pura, #566) de `created_at`
+  // (instante ISO legado) para no desplazar el día en husos al oeste de UTC.
+  const date = parseMomentDate(value)
   if (Number.isNaN(date.getTime())) return '—'
   return dateFmt.format(date).replace('.', '')
 }

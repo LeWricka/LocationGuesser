@@ -134,6 +134,7 @@ function baseChallenge(
     number_decimals: 0,
     number_tolerance: 'normal',
     time_scoring: true,
+    happened_on: null,
     created_by: ME_ID,
     created_at: isoFromNow(-5 * DAY),
     ...over,
