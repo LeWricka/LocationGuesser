@@ -29,11 +29,45 @@ import tokioPhoto from './assets/tokio-lg.webp'
 import sidneyPhoto from './assets/sidney-lg.webp'
 import ciudadDelCaboPhoto from './assets/ciudad-del-cabo-lg.webp'
 import romaPhoto from './assets/roma-lg.webp'
-import type { HomeGroup, HomePinned } from '../ui'
+import type { GlobePin, HomeGroup, HomePinned } from '../ui'
 import type { Moment, RoutePoint } from '../lib/trip'
 import type { GameSceneData } from '../features/play/GameScene'
 
 // ── showcase-home: dashboard logueado con portadas y pines-foto reales ───────
+
+// Pines del globo SOLO para la captura showcase-home (landing:assets): el set
+// demo global (HOME_DEMO_PINS) abarca Tokio-Sídney-Ciudad del Cabo y el fit del
+// mundo real centraba la esfera en la Antártida (centroide oceánico). Para el
+// asset de marketing usamos el mismo arco europeo del viaje showcase: la esfera
+// enseña tierra reconocible y los pines caen agrupados. La landing REAL sigue
+// usando HOME_DEMO_PINS (allí el globo deriva y funciona bien).
+export const SHOWCASE_HOME_PINS: GlobePin[] = [
+  {
+    id: 'showcase-lisboa',
+    lat: 38.7223,
+    lng: -9.1393,
+    title: 'Lisboa',
+    imageUrl: lisboaPhoto,
+    targetId: 'showcase',
+  },
+  {
+    id: 'showcase-algarve',
+    lat: 37.0891,
+    lng: -8.2479,
+    title: 'Algarve',
+    imageUrl: ciudadDelCaboPhoto,
+    targetId: 'showcase',
+  },
+  {
+    id: 'showcase-roma',
+    lat: 41.8902,
+    lng: 12.4922,
+    title: 'Roma',
+    imageUrl: romaPhoto,
+    targetId: 'showcase',
+    lead: true,
+  },
+]
 export const SHOWCASE_HOME_GROUPS: HomeGroup[] = [
   {
     id: 'showcase-japon',
@@ -97,22 +131,22 @@ export const SHOWCASE_MOMENTS: Moment[] = [
     country: { code: 'PT', name: 'PORTUGAL', flag: '🇵🇹' },
   },
   {
-    challengeId: 'showcase-tokio-noche',
+    challengeId: 'showcase-roma-noche',
     title: '¿Dónde nos perdimos esta noche?',
-    description: 'Luces de neón hasta donde alcanza la vista.',
+    description: 'Dos mil años de piedra y nosotros sin mapa.',
     status: 'closed',
     isChallenge: true,
     date: '2026-06-12T20:00:00.000Z',
     deadlineAt: '2026-06-13T20:00:00.000Z',
-    imageUrl: tokioPhoto,
+    imageUrl: romaPhoto,
     imagePath: null,
-    lat: 35.6762,
-    lng: 139.6503,
+    lat: 41.8902,
+    lng: 12.4922,
     guessedCount: 3,
     isOwn: false,
     guessSeconds: 30,
     svPanoId: null,
-    country: { code: 'JP', name: 'JAPÓN', flag: '🇯🇵' },
+    country: { code: 'IT', name: 'ITALIA', flag: '🇮🇹' },
   },
   {
     challengeId: 'showcase-sidney-atardecer',
@@ -134,22 +168,22 @@ export const SHOWCASE_MOMENTS: Moment[] = [
     svPanoId: null,
   },
   {
-    challengeId: 'showcase-capetown-mesa',
-    title: 'Mesa redonda al amanecer',
-    description: 'Subimos antes de que abriera el teleférico.',
+    challengeId: 'showcase-algarve-amanecer',
+    title: 'Amanecer en el Algarve',
+    description: 'Madrugón para tener la playa entera para nosotros.',
     status: 'recuerdo',
     isChallenge: false,
     date: '2026-06-08T07:00:00.000Z',
     deadlineAt: null,
     imageUrl: ciudadDelCaboPhoto,
     imagePath: null,
-    lat: -33.9249,
-    lng: 18.4241,
+    lat: 37.0891,
+    lng: -8.2479,
     guessedCount: 0,
     isOwn: false,
     guessSeconds: null,
     svPanoId: null,
-    country: { code: 'ZA', name: 'SUDÁFRICA', flag: '🇿🇦' },
+    country: { code: 'PT', name: 'PORTUGAL', flag: '🇵🇹' },
   },
 ]
 
@@ -157,10 +191,10 @@ export const SHOWCASE_MOMENTS: Moment[] = [
 // entran en la polyline (el activo, sin lat/lng, queda fuera a propósito).
 export const SHOWCASE_ROUTE: RoutePoint[] = [
   {
-    challengeId: 'showcase-capetown-mesa',
-    lat: -33.9249,
-    lng: 18.4241,
-    title: 'Mesa redonda al amanecer',
+    challengeId: 'showcase-algarve-amanecer',
+    lat: 37.0891,
+    lng: -8.2479,
+    title: 'Amanecer en el Algarve',
     imageUrl: ciudadDelCaboPhoto,
     date: '2026-06-08T07:00:00.000Z',
   },
@@ -173,16 +207,16 @@ export const SHOWCASE_ROUTE: RoutePoint[] = [
     date: '2026-06-10T09:00:00.000Z',
   },
   {
-    challengeId: 'showcase-tokio-noche',
-    lat: 35.6762,
-    lng: 139.6503,
+    challengeId: 'showcase-roma-noche',
+    lat: 41.8902,
+    lng: 12.4922,
     title: '¿Dónde nos perdimos esta noche?',
-    imageUrl: tokioPhoto,
+    imageUrl: romaPhoto,
     date: '2026-06-12T20:00:00.000Z',
   },
 ]
 
-export const SHOWCASE_SELECTED_MOMENT = 'showcase-tokio-noche'
+export const SHOWCASE_SELECTED_MOMENT = 'showcase-roma-noche'
 
 // ── showcase-jugar: la escena de JUGAR a pantalla completa (foto real), 100%
 // presentacional vía `GameScene` (extraída de PlayChallenge, sin estado propio):

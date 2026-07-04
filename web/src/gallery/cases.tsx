@@ -60,6 +60,7 @@ import {
 } from './fixtures'
 import {
   SHOWCASE_HOME_GROUPS,
+  SHOWCASE_HOME_PINS,
   SHOWCASE_HOME_PINNED,
   SHOWCASE_JUGAR_SCENE,
   SHOWCASE_JUGAR_TITLE,
@@ -73,7 +74,6 @@ import {
   SHOWCASE_ROUTE,
   SHOWCASE_SELECTED_MOMENT,
 } from './showcaseFixtures'
-import { HOME_DEMO_PINS } from '../features/home/homeDemoPins'
 
 export interface GalleryCase {
   id: string
@@ -699,7 +699,7 @@ export const cases: GalleryCase[] = [
         userId={ME_ID}
         displayName="Lewis"
         groups={SHOWCASE_HOME_GROUPS}
-        pins={HOME_DEMO_PINS}
+        pins={SHOWCASE_HOME_PINS}
         pinned={SHOWCASE_HOME_PINNED}
         onOpenProfile={noop}
         onCreateGroup={noop}
