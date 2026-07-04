@@ -152,13 +152,21 @@ export const CH_CLOSED = 'ch-closed-arashiyama'
 // `detalle-reto-cerrado` usaba CH_CLOSED (propio + auto-voto imposible), lo que
 // disparaba la guarda "es tuyo" en vez del revelado real — separado aquí.
 export const CH_CLOSED_OTHER = 'ch-closed-kinkakuji'
-// Recuerdo puro (sin juego): foto + lugar visible, sin plazo.
+// Recuerdo puro (sin juego): foto + lugar visible, sin plazo. Lleva galería
+// multi-foto (MOMENT_IMAGES, más abajo) + nota de voz — caso rico de la
+// Bitácora (issue de "Bitácora": kicker + título + descripción con capitular +
+// nota de voz inline + TODAS sus fotos a ancho completo).
 export const CH_MEMORY = 'ch-memory-ramen'
+// Recuerdo SIN descripción (caso de galería `viaje-bitacora`): la Bitácora no
+// debe dejar un hueco raro donde iría el cuerpo de artículo si el dueño aún no
+// ha escrito nada — solo kicker + título + su única foto.
+export const CH_MEMORY_QUIET = 'ch-memory-togetsukyo'
 // Reto de NÚMERO cerrado: ¿cuánto costó?
 export const CH_NUMBER = 'ch-number-shinkansen'
-// Reto EN JUEGO con foto SORPRESA (`photo_is_hint: false`): la pestaña Fotos
-// (issue #645) NO debe enseñar su foto mientras siga en juego — caso de
-// vigilancia visual del filtro anti-spoiler (`isMomentPhotoVisible`).
+// Reto EN JUEGO con foto SORPRESA (`photo_is_hint: false`): la pestaña
+// Bitácora (issue #645, antes "Fotos") NO debe enseñar su foto mientras siga
+// en juego — caso de vigilancia visual del filtro anti-spoiler
+// (`isMomentPhotoVisible`).
 export const CH_ACTIVE_SORPRESA = 'ch-active-sorpresa-dotombori'
 
 export const CHALLENGES: ChallengeRow[] = [
@@ -225,6 +233,10 @@ export const CHALLENGES: ChallengeRow[] = [
     description: 'Una barra de ocho asientos perdida en un callejón.',
     is_challenge: false,
     image_path: 'photo-ramen.jpg',
+    // Nota de voz (issue #648, caso de galería `viaje-bitacora`): el fake
+    // storage la resuelve a un WAV silencioso válido (ver `fakeSupabase.ts`),
+    // no a la imagen-etiqueta de `photoDataUri` — decodifica sin error.
+    audio_path: 'audio/nota-ramen.webm',
     place_lat: 35.0036,
     place_lng: 135.7788,
     lat: 35.0036,
@@ -232,6 +244,22 @@ export const CHALLENGES: ChallengeRow[] = [
     deadline_at: null,
     created_by: 'user-noa-0003',
     created_at: isoFromNow(-4 * DAY),
+  }),
+  // Recuerdo SIN descripción (caso de galería `viaje-bitacora`): una foto
+  // suelta, sin galería extra ni voz — la Bitácora debe verse completa igual
+  // (kicker + título, sin hueco de artículo vacío).
+  baseChallenge({
+    id: CH_MEMORY_QUIET,
+    title: 'El puente Togetsukyo al atardecer',
+    is_challenge: false,
+    image_path: 'photo-togetsukyo.jpg',
+    place_lat: 35.0094,
+    place_lng: 135.6779,
+    lat: 35.0094,
+    lng: 135.6779,
+    deadline_at: null,
+    created_by: 'user-marta-0001',
+    created_at: isoFromNow(-4 * DAY + HOUR),
   }),
   // Reto EN JUEGO con foto SORPRESA: `photo_is_hint: false` + `deadline_at`
   // futuro. La pestaña Fotos debe OCULTAR esta foto (issue #645) — no debe
@@ -386,6 +414,7 @@ export const PHOTO_LABELS: Record<string, string> = {
   'photo-ramen-2.jpg': 'La barra',
   'photo-ramen-3.jpg': 'El caldo',
   'photo-dotombori.jpg': 'Dotonbori (sorpresa oculta)',
+  'photo-togetsukyo.jpg': 'Puente Togetsukyo',
 }
 
 // Galería del recuerdo del ramen: varias fotos ordenadas por sort_order (la de 0
