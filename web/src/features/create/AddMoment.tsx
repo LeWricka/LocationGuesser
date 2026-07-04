@@ -172,6 +172,9 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
   // viaje es futuro (ver `computeDefaultDate`). Arranca en hoy y solo cambia tras
   // resolver la cascada (evita parpadeo: nunca deja elegir MÁS de lo permitido).
   const [maxDate, setMaxDate] = useState(todayIso)
+  // Nombre del viaje para el kicker de la cabecera 5B (#659). Llega con la misma
+  // consulta getGroup() de la cascada de fecha; hasta entonces, cabecera sin kicker.
+  const [groupName, setGroupName] = useState<string | null>(null)
   // Si el usuario toca la fecha a mano, la cascada async ya no debe pisarla.
   const dateTouchedRef = useRef(false)
 
@@ -249,6 +252,7 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
           getGroup(groupId),
         ])
         if (cancelled) return
+        setGroupName(group?.name ?? null)
         const { date: defaultDate, max } = computeDefaultDate(
           latestDate,
           group?.starts_on ?? null,
@@ -599,7 +603,13 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       {/* Cabecera ÚNICA del producto (variante papel), a sangre con su hairline.
           El gutter lo lleva el cuerpo, para que la cabecera no flote como una
           barra blanca recortada distinta al papel. */}
-      <AppHeader lead="back" onLead={onBack} leadLabel="Volver" title="Nuevo recuerdo" />
+      <AppHeader
+        lead="back"
+        onLead={onBack}
+        leadLabel="Volver"
+        kicker={groupName ?? undefined}
+        title="Nuevo recuerdo"
+      />
       <Stack gap={5} className={`${styles.body} lg-stagger`}>
         <div className={styles.heading}>
           <p className={styles.lede}>

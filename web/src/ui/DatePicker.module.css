@@ -19,7 +19,10 @@
   background: var(--color-surface-hover);
   color: var(--color-text);
   font-family: inherit;
-  font-size: var(--font-size-md);
+  /* sm, no md: el disparador es un chip que a menudo vive en pareja a dos
+     columnas (Salida/Vuelta) reservando además --tap-target para el aspa;
+     con md, "18 jun 2026" aún se cortaba a 390px (issue #673). */
+  font-size: var(--font-size-sm);
   line-height: var(--line-height-normal);
   text-align: left;
   cursor: pointer;
