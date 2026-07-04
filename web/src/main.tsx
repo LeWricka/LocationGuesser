@@ -128,30 +128,55 @@ const updateSW = registerSW({
   onNeedRefresh() {
     updateAvailable = true
     // La pestaña ya está oculta (p.ej. el sondeo de 60 s la encontró mientras el
-    // usuario estaba en otra app): nadie mira, la aplicamos ya en vez de esperar
-    // a que vuelva y le salte el banner de sorpresa.
-    if (document.hidden) applyUpdate()
+    // usuario estaba en otra app): programamos la aplicación con el MISMO retardo
+    // que el listener de visibilidad — aplicar al instante convertía una ausencia
+    // de segundos en una recarga (reporte del dueño, 4 jul).
+    if (document.hidden) scheduleHiddenApply()
     else showUpdateBanner(applyUpdate)
   },
 })
 
-// Aplica la actualización pendiente en cuanto el usuario deja de mirar la pestaña
-// (la minimiza, cambia de pestaña o de app): el momento en que una recarga es
-// invisible para él. Solo si hay de verdad una actualización esperando Y la
-// ruta actual es segura (#647) — si no, la pastilla manual sigue disponible y
-// esperamos a que el usuario navegue a una ruta segura (ver el listener de
-// `hashchange` de abajo) o decida él mismo.
+// Aplica la actualización pendiente cuando el usuario lleva un rato SIN mirar la
+// pestaña. El "un rato" importa (reporte del dueño, 4 jul): con la cadencia real
+// de deploys casi siempre hay una actualización esperando, y aplicar nada más
+// ocultarse convertía CADA salto a otra app (contestar un WhatsApp y volver) en
+// una recarga — pérdida de scroll y de dónde estabas. Con el retardo, los saltos
+// cortos no recargan nunca; las ausencias de verdad (donde la recarga sí es
+// invisible) siguen actualizando solas. Solo en rutas seguras (#647); en el
+// resto queda la pastilla manual.
+const HIDDEN_APPLY_DELAY_MS = 5 * 60_000
+let hiddenApplyTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleHiddenApply() {
+  if (hiddenApplyTimer != null) return
+  hiddenApplyTimer = setTimeout(() => {
+    hiddenApplyTimer = null
+    // Re-comprobar al disparar: pudo volver a primer plano, navegar a una ruta
+    // no segura, o haberse aplicado ya por la pastilla manual.
+    if (document.hidden && updateAvailable && isSafeUpdateRoute(window.location.hash)) {
+      applyUpdate()
+    }
+  }, HIDDEN_APPLY_DELAY_MS)
+}
 document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && hiddenApplyTimer != null) {
+    // Volvió antes del retardo: el salto fue corto, no se recarga nada.
+    clearTimeout(hiddenApplyTimer)
+    hiddenApplyTimer = null
+    return
+  }
   if (document.hidden && updateAvailable && isSafeUpdateRoute(window.location.hash)) {
-    applyUpdate()
+    scheduleHiddenApply()
   }
 })
 
-// Si la actualización se quedó pendiente por estar en una ruta no segura, se
-// aplica en cuanto el usuario navega (por hash) a una ruta segura: así no se
-// queda pendiente eternamente mientras "vive" en formularios o partidas.
+// Si la actualización se quedó pendiente por estar en una ruta no segura, al
+// navegar a una segura NO se aplica sola (#647 lo hacía y esa recarga SÍ era
+// visible: justo al "volver atrás" al viaje te comías el refresco — reporte del
+// dueño, 4 jul). En su lugar enseñamos la pastilla y decide el usuario.
 window.addEventListener('hashchange', () => {
-  if (updateAvailable && isSafeUpdateRoute(window.location.hash)) applyUpdate()
+  if (updateAvailable && isSafeUpdateRoute(window.location.hash)) {
+    showUpdateBanner(applyUpdate)
+  }
 })
 
 // Fallback amable cuando un error de render escapa hasta la raíz: la app no se

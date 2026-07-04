@@ -111,7 +111,7 @@ describe('main: auto-apply del update de PWA en rutas seguras (#647)', () => {
     expect(updateSWMock).not.toHaveBeenCalled()
   })
 
-  test('visibilidad en ruta segura: aplica', async () => {
+  test('visibilidad en ruta segura: aplica tras el retardo, no al instante', async () => {
     setHash('#g=abc123')
     await loadMain()
     onNeedRefresh()
@@ -119,28 +119,48 @@ describe('main: auto-apply del update de PWA en rutas seguras (#647)', () => {
     setHidden(true)
     document.dispatchEvent(new Event('visibilitychange'))
 
+    // Al ocultarse NO aplica ya (un salto corto a otra app no debe recargar)…
+    expect(updateSWMock).not.toHaveBeenCalled()
+
+    // …pero tras el retardo de ausencia real, sí.
+    vi.advanceTimersByTime(5 * 60_000)
     expect(updateSWMock).toHaveBeenCalledTimes(1)
   })
 
-  test('hashchange a ruta segura tras quedar pendiente en una no segura: aplica una vez', async () => {
-    setHash('#nuevo')
+  test('salto corto: volver antes del retardo cancela la recarga', async () => {
+    setHash('#g=abc123')
     await loadMain()
     onNeedRefresh()
 
-    // Sigue visible (o se oculta en ruta no segura): no aplica.
     setHidden(true)
     document.dispatchEvent(new Event('visibilitychange'))
+    vi.advanceTimersByTime(2 * 60_000)
+
+    // Vuelve antes de que venza el retardo: el timer se cancela.
+    setHidden(false)
+    document.dispatchEvent(new Event('visibilitychange'))
+    vi.advanceTimersByTime(10 * 60_000)
+
+    expect(updateSWMock).not.toHaveBeenCalled()
+  })
+
+  test('hashchange a ruta segura NO aplica solo: enseña la pastilla y decide el usuario', async () => {
+    setHash('#nuevo')
+    await loadMain()
+    setHidden(true)
+    onNeedRefresh()
+
+    // Oculta en ruta no segura: ni al instante ni tras el retardo.
+    document.dispatchEvent(new Event('visibilitychange'))
+    vi.advanceTimersByTime(5 * 60_000)
     expect(updateSWMock).not.toHaveBeenCalled()
 
-    // El usuario navega a una ruta segura: se aplica entonces.
+    // Navega a una ruta segura: antes (#647) esto recargaba en la cara del
+    // usuario ("volver atrás" = refresco); ahora solo muestra la pastilla.
     setHash('#g=abc123')
     window.dispatchEvent(new Event('hashchange'))
-    expect(updateSWMock).toHaveBeenCalledTimes(1)
-
-    // Ya no queda actualización pendiente: un hashchange posterior no la vuelve a aplicar.
-    setHash('#g=abc123&v=marcador')
-    window.dispatchEvent(new Event('hashchange'))
-    expect(updateSWMock).toHaveBeenCalledTimes(1)
+    expect(updateSWMock).not.toHaveBeenCalled()
+    expect(document.getElementById('update-banner-root')).not.toBeNull()
   })
 
   test('hashchange a ruta NO segura no aplica', async () => {
