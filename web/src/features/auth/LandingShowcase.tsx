@@ -50,6 +50,10 @@ export function LandingShowcase({ onStart, className }: Props) {
               />
             </div>
           </div>
+          {/* Crédito del mapa satélite de repuesto (issue #695): solo cuando la
+              propia captura no deja legible el crédito de Esri que pinta el mapa
+              (ver `ShowcaseShot.mapCredit`). Ausente en el resto de diapositivas. */}
+          {shot.mapCredit && <p className={styles.mapCredit}>{shot.mapCredit}</p>}
         </section>
       ))}
 
