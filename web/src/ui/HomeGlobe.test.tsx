@@ -117,6 +117,16 @@ function samplePins(): GlobePin[] {
   ]
 }
 
+// Pines AGRUPADOS (mismo continente): el fit inicial usa fitBounds (sin easeTo), así
+// que los tests de vuelo por `activeTargetId` pueden contar easeTo en absoluto sin
+// que la política de protagonista intercontinental (MAX_FIT_SPAN_*) les meta ruido.
+function clusteredPins(): GlobePin[] {
+  return [
+    { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+    { id: 'roma', lat: 41.8902, lng: 12.4922, title: 'Roma', imageUrl: null, targetId: 't2' },
+  ]
+}
+
 // Simula prefers-reduced-motion (mismo patrón que CountUp.test.tsx/TripPage.test.tsx):
 // jsdom no implementa `matchMedia` por defecto.
 function mockReducedMotion(matches: boolean) {
@@ -165,12 +175,53 @@ describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
     expect(mapInstances[0].easeToCalls).toHaveLength(0)
   })
 
-  test('framing "pins" (por defecto) SÍ reencuadra a los pines', async () => {
-    render(<HomeGlobe pins={samplePins()} />)
+  test('framing "pins" con pines AGRUPADOS (mismo continente): fitBounds a todos', async () => {
+    const iberia: GlobePin[] = [
+      { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+      { id: 'roma', lat: 41.8902, lng: 12.4922, title: 'Roma', imageUrl: null, targetId: 't2' },
+    ]
+    render(<HomeGlobe pins={iberia} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
     mapInstances[0].fire('load')
     await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+  })
+
+  test('framing "pins" INTERCONTINENTAL: manda el protagonista, no el centroide', async () => {
+    // El caso real del dueño (Japón + Maldivas + Colombia): fitBounds sobre pines
+    // casi antípodas centra la cámara en océano abierto con los pines en los bordes.
+    // Pasado MAX_FIT_SPAN_* la cámara va al pin `lead` a zoom de pin único.
+    const pins: GlobePin[] = [
+      { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+      {
+        id: 'sidney',
+        lat: -33.8688,
+        lng: 151.2093,
+        title: 'Sídney',
+        imageUrl: null,
+        targetId: 't2',
+        lead: true,
+      },
+    ]
+    render(<HomeGlobe pins={pins} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].easeToCalls).toHaveLength(1))
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
+    const call = mapInstances[0].easeToCalls[0] as { center: [number, number] }
+    expect(call.center).toEqual([151.2093, -33.8688])
+  })
+
+  test('framing "pins" intercontinental SIN lead: manda el primero', async () => {
+    render(<HomeGlobe pins={samplePins()} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].easeToCalls).toHaveLength(1))
+    const call = mapInstances[0].easeToCalls[0] as { center: [number, number] }
+    expect(call.center).toEqual([-9.1393, 38.7223])
   })
 })
 
@@ -255,16 +306,16 @@ describe('HomeGlobe — pin "lead" no se sale de position:absolute (#523)', () =
 // --- #567: globo reactivo — prop `activeTargetId` -------------------------------
 describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () => {
   test('cambiar a un targetId con pin: vuela (easeTo) a su centro y le pone "lead", retirándoselo al anterior', async () => {
-    // Sídney arranca "lead" por DATO (`pin.lead`), como el pin más reciente de un
+    // Roma arranca "lead" por DATO (`pin.lead`), como el pin más reciente de un
     // viaje real. Al activar Lisboa por `activeTargetId`, el override debe ganarle
-    // la exclusividad aunque Sídney la trajera horneada desde el propio dato.
+    // la exclusividad aunque Roma la trajera horneada desde el propio dato.
     const pins: GlobePin[] = [
       { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
       {
-        id: 'sidney',
-        lat: -33.8688,
-        lng: 151.2093,
-        title: 'Sídney',
+        id: 'roma',
+        lat: 41.8902,
+        lng: 12.4922,
+        title: 'Roma',
         imageUrl: null,
         targetId: 't2',
         lead: true,
@@ -276,15 +327,15 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     mapInstances[0].fire('load')
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
-    const [lisboaEl, sidneyEl] = markerInstances.map((m) => m.getElement())
-    expect(sidneyEl.classList.contains('lg-home-pin--lead')).toBe(true)
+    const [lisboaEl, romaEl] = markerInstances.map((m) => m.getElement())
+    expect(romaEl.classList.contains('lg-home-pin--lead')).toBe(true)
     expect(lisboaEl.classList.contains('lg-home-pin--lead')).toBe(false)
     expect(mapInstances[0].easeToCalls).toHaveLength(0)
 
     rerender(<HomeGlobe pins={pins} activeTargetId="t1" />)
 
     expect(lisboaEl.classList.contains('lg-home-pin--lead')).toBe(true)
-    expect(sidneyEl.classList.contains('lg-home-pin--lead')).toBe(false)
+    expect(romaEl.classList.contains('lg-home-pin--lead')).toBe(false)
     expect(mapInstances[0].easeToCalls).toHaveLength(1)
     expect(mapInstances[0].easeToCalls[0]).toMatchObject({
       center: [-9.1393, 38.7223],
@@ -293,7 +344,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
   })
 
   test('activeTargetId null/undefined: no vuela y no toca el "lead" (comportamiento actual intacto)', async () => {
-    const pins = samplePins()
+    const pins = clusteredPins()
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
@@ -310,7 +361,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
   })
 
   test('un targetId sin pin correspondiente es un no-op (ni clase ni cámara)', async () => {
-    const pins = samplePins()
+    const pins = clusteredPins()
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
@@ -327,7 +378,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
 
   test('prefers-reduced-motion: salto directo (easeTo duration:0), sin animación', async () => {
     mockReducedMotion(true)
-    const pins = samplePins()
+    const pins = clusteredPins()
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
@@ -342,14 +393,14 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     expect(mapInstances[0].jumpToCalls).toHaveLength(0)
     expect(mapInstances[0].easeToCalls).toHaveLength(1)
     expect(mapInstances[0].easeToCalls[0]).toMatchObject({
-      center: [151.2093, -33.8688],
+      center: [12.4922, 41.8902],
       duration: 0,
     })
     expect(markerInstances[1].getElement().classList.contains('lg-home-pin--lead')).toBe(true)
   })
 
   test('gesto en curso (drag): el resaltado se aplica pero el vuelo se cancela, no se encola', async () => {
-    const pins = samplePins()
+    const pins = clusteredPins()
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
