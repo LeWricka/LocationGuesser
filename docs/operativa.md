@@ -402,3 +402,51 @@ Prerrequisitos de PROD (los activa el dueño en el dashboard; el código ya est�
 4. **Caso email ya registrado:** si en la entrada el correo ya pertenece a una cuenta, NO
    se enlaza a un anónimo (fallaría con `email_exists`); en su lugar se manda un **magic
    link de recuperación** (mismo flujo OTP/passwordless) para recuperar la cuenta original.
+
+---
+
+## 8. Email transaccional propio (SMTP de momentu.art vía Porkbun)
+
+Los correos de acceso (código OTP + enlace) salen de Supabase Auth. Por defecto usan
+el SMTP COMPARTIDO de Supabase: remitente genérico, límites bajos (~2/hora en picos)
+y sospechoso de los correos duplicados observados el 4 jul. Con el buzón de
+momentu.art contratado en Porkbun, se cambia a SMTP propio:
+
+### 8.1 Configurar el SMTP en Supabase (una vez, ~5 min)
+
+**Dashboard → Project Settings → Authentication → SMTP Settings → Enable Custom SMTP:**
+
+| Campo | Valor |
+|---|---|
+| Sender email | el buzón creado en Porkbun (p.ej. `hola@momentu.art`) |
+| Sender name | `Momentu` |
+| Host | `smtp.porkbun.com` |
+| Port | `587` (STARTTLS; si falla, `465` SSL) |
+| Username | el buzón completo (`hola@momentu.art`) |
+| Password | la contraseña del buzón en Porkbun |
+
+Guardar y **enviarse un email de prueba** (logout → entrar de nuevo).
+
+> DNS: si el dominio se gestiona en Vercel, los registros MX/SPF/DKIM que pide
+> Porkbun deben estar en la zona DNS de Vercel (Domains → momentu.art → DNS).
+> Sin SPF/DKIM correctos, Gmail manda estos correos a spam. Verificación rápida:
+> `dig MX momentu.art +short` y `dig TXT momentu.art +short` (debe verse el SPF
+> de Porkbun).
+
+### 8.2 Plantilla con marca
+
+**Dashboard → Authentication → Email Templates → Magic Link**: pegar el HTML de
+[docs/plantillas/email-acceso-momentu.html](plantillas/email-acceso-momentu.html)
+(código grande + botón de enlace, paleta y serif de Momentu). Asunto sugerido:
+`Tu código para entrar en Momentu`.
+
+La plantilla usa `{{ .Token }}` (código de 6 dígitos) y `{{ .ConfirmationURL }}`
+(enlace de respaldo) — las mismas variables que ya usa el flujo actual
+(`sendEmailOtp`, lib/auth.ts): no hay que tocar código.
+
+### 8.3 Después del cambio
+
+- Vigilar el primer login real: llega 1 correo (no 2 — si con SMTP propio los
+  duplicados desaparecen, el culpable era el SMTP compartido) y no cae en spam.
+- El evento `login_email_solicitado` (Mixpanel, #679) sigue contando los envíos
+  pedidos desde el cliente para contrastar.
