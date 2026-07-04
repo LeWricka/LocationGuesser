@@ -460,6 +460,17 @@ describe('computeDefaultDate — fecha por defecto en cascada (#553)', () => {
       max: today,
     })
   })
+
+  // Issue #566: desde la migración 0037, `latestMomentDate` puede llegar como un
+  // `happened_on` PURO (`YYYY-MM-DD`, sin hora ni huso) en vez de un `created_at`
+  // ISO completo. No debe pasar por la conversión de huso horario (que asumiría
+  // medianoche UTC y podría restar un día) — se usa tal cual.
+  test('happened_on PURO (YYYY-MM-DD) se usa tal cual, sin conversión de huso', () => {
+    expect(computeDefaultDate('2024-09-10', '2024-09-01', '2024-09-15', today)).toEqual({
+      date: '2024-09-10',
+      max: today,
+    })
+  })
 })
 
 describe('AddMoment — fecha por defecto pre-rellenada (#553)', () => {
@@ -481,5 +492,67 @@ describe('AddMoment — fecha por defecto pre-rellenada (#553)', () => {
     // (`toggleOpen`), así que no hace falta ninguna prop nueva de "mes inicial".
     await userEvent.click(trigger)
     expect(screen.getByRole('dialog')).toHaveTextContent('septiembre 2024')
+  })
+
+  // Issue #566: `happened_on` (fecha ELEGIDA, migración 0037) manda sobre
+  // `created_at` (cuándo se subió) al anclar la cascada — el caso real de
+  // backfill: el último momento se SUBIÓ hoy pero OCURRIÓ hace días.
+  test('con happened_on en el último momento, ancla ESA fecha, no created_at', async () => {
+    latestMomentMock.mockResolvedValue({
+      data: { happened_on: '2024-09-12', created_at: '2026-07-03T09:00:00.000Z' },
+      error: null,
+    })
+
+    renderAddMoment()
+
+    const trigger = await screen.findByLabelText('Fecha')
+    await waitFor(() => expect(trigger).toHaveTextContent('12 de septiembre de 2024'))
+  })
+})
+
+describe('AddMoment — fecha elegida en happened_on (#566)', () => {
+  beforeEach(() => {
+    trackMock.mockClear()
+    reportErrorMock.mockClear()
+    createMomentMock.mockReset()
+    getGroupMock.mockReset().mockResolvedValue(null)
+    latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
+  })
+
+  test('guarda la fecha del campo "Fecha" en happenedOn (YYYY-MM-DD, sin hora ni huso)', async () => {
+    createMomentMock.mockResolvedValue({
+      challenge: { id: 'm1', title: 'Mi recuerdo' } as ChallengeForPlay,
+      groupId: 'g1',
+    })
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    const call = createMomentMock.mock.calls[0][0] as { happenedOn?: string }
+    expect(call.happenedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  // Antes de la migración 0037 la fecha se anteponía a la descripción como texto
+  // (`📅 8 de abril · ...`, ver `buildDescription`); ahora vive en happened_on y
+  // la descripción se guarda tal cual la escribió el dueño.
+  test('la descripción ya NO incrusta la fecha (vive en happened_on)', async () => {
+    createMomentMock.mockResolvedValue({
+      challenge: { id: 'm1', title: 'Mi recuerdo' } as ChallengeForPlay,
+      groupId: 'g1',
+    })
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.type(screen.getByLabelText(/descripción/i), 'Un día genial')
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    expect(createMomentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Un día genial' }),
+    )
   })
 })

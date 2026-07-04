@@ -49,3 +49,25 @@ export function formatDeadline(iso: string | null): string {
 export function isPast(iso: string): boolean {
   return new Date(iso).getTime() < Date.now()
 }
+
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+/**
+ * Parsea la fecha de un MOMENTO (`Moment.date`, lib/trip.ts) a un `Date` sin
+ * desplazar el día. Ese valor puede ser de dos naturalezas distintas y cada una
+ * necesita un parseo distinto (issue #566, migración 0037 — `happened_on`):
+ *  - fecha PURA (`happened_on`, `YYYY-MM-DD`, sin hora ni huso): construimos el
+ *    `Date` con componentes LOCALES (año/mes/día). Pasarla por `new Date(str)`
+ *    la interpretaría como medianoche UTC y, en husos AL OESTE de UTC, el
+ *    `Date` resultante cae en el día ANTERIOR al leerlo con getters locales
+ *    (`getFullYear`/`getMonth`/`getDate`) o al formatear sin `timeZone: 'UTC'`.
+ *  - instante REAL (`created_at`, ISO completo con hora y huso — momentos legado
+ *    sin `happened_on`): aquí SÍ queremos la conversión a huso LOCAL de siempre
+ *    (el día que vivió quien lo creó, no el de un servidor en UTC).
+ */
+export function parseMomentDate(value: string): Date {
+  const match = DATE_ONLY_RE.exec(value)
+  if (!match) return new Date(value)
+  const [, y, m, d] = match
+  return new Date(Number(y), Number(m) - 1, Number(d))
+}

@@ -196,6 +196,34 @@ describe('MomentSheet', () => {
     expect(screen.queryByRole('heading', { name: 'Editar recuerdo' })).not.toBeInTheDocument()
   })
 
+  // Issue #566 / migración 0037: la fecha editada se guarda en `happenedOn`
+  // (columna real), no repurposeando `created_at` (el hack de antes).
+  test('editar la fecha del recuerdo guarda happenedOn (YYYY-MM-DD), no createdAt', async () => {
+    const user = userEvent.setup()
+    const onEdited = vi.fn()
+    renderSheet({ onEdited })
+
+    await user.click(screen.getByRole('button', { name: 'Editar recuerdo' }))
+
+    // El campo "Fecha" arranca sembrado con la fecha actual del momento
+    // (2026-06-28, derivada de `moment.date`); elegimos otro día del mismo mes.
+    const trigger = screen.getByLabelText('Fecha')
+    await user.click(trigger)
+    await user.click(screen.getByRole('gridcell', { name: '20 de junio de 2026' }))
+
+    await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(updateMomentMock).toHaveBeenCalledWith(
+      'c1',
+      expect.objectContaining({ happenedOn: '2026-06-20' }),
+    )
+    expect(updateMomentMock).not.toHaveBeenCalledWith(
+      'c1',
+      expect.objectContaining({ createdAt: expect.anything() }),
+    )
+    expect(onEdited).toHaveBeenCalledTimes(1)
+  })
+
   test('cancelar la edición vuelve a la vista sin guardar (fix #571)', async () => {
     const user = userEvent.setup()
     renderSheet()

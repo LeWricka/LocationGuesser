@@ -1,5 +1,11 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { deadlineFromMinutes, deadlineFromNow, formatDeadline, isPast } from './time'
+import {
+  deadlineFromMinutes,
+  deadlineFromNow,
+  formatDeadline,
+  isPast,
+  parseMomentDate,
+} from './time'
 
 describe('time', () => {
   beforeEach(() => {
@@ -64,5 +70,54 @@ describe('time', () => {
   test('isPast', () => {
     expect(isPast('2026-06-20T09:00:00Z')).toBe(true)
     expect(isPast('2026-06-20T11:00:00Z')).toBe(false)
+  })
+})
+
+// Issue #566 / migración 0037: `parseMomentDate` es la pieza que evita el
+// off-by-one al mostrar/editar `happened_on` (fecha PURA, sin hora ni huso) en
+// husos horarios AL OESTE de UTC — el propio hueco que describe el issue
+// ("cuidado con el off-by-one de toISOString y timezones").
+describe('parseMomentDate (#566, migración 0037)', () => {
+  // `process.env.TZ` SÍ afecta a los `Date` creados DESPUÉS de cambiarlo (V8 lo
+  // consulta en cada construcción, no solo al arrancar el proceso) — verificado
+  // en Node antes de escribir el test. Restauramos siempre, para no filtrar el
+  // huso a otros tests de este proceso.
+  const originalTz = process.env.TZ
+  afterEach(() => {
+    process.env.TZ = originalTz
+  })
+
+  test('fecha PURA (YYYY-MM-DD): construye el Date en LOCAL, sin desplazar el día', () => {
+    process.env.TZ = 'UTC'
+    const d = parseMomentDate('2026-07-02')
+    expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2026, 6, 2])
+  })
+
+  test('en un huso AL OESTE de UTC, el día elegido NO se corre al anterior', () => {
+    // `new Date('2026-07-02')` a pelo SÍ se correría a 1 de julio aquí (medianoche
+    // UTC cae en la tarde del día previo en Los Ángeles) — la razón de ser de esta
+    // función. Repro verificado con Node antes de escribir el test.
+    process.env.TZ = 'America/Los_Angeles'
+    const naive = new Date('2026-07-02')
+    expect(naive.getDate()).toBe(1) // el bug que NO queremos
+
+    const fixed = parseMomentDate('2026-07-02')
+    expect([fixed.getFullYear(), fixed.getMonth(), fixed.getDate()]).toEqual([2026, 6, 2])
+  })
+
+  test('en un huso AL ESTE de UTC, el día elegido tampoco se adelanta', () => {
+    process.env.TZ = 'Pacific/Auckland' // UTC+12/+13 según DST
+    const fixed = parseMomentDate('2026-07-02')
+    expect([fixed.getFullYear(), fixed.getMonth(), fixed.getDate()]).toEqual([2026, 6, 2])
+  })
+
+  test('instante ISO completo (created_at, momento legado): se parsea como instante real', () => {
+    process.env.TZ = 'UTC'
+    const iso = '2026-07-02T23:00:00.000Z'
+    expect(parseMomentDate(iso).getTime()).toBe(new Date(iso).getTime())
+  })
+
+  test('valor inválido: Date inválido (NaN), no revienta', () => {
+    expect(Number.isNaN(parseMomentDate('no-es-una-fecha').getTime())).toBe(true)
   })
 })

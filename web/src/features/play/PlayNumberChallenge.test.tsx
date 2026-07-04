@@ -76,6 +76,7 @@ const numberChallenge: ChallengeForPlay = {
   number_decimals: 0,
   number_tolerance: 'normal',
   time_scoring: true,
+  happened_on: null,
   created_by: 'u-other',
   created_at: '2026-06-19T10:00:00.000Z',
 }

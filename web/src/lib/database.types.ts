@@ -172,6 +172,11 @@ export interface Database {
           // rápido suma y tarde resta, solo con límite por jugada (guess_seconds no
           // null). Default true (ON). No es spoiler.
           time_scoring: boolean
+          // Fecha ELEGIDA por el dueño (sin hora/huso): cuándo OCURRIÓ el momento, no
+          // cuándo se subió (`created_at`). Null = legado o sin fecha propia, cae a
+          // `created_at` como proxy (ver `Moment.date`, lib/trip.ts). No es spoiler:
+          // se sirve siempre. Migración 0037 (#566).
+          happened_on: string | null
           created_by: string
           created_at: string
         }
@@ -215,6 +220,9 @@ export interface Database {
           // Default true en BD: omitirlo crea un reto con la velocidad activada
           // (comportamiento por defecto del issue #628). Migración 0034.
           time_scoring?: boolean
+          // Fecha ELEGIDA por el dueño (0037, #566); omitirla deja happened_on null
+          // (el diario cae a created_at como proxy).
+          happened_on?: string | null
           created_by: string
           created_at?: string
         }
@@ -252,6 +260,8 @@ export interface Database {
           answer_number_src?: number | null
           // La velocidad puntúa (0034, issue #628).
           time_scoring?: boolean
+          // Fecha ELEGIDA por el dueño (0037, #566); null la limpia (cae a created_at).
+          happened_on?: string | null
           created_by?: string
           created_at?: string
         }

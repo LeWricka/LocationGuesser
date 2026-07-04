@@ -4,6 +4,7 @@ import { Avatar, Icon, IconCamara, IconCandado } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import { resolveMomentPhoto, type Moment, type RoutePoint } from '../../lib/trip'
+import { parseMomentDate } from '../../lib/time'
 import { Podium, type PodiumClasses } from '../group/Podium'
 import { TripMap } from './TripMap'
 import type { ChallengeWinner } from './useTripData'
@@ -50,14 +51,16 @@ const podiumClasses: PodiumClasses = {
 const dayMonthFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
 const longFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })
 
+// `parseMomentDate` distingue `happened_on` (fecha pura, #566) de `created_at`
+// (instante ISO legado) para no desplazar el día en husos al oeste de UTC.
 function shortDate(value: string): string {
-  const date = new Date(value)
+  const date = parseMomentDate(value)
   if (Number.isNaN(date.getTime())) return '—'
   return dayMonthFmt.format(date).replace('.', '')
 }
 
 function longDate(value: string): string {
-  const date = new Date(value)
+  const date = parseMomentDate(value)
   if (Number.isNaN(date.getTime())) return ''
   return longFmt.format(date)
 }
