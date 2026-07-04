@@ -773,6 +773,12 @@ export function TripPage({
             void reloadMembership()
             void refresh()
           }}
+          onInvite={() => {
+            // El camino a "otra persona dueña": invitar → promover. Cerramos
+            // Miembros y abrimos la hoja de invitar en un solo gesto (#689).
+            setMembersOpen(false)
+            setInviting(true)
+          }}
         />
       )}
 

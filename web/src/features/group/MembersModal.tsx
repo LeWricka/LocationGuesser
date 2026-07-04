@@ -8,7 +8,7 @@ import {
   type GroupMemberInfo,
 } from '../../lib/membership'
 import { track } from '../../lib/analytics'
-import { Crown, LogOut, UserMinus, Users } from 'lucide-react'
+import { Crown, LogOut, UserMinus, UserPlus, Users } from 'lucide-react'
 import { Avatar, Badge, Button, Icon, Modal, Row, Skeleton, Stack, useToast } from '../../ui'
 // Estilos compartidos de la feature (youTag, empty, skelRow, radioRow, botón
 // discreto) + los propios de esta lista (filas que envuelven, ver el .css).
@@ -24,6 +24,13 @@ interface Props {
   onLeft: () => void
   /** Tras promover/degradar, expulsar o transferir: el viaje recarga permisos y datos. */
   onChanged: () => void
+  /**
+   * Salta a la hoja de invitar (cierra este modal y abre InviteModal en el padre).
+   * Existe porque el camino a "otra persona dueña" es invitar → promover, y en un
+   * viaje donde aún estás solo esta lista no tenía NADA que ofrecer (reporte del
+   * dueño, 4 jul: "no encuentro cómo invitar a otra persona a ser dueña").
+   */
+  onInvite?: () => void
 }
 
 /**
@@ -54,7 +61,7 @@ type View =
  *   · Transferir → `groups_transfer_owner` (0009): solo el `created_by` actual,
  *     y el nuevo dueño debe ser ya miembro.
  */
-export function MembersModal({ groupId, meId, onClose, onLeft, onChanged }: Props) {
+export function MembersModal({ groupId, meId, onClose, onLeft, onChanged, onInvite }: Props) {
   const [members, setMembers] = useState<GroupMemberInfo[] | null>(null)
   const [error, setError] = useState(false)
   const [view, setView] = useState<View>({ kind: 'list' })
@@ -274,6 +281,24 @@ export function MembersModal({ groupId, meId, onClose, onLeft, onChanged }: Prop
                 )
               })}
             </ul>
+          )}
+
+          {/* Guía cuando el viaje aún no tiene a nadie más (o para sumar gente):
+              el camino a "otra persona dueña" es invitar → hacer co-dueño desde
+              esta misma lista. Sin esta pieza, un dueño en solitario abría
+              Miembros y no encontraba NADA que hacer. */}
+          {members != null && meIsOwner && onInvite && (
+            <div className={styles.inviteGuide}>
+              {members.length <= 1 && (
+                <p className={styles.inviteHint}>
+                  Aquí todavía estás tú. Invita a los tuyos con el enlace del viaje; cuando entren,
+                  desde esta lista podrás hacerlos co-dueños.
+                </p>
+              )}
+              <Button variant="secondary" size="sm" onClick={onInvite}>
+                <Icon icon={UserPlus} size={15} /> Invitar al viaje
+              </Button>
+            </div>
           )}
 
           {/* Acciones de pie de lista: salir (no-creador) y transferir (creador). */}
