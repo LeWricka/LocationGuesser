@@ -46,6 +46,7 @@ import {
   myGroups,
   pendingChallenges,
   getGroupMembers,
+  groupAvatars,
   leaveGroup,
   kickMember,
   setMemberRole,
@@ -223,6 +224,61 @@ describe('getGroupMembers', () => {
     results['group_members'] = { data: [], error: null }
     results['groups'] = { data: { created_by: 'x' }, error: null }
     expect(await getGroupMembers('g1')).toEqual([])
+  })
+})
+
+describe('groupAvatars', () => {
+  test('sin ids devuelve un Map vacío sin consultar', async () => {
+    const map = await groupAvatars([])
+    expect(map.size).toBe(0)
+  })
+
+  test('agrupa por group_id y resuelve nombre/avatar por perfil (dos consultas)', async () => {
+    results['group_members'] = {
+      data: [
+        { group_id: 'g1', user_id: 'u1', joined_at: '2026-01-02T00:00:00.000Z' },
+        { group_id: 'g1', user_id: 'u2', joined_at: '2026-01-01T00:00:00.000Z' },
+        { group_id: 'g2', user_id: 'u1', joined_at: '2026-01-01T00:00:00.000Z' },
+      ],
+      error: null,
+    }
+    results['profiles'] = {
+      data: [
+        { id: 'u1', display_name: 'Ana', avatar_url: 'https://a.test/ana.png' },
+        { id: 'u2', display_name: 'Bea', avatar_url: null },
+      ],
+      error: null,
+    }
+
+    const map = await groupAvatars(['g1', 'g2'])
+    // g1 ordenado por joined_at: u2 (antes) primero, u1 después.
+    expect(map.get('g1')).toEqual([
+      { userId: 'u2', name: 'Bea', avatarUrl: null },
+      { userId: 'u1', name: 'Ana', avatarUrl: 'https://a.test/ana.png' },
+    ])
+    expect(map.get('g2')).toEqual([
+      { userId: 'u1', name: 'Ana', avatarUrl: 'https://a.test/ana.png' },
+    ])
+  })
+
+  test('sin membresías devuelve un Map vacío', async () => {
+    results['group_members'] = { data: [], error: null }
+    const map = await groupAvatars(['g1'])
+    expect(map.size).toBe(0)
+  })
+
+  test('propaga el error de group_members', async () => {
+    results['group_members'] = { data: null, error: new Error('boom') }
+    await expect(groupAvatars(['g1'])).rejects.toThrow('boom')
+  })
+
+  test('propaga el error de profiles', async () => {
+    results['group_members'] = {
+      data: [{ group_id: 'g1', user_id: 'u1', joined_at: '2026-01-01T00:00:00.000Z' }],
+      error: null,
+    }
+    results['profiles'] = { data: null, error: new Error('boom') }
+    await expect(groupAvatars(['g1'])).rejects.toThrow('boom')
   })
 })
 

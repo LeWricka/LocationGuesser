@@ -1,0 +1,41 @@
+/* Fila de avatares solapados (issue #543): "aquí está tu grupo" en la tarjeta de
+   viaje de la home. Cada disco lleva un borde de PAPEL (no del set del propio
+   Avatar) para separarse del fondo fotográfico de la tarjeta, sea cual sea la
+   foto de portada — un anillo del set de avatares (`--avatar-ring`) no
+   garantiza contraste sobre una foto arbitraria, uno de papel sí. */
+.stack {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+.item {
+  display: inline-flex;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--paper);
+  box-shadow: var(--shadow-sm);
+}
+/* Solape −6px: cada disco (a partir del segundo) se mete bajo el borde del
+   anterior; el propio DOM order ya deja al más reciente encima, sin z-index. */
+.item + .item {
+  margin-left: -6px;
+}
+
+/* Chip "+N": mismo disco de papel que los avatares, iniciales sobre teal suave
+   (paleta de marca) en vez de una foto/inicial de persona concreta. */
+.extra {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--avatar-xs);
+  height: var(--avatar-xs);
+  margin-left: -6px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--paper);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: 10px; /* design-lint-allow: chip compacto "+N", no texto de lectura */
+  font-weight: var(--font-weight-bold);
+}

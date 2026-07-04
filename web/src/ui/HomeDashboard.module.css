@@ -488,11 +488,31 @@
   overflow: hidden;
 }
 
-/* Chip de fechas sobre la foto: mismo vidrio esmerilado que los chips de arriba
-   (tokens --glass-*, clase `lg-glass` en el TSX). Aquí solo el posicionamiento. */
-.dates {
+/* Fila de metadatos al pie de la tarjeta (issue #543): fechas a la izquierda +
+   fila de avatares del grupo a la derecha (`.avatars`, `margin-left: auto`
+   la empuja aunque no haya fechas). Solo se pinta si hay algo que mostrar (ver
+   condición en el TSX): sin fechas ni grupo (viaje en solitario, sin fechas)
+   no queda un hueco vacío bajo el nombre. */
+.metaRow {
   margin-top: var(--space-1);
-  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Chip de fechas sobre la foto: mismo vidrio esmerilado que los chips de arriba
+   (tokens --glass-*, clase `lg-glass` en el TSX). `.metaRow` (fila, no columna)
+   ya centra verticalmente y evita que el chip se estire — sin `align-self`
+   propio, a diferencia de cuando vivía suelto en `.cardBody` (issue #543). */
+.dates {
+  flex: none;
+}
+
+/* Fila de avatares del grupo (issue #543): pegada al borde derecho de la
+   tarjeta, tanto si hay fechas a su izquierda como si va sola. */
+.avatars {
+  margin-left: auto;
+  flex: none;
 }
 
 /* Chip de estado sobre foto: vidrio esmerilado real (`lg-glass` en el TSX, regla

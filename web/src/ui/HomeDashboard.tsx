@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Crown, MapPin, Play, Plus } from 'lucide-react'
 import { Avatar } from './Avatar'
+import { AvatarStack } from './AvatarStack'
 import { Chip } from './Chip'
 import { Icon } from './Icon'
 import type { GroupStatus } from './GroupCard'
@@ -108,6 +109,13 @@ function rememberHeroTrip(groupId: string): void {
   }
 }
 
+/** Miembro del viaje para la fila de avatares de la tarjeta (issue #543). */
+export interface HomeGroupMember {
+  userId: string
+  name: string
+  avatarUrl?: string | null
+}
+
 export interface HomeGroup {
   id: string
   name: string
@@ -124,6 +132,12 @@ export interface HomeGroup {
   endsOn?: string | null
   /** Fecha de creación (ISO) para ordenar por más reciente. Opcional en tests. */
   createdAt?: string
+  /**
+   * Miembros del viaje, para la fila de avatares solapados de la tarjeta
+   * (issue #543, "aquí está tu grupo"). Con 0 o 1 miembro (viaje en solitario)
+   * `AvatarStack` no pinta nada — no hace falta filtrar aquí. Opcional en tests.
+   */
+  members?: HomeGroupMember[]
 }
 
 /** Reto abierto fijado ("Te toca jugar"): foto + cuenta atrás + CTA jugar. */
@@ -537,11 +551,12 @@ function PinnedChip({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => voi
 // CENTRADA (`active`) va a opacidad/escala plenas, las demás atenuadas (issue #568,
 // sin animar bajo `prefers-reduced-motion`: transición "a corte").
 //
-// Avatares del grupo (issue #536, punto 5): NO se pintan todavía. `HomeGroup` (y
-// `MyGroup` en lib/membership) no traen miembros/avatares del viaje, solo metadatos
-// del viaje en sí — ampliar esa consulta se sale del área de este cambio (ui/features
-// de home, sin tocar lib/membership). Cuando esa consulta exista, este es el sitio:
-// junto a `.mapChip`, en `.cardTop`.
+// Avatares del grupo (issue #543, cierra el punto 5 de #536): fila junto a las
+// fechas, en `.metaRow` — no compite con el título (`.name`), que sigue solo en
+// su propia línea. `group.members` los trae `useHomeData` (dos consultas
+// agregadas para TODOS los viajes visibles, no una por tarjeta: ver
+// `groupAvatars` en lib/membership.ts). `AvatarStack` decide por sí solo no
+// pintar nada con 0-1 miembro (viaje en solitario).
 function TripCard({
   group,
   active,
@@ -662,10 +677,15 @@ function TripCard({
         </span>
 
         <span className={styles.name}>{group.name}</span>
-        {dates && (
-          <Chip tone="neutral" className={[styles.dates, 'lg-glass'].join(' ')}>
-            {dates}
-          </Chip>
+        {(dates || (group.members && group.members.length > 1)) && (
+          <span className={styles.metaRow}>
+            {dates && (
+              <Chip tone="neutral" className={[styles.dates, 'lg-glass'].join(' ')}>
+                {dates}
+              </Chip>
+            )}
+            {group.members && <AvatarStack members={group.members} className={styles.avatars} />}
+          </span>
         )}
       </span>
     </button>

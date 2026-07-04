@@ -389,4 +389,43 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
       expect(() => vi.advanceTimersByTime(500)).not.toThrow()
     })
   })
+
+  // Fila de avatares del grupo (issue #543): "aquí está tu grupo" en la tarjeta.
+  describe('avatares del grupo (issue #543)', () => {
+    test('2+ miembros → pinta la fila de avatares junto a los metadatos', () => {
+      const withMembers: HomeGroup[] = [
+        {
+          id: 'a',
+          name: "Interrail '26",
+          status: 'idle',
+          members: [
+            { userId: 'u1', name: 'Lewis' },
+            { userId: 'u2', name: 'Marta' },
+            { userId: 'u3', name: 'Iker' },
+            { userId: 'u4', name: 'Noa' },
+          ],
+        },
+      ]
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={withMembers} />)
+      expect(
+        screen.getByRole('group', { name: 'Viaje de 4 personas: Lewis, Marta, Iker, Noa' }),
+      ).toBeInTheDocument()
+      // 3 visibles + chip "+1" con el resto (issue #543, tope de 3).
+      expect(screen.getByText('+1')).toBeInTheDocument()
+    })
+
+    test('viaje en solitario (0 o 1 miembro) → sin fila de avatares', () => {
+      const solo: HomeGroup[] = [
+        {
+          id: 'a',
+          name: 'Ruta en solitario',
+          status: 'idle',
+          members: [{ userId: 'u1', name: 'Lewis' }],
+        },
+        { id: 'b', name: 'Sin datos de grupo', status: 'idle' },
+      ]
+      render(<HomeDashboard userId="u1" displayName="Lewis" groups={solo} />)
+      expect(screen.queryByRole('group')).not.toBeInTheDocument()
+    })
+  })
 })

@@ -46,6 +46,11 @@ export { Banner } from './Banner'
 
 // Pantallas y piezas de "Cuentas + Home" (presentacionales; las cablean #3/#4/#5).
 export { Avatar } from './Avatar'
+// Fila de avatares solapados del grupo del viaje (issue #543): la usa la tarjeta
+// de la home; reutilizable por cualquier otra pantalla que necesite "aquí está
+// tu grupo" sin repetir el patrón de solape/chip "+N".
+export { AvatarStack } from './AvatarStack'
+export type { AvatarStackMember } from './AvatarStack'
 export { GroupCard } from './GroupCard'
 export type { GroupStatus } from './GroupCard'
 export { CreateGroupFab } from './CreateGroupFab'
@@ -57,7 +62,7 @@ export { HomeEmptyState } from './HomeEmptyState'
 export { HowItWorks } from './HowItWorks'
 export { HowItWorksImmersive } from './HowItWorksImmersive'
 export { HomeDashboard } from './HomeDashboard'
-export type { HomeGroup, HomePinned } from './HomeDashboard'
+export type { HomeGroup, HomeGroupMember, HomePinned } from './HomeDashboard'
 // Patrón globo + hoja (Home deslogueada y logueada): globo héroe + hoja blanca (#343).
 export { GlobeSheet } from './GlobeSheet'
 export { HomeGlobe } from './HomeGlobe'

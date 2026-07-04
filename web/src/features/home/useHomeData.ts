@@ -9,9 +9,9 @@
 // foto firmada, para alimentar la tarjeta destacada de la home.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { HomeGroup } from '../../ui'
-import { myGroups, pendingChallenges } from '../../lib/membership'
-import type { MyGroup } from '../../lib/membership'
+import type { HomeGroup, HomeGroupMember } from '../../ui'
+import { groupAvatars, myGroups, pendingChallenges } from '../../lib/membership'
+import type { MemberAvatar, MyGroup } from '../../lib/membership'
 import { signedImageUrl } from '../../lib/storage'
 import { useVisibilityReload } from '../../lib/useVisibilityReload'
 
@@ -49,7 +49,15 @@ function toUiStatus(status: MyGroup['status']): HomeGroup['status'] {
   return status === 'your-turn' ? 'toplay' : status
 }
 
-function toHomeGroup(group: MyGroup): HomeGroup {
+// `MemberAvatar` (lib) y `HomeGroupMember` (ui) tienen la misma forma; sin
+// conversión salvo el nombre del campo. Mapeo explícito en vez de un cast: dos
+// tipos con el mismo shape pero definidos en capas distintas (datos vs. UI) no
+// deberían acoplarse por casualidad de estructura.
+function toHomeGroupMember(m: MemberAvatar): HomeGroupMember {
+  return { userId: m.userId, name: m.name, avatarUrl: m.avatarUrl }
+}
+
+function toHomeGroup(group: MyGroup, members: MemberAvatar[]): HomeGroup {
   return {
     id: group.id,
     name: group.name ?? group.id, // sin nombre aún → mostramos el código del grupo
@@ -62,6 +70,8 @@ function toHomeGroup(group: MyGroup): HomeGroup {
     // La portada propia del viaje se firma en HomePage (junto a la derivada del
     // mapa, que es el fallback): aquí solo arrastramos el path.
     coverPath: group.coverImagePath,
+    // Fila de avatares del grupo (issue #543): ver `groupAvatars` más abajo.
+    members: members.map(toHomeGroupMember),
   }
 }
 
@@ -98,7 +108,15 @@ async function loadHomeData(userId: string): Promise<HomeData> {
   // En paralelo: la lista de viajes y el reto fijado (ambos derivan de la
   // membresía; se resuelven a la vez para no encadenar latencias).
   const [groups, pinned] = await Promise.all([myGroups(userId), loadPinned(userId)])
-  return { groups: groups.map(toHomeGroup), pinned }
+  // Avatares (issue #543): UNA consulta agregada para TODOS los viajes visibles
+  // (no una por tarjeta — evita N+1), encadenada tras `myGroups` porque necesita
+  // sus ids. `groupAvatars` ya es, en sí misma, solo dos consultas (membresías +
+  // perfiles) para todo el lote.
+  const avatarsByGroup = await groupAvatars(groups.map((g) => g.id))
+  return {
+    groups: groups.map((g) => toHomeGroup(g, avatarsByGroup.get(g.id) ?? [])),
+    pinned,
+  }
 }
 
 /**

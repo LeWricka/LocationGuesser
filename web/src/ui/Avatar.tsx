@@ -8,7 +8,7 @@ import {
 } from '../lib/avatar'
 import styles from './Avatar.module.css'
 
-type Size = 'sm' | 'md' | 'lg'
+type Size = 'xs' | 'sm' | 'md' | 'lg'
 
 interface Props {
   /** Id del usuario: deriva el avatar por defecto (emoji + fondo) de forma estable. */
