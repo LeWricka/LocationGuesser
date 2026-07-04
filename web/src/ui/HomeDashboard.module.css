@@ -327,17 +327,18 @@
   display: none;
 }
 
-/* Foto-first (issue #573, agrandada en #632, ATENUADA en #636): el 78vw de #632 se
-   pasó — tapaba el globo entero (solo asomaba un gajo) y pisaba el pin/label. Punto
-   medio: clamp(220px, 62vw, 300px), proporción 4:5 — la foto sigue respirando (no
-   vuelve al 3:2 original) pero el dock ya no se come media pantalla, así el globo
-   recupera su mitad superior ENTERA. Sigue en `aspect-ratio` (no alto fijo en px):
-   escala igual de bien a 390×844 que a 1080×2400. El alto extra lo cede el hueco del
-   dock (`.dock` ya lo compensa), NO el globo — el globo es `position: absolute` a
-   sangre y no se encoge por esto (ver `.globeLayer`). La vecina sigue asomando (peek)
-   con el mismo `gap`/padding del carrusel. */
+/* Foto-first (issue #573, agrandada en #632, ATENUADA en #636, ENCOGIDA en #693): el
+   78vw de #632 se pasó — tapaba el globo entero. El clamp(220px, 62vw, 300px) de #636
+   seguía dejando un dock demasiado alto: con el fit ahora consciente del alto REAL del
+   dock (issue #693, ver `HomeGlobe.tsx`/`computeFitPaddingY`), una tarjeta más pequeña
+   ensancha la banda visible donde aterrizan los pines — a 390px pasa de ~242px a
+   ~211px de ancho. Sigue en `aspect-ratio` 4:5 (no alto fijo en px): escala igual de
+   bien a 390×844 que a 1080×2400. El alto extra lo cede el hueco del dock (`.dock` ya
+   lo compensa), NO el globo — el globo es `position: absolute` a sangre y no se
+   encoge por esto (ver `.globeLayer`). La vecina sigue asomando (peek) con el mismo
+   `gap`/padding del carrusel. */
 .slide {
-  flex: 0 0 clamp(220px, 62vw, 300px);
+  flex: 0 0 clamp(200px, 54vw, 270px);
   aspect-ratio: 4 / 5;
   scroll-snap-align: center;
 }

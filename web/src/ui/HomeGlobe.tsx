@@ -55,6 +55,15 @@ interface Props {
    * API pública.
    */
   activeTargetId?: string | null
+  /**
+   * Alto en px del chrome flotante INFERIOR de `HomeDashboard` (chip "Te toca jugar" +
+   * cabecera "Tus viajes" + filtros + carrusel de tarjetas — el "dock") que tapa la
+   * parte de abajo del lienzo del globo (issue #693: el fit centraba los pines contra
+   * el LIENZO COMPLETO, y caían justo detrás del dock — invisibles). `HomeDashboard` lo
+   * mide con `ResizeObserver` y lo pasa aquí; `0` (por defecto) es el comportamiento de
+   * siempre, correcto para `framing="world"` (la landing decorativa, sin dock ni fit).
+   */
+  bottomObscuredPx?: number
   className?: string
 }
 
@@ -103,16 +112,55 @@ const FLY_TO_ACTIVE_DURATION_MS = 700
 // pulso de bienvenida sobresalen un poco más: redondeamos al alza.
 const PIN_HEIGHT = 56
 const PIN_HALF_WIDTH = 28
-// Padding asimétrico del fit, ya con el TAMAÑO DEL PIN reservado (el fit encuadra las
-// COORDENADAS, no las cajas de los pines; sin este colchón el disco del pin más alto o el
-// de los laterales se sale del encuadre y el lienzo lo recorta). Deja además aire arriba
-// (marca/ajustes flotantes) y ABAJO extra para que el asa de la hoja que sube sobre el
-// globo nunca tape el pin más bajo.
-const FIT_PADDING = {
-  top: 72 + PIN_HEIGHT,
-  bottom: 120 + PIN_HEIGHT,
-  left: 48 + PIN_HALF_WIDTH,
-  right: 48 + PIN_HALF_WIDTH,
+// Padding SUPERIOR/lateral del fit, ya con el TAMAÑO DEL PIN reservado (el fit encuadra
+// las COORDENADAS, no las cajas de los pines; sin este colchón el disco del pin más alto
+// o el de los laterales se sale del encuadre y el lienzo lo recorta). Deja aire arriba
+// para la marca/el avatar flotantes. FIJO: a diferencia del `bottom` (ver
+// `computeFitPaddingY`), el chrome superior no cambia de alto con los datos del usuario.
+const FIT_PADDING_TOP = 72 + PIN_HEIGHT
+const FIT_PADDING_SIDE = 48 + PIN_HALF_WIDTH
+// Aire entre el disco del pin y el canto del dock de HomeDashboard (chip "Te toca
+// jugar" + cabecera "Tus viajes" + filtros + carrusel — `bottomObscuredPx`, medido por
+// HomeDashboard): sin este respiro el pin tocaría el borde del dock en vez de flotar
+// claramente por encima.
+const GAP_ABOVE_DOCK = 16
+// Banda MÍNIMA de lienzo que el fit debe dejar SIEMPRE visible para los pines (fracción
+// del alto del contenedor) — el suelo que evita que un dock muy alto (viewport bajo, o
+// un carrusel con tarjetas grandes) se coma el lienzo entero y deje el fit sin ningún
+// hueco real donde encuadrar. Mismo espíritu que `safeFitZoom` en TripMapGlobe (#641):
+// el chrome nunca puede recortar los pines por completo, solo empujarlos hasta un límite.
+const MIN_VISIBLE_FRACTION = 0.22
+
+/**
+ * Padding vertical del fit (issue #693), consciente del dock REAL de HomeDashboard: el
+ * `bottom` reserva el alto medido del dock (`bottomObscuredPx`) + el alto de un pin +
+ * un respiro (`GAP_ABOVE_DOCK`), clampado para que la banda visible entre el chrome
+ * superior y el dock nunca baje de `MIN_VISIBLE_FRACTION` del alto del contenedor —
+ * sin este suelo, un dock casi tan alto como la pantalla dejaría el fit sin hueco.
+ */
+function computeFitPaddingY(
+  containerHeight: number,
+  bottomObscuredPx: number,
+): { top: number; bottom: number } {
+  const top = FIT_PADDING_TOP
+  const desiredBottom = bottomObscuredPx + PIN_HEIGHT + GAP_ABOVE_DOCK
+  const minVisible = containerHeight * MIN_VISIBLE_FRACTION
+  const maxBottom = Math.max(0, containerHeight - top - minVisible)
+  return { top, bottom: Math.min(Math.max(0, desiredBottom), maxBottom) }
+}
+
+/**
+ * Desplazamiento vertical (px) para que `easeTo`/`jumpTo` centren la cámara en la banda
+ * VISIBLE (entre el chrome superior y el dock) en vez del centro del lienzo COMPLETO —
+ * se pasa como opción `offset` (MapLibre: el punto `center` pedido aparece en
+ * `centro-del-lienzo + offset`, no en el centro real). Negativo = sube el pin en
+ * pantalla. Reutiliza el MISMO padding que `fitBounds` (arriba) para que el vuelo al pin
+ * activo (`flyToTarget`) aterrice en la misma banda que ya usa el fit de varios pines.
+ */
+function verticalFrameOffset(containerHeight: number, bottomObscuredPx: number): number {
+  const { top, bottom } = computeFitPaddingY(containerHeight, bottomObscuredPx)
+  const visibleCenter = (top + (containerHeight - bottom)) / 2
+  return visibleCenter - containerHeight / 2
 }
 // Span MÍNIMO del encuadre (grados). Cuando todos los pines caen casi en el mismo punto
 // (varios momentos de una misma ciudad: "Finde Madrid"), sus bounds son minúsculos y el
@@ -199,6 +247,7 @@ export function HomeGlobe({
   framing = 'pins',
   relaxed = false,
   activeTargetId = null,
+  bottomObscuredPx = 0,
   className,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -218,12 +267,16 @@ export function HomeGlobe({
   const onOpenRef = useRef(onOpenPin)
   const framingRef = useRef(framing)
   const activeTargetIdRef = useRef(activeTargetId)
+  // Issue #693: alto medido del dock de HomeDashboard, en ref por el mismo motivo que
+  // el resto (el handler `load`, async, siempre debe leer el último valor).
+  const bottomObscuredRef = useRef(bottomObscuredPx)
   useEffect(() => {
     pinsRef.current = pins
     onOpenRef.current = onOpenPin
     framingRef.current = framing
     relaxedRef.current = relaxed
     activeTargetIdRef.current = activeTargetId
+    bottomObscuredRef.current = bottomObscuredPx
   })
 
   // Gesto del usuario (arrastre) en curso: si `activeTargetId` cambia mientras el
@@ -325,8 +378,13 @@ export function HomeGlobe({
     const pts = pinsRef.current.map((p) => [p.lng, p.lat] as [number, number])
     if (pts.length === 0) return
     const duration = prefersReducedMotion() ? 0 : 700
+    // Alto real del lienzo (issue #693): el fit/vuelo necesita saber cuánto reservar
+    // abajo para el dock de HomeDashboard — sin el contenedor montado (aún no debería
+    // pasar aquí, pero por robustez) cae a 0 y el padding/offset quedan en su mínimo.
+    const containerHeight = containerRef.current?.clientHeight ?? 0
     if (pts.length === 1) {
-      map.easeTo({ center: pts[0], zoom: SINGLE_ZOOM, duration })
+      const offsetY = verticalFrameOffset(containerHeight, bottomObscuredRef.current)
+      map.easeTo({ center: pts[0], zoom: SINGLE_ZOOM, duration, offset: [0, offsetY] })
       return
     }
     // Extensión real de los pines.
@@ -355,7 +413,12 @@ export function HomeGlobe({
       maxLat = midLat + half
     }
     const bounds = new gl.LngLatBounds([minLng, minLat], [maxLng, maxLat])
-    map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration })
+    const { top, bottom } = computeFitPaddingY(containerHeight, bottomObscuredRef.current)
+    map.fitBounds(bounds, {
+      padding: { top, bottom, left: FIT_PADDING_SIDE, right: FIT_PADDING_SIDE },
+      maxZoom: FIT_MAX_ZOOM,
+      duration,
+    })
   }, [])
 
   // Vuela al pin de `activeTargetId` (#567) y le aplica el "lead" en exclusiva
@@ -375,20 +438,26 @@ export function HomeGlobe({
     if (framingRef.current === 'world' || interactingRef.current) return
     const pin = pinsRef.current[idx]
     const center: [number, number] = [pin.lng, pin.lat]
+    // Mismo padding que `fitToPins` (issue #693): el pin activo aterriza en la MISMA
+    // banda visible (por encima del dock), no en el centro del lienzo completo.
+    const containerHeight = containerRef.current?.clientHeight ?? 0
+    const offset: [number, number] = [
+      0,
+      verticalFrameOffset(containerHeight, bottomObscuredRef.current),
+    ]
     if (prefersReducedMotion()) {
       // Reduced-motion: salto directo, sin vuelo (la escala del "lead" tampoco anima:
       // la regla `@media (prefers-reduced-motion: reduce)` de HomeGlobe.module.css ya
-      // desactiva el pulso de bienvenida del `::before`). Robustez: si el doble/stub
-      // (galería) no expone `jumpTo`, un `easeTo` con `duration: 0` es el mismo salto
-      // instantáneo (ambos aceptan las mismas opciones de cámara).
-      if (typeof map.jumpTo === 'function') {
-        map.jumpTo({ center, zoom: SINGLE_ZOOM })
-      } else {
-        map.easeTo({ center, zoom: SINGLE_ZOOM, duration: 0 })
-      }
+      // desactiva el pulso de bienvenida del `::before`). `easeTo` con `duration: 0` en
+      // vez de `jumpTo` (issue #693): el tipo `JumpToOptions` de MapLibre NO admite
+      // `offset` (a diferencia de `easeTo`/`flyTo`) — sin `offset` el pin activo
+      // volvería al centro del lienzo COMPLETO bajo reduced-motion, justo el bug que
+      // arregla esta issue. `easeTo({ duration: 0 })` es el mismo salto instantáneo
+      // (ya lo era el comentario original) y SÍ admite `offset`.
+      map.easeTo({ center, zoom: SINGLE_ZOOM, duration: 0, offset })
       return
     }
-    map.easeTo({ center, zoom: SINGLE_ZOOM, duration: FLY_TO_ACTIVE_DURATION_MS })
+    map.easeTo({ center, zoom: SINGLE_ZOOM, duration: FLY_TO_ACTIVE_DURATION_MS, offset })
   }, [applyActiveLead])
 
   // Bucle de deriva: empuja la longitud del centro a velocidad constante (grados/seg), de
@@ -567,6 +636,16 @@ export function HomeGlobe({
   useEffect(() => {
     if (readyRef.current) flyToTarget()
   }, [activeTargetId, flyToTarget])
+
+  // Issue #693: si el dock cambia de alto (aparece/desaparece el chip "Te toca jugar",
+  // los chips de filtro, o el usuario cambia a un viaje con/sin fechas) el hueco visible
+  // cambia — reencuadra/revuela para que los pines sigan aterrizando por encima del
+  // dock, no en la banda que acaba de crecer o encogerse.
+  useEffect(() => {
+    if (!readyRef.current) return
+    fitToPins()
+    flyToTarget()
+  }, [bottomObscuredPx, fitToPins, flyToTarget])
 
   // Rendimiento + deriva según la hoja. Con la hoja SUBIDA (`relaxed`) el globo queda casi
   // tapado: paramos la rotación de teselas (batería) y PAUSAMOS la deriva. Al RECOGERSE la

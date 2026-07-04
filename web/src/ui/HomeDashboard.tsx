@@ -260,6 +260,17 @@ export function HomeDashboard({
 }: Props) {
   const feed = sortTrips(groups)
   const carouselRef = useRef<HTMLUListElement>(null)
+  // Medición del chrome inferior (issue #693): `sceneRef` es el lienzo entero (mismo
+  // alto que el globo, `position: fixed; inset: 0`) y `spacerRef` es el hueco flexible
+  // que separa el chrome superior del chip/dock — al ser `flex: 1` entre dos bloques
+  // `flex: none` (overlay arriba; chip "Te toca" + dock abajo), su borde INFERIOR cae
+  // justo donde empieza el chrome flotante que tapa el globo, sea cual sea su
+  // composición (con/sin chip fijado, con/sin chips de filtro, tarjeta grande o
+  // pequeña). Medir AQUÍ, en vez de sumar a mano la altura de cada pieza del dock, es
+  // robusto a cualquier cambio futuro de ese chrome sin tener que tocar esta cuenta.
+  const sceneRef = useRef<HTMLDivElement>(null)
+  const spacerRef = useRef<HTMLDivElement>(null)
+  const [bottomObscuredPx, setBottomObscuredPx] = useState(0)
 
   // Chips de filtro (issue #609): solo aportan si hay AMBOS tipos de viaje — si
   // el usuario solo tiene propios (o solo de amigos), un filtro no distingue nada
@@ -346,18 +357,44 @@ export function HomeDashboard({
     }
   }, [visibleFeed])
 
+  // Mide el chrome inferior real (issue #693) y se lo pasa a HomeGlobe para que su fit
+  // reserve exactamente ese hueco (ver comentario de `spacerRef` arriba). Un
+  // `ResizeObserver` sobre el propio `spacer`: como es el elemento `flex: 1` que cede
+  // sitio a sus hermanos, CUALQUIER cambio de alto del chip/dock (aparece/desaparece el
+  // chip "Te toca jugar", los chips de filtro, el aviso de "sin resultados"…) encoge o
+  // agranda el spacer automáticamente, así que un único observer basta — no hace falta
+  // reobservar al vuelo cada pieza del dock por separado.
+  useEffect(() => {
+    const scene = sceneRef.current
+    const spacer = spacerRef.current
+    if (!scene || !spacer) return
+    const update = () => {
+      const obscured = scene.getBoundingClientRect().bottom - spacer.getBoundingClientRect().bottom
+      setBottomObscuredPx(Math.max(0, obscured))
+    }
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(spacer)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <div className={[styles.scene, className].filter(Boolean).join(' ')}>
+    <div ref={sceneRef} className={[styles.scene, className].filter(Boolean).join(' ')}>
       {/* Globo A SANGRE: llena la escena entera (protagonista, misma gramática que el
           Diario). El pin del viaje centrado en el carrusel se enciende vía
           `activeTargetId` — #567 añade esta prop a HomeGlobe (vuelo suave + anillo
-          "lead"); aquí ya la consumimos según el contrato acordado entre ambas piezas. */}
+          "lead"); aquí ya la consumimos según el contrato acordado entre ambas piezas.
+          `bottomObscuredPx` (issue #693): el alto medido del dock (ver `spacerRef`
+          arriba), para que el fit del globo reserve ese hueco y los pines no caigan
+          detrás del carrusel. */}
       <div className={styles.globeLayer}>
         <HomeGlobe
           pins={pins}
           onOpenPin={onOpenGroup}
           framing="pins"
           activeTargetId={activeId || null}
+          bottomObscuredPx={bottomObscuredPx}
         />
       </div>
 
@@ -392,7 +429,7 @@ export function HomeDashboard({
       </div>
 
       {/* Deja respirar la escena entre el chrome y el chip/dock (el globo se ve). */}
-      <div className={styles.spacer} aria-hidden="true" />
+      <div ref={spacerRef} className={styles.spacer} aria-hidden="true" />
 
       {/* Reto fijado: chip de vidrio flotante y corto (la pregunta del reto), tap →
           jugar. Sustituye al Banner ancho de la hoja de papel; sin reto pendiente no
