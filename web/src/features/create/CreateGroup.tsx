@@ -44,6 +44,11 @@ export function CreateGroup({ onBack }: Props) {
   // calcular la dirección ahí cubre avanzar y retroceder.
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
   const [name, setName] = useState('')
+  // Se activa al INTENTAR avanzar sin nombre (issue #673): antes el hint "Falta
+  // el nombre del viaje." se pintaba desde el primer render, regañando antes de
+  // que el usuario escribiera nada. El CTA deshabilitado ya comunica el estado
+  // inicial; el hint solo hace falta tras un intento fallido.
+  const [attempted, setAttempted] = useState(false)
   const [startsOn, setStartsOn] = useState('')
   const [endsOn, setEndsOn] = useState('')
   const [description, setDescription] = useState('')
@@ -93,6 +98,7 @@ export function CreateGroup({ onBack }: Props) {
 
   function advance() {
     if (stage === 0 && !nameOk) {
+      setAttempted(true)
       toast.show('Falta el nombre del viaje para seguir.', { tone: 'neutral' })
       return
     }
@@ -351,7 +357,7 @@ export function CreateGroup({ onBack }: Props) {
               </div>
             </div>
 
-            {!nameOk && <p className={styles.warnHint}>Falta el nombre del viaje.</p>}
+            {attempted && !nameOk && <p className={styles.warnHint}>Falta el nombre del viaje.</p>}
           </section>
         )}
 

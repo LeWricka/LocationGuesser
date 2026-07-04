@@ -805,20 +805,26 @@ export function MomentSheet({
                   </div>
                 )}
 
-                {/* Chip de lugar (país) sobre la foto, estilo "place-chip" de A. */}
-                {country && (
+                {/* Chip de lugar (país) sobre la foto, estilo "place-chip" de A. Con
+                    héroe CON foto (issue #673) la ubicación ya se dice en la línea de
+                    meta que cae sobre el papel más abajo — este chip duplicaba el
+                    dato flotando justo en la costura y quedaba medio ilegible sobre
+                    el degradado blanco del fundido. Se conserva para el héroe SIN
+                    foto (fondo neutro, sin meta propia que lo sustituya). */}
+                {country && !heroPhotoSrc && (
                   <div className={styles.placeChip}>
                     <Icon icon={MapPin} size={13} />
                     <span>{country.name}</span>
                   </div>
                 )}
 
-                {/* Velo inferior con la info: eyebrow + título serif GRANDE + meta. */}
+                {/* Velo inferior con la info: eyebrow + título serif GRANDE (+ meta,
+                    solo sin foto: con foto la meta vive en el papel, ver más abajo). */}
                 <div className={styles.veil}>
                   <p className={styles.eyebrow}>{eyebrow}</p>
                   <h1 className={styles.title}>{moment.title}</h1>
                   <span className={styles.rule} aria-hidden="true" />
-                  {(country || date) && (
+                  {!heroPhotoSrc && (country || date) && (
                     <p className={styles.meta}>
                       {country && (
                         <span className={styles.country}>
@@ -847,6 +853,24 @@ export function MomentSheet({
                 se renderiza en modo VISTA. Cada sección de abajo se oculta por su
                 cuenta mientras `promoting` (convertir en reto) es el foco. */}
                 <>
+                  {/* Meta (bandera + lugar + fecha), issue #673: con héroe CON foto
+                    vive AQUÍ, ya sobre el papel — no en el velo sobre la imagen, donde
+                    el fundido blanco de la costura (`.article::before`) le comía el
+                    contraste a la tinta clara de escena. Sobre el papel es texto
+                    normal (AA garantizado, mismos tokens que el resto del cuerpo) y es
+                    la ÚNICA fuente del dato de lugar (sin el chip flotante, ver arriba). */}
+                  {heroPhotoSrc && (country || date) && (
+                    <p className={styles.paperMeta}>
+                      {country && (
+                        <span className={styles.paperCountry}>
+                          <span aria-hidden="true">{country.flag}</span> {country.name}
+                        </span>
+                      )}
+                      {country && date && <span aria-hidden="true"> · </span>}
+                      {date}
+                    </p>
+                  )}
+
                   {/* CLIP DE VÍDEO CORTO (issue #649): player nativo justo bajo el héroe,
                     con la MISMA foto de portada como `poster` (el fotograma-portada del
                     clip ya se sube como esa foto, ver AddMoment/lib/storage). SOLO puede
