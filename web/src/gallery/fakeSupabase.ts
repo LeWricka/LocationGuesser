@@ -233,14 +233,28 @@ function photoDataUri(path: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
 }
 
+// WAV silencioso VÁLIDO (44 bytes de cabecera, 0 muestras): a diferencia de
+// `photoDataUri` (una imagen SVG), un `<audio src>` SÍ intenta decodificar su
+// fuente — apuntarlo a un SVG dispara un error de "formato no soportado" en
+// consola. Los paths de audio reales viven bajo `audio/` (`uploadAudio`,
+// `lib/storage.ts`); el fake storage los detecta por ese prefijo y sirve este
+// WAV en vez de la etiqueta-imagen, así `AudioPlayer` (issue Bitácora, #648)
+// decodifica limpio en la galería.
+const SILENT_WAV_DATA_URI =
+  'data:audio/wav;base64,UklGRiQAAAAAV0FWRWZtdCAQAAAAAQABAEANDgAAgL0AAgAQAGRhdGEAAAAA'
+
+function signedUrlFor(path: string): string {
+  return path.startsWith('audio/') ? SILENT_WAV_DATA_URI : photoDataUri(path)
+}
+
 const fakeStorage = {
   from() {
     return {
       createSignedUrl(path: string) {
-        return Promise.resolve({ data: { signedUrl: photoDataUri(path) }, error: null })
+        return Promise.resolve({ data: { signedUrl: signedUrlFor(path) }, error: null })
       },
       getPublicUrl(path: string) {
-        return { data: { publicUrl: photoDataUri(path) } }
+        return { data: { publicUrl: signedUrlFor(path) } }
       },
       upload(path: string) {
         return Promise.resolve({ data: { path }, error: null })

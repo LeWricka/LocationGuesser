@@ -28,18 +28,25 @@ import { MembersModal } from '../group/MembersModal'
 import { GroupSettingsModal, type SettingsSection } from '../group/GroupSettingsModal'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
-import { FotosTab } from './FotosTab'
+import { BitacoraTab } from './BitacoraTab'
 import { MarcadorTab } from './MarcadorTab'
 import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import styles from './TripPage.module.css'
 
-/** Las TRES secciones del viaje (tab, issue #645). Solo la activa se monta en el DOM. */
+/**
+ * Las TRES secciones del viaje (tab, issue #645). Solo la activa se monta en el
+ * DOM. El valor interno de la segunda sigue siendo `'fotos'` (así como
+ * `v=fotos` en `lib/route.ts`): es un identificador interno, no copy — ahora
+ * se ETIQUETA "Bitácora" (el diario que se hojea, ver `BitacoraTab`), pero
+ * cambiar el id no aportaría nada al usuario y arrastraría enlaces `#g=…&v=fotos`
+ * ya compartidos. Decisión deliberada: lo simple es no tocarlo.
+ */
 type Section = 'diario' | 'fotos' | 'marcador'
 
 const SECTION_OPTIONS = [
   { value: 'diario' as const, label: 'Diario' },
-  { value: 'fotos' as const, label: 'Fotos' },
+  { value: 'fotos' as const, label: 'Bitácora' },
   { value: 'marcador' as const, label: 'Marcador' },
 ]
 
@@ -48,7 +55,7 @@ interface Props {
   /**
    * Sección inicial al abrir el viaje. Por defecto "Diario"; los enlaces antiguos
    * a la GroupPage clásica (`#g=…&v=clasico`) entran ya en "Marcador"; `v=fotos`
-   * entra en "Fotos" (issue #645).
+   * entra en "Bitácora" (issue #645, renombrada de "Fotos").
    */
   initialSection?: Section
   /** Lanza el flujo de adivinar de un momento (reto). Lo cablea App al router. */
@@ -433,9 +440,9 @@ export function TripPage({
     )
   }
 
-  // Escena PAPEL solo en Marcador; Diario Y Fotos son escenas OSCURAS a sangre
-  // (mapa satélite / galería sobre grafito), así que comparten el chrome de
-  // vidrio esmerilado (regla #537: sobre fondo oscuro, vidrio).
+  // Escena PAPEL solo en Marcador; Diario Y Bitácora son escenas OSCURAS a
+  // sangre (mapa satélite / diario sobre grafito), así que comparten el chrome
+  // de vidrio esmerilado (regla #537: sobre fondo oscuro, vidrio).
   const isPaperScene = section === 'marcador'
 
   return (
@@ -472,9 +479,9 @@ export function TripPage({
           </button>
         }
       />
-      {/* Tab Diario · Fotos · Marcador (issue #645): el control segmentado conmuta
-          de sección. Flota bajo la cabecera, centrado, sobre cada fondo (mapa,
-          galería o papel). */}
+      {/* Tab Diario · Bitácora · Marcador (issue #645): el control segmentado
+          conmuta de sección. Flota bajo la cabecera, centrado, sobre cada fondo
+          (mapa, bitácora o papel). */}
       <div className={styles.tabs}>
         <SegmentedControl
           options={SECTION_OPTIONS}
@@ -533,17 +540,18 @@ export function TripPage({
           </section>
         )}
         {section === 'fotos' && (
-          /* FOTOS (issue #645): galería completa del viaje agrupada por día.
-             Reusa los MISMOS `moments` ya cargados por useTripData (sin pedir
-             el grupo/los retos de nuevo); "Ver el momento" del lightbox abre la
-             MISMA hoja de detalle que el Diario (`setOpenMoment`). */
+          /* BITÁCORA (issue #645; antes "Fotos"): el diario del viaje que se
+             hojea, día a día. Reusa los MISMOS `moments` ya cargados por
+             useTripData (sin pedir el grupo/los retos de nuevo); "Ver el
+             momento" (título o visor) abre la MISMA hoja de detalle que el
+             Diario (`setOpenMoment`). */
           <section
             key="fotos"
             className={`${styles.panel} ${styles.panelFotos} ${reducedMotion ? '' : styles.panelEnter}`}
             role="tabpanel"
-            aria-label="Fotos"
+            aria-label="Bitácora"
           >
-            <FotosTab
+            <BitacoraTab
               groupId={groupId}
               moments={moments}
               canCreate={canCreate}

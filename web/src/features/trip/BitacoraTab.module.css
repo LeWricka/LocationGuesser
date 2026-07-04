@@ -1,0 +1,258 @@
+/*
+ * Pestaña BITÁCORA del viaje (antes "Fotos", issue #645; el diario que se
+ * hojea, esta issue): scroll vertical cronológico sobre una ESCENA oscura
+ * (mismo grafito `--scene-bg` que el mapa satélite del Diario), agrupado por
+ * día y, dentro del día, por recuerdo. CERO rejilla: cada foto se pinta a
+ * ancho completo de la columna, apilada — el dueño quiere verlas sin hacer
+ * clics, no una tira de miniaturas.
+ */
+.scene {
+  min-height: 100%;
+  background: var(--scene-bg);
+  padding-bottom: var(--space-6);
+}
+
+.day + .day {
+  margin-top: var(--space-6);
+}
+
+/* Cabecera de día: pegajosa (queda fija mientras su grupo desfila; las cabeceras
+ * se van "empujando" entre sí al llegar la siguiente, patrón de lista agrupada).
+ * Fila: fecha en serif + hilo punteado dorado + lugares del día en versalitas.
+ *
+ * `top: 0` — GOTCHA (issue #645): el offset de `position: sticky` se resuelve
+ * contra el BORDE DE CONTENIDO del contenedor de scroll (`.panelFotos`), que ya
+ * arranca desplazado por SU PROPIO `padding-top` (la reserva de la cabecera +
+ * tabs flotantes). Un `top` que repita esa reserva (p.ej. el mismo calc que
+ * `.panelFotos`) se SUMA a ella en vez de sustituirla: la primera cabecera de
+ * día aparecía pegada al doble de esa distancia, flotando en medio de sus
+ * propias fotos. `top: 0` ya fija la cabecera justo donde empieza el contenido
+ * (debajo del chrome flotante); no hace falta repetir la reserva aquí. */
+.dayHeader {
+  position: sticky;
+  top: 0;
+  /* capa local de la pestaña: cabecera de día pegajosa sobre los recuerdos */
+  z-index: 2; /* design-lint-allow: capa local (ver comentario arriba), no compite con el chrome del viaje */
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(to bottom, var(--scene-bg) 65%, transparent);
+}
+
+.dayDate {
+  flex: none;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--scene-ink);
+  white-space: nowrap;
+}
+
+/* Hilo punteado dorado (issue #645): mismo token `--route-gold` que la ruta
+ * recorrida del mapa (`TripMapLeaflet`/`TripMapGlobe`) — el mismo lenguaje de
+ * "camino" cose la cabecera del día como cose el mapa el recorrido. Suave
+ * (`-soft`): es un separador tenue, no un dato que gritar. */
+.dayThread {
+  flex: 1 1 auto;
+  min-width: var(--space-5);
+  align-self: center;
+  height: 0;
+  border-bottom: 1px dashed var(--route-gold-soft);
+}
+
+.dayPlaces {
+  flex: none;
+  max-width: 55%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--scene-ink-soft);
+}
+
+.moments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  padding: var(--space-4);
+}
+
+.moment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Kicker de lugar: dorado, versalitas — mismo tratamiento que un eyebrow
+ * editorial, con el acento de "camino" (`--route-gold`) en vez de tinta neutra. */
+.kicker {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--route-gold);
+}
+/* Bullet decorativo por CSS (no un nodo de texto propio): el texto del DOM es
+ * solo el nombre del lugar, sin partirlo entre símbolo y nombre. */
+.kicker::before {
+  content: '◦ ';
+}
+
+.titleBtn {
+  appearance: none;
+  cursor: pointer;
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  color: var(--scene-ink);
+  text-wrap: balance;
+}
+.titleBtn:hover .title {
+  color: var(--route-gold);
+}
+.titleBtn:focus-visible {
+  outline: 2px solid var(--route-gold);
+  outline-offset: 3px;
+  border-radius: var(--radius-xs);
+}
+
+/* Descripción con capitular (mismo tratamiento que `MomentSheet.module.css
+ * .description`), sobre tinta de ESCENA (AA en oscuro) en vez de papel: el
+ * acento del capitular pasa de `--accent-deep` a `--route-gold`, coherente con
+ * el resto del lenguaje dorado de esta pantalla. */
+.description {
+  margin: 0;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  color: var(--scene-ink);
+  white-space: pre-wrap;
+}
+.description::first-letter {
+  font-family: var(--font-serif);
+  font-weight: var(--font-weight-bold);
+  font-size: 3.1em;
+  line-height: 0.78;
+  float: left;
+  padding: 0.06em 0.12em 0 0;
+  color: var(--route-gold);
+}
+
+/* Nota de voz: `AudioPlayer` usa tokens de PAPEL (pensado para vivir sobre una
+ * hoja), ilegible directo sobre la escena oscura — misma excepción ya
+ * documentada en `.emptyCard` de abajo: una tarjeta opaca de superficie por
+ * debajo, en vez de esperar a una variante "sobre escena". */
+.audioCard {
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.photos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Clip corto (issue #649): mismo marco/radio que las fotos que lo acompañan. */
+.media {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-md);
+  background: var(--scene-bg);
+  box-shadow: var(--shadow-photo-card);
+}
+
+.photoBtn {
+  appearance: none;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/*
+ * Reserva de espacio (issue #645): sin dimensiones guardadas en BD, no hay
+ * forma de saber la proporción real de una foto antes de que cargue. `4 / 5`
+ * es una caja de arranque razonable (retrato, el gesto más común en fotos de
+ * viaje) — MEJOR ESFUERZO, no exacta: con `loading="lazy"` y decenas de fotos,
+ * reservar ALGO evita el colapso a 0 (mucho peor) mientras se hace scroll. Al
+ * cargar (`.photoFrameLoaded`), la caja SUELTA esa reserva por la proporción
+ * NATURAL de la imagen: nunca se recorta, como pide el dueño — solo se ajusta
+ * una vez, con el fundido de `lg-photo-in` disimulando el salto.
+ */
+.photoFrame {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface-hover);
+}
+.photoFrameLoaded {
+  aspect-ratio: auto;
+}
+
+.photoImg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.photoImgHidden {
+  opacity: 0;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+.skeletonCard {
+  display: block;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--radius-md);
+}
+
+.emptyWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70svh;
+  padding: var(--space-6) var(--space-4);
+}
+
+/* `EmptyState` usa tinta fija `--color-text` (pensada para papel): sobre la
+ * ESCENA oscura de esta pestaña sería casi invisible. Misma excepción ya
+ * documentada en `TripDiario.module.css .emptyDock` — una tarjeta opaca de
+ * superficie por debajo, en vez de esperar a una variante "sobre escena". */
+.emptyCard {
+  width: min(92%, 420px);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}

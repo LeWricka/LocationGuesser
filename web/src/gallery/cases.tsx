@@ -343,12 +343,17 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
-    // Issue #645: galería completa del viaje agrupada por día. El mundo
-    // sembrado ya trae un recuerdo con galería multi-foto (CH_MEMORY, 3 fotos)
-    // y un reto EN JUEGO con foto SORPRESA (CH_ACTIVE_SORPRESA, `photo_is_hint:
-    // false`) que NO debe aparecer — vigilancia visual del filtro anti-spoiler.
-    id: 'viaje-fotos',
-    title: 'Viaje · Fotos',
+    // Bitácora del viaje (antes "Fotos", issue #645): scroll cronológico por
+    // día → recuerdo → fotos a ancho completo. El mundo sembrado cubre:
+    //  - CH_MEMORY: recuerdo con galería multi-foto (3 fotos) + descripción +
+    //    nota de voz (audio/, issue #648) — el bloque más rico.
+    //  - CH_MEMORY_QUIET: recuerdo SIN descripción, una sola foto.
+    //  - CH_CLOSED / CH_CLOSED_OTHER: retos SELLADOS (ya revelados), con foto
+    //    y descripción, como cualquier recuerdo.
+    //  - CH_ACTIVE_SORPRESA: reto EN JUEGO con foto SORPRESA (`photo_is_hint:
+    //    false`) que NO debe aparecer — vigilancia visual del anti-spoiler.
+    id: 'viaje-bitacora',
+    title: 'Viaje · Bitácora',
     section: 'Viaje',
     render: () => (
       <TripPage
