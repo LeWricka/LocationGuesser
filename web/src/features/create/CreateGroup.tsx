@@ -457,6 +457,8 @@ export function CreateGroup({ onBack }: Props) {
           groupName={name.trim() || createdGroupId}
           link={tripShareUrl(location.origin, createdGroupId)}
           challengeCount={0}
+          // El creador SIEMPRE es dueño de su propio grupo recién creado.
+          isOwner
         />
       )}
     </div>

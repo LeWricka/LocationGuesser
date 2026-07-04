@@ -286,13 +286,16 @@ export function MembersModal({ groupId, meId, onClose, onLeft, onChanged, onInvi
           {/* Guía cuando el viaje aún no tiene a nadie más (o para sumar gente):
               el camino a "otra persona dueña" es invitar → hacer co-dueño desde
               esta misma lista. Sin esta pieza, un dueño en solitario abría
-              Miembros y no encontraba NADA que hacer. */}
+              Miembros y no encontraba NADA que hacer. Issue #707: si ya sabes que
+              quieres que administre, hay un atajo más directo (enlace de
+              co-dueño) desde la propia hoja de Invitar. */}
           {members != null && meIsOwner && onInvite && (
             <div className={styles.inviteGuide}>
               {members.length <= 1 && (
                 <p className={styles.inviteHint}>
                   Aquí todavía estás tú. Invita a los tuyos con el enlace del viaje; cuando entren,
-                  desde esta lista podrás hacerlos co-dueños.
+                  desde esta lista podrás hacerlos co-dueños. O mándale directamente un enlace de
+                  co-dueño desde «Invitar».
                 </p>
               )}
               <Button variant="secondary" size="sm" onClick={onInvite}>

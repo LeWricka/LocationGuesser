@@ -32,6 +32,13 @@ vi.mock('./tripInviteCover', () => ({
   resolveTripInviteCover: (...args: unknown[]) => resolveTripInviteCoverMock(...args),
 }))
 
+// Enlace de co-dueño (issue #707): mockeamos la emisión del token (toca
+// Supabase/RLS, fuera del alcance de este test — ver ownerInvites.test.ts).
+const createOwnerInviteMock = vi.fn()
+vi.mock('../../lib/ownerInvites', () => ({
+  createOwnerInvite: (...args: unknown[]) => createOwnerInviteMock(...args),
+}))
+
 import { InviteModal } from './InviteModal'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
@@ -45,7 +52,7 @@ const session: SessionState = {
   refreshProfile: async () => {},
 }
 
-function renderModal(onClose = vi.fn()) {
+function renderModal(onClose = vi.fn(), isOwner = true) {
   render(
     <SessionContext.Provider value={session}>
       <ToastProvider>
@@ -56,6 +63,7 @@ function renderModal(onClose = vi.fn()) {
           groupName="Japón en primavera"
           link="https://momentu.art/v/abc123"
           challengeCount={3}
+          isOwner={isOwner}
         />
       </ToastProvider>
     </SessionContext.Provider>,
@@ -70,6 +78,7 @@ describe('InviteModal — invitación como tarjeta-imagen (#617)', () => {
     resolveTripInviteCoverMock.mockReset().mockResolvedValue(null)
     nodeToPngBlobMock.mockReset().mockResolvedValue(new Blob(['x'], { type: 'image/png' }))
     shareLeaderboardImageMock.mockReset()
+    createOwnerInviteMock.mockReset().mockResolvedValue('tok-1')
     Object.assign(navigator, { clipboard: { writeText: vi.fn().mockResolvedValue(undefined) } })
     // jsdom no implementa createObjectURL/revokeObjectURL.
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
@@ -168,5 +177,51 @@ describe('InviteModal — invitación como tarjeta-imagen (#617)', () => {
     await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
     expect(screen.getByRole('button', { name: /compartir/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Copiar enlace' })).toBeEnabled()
+  })
+
+  // Enlace de co-dueño (issue #707): solo-dueño, separado de la invitación social.
+  describe('enlace de co-dueño', () => {
+    test('un no-dueño no ve el botón de generar enlace de co-dueño', async () => {
+      renderModal(vi.fn(), false)
+      expect(
+        screen.queryByRole('button', { name: /generar enlace de co-dueño/i }),
+      ).not.toBeInTheDocument()
+      await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
+    })
+
+    test('un dueño ve el botón y, al generarlo, se copia con su propio caption', async () => {
+      renderModal(vi.fn(), true)
+      const btn = screen.getByRole('button', { name: /generar enlace de co-dueño/i })
+      await userEvent.click(btn)
+
+      await waitFor(() => expect(createOwnerInviteMock).toHaveBeenCalledWith('g1', 'u-me'))
+      await waitFor(() =>
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+          expect.stringContaining('co-dueño de «Japón en primavera»'),
+        ),
+      )
+      // El caption trae el token generado, en el hash de co-dueño (#g=…&adm=…).
+      const [captionArg] = (navigator.clipboard.writeText as ReturnType<typeof vi.fn>).mock.calls[0]
+      expect(captionArg).toContain('adm=tok-1')
+      expect(trackMock).toHaveBeenCalledWith(
+        'owner_invite_created',
+        expect.objectContaining({ group_id: 'g1' }),
+      )
+      expect(
+        await screen.findByText('Enlace de co-dueño copiado, pégalo en el chat'),
+      ).toBeInTheDocument()
+      await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
+    })
+
+    test('si falla la emisión, avisa con un toast honesto sin romper el modal', async () => {
+      createOwnerInviteMock.mockRejectedValue(new Error('no eres dueño'))
+      renderModal(vi.fn(), true)
+      await userEvent.click(screen.getByRole('button', { name: /generar enlace de co-dueño/i }))
+
+      expect(
+        await screen.findByText(/No se pudo generar el enlace de co-dueño: no eres dueño/),
+      ).toBeInTheDocument()
+      await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
+    })
   })
 })

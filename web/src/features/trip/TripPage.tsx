@@ -828,6 +828,7 @@ export function TripPage({
         groupName={title}
         link={tripShareUrl(location.origin, groupId)}
         challengeCount={challengeCount}
+        isOwner={canCreate}
       />
     </div>
   )

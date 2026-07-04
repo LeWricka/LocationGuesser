@@ -134,6 +134,13 @@ export type AnalyticsEvent =
   // contenido del audio ni ubicación.
   | 'voice_note_recorded'
   | 'voice_note_played'
+  // Enlace de CO-DUEÑO (issue #707): separa "invitar a ver" de "invitar a
+  // administrar" (antes había que invitar y luego promover a mano en
+  // Miembros). `owner_invite_created`: un dueño genera el enlace desde
+  // InviteModal. `owner_invite_redeemed`: alguien lo canjea (asciende a
+  // co-dueño). Props: group_id. Sin el token ni datos del invitado.
+  | 'owner_invite_created'
+  | 'owner_invite_redeemed'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest'
 import {
   buildInviteCaption,
+  buildOwnerInviteCaption,
   challengesLabel,
   travelersLabel,
   tripInviteMetaLine,
@@ -54,5 +55,16 @@ describe('buildInviteCaption', () => {
     const lines = text.split('\n')
     expect(lines).toHaveLength(2)
     expect(lines[1]).toBe('https://momentu.art/v/xyz')
+  })
+})
+
+// Enlace de co-dueño (issue #707): caption OPERATIVO, distinto del gancho social
+// de buildInviteCaption — deja claro qué es y sus condiciones (un solo uso, 7 días).
+describe('buildOwnerInviteCaption', () => {
+  test('explica las condiciones y lleva el enlace al final', () => {
+    const text = buildOwnerInviteCaption('Japón en primavera', 'https://momentu.art/#g=abc&adm=t1')
+    expect(text).toContain('co-dueño de «Japón en primavera»')
+    expect(text).toContain('Un solo uso, caduca en 7 días')
+    expect(text.endsWith('https://momentu.art/#g=abc&adm=t1')).toBe(true)
   })
 })
