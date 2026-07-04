@@ -16,29 +16,20 @@
   margin-top: var(--space-6);
 }
 
-/* Cabecera de día: pegajosa (queda fija mientras su grupo desfila; las cabeceras
- * se van "empujando" entre sí al llegar la siguiente, patrón de lista agrupada).
- * Fila: fecha en serif + hilo punteado dorado + lugares del día en versalitas.
- *
- * `top: 0` — GOTCHA (issue #645): el offset de `position: sticky` se resuelve
- * contra el BORDE DE CONTENIDO del contenedor de scroll (`.panelFotos`), que ya
- * arranca desplazado por SU PROPIO `padding-top` (la reserva de la cabecera +
- * tabs flotantes). Un `top` que repita esa reserva (p.ej. el mismo calc que
- * `.panelFotos`) se SUMA a ella en vez de sustituirla: la primera cabecera de
- * día aparecía pegada al doble de esa distancia, flotando en medio de sus
- * propias fotos. `top: 0` ya fija la cabecera justo donde empieza el contenido
- * (debajo del chrome flotante); no hace falta repetir la reserva aquí. */
+/* Cabecera de día: fecha en serif + hilo punteado dorado + lugares del día en
+ * versalitas. FLUYE con el contenido (sin position: sticky): la escena es
+ * transparente y una cabecera pegajosa necesitaría una barra opaca para no
+ * pisarse con los títulos que desfilan por debajo (verificado con capturas:
+ * con top:0 quedaba detrás del chrome flotante del viaje; con el offset de la
+ * reserva, tapaba los títulos de los recuerdos). El hilo dorado ya separa los
+ * días de sobra; si algún día hace falta orientación persistente, será una
+ * barra opaca diseñada a propósito, no este parche. */
 .dayHeader {
-  position: sticky;
-  top: 0;
-  /* capa local de la pestaña: cabecera de día pegajosa sobre los recuerdos */
-  z-index: 2; /* design-lint-allow: capa local (ver comentario arriba), no compite con el chrome del viaje */
   margin: 0;
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  background: linear-gradient(to bottom, var(--scene-bg) 65%, transparent);
 }
 
 .dayDate {
@@ -162,10 +153,11 @@
  * documentada en `.emptyCard` de abajo: una tarjeta opaca de superficie por
  * debajo, en vez de esperar a una variante "sobre escena". */
 .audioCard {
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
+  /* Sin tarjeta blanca alrededor: la píldora del AudioPlayer (tokens de papel)
+   * ya es el único elemento claro y lee como control sobre la escena — mismo
+   * criterio que los chips claros de las tarjetas del viaje. Doble capa blanca
+   * pesaba demasiado en la bitácora (verificado con captura). */
+  border-radius: var(--radius-full);
 }
 
 .photos {
