@@ -69,7 +69,6 @@ export { HomeGlobe } from './HomeGlobe'
 export type { GlobePin } from './HomeGlobe'
 export { AuthScreen } from './AuthScreen'
 export { LoginScreen } from './LoginScreen'
-export { CheckEmail } from './CheckEmail'
 export { EnterCode } from './EnterCode'
 export { ProfileStep } from './ProfileStep'
 
