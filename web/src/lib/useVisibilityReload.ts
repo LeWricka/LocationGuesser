@@ -3,12 +3,14 @@ import { useEffect, useRef } from 'react'
 /**
  * Cuánto puede vivir un dato ya resuelto antes de considerarlo potencialmente
  * caducado al volver a la pestaña (issue #638). Las URLs firmadas duran
- * `SIGNED_URL_TTL_SECONDS` (24h, ver lib/storage), pero una PWA puede quedar
- * viva en segundo plano mucho más — 45min es un margen prudente por debajo de
- * ese TTL: si ha pasado más, re-resolvemos por delante en vez de esperar a que
- * el usuario vea portadas en blanco (y confiar solo en el `onerror` del preload).
+ * `SIGNED_URL_TTL_SECONDS` (24h, ver lib/storage); recargamos al volver solo si
+ * han pasado 20h — margen holgado por debajo del TTL. Antes eran 45min (herencia
+ * del TTL de 1h pre-#639): con URLs de 24h ese umbral convertía cualquier vuelta
+ * a la pestaña tras una pausa larga en una recarga innecesaria (reporte del
+ * dueño, 4 jul). El `onerror` del preload sigue de red de seguridad para el
+ * borde raro (URL caducada antes de tiempo).
  */
-export const STALE_RELOAD_MS = 45 * 60 * 1000
+export const STALE_RELOAD_MS = 20 * 60 * 60 * 1000
 
 /**
  * Dispara `reload` cuando la pestaña vuelve a primer plano (`visibilitychange`)
