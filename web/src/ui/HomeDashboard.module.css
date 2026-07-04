@@ -24,7 +24,17 @@
    mapa a sangre del Diario, ver TripDiario.module.css). */
 .globeLayer {
   position: absolute;
-  inset: 0;
+  /* Lienzo extendido POR ARRIBA (issue #702, "sigue sobrando espacio"): a zoom bajo
+     la esfera de MapLibre se dibuja SIEMPRE centrada en su lienzo — padding y offset
+     de cámara solo la ROTAN (verificado con el motor real) — así que el único modo
+     de subirla en pantalla es subir el lienzo. Estirarlo -2·lift por arriba eleva el
+     centro de la esfera lift px; la cámara lo compensa con `topObscuredPx` (misma
+     mecánica que el dock). El valor lo inyecta HomeDashboard (--globe-lift) para que
+     TS y CSS compartan una sola fuente. */
+  top: calc(-2 * var(--globe-lift, 0px));
+  right: 0;
+  bottom: 0;
+  left: 0;
   z-index: 0; /* design-lint-allow: capa local de la escena (globo bajo todo el chrome) */
 }
 .globeLayer > :global(*) {
