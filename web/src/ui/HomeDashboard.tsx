@@ -8,6 +8,13 @@ import { Icon } from './Icon'
 import type { GroupStatus } from './GroupCard'
 import { HomeGlobe } from './HomeGlobe'
 import type { GlobePin, GlobeRoute } from './HomeGlobe'
+
+// Elevación del lienzo del globo (issue #702): a zoom bajo la esfera se dibuja
+// SIEMPRE centrada en su lienzo (padding/offset de cámara solo la rotan), así que
+// subir el lienzo es el único modo de comerse el cielo negro entre la marca y la
+// coronilla. TS y CSS comparten este valor vía la custom property --globe-lift
+// (ver .globeLayer en el css); la cámara lo compensa con topObscuredPx.
+const GLOBE_LIFT_PX = 120
 import { IconPin, LogoMomentu, WordmarkMomentu } from './icons'
 import { sortTrips } from './sortTrips'
 import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
@@ -376,7 +383,10 @@ export function HomeDashboard({
           `bottomObscuredPx` (issue #693): el alto medido del dock (ver `spacerRef`
           arriba), para que el fit del globo reserve ese hueco y los pines no caigan
           detrás del carrusel. */}
-      <div className={styles.globeLayer}>
+      <div
+        className={styles.globeLayer}
+        style={{ '--globe-lift': `${GLOBE_LIFT_PX}px` } as CSSProperties}
+      >
         <HomeGlobe
           pins={pins}
           routes={routes}
@@ -384,6 +394,7 @@ export function HomeDashboard({
           framing="pins"
           activeTargetId={activeId || null}
           bottomObscuredPx={bottomObscuredPx}
+          topObscuredPx={2 * GLOBE_LIFT_PX}
         />
       </div>
 

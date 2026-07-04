@@ -80,6 +80,13 @@ interface Props {
    * siempre, correcto para `framing="world"` (la landing decorativa, sin dock ni fit).
    */
   bottomObscuredPx?: number
+  /**
+   * Alto en px de lienzo EXTRA por ENCIMA del viewport (issue #702): HomeDashboard
+   * estira `.globeLayer` hacia arriba (−2·lift) para subir la esfera en pantalla
+   * — a zoom bajo se dibuja centrada en su lienzo y la cámara no puede moverla —
+   * y la cámara compensa esa franja invisible igual que hace con el dock.
+   */
+  topObscuredPx?: number
   className?: string
 }
 
@@ -165,8 +172,9 @@ const MIN_VISIBLE_FRACTION = 0.22
 function computeFitPaddingY(
   containerHeight: number,
   bottomObscuredPx: number,
+  topObscuredPx: number,
 ): { top: number; bottom: number } {
-  const top = FIT_PADDING_TOP
+  const top = FIT_PADDING_TOP + topObscuredPx
   const desiredBottom = bottomObscuredPx + PIN_HEIGHT + GAP_ABOVE_DOCK
   const minVisible = containerHeight * MIN_VISIBLE_FRACTION
   const maxBottom = Math.max(0, containerHeight - top - minVisible)
@@ -181,11 +189,26 @@ function computeFitPaddingY(
  * pantalla. Reutiliza el MISMO padding que `fitBounds` (arriba) para que el vuelo al pin
  * activo (`flyToTarget`) aterrice en la misma banda que ya usa el fit de varios pines.
  */
-function verticalFrameOffset(containerHeight: number, bottomObscuredPx: number): number {
-  const { top, bottom } = computeFitPaddingY(containerHeight, bottomObscuredPx)
-  const visibleCenter = (top + (containerHeight - bottom)) / 2
-  return visibleCenter - containerHeight / 2
+function verticalFrameOffset(
+  containerHeight: number,
+  bottomObscuredPx: number,
+  topObscuredPx: number,
+): number {
+  const { top, bottom } = computeFitPaddingY(containerHeight, bottomObscuredPx, topObscuredPx)
+  // Ancla en el TERCIO ALTO de la banda visible, no en su centro (reporte del dueño,
+  // 4 jul: "sigue sobrando espacio [arriba]"): con el zoom capado (GLOBE_MAX_ZOOM, la
+  // esfera no puede crecer) centrar en la banda deja un cielo negro enorme entre la
+  // marca y la coronilla; anclar arriba lo consume y el aire sobrante cae entre el
+  // contenido y el dock, donde ya hay chrome que lo aprovecha.
+  const band = Math.max(0, containerHeight - bottom - top)
+  const anchor = top + band * BAND_ANCHOR_FRACTION
+  return anchor - containerHeight / 2
 }
+
+// Fracción de la banda visible donde ancla el contenido encuadrado (0 = pegado al
+// chrome superior, 0.5 = centro de la banda). Ver `verticalFrameOffset`.
+const BAND_ANCHOR_FRACTION = 0.3
+
 // Span MÍNIMO del encuadre (grados). Cuando todos los pines caen casi en el mismo punto
 // (varios momentos de una misma ciudad: "Finde Madrid"), sus bounds son minúsculos y el
 // fit intentaría un zoom muy cercano —capado a FIT_MAX_ZOOM, con los discos apilados en
@@ -332,6 +355,7 @@ export function HomeGlobe({
   relaxed = false,
   activeTargetId = null,
   bottomObscuredPx = 0,
+  topObscuredPx = 0,
   className,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -356,6 +380,7 @@ export function HomeGlobe({
   // Issue #693: alto medido del dock de HomeDashboard, en ref por el mismo motivo que
   // el resto (el handler `load`, async, siempre debe leer el último valor).
   const bottomObscuredRef = useRef(bottomObscuredPx)
+  const topObscuredRef = useRef(topObscuredPx)
   // Fuentes/capas de línea YA creadas en el mapa, por `targetId` (issue #702): permite
   // (1) recolorear una ruta existente vía `setPaintProperty` sin recrearla
   // (`applyRouteEmphasis`) y (2) detectar rutas OBSOLETAS (un viaje que perdió su
@@ -370,6 +395,7 @@ export function HomeGlobe({
     relaxedRef.current = relaxed
     activeTargetIdRef.current = activeTargetId
     bottomObscuredRef.current = bottomObscuredPx
+    topObscuredRef.current = topObscuredPx
   })
 
   // Gesto del usuario (arrastre) en curso: si `activeTargetId` cambia mientras el
@@ -549,7 +575,11 @@ export function HomeGlobe({
     // pasar aquí, pero por robustez) cae a 0 y el padding/offset quedan en su mínimo.
     const containerHeight = containerRef.current?.clientHeight ?? 0
     if (route.length === 1) {
-      const offsetY = verticalFrameOffset(containerHeight, bottomObscuredRef.current)
+      const offsetY = verticalFrameOffset(
+        containerHeight,
+        bottomObscuredRef.current,
+        topObscuredRef.current,
+      )
       map.easeTo({
         center: [route[0].lng, route[0].lat],
         zoom: SINGLE_ZOOM,
@@ -576,7 +606,11 @@ export function HomeGlobe({
     if (maxLng - minLng > MAX_FIT_SPAN_LNG_DEG || maxLat - minLat > MAX_FIT_SPAN_LAT_DEG) {
       const lead =
         route.find((p) => p.lead) ?? (fallbackLead === 'first' ? route[0] : route[route.length - 1])
-      const offsetY = verticalFrameOffset(containerHeight, bottomObscuredRef.current)
+      const offsetY = verticalFrameOffset(
+        containerHeight,
+        bottomObscuredRef.current,
+        topObscuredRef.current,
+      )
       map.easeTo({
         center: [lead.lng, lead.lat],
         zoom: SINGLE_ZOOM,
@@ -600,12 +634,14 @@ export function HomeGlobe({
       maxLat = midLat + half
     }
     const bounds = new gl.LngLatBounds([minLng, minLat], [maxLng, maxLat])
-    const { top, bottom } = computeFitPaddingY(containerHeight, bottomObscuredRef.current)
-    map.fitBounds(bounds, {
-      padding: { top, bottom, left: FIT_PADDING_SIDE, right: FIT_PADDING_SIDE },
-      maxZoom: FIT_MAX_ZOOM,
-      duration,
-    })
+    const { top, bottom } = computeFitPaddingY(
+      containerHeight,
+      bottomObscuredRef.current,
+      topObscuredRef.current,
+    )
+    const padding = { top, bottom, left: FIT_PADDING_SIDE, right: FIT_PADDING_SIDE }
+
+    map.fitBounds(bounds, { padding, maxZoom: FIT_MAX_ZOOM, duration })
   }, [])
 
   // Encuadre por defecto (#700, "globo poblado"): el RECORRIDO del viaje activo —
