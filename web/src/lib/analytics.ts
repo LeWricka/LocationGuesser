@@ -53,6 +53,11 @@ function enqueue(op: (m: MixpanelClient) => void): void {
 export type AnalyticsEvent =
   | 'signup_completed'
   | 'login'
+  // Email de acceso (código OTP + enlace) SOLICITADO desde el cliente. Cuenta
+  // exacta de envíos que pedimos a Supabase: si al usuario le llegan 2 correos
+  // y aquí hay 1 evento, la duplicación es del lado servidor/SMTP, no nuestra.
+  // Props: reenvio (false = submit inicial, true = botón reenviar).
+  | 'login_email_solicitado'
   | 'group_created'
   | 'group_joined'
   | 'challenge_created'
