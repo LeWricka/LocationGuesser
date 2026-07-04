@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { resolveVisibleTripMoments, pickTripCoverImagePath } from '../../lib/tripCover'
+import type { VisibleTripMoment } from '../../lib/tripCover'
 import { signedImageUrl } from '../../lib/storage'
 import { haversine } from '../../lib/geo'
 import { useVisibilityReload } from '../../lib/useVisibilityReload'
@@ -35,7 +36,11 @@ export interface TripPoint {
   title: string
   /** URL firmada de la miniatura del pin, o null (cae a un marcador genérico). */
   imageUrl: string | null
-  /** Fecha del momento en ISO (orden cronológico de la mini-ruta). */
+  /** Fecha EFECTIVA del momento (`happened_on` elegida por el dueño si existe;
+   * si no, `created_at`) — mismo criterio que ordena el diario real (`useTripData`,
+   * #566), para que la mini-ruta del globo (#702) coincida con el orden real del
+   * viaje. Puede ser una fecha pura `YYYY-MM-DD` o un ISO completo; solo se usa
+   * para ordenar, nunca se muestra. */
   date: string
 }
 
@@ -80,6 +85,17 @@ async function signOrNull(imagePath: string | null | undefined): Promise<string 
 }
 
 /**
+ * Instante (ms) para ordenar momentos cronológicamente: `happened_on` (fecha
+ * ELEGIDA por el dueño, #566) si existe; si no, `created_at`. Mismo criterio
+ * exacto que `momentSortValue` en `useTripData.ts` — se duplica aquí (función
+ * pequeña, un solo `new Date().getTime()`) para no crear una dependencia entre
+ * `features/home` y `features/trip` por una línea de lógica.
+ */
+function momentSortValue(m: Pick<VisibleTripMoment, 'happened_on' | 'created_at'>): number {
+  return new Date(m.happened_on ?? m.created_at).getTime()
+}
+
+/**
  * Resuelve TODOS los puntos visibles de un grupo (su constelación) + su portada.
  * Recorre los momentos del viaje:
  *  - RECUERDO con lugar visible (`place_lat`/`place_lng`) → punto.
@@ -102,19 +118,33 @@ async function resolveTrip(groupId: string, name: string): Promise<WorldTrip | n
   // queda con los más recientes ANTES de firmar — capa markers Y firmas a la vez.
   const recent = raw.slice(0, MAX_POINTS_PER_TRIP)
 
+  // Orden cronológico ASC para la mini-ruta (el recorrido REAL del viaje en el
+  // tiempo, issue #702): mismo criterio que el diario (`useTripData`, #566) —
+  // `happened_on` con fallback a `created_at`, empate roto por `created_at` real
+  // (orden de entrada dentro del mismo día elegido). Antes de #702 aquí solo se
+  // ordenaba por `created_at` (orden de SUBIDA): un recuerdo backfilleado días
+  // después del viaje con una fecha elegida anterior aparecía fuera de sitio en
+  // la ruta dorada, aunque el diario ya lo mostrara en su lugar cronológico real.
+  // Se ordena DESPUÉS del cap de arriba (#700): el cap decide QUÉ puntos entran
+  // (los más recientes por orden de subida); este orden decide en QUÉ SECUENCIA
+  // se cosen esos puntos ya elegidos.
+  const ordered = [...recent].sort((a, b) => {
+    const primary = momentSortValue(a) - momentSortValue(b)
+    if (primary !== 0) return primary
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  })
+
   // Firmamos las miniaturas de los pines en paralelo (cada una tolerante a fallo).
   const points: TripPoint[] = await Promise.all(
-    recent.map(async (r) => ({
+    ordered.map(async (r) => ({
       id: r.id,
       lat: r.lat,
       lng: r.lng,
       title: r.title,
       imageUrl: await signOrNull(r.image_path),
-      date: r.created_at,
+      date: r.happened_on ?? r.created_at,
     })),
   )
-  // Orden cronológico ASC para la mini-ruta (el recorrido del viaje en el tiempo).
-  points.sort((a, b) => a.date.localeCompare(b.date))
 
   return { groupId, name, coverUrl, points }
 }

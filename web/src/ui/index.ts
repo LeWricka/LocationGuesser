@@ -68,7 +68,7 @@ export { sortTrips } from './sortTrips'
 // Patrón globo + hoja (Home deslogueada y logueada): globo héroe + hoja blanca (#343).
 export { GlobeSheet } from './GlobeSheet'
 export { HomeGlobe } from './HomeGlobe'
-export type { GlobePin } from './HomeGlobe'
+export type { GlobePin, GlobeRoute } from './HomeGlobe'
 export { AuthScreen } from './AuthScreen'
 export { LoginScreen } from './LoginScreen'
 export { EnterCode } from './EnterCode'

@@ -7,7 +7,7 @@ import { Chip } from './Chip'
 import { Icon } from './Icon'
 import type { GroupStatus } from './GroupCard'
 import { HomeGlobe } from './HomeGlobe'
-import type { GlobePin } from './HomeGlobe'
+import type { GlobePin, GlobeRoute } from './HomeGlobe'
 import { IconPin, LogoMomentu, WordmarkMomentu } from './icons'
 import { sortTrips } from './sortTrips'
 import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
@@ -200,6 +200,8 @@ interface Props {
   groups?: HomeGroup[]
   /** Pines-foto de los viajes para el globo héroe (los situados; los compone HomePage). */
   pins?: GlobePin[]
+  /** Rutas doradas por viaje para el globo héroe (issue #702; las compone HomePage). */
+  routes?: GlobeRoute[]
   /** Reto abierto a fijar en el chip ("Te toca jugar"). Sin reto → no se pinta nada. */
   pinned?: HomePinned | null
   onOpenProfile?: () => void
@@ -235,6 +237,7 @@ export function HomeDashboard({
   avatarUrl,
   groups = [],
   pins = [],
+  routes = [],
   pinned,
   onOpenProfile,
   onCreateGroup,
@@ -376,6 +379,7 @@ export function HomeDashboard({
       <div className={styles.globeLayer}>
         <HomeGlobe
           pins={pins}
+          routes={routes}
           onOpenPin={onOpenGroup}
           framing="pins"
           activeTargetId={activeId || null}

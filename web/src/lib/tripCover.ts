@@ -44,6 +44,11 @@ export interface VisibleTripMoment {
   title: string
   image_path: string | null
   created_at: string
+  /** Fecha ELEGIDA por el dueño (migración 0037/#566), o null en momentos legado
+   * sin fecha propia. Mismo campo que ordena el diario real (`useTripData`); se
+   * expone aquí para que el orden cronológico de la mini-ruta del globo (#702)
+   * coincida con el del diario, en vez de caer solo al orden de subida. */
+  happened_on: string | null
   lat: number
   lng: number
 }
@@ -74,6 +79,7 @@ export async function resolveVisibleTripMoments(groupId: string): Promise<Visibl
           title: c.title,
           image_path: c.image_path,
           created_at: c.created_at,
+          happened_on: c.happened_on,
           lat: ans.lat,
           lng: ans.lng,
         })
@@ -86,6 +92,7 @@ export async function resolveVisibleTripMoments(groupId: string): Promise<Visibl
           title: c.title,
           image_path: c.image_path,
           created_at: c.created_at,
+          happened_on: c.happened_on,
           lat: c.place_lat,
           lng: c.place_lng,
         })

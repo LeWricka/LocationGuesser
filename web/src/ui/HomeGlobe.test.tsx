@@ -2,7 +2,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, waitFor } from '@testing-library/react'
 import fs from 'node:fs'
 import path from 'node:path'
-import type { GlobePin } from './HomeGlobe'
+import type { GlobePin, GlobeRoute } from './HomeGlobe'
 
 // --- Doble mínimo de maplibre-gl -------------------------------------------------
 // HomeGlobe importa el motor dinámicamente (`import('maplibre-gl')`) dentro de un
@@ -12,11 +12,35 @@ import type { GlobePin } from './HomeGlobe'
 // de verdad.
 type Handler = () => void
 
+/** Registro de un `addSource`/`addLayer` de línea (issue #702: rutas del globo). */
+interface AddSourceCall {
+  id: string
+  coordinates: unknown
+}
+interface AddLayerCall {
+  id: string
+  color: unknown
+  dash: unknown
+}
+interface SetPaintPropertyCall {
+  layerId: string
+  prop: string
+  value: unknown
+}
+
 class MockMap {
   handlers: Record<string, Handler[]> = {}
   fitBoundsCalls: unknown[] = []
   easeToCalls: unknown[] = []
   jumpToCalls: unknown[] = []
+  // Issue #702: registro de fuentes/capas de línea (rutas) + recoloreos, para que
+  // los tests de jerarquía protagonista/tenue puedan inspeccionar qué se pidió.
+  addSourceCalls: AddSourceCall[] = []
+  addLayerCalls: AddLayerCall[] = []
+  setPaintPropertyCalls: SetPaintPropertyCall[] = []
+  removeLayerCalls: string[] = []
+  removeSourceCalls: string[] = []
+  private sourcesById = new Map<string, unknown>()
   opts: Record<string, unknown>
   constructor(opts: Record<string, unknown>) {
     this.opts = opts
@@ -29,8 +53,41 @@ class MockMap {
   off() {
     return this
   }
-  addSource() {}
-  addLayer() {}
+  addSource(id: string, source: { type: string; data?: { geometry?: { coordinates?: unknown } } }) {
+    this.sourcesById.set(id, source)
+    // Solo nos interesan las fuentes GeoJSON de línea (la ruta, #702) — el basemap/
+    // labels raster de la home NO son lo que estos tests quieren inspeccionar.
+    if (source.type === 'geojson') {
+      this.addSourceCalls.push({ id, coordinates: source?.data?.geometry?.coordinates })
+    }
+  }
+  getSource(id: string): { setData: (data: unknown) => void } | undefined {
+    if (!this.sourcesById.has(id)) return undefined
+    return {
+      setData: (data: unknown) => {
+        this.sourcesById.set(id, { data })
+      },
+    }
+  }
+  addLayer(layer: { id: string; type: string; paint?: Record<string, unknown> }) {
+    // Igual que `addSource`: solo registramos capas `line` (rutas, #702), no el
+    // basemap/labels raster que la home añade siempre tras 'load'.
+    if (layer.type !== 'line') return
+    this.addLayerCalls.push({
+      id: layer.id,
+      color: layer.paint?.['line-color'],
+      dash: layer.paint?.['line-dasharray'],
+    })
+  }
+  setPaintProperty(layerId: string, prop: string, value: unknown) {
+    this.setPaintPropertyCalls.push({ layerId, prop, value })
+  }
+  removeLayer(id: string) {
+    this.removeLayerCalls.push(id)
+  }
+  removeSource(id: string) {
+    this.removeSourceCalls.push(id)
+  }
   setProjection() {}
   fitBounds(bounds: unknown, opts: unknown) {
     this.fitBoundsCalls.push({ bounds, opts })
@@ -47,6 +104,9 @@ class MockMap {
   setCenter() {}
   stop() {}
   remove() {}
+  getContainer(): HTMLElement | undefined {
+    return this.opts.container as HTMLElement | undefined
+  }
   /** Dispara los handlers registrados con `on(event, …)` (simula 'load'/'dragstart'/… del mapa real). */
   fire(event: string) {
     for (const h of this.handlers[event] ?? []) h()
@@ -537,5 +597,123 @@ describe('HomeGlobe — encuadre del recorrido del viaje protagonista (#700)', (
     expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
     const call = mapInstances[0].easeToCalls[0] as { center: [number, number] }
     expect(call.center).toEqual([151.2093, -33.8688])
+  })
+})
+
+// --- #702: rutas doradas por viaje en el globo ------------------------------------
+describe('HomeGlobe — rutas doradas por viaje (#702)', () => {
+  /** Color EFECTIVO de una capa: el último `setPaintProperty` recibido (recoloreo
+   * barato, ver `applyRouteEmphasis`) o, si no hubo ninguno, el color con el que se
+   * creó la capa (`addLayer`). */
+  function currentColor(map: MockMap, layerId: string): unknown {
+    const lastSetPaint = [...map.setPaintPropertyCalls].reverse().find((c) => c.layerId === layerId)
+    if (lastSetPaint) return lastSetPaint.value
+    return map.addLayerCalls.find((c) => c.id === layerId)?.color
+  }
+
+  test('ruta con ≥2 puntos: addSource/addLayer con las coordenadas en el MISMO ORDEN de entrada', async () => {
+    const routes: GlobeRoute[] = [
+      {
+        targetId: 't1',
+        points: [
+          [-9.1393, 38.7223], // Lisboa
+          [2.3522, 48.8566], // París
+          [12.4922, 41.8902], // Roma
+        ],
+      },
+    ]
+    render(<HomeGlobe pins={clusteredPins()} routes={routes} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].addSourceCalls).toHaveLength(1))
+
+    // Sin reordenar: exactamente el mismo array de `points` que se le pasó.
+    expect(mapInstances[0].addSourceCalls[0].coordinates).toEqual(routes[0].points)
+    expect(mapInstances[0].addLayerCalls).toHaveLength(1)
+    expect(mapInstances[0].addLayerCalls[0].id).toBe('lg-home-route-line-t1')
+  })
+
+  test('ruta con 1 solo punto: no se llama addSource/addLayer para ella', async () => {
+    const routes: GlobeRoute[] = [{ targetId: 't1', points: [[-9.1393, 38.7223]] }]
+    render(<HomeGlobe pins={clusteredPins()} routes={routes} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(markerInstances).toHaveLength(2))
+
+    expect(mapInstances[0].addSourceCalls).toHaveLength(0)
+    expect(mapInstances[0].addLayerCalls).toHaveLength(0)
+  })
+
+  test('la ruta cuyo targetId es el activeTargetId recibe el color protagonista; el resto, tenue', async () => {
+    const routes: GlobeRoute[] = [
+      {
+        targetId: 't1',
+        points: [
+          [-9.1393, 38.7223],
+          [12.4922, 41.8902],
+        ],
+      },
+      {
+        targetId: 't2',
+        points: [
+          [151.2093, -33.8688],
+          [174.7633, -36.8485],
+        ],
+      },
+    ]
+    render(<HomeGlobe pins={clusteredPins()} routes={routes} activeTargetId="t1" />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].addLayerCalls).toHaveLength(2))
+
+    const map = mapInstances[0]
+    const activeColor = currentColor(map, 'lg-home-route-line-t1')
+    const inactiveColor = currentColor(map, 'lg-home-route-line-t2')
+    expect(activeColor).toBeTruthy()
+    expect(inactiveColor).toBeTruthy()
+    expect(activeColor).not.toBe(inactiveColor)
+  })
+
+  test('al cambiar activeTargetId (rerender), el énfasis se recalcula vía setPaintProperty', async () => {
+    const routes: GlobeRoute[] = [
+      {
+        targetId: 't1',
+        points: [
+          [-9.1393, 38.7223],
+          [12.4922, 41.8902],
+        ],
+      },
+      {
+        targetId: 't2',
+        points: [
+          [151.2093, -33.8688],
+          [174.7633, -36.8485],
+        ],
+      },
+    ]
+    const { rerender } = render(
+      <HomeGlobe pins={clusteredPins()} routes={routes} activeTargetId="t1" />,
+    )
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].addLayerCalls).toHaveLength(2))
+
+    const map = mapInstances[0]
+    const before1 = currentColor(map, 'lg-home-route-line-t1')
+    const before2 = currentColor(map, 'lg-home-route-line-t2')
+    expect(before1).not.toBe(before2)
+
+    rerender(<HomeGlobe pins={clusteredPins()} routes={routes} activeTargetId="t2" />)
+
+    // La ruta que era protagonista pasa a tenue y viceversa: cada una toma el color
+    // que antes tenía la otra.
+    const after1 = currentColor(map, 'lg-home-route-line-t1')
+    const after2 = currentColor(map, 'lg-home-route-line-t2')
+    expect(after1).toBe(before2)
+    expect(after2).toBe(before1)
   })
 })
