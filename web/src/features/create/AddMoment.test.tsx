@@ -509,7 +509,8 @@ describe('AddMoment — fecha por defecto pre-rellenada (#553)', () => {
     renderAddMoment()
 
     const trigger = await screen.findByLabelText('Fecha')
-    await waitFor(() => expect(trigger).toHaveTextContent('12 de septiembre de 2024'))
+    // Formato compacto del disparador (issue #673), ver el test de más arriba.
+    await waitFor(() => expect(trigger).toHaveTextContent('12 sep 2024'))
   })
 })
 
