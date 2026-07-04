@@ -189,15 +189,52 @@ const dashboardGroups: HomeGroup[] = [
     members: dashboardMembers.slice(0, 2),
   },
 ]
+// Globo poblado (#700): el viaje protagonista (Japón, primero del carrusel por su
+// estado `toplay`) aporta su RECORRIDO — varios momentos agrupados, en orden
+// cronológico ASC con el "lead" en el más reciente (el último), como los compone
+// HomePage — y el resto de viajes clavan pines SUELTOS por la esfera, fuera del
+// encuadre (visibles al girar el globo).
 const dashboardPins: GlobePin[] = [
   {
-    id: 'p1',
+    id: 'p-tokio',
+    lat: 35.6762,
+    lng: 139.6503,
+    title: 'Japón · Tokio',
+    imageUrl: null,
+    targetId: GROUP_ID,
+  },
+  {
+    id: 'p-kioto',
     lat: 35.0116,
     lng: 135.7681,
     title: 'Japón · Kioto',
     imageUrl: null,
     targetId: GROUP_ID,
+  },
+  {
+    id: 'p-nara',
+    lat: 34.6851,
+    lng: 135.8048,
+    title: 'Japón · Nara',
+    imageUrl: null,
+    targetId: GROUP_ID,
     lead: true,
+  },
+  {
+    id: 'p-alpes',
+    lat: 45.9237,
+    lng: 6.8694,
+    title: 'Ruta por los Alpes · Chamonix',
+    imageUrl: null,
+    targetId: 'viaje-alpes',
+  },
+  {
+    id: 'p-lisboa',
+    lat: 38.7223,
+    lng: -9.1393,
+    title: 'Finde en Lisboa · Alfama',
+    imageUrl: null,
+    targetId: 'viaje-lisboa',
   },
 ]
 const dashboardPinned: HomePinned = {

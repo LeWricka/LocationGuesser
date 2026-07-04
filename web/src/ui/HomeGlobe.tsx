@@ -45,14 +45,16 @@ interface Props {
   relaxed?: boolean
   /**
    * Id del destino "activo" ahora mismo (p.ej. el viaje enfocado en la hoja, pieza 2
-   * de la home inmersiva — issue #567). Al cambiar a un valor con un pin cuyo
-   * `targetId` coincida, el globo VUELA suave a ese pin y le aplica en EXCLUSIVA el
+   * de la home inmersiva — issue #567). Al cambiar a un valor con pines cuyo
+   * `targetId` coincida, el globo ENCUADRA el recorrido de ese viaje —fit de todos
+   * sus pines; con uno solo, vuelo suave a él (#700)— y aplica en EXCLUSIVA el
    * estado "lead" (anillo dorado + escala, el mismo estilo que ya existe para
-   * `pin.lead`), retirándoselo a cualquier otro —incluido uno que lo llevara por
-   * dato—. `null`/`undefined` (o un id sin pin correspondiente) es un NO-OP: deja
+   * `pin.lead`) a su pin más reciente, retirándoselo a cualquier otro —incluido uno
+   * que lo llevara por dato—. También manda sobre el ENCUADRE POR DEFECTO: al cargar
+   * o cambiar los pines, el fit es el recorrido de este viaje (no el centroide de
+   * todos). `null`/`undefined` (o un id sin pin correspondiente) es un NO-OP: deja
    * intacto el framing/deriva y el "lead" que ya hubiera (por dato o por un vuelo
-   * anterior). Contrato exacto con la pieza 2: SOLO esta prop, sin más cambios de
-   * API pública.
+   * anterior), y el encuadre cae a todos los pines.
    */
   activeTargetId?: string | null
   /**
@@ -93,18 +95,16 @@ const GLOBE_MAX_ZOOM = 2.4
 const FIT_MAX_ZOOM = 2.2
 // Un solo pin: acercamos algo más, pero sin perder la curvatura del globo.
 const SINGLE_ZOOM = 2.2
-// Vuelo al pin ACTIVO (`activeTargetId`, #567): mismo zoom "un solo pin" de arriba.
-// Duración del vuelo en ms (lo que pide `Map#easeTo`) — el sistema `--motion` no
-// tiene un token propio para "viaje de cámara" (su techo, `--duration-slower`, son
-// 480ms, pensados para transiciones de UI, no para un giro de globo); 700ms es
-// DELIBERADAMENTE más lento, coherente con el resto de este fichero, que YA usa 700ms
-// para `fitToPins` (arriba). MapLibre pide la curva como función `(t) => t'` de
-// progreso temporal, no como cadena `cubic-bezier()`, así que no podemos reenchufar
-// literalmente `--motion-ease-emphasized`; dejamos el easing por defecto de
-// `easeTo` (una curva ease-out equivalente en sensación a `--motion-ease-emphasized`,
-// arranca rápido y frena suave) en vez de reimplementar un evaluador de Bézier solo
-// para este vuelo.
-const FLY_TO_ACTIVE_DURATION_MS = 700
+// Duración de los movimientos de cámara (fit del recorrido y vuelos, `Map#easeTo`/
+// `fitBounds`) — el sistema `--motion` no tiene un token propio para "viaje de
+// cámara" (su techo, `--duration-slower`, son 480ms, pensados para transiciones de
+// UI, no para un giro de globo); 700ms es DELIBERADAMENTE más lento. MapLibre pide
+// la curva como función `(t) => t'` de progreso temporal, no como cadena
+// `cubic-bezier()`, así que no podemos reenchufar literalmente
+// `--motion-ease-emphasized`; dejamos el easing por defecto (una curva ease-out
+// equivalente en sensación, arranca rápido y frena suave) en vez de reimplementar
+// un evaluador de Bézier solo para esto.
+const CAMERA_DURATION_MS = 700
 // Alto/ancho aproximado del pin de la home (disco + puntita + aro "lead") en px. El
 // marcador se ancla por la PUNTA (base) y el disco crece HACIA ARRIBA, así que el fit
 // necesita reservar ~este alto por ENCIMA de cada coordenada para que ningún disco quede
@@ -169,13 +169,13 @@ function verticalFrameOffset(containerHeight: number, bottomObscuredPx: number):
 // que el encuadre deje aire y los pines cercanos se separen en vez de amontonarse.
 const MIN_FIT_SPAN_DEG = 1.2
 
-// Span MÁXIMO encuadrable (grados). Cuando los viajes abarcan varios continentes
-// (el caso real del dueño: Japón + Maldivas + Colombia), encuadrar TODOS los pines
-// obliga a la cámara a su centroide — casi siempre océano abierto (Índico/Antártida)
-// con los pines diminutos en los bordes de la esfera. El globo de la home es
-// AMBIENTE, no un data-viz de cobertura: pasado este umbral manda el pin
-// protagonista (ver `fitToPins`) a zoom de pin único, y el resto viven fuera de
-// plano — la deriva y el gesto los traen al girar la esfera.
+// Span MÁXIMO encuadrable (grados). Cuando el conjunto a encuadrar abarca varios
+// continentes (el caso real del dueño: Japón + Maldivas + Colombia), encuadrarlo
+// entero obliga a la cámara a su centroide — casi siempre océano abierto (Índico/
+// Antártida) con los pines diminutos en los bordes de la esfera. El globo de la
+// home es AMBIENTE, no un data-viz de cobertura: pasado este umbral manda el pin
+// protagonista (ver `frameRoute`, #699) a zoom de pin único, y el resto viven
+// fuera de plano — la deriva y el gesto los traen al girar la esfera.
 const MAX_FIT_SPAN_LNG_DEG = 100
 const MAX_FIT_SPAN_LAT_DEG = 65
 
@@ -323,7 +323,16 @@ export function HomeGlobe({
   const applyActiveLead = useCallback((): number => {
     const targetId = activeTargetIdRef.current
     if (targetId == null) return -1
-    const idx = pinsRef.current.findIndex((p) => p.targetId === targetId)
+    // El "lead" de un viaje es su momento MÁS RECIENTE (#700): los puntos de cada
+    // viaje llegan en orden cronológico ASC (HomePage), así que buscamos el ÚLTIMO
+    // pin del targetId, no el primero (con un pin por viaje, como antes, da igual).
+    let idx = -1
+    for (let i = pinsRef.current.length - 1; i >= 0; i--) {
+      if (pinsRef.current[i].targetId === targetId) {
+        idx = i
+        break
+      }
+    }
     if (idx === -1) return -1
     // Recorremos TODOS los markers (no solo "el anterior recordado"): así también
     // sustituye limpio un `lead` que viniera del propio dato, sin refs extra.
@@ -378,42 +387,55 @@ export function HomeGlobe({
     applyActiveLead()
   }, [applyActiveLead])
 
-  // Encuadra todos los pines (sin pines, queda el mundo entero). En modo `'world'`
-  // (landing decorativa) NO encuadra: deja la vista mundo de arranque, siempre esférica.
-  const fitToPins = useCallback(() => {
-    if (framingRef.current === 'world') return
+  // Encuadra un RECORRIDO: un conjunto de pines (los de UN viaje, o todos como
+  // fallback). Reutiliza el padding del dock (#696) y decide el gesto de cámara:
+  //  - 1 pin → `easeTo` a zoom de pin único (con `offset` a la banda visible; en
+  //    reduced-motion `duration: 0` — nunca `jumpTo`, su tipo no admite `offset`,
+  //    ver #693 — mismo salto instantáneo pero aterriza sobre el dock).
+  //  - span intercontinental → política de protagonista (#699): `easeTo` al pin
+  //    `lead` del conjunto o, en su defecto, a `fallbackLead`.
+  //  - resto → `fitBounds` del recorrido, con span mínimo anti-amontonamiento.
+  // `fallbackLead` distingue los dos llamadores: para el recorrido de UN viaje el
+  // protagonista natural es su momento más reciente ('last', puntos en orden
+  // cronológico ASC); para el fallback "todos los pines" se mantiene el contrato
+  // de #699 ('first').
+  const frameRoute = useCallback((route: GlobePin[], fallbackLead: 'first' | 'last') => {
     const map = mapRef.current
     const gl = glRef.current
-    if (!map || !gl) return
-    const pts = pinsRef.current.map((p) => [p.lng, p.lat] as [number, number])
-    if (pts.length === 0) return
-    const duration = prefersReducedMotion() ? 0 : 700
+    if (!map || !gl || route.length === 0) return
+    const duration = prefersReducedMotion() ? 0 : CAMERA_DURATION_MS
     // Alto real del lienzo (issue #693): el fit/vuelo necesita saber cuánto reservar
     // abajo para el dock de HomeDashboard — sin el contenedor montado (aún no debería
     // pasar aquí, pero por robustez) cae a 0 y el padding/offset quedan en su mínimo.
     const containerHeight = containerRef.current?.clientHeight ?? 0
-    if (pts.length === 1) {
+    if (route.length === 1) {
       const offsetY = verticalFrameOffset(containerHeight, bottomObscuredRef.current)
-      map.easeTo({ center: pts[0], zoom: SINGLE_ZOOM, duration, offset: [0, offsetY] })
+      map.easeTo({
+        center: [route[0].lng, route[0].lat],
+        zoom: SINGLE_ZOOM,
+        duration,
+        offset: [0, offsetY],
+      })
       return
     }
-    // Extensión real de los pines.
-    let minLng = pts[0][0]
-    let maxLng = pts[0][0]
-    let minLat = pts[0][1]
-    let maxLat = pts[0][1]
-    for (const [lng, lat] of pts) {
+    // Extensión real de los pines del recorrido.
+    let minLng = route[0].lng
+    let maxLng = route[0].lng
+    let minLat = route[0].lat
+    let maxLat = route[0].lat
+    for (const { lng, lat } of route) {
       if (lng < minLng) minLng = lng
       if (lng > maxLng) maxLng = lng
       if (lat < minLat) minLat = lat
       if (lat > maxLat) maxLat = lat
     }
-    // Viajes intercontinentales: si los pines no caben en un encuadre continental,
+    // Recorrido intercontinental: si los pines no caben en un encuadre continental,
     // NO se encuadran todos (centroide oceánico, ver MAX_FIT_SPAN_*). Manda el
-    // protagonista: el pin `lead` del dato (el viaje activo/te-toca) o, en su
-    // defecto, el primero — mismo tratamiento que un pin único, misma banda visible.
+    // protagonista (#699): el pin `lead` del dato o, en su defecto, `fallbackLead` —
+    // mismo tratamiento que un pin único, misma banda visible.
     if (maxLng - minLng > MAX_FIT_SPAN_LNG_DEG || maxLat - minLat > MAX_FIT_SPAN_LAT_DEG) {
-      const lead = pinsRef.current.find((p) => p.lead) ?? pinsRef.current[0]
+      const lead =
+        route.find((p) => p.lead) ?? (fallbackLead === 'first' ? route[0] : route[route.length - 1])
       const offsetY = verticalFrameOffset(containerHeight, bottomObscuredRef.current)
       map.easeTo({
         center: [lead.lng, lead.lat],
@@ -446,10 +468,28 @@ export function HomeGlobe({
     })
   }, [])
 
-  // Vuela al pin de `activeTargetId` (#567) y le aplica el "lead" en exclusiva
-  // (vía `applyActiveLead`, que también corrige el `classList`). `null`/`undefined`
-  // o un id sin pin correspondiente: NO-OP total, ni clase ni cámara — deja intacto
-  // el framing/deriva y el `lead` que ya hubiera (contrato de la prop, ver `Props`).
+  // Encuadre por defecto (#700, "globo poblado"): el RECORRIDO del viaje activo —
+  // el protagonista que HomeDashboard pasa como `activeTargetId` desde el arranque
+  // (el primer viaje del carrusel) — no el centroide de todos los viajes. Los pines
+  // del RESTO de viajes quedan clavados por el globo, fuera del encuadre: el
+  // "mapamundi poblado", visibles al girar la esfera. Sin viaje activo (o sin pines
+  // suyos) cae al comportamiento clásico: todos los pines (contrato de #699). En
+  // modo `'world'` (landing decorativa) NO encuadra: vista mundo, siempre esférica.
+  const fitToPins = useCallback(() => {
+    if (framingRef.current === 'world') return
+    const activeId = activeTargetIdRef.current
+    const route = activeId != null ? pinsRef.current.filter((p) => p.targetId === activeId) : []
+    if (route.length > 0) frameRoute(route, 'last')
+    else frameRoute(pinsRef.current, 'first')
+  }, [frameRoute])
+
+  // Vuela al viaje de `activeTargetId` (#567→#700) y le aplica el "lead" en
+  // exclusiva (vía `applyActiveLead`, que también corrige el `classList`). Desde
+  // #700 el vuelo ya no es "easeTo a SU pin" sino el FIT de su recorrido entero
+  // (mismos bounds+padding que el encuadre por defecto; con 1 solo pin sigue
+  // siendo el easeTo de siempre — ver `frameRoute`). `null`/`undefined` o un id
+  // sin pin correspondiente: NO-OP total, ni clase ni cámara — deja intacto el
+  // framing/deriva y el `lead` que ya hubiera (contrato de la prop, ver `Props`).
   const flyToTarget = useCallback(() => {
     const map = mapRef.current
     if (!map || !readyRef.current) return
@@ -461,29 +501,12 @@ export function HomeGlobe({
     // reencuadra nada). El gesto del usuario manda igual de tajante: si está
     // arrastrando el globo, cancelamos el vuelo en vez de pelearle la cámara.
     if (framingRef.current === 'world' || interactingRef.current) return
-    const pin = pinsRef.current[idx]
-    const center: [number, number] = [pin.lng, pin.lat]
-    // Mismo padding que `fitToPins` (issue #693): el pin activo aterriza en la MISMA
-    // banda visible (por encima del dock), no en el centro del lienzo completo.
-    const containerHeight = containerRef.current?.clientHeight ?? 0
-    const offset: [number, number] = [
-      0,
-      verticalFrameOffset(containerHeight, bottomObscuredRef.current),
-    ]
-    if (prefersReducedMotion()) {
-      // Reduced-motion: salto directo, sin vuelo (la escala del "lead" tampoco anima:
-      // la regla `@media (prefers-reduced-motion: reduce)` de HomeGlobe.module.css ya
-      // desactiva el pulso de bienvenida del `::before`). `easeTo` con `duration: 0` en
-      // vez de `jumpTo` (issue #693): el tipo `JumpToOptions` de MapLibre NO admite
-      // `offset` (a diferencia de `easeTo`/`flyTo`) — sin `offset` el pin activo
-      // volvería al centro del lienzo COMPLETO bajo reduced-motion, justo el bug que
-      // arregla esta issue. `easeTo({ duration: 0 })` es el mismo salto instantáneo
-      // (ya lo era el comentario original) y SÍ admite `offset`.
-      map.easeTo({ center, zoom: SINGLE_ZOOM, duration: 0, offset })
-      return
-    }
-    map.easeTo({ center, zoom: SINGLE_ZOOM, duration: FLY_TO_ACTIVE_DURATION_MS, offset })
-  }, [applyActiveLead])
+    const targetId = activeTargetIdRef.current
+    frameRoute(
+      pinsRef.current.filter((p) => p.targetId === targetId),
+      'last',
+    )
+  }, [applyActiveLead, frameRoute])
 
   // Bucle de deriva: empuja la longitud del centro a velocidad constante (grados/seg), de
   // modo que el globo gira solo. Solo en reposo (no pausado) y sin reduced-motion. Mover el
@@ -594,12 +617,12 @@ export function HomeGlobe({
             map.addLayer({ id: 'labels', type: 'raster', source: 'labels' })
           }
           readyRef.current = true
+          // `repaint` ya aplica el "lead" del `activeTargetId` inicial (vía
+          // `applyActiveLead`) y `fitToPins` ya encuadra SU recorrido (#700), así
+          // que no hace falta un vuelo aparte al cargar: un solo movimiento de
+          // cámara, no dos idénticos encadenados.
           repaint()
           fitToPins()
-          // Si `activeTargetId` ya llega con valor en el primer render (p.ej. la home
-          // abre con un viaje ya enfocado), aplica su vuelo/lead nada más cargar —si no,
-          // habría que esperar a que la prop CAMBIE para que se refleje.
-          flyToTarget()
 
           // Deriva en reposo: solo en la landing decorativa (`world`); en la home con
           // viajes reales (`pins`) el globo queda encuadrado en los pines, sin girar. Si la
@@ -646,7 +669,7 @@ export function HomeGlobe({
     // `relaxed` NO va en las deps: cambia al arrastrar la hoja y recrear el mapa WebGL en
     // cada toque sería carísimo. Su efecto vive en el useEffect de abajo (pausa/reanuda la
     // deriva y el render sin recrear nada). El montaje lee su valor inicial vía `relaxedRef`.
-  }, [webgl, repaint, fitToPins, flyToTarget, startSpin, stopSpin])
+  }, [webgl, repaint, fitToPins, startSpin, stopSpin])
 
   // Repinta + reencuadra cuando cambian los pines (no recrea el mapa).
   useEffect(() => {
@@ -664,13 +687,13 @@ export function HomeGlobe({
 
   // Issue #693: si el dock cambia de alto (aparece/desaparece el chip "Te toca jugar",
   // los chips de filtro, o el usuario cambia a un viaje con/sin fechas) el hueco visible
-  // cambia — reencuadra/revuela para que los pines sigan aterrizando por encima del
-  // dock, no en la banda que acaba de crecer o encogerse.
+  // cambia — reencuadra para que los pines sigan aterrizando por encima del dock, no en
+  // la banda que acaba de crecer o encogerse. Basta `fitToPins`: desde #700 ya encuadra
+  // el recorrido del viaje activo (antes hacía falta `flyToTarget` aparte).
   useEffect(() => {
     if (!readyRef.current) return
     fitToPins()
-    flyToTarget()
-  }, [bottomObscuredPx, fitToPins, flyToTarget])
+  }, [bottomObscuredPx, fitToPins])
 
   // Rendimiento + deriva según la hoja. Con la hoja SUBIDA (`relaxed`) el globo queda casi
   // tapado: paramos la rotación de teselas (batería) y PAUSAMOS la deriva. Al RECOGERSE la

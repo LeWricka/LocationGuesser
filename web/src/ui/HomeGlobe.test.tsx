@@ -425,3 +425,117 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     expect(markerInstances[1].getElement().classList.contains('lg-home-pin--lead')).toBe(false)
   })
 })
+
+// --- #700: globo poblado — encuadre del RECORRIDO del viaje protagonista ---------
+//
+// Con todos los momentos de todos los viajes clavados en el globo, el encuadre por
+// defecto ya no puede ser "todos los pines" (centroide sin sentido): es el recorrido
+// del viaje ACTIVO (`activeTargetId`, que HomeDashboard pasa desde el arranque con el
+// primer viaje del carrusel). Los pines del resto de viajes quedan clavados fuera del
+// encuadre. Spans elegidos > MIN_FIT_SPAN_DEG (1.2°) para que el ensanchado
+// anti-amontonamiento no toque los bounds y podamos asertar valores exactos.
+describe('HomeGlobe — encuadre del recorrido del viaje protagonista (#700)', () => {
+  // t1: recorrido ibérico (2 pines); t2: un pin suelto casi antípoda (Sídney). Si el
+  // fit incluyera a t2, el span sería intercontinental y saldría un easeTo (#699), no
+  // un fitBounds: que el arranque haga fitBounds YA demuestra que t2 quedó fuera.
+  function tripPins(): GlobePin[] {
+    return [
+      { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+      { id: 'madrid', lat: 40.4168, lng: -3.7038, title: 'Madrid', imageUrl: null, targetId: 't1' },
+      {
+        id: 'sidney',
+        lat: -33.8688,
+        lng: 151.2093,
+        title: 'Sídney',
+        imageUrl: null,
+        targetId: 't2',
+      },
+    ]
+  }
+
+  test('arranque con activeTargetId: fitBounds SOLO sobre los pines del protagonista', async () => {
+    render(<HomeGlobe pins={tripPins()} activeTargetId="t1" />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+
+    // Bounds EXACTOS del recorrido de t1 (Lisboa–Madrid): Sídney fuera.
+    const { bounds } = mapInstances[0].fitBoundsCalls[0] as { bounds: MockLngLatBounds }
+    expect(bounds.sw).toEqual([-9.1393, 38.7223])
+    expect(bounds.ne).toEqual([-3.7038, 40.4168])
+    // El "lead" del arranque recae en el pin MÁS RECIENTE del protagonista (el último
+    // de su recorrido, orden cronológico ASC), no en el primero.
+    expect(markerInstances[1].getElement().classList.contains('lg-home-pin--lead')).toBe(true)
+    expect(markerInstances[0].getElement().classList.contains('lg-home-pin--lead')).toBe(false)
+  })
+
+  test('cambiar activeTargetId a un viaje con varios pines: fit de SU recorrido', async () => {
+    const pins: GlobePin[] = [
+      ...tripPins(),
+      { id: 'roma', lat: 41.8902, lng: 12.4922, title: 'Roma', imageUrl: null, targetId: 't3' },
+      { id: 'paris', lat: 48.8566, lng: 2.3522, title: 'París', imageUrl: null, targetId: 't3' },
+    ]
+    const { rerender } = render(<HomeGlobe pins={pins} activeTargetId="t1" />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
+
+    rerender(<HomeGlobe pins={pins} activeTargetId="t3" />)
+
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(2)
+    const { bounds } = mapInstances[0].fitBoundsCalls[1] as { bounds: MockLngLatBounds }
+    expect(bounds.sw).toEqual([2.3522, 41.8902])
+    expect(bounds.ne).toEqual([12.4922, 48.8566])
+    // El "lead" pasa en exclusiva al pin más reciente del viaje nuevo (París, el
+    // último de t3).
+    expect(markerInstances[4].getElement().classList.contains('lg-home-pin--lead')).toBe(true)
+    expect(markerInstances[1].getElement().classList.contains('lg-home-pin--lead')).toBe(false)
+  })
+
+  test('viaje activo de un solo pin: easeTo como siempre (sin fitBounds nuevo)', async () => {
+    const pins = tripPins()
+    const { rerender } = render(<HomeGlobe pins={pins} activeTargetId="t1" />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
+
+    rerender(<HomeGlobe pins={pins} activeTargetId="t2" />)
+
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(1)
+    expect(mapInstances[0].easeToCalls).toHaveLength(1)
+    expect(mapInstances[0].easeToCalls[0]).toMatchObject({
+      center: [151.2093, -33.8688],
+      zoom: 2.2,
+      duration: 700,
+    })
+  })
+
+  test('recorrido del viaje activo intercontinental: manda su pin más reciente (#699)', async () => {
+    // Un MISMO viaje con pines casi antípodas (raro, pero posible): su fit caería en
+    // el centroide oceánico, así que aplica la política de protagonista de #699 sobre
+    // su propio recorrido — easeTo a su pin más reciente (el último, orden ASC).
+    const pins: GlobePin[] = [
+      { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+      {
+        id: 'sidney',
+        lat: -33.8688,
+        lng: 151.2093,
+        title: 'Sídney',
+        imageUrl: null,
+        targetId: 't1',
+      },
+    ]
+    render(<HomeGlobe pins={pins} activeTargetId="t1" />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+    await waitFor(() => expect(mapInstances[0].easeToCalls).toHaveLength(1))
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
+    const call = mapInstances[0].easeToCalls[0] as { center: [number, number] }
+    expect(call.center).toEqual([151.2093, -33.8688])
+  })
+})

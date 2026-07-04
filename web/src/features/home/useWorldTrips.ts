@@ -61,6 +61,14 @@ export interface WorldData {
 
 const EMPTY: WorldData = { trips: [], totalKm: 0, loading: true }
 
+// Cap de cordura (#700): un viaje largo puede acumular decenas de momentos situados,
+// y cada punto del globo cuesta un marker DOM + una firma de URL en CADA carga de la
+// home. Nos quedamos con los N más recientes POR VIAJE (el recorrido reciente, que es
+// lo que se lee a zoom continente); el resto no aporta a un globo-ambiente y sí
+// castiga a un viaje de meses (80 markers, 80 firmas). Nota: `totalKm` (el caption)
+// se calcula sobre los puntos capados — aproximación asumida para viajes muy largos.
+const MAX_POINTS_PER_TRIP = 15
+
 /** Firma el path de una foto a URL; null si no hay path o si falla (no rompe el pin). */
 async function signOrNull(imagePath: string | null | undefined): Promise<string | null> {
   if (!imagePath) return null
@@ -86,12 +94,17 @@ async function resolveTrip(groupId: string, name: string): Promise<WorldTrip | n
   const raw = await resolveVisibleTripMoments(groupId)
   if (raw.length === 0) return null
 
-  // Portada: mismo criterio que usa la invitación al viaje (#619).
+  // Portada: mismo criterio que usa la invitación al viaje (#619) — se elige sobre
+  // TODOS los momentos visibles, antes del cap de puntos (no cambia con él).
   const coverUrl = await signOrNull(pickTripCoverImagePath(raw))
+
+  // Cap por viaje (ver MAX_POINTS_PER_TRIP): `raw` viene DESC, así que el slice se
+  // queda con los más recientes ANTES de firmar — capa markers Y firmas a la vez.
+  const recent = raw.slice(0, MAX_POINTS_PER_TRIP)
 
   // Firmamos las miniaturas de los pines en paralelo (cada una tolerante a fallo).
   const points: TripPoint[] = await Promise.all(
-    raw.map(async (r) => ({
+    recent.map(async (r) => ({
       id: r.id,
       lat: r.lat,
       lng: r.lng,

@@ -9,6 +9,7 @@ import type { GroupStatus } from './GroupCard'
 import { HomeGlobe } from './HomeGlobe'
 import type { GlobePin } from './HomeGlobe'
 import { IconPin, LogoMomentu, WordmarkMomentu } from './icons'
+import { sortTrips } from './sortTrips'
 import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
 import styles from './HomeDashboard.module.css'
 
@@ -152,22 +153,6 @@ export interface HomePinned {
   deadlineAt: string | null
   /** Foto del reto, o null (cae a un fondo de papel). */
   coverUrl?: string | null
-}
-
-// Orden del carrusel: PRIMERO los viajes que piden acción (te toca → en juego), luego
-// el resto por más reciente. Así lo que urge queda más a mano (el reto concreto,
-// además, va fijado en el chip de vidrio flotante).
-function actionRank(status: GroupStatus): number {
-  if (status === 'toplay') return 0 // te toca jugar
-  if (status === 'live') return 1 // hay reto abierto
-  return 2 // sin acción pendiente
-}
-function sortTrips(list: HomeGroup[]): HomeGroup[] {
-  return [...list].sort(
-    (a, b) =>
-      actionRank(a.status) - actionRank(b.status) ||
-      (b.createdAt ?? '').localeCompare(a.createdAt ?? ''),
-  )
 }
 
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']

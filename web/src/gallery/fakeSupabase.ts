@@ -13,6 +13,7 @@
 import {
   ANSWERS,
   CHALLENGES,
+  EXTRA_GROUPS,
   GROUP,
   isEmptyWorld,
   ME_ID,
@@ -24,6 +25,7 @@ import {
   PROFILES,
   VOTES,
 } from './fixtures'
+import type { GalleryGroupRow } from './fixtures'
 
 type Row = Record<string, unknown>
 interface QueryResult<T> {
@@ -34,10 +36,31 @@ interface QueryResult<T> {
 // Devuelve TODAS las filas de una tabla sembrada (sin recortar columnas: el
 // `.select(cols)` se ignora salvo para detectar embeds, igual que en una BD donde
 // pedir menos columnas no cambia el contenido de las que sí pides).
+// Fila de group_members con el embed `groups` que pide `myGroups`.
+function membershipRow(group: GalleryGroupRow, userId: string, role: string): Row {
+  return {
+    group_id: group.id,
+    user_id: userId,
+    role,
+    joined_at: group.created_at,
+    // Embed que pide `myGroups`: group_members → groups.
+    groups: {
+      id: group.id,
+      name: group.name,
+      created_by: group.created_by,
+      created_at: group.created_at,
+      closed_at: group.closed_at,
+      starts_on: group.starts_on,
+      ends_on: group.ends_on,
+      cover_image_path: group.cover_image_path,
+    },
+  }
+}
+
 function rowsFor(table: string): Row[] {
   switch (table) {
     case 'groups':
-      return [GROUP as unknown as Row]
+      return [GROUP, ...EXTRA_GROUPS] as unknown as Row[]
     case 'challenges':
       return CHALLENGES as unknown as Row[]
     case 'votes':
@@ -47,23 +70,12 @@ function rowsFor(table: string): Row[] {
     case 'group_members':
       // Mundo vacío (home recién llegada): sin membresías → myGroups() = [].
       if (isEmptyWorld()) return []
-      return MEMBERS.map((m) => ({
-        group_id: GROUP.id,
-        user_id: m.userId,
-        role: m.role,
-        joined_at: GROUP.created_at,
-        // Embed que pide `myGroups`: group_members → groups.
-        groups: {
-          id: GROUP.id,
-          name: GROUP.name,
-          created_by: GROUP.created_by,
-          created_at: GROUP.created_at,
-          closed_at: GROUP.closed_at,
-          starts_on: GROUP.starts_on,
-          ends_on: GROUP.ends_on,
-          cover_image_path: GROUP.cover_image_path,
-        },
-      }))
+      return [
+        // El viaje protagonista (Japón), con sus 4 miembros.
+        ...MEMBERS.map((m) => membershipRow(GROUP, m.userId, m.role)),
+        // Los otros viajes (#700, pines sueltos del globo): solo yo como miembro.
+        ...EXTRA_GROUPS.map((g) => membershipRow(g, ME_ID, 'owner')),
+      ]
     case 'challenge_answers':
       // Respuestas (lat/lng o cifra) SOLO de los retos cerrados (anti-spoiler),
       // igual que la RLS de challenge_answers en prod: los activos no aparecen.
