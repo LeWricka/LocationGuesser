@@ -14,12 +14,15 @@ En **Google Cloud Console → APIs y servicios → Credenciales → [la API key]
 Marcar **"Sitios web (Referentes HTTP)"** y permitir exactamente estos referrers:
 
 ```
+https://www.momentu.art/*
+https://momentu.art/*
 https://locationguesser-sage.vercel.app/*
 https://*.vercel.app/*
 http://localhost:5173/*
 ```
 
-- `locationguesser-sage.vercel.app/*` → producción.
+- `momentu.art/*` (y `www.`) → producción (dominio propio desde jul 2026).
+- `locationguesser-sage.vercel.app/*` → la URL de Vercel subyacente (sigue viva).
 - `*.vercel.app/*` → deploys de preview de Vercel (cada PR genera una URL distinta).
 - `localhost:5173/*` → dev local (puerto por defecto de Vite).
 
@@ -256,7 +259,7 @@ Los E2E de CI son **herméticos** (mockean sesión, Supabase y Google Maps): caz
 regresiones de lógica, pero por diseño **no ven** los bugs que solo aparecen
 **logueado + con Google Maps/BD reales** (el punto ciego de esta semana: el bloque
 "Añadir Street View" que no se veía en local). El **smoke logueado** cubre ese hueco:
-un navegador real contra `https://www.tabide.app` con una **cuenta de test** que
+un navegador real contra `https://www.momentu.art` con una **cuenta de test** que
 recorre home logueada → abrir un viaje → crear reto → soltar pin → comprobar que
 **"Añadir Street View" es visible**.
 
@@ -307,7 +310,7 @@ true`), así que puede loguear por password y **crear viajes** sin validar corre
 
 Para que el smoke sea **no destructivo**, apúntalo a un **viaje de test dedicado** que
 ya exista (así no crea nada). Logueado como el usuario de test en
-`https://www.tabide.app`, crea un viaje (p.ej. "smoke e2e — no tocar") y coge su **id**
+`https://www.momentu.art`, crea un viaje (p.ej. "smoke e2e — no tocar") y coge su **id**
 del hash de la URL (`…/#g=<ESTE_ID>`). Ese id va en el secret `E2E_TRIP_ID`.
 
 (Si no configuras `E2E_TRIP_ID`, el smoke abre la primera tarjeta de "Tus viajes"; y si
@@ -346,7 +349,7 @@ Actions → New repository secret**:
   npm run e2e:prod-logged
   ```
 
-  Apunta a `https://www.tabide.app` por defecto; override con `E2E_BASE_URL` para un
+  Apunta a `https://www.momentu.art` por defecto; override con `E2E_BASE_URL` para un
   deploy de preview.
 
 ---

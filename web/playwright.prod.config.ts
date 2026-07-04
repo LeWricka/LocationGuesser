@@ -5,7 +5,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 // Config del SMOKE LOGUEADO POST-DEPLOY contra PRODUCCIÓN (#458). A diferencia del
 // smoke hermético (mocks, sin secretos, corre en cada PR), este apunta a la app
-// REAL en `https://www.tabide.app` con una CUENTA DE TEST, para cazar lo que solo
+// REAL en `https://www.momentu.art` con una CUENTA DE TEST, para cazar lo que solo
 // se ve logueado + con Google Maps/BD de verdad (el punto ciego de esta semana).
 //
 // - NO levanta servidor: pega a la URL de prod tal cual.
@@ -41,11 +41,11 @@ function loadDotEnvLocal() {
 }
 loadDotEnvLocal()
 
-// Origen EFECTIVO de prod. `tabide.app` hace 308 → `www.tabide.app`, así que la app
+// Origen EFECTIVO de prod. `momentu.art` hace 308 → `www.momentu.art`, así que la app
 // corre en `www`. La sesión en storageState es scope de ORIGEN: fijarla en el origen
 // donde la SPA realmente carga evita que un redirect deje la navegación sin sesión.
 // Override con E2E_BASE_URL (p.ej. un deploy de preview) si hiciera falta.
-const baseURL = process.env.E2E_BASE_URL ?? 'https://www.tabide.app'
+const baseURL = process.env.E2E_BASE_URL ?? 'https://www.momentu.art'
 
 export default defineConfig({
   testDir: 'e2e',

@@ -4,7 +4,7 @@ import { test, expect, hasAuthCreds } from './helpers/authed'
 // SMOKE LOGUEADO POST-DEPLOY contra PRODUCCIÓN (#458).
 //
 // Corre con `npm run e2e:prod-logged` (config: playwright.prod.config.ts) contra la
-// app REAL en `https://www.tabide.app` con una CUENTA DE TEST. Reutiliza el mecanismo
+// app REAL en `https://www.momentu.art` con una CUENTA DE TEST. Reutiliza el mecanismo
 // de login por password del global-setup (storageState con la sesión de Supabase ya
 // puesta en localStorage → arranca logueado, sin magic link).
 //

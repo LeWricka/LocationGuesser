@@ -87,7 +87,7 @@ jobs:
         if: steps.guard.outputs.run == 'true' && github.event_name == 'workflow_run'
         run: sleep 90
 
-      - name: Smoke logueado en prod (www.tabide.app)
+      - name: Smoke logueado en prod (www.momentu.art)
         if: steps.guard.outputs.run == 'true'
         working-directory: web
         run: npm run e2e:prod-logged

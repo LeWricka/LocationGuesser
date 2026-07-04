@@ -75,5 +75,5 @@ del `config.toml`.
 > "HTTP ok" para el navegador, así que el preflight fallaba en bucle y
 > `resolvePlaceCover` (sin cachear el fallo) reintentaba en cada remonte de
 > tarjeta, congelando la web. Tras desplegar, comprobar con:
-> `curl -i -X OPTIONS "$URL/functions/v1/place-cover" -H "Origin: https://www.tabide.app" -H "Access-Control-Request-Method: POST"`
+> `curl -i -X OPTIONS "$URL/functions/v1/place-cover" -H "Origin: https://www.momentu.art" -H "Access-Control-Request-Method: POST"`
 > — debe responder `204` (no `404` ni `401`).
