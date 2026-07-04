@@ -354,9 +354,12 @@ export function CreateLocationChallenge({
     <div className={styles.root}>
       {/* Cabecera: atrás (sale en el paso 1, vuelve al paso 1 en el paso 2) +
           título + botón GPS secundario (solo en el paso 1, donde hay mapa que
-          centrar y solo se dispara al pulsarlo — issue #592 punto 1). */}
+          centrar y solo se dispara al pulsarlo — issue #592 punto 1).
+          `dense` en el paso 1 (issue #705): el mapa es el protagonista a
+          sangre y pelea por el alto — atrás+título en una fila, hilo corto.
+          El paso 2 (las reglas) es un formulario normal → `plain`. */}
       <AppHeader
-        variant="plain"
+        variant={step === 'sitio' ? 'dense' : 'plain'}
         lead="back"
         onLead={step === 'previa' ? backToSitio : onBack}
         leadLabel="Atrás"

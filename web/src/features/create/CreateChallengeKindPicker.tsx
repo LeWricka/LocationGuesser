@@ -23,10 +23,12 @@ export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) 
     <div className={styles.root}>
       <ShellUtilitario
         header={
-          // Cabecera ÚNICA del producto (variante papel): mismo título serif y
-          // back-disco de 44px que el resto del flujo de crear. El contexto del
-          // viaje vive en el eyebrow del cuerpo (la cabecera es de una sola línea).
-          <AppHeader lead="back" onLead={onBack} leadLabel="Atrás" title="Nuevo reto" />
+          // Cabecera SOLO con el atrás (issue #705): con la cabecera 5B
+          // compactada, un título "Nuevo reto" aquí quedaba redundante con el
+          // heading "¿A qué jugamos?" de abajo (dos títulos consecutivos). El
+          // texto "Nuevo reto" pasa a ser el kicker del heading del cuerpo —
+          // sigue estando, pero una sola vez.
+          <AppHeader variant="dense" lead="back" onLead={onBack} leadLabel="Atrás" />
         }
       >
         {/* ShellUtilitario ancla el cuerpo ARRIBA (sin centrado vertical): en
@@ -35,7 +37,7 @@ export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) 
         <div className={styles.body}>
           <header className={styles.lede}>
             <span className={styles.eyebrow}>
-              {groupName ? `Viaje · ${groupName} · Elige el tipo` : 'Elige el tipo'}
+              {groupName ? `Nuevo reto · ${groupName}` : 'Nuevo reto'}
             </span>
             <h1 className={styles.h}>¿A qué jugamos?</h1>
             <p className={styles.sub}>Dos formas de retar al grupo. Eliges una y a por ello.</p>
