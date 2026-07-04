@@ -7,6 +7,8 @@ import {
   fotosGroupHash,
   addMomentHash,
   addChallengeHash,
+  ownerInviteHash,
+  stripOwnerInviteToken,
 } from './route'
 
 describe('parseHash', () => {
@@ -136,6 +138,14 @@ describe('parseHash', () => {
   test('from sin add=reto se ignora (solo aplica al crear reto)', () => {
     expect(parseHash('#g=abc123&from=m-1')).toEqual({ view: 'home', group: 'abc123' })
   })
+
+  test('adm=<token> marca el enlace de co-dueño (issue #707)', () => {
+    expect(parseHash('#g=abc123&adm=tok-1')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      ownerInviteToken: 'tok-1',
+    })
+  })
 })
 
 describe('groupHash', () => {
@@ -185,5 +195,26 @@ describe('marcadorGroupHash / classicGroupHash / addMomentHash', () => {
     const r = parseHash(addChallengeHash('abc123', 'm-1'))
     expect(r.groupAddChallenge).toBe(true)
     expect(r.groupChallengeFrom).toBe('m-1')
+  })
+})
+
+describe('ownerInviteHash / stripOwnerInviteToken', () => {
+  test('ownerInviteHash construye el enlace de co-dueño', () => {
+    expect(ownerInviteHash('abc123', 'tok-1')).toBe('#g=abc123&adm=tok-1')
+    const r = parseHash(ownerInviteHash('abc123', 'tok-1'))
+    expect(r.group).toBe('abc123')
+    expect(r.ownerInviteToken).toBe('tok-1')
+  })
+
+  test('stripOwnerInviteToken quita adm y conserva el resto', () => {
+    expect(stripOwnerInviteToken('#g=abc123&adm=tok-1&add=reto')).toBe('#g=abc123&add=reto')
+  })
+
+  test('stripOwnerInviteToken es no-op si no hay adm', () => {
+    expect(stripOwnerInviteToken('#g=abc123&add=reto')).toBe('#g=abc123&add=reto')
+  })
+
+  test('stripOwnerInviteToken añade # si el hash no lo trae', () => {
+    expect(stripOwnerInviteToken('g=abc123')).toBe('#g=abc123')
   })
 })

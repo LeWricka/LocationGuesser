@@ -6,8 +6,10 @@
 
 import { useCallback, useRef } from 'react'
 import { isMember, joinGroup } from '../../lib/membership'
-import { parseHash } from '../../lib/route'
+import { parseHash, stripOwnerInviteToken } from '../../lib/route'
 import { track } from '../../lib/analytics'
+import { redeemOwnerInvite } from '../../lib/ownerInvites'
+import { useToast } from '../../ui'
 
 /**
  * Devuelve `joinIfGroup(hash)`: si el hash apunta a un grupo, hace `joinGroup` y
@@ -18,6 +20,7 @@ import { track } from '../../lib/analytics'
 export function useDeepLinkJoin(userId: string | undefined) {
   // Evita carreras: si ya estamos uniéndonos a un destino, no lo repetimos.
   const inFlight = useRef<string | null>(null)
+  const toast = useToast()
 
   const joinIfGroup = useCallback(
     async (hash: string): Promise<void> => {
@@ -33,15 +36,35 @@ export function useDeepLinkJoin(userId: string | undefined) {
       if (inFlight.current === hash) return
       inFlight.current = hash
       try {
-        // ¿Ya soy miembro? Lo comprobamos ANTES del upsert para distinguir un
-        // alta real (interesa para analítica) de una reentrada idempotente.
-        const alreadyMember = await isMember(route.group, userId)
-        // Auto-join idempotente: alta en group_members (o no-op si ya soy miembro).
-        await joinGroup(route.group, userId)
-        // Solo contamos `group_joined` cuando el usuario REALMENTE se une (no en
-        // reentradas: abrir el mismo link otra vez no es un join nuevo).
-        if (!alreadyMember) {
-          track('group_joined', { group_id: route.group })
+        // Enlace de CO-DUEÑO (`#g=…&adm=<token>`, issue #707): en vez del alta
+        // normal de miembro, canjeamos el token — asciende directo a co-dueño.
+        // Éxito → ya quedó con la membresía correcta, sin pasar por joinGroup
+        // (que además sería redundante). Fallo (caducado/usado/inválido) → aviso
+        // honesto y CAE al alta normal de miembro, como si `adm` no existiera:
+        // quien recibe el enlace nunca se queda sin poder entrar al viaje.
+        let ownerInviteFailed = false
+        if (route.ownerInviteToken) {
+          try {
+            await redeemOwnerInvite(route.ownerInviteToken)
+            track('owner_invite_redeemed', { group_id: route.group })
+          } catch (err) {
+            ownerInviteFailed = true
+            const detail = err instanceof Error ? err.message : 'inténtalo con el enlace normal'
+            toast.show(`No se pudo activar el enlace de co-dueño: ${detail}`, { tone: 'danger' })
+          }
+        }
+
+        if (!route.ownerInviteToken || ownerInviteFailed) {
+          // ¿Ya soy miembro? Lo comprobamos ANTES del upsert para distinguir un
+          // alta real (interesa para analítica) de una reentrada idempotente.
+          const alreadyMember = await isMember(route.group, userId)
+          // Auto-join idempotente: alta en group_members (o no-op si ya soy miembro).
+          await joinGroup(route.group, userId)
+          // Solo contamos `group_joined` cuando el usuario REALMENTE se une (no en
+          // reentradas: abrir el mismo link otra vez no es un join nuevo).
+          if (!alreadyMember) {
+            track('group_joined', { group_id: route.group })
+          }
         }
         // Restaurar el destino: el router por hash repinta la pantalla correcta a
         // partir del hash de ENTRADA tal cual, SIN reconstruirlo. `hash` ya viene
@@ -64,7 +87,10 @@ export function useDeepLinkJoin(userId: string | undefined) {
         // ya estaba, y comparar contra `window.location.hash` evita además
         // reescrituras innecesarias: en el Flujo C ambos son el mismo string, así
         // que este `if` nunca dispara.
-        const target = hash.startsWith('#') ? hash : `#${hash}`
+        // `adm` se CONSUME (issue #707): es de un solo uso, así que no debe
+        // sobrevivir en la URL tras intentar el canje (con éxito o fallback) —
+        // un F5 no debe reintentar el mismo token. Mismo criterio que `add=1`.
+        const target = stripOwnerInviteToken(hash)
         if (window.location.hash !== target) {
           window.location.hash = target
         }
@@ -72,7 +98,7 @@ export function useDeepLinkJoin(userId: string | undefined) {
         inFlight.current = null
       }
     },
-    [userId],
+    [userId, toast],
   )
 
   return joinIfGroup

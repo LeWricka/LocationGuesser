@@ -408,6 +408,43 @@ export interface Database {
         }
         Relationships: []
       }
+      group_invites: {
+        // Enlaces de invitación de UN SOLO USO que ascienden directamente a un
+        // rol (hoy solo 'owner') al canjearse, vía la RPC `redeem_owner_invite`.
+        // RLS: INSERT/SELECT solo dueños del grupo; sin SELECT público (el
+        // token no se enumera). Migración 0038.
+        Row: {
+          token: string
+          group_id: string
+          role: string
+          created_by: string
+          created_at: string
+          expires_at: string
+          used_by: string | null
+          used_at: string | null
+        }
+        Insert: {
+          token?: string
+          group_id: string
+          role: string
+          created_by: string
+          created_at?: string
+          expires_at?: string
+          used_by?: string | null
+          used_at?: string | null
+        }
+        Update: {
+          token?: string
+          group_id?: string
+          role?: string
+          created_by?: string
+          created_at?: string
+          expires_at?: string
+          used_by?: string | null
+          used_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -587,6 +624,14 @@ export interface Database {
           median_response_seconds: number | null
         }[]
       }
+      // Canjea un enlace de co-dueño (issue #707): valida el token (existe, no
+      // usado, no caducado) y asciende — o da de alta — a `auth.uid()` como
+      // 'owner' del grupo del token. SECURITY DEFINER, un solo uso. Devuelve el
+      // group_id para navegar. Migración 0038.
+      redeem_owner_invite: {
+        Args: { invite_token: string }
+        Returns: string
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
@@ -601,6 +646,7 @@ export type Challenge = Database['public']['Tables']['challenges']['Row']
 export type Vote = Database['public']['Tables']['votes']['Row']
 export type ChallengeAnswer = Database['public']['Tables']['challenge_answers']['Row']
 export type PushSubscriptionRow = Database['public']['Tables']['push_subscriptions']['Row']
+export type GroupInvite = Database['public']['Tables']['group_invites']['Row']
 /** Una fila del retorno de la RPC `submit_vote` (revelado al votar). */
 export type SubmitVoteResult = Database['public']['Functions']['submit_vote']['Returns'][number]
 /** Una fila del retorno de la RPC `submit_number_vote` (revelado del reto de número). */

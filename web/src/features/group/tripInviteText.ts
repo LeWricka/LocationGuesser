@@ -37,3 +37,13 @@ export function tripInviteMetaLine(memberCount: number | null, challengeCount: n
 export function buildInviteCaption(authorName: string, tripName: string, link: string): string {
   return `${tripShareText(authorName, tripName)}\n${link}`
 }
+
+/**
+ * Caption del enlace de CO-DUEÑO (issue #707): a diferencia de `buildInviteCaption`
+ * (invitación social, tarjeta-imagen), este es un enlace OPERATIVO — sin gancho ni
+ * tarjeta, solo lo esencial para que quien lo reciba sepa qué es y sus condiciones
+ * (un solo uso, caduca en 7 días) antes de abrirlo.
+ */
+export function buildOwnerInviteCaption(tripName: string, link: string): string {
+  return `Entra como co-dueño de «${tripName}». Un solo uso, caduca en 7 días.\n${link}`
+}

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Share2 } from 'lucide-react'
+import { Crown, Share2 } from 'lucide-react'
 import { Button, Icon, Modal, Spinner, useToast } from '../../ui'
 import { track } from '../../lib/analytics'
 import { getGroupMembers } from '../../lib/membership'
 import { useSession } from '../../lib/session-context'
-import { buildInviteCaption, tripInviteMetaLine } from './tripInviteText'
+import { createOwnerInvite } from '../../lib/ownerInvites'
+import { ownerInviteHash } from '../../lib/route'
+import { buildInviteCaption, buildOwnerInviteCaption, tripInviteMetaLine } from './tripInviteText'
 import { resolveTripInviteCover } from './tripInviteCover'
 import { TripInviteCard } from './TripInviteCard'
 // La rasterización y el propio compartir/descarga de la imagen se REUTILIZAN de
@@ -24,6 +26,13 @@ interface Props {
   link: string
   /** Nº de retos del grupo (ya lo tiene GroupPage) para la tarjeta. */
   challengeCount: number
+  /**
+   * Soy dueño (creador raíz o co-dueño) de este grupo: solo un dueño puede
+   * EMITIR un enlace de co-dueño (issue #707; RLS `group_invites_insert_owner`,
+   * migración 0038 lo exige igualmente en servidor). Gatea la sección de
+   * "Generar enlace de co-dueño"; el resto del modal es igual para todos.
+   */
+  isOwner: boolean
 }
 
 // Modal de "Invitar al viaje" (issue #617): "Compartir" genera y comparte una
@@ -34,8 +43,16 @@ interface Props {
 // SOLO en el caption (nunca estampado en la imagen); sin Web Share, cae a
 // descargar la imagen + copiar el mensaje. "Copiar enlace" queda intacto:
 // sigue copiando texto + enlace, independiente de si la imagen se generó.
-export function InviteModal({ open, onClose, groupId, groupName, link, challengeCount }: Props) {
-  const { profile } = useSession()
+export function InviteModal({
+  open,
+  onClose,
+  groupId,
+  groupName,
+  link,
+  challengeCount,
+  isOwner,
+}: Props) {
+  const { user, profile } = useSession()
   const cardRef = useRef<HTMLDivElement>(null)
   // Recuento de miembros emparejado con el groupId que lo pidió: así sabemos si
   // el dato corresponde al grupo actual sin resetear estado de forma síncrona en
@@ -59,6 +76,10 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
   const [blob, setBlob] = useState<Blob | null>(null)
   const [error, setError] = useState(false)
   const [sharing, setSharing] = useState(false)
+  // Generar el enlace de co-dueño (issue #707) es una acción aparte, sin estado
+  // que sobreviva al cierre del modal: cada apertura ofrece "generar" de nuevo
+  // (un enlace ya copiado no necesita quedar visible aquí).
+  const [generatingCoOwnerLink, setGeneratingCoOwnerLink] = useState(false)
   const toast = useToast()
 
   // Quién invita: el display_name de la sesión (cae a "Alguien" si aún no carga).
@@ -153,6 +174,29 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
     }
   }
 
+  // Genera un enlace de CO-DUEÑO (issue #707): a diferencia de "Copiar enlace"
+  // (invita a VER/jugar), este asciende directo a co-dueño al canjearlo — sin
+  // pasar por el alta normal + promover a mano en «Miembros». Un solo uso;
+  // servidor decide quién puede emitirlo (RLS `group_invites_insert_owner`), la
+  // UI solo lo esconde a no-dueños para no ofrecer una acción que 0-filas.
+  async function generateCoOwnerLink() {
+    if (!user?.id) return
+    setGeneratingCoOwnerLink(true)
+    try {
+      const token = await createOwnerInvite(groupId, user.id)
+      const url = `${window.location.origin}${ownerInviteHash(groupId, token)}`
+      const caption = buildOwnerInviteCaption(groupName, url)
+      await navigator.clipboard.writeText(caption)
+      track('owner_invite_created', { group_id: groupId })
+      toast.show('Enlace de co-dueño copiado, pégalo en el chat', { tone: 'success' })
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : 'inténtalo de nuevo'
+      toast.show(`No se pudo generar el enlace de co-dueño: ${detail}`, { tone: 'danger' })
+    } finally {
+      setGeneratingCoOwnerLink(false)
+    }
+  }
+
   // Comparte la tarjeta-imagen: Web Share nivel 2 con el PNG como file y el
   // caption (enlace incluido) como texto. Sin Web Share (o si el usuario
   // cancela), cae a descargar la imagen + copiar el caption (patrón #604).
@@ -226,11 +270,31 @@ export function InviteModal({ open, onClose, groupId, groupName, link, challenge
       <p className={styles.hint}>
         Comparte la tarjeta en el chat del grupo. Quien la abra entra directo al viaje.
       </p>
-      {/* Descubribilidad (#616): quien invita suele querer también repartir la
-          gestión; el sitio para eso es la vista Miembros, no esta hoja. */}
-      <p className={styles.hint}>
-        ¿Quieres que también administre el viaje? Hazlo co-dueño desde «Miembros» (menú ⋯).
-      </p>
+      {/* Descubribilidad (#616): para alguien que YA es miembro, el sitio para
+          hacerlo co-dueño es la vista Miembros. Para alguien que aún no ha
+          entrado, la sección de abajo (#707) manda el enlace de co-dueño
+          directo, sin ese paso intermedio. */}
+      <p className={styles.hint}>¿Ya está en el viaje? Hazlo co-dueño desde «Miembros» (menú ⋯).</p>
+
+      {/* Enlace de co-dueño (issue #707): sección discreta, SOLO para dueños —
+          no es una invitación social (sin tarjeta-imagen), es un enlace
+          operativo de un solo uso. Separada de las acciones principales del
+          pie: no compite con "Copiar enlace"/"Compartir". */}
+      {isOwner && (
+        <div className={styles.ownerInvite}>
+          <p className={styles.ownerInviteHint}>
+            ¿Para que lo administre contigo? <strong>Genera un enlace de co-dueño.</strong>
+          </p>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void generateCoOwnerLink()}
+            loading={generatingCoOwnerLink}
+          >
+            <Icon icon={Crown} size={15} /> Generar enlace de co-dueño
+          </Button>
+        </div>
+      )}
 
       {/* La tarjeta real, a tamaño completo, montada fuera del viewport para que
           html-to-image la mida y rasterice bien (display:none daría 0×0). Solo

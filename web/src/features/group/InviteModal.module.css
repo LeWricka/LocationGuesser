@@ -47,6 +47,26 @@
   color: var(--color-text-muted);
 }
 
+/* Sección de enlace de co-dueño (#707): discreta, separada por un filete del
+   resto del modal — es una acción operativa, no la invitación social de
+   arriba. Solo la ve un dueño (gate en el propio componente). */
+.ownerInvite {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.ownerInviteHint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-muted);
+}
+
 /* Pie de acciones (#607): fila que ocupa todo el ancho del footer del Modal y
    envuelve si no cabe, en vez de desbordar el panel. min-width:0 deja que cada
    botón encoja por debajo de su ancho de contenido antes de forzar el wrap. */

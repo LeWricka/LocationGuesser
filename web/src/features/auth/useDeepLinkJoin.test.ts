@@ -15,6 +15,20 @@ vi.mock('../../lib/analytics', () => ({
   track: (event: string, props?: Record<string, unknown>) => track(event, props),
 }))
 
+// Enlace de co-dueño (issue #707): mockeamos el canje para separar el
+// comportamiento del hook (qué hace con éxito/fallo) de la RPC real.
+const redeemOwnerInvite = vi.fn<(token: string) => Promise<string>>(async () => 'ABC')
+vi.mock('../../lib/ownerInvites', () => ({
+  redeemOwnerInvite: (token: string) => redeemOwnerInvite(token),
+}))
+
+// useToast exige un <ToastProvider>; el hook solo lo usa para avisar del
+// fallback del enlace de co-dueño, así que mockeamos un `show` espiable.
+const toastShow = vi.fn()
+vi.mock('../../ui', () => ({
+  useToast: () => ({ show: toastShow, dismiss: vi.fn() }),
+}))
+
 import { useDeepLinkJoin } from './useDeepLinkJoin'
 
 beforeEach(() => {
@@ -22,6 +36,9 @@ beforeEach(() => {
   isMember.mockClear()
   isMember.mockResolvedValue(false)
   track.mockClear()
+  redeemOwnerInvite.mockClear()
+  redeemOwnerInvite.mockResolvedValue('ABC')
+  toastShow.mockClear()
   window.location.hash = ''
 })
 
@@ -105,5 +122,38 @@ describe('useDeepLinkJoin', () => {
     await result.current('#g=ABC&add=reto&from=momento-1')
     expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
     expect(window.location.hash).toBe('#g=ABC&add=reto&from=momento-1')
+  })
+
+  // Enlace de co-dueño (issue #707): `#g=…&adm=<token>` canjea en vez de dar de
+  // alta como miembro normal.
+  describe('enlace de co-dueño (adm)', () => {
+    test('éxito: canjea el token, NO llama a joinGroup y trackea owner_invite_redeemed', async () => {
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await result.current('#g=ABC&adm=tok-1')
+      expect(redeemOwnerInvite).toHaveBeenCalledWith('tok-1')
+      expect(joinGroup).not.toHaveBeenCalled()
+      expect(track).toHaveBeenCalledWith('owner_invite_redeemed', { group_id: 'ABC' })
+    })
+
+    test('éxito: el token se CONSUME (no queda `adm` en el hash restaurado)', async () => {
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await result.current('#g=ABC&adm=tok-1&add=reto')
+      expect(window.location.hash).toBe('#g=ABC&add=reto')
+    })
+
+    test('fallo (caducado/usado/inválido): avisa con un toast y cae al alta normal de miembro', async () => {
+      redeemOwnerInvite.mockRejectedValue(new Error('Este enlace de co-dueño ya se ha usado'))
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await result.current('#g=ABC&adm=tok-1')
+      expect(redeemOwnerInvite).toHaveBeenCalledWith('tok-1')
+      // Fallback: el camino normal de miembro se ejecuta igual que sin `adm`.
+      expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+      expect(toastShow).toHaveBeenCalledWith(
+        expect.stringContaining('ya se ha usado'),
+        expect.objectContaining({ tone: 'danger' }),
+      )
+      // El token consumido tampoco sobrevive en el hash tras el fallback.
+      expect(window.location.hash).toBe('#g=ABC')
+    })
   })
 })

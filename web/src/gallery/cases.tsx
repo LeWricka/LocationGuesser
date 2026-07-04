@@ -443,6 +443,7 @@ export const cases: GalleryCase[] = [
           groupName={GROUP.name ?? GROUP_ID}
           link={`https://momentu.art/v/${GROUP_ID}`}
           challengeCount={CHALLENGES.length}
+          isOwner
         />
       </div>
     ),

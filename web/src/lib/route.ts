@@ -49,6 +49,14 @@ export interface Route {
    * a `add=reto`.
    */
   groupChallengeFrom?: string
+  /**
+   * Token de un enlace de CO-DUEÑO (`#g=…&adm=<token>`, issue #707): en vez del
+   * alta normal de miembro, `useDeepLinkJoin` canjea este token
+   * (`redeemOwnerInvite`) para ascender directo a co-dueño. Un solo uso; si el
+   * canje falla (caducado/usado/inválido) cae al alta normal. Se CONSUME (no
+   * queda en la URL tras usarse), mismo criterio que `add=1`/`groupAdd`.
+   */
+  ownerInviteToken?: string
 }
 
 // Hashes atómicos (sin pares clave=valor) que mapean a vistas de la app.
@@ -110,6 +118,12 @@ export function parseHash(hash: string = window.location.hash): Route {
     if (from) route.groupChallengeFrom = from
   }
 
+  // Enlace de co-dueño (`#g=…&adm=<token>`, issue #707): solo tiene sentido
+  // junto a un grupo. `useDeepLinkJoin` lo consume y lo quita del hash tras
+  // canjearlo (con éxito o fallback), así una recarga no reintenta el canje.
+  const adm = params.get('adm')?.trim()
+  if (adm) route.ownerInviteToken = adm
+
   return route
 }
 
@@ -165,4 +179,27 @@ export function addMomentHash(groupId: string): string {
 export function addChallengeHash(groupId: string, fromMomentId?: string): string {
   const base = `#g=${encodeURIComponent(groupId)}&add=reto`
   return fromMomentId ? `${base}&from=${encodeURIComponent(fromMomentId)}` : base
+}
+
+/**
+ * Hash del enlace de CO-DUEÑO (`#g=…&adm=<token>`, issue #707): al abrirlo con
+ * sesión, `useDeepLinkJoin` canjea el token en vez de hacer el alta normal de
+ * miembro. Lo genera `InviteModal` con el token que devuelve `createOwnerInvite`.
+ */
+export function ownerInviteHash(groupId: string, token: string): string {
+  return `#g=${encodeURIComponent(groupId)}&adm=${encodeURIComponent(token)}`
+}
+
+/**
+ * Quita `adm=<token>` de un hash, preservando el resto de parámetros tal cual
+ * (mismo criterio de "hash tal cual, sin reconstruir" que `useDeepLinkJoin`).
+ * El token es de UN SOLO USO (issue #707): `useDeepLinkJoin` lo consume tras
+ * intentar el canje (con éxito o fallback) para que un F5 no lo reintente.
+ */
+export function stripOwnerInviteToken(hash: string): string {
+  const raw = hash.startsWith('#') ? hash.slice(1) : hash
+  if (!raw.includes('adm=')) return hash.startsWith('#') ? hash : `#${hash}`
+  const params = new URLSearchParams(raw)
+  params.delete('adm')
+  return `#${params.toString()}`
 }
