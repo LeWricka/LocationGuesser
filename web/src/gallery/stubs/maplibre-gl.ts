@@ -1,9 +1,12 @@
 // Stub de maplibre-gl para la galería (alias de Vite SOLO en el entry de galería).
 // Evita cargar el motor WebGL real y pedir tiles a la red (no determinista), pero
 // conserva la API que usan HomeGlobe y TripMapGlobe: el mapa "carga" (dispara
-// 'load') sobre un lienzo vacío y los MARCADORES SÍ se clavan (sus elementos HTML
-// se insertan en el contenedor), así los PINES siguen visibles para la revisión
+// 'load') sobre un lienzo con la textura de "mapa nocturno de marca" (issue #661,
+// ver nightMapTexture.ts) y los MARCADORES SÍ se clavan (sus elementos HTML se
+// insertan en el contenedor), así los PINES siguen visibles para la revisión
 // visual. Lo demás (tiles, vuelo, proyección) son no-ops deterministas.
+
+import { NIGHT_MAP_TEXTURE_URL } from './nightMapTexture'
 
 type LngLat = [number, number]
 
@@ -21,9 +24,19 @@ export class Map {
     const c = opts.container
     this.container = typeof c === 'string' ? document.getElementById(c) : (c ?? null)
     if (this.container) {
-      // Fondo de escena (azul pizarra) para que la zona del globo no quede en
-      // blanco; los pines se montan encima.
-      this.container.style.background = '#16222e'
+      // Fondo de escena: la textura "mapa nocturno de marca" (issue #661), no un
+      // azul pizarra liso — el feedback del dueño sobre #656 fue que la zona de
+      // mapa del showcase salía NEGRA/rota. Decisión GLOBAL (no solo showcase-*):
+      // probado en 'viaje-diario' (diario real, no showcase) sin romper a11y/
+      // overflow ni el propio look — es decoración bajo los pines, no compite con
+      // ellos — así que mejora TODA captura de la galería que monte un mapa
+      // stubeado, no solo las del showcase (ver nightMapTexture.ts para el porqué
+      // de cada elemento del dibujo).
+      this.container.style.backgroundColor = '#0b1016'
+      this.container.style.backgroundImage = `url("${NIGHT_MAP_TEXTURE_URL}")`
+      this.container.style.backgroundSize = 'cover'
+      this.container.style.backgroundPosition = 'center'
+      this.container.style.backgroundRepeat = 'no-repeat'
     }
     // 'load' en microtarea: deja que el componente registre su callback primero.
     queueMicrotask(() => {
