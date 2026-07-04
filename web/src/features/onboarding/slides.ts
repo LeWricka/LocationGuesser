@@ -80,7 +80,7 @@ const GROUP_SLIDES: OnboardingSlide[] = [
   {
     icon: LinkIcon,
     visual: 'link',
-    title: 'Invita a tu grupo',
+    title: 'Invita a tu gente',
     body: 'Les pasas el enlace del viaje y entran sin complicarse.',
     // Sin captura real del share: foto de viaje bonita.
     image: sidneyPhoto,

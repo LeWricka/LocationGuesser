@@ -48,7 +48,7 @@ describe('Landing (email-first, issue #506)', () => {
       screen.getByRole('heading', { name: /Comparte tus momentos de una forma diferente/i }),
     ).toBeInTheDocument()
     // El showcase ENSEÑA capturas reales del producto.
-    expect(screen.getByRole('heading', { name: 'Todo el viaje en un globo' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Cada viaje deja su camino' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Cada momento, en su sitio' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Adivina dónde es' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Gana quien más se acerca' })).toBeInTheDocument()

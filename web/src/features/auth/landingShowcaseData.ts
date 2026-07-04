@@ -49,9 +49,9 @@ export const SHOWCASE_SHOTS: ShowcaseShot[] = [
     id: 'home',
     image: homeShot,
     alt: 'Pantalla de inicio de Tabide: un globo con el pin del viaje y el reto pendiente de jugar.',
-    eyebrow: 'Tu mundo',
-    title: 'Todo el viaje en un globo',
-    lede: 'Cada momento que compartes se clava en el mapa. Al abrir Tabide, tu gente ve dónde habéis estado y qué reto toca jugar.',
+    eyebrow: 'Tus viajes',
+    title: 'Cada viaje deja su camino',
+    lede: 'Cada momento se guarda en su sitio del mapa. Al abrir Tabide, tu gente ve dónde habéis estado y qué toca jugar.',
   },
   {
     id: 'viaje',
@@ -59,7 +59,7 @@ export const SHOWCASE_SHOTS: ShowcaseShot[] = [
     alt: 'Pantalla del diario de un viaje en Tabide: los momentos del recorrido con sus fotos, en orden.',
     eyebrow: 'El recorrido',
     title: 'Cada momento, en su sitio',
-    lede: 'Fotos y retos se clavan en el diario del viaje, en orden. Así vuestro grupo revive por dónde habéis pasado.',
+    lede: 'Fotos y retos se guardan en el diario del viaje, en orden. Así tu gente revive por dónde habéis pasado.',
   },
   {
     id: 'jugar',

@@ -128,7 +128,7 @@ export function Landing({ groupName, redirectTo }: Props) {
                 Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
               </h1>
               <p className={styles.lead}>
-                Guarda tu viaje, comparte cada lugar y deja que tu gente interactúe contigo.
+                Guarda tu viaje, comparte cada lugar y deja que tu gente lo viva contigo.
               </p>
             </>
           )}
