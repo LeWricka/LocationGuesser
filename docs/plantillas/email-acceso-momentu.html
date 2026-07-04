@@ -1,0 +1,54 @@
+<!-- Plantilla del email de acceso (código OTP + enlace) — marca Momentu.
+     Pegar en: Supabase Dashboard → Authentication → Email Templates → Magic Link.
+     Variables de Supabase: {{ .Token }} (código de 6 dígitos) y {{ .ConfirmationURL }}
+     (enlace mágico de respaldo). HTML de email: tablas + estilos inline, tipografías
+     de sistema (Georgia como serif de marca; los webfonts no son fiables en email). -->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F4F3EF;padding:32px 16px;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:420px;background-color:#FFFFFF;border-radius:16px;padding:36px 28px;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1F2A30;">
+        <tr>
+          <td align="center" style="padding-bottom:8px;">
+            <span style="font-family:Georgia,'Times New Roman',serif;font-size:26px;color:#1F2A30;">momentu</span><span style="color:#0F766E;font-size:26px;">&#183;</span>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding-bottom:24px;">
+            <div style="width:56px;border-top:2px dotted #D9B96A;"></div>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="font-family:Georgia,'Times New Roman',serif;font-size:22px;padding-bottom:8px;">
+            Tu c&oacute;digo para entrar
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="font-size:14px;color:#5c6166;padding-bottom:24px;line-height:1.5;">
+            Escr&iacute;belo en la pantalla de Momentu.<br>Caduca en unos minutos.
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding-bottom:28px;">
+            <span style="display:inline-block;background-color:#F4F3EF;border-radius:12px;padding:14px 28px;font-size:32px;letter-spacing:8px;font-weight:700;color:#0F766E;">{{ .Token }}</span>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="font-size:13px;color:#5c6166;padding-bottom:10px;">
+            O entra directamente con este enlace:
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="padding-bottom:28px;">
+            <a href="{{ .ConfirmationURL }}" style="display:inline-block;background-color:#0F766E;color:#FFFFFF;text-decoration:none;border-radius:999px;padding:12px 28px;font-size:15px;font-weight:600;">Entrar en Momentu</a>
+          </td>
+        </tr>
+        <tr>
+          <td align="center" style="font-size:12px;color:#8a8f94;line-height:1.5;">
+            Si no has pedido este correo, puedes ignorarlo.<br>
+            <a href="https://www.momentu.art" style="color:#0F766E;text-decoration:none;">momentu.art</a> &mdash; guarda tus momentos para siempre.
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

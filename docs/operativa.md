@@ -402,3 +402,65 @@ Prerrequisitos de PROD (los activa el dueño en el dashboard; el código ya est�
 4. **Caso email ya registrado:** si en la entrada el correo ya pertenece a una cuenta, NO
    se enlaza a un anónimo (fallaría con `email_exists`); en su lugar se manda un **magic
    link de recuperación** (mismo flujo OTP/passwordless) para recuperar la cuenta original.
+
+---
+
+## 8. Email transaccional propio (SMTP de momentu.art vía Porkbun)
+
+Los correos de acceso (código OTP + enlace) salen de Supabase Auth. Por defecto usan
+el SMTP COMPARTIDO de Supabase: remitente genérico, límites bajos (~2/hora en picos)
+y sospechoso de los correos duplicados observados el 4 jul.
+
+El dominio momentu.art está registrado en Porkbun con la zona DNS en Vercel; NO hay
+buzón de correo (ni falta que hace para enviar): se usa un servicio TRANSACCIONAL
+que envía "como" el dominio verificándolo por DNS.
+
+### 8.1 Resend (recomendado — gratis hasta 3.000/mes, sin buzón)
+
+1. Cuenta en resend.com → **Domains → Add domain** → `momentu.art`.
+2. Resend da los registros DNS (SPF + DKIM) → añadirlos en **Vercel → Domains →
+   momentu.art → DNS**. Verifica en minutos.
+3. Resend → **API Keys** → crear una (permiso de envío).
+4. **Supabase Dashboard → Project Settings → Authentication → SMTP Settings →
+   Enable Custom SMTP:**
+
+| Campo | Valor |
+|---|---|
+| Sender email | `no-reply@momentu.art` (no necesita existir como buzón) |
+| Sender name | `Momentu` |
+| Host | `smtp.resend.com` |
+| Port | `465` (SSL; alternativa `587` STARTTLS) |
+| Username | `resend` (literal) |
+| Password | la API key de Resend |
+
+Guardar y probar (logout → entrar de nuevo): debe llegar 1 correo, desde
+`no-reply@momentu.art`, sin caer en spam.
+
+> A `no-reply@` no se puede responder (no hay buzón): correcto para códigos de
+> acceso. Para RECIBIR correo en el dominio (p.ej. `hola@momentu.art`) sin comprar
+> buzón: Porkbun ofrece reenvío gratuito de alias → un correo personal.
+
+### 8.1-bis Alternativa: buzón + SMTP de Porkbun
+
+Si algún día se quiere buzón real (enviar Y recibir): contratar Email Hosting en
+Porkbun (crea `hola@momentu.art`), añadir sus MX/SPF/DKIM a la zona de Vercel, y en
+Supabase usar host `smtp.porkbun.com`, puerto `587`, usuario el buzón completo y su
+contraseña.
+
+### 8.2 Plantilla con marca
+
+**Dashboard → Authentication → Email Templates → Magic Link**: pegar el HTML de
+[docs/plantillas/email-acceso-momentu.html](plantillas/email-acceso-momentu.html)
+(código grande + botón de enlace, paleta y serif de Momentu). Asunto sugerido:
+`Tu código para entrar en Momentu`.
+
+La plantilla usa `{{ .Token }}` (código de 6 dígitos) y `{{ .ConfirmationURL }}`
+(enlace de respaldo) — las mismas variables que ya usa el flujo actual
+(`sendEmailOtp`, lib/auth.ts): no hay que tocar código.
+
+### 8.3 Después del cambio
+
+- Vigilar el primer login real: llega 1 correo (no 2 — si con SMTP propio los
+  duplicados desaparecen, el culpable era el SMTP compartido) y no cae en spam.
+- El evento `login_email_solicitado` (Mixpanel, #679) sigue contando los envíos
+  pedidos desde el cliente para contrastar.
