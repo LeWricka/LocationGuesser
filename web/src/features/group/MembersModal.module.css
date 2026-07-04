@@ -42,3 +42,23 @@
   gap: var(--space-1);
   margin-left: auto;
 }
+
+/* Guía de invitar (dueño en viaje aún en solitario, o para sumar gente): el
+ * camino a co-dueño es invitar → promover; esta pieza lo hace visible desde la
+ * propia lista en vez de dejar la sección vacía de acciones. */
+.inviteGuide {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.inviteHint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
