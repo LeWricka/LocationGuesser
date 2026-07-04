@@ -325,7 +325,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     }
   })
 
-  test('prefers-reduced-motion: salto directo (jumpTo), sin easeTo', async () => {
+  test('prefers-reduced-motion: salto directo (easeTo duration:0), sin animación', async () => {
     mockReducedMotion(true)
     const pins = samplePins()
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
@@ -336,9 +336,15 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
 
     rerender(<HomeGlobe pins={pins} activeTargetId="t2" />)
 
-    expect(mapInstances[0].easeToCalls).toHaveLength(0)
-    expect(mapInstances[0].jumpToCalls).toHaveLength(1)
-    expect(mapInstances[0].jumpToCalls[0]).toMatchObject({ center: [151.2093, -33.8688] })
+    // Issue #693: `jumpTo` (real API de MapLibre) NO admite `offset` — con reduced-
+    // motion el salto directo pasa a `easeTo({ duration: 0, offset })` (mismo salto
+    // instantáneo, pero SÍ puede aterrizar en la banda visible por encima del dock).
+    expect(mapInstances[0].jumpToCalls).toHaveLength(0)
+    expect(mapInstances[0].easeToCalls).toHaveLength(1)
+    expect(mapInstances[0].easeToCalls[0]).toMatchObject({
+      center: [151.2093, -33.8688],
+      duration: 0,
+    })
     expect(markerInstances[1].getElement().classList.contains('lg-home-pin--lead')).toBe(true)
   })
 

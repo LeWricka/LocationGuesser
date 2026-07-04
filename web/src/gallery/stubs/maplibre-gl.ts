@@ -56,6 +56,27 @@ const MARGIN_X = 0.16
 const MARGIN_TOP = 0.2
 const MARGIN_BOTTOM = 0.68
 
+// ── Margen consciente del padding/offset REALES pedidos por el componente (#693) ──
+// Los tres de arriba son el DECORATIVO por defecto (sin `fitBounds`/`easeTo`/`jumpTo`
+// con padding u offset explícitos). Pero HomeGlobe (home logueada) SÍ pasa un padding
+// real, consciente del dock (`computeFitPaddingY` en HomeGlobe.tsx) y un offset real al
+// volar al pin activo (`verticalFrameOffset`) — si el stub los ignorase, el guardarraíl
+// de Playwright que compara pin-vs-dock (#693) no protegería nada: el pin caería
+// siempre en el mismo sitio decorativo, calibrado bien o mal el padding real. Por eso
+// el margen EFECTIVO se deriva, de aquí en adelante, del último padding/offset real
+// recibido (si lo hay) — ver `Map.computeMargins`.
+interface Margins {
+  x: number
+  top: number
+  bottom: number
+}
+const DEFAULT_MARGINS: Margins = { x: MARGIN_X, top: MARGIN_TOP, bottom: MARGIN_BOTTOM }
+
+/** Nunca un margen que invierta o cierre del todo el hueco visible del eje. */
+function clampFrac(v: number): number {
+  return Math.min(0.49, Math.max(0, v))
+}
+
 function computeBBox(points: LngLatPoint[]): {
   minLng: number
   maxLng: number
@@ -79,17 +100,19 @@ function computeBBox(points: LngLatPoint[]): {
 /** lng/lat → posición relativa (%) dentro del contenedor, dado el bbox de TODOS
  * los puntos vivos del mapa (pines + coordenadas de cualquier ruta). Un bbox
  * degenerado (un único punto, o varios en la misma coordenada) cae al centro del
- * hueco que deja el margen, nunca al canto. */
+ * hueco que deja el margen, nunca al canto. `margins` por defecto es el decorativo de
+ * arriba; `Map.computeMargins` calcula uno real cuando hay padding/offset pedidos. */
 function projectToPercent(
   point: LngLatPoint,
   bbox: { minLng: number; maxLng: number; minLat: number; maxLat: number },
+  margins: Margins = DEFAULT_MARGINS,
 ): { xPct: number; yPct: number } {
   const spanLng = bbox.maxLng - bbox.minLng
   const spanLat = bbox.maxLat - bbox.minLat
   const nx = spanLng > 0 ? (point.lng - bbox.minLng) / spanLng : 0.5
   const ny = spanLat > 0 ? (bbox.maxLat - point.lat) / spanLat : 0.5
-  const xPct = (MARGIN_X + nx * (1 - 2 * MARGIN_X)) * 100
-  const yPct = (MARGIN_TOP + ny * (1 - MARGIN_TOP - MARGIN_BOTTOM)) * 100
+  const xPct = (margins.x + nx * (1 - 2 * margins.x)) * 100
+  const yPct = (margins.top + ny * (1 - margins.top - margins.bottom)) * 100
   return { xPct, yPct }
 }
 
@@ -122,6 +145,19 @@ export class Map {
   private sources = new globalThis.Map<string, unknown>()
   private lineLayers = new globalThis.Map<string, LineLayerConfig>()
   private routeOverlay: SVGSVGElement | null = null
+  // Último padding REAL pedido a `fitBounds` (#693), en px — o `null` sin pedir ninguno
+  // todavía (cae al margen decorativo). `fitBounds` es "absoluto": recoloca la cámara
+  // desde cero, así que también DESCARTA cualquier `cameraOffset` anterior (mismo
+  // espíritu que el motor real: el padding de un fit no convive con el offset de un
+  // vuelo previo, uno sustituye al otro).
+  private fitPadding: { top: number; bottom: number; left: number; right: number } | null = null
+  // Último offset REAL pedido a `easeTo`/`jumpTo` (#693, vuelo al pin activo), en px —
+  // o `null` sin pedir ninguno (cae al margen decorativo, o al de `fitPadding` si lo
+  // hubiera). Igual de "absoluto" en sentido inverso: pedir un offset descarta el
+  // `fitPadding` anterior (un vuelo a un punto sustituye al fit de bounds, como en el
+  // motor real: el padding solo influye en EL CÁLCULO del fit, no es estado persistente
+  // de cámara).
+  private cameraOffset: { x: number; y: number } | null = null
 
   constructor(opts: MapOptions = {}) {
     const c = opts.container
@@ -185,6 +221,61 @@ export class Map {
     this.layout()
   }
 
+  /**
+   * Margen EFECTIVO del momento: deriva de `fitPadding`/`cameraOffset` (lo último
+   * pedido de verdad, ver los comentarios de esos campos) contra el tamaño REAL del
+   * contenedor; sin ninguno de los dos (aún no se llamó a `fitBounds`/`easeTo` con
+   * padding/offset), cae al decorativo `DEFAULT_MARGINS`.
+   *
+   * `cameraOffset` no tiene bbox propio que "encajar" (es un desplazamiento de cámara,
+   * no un encuadre de varios puntos) — para poder reusar la MISMA fórmula de
+   * `projectToPercent` (que sí asume un rectángulo visible con margen por lado),
+   * traducimos el offset a un rectángulo del MISMO ANCHO/ALTO que el decorativo pero
+   * RECENTRADO: así un punto único (bbox degenerado, `nx=ny=0.5`) aterriza exactamente
+   * en `centro-del-lienzo + offset`, igual que en el motor real.
+   */
+  private computeMargins(): Margins {
+    const rect = this.container?.getBoundingClientRect()
+    if (!rect || rect.width <= 0 || rect.height <= 0) return DEFAULT_MARGINS
+
+    if (this.fitPadding) {
+      const top = clampFrac(this.fitPadding.top / rect.height)
+      const bottom = clampFrac(this.fitPadding.bottom / rect.height)
+      // Los cuatro FIT_PADDING reales de HomeGlobe/TripMapGlobe son simétricos
+      // izq/der: basta uno para el margen `x` (compartido por ambos lados).
+      const x = clampFrac(this.fitPadding.left / rect.width)
+      return { x, top, bottom }
+    }
+
+    if (this.cameraOffset) {
+      // `top`/`bottom` están LIGADOS por construcción (su suma siempre deja el mismo
+      // `visibleHeight` decorativo, recentrado): NO se pueden clampar por separado con
+      // `clampFrac` (tope 0.49 por lado) sin romper esa relación — para un offset
+      // grande (pin cerca de un canto), el margen del lado ancho supera 0.49 de forma
+      // LEGÍTIMA (solo indica "casi todo el hueco de ese lado"), y clamparlo ahí
+      // desplazaba el punto hacia el lado EQUIVOCADO en vez de mantenerlo centrado en
+      // el offset pedido (bug real, cazado con el propio guardarraíl de #693: el pin
+      // aterrizaba más abajo de lo que pedía `verticalFrameOffset`). En su lugar,
+      // clampamos solo `top` a un rango que garantiza `bottom = 1 - top - visible`
+      // siempre no-negativo, y derivamos `bottom` de esa igualdad — invariante
+      // preservado por construcción, nunca roto a posteriori.
+      const visibleWidth = 1 - 2 * MARGIN_X
+      const visibleHeight = 1 - MARGIN_TOP - MARGIN_BOTTOM
+      const ofx = this.cameraOffset.x / rect.width
+      const ofy = this.cameraOffset.y / rect.height
+      // Horizontal: el modelo de `Margins` solo admite un margen SIMÉTRICO (mismo
+      // valor a ambos lados, ver `projectToPercent`), así que un `ofx` no puede
+      // recentrar de verdad — hoy es irrelevante (HomeGlobe solo pasa offset
+      // vertical, `[0, offsetY]`), documentado por si algún día hiciera falta más.
+      const x = clampFrac(0.5 + ofx - visibleWidth / 2)
+      const top = Math.min(Math.max(0.5 + ofy - visibleHeight / 2, 0), 1 - visibleHeight)
+      const bottom = 1 - top - visibleHeight
+      return { x, top, bottom }
+    }
+
+    return DEFAULT_MARGINS
+  }
+
   /** Recoloca TODOS los pines vivos (proyección sobre su bbox conjunto + el de
    * cualquier ruta) y redibuja la ruta dorada. Se llama en cada alta/baja de pin
    * y en cada `addLayer`/`setData` de tipo línea: siempre determinista, sin
@@ -201,14 +292,16 @@ export class Map {
       }
     }
     const bbox = computeBBox(points)
+    const margins = this.computeMargins()
     if (bbox) {
-      for (const m of this.markers) m.applyProjectedPosition(bbox)
+      for (const m of this.markers) m.applyProjectedPosition(bbox, margins)
     }
-    this.drawRoute(bbox)
+    this.drawRoute(bbox, margins)
   }
 
   private drawRoute(
     bbox: { minLng: number; maxLng: number; minLat: number; maxLat: number } | null,
+    margins: Margins,
   ): void {
     const svg = this.routeOverlay
     if (!svg) return
@@ -219,7 +312,7 @@ export class Map {
       if (coords.length < 2) continue
       const d = coords
         .map(([lng, lat], i) => {
-          const { xPct, yPct } = projectToPercent({ lng, lat }, bbox)
+          const { xPct, yPct } = projectToPercent({ lng, lat }, bbox, margins)
           return `${i === 0 ? 'M' : 'L'} ${xPct.toFixed(2)} ${yPct.toFixed(2)}`
         })
         .join(' ')
@@ -300,13 +393,40 @@ export class Map {
   removeSource(): this {
     return this
   }
-  easeTo(): this {
+  // `offset` (#693: vuelo al pin activo con `verticalFrameOffset`) es lo único que nos
+  // interesa de las opciones de cámara — el resto (`center`/`zoom`/`duration`) no
+  // afecta a esta proyección aproximada (que no tiene estado de cámara real, solo
+  // deriva las posiciones del bbox de los pines vivos). Un offset "presente pero
+  // [0,0]" SÍ cuenta como pedido explícito (recentra en el medio del rectángulo
+  // decorativo) — se distingue de "sin offset" (`undefined`, cae al padding/margen
+  // previos) comprobando la propia opción, no el valor.
+  easeTo(opts?: { offset?: [number, number] }): this {
+    if (opts?.offset) {
+      this.cameraOffset = { x: opts.offset[0], y: opts.offset[1] }
+      this.fitPadding = null
+    }
+    this.layout()
     return this
   }
   flyTo(): this {
     return this
   }
-  fitBounds(): this {
+  // `padding` (#693: encuadre consciente del dock, `computeFitPaddingY`) es lo único
+  // que nos interesa — ver comentario de `easeTo` arriba, mismo motivo.
+  fitBounds(
+    _bounds: unknown,
+    opts?: { padding?: Partial<Record<'top' | 'bottom' | 'left' | 'right', number>> },
+  ): this {
+    if (opts?.padding) {
+      this.fitPadding = {
+        top: opts.padding.top ?? 0,
+        bottom: opts.padding.bottom ?? 0,
+        left: opts.padding.left ?? 0,
+        right: opts.padding.right ?? 0,
+      }
+      this.cameraOffset = null
+    }
+    this.layout()
     return this
   }
   setSky(): this {
@@ -328,7 +448,14 @@ export class Map {
   // ejecución y con ello el registro de `idle` (ver microtarea del constructor):
   // el skeleton del mapa se quedaba colgado hasta su temporizador de red de
   // seguridad (MAP_READY_FALLBACK_MS), más lento que la espera de la galería.
-  jumpTo(): this {
+  // `offset` (#693, salto sin animación con `prefers-reduced-motion`): mismo trato que
+  // `easeTo` de arriba — es el mismo vuelo, sin animar.
+  jumpTo(opts?: { offset?: [number, number] }): this {
+    if (opts?.offset) {
+      this.cameraOffset = { x: opts.offset[0], y: opts.offset[1] }
+      this.fitPadding = null
+    }
+    this.layout()
     return this
   }
   setCenter(): this {
@@ -408,14 +535,16 @@ export class Marker {
     return this.lngLat
   }
   /** @internal aplica la posición proyectada; lo llama `Map.layout`. */
-  applyProjectedPosition(bbox: {
-    minLng: number
-    maxLng: number
-    minLat: number
-    maxLat: number
-  }): void {
+  applyProjectedPosition(
+    bbox: { minLng: number; maxLng: number; minLat: number; maxLat: number },
+    margins?: Margins,
+  ): void {
     if (!this.element) return
-    const { xPct, yPct } = projectToPercent({ lng: this.lngLat[0], lat: this.lngLat[1] }, bbox)
+    const { xPct, yPct } = projectToPercent(
+      { lng: this.lngLat[0], lat: this.lngLat[1] },
+      bbox,
+      margins,
+    )
     this.element.style.left = `${xPct}%`
     this.element.style.top = `${yPct}%`
     this.element.style.transform = 'translate(-50%, -100%)'
