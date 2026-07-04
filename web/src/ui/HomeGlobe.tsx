@@ -169,6 +169,16 @@ function verticalFrameOffset(containerHeight: number, bottomObscuredPx: number):
 // que el encuadre deje aire y los pines cercanos se separen en vez de amontonarse.
 const MIN_FIT_SPAN_DEG = 1.2
 
+// Span MÁXIMO encuadrable (grados). Cuando los viajes abarcan varios continentes
+// (el caso real del dueño: Japón + Maldivas + Colombia), encuadrar TODOS los pines
+// obliga a la cámara a su centroide — casi siempre océano abierto (Índico/Antártida)
+// con los pines diminutos en los bordes de la esfera. El globo de la home es
+// AMBIENTE, no un data-viz de cobertura: pasado este umbral manda el pin
+// protagonista (ver `fitToPins`) a zoom de pin único, y el resto viven fuera de
+// plano — la deriva y el gesto los traen al girar la esfera.
+const MAX_FIT_SPAN_LNG_DEG = 100
+const MAX_FIT_SPAN_LAT_DEG = 65
+
 // Deriva del globo en reposo (grados de longitud por segundo): lento y aspiracional,
 // como una Tierra que gira sola. Tan suave que no marea ni distrae de los pines, pero da
 // vida al héroe. Se desactiva con `prefers-reduced-motion` y se pausa al interactuar / con
@@ -397,6 +407,21 @@ export function HomeGlobe({
       if (lng > maxLng) maxLng = lng
       if (lat < minLat) minLat = lat
       if (lat > maxLat) maxLat = lat
+    }
+    // Viajes intercontinentales: si los pines no caben en un encuadre continental,
+    // NO se encuadran todos (centroide oceánico, ver MAX_FIT_SPAN_*). Manda el
+    // protagonista: el pin `lead` del dato (el viaje activo/te-toca) o, en su
+    // defecto, el primero — mismo tratamiento que un pin único, misma banda visible.
+    if (maxLng - minLng > MAX_FIT_SPAN_LNG_DEG || maxLat - minLat > MAX_FIT_SPAN_LAT_DEG) {
+      const lead = pinsRef.current.find((p) => p.lead) ?? pinsRef.current[0]
+      const offsetY = verticalFrameOffset(containerHeight, bottomObscuredRef.current)
+      map.easeTo({
+        center: [lead.lng, lead.lat],
+        zoom: SINGLE_ZOOM,
+        duration,
+        offset: [0, offsetY],
+      })
+      return
     }
     // Ensancha los bounds hasta un span mínimo alrededor de su centro: si todos los pines
     // caen casi en el mismo punto (una sola ciudad), evita el zoom "de aguja" que los
