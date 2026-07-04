@@ -184,7 +184,7 @@ const SPANISH_MONTHS = [
 // pintarlos por separado (el emoji suelto delante del texto es lo que rompía
 // la letra capitular de `.description::first-letter`, issue raíz de #686).
 const LEGACY_DATE_PREFIX_RE = new RegExp(
-  `^📅\\s+(\\d{1,2}\\s+de\\s+(?:${SPANISH_MONTHS.join('|')}))(?:\\s*·\\s*([\\s\\S]*))?$`,
+  `^📅\\s+(\\d{1,2}\\s+de\\s+(?:${SPANISH_MONTHS.join('|')}))(?:\\s*·\\s*([\\s\\S]*))?$`, // design-lint-allow: el emoji es el DATO legado a detectar en BD, no UI pintada
   'i',
 )
 
