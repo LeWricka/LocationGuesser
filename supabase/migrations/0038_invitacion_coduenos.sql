@@ -138,16 +138,26 @@ begin
     raise exception 'Este enlace de co-dueño ha caducado' using errcode = 'P0001';
   end if;
 
+  -- RECLAMA el token ANTES de tocar la membresía, de forma atómica (`where
+  -- used_at is null`): dos canjes simultáneos del mismo token pasarían ambos
+  -- las comprobaciones de arriba (leen el mismo estado), pero solo UNO gana
+  -- este update — el otro no encuentra fila y falla como "ya usado". Sin esta
+  -- reclamación, un token de un solo uso podría ascender a dos personas.
+  update public.group_invites
+     set used_by = v_uid, used_at = now()
+   where token = invite_token
+     and used_at is null;
+
+  if not found then
+    raise exception 'Este enlace de co-dueño ya se ha usado' using errcode = 'P0001';
+  end if;
+
   -- Alta o ASCENSO a co-dueño: si ya era miembro, lo promueve; si no, lo da de
   -- alta directamente como owner (evita el paso intermedio de entrar como
   -- miembro y que otro dueño lo promueva a mano).
   insert into public.group_members (group_id, user_id, role)
   values (v_group, v_uid, 'owner')
   on conflict (group_id, user_id) do update set role = 'owner';
-
-  update public.group_invites
-     set used_by = v_uid, used_at = now()
-   where token = invite_token;
 
   return v_group;
 end;
