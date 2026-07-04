@@ -1,5 +1,7 @@
 # LocationGuesser — Contexto de proyecto
 
+> Nombre de producto: **Momentu** (momentu = "momento" en euskera) — dominio [www.momentu.art](https://www.momentu.art). El repo conserva su nombre histórico.
+
 **Qué es:** una forma distinta de compartir con tu grupo. Compartes dónde estás (una foto y/o un Street View con tu ubicación real) y los demás adivinan en el mapa dónde es; gana quien más se acerca. Con cuenta atrás. La mecánica de adivinar una ubicación es el *cómo* (el gancho), no el *qué somos*: la identidad es el compartir social, no el juego. (Frase ancla de producto: **"Comparte tus momentos de una forma diferente."** — el gancho es compartir distinto; la mecánica de adivinar baja al subtítulo.)
 
 **Origen:** caso real de un grupo de viaje en WhatsApp que ya juega a esto "a ojo". Objetivo: que el grupo juegue ≥1 reto durante el viaje y repita.
@@ -14,7 +16,7 @@
 | Diseño v0.2 (prueba de un día) | ✅ [docs/estrategia/prueba-de-un-dia.md](docs/estrategia/prueba-de-un-dia.md) |
 | App v0.1 (web estática) | 🗄️ archivada en `legacy/v0.1/` (referencia) |
 | App v0.2 (React + Supabase) | 🔨 en construcción en `web/` |
-| Despliegue | ✅ en vivo — [locationguesser-sage.vercel.app](https://locationguesser-sage.vercel.app) (Vercel + Supabase) |
+| Despliegue | ✅ en vivo — [www.momentu.art](https://www.momentu.art) (Vercel + Supabase) |
 | Hito Cuentas + Home (login magic link, perfil, membresía, propiedad, foto opcional, duración relativa) | ✅ **en vivo** — mergeado a `main`, migración `0004` aplicada en Supabase, Auth configurado (redirect URLs + plantilla email). Diseño en [docs/estrategia/cuentas-y-home.md](docs/estrategia/cuentas-y-home.md). Pendiente: reescribir E2E (`web/e2e`) para el flujo con login. |
 
 ---

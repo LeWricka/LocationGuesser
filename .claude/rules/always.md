@@ -52,7 +52,7 @@ Todo en verde. El CI repite estos checks en cada PR.
 ```
 cd web && npx playwright install chromium   # una vez
 npm run e2e        # local (levanta el dev server)
-npm run e2e:prod   # producción (https://locationguesser-sage.vercel.app)
+npm run e2e:prod   # producción (https://www.momentu.art)
 ```
 
 Playwright dirige un navegador real y caza lo que los unit tests no ven:
@@ -81,7 +81,7 @@ hace la validación final; el orquestador valida primero.
 ## 7. Despliegue (Vercel)
 
 - Front estático en Vercel, **Root Directory = `web`**, con las dos env `VITE_*`.
-- Cada merge a `main` redespliega. Prod: `https://locationguesser-sage.vercel.app`.
+- Cada merge a `main` redespliega. Prod: `https://www.momentu.art`.
 
 ## 8. Project board (#14)
 
