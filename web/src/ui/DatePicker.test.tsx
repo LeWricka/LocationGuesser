@@ -43,9 +43,13 @@ describe('DatePicker', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
   })
 
-  test('muestra la fecha elegida en formato humano', () => {
+  test('muestra la fecha elegida en formato humano compacto', () => {
+    // Formato compacto (issue #673): el disparador es un chip estrecho que a
+    // menudo vive en pareja (Salida/Vuelta) — el formato largo se cortaba con
+    // elipsis a 390px. Las celdas del calendario sí usan el formato largo (ahí
+    // sobra ancho), ver el test de más abajo con `getByRole('gridcell', …)`.
     render(<DatePicker value="2026-03-15" onChange={vi.fn()} aria-label="Fecha" />)
-    expect(screen.getByRole('button', { name: 'Fecha' })).toHaveTextContent('15 de marzo de 2026')
+    expect(screen.getByRole('button', { name: 'Fecha' })).toHaveTextContent('15 mar 2026')
   })
 
   test('abrir → seleccionar un día emite YYYY-MM-DD y cierra', async () => {

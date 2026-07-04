@@ -345,6 +345,25 @@
   letter-spacing: var(--letter-spacing-wide);
 }
 
+/* Meta (bandera + lugar + fecha) SOBRE EL PAPEL (issue #673): misma línea que
+   `.meta`/`.country` de arriba, pero con héroe CON foto vive aquí en vez de sobre
+   la imagen — tokens de papel (no de escena), contraste AA garantizado sin
+   pelear con el fundido de la costura. Primer elemento del cuerpo editorial. */
+.paperMeta {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.paperCountry {
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-text);
+}
+
 /* Cuenta atrás viva del reto en juego, sobre la foto bajo la meta-línea. */
 .countdown {
   display: flex;

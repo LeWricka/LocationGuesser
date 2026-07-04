@@ -65,11 +65,24 @@ function todayIso(): string {
   return toIso(new Date())
 }
 
-// Fecha humana larga: "3 de marzo de 2026" (para el disparador).
+// Fecha humana larga: "3 de marzo de 2026" (nombre accesible de cada día de la
+// rejilla y de las celdas — ahí sobra ancho, así que la claridad manda).
 function humanLong(iso: string): string {
   const d = parseIso(iso)
   if (!d) return ''
   return `${d.getDate()} de ${MONTHS[d.getMonth()]} de ${d.getFullYear()}`
+}
+
+// Fecha humana COMPACTA: "3 mar 2026" (para el TEXTO VISIBLE del disparador).
+// El disparador es un "chip" estrecho que a menudo vive en pareja (Salida/Vuelta
+// a dos columnas, issue #673): con el formato largo, a 390px el texto se cortaba
+// con elipsis ("4 de junio..."). Los tres primeros caracteres de cada mes en
+// español ya son su abreviatura estándar (ene/feb/mar/abr/may/jun/jul/ago/sep/
+// oct/nov/dic), así que basta un `.slice(0, 3)` sin mantener una segunda lista.
+function humanCompact(iso: string): string {
+  const d = parseIso(iso)
+  if (!d) return ''
+  return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`
 }
 
 // Índice de columna (0=Lunes … 6=Domingo) del primer día del mes.
@@ -312,7 +325,7 @@ export function DatePicker({
       >
         <Icon icon={Calendar} size={18} className={styles.triggerIco} />
         <span className={styles.triggerText}>
-          {selectedIso ? humanLong(selectedIso) : placeholder}
+          {selectedIso ? humanCompact(selectedIso) : placeholder}
         </span>
       </button>
       {/* Vaciar la fecha (opcional → null). Va como HERMANO del disparador —no

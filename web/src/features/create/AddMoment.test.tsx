@@ -485,7 +485,10 @@ describe('AddMoment — fecha por defecto pre-rellenada (#553)', () => {
     // El campo llega con "hoy" (mientras resuelve la cascada) y se actualiza solo,
     // sin que el usuario toque nada, en cuanto llega el último momento del viaje.
     const trigger = await screen.findByLabelText('Fecha')
-    await waitFor(() => expect(trigger).toHaveTextContent('10 de septiembre de 2024'))
+    // Formato compacto del disparador (issue #673): "10 sep 2024", no la fecha
+    // larga (que se corta con elipsis en un chip estrecho). El calendario abierto
+    // sí muestra el mes en formato largo, ver la aserción de más abajo.
+    await waitFor(() => expect(trigger).toHaveTextContent('10 sep 2024'))
 
     // Al abrir el calendario, el mes visible es el de la fecha pre-rellenada (sept
     // 2024), no el de hoy: DatePicker recalcula el mes visible en el gesto de abrir
