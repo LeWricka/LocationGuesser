@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowRight, MapPin } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import { PhotoDropzone } from './PhotoDropzone'
@@ -16,6 +16,7 @@ import { DEFAULT_TIME_SCORING, type LatLng } from '../../lib/geo'
 import { AppHeader, SegmentedControl, Spinner, useToast } from '../../ui'
 import { IconGps } from '../../ui/icons/IconGps'
 import { IconCandado } from '../../ui/icons/IconCandado'
+import { IconPin } from '../../ui/icons/IconPin'
 import styles from './CreateLocationChallenge.module.css'
 
 // Los DOS pasos del flujo (issue #592, antes #585): el mapa manda en el paso de
@@ -392,7 +393,7 @@ export function CreateLocationChallenge({
             {/* Hint inicial: solo cuando no hay punto elegido. */}
             {!pickedPoint && (
               <div className={styles.mapHint} aria-live="polite">
-                <MapPin size={15} strokeWidth={1.8} aria-hidden />
+                <IconPin size={15} />
                 Toca el mapa para elegir el sitio
               </div>
             )}
@@ -409,7 +410,7 @@ export function CreateLocationChallenge({
                 )}
                 {noCoverage && (
                   <div className={styles.svCardNoCoverage} role="alert">
-                    <MapPin size={18} strokeWidth={1.6} aria-hidden />
+                    <IconPin size={18} />
                     <p>Sin Street View aquí — mueve el pin.</p>
                   </div>
                 )}

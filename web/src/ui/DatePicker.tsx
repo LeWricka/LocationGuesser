@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { Icon } from './Icon'
+import { IconCalendario } from './icons'
 import styles from './DatePicker.module.css'
 
 interface Props {
@@ -323,7 +324,7 @@ export function DatePicker({
         aria-describedby={ariaDescribedBy}
         aria-invalid={ariaInvalid ?? invalid ?? undefined}
       >
-        <Icon icon={Calendar} size={18} className={styles.triggerIco} />
+        <IconCalendario size={18} className={styles.triggerIco} />
         <span className={styles.triggerText}>
           {selectedIso ? humanCompact(selectedIso) : placeholder}
         </span>

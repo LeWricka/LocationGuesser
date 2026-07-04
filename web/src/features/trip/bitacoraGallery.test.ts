@@ -7,6 +7,7 @@ function momentInput(over: Partial<BitacoraMomentInput> = {}): BitacoraMomentInp
     momentTitle: 'Un momento',
     date: '2026-06-15T10:00:00.000Z',
     description: null,
+    dateLabel: null,
     audioUrl: null,
     videoUrl: null,
     placeLabel: null,

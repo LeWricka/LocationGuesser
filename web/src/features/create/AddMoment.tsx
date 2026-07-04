@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Check, MapPin, Target } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
 import { VoiceRecorder, type VoiceValue } from './VoiceRecorder'
@@ -22,6 +22,9 @@ import {
   Field,
   Input,
   Icon,
+  IconDiana,
+  IconGps,
+  IconPin,
   Row,
   Stack,
   useToast,
@@ -587,7 +590,7 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
           </div>
           <Stack gap={3} className={styles.savedActions}>
             <Button size="lg" fullWidth onClick={() => onAddChallenge(saved.id)}>
-              <Icon icon={Target} size={18} /> Añadir reto
+              <IconDiana size={18} /> Añadir reto
             </Button>
             <Button variant="secondary" size="lg" fullWidth onClick={() => onCreated(saved)}>
               Listo, volver al viaje
@@ -640,18 +643,18 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
         {/* LUGAR — mapa satélite. En un recuerdo es el sitio VISIBLE. */}
         <section className={styles.block}>
           <span className={styles.blockLabel}>
-            <Icon icon={MapPin} size={16} /> Sitio del recuerdo{' '}
+            <IconPin size={16} /> Sitio del recuerdo{' '}
             <span className={styles.optional}>opcional</span>
           </span>
           <Stack gap={3}>
             <Button variant="secondary" fullWidth loading={locating} onClick={useGps}>
-              <Icon icon={MapPin} size={18} /> Mi ubicación
+              <IconGps size={18} /> Mi ubicación
             </Button>
             <MapPicker value={place} flyTo={flyTo} center={SPAIN} zoom={5} onPick={pickPlace} />
             {place ? (
               <Row gap={2} align="center">
                 <Badge tone="accent">
-                  <Icon icon={MapPin} size={14} /> Sitio marcado
+                  <IconPin size={14} /> Sitio marcado
                 </Badge>
                 <span className={styles.coords}>
                   {place.lat.toFixed(5)}, {place.lng.toFixed(5)}

@@ -193,6 +193,54 @@ describe('BitacoraTab — recuerdo (kicker, título, descripción, fotos)', () =
   })
 })
 
+describe('BitacoraTab — prefijo de fecha legado (issue #686)', () => {
+  test('separa el prefijo "📅 <fecha>" de la descripción y lo pinta junto al kicker', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-legado',
+        title: 'Tarde en el mirador',
+        description: '📅 17 de julio · Una tarde tranquila.',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Tarde en el mirador' })
+    // El cuerpo se pinta LIMPIO, sin el emoji (que rompía la letra capitular).
+    expect(screen.getByText('Una tarde tranquila.')).toBeInTheDocument()
+    expect(screen.queryByText(/📅/)).not.toBeInTheDocument()
+    // La fecha sigue visible, junto al kicker (sin lugar en este caso).
+    expect(screen.getByText('17 de julio')).toBeInTheDocument()
+  })
+
+  test('sin lugar resuelto, el kicker muestra solo la fecha legada', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-solo-fecha',
+        title: 'Solo fecha',
+        description: '📅 1 de septiembre',
+      }),
+    ]
+    renderTab(moments)
+
+    expect(await screen.findByText('1 de septiembre')).toBeInTheDocument()
+  })
+
+  test('lugar y fecha legada conviven en el mismo nodo de texto del kicker', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-lugar-fecha',
+        title: 'Con lugar y fecha',
+        description: '📅 3 de marzo · Un día completo.',
+        country: { code: 'CO', name: 'COLOMBIA', flag: '🇨🇴' },
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Con lugar y fecha' })
+    expect(screen.getByText('COLOMBIA · 3 de marzo')).toBeInTheDocument()
+  })
+})
+
 describe('BitacoraTab — nota de voz inline (issue #648)', () => {
   test('con nota de voz, el reproductor aparece SIN abrir el recuerdo', async () => {
     const moments = [

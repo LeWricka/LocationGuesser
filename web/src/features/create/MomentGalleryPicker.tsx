@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react'
-import { AlertTriangle, Camera, Play, Star, Trash2 } from 'lucide-react'
-import { Icon, Spinner, useToast } from '../../ui'
+import { AlertTriangle, Play, Star, Trash2 } from 'lucide-react'
+import { Icon, IconCamara, Spinner, useToast } from '../../ui'
 import {
   extractVideoCoverFrame,
   markFileSelection,
@@ -213,7 +213,7 @@ export function MomentGalleryPicker({
     return (
       <label className={styles.empty} aria-busy={busy || undefined}>
         <span className={styles.icon} aria-hidden>
-          {busy ? <Spinner size={28} /> : <Icon icon={Camera} size={28} />}
+          {busy ? <Spinner size={28} /> : <IconCamara size={28} />}
           {!busy && <span className={styles.plus}>+</span>}
         </span>
         <span className={styles.emptyLabel}>{busy ? emptyLabel : 'Sube fotos del día'}</span>

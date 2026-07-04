@@ -346,7 +346,9 @@ export const cases: GalleryCase[] = [
     // Bitácora del viaje (antes "Fotos", issue #645): scroll cronológico por
     // día → recuerdo → fotos a ancho completo. El mundo sembrado cubre:
     //  - CH_MEMORY: recuerdo con galería multi-foto (3 fotos) + descripción +
-    //    nota de voz (audio/, issue #648) — el bloque más rico.
+    //    nota de voz (audio/, issue #648) — el bloque más rico. Su descripción
+    //    lleva el prefijo de fecha LEGADO (`📅 <fecha> · …`, issue #686): guarda
+    //    visual permanente de que no vuelva a pintarse el emoji gigante.
     //  - CH_MEMORY_QUIET: recuerdo SIN descripción, una sola foto.
     //  - CH_CLOSED / CH_CLOSED_OTHER: retos SELLADOS (ya revelados), con foto
     //    y descripción, como cualquier recuerdo.

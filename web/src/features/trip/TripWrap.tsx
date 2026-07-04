@@ -1,6 +1,6 @@
-import { useEffect, type CSSProperties } from 'react'
-import { Camera, Flag, Footprints, Target, Users, X } from 'lucide-react'
-import { Avatar, Icon, IconCamara, IconCandado } from '../../ui'
+import { useEffect, type CSSProperties, type ReactNode } from 'react'
+import { Flag, Footprints, Users, X } from 'lucide-react'
+import { Avatar, Icon, IconCamara, IconCandado, IconDiana } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import { resolveMomentPhoto, type Moment, type RoutePoint } from '../../lib/trip'
@@ -114,10 +114,25 @@ export function TripWrap({
   const top = leaderboard[0]?.points ?? 0
   const range = dateRange(moments)
 
-  const stats: { icon: typeof Camera; value: number; label: string }[] = [
-    { icon: Camera, value: memoriesCount, label: memoriesCount === 1 ? 'recuerdo' : 'recuerdos' },
-    { icon: Target, value: challengesCount, label: challengesCount === 1 ? 'reto' : 'retos' },
-    { icon: Users, value: playersCount, label: playersCount === 1 ? 'jugador' : 'jugadores' },
+  // `icon` va ya RENDERIZADO (no el componente): mezcla iconos custom de marca
+  // (cámara, diana) con lucide (`Users`, sin equivalente propio todavía) sin
+  // forzar un tipo común entre ambos sistemas de icono.
+  const stats: { icon: ReactNode; value: number; label: string }[] = [
+    {
+      icon: <IconCamara size={18} />,
+      value: memoriesCount,
+      label: memoriesCount === 1 ? 'recuerdo' : 'recuerdos',
+    },
+    {
+      icon: <IconDiana size={18} />,
+      value: challengesCount,
+      label: challengesCount === 1 ? 'reto' : 'retos',
+    },
+    {
+      icon: <Icon icon={Users} size={18} />,
+      value: playersCount,
+      label: playersCount === 1 ? 'jugador' : 'jugadores',
+    },
   ]
 
   return (
@@ -154,7 +169,7 @@ export function TripWrap({
           {stats.map((s) => (
             <div key={s.label} className={styles.stat}>
               <span className={styles.statIcon} aria-hidden="true">
-                <Icon icon={s.icon} size={18} />
+                {s.icon}
               </span>
               <span className={styles.statValue}>{s.value.toLocaleString('es-ES')}</span>
               <span className={styles.statLabel}>{s.label}</span>
@@ -245,7 +260,7 @@ export function TripWrap({
                         <span className={styles.tlResult}>
                           {winner && winner.name ? (
                             <>
-                              <Icon icon={Target} size={14} /> Ganó <b>{winner.name}</b>
+                              <IconDiana size={14} /> Ganó <b>{winner.name}</b>
                               {winner.guessedCount > 0 &&
                                 ` · ${winner.guessedCount} ${
                                   winner.guessedCount === 1 ? 'acierto' : 'aciertos'
@@ -253,7 +268,7 @@ export function TripWrap({
                             </>
                           ) : (
                             <>
-                              <Icon icon={Target} size={14} /> Reto sin jugadas
+                              <IconDiana size={14} /> Reto sin jugadas
                             </>
                           )}
                         </span>
@@ -261,7 +276,7 @@ export function TripWrap({
                     </div>
                     {m.isChallenge && (
                       <span className={styles.tlBadge} aria-hidden="true">
-                        <Icon icon={Target} size={13} />
+                        <IconDiana size={13} />
                       </span>
                     )}
                   </li>

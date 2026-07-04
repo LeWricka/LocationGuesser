@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { AlertTriangle, Crown, Gift, Share2, Target } from 'lucide-react'
+import { AlertTriangle, Crown, Gift, Share2 } from 'lucide-react'
 import {
   Avatar,
   Button,
   CountUp,
   Icon,
+  IconDiana,
   IconTrofeo,
   Input,
   Modal,
@@ -331,7 +332,7 @@ export function MarcadorTab({
               </Button>
               {canCreate && (
                 <Button size="sm" onClick={onAddChallenge}>
-                  <Icon icon={Target} size={16} /> Crear un reto
+                  <IconDiana size={16} /> Crear un reto
                 </Button>
               )}
             </div>
