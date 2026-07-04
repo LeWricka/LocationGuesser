@@ -59,6 +59,9 @@
 
 .segment {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex: 1;
   min-height: var(--tap-target-sm);
   padding: var(--space-2) var(--space-4);
