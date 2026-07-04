@@ -13,6 +13,7 @@ import {
   Skeleton,
   Stack,
   Row,
+  sortTrips,
 } from '../../ui'
 import type { GlobePin, HomeGroup, HomePinned } from '../../ui'
 import { useSession } from '../../lib/session-context'
@@ -152,10 +153,18 @@ export function HomePage() {
     coverUrl: coverByGroup.get(g.id) ?? worldCoverByGroup.get(g.id) ?? null,
   }))
 
-  // Pines-foto del globo: un pin por punto situado de cada viaje; el más reciente del
-  // viaje más reciente lleva el anillo cálido ("lead"). Tocar un pin abre su viaje.
+  // Pines-foto del globo: un pin por punto situado de cada viaje — el "mapamundi
+  // poblado" (#700). El anillo cálido ("lead") lo lleva SOLO el momento más reciente
+  // del viaje PROTAGONISTA (el primero del carrusel, mismo orden `sortTrips` que usa
+  // HomeDashboard): con un lead por viaje, un globo con varios viajes pulsaría por
+  // todas partes. Al enfocar otra tarjeta, HomeGlobe reasigna el lead en exclusiva
+  // (contrato de `activeTargetId`). Tocar cualquier pin abre su viaje.
+  const protagonistId = sortTrips(groups)[0]?.id ?? null
   const pins: GlobePin[] = world.trips.flatMap((trip) => {
-    const leadId = trip.points.length > 0 ? trip.points[trip.points.length - 1].id : null
+    const leadId =
+      trip.groupId === protagonistId && trip.points.length > 0
+        ? trip.points[trip.points.length - 1].id
+        : null
     return trip.points.map((p) => ({
       id: `${trip.groupId}:${p.id}`,
       lat: p.lat,

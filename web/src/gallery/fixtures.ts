@@ -99,6 +99,44 @@ export const GROUP: GalleryGroupRow = {
   cover_image_path: 'cover-japon.jpg',
 }
 
+// ── Otros viajes del "mapamundi poblado" (#700) ───────────────────────────────
+// La home real clava TODOS los momentos situados de TODOS tus viajes: el globo
+// encuadra el recorrido del PROTAGONISTA (Japón, el primero del carrusel) y el
+// resto de viajes aportan pines sueltos repartidos por la esfera. Dos viajes
+// extra, ya terminados (idle, solo yo como miembro), cada uno con un recuerdo
+// situado en otro continente — los pines sueltos del caso `home-con-datos`.
+export const GROUP_ANDES_ID = 'viaje-andes'
+export const GROUP_LISBOA_ID = 'viaje-lisboa'
+
+export const EXTRA_GROUPS: GalleryGroupRow[] = [
+  {
+    id: GROUP_ANDES_ID,
+    name: 'Ruta por los Andes',
+    prizes: null,
+    created_by: ME_ID,
+    created_at: isoFromNow(-90 * DAY),
+    closed_at: isoFromNow(-75 * DAY),
+    starts_on: '2026-03-10',
+    ends_on: '2026-03-22',
+    description: null,
+    companions: null,
+    cover_image_path: null,
+  },
+  {
+    id: GROUP_LISBOA_ID,
+    name: 'Finde en Lisboa',
+    prizes: null,
+    created_by: ME_ID,
+    created_at: isoFromNow(-150 * DAY),
+    closed_at: isoFromNow(-145 * DAY),
+    starts_on: '2026-01-16',
+    ends_on: '2026-01-18',
+    description: null,
+    companions: null,
+    cover_image_path: null,
+  },
+]
+
 // ── Retos / momentos del viaje ────────────────────────────────────────────────
 // Un reto vive en `challenges`. ChallengeForPlay = Omit<Challenge, 'lat' | 'lng'>,
 // pero la fila completa lleva lat/lng (la respuesta oculta); el cliente falso ya
@@ -281,6 +319,37 @@ export const CHALLENGES: ChallengeRow[] = [
     created_by: ME_ID,
     created_at: isoFromNow(-2 * HOUR),
   }),
+  // Recuerdos situados de los OTROS viajes (#700): un pin suelto por viaje en el
+  // globo de `home-con-datos`. Recuerdos (sin plazo) a propósito: no alteran el
+  // estado del viaje (idle) ni el chip "Te toca jugar" del protagonista.
+  baseChallenge({
+    id: 'ch-memory-machu',
+    group_id: GROUP_ANDES_ID,
+    title: 'Amanecer en Machu Picchu',
+    is_challenge: false,
+    image_path: 'photo-machu.jpg',
+    place_lat: -13.1631,
+    place_lng: -72.545,
+    lat: -13.1631,
+    lng: -72.545,
+    deadline_at: null,
+    created_by: ME_ID,
+    created_at: isoFromNow(-80 * DAY),
+  }),
+  baseChallenge({
+    id: 'ch-memory-alfama',
+    group_id: GROUP_LISBOA_ID,
+    title: 'Callejeando por Alfama',
+    is_challenge: false,
+    image_path: 'photo-alfama.jpg',
+    place_lat: 38.7223,
+    place_lng: -9.1393,
+    lat: 38.7223,
+    lng: -9.1393,
+    deadline_at: null,
+    created_by: ME_ID,
+    created_at: isoFromNow(-148 * DAY),
+  }),
 ]
 
 // Respuestas (lat/lng) de los retos CERRADOS: solo se sirven para los cerrados
@@ -419,6 +488,8 @@ export const PHOTO_LABELS: Record<string, string> = {
   'photo-ramen-3.jpg': 'El caldo',
   'photo-dotombori.jpg': 'Dotonbori (sorpresa oculta)',
   'photo-togetsukyo.jpg': 'Puente Togetsukyo',
+  'photo-machu.jpg': 'Machu Picchu',
+  'photo-alfama.jpg': 'Alfama',
 }
 
 // Galería del recuerdo del ramen: varias fotos ordenadas por sort_order (la de 0

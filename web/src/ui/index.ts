@@ -63,6 +63,8 @@ export { HowItWorks } from './HowItWorks'
 export { HowItWorksImmersive } from './HowItWorksImmersive'
 export { HomeDashboard } from './HomeDashboard'
 export type { HomeGroup, HomeGroupMember, HomePinned } from './HomeDashboard'
+// Orden del carrusel de la home (#700): compartido entre HomeDashboard y HomePage.
+export { sortTrips } from './sortTrips'
 // Patrón globo + hoja (Home deslogueada y logueada): globo héroe + hoja blanca (#343).
 export { GlobeSheet } from './GlobeSheet'
 export { HomeGlobe } from './HomeGlobe'
