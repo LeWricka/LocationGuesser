@@ -155,6 +155,59 @@ export function resolveMomentPhoto(
   return { src: moment.isOwn ? moment.imageUrl : null, surprise: true }
 }
 
+// Meses en español, en el mismo orden y grafía que produce
+// `Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long' })` (ver
+// `buildDescription`, código legado pre-migración-0037/#566): minúsculas, sin
+// acentos en las terminaciones que los llevan tal cual las da el motor de JS.
+const SPANISH_MONTHS = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+] as const
+
+// Antes de la migración 0037 (issue #566) un momento no tenía fecha propia
+// (`happened_on`): si el dueño elegía un día distinto de hoy, la única forma de
+// guardarlo era incrustar `📅 <día> de <mes>` al principio de `description`
+// (opcionalmente ` · <cuerpo>` si además escribía texto). Ese texto sigue tal
+// cual en BD para los momentos antiguos — no hay forma fiable de "migrar" la
+// fecha real desde ahí (issue #686), así que esto es una transformación de
+// PRESENTACIÓN al leer: separa el prefijo de fecha del cuerpo para poder
+// pintarlos por separado (el emoji suelto delante del texto es lo que rompía
+// la letra capitular de `.description::first-letter`, issue raíz de #686).
+const LEGACY_DATE_PREFIX_RE = new RegExp(
+  `^📅\\s+(\\d{1,2}\\s+de\\s+(?:${SPANISH_MONTHS.join('|')}))(?:\\s*·\\s*([\\s\\S]*))?$`,
+  'i',
+)
+
+/**
+ * Separa el prefijo de fecha legado (ver `LEGACY_DATE_PREFIX_RE`) de una
+ * descripción, si lo lleva:
+ *  - `dateLabel`: el texto de fecha SIN el emoji (p.ej. `"17 de julio"`), o
+ *    `null` si la descripción no llevaba el prefijo.
+ *  - `text`: el cuerpo tras el separador ` · `, o `null` si no había cuerpo
+ *    (prefijo solo) o si la descripción de entrada era `null`. Sin prefijo,
+ *    `text` es la descripción original tal cual.
+ */
+export function parseLegacyDescription(description: string | null): {
+  dateLabel: string | null
+  text: string | null
+} {
+  if (description == null) return { dateLabel: null, text: null }
+  const match = description.match(LEGACY_DATE_PREFIX_RE)
+  if (!match) return { dateLabel: null, text: description }
+  const [, dateLabel, body] = match
+  return { dateLabel, text: body && body.trim() !== '' ? body : null }
+}
+
 /**
  * Punto de la RUTA en el mapa. Solo existen para momentos CERRADOS con lat/lng
  * visible: son los que la polyline "cose" en orden cronológico. Por eso lat/lng

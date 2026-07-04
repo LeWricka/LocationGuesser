@@ -29,6 +29,14 @@ export interface BitacoraMoment {
   momentTitle: string
   date: string
   description: string | null
+  /**
+   * Fecha legada incrustada en `description` (issue #686, ver
+   * `parseLegacyDescription` en `lib/trip.ts`), YA separada del cuerpo — p.ej.
+   * `"17 de julio"`, sin el emoji roto que rompía la letra capitular. `null`
+   * si el momento no lleva ese prefijo (todos los momentos con `happened_on`
+   * propio, migración 0037, y los que nunca tuvieron fecha embebida).
+   */
+  dateLabel: string | null
   audioUrl: string | null
   /**
    * Clip corto (issue #649): si existe, se pinta como `<video controls>` con
@@ -67,6 +75,8 @@ export interface BitacoraMomentInput {
   momentTitle: string
   date: string
   description: string | null
+  /** Ver `BitacoraMoment.dateLabel` — ya resuelto por quien construye el input. */
+  dateLabel: string | null
   audioUrl: string | null
   videoUrl: string | null
   placeLabel: string | null
@@ -149,6 +159,7 @@ export function groupMomentsByDay(moments: BitacoraMomentInput[]): BitacoraGroup
       momentTitle: m.momentTitle,
       date: m.date,
       description: m.description,
+      dateLabel: m.dateLabel,
       audioUrl: m.audioUrl,
       videoUrl: m.videoUrl,
       videoPoster: hasVideo ? (m.photos[0] ?? null) : null,

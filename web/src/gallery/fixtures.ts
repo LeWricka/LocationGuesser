@@ -230,7 +230,11 @@ export const CHALLENGES: ChallengeRow[] = [
   baseChallenge({
     id: CH_MEMORY,
     title: 'El mejor ramen del viaje',
-    description: 'Una barra de ocho asientos perdida en un callejón.',
+    // Prefijo de fecha LEGADO (pre-migración-0037/#566, ver `parseLegacyDescription`
+    // en `lib/trip.ts`) a propósito: este es el caso REAL que reportó el dueño
+    // (issue #686, calendario gigante bajo la letra capitular) — la galería lo
+    // mantiene como guarda visual permanente contra la regresión.
+    description: '📅 17 de julio · Una barra de ocho asientos perdida en un callejón.',
     is_challenge: false,
     image_path: 'photo-ramen.jpg',
     // Nota de voz (issue #648, caso de galería `viaje-bitacora`): el fake

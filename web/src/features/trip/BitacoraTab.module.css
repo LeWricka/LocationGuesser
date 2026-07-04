@@ -170,7 +170,7 @@
 .media {
   display: block;
   width: 100%;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--scene-bg);
   box-shadow: var(--shadow-photo-card);
 }
@@ -195,12 +195,16 @@
  * NATURAL de la imagen: nunca se recorta, como pide el dueño — solo se ajusta
  * una vez, con el fundido de `lg-photo-in` disimulando el salto.
  */
+/* `--radius-lg` (no `-md`): las MISMAS fotos, abiertas en la hoja de detalle
+ * del momento, llevan ese radio en su carrusel (`MomentGallery.module.css
+ * .frame/.slide`) — un radio distinto según la pantalla desde la que se mira
+ * la foto era la discrepancia visual que pidió resolver el dueño (#686). */
 .photoFrame {
   display: block;
   width: 100%;
   aspect-ratio: 4 / 5;
   overflow: hidden;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background-color: var(--color-surface-hover);
 }
 .photoFrameLoaded {

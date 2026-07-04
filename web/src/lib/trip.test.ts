@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { isMomentPhotoVisible, resolveMomentPhoto } from './trip'
+import { isMomentPhotoVisible, parseLegacyDescription, resolveMomentPhoto } from './trip'
 import type { Moment } from './trip'
 
 type MomentInput = Pick<Moment, 'isChallenge' | 'status' | 'photoIsHint'>
@@ -87,5 +87,39 @@ describe('resolveMomentPhoto (issue #655, spoiler del carrusel/hoja/recap)', () 
         pm({ isChallenge: false, status: 'recuerdo', isOwn: false, imageUrl: src }),
       ),
     ).toEqual({ src, surprise: false })
+  })
+})
+
+describe('parseLegacyDescription (issue #686, prefijo de fecha legado pre-0037)', () => {
+  test('prefijo + cuerpo: separa la fecha (sin emoji) del texto', () => {
+    expect(parseLegacyDescription('📅 17 de julio · Una barra de ocho asientos.')).toEqual({
+      dateLabel: '17 de julio',
+      text: 'Una barra de ocho asientos.',
+    })
+  })
+
+  test('prefijo solo (sin cuerpo): dateLabel presente, text null', () => {
+    expect(parseLegacyDescription('📅 1 de septiembre')).toEqual({
+      dateLabel: '1 de septiembre',
+      text: null,
+    })
+  })
+
+  test('sin prefijo: dateLabel null, text es la descripción tal cual', () => {
+    expect(parseLegacyDescription('Un día cualquiera sin fecha incrustada.')).toEqual({
+      dateLabel: null,
+      text: 'Un día cualquiera sin fecha incrustada.',
+    })
+  })
+
+  test('descripción null: ambos campos null', () => {
+    expect(parseLegacyDescription(null)).toEqual({ dateLabel: null, text: null })
+  })
+
+  test('cuerpo con varias líneas tras el separador se conserva completo', () => {
+    expect(parseLegacyDescription('📅 3 de marzo · Primera línea.\nSegunda línea.')).toEqual({
+      dateLabel: '3 de marzo',
+      text: 'Primera línea.\nSegunda línea.',
+    })
   })
 })

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ListOrdered, MapPin, Pencil, Target, Trash2, User } from 'lucide-react'
+import { ArrowLeft, ListOrdered, Pencil, Trash2, User } from 'lucide-react'
 import {
   AudioPlayer,
   Badge,
@@ -7,11 +7,13 @@ import {
   ChallengePhoto,
   Icon,
   IconCandado,
+  IconDiana,
+  IconPin,
   Modal,
   useReducedMotion,
   useToast,
 } from '../../ui'
-import { resolveMomentPhoto, type Moment } from '../../lib/trip'
+import { parseLegacyDescription, resolveMomentPhoto, type Moment } from '../../lib/trip'
 import type { LatLng } from '../../lib/geo'
 import { fmtDist, fmtNumber } from '../../lib/geo'
 import {
@@ -239,7 +241,16 @@ export function MomentSheet({
   // `key` al cambiar de momento (ver más abajo), así que el estado inicial siempre
   // refleja el momento abierto. Tras guardar, lo dejamos optimista (el Realtime del
   // viaje escucha votos, no `challenges`, así que no se refrescaría solo).
-  const [description, setDescription] = useState(moment?.description ?? '')
+  //
+  // Un momento de antes de la migración 0037 (issue #566) puede llevar el
+  // prefijo legado `📅 <día> de <mes>` incrustado al principio (ver
+  // `parseLegacyDescription`): aquí se descarta, no solo se oculta al pintar
+  // (issue #686). La fecha REAL ya se ve arriba (`date`, de `moment.date`), así
+  // que repetirla en el cuerpo sería ruido — y si el dueño edita y guarda, el
+  // texto legado se limpia solo en vez de perpetuarse en cada edición futura.
+  const [description, setDescription] = useState(
+    parseLegacyDescription(moment?.description ?? null).text ?? '',
+  )
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -790,7 +801,7 @@ export function MomentSheet({
                       </Badge>
                     ) : isReto ? (
                       <span className={styles.seal}>
-                        <Icon icon={Target} size={13} /> Reto
+                        <IconDiana size={13} /> Reto
                       </span>
                     ) : null}
                     {photoSurprise && (
@@ -813,7 +824,7 @@ export function MomentSheet({
                     foto (fondo neutro, sin meta propia que lo sustituya). */}
                 {country && !heroPhotoSrc && (
                   <div className={styles.placeChip}>
-                    <Icon icon={MapPin} size={13} />
+                    <IconPin size={13} />
                     <span>{country.name}</span>
                   </div>
                 )}
@@ -913,7 +924,7 @@ export function MomentSheet({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              setDescription(moment.description ?? '')
+                              setDescription(parseLegacyDescription(moment.description).text ?? '')
                               setEditing(false)
                             }}
                             disabled={saving}
@@ -1078,7 +1089,7 @@ export function MomentSheet({
                       onClick={startPromote}
                       className={styles.cta}
                     >
-                      <Icon icon={Target} size={16} /> Convertir en reto
+                      <IconDiana size={16} /> Convertir en reto
                     </Button>
                   )}
 
@@ -1086,7 +1097,7 @@ export function MomentSheet({
                     <section className={styles.promote}>
                       <header className={styles.promoteHead}>
                         <span className={styles.promoteTitle}>
-                          <Icon icon={Target} size={15} /> Convertir en reto
+                          <IconDiana size={15} /> Convertir en reto
                         </span>
                         <span className={styles.promoteHint}>
                           Esconde el lugar y que adivinen dónde es, con cuenta atrás.

@@ -148,6 +148,23 @@ describe('MomentSheet', () => {
     expect(screen.getAllByText(/ESPAÑA/).length).toBeGreaterThan(0)
   })
 
+  test('limpia el prefijo de fecha legado del cuerpo (issue #686)', async () => {
+    const user = userEvent.setup()
+    const legado: Moment = {
+      ...RECUERDO,
+      description: '📅 17 de julio · Una barra de ocho asientos.',
+    }
+    renderSheet({ moment: legado })
+
+    // El cuerpo se pinta LIMPIO, sin el emoji roto (rompía la letra capitular).
+    expect(screen.getByText('Una barra de ocho asientos.')).toBeInTheDocument()
+    expect(screen.queryByText(/📅/)).not.toBeInTheDocument()
+
+    // El editor inline también arranca limpio (no reintroduce el prefijo al guardar).
+    await user.click(screen.getByRole('button', { name: 'Editar' }))
+    expect(screen.getByPlaceholderText(/Cuenta el día/i)).toHaveValue('Una barra de ocho asientos.')
+  })
+
   test('editar la descripción guarda en BD y dispara onEdited (fix #313)', async () => {
     const user = userEvent.setup()
     const onEdited = vi.fn()

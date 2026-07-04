@@ -5,7 +5,7 @@ import { listGroupMomentImages } from '../../lib/momentImages'
 import { signedImageUrl } from '../../lib/storage'
 import { reportError } from '../../lib/observability'
 import { track } from '../../lib/analytics'
-import { isMomentPhotoVisible, type Moment } from '../../lib/trip'
+import { isMomentPhotoVisible, parseLegacyDescription, type Moment } from '../../lib/trip'
 import {
   groupMomentsByDay,
   type BitacoraGrouped,
@@ -95,11 +95,18 @@ export function BitacoraTab({ groupId, moments, canCreate, onAddMoment, onOpenMo
           const photos = pending
             .map(() => resolved[cursor++])
             .filter((src): src is string => Boolean(src))
+          // Momentos de antes de la migración 0037 (issue #566) incrustaban la
+          // fecha elegida al principio de `description` (`📅 <día> de <mes>`,
+          // ver `parseLegacyDescription`): sin separarlo, ese emoji se pintaba
+          // GIGANTE bajo la letra capitular de `.description` (issue #686). El
+          // cuerpo limpio va al párrafo de siempre; la fecha, junto al kicker.
+          const { dateLabel, text } = parseLegacyDescription(m.description)
           return {
             momentId: m.challengeId,
             momentTitle: m.title,
             date: m.date,
-            description: m.description,
+            description: text,
+            dateLabel,
             audioUrl: m.audioUrl ?? null,
             videoUrl: m.videoUrl ?? null,
             // Lugar del kicker/cabecera de día: el mismo país resuelto que usa
@@ -157,19 +164,31 @@ export function BitacoraTab({ groupId, moments, canCreate, onAddMoment, onOpenMo
             <h3 className={styles.dayHeader}>
               <span className={styles.dayDate}>{day.label}</span>
               <span className={styles.dayThread} aria-hidden="true" />
-              {/* El guion separador es texto real (no solo hueco visual): sin él,
-                  la fecha y los lugares se leerían pegados ("3 julSALENTO") al
-                  usuario de lector de pantalla y en el `textContent` del h3. */}
-              {day.placesLabel && <span className={styles.dayPlaces}>— {day.placesLabel}</span>}
+              {/* El separador es texto real (no solo hueco visual): sin él, la
+                  fecha y los lugares se leerían pegados ("3 julSALENTO") al
+                  usuario de lector de pantalla y en el `textContent` del h3.
+                  Un "·" (no "—", issue #686): el hilo punteado YA separa fecha
+                  de lugares visualmente — un guion encima era una segunda
+                  marca de separación redundante y recargaba la fila; el punto
+                  medio es más ligero y es el MISMO lenguaje de puntuación que
+                  ya usa `.kicker` y el propio `dayPlaces` entre lugares. */}
+              {day.placesLabel && <span className={styles.dayPlaces}>· {day.placesLabel}</span>}
             </h3>
 
             <div className={`${styles.moments} lg-stagger`}>
               {day.moments.map((moment) => (
                 <article key={moment.momentId} className={styles.moment}>
                   {/* El "◦ " es decorativo (CSS `::before`, ver .kicker): así el
-                      texto accesible/testeable es solo el lugar, sin un nodo de
-                      texto partido entre el símbolo y el nombre. */}
-                  {moment.placeLabel && <p className={styles.kicker}>{moment.placeLabel}</p>}
+                      texto accesible/testeable arranca en el lugar (o la fecha, si
+                      no hay lugar), sin un nodo partido entre el símbolo y el texto.
+                      Lugar y fecha legada (#686) van en el MISMO nodo de texto — un
+                      "· " entre ambos, nunca en `<span>` hermanos — para que un
+                      lector de pantalla los lea como una sola frase, no pegados. */}
+                  {(moment.placeLabel || moment.dateLabel) && (
+                    <p className={styles.kicker}>
+                      {[moment.placeLabel, moment.dateLabel].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
                   <button
                     type="button"
                     className={styles.titleBtn}
