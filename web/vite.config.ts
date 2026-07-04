@@ -14,6 +14,15 @@ const ACCENT = '#34506b' // theme_color (azul pizarra de marca)
 // Rollup y (2) aliaseamos la capa de datos y los paquetes de mapas a sus dobles de
 // `src/gallery/`. Sin la env, la app de producción no se ve afectada en absoluto.
 const galleryMode = process.env.GALLERY === '1'
+// GALERÍA CON MAPA REAL (issue #695): variante de captura, SOLO para regenerar los
+// assets del showcase de la landing (`web/src/assets/landing/*.webp`) con el
+// satélite Esri de verdad en vez del stub plano oscuro. Mantiene TODOS los demás
+// dobles (fakeSupabase/session/Google Maps) y el determinismo de la galería (reloj
+// congelado, animaciones apagadas): solo deja pasar el paquete REAL `maplibre-gl`
+// (y su CSS) para que los pines-foto queden clavados sobre el mundo de verdad. La
+// usa exclusivamente `npm run landing:assets` (ver playwright.landing-assets.config.ts);
+// `npm run gallery`/`gallery:shots`/`a11y` siguen 100% herméticos, sin este flag.
+const galleryRealMap = galleryMode && process.env.GALLERY_REAL_MAP === '1'
 const resolvePath = (rel: string) => fileURLToPath(new URL(rel, import.meta.url))
 
 // Redirige los módulos reales a sus dobles cuando se compila la galería. Lo hacemos
@@ -23,9 +32,14 @@ const resolvePath = (rel: string) => fileURLToPath(new URL(rel, import.meta.url)
 // de ruta. Solo se enchufa con GALLERY=1, así producción no se toca.
 function galleryDoublesPlugin(): Plugin {
   const bareDoubles: Record<string, string> = {
-    'maplibre-gl/dist/maplibre-gl.css': resolvePath('./src/gallery/stubs/empty.css'),
-    'maplibre-gl': resolvePath('./src/gallery/stubs/maplibre-gl.ts'),
     '@vis.gl/react-google-maps': resolvePath('./src/gallery/stubs/react-google-maps.tsx'),
+  }
+  // Con GALLERY_REAL_MAP=1 NO aliaseamos maplibre-gl (ni su CSS): el import real
+  // resuelve tal cual y el mapa pinta teselas de verdad. En cualquier otro caso
+  // (galería normal) se mantiene el doble plano de siempre.
+  if (!galleryRealMap) {
+    bareDoubles['maplibre-gl/dist/maplibre-gl.css'] = resolvePath('./src/gallery/stubs/empty.css')
+    bareDoubles['maplibre-gl'] = resolvePath('./src/gallery/stubs/maplibre-gl.ts')
   }
   const fileDoubles: { suffix: string; target: string }[] = [
     { suffix: '/lib/supabase.ts', target: resolvePath('./src/gallery/fakeSupabase.ts') },

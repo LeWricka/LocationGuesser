@@ -22,6 +22,7 @@
     "e2e:seed-user": "node scripts/e2e-seed-user.mjs",
     "gallery": "GALLERY=1 vite --port 5188",
     "gallery:shots": "playwright test -c playwright.gallery.config.ts",
+    "landing:assets": "playwright test -c playwright.landing-assets.config.ts",
     "a11y": "playwright test -c playwright.a11y.config.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
