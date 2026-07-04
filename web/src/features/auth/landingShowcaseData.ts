@@ -1,5 +1,5 @@
 // Datos del showcase de la landing deslogueada (issue #462): en vez de recrear el
-// producto con componentes vivos, enseñamos CAPTURAS REALES de pantallas de Tabide
+// producto con componentes vivos, enseñamos CAPTURAS REALES de pantallas de Momentu
 // —fotografiadas con el sistema de galería (fixtures deterministas + Playwright)—
 // dentro de marcos de móvil, al estilo Polarsteps (imagen de producto real sobre una
 // composición editorial). El dueño lo pidió así: "capturas reales, tipo la home de
@@ -48,15 +48,15 @@ export const SHOWCASE_SHOTS: ShowcaseShot[] = [
   {
     id: 'home',
     image: homeShot,
-    alt: 'Pantalla de inicio de Tabide: un globo con el pin del viaje y el reto pendiente de jugar.',
+    alt: 'Pantalla de inicio de Momentu: un globo con el pin del viaje y el reto pendiente de jugar.',
     eyebrow: 'Tus viajes',
     title: 'Cada viaje deja su camino',
-    lede: 'Cada momento se guarda en su sitio del mapa. Al abrir Tabide, tu gente ve dónde habéis estado y qué toca jugar.',
+    lede: 'Cada momento se guarda en su sitio del mapa. Al abrir Momentu, tu gente ve dónde habéis estado y qué toca jugar.',
   },
   {
     id: 'viaje',
     image: viajeShot,
-    alt: 'Pantalla del diario de un viaje en Tabide: los momentos del recorrido con sus fotos, en orden.',
+    alt: 'Pantalla del diario de un viaje en Momentu: los momentos del recorrido con sus fotos, en orden.',
     eyebrow: 'El recorrido',
     title: 'Cada momento, en su sitio',
     lede: 'Fotos y retos se guardan en el diario del viaje, en orden. Así tu gente revive por dónde habéis pasado.',
@@ -64,7 +64,7 @@ export const SHOWCASE_SHOTS: ShowcaseShot[] = [
   {
     id: 'jugar',
     image: jugarShot,
-    alt: 'Pantalla de jugar un reto en Tabide: la foto real a pantalla completa, lista para colocar el pin.',
+    alt: 'Pantalla de jugar un reto en Momentu: la foto real a pantalla completa, lista para colocar el pin.',
     eyebrow: 'La partida',
     title: 'Adivina dónde es',
     lede: 'Marcas en el mapa dónde crees que es. Hay cuenta atrás: cuanto más rápido y más cerca, más puntos.',
@@ -72,7 +72,7 @@ export const SHOWCASE_SHOTS: ShowcaseShot[] = [
   {
     id: 'resultado',
     image: resultadoShot,
-    alt: 'Pantalla de resultado de Tabide: los puntos de un intento y lo cerca que quedó del lugar real.',
+    alt: 'Pantalla de resultado de Momentu: los puntos de un intento y lo cerca que quedó del lugar real.',
     eyebrow: 'El resultado',
     title: 'Gana quien más se acerca',
     lede: 'Al revelar ves tus puntos y a qué distancia quedaste. Reto a reto, se llena el marcador del viaje.',
@@ -80,7 +80,7 @@ export const SHOWCASE_SHOTS: ShowcaseShot[] = [
 ]
 
 // El relato de una línea del bucle (foto-first, cuatro pasos cortos, estilo
-// Polarsteps Plan/Track/Relive pero en la voz de Tabide).
+// Polarsteps Plan/Track/Relive pero en la voz de Momentu).
 export const SHOWCASE_LOOP: string[] = [
   'Comparte un momento del viaje',
   'Tu gente adivina dónde es',

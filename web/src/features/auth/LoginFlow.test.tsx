@@ -62,7 +62,7 @@ describe('LoginFlow (email-first con código OTP, issue #506)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     await screen.findByLabelText('Código de 6 dígitos')
     await userEvent.click(screen.getByRole('button', { name: 'Cambiar email' }))
-    expect(screen.getByRole('heading', { name: 'Entra a Tabide' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Entra a Momentu' })).toBeInTheDocument()
   })
 
   test('con groupName muestra el copy de unirse al reto', () => {

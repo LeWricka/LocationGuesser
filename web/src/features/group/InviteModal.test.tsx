@@ -20,7 +20,7 @@ const nodeToPngBlobMock = vi.fn()
 const shareLeaderboardImageMock = vi.fn()
 vi.mock('./shareLeaderboard', () => ({
   nodeToPngBlob: (...args: unknown[]) => nodeToPngBlobMock(...args),
-  shareDomain: () => 'tabide.app',
+  shareDomain: () => 'momentu.art',
   shareLeaderboardImage: (...args: unknown[]) => shareLeaderboardImageMock(...args),
 }))
 
@@ -54,7 +54,7 @@ function renderModal(onClose = vi.fn()) {
           onClose={onClose}
           groupId="g1"
           groupName="Japón en primavera"
-          link="https://tabide.app/v/abc123"
+          link="https://momentu.art/v/abc123"
           challengeCount={3}
         />
       </ToastProvider>
@@ -110,7 +110,7 @@ describe('InviteModal — invitación como tarjeta-imagen (#617)', () => {
 
     await waitFor(() =>
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-        expect.stringContaining('https://tabide.app/v/abc123'),
+        expect.stringContaining('https://momentu.art/v/abc123'),
       ),
     )
     expect(trackMock).toHaveBeenCalledWith(
@@ -135,7 +135,7 @@ describe('InviteModal — invitación como tarjeta-imagen (#617)', () => {
     const [blobArg, captionArg] = shareLeaderboardImageMock.mock.calls[0]
     expect(blobArg).toBeInstanceOf(Blob)
     // El enlace SOLO va en el caption, nunca estampado en la imagen.
-    expect(captionArg).toContain('https://tabide.app/v/abc123')
+    expect(captionArg).toContain('https://momentu.art/v/abc123')
     expect(trackMock).toHaveBeenCalledWith(
       'invite_shared',
       expect.objectContaining({ surface: 'shared', group_id: 'g1' }),

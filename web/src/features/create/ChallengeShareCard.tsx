@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
 import { ArrowRight, Compass } from 'lucide-react'
-import { Icon, IconPin, WordmarkTabide } from '../../ui'
+import { Icon, IconPin, WordmarkMomentu } from '../../ui'
 import styles from './ChallengeShareCard.module.css'
 
 interface Props {
@@ -53,7 +53,7 @@ export const ChallengeShareCard = forwardRef<HTMLDivElement, Props>(function Cha
       <div className={styles.scrim} aria-hidden="true" />
 
       <div className={styles.top}>
-        <WordmarkTabide size={40} className={styles.wordmark} />
+        <WordmarkMomentu size={40} className={styles.wordmark} />
       </div>
 
       <div className={styles.bottom}>

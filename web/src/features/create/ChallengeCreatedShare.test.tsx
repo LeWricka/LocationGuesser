@@ -16,7 +16,7 @@ const shareLeaderboardImageMock = vi.fn()
 const downloadBlobMock = vi.fn()
 vi.mock('../group/shareLeaderboard', () => ({
   nodeToPngBlob: (...args: unknown[]) => nodeToPngBlobMock(...args),
-  shareDomain: () => 'tabide.app',
+  shareDomain: () => 'momentu.art',
   shareLeaderboardImage: (...args: unknown[]) => shareLeaderboardImageMock(...args),
   downloadBlob: (...args: unknown[]) => downloadBlobMock(...args),
 }))

@@ -26,7 +26,7 @@ vi.mock('../../lib/storage', async (importOriginal) => {
 // dobles simples para no tocar Supabase/html-to-image reales.
 vi.mock('../group/shareLeaderboard', () => ({
   nodeToPngBlob: vi.fn().mockResolvedValue(new Blob()),
-  shareDomain: vi.fn(() => 'tabide.app'),
+  shareDomain: vi.fn(() => 'momentu.art'),
   shareLeaderboardImage: vi.fn().mockResolvedValue('cancelled'),
   downloadBlob: vi.fn(),
 }))

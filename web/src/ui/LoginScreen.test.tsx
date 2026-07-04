@@ -6,7 +6,7 @@ import { LoginScreen } from './LoginScreen'
 describe('LoginScreen', () => {
   test('sin contexto de grupo usa el copy genérico', () => {
     render(<LoginScreen email="" onEmailChange={() => {}} />)
-    expect(screen.getByRole('heading', { name: 'Entra a Tabide' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Entra a Momentu' })).toBeInTheDocument()
   })
 
   test('con groupName usa el copy de "únete para jugar"', () => {

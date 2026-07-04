@@ -8,7 +8,7 @@ import { Icon } from './Icon'
 import type { GroupStatus } from './GroupCard'
 import { HomeGlobe } from './HomeGlobe'
 import type { GlobePin } from './HomeGlobe'
-import { IconPin, LogoTabide, WordmarkTabide } from './icons'
+import { IconPin, LogoMomentu, WordmarkMomentu } from './icons'
 import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
 import styles from './HomeDashboard.module.css'
 
@@ -378,8 +378,8 @@ export function HomeDashboard({
         <span className={styles.brand}>
           {/* Variante `oscuro`: el símbolo lleva su paleta propia (papel + oro + teal)
               sobre la escena oscura del globo, en vez de aplanarse a un solo tono. */}
-          <LogoTabide variant="oscuro" size={22} />
-          <WordmarkTabide size={18} />
+          <LogoMomentu variant="oscuro" size={22} />
+          <WordmarkMomentu size={18} />
         </span>
         <button
           type="button"

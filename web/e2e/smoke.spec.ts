@@ -96,7 +96,7 @@ test.describe('smoke', () => {
     // nuevo y recurrente. Sin campo de nombre (si la cuenta es nueva, el nombre se
     // pide DESPUÉS del código, no aquí).
     await startBtn.click()
-    await expect(page.getByRole('heading', { name: 'Entra a Tabide' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Entra a Momentu' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Tu nombre' })).toHaveCount(0)
 

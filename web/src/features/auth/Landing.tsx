@@ -24,7 +24,7 @@
 //  - `LandingShowcase` para enseñar el producto en acción, ahora en vidrio sobre la escena.
 
 import { useEffect, useState } from 'react'
-import { Button, HomeGlobe, LogoTabide, Stack, WordmarkTabide, useToast } from '../../ui'
+import { Button, HomeGlobe, LogoMomentu, Stack, WordmarkMomentu, useToast } from '../../ui'
 import { takeLegacySessionNotice } from '../../lib/auth'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { LandingShowcase } from './LandingShowcase'
@@ -104,8 +104,8 @@ export function Landing({ groupName, redirectTo }: Props) {
           <span className={styles.brand}>
             {/* Variante `oscuro`: paleta propia (papel + oro + teal) sobre la escena
                 oscura del globo héroe, en vez de aplanarse a un solo tono (#557). */}
-            <LogoTabide variant="oscuro" size={22} />
-            <WordmarkTabide size={18} />
+            <LogoMomentu variant="oscuro" size={22} />
+            <WordmarkMomentu size={18} />
           </span>
         </div>
 

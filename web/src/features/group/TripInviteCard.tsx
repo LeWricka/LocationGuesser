@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
 import { ArrowRight, Users } from 'lucide-react'
-import { Icon, IconPin, WordmarkTabide } from '../../ui'
+import { Icon, IconPin, WordmarkMomentu } from '../../ui'
 import styles from './TripInviteCard.module.css'
 
 interface Props {
@@ -55,7 +55,7 @@ export const TripInviteCard = forwardRef<HTMLDivElement, Props>(function TripInv
       <div className={styles.scrim} aria-hidden="true" />
 
       <div className={styles.top}>
-        <WordmarkTabide size={40} className={styles.wordmark} />
+        <WordmarkMomentu size={40} className={styles.wordmark} />
       </div>
 
       <div className={styles.bottom}>

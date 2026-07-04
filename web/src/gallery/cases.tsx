@@ -403,7 +403,7 @@ export const cases: GalleryCase[] = [
           onClose={noop}
           groupId={GROUP_ID}
           groupName={GROUP.name ?? GROUP_ID}
-          link={`https://tabide.app/v/${GROUP_ID}`}
+          link={`https://momentu.art/v/${GROUP_ID}`}
           challengeCount={CHALLENGES.length}
         />
       </div>
@@ -639,7 +639,7 @@ export const cases: GalleryCase[] = [
         challengeTitle="El bosque de bambú"
         points={4880}
         distanceKm={1.2}
-        domain="tabide.app"
+        domain="momentu.art"
       />
     ),
   },

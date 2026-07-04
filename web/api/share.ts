@@ -23,7 +23,7 @@ import {
   type ShareMeta,
 } from './_meta'
 
-const SITE_NAME = 'Tabide'
+const SITE_NAME = 'Momentu'
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '')

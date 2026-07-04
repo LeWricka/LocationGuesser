@@ -84,10 +84,10 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
             <OnboardingVisual visual={slide.visual} icon={slide.icon} image={slide.image} />
           </div>
           <div className={[styles.heading, styles.reveal].join(' ')} style={revealStyle(1)}>
-            {/* Eyebrow editorial con el paso actual (p.ej. "Tabide · 1 de 3"):
+            {/* Eyebrow editorial con el paso actual (p.ej. "Momentu · 1 de 3"):
                 ubica al usuario en el recorrido sin robar peso al titular. */}
             <span className={`t-label ${styles.eyebrow}`}>
-              Tabide · {index + 1} de {slides.length}
+              Momentu · {index + 1} de {slides.length}
             </span>
             <h2 id="lg-onboarding-title" className={`t-section ${styles.title}`}>
               {slide.title}

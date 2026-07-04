@@ -80,7 +80,7 @@ export async function resolveTripMeta(code: string): Promise<ShareMeta | null> {
     kind: 'trip',
     code,
     groupId: group.id,
-    title: group.name?.trim() || 'Un viaje en Tabide',
+    title: group.name?.trim() || 'Un viaje en Momentu',
     authorName,
     coverPath,
   }
@@ -157,7 +157,7 @@ export function ogDescription(meta: ShareMeta): string {
 
 export function ogEyebrow(meta: ShareMeta): string {
   if (meta.kind === 'challenge') {
-    return meta.authorName ? `Un reto de ${meta.authorName}` : 'Un reto en Tabide'
+    return meta.authorName ? `Un reto de ${meta.authorName}` : 'Un reto en Momentu'
   }
-  return meta.authorName ? `Un viaje de ${meta.authorName}` : 'Un viaje en Tabide'
+  return meta.authorName ? `Un viaje de ${meta.authorName}` : 'Un viaje en Momentu'
 }

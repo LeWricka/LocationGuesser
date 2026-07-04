@@ -44,7 +44,7 @@ interface Props {
 }
 
 // Hilo punteado dorado con punto teal final: firma discreta bajo el título de
-// las cabeceras de tarea (issue #659), la misma idea de "camino" que LogoTabide
+// las cabeceras de tarea (issue #659), la misma idea de "camino" que LogoMomentu
 // pero aislada del símbolo de marca (aquí es solo un remate tipográfico, no el
 // logo entero). El color va por CSS (var(--medal-gold)/var(--accent)) y no por
 // atributo SVG para que el design-lint de colores crudos no lo marque y el

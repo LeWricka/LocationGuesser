@@ -53,7 +53,7 @@ export const ResultCard = forwardRef<HTMLDivElement, Props>(function ResultCard(
         <span className={styles.logoMark} aria-hidden="true">
           <Icon icon={MapPin} size={44} />
         </span>
-        <span className={styles.brandName}>Tabide</span>
+        <span className={styles.brandName}>Momentu</span>
       </div>
 
       <div className={styles.header}>
