@@ -12,6 +12,7 @@
 
 import { useState } from 'react'
 import { sendEmailOtp, verifyEmailOtp } from '../../lib/auth'
+import { track } from '../../lib/analytics'
 
 // Dos pasos visibles: pedir el email → introducir el código. (Al verificar bien,
 // onAuthStateChange repinta logueado, así que no hay un tercer paso propio.)
@@ -65,7 +66,7 @@ export function useMagicLink({ redirectTo }: Options = {}): MagicLink {
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function send(): Promise<boolean> {
+  async function send(esReenvio: boolean): Promise<boolean> {
     setError(null)
     if (!isValidEmail(email)) {
       setError('Escribe un correo válido.')
@@ -75,6 +76,9 @@ export function useMagicLink({ redirectTo }: Options = {}): MagicLink {
       // No mandamos display_name aquí: el nombre se elige en el paso de perfil al
       // volver (ProfileStep). El trigger crea un perfil provisional.
       await sendEmailOtp(email.trim(), undefined, redirectTo)
+      // Cuenta exacta de envíos pedidos desde el cliente (diagnóstico de correos
+      // duplicados: 2 correos con 1 evento = duplicación servidor/SMTP).
+      track('login_email_solicitado', { reenvio: esReenvio })
       return true
     } catch {
       setError('No pudimos enviar el correo. Inténtalo de nuevo.')
@@ -84,7 +88,7 @@ export function useMagicLink({ redirectTo }: Options = {}): MagicLink {
 
   async function submit(): Promise<void> {
     setLoading(true)
-    const ok = await send()
+    const ok = await send(false)
     setLoading(false)
     if (ok) {
       setCode('')
@@ -94,7 +98,7 @@ export function useMagicLink({ redirectTo }: Options = {}): MagicLink {
 
   async function resend(): Promise<void> {
     setResending(true)
-    await send()
+    await send(true)
     setResending(false)
   }
 
