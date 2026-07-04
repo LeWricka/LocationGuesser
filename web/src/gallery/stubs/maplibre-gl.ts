@@ -227,7 +227,13 @@ export class Map {
       path.setAttribute('d', d)
       path.setAttribute('fill', 'none')
       path.setAttribute('stroke', layer.color)
-      path.setAttribute('stroke-width', '1.1')
+      // Fiel a la app real: upsertLine pinta 'line-width': 3 (px de pantalla).
+      // El viewBox del overlay es porcentual (0-100), así que un stroke-width
+      // en unidades de usuario se escalaría con el contenedor (1.1 ≈ 9px en el
+      // marco del showcase — salía una banda gorda). non-scaling-stroke fija
+      // el grosor en px de dispositivo, como MapLibre.
+      path.setAttribute('stroke-width', '3')
+      path.setAttribute('vector-effect', 'non-scaling-stroke')
       path.setAttribute('stroke-linecap', 'round')
       path.setAttribute('stroke-linejoin', 'round')
       if (layer.dash) path.setAttribute('stroke-dasharray', layer.dash.join(' '))
