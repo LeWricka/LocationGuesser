@@ -116,6 +116,14 @@ test('accesibilidad (axe) + sin overflow horizontal a 320px en cada caso', async
     await page.waitForLoadState('networkidle')
     await expect(page.locator('#root')).not.toBeEmpty()
 
+    // Guardarraíl #670: si el caso pinta el estado de error genérico es que el
+    // fixture/stub se rompió (p.ej. un método del builder sin implementar en
+    // fakeSupabase). axe pasa igual sobre un estado de error, así que se afirma aquí.
+    await expect(
+      page.getByText(/No hemos podido cargar/),
+      `[${c.id}] pinta el estado de error genérico — fixture/stub roto`,
+    ).toHaveCount(0)
+
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze()

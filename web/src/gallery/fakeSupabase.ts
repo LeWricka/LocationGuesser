@@ -83,7 +83,7 @@ function rowsFor(table: string): Row[] {
 }
 
 interface Filter {
-  kind: 'eq' | 'in'
+  kind: 'eq' | 'in' | 'not-null'
   column: string
   value: unknown
 }
@@ -130,6 +130,16 @@ class FakeQuery<T = Row[]> implements PromiseLike<QueryResult<T>> {
     this.filters.push({ kind: 'in', column, value })
     return this
   }
+  // Solo cubrimos `.not(col, 'is', null)` (columna no nula), que es lo único que
+  // usa la app (clips de vídeo en useTripData). Otros operadores lanzarían aquí
+  // en vez de devolver filas mal filtradas en silencio.
+  not(column: string, operator: string, value: unknown): this {
+    if (operator !== 'is' || value !== null) {
+      throw new Error(`fakeSupabase: .not('${column}', '${operator}', …) no soportado`)
+    }
+    this.filters.push({ kind: 'not-null', column, value })
+    return this
+  }
   order(column: string, opts?: { ascending?: boolean }): this {
     this.orderCol = column
     this.orderAsc = opts?.ascending ?? true
@@ -150,7 +160,9 @@ class FakeQuery<T = Row[]> implements PromiseLike<QueryResult<T>> {
       rows =
         f.kind === 'eq'
           ? rows.filter((r) => r[f.column] === f.value)
-          : rows.filter((r) => (f.value as unknown[]).includes(r[f.column]))
+          : f.kind === 'not-null'
+            ? rows.filter((r) => r[f.column] != null)
+            : rows.filter((r) => (f.value as unknown[]).includes(r[f.column]))
     }
     if (this.orderCol) {
       const col = this.orderCol
