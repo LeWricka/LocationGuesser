@@ -409,29 +409,43 @@ Prerrequisitos de PROD (los activa el dueño en el dashboard; el código ya est�
 
 Los correos de acceso (código OTP + enlace) salen de Supabase Auth. Por defecto usan
 el SMTP COMPARTIDO de Supabase: remitente genérico, límites bajos (~2/hora en picos)
-y sospechoso de los correos duplicados observados el 4 jul. Con el buzón de
-momentu.art contratado en Porkbun, se cambia a SMTP propio:
+y sospechoso de los correos duplicados observados el 4 jul.
 
-### 8.1 Configurar el SMTP en Supabase (una vez, ~5 min)
+El dominio momentu.art está registrado en Porkbun con la zona DNS en Vercel; NO hay
+buzón de correo (ni falta que hace para enviar): se usa un servicio TRANSACCIONAL
+que envía "como" el dominio verificándolo por DNS.
 
-**Dashboard → Project Settings → Authentication → SMTP Settings → Enable Custom SMTP:**
+### 8.1 Resend (recomendado — gratis hasta 3.000/mes, sin buzón)
+
+1. Cuenta en resend.com → **Domains → Add domain** → `momentu.art`.
+2. Resend da los registros DNS (SPF + DKIM) → añadirlos en **Vercel → Domains →
+   momentu.art → DNS**. Verifica en minutos.
+3. Resend → **API Keys** → crear una (permiso de envío).
+4. **Supabase Dashboard → Project Settings → Authentication → SMTP Settings →
+   Enable Custom SMTP:**
 
 | Campo | Valor |
 |---|---|
-| Sender email | el buzón creado en Porkbun (p.ej. `hola@momentu.art`) |
+| Sender email | `no-reply@momentu.art` (no necesita existir como buzón) |
 | Sender name | `Momentu` |
-| Host | `smtp.porkbun.com` |
-| Port | `587` (STARTTLS; si falla, `465` SSL) |
-| Username | el buzón completo (`hola@momentu.art`) |
-| Password | la contraseña del buzón en Porkbun |
+| Host | `smtp.resend.com` |
+| Port | `465` (SSL; alternativa `587` STARTTLS) |
+| Username | `resend` (literal) |
+| Password | la API key de Resend |
 
-Guardar y **enviarse un email de prueba** (logout → entrar de nuevo).
+Guardar y probar (logout → entrar de nuevo): debe llegar 1 correo, desde
+`no-reply@momentu.art`, sin caer en spam.
 
-> DNS: si el dominio se gestiona en Vercel, los registros MX/SPF/DKIM que pide
-> Porkbun deben estar en la zona DNS de Vercel (Domains → momentu.art → DNS).
-> Sin SPF/DKIM correctos, Gmail manda estos correos a spam. Verificación rápida:
-> `dig MX momentu.art +short` y `dig TXT momentu.art +short` (debe verse el SPF
-> de Porkbun).
+> A `no-reply@` no se puede responder (no hay buzón): correcto para códigos de
+> acceso. Para RECIBIR correo en el dominio (p.ej. `hola@momentu.art`) sin comprar
+> buzón: Porkbun ofrece reenvío gratuito de alias → un correo personal.
+
+### 8.1-bis Alternativa: buzón + SMTP de Porkbun
+
+Si algún día se quiere buzón real (enviar Y recibir): contratar Email Hosting en
+Porkbun (crea `hola@momentu.art`), añadir sus MX/SPF/DKIM a la zona de Vercel, y en
+Supabase usar host `smtp.porkbun.com`, puerto `587`, usuario el buzón completo y su
+contraseña.
 
 ### 8.2 Plantilla con marca
 
