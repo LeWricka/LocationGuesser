@@ -134,6 +134,62 @@ export async function getGroupMembers(groupId: string): Promise<GroupMemberInfo[
     .sort((a, b) => Number(b.isOwner) - Number(a.isOwner) || a.name.localeCompare(b.name))
 }
 
+/** Avatar mínimo de un miembro, para la fila de avatares de la tarjeta de la
+ * home (issue #543). Sin rol/dueño: la tarjeta solo pinta "aquí está tu grupo",
+ * no gestiona permisos (eso es `GroupMemberInfo`, en `getGroupMembers`). */
+export interface MemberAvatar {
+  userId: string
+  name: string
+  avatarUrl: string | null
+}
+
+/**
+ * Avatares de los miembros de VARIOS grupos a la vez (issue #543), para la fila
+ * de avatares solapados de cada tarjeta de la home. Dos consultas para TODOS
+ * los grupos pedidos (nunca una por tarjeta — evita N+1): (1) `group_members`
+ * de esos ids, (2) `profiles` de los `user_id` resultantes. Mismo patrón
+ * dos-consultas que `getGroupMembers`: `group_members.user_id` referencia
+ * `auth.users`, no `public.profiles`, así que un embed `profiles(...)` no
+ * resuelve nada (gotcha RLS/PostgREST, ver docblock de `getGroupMembers`).
+ * Orden por `joined_at`: los primeros en unirse encabezan la fila.
+ */
+export async function groupAvatars(groupIds: string[]): Promise<Map<string, MemberAvatar[]>> {
+  if (groupIds.length === 0) return new Map()
+
+  const { data: rows, error } = await supabase
+    .from('group_members')
+    .select('group_id, user_id, joined_at')
+    .in('group_id', groupIds)
+  if (error) throw error
+
+  // Orden en cliente (no `.order()` en la consulta): mismo criterio que el resto
+  // del fichero (p.ej. `getGroupMembers`), y evita depender de un índice por
+  // `joined_at` para un dato que ya llega en un puñado de filas por grupo.
+  const memberRows = [...(rows ?? [])].sort((a, b) => a.joined_at.localeCompare(b.joined_at))
+  if (memberRows.length === 0) return new Map()
+
+  const userIds = [...new Set(memberRows.map((r) => r.user_id))]
+  const { data: profiles, error: profilesError } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url')
+    .in('id', userIds)
+  if (profilesError) throw profilesError
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]))
+
+  const byGroup = new Map<string, MemberAvatar[]>()
+  for (const row of memberRows) {
+    const profile = profileById.get(row.user_id)
+    const list = byGroup.get(row.group_id) ?? []
+    list.push({
+      userId: row.user_id,
+      name: profile?.display_name ?? '—',
+      avatarUrl: profile?.avatar_url ?? null,
+    })
+    byGroup.set(row.group_id, list)
+  }
+  return byGroup
+}
+
 /**
  * Salir de un grupo: borra la fila propia de `group_members`. El RLS
  * `group_members_delete` permite borrar la fila propia (`user_id = auth.uid()`).

@@ -506,7 +506,11 @@
   /* Alto máximo de una hoja inferior en móvil (dvh: sigue al chrome del navegador). */
   --sheet-max-height: 92dvh;
 
-  /* Avatares: tamaños del disco (sm/md/lg) y anillo interior de contraste. */
+  /* Avatares: tamaños del disco (xs/sm/md/lg) y anillo interior de contraste.
+   * xs (issue #543): fila de avatares solapados de la tarjeta de viaje —
+   * más pequeño que `sm`, pensado para apilarse 3-4 juntos sin invadir el
+   * espacio del título/metadatos de la tarjeta. */
+  --avatar-xs: 22px;
   --avatar-sm: 28px;
   --avatar-md: 40px;
   --avatar-lg: 64px;

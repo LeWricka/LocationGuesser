@@ -55,6 +55,7 @@ import {
   GROUP,
   GROUP_ID,
   ME_ID,
+  MEMBERS,
   setEmptyWorld,
 } from './fixtures'
 import {
@@ -149,6 +150,14 @@ const MOMENT_SIN_FOTO: Moment = {
   country: null,
 }
 
+// Avatares del grupo (issue #543): los 4 miembros sembrados del viaje de Japón
+// (todos con `avatar: null` en fixtures.ts → 3 discos por defecto + chip "+1").
+const dashboardMembers = MEMBERS.map((m) => ({
+  userId: m.userId,
+  name: m.name,
+  avatarUrl: m.avatar,
+}))
+
 // HomeDashboard directo (home logueada, estado lleno): mismo patrón que su story,
 // pero con los fixtures del viaje sembrado para coherencia con el resto de casos.
 const dashboardGroups: HomeGroup[] = [
@@ -159,6 +168,7 @@ const dashboardGroups: HomeGroup[] = [
     owned: true,
     startsOn: GROUP.starts_on,
     endsOn: GROUP.ends_on,
+    members: dashboardMembers,
   },
   {
     id: 'viaje-alpes',
@@ -167,6 +177,8 @@ const dashboardGroups: HomeGroup[] = [
     owned: true,
     closed: true,
     startsOn: '2026-04-04',
+    // Viaje en solitario (issue #543): un único miembro → sin fila de avatares.
+    members: [dashboardMembers[0]],
   },
   {
     id: 'viaje-lisboa',
@@ -174,6 +186,7 @@ const dashboardGroups: HomeGroup[] = [
     status: 'live',
     startsOn: '2026-05-02',
     endsOn: '2026-05-05',
+    members: dashboardMembers.slice(0, 2),
   },
 ]
 const dashboardPins: GlobePin[] = [

@@ -42,6 +42,17 @@
   filter: drop-shadow(var(--avatar-emoji-shadow));
 }
 
+/* xs (issue #543): disco de la fila de avatares solapados de la tarjeta de
+ * viaje — el más pequeño del set, pensado para apilarse 3-4 juntos. */
+.xs {
+  width: var(--avatar-xs);
+  height: var(--avatar-xs);
+}
+
+.xs .emoji {
+  font-size: 13px; /* design-lint-allow: glifo proporcional al disco xs, no texto */
+}
+
 .sm {
   width: var(--avatar-sm);
   height: var(--avatar-sm);

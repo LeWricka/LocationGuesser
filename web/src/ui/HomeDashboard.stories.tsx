@@ -2,6 +2,16 @@ import type { Meta, StoryObj } from '@storybook/react-vite'
 import { HomeDashboard } from './HomeDashboard'
 import type { HomeGroup, HomePinned } from './HomeDashboard'
 
+// Miembros de ejemplo (issue #543): 4 en el viaje propio (3 avatares + chip
+// "+1"), 2 en el de amigos (sin chip), 1 (solo el dueño) en el cerrado en
+// solitario — `AvatarStack` no pinta nada con un único miembro.
+const membersFull = [
+  { userId: 'u1', name: 'Lewis' },
+  { userId: 'u2', name: 'Marta' },
+  { userId: 'u3', name: 'Iker' },
+  { userId: 'u4', name: 'Noa' },
+]
+
 const groups: HomeGroup[] = [
   {
     id: 'a',
@@ -10,6 +20,7 @@ const groups: HomeGroup[] = [
     owned: true,
     startsOn: '2026-06-15',
     endsOn: '2026-06-28',
+    members: membersFull,
   },
   {
     id: 'b',
@@ -17,6 +28,10 @@ const groups: HomeGroup[] = [
     status: 'live',
     startsOn: '2026-06-02',
     endsOn: '2026-06-09',
+    members: [
+      { userId: 'u5', name: 'Cris' },
+      { userId: 'u6', name: 'Ana' },
+    ],
   },
   {
     id: 'c',
@@ -25,6 +40,7 @@ const groups: HomeGroup[] = [
     owned: true,
     closed: true,
     startsOn: '2026-04-04',
+    members: [{ userId: 'u1', name: 'Lewis' }],
   },
 ]
 

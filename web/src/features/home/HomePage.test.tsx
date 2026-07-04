@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import type { MyGroup, PendingChallenge } from '../../lib/membership'
+import type { MemberAvatar, MyGroup, PendingChallenge } from '../../lib/membership'
 import type { Profile } from '../../lib/database.types'
 import type { ChallengeForPlay } from '../../lib/challenges'
 
@@ -19,9 +19,14 @@ vi.mock('../../lib/session-context', () => ({
 
 const myGroupsMock = vi.fn<(userId: string) => Promise<MyGroup[]>>()
 const pendingChallengesMock = vi.fn<(userId: string) => Promise<PendingChallenge[]>>()
+// Avatares del grupo (issue #543): por defecto ningún viaje trae miembros
+// sembrados en estos tests (no es lo que verifican); un test dedicado a la fila
+// de avatares fija esta respuesta explícitamente.
+const groupAvatarsMock = vi.fn<(groupIds: string[]) => Promise<Map<string, MemberAvatar[]>>>()
 vi.mock('../../lib/membership', () => ({
   myGroups: (userId: string) => myGroupsMock(userId),
   pendingChallenges: (userId: string) => pendingChallengesMock(userId),
+  groupAvatars: (groupIds: string[]) => groupAvatarsMock(groupIds),
 }))
 
 // Firmado de portadas: la home firma los paths a URL; lo stubbeamos para no tocar
@@ -71,6 +76,7 @@ beforeEach(() => {
   sessionState.profile = { display_name: 'Lewis', avatar_url: null }
   myGroupsMock.mockResolvedValue([])
   pendingChallengesMock.mockResolvedValue([])
+  groupAvatarsMock.mockResolvedValue(new Map())
   signedImageUrlMock.mockResolvedValue(null)
   getGroupChallengesMock.mockResolvedValue([])
   getAnswersMock.mockResolvedValue(new Map())
@@ -128,6 +134,71 @@ describe('HomePage', () => {
     expect(screen.queryByTestId('world-map')).not.toBeInTheDocument()
     // SIN "cómo funciona" para el usuario recurrente (relato nuevo).
     expect(screen.queryByText('Cómo funciona')).not.toBeInTheDocument()
+  })
+
+  test('con miembros del grupo → pinta la fila de avatares en la tarjeta (#543)', async () => {
+    myGroupsMock.mockResolvedValue([
+      {
+        id: 'g1',
+        name: "Interrail '26",
+        role: 'owner',
+        isOwner: true,
+        status: 'idle',
+        createdAt: '2026-06-01T00:00:00Z',
+        closed: false,
+        startsOn: null,
+        endsOn: null,
+        coverImagePath: null,
+      },
+    ])
+    groupAvatarsMock.mockResolvedValue(
+      new Map([
+        [
+          'g1',
+          [
+            { userId: 'u1', name: 'Lewis', avatarUrl: null },
+            { userId: 'u2', name: 'Marta', avatarUrl: null },
+          ],
+        ],
+      ]),
+    )
+
+    render(<HomePage />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('group', { name: 'Viaje de 2 personas: Lewis, Marta' }),
+      ).toBeInTheDocument(),
+    )
+  })
+
+  test('viaje en solitario (1 miembro) → no pinta la fila de avatares (#543)', async () => {
+    myGroupsMock.mockResolvedValue([
+      {
+        id: 'g1',
+        name: 'Ruta en solitario',
+        role: 'owner',
+        isOwner: true,
+        status: 'idle',
+        createdAt: '2026-06-01T00:00:00Z',
+        closed: false,
+        startsOn: null,
+        endsOn: null,
+        coverImagePath: null,
+      },
+    ])
+    groupAvatarsMock.mockResolvedValue(
+      new Map([['g1', [{ userId: 'u1', name: 'Lewis', avatarUrl: null }]]]),
+    )
+
+    render(<HomePage />)
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Abrir viaje Ruta en solitario' }),
+      ).toBeInTheDocument(),
+    )
+    expect(screen.queryByRole('group')).not.toBeInTheDocument()
   })
 
   // #554: la tarjeta del viaje cae al placeholder de mapa nocturno aunque el viaje
