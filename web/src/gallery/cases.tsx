@@ -19,6 +19,7 @@ import { CreateGroup } from '../features/create/CreateGroup'
 import { AddMoment } from '../features/create/AddMoment'
 import { CreateNumberChallenge } from '../features/create/CreateNumberChallenge'
 import { CreateLocationChallenge } from '../features/create/CreateLocationChallenge'
+import { CreateChallengeKindPicker } from '../features/create/CreateChallengeKindPicker'
 import { EditChallenge } from '../features/group/EditChallenge'
 import { MomentGallery } from '../features/trip/MomentGallery'
 import { MomentSheet } from '../features/trip/MomentSheet'
@@ -498,6 +499,14 @@ export const cases: GalleryCase[] = [
     render: () => (
       <AddMoment groupId={GROUP_ID} onBack={noop} onCreated={noop} onAddChallenge={noop} />
     ),
+  },
+  {
+    // Selector de tipo a la ENTRADA de crear reto (issue #705): la captura del
+    // dueño que evidenció el aire sobrante de la cabecera 5B compactada.
+    id: 'nuevo-reto',
+    title: 'Nuevo reto · ¿A qué jugamos?',
+    section: 'Crear',
+    render: () => <CreateChallengeKindPicker groupName={GROUP.name} onBack={noop} onPick={noop} />,
   },
   {
     // Reto ¿Adivinas? de papel (issue #586): antes montaba CreateChallengeFlow

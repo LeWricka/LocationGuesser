@@ -45,3 +45,52 @@ describe('AppHeader — variant="floating" (sin cambios por #659)', () => {
     expect(screen.queryByText('Japón en primavera')).not.toBeInTheDocument()
   })
 })
+
+// Variante "dense" (issue #705): 5B en miniatura para pantallas con
+// protagonista a sangre (el mapa de "¿Dónde?") — atrás y título EN LA MISMA
+// FILA, kicker opcional, hilo corto. Mucho menos alto que "plain".
+describe('AppHeader — variant="dense" (issue #705)', () => {
+  test('el título se pinta junto al atrás, en la misma fila', () => {
+    const { container } = render(
+      <AppHeader variant="dense" title="¿Dónde?" onLead={() => {}} leadLabel="Atrás" />,
+    )
+    expect(screen.getByRole('heading', { name: '¿Dónde?' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Atrás' })).toBeInTheDocument()
+    // Una única fila (denseRow) como hijo directo del header: atrás y título
+    // NO están en filas separadas, a diferencia de "plain".
+    const denseRow = container.querySelector('header > div:first-child')
+    expect(denseRow?.querySelector('button')).toBeInTheDocument()
+    expect(denseRow?.querySelector('h1')).toBeInTheDocument()
+  })
+
+  test('con kicker, se apila encima del título dentro de la misma fila', () => {
+    render(
+      <AppHeader
+        variant="dense"
+        title="¿Dónde?"
+        kicker="Japón en primavera"
+        onLead={() => {}}
+        leadLabel="Atrás"
+      />,
+    )
+    expect(screen.getByText('Japón en primavera')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '¿Dónde?' })).toBeInTheDocument()
+  })
+
+  test('sin título, la cabecera queda solo con el atrás', () => {
+    const { container } = render(<AppHeader variant="dense" onLead={() => {}} leadLabel="Atrás" />)
+    expect(screen.getByRole('button', { name: 'Atrás' })).toBeInTheDocument()
+    expect(container.querySelector('h1')).not.toBeInTheDocument()
+    // Sin título tampoco se pinta el hilo (solo acompaña al título) — el único
+    // svg que queda es el del icono del botón atrás.
+    expect(screen.getByRole('button', { name: 'Atrás' }).querySelector('svg')).toBeInTheDocument()
+    expect(container.querySelectorAll('svg').length).toBe(1)
+  })
+
+  test('la acción se pinta al final de la fila', () => {
+    render(
+      <AppHeader variant="dense" title="¿Dónde?" onLead={() => {}} action={<button>GPS</button>} />,
+    )
+    expect(screen.getByRole('button', { name: 'GPS' })).toBeInTheDocument()
+  })
+})
