@@ -36,9 +36,6 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
-    defaults:
-      run:
-        working-directory: web
     env:
       # Los secrets se copian a env aquí para poder detectar su AUSENCIA en un step y
       # saltar limpio. GitHub NO permite leer secrets directamente en `if:`.
@@ -76,10 +73,12 @@ jobs:
 
       - name: Install dependencies
         if: steps.guard.outputs.run == 'true'
+        working-directory: web
         run: npm ci
 
       - name: Install Playwright Chromium
         if: steps.guard.outputs.run == 'true'
+        working-directory: web
         run: npx playwright install --with-deps chromium
 
       # Espera prudente a que Vercel termine de redesplegar tras el merge a main. Solo
@@ -90,6 +89,7 @@ jobs:
 
       - name: Smoke logueado en prod (www.tabide.app)
         if: steps.guard.outputs.run == 'true'
+        working-directory: web
         run: npm run e2e:prod-logged
 
       - name: Subir artefactos de Playwright si falla
