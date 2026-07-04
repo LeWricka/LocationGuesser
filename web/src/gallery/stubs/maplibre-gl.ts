@@ -387,10 +387,25 @@ export class Map {
       },
     }
   }
-  removeLayer(): this {
+  // `setPaintProperty` (issue #702: HomeGlobe recolorea protagonista/tenue sin
+  // recrear la capa) — solo nos importa 'line-color', la única propiedad que el
+  // componente actualiza así. Actualiza el color guardado y redibuja el `<path>`.
+  setPaintProperty(layerId: string, prop: string, value: unknown): this {
+    if (prop !== 'line-color' || typeof value !== 'string') return this
+    const layer = this.lineLayers.get(layerId)
+    if (layer) {
+      this.lineLayers.set(layerId, { ...layer, color: value })
+      this.layout()
+    }
     return this
   }
-  removeSource(): this {
+  removeLayer(id: string): this {
+    this.lineLayers.delete(id)
+    this.layout()
+    return this
+  }
+  removeSource(id: string): this {
+    this.sources.delete(id)
     return this
   }
   // `offset` (#693: vuelo al pin activo con `verticalFrameOffset`) es lo único que nos

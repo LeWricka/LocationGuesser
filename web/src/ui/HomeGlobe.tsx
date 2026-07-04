@@ -25,9 +25,23 @@ export interface GlobePin {
   lead?: boolean
 }
 
+/** Ruta dorada de un viaje del globo (issue #702): los puntos VISIBLES de ese
+ * viaje, en orden cronológico ASC (los cose `useWorldTrips`), formato `[lng, lat]`
+ * (el que espera MapLibre). Con menos de 2 puntos no dibuja nada (ver `repaint`). */
+export interface GlobeRoute {
+  /** Id del destino (viaje) al que pertenece esta ruta; casa con `GlobePin.targetId`
+   * y con `activeTargetId` para decidir si es la protagonista (oro pleno) o no
+   * (oro tenue). */
+  targetId: string
+  points: [number, number][]
+}
+
 interface Props {
   /** Pines-foto a clavar en el globo. */
   pins: GlobePin[]
+  /** Rutas doradas por viaje (issue #702): una polyline por viaje con ≥2 puntos
+   * visibles. La del viaje `activeTargetId` se pinta en oro pleno; el resto, tenue. */
+  routes?: GlobeRoute[]
   /** Tocar un pin → abre su destino (un viaje). */
   onOpenPin?: (targetId: string) => void
   /**
@@ -117,7 +131,17 @@ const PIN_HALF_WIDTH = 28
 // o el de los laterales se sale del encuadre y el lienzo lo recorta). Deja aire arriba
 // para la marca/el avatar flotantes. FIJO: a diferencia del `bottom` (ver
 // `computeFitPaddingY`), el chrome superior no cambia de alto con los datos del usuario.
-const FIT_PADDING_TOP = 72 + PIN_HEIGHT
+// Componente FIJO reducido de 72 → 56 (issue #702, parte 2: "sobra margen por
+// arriba"): mide EXACTAMENTE la banda superior en blanco entre el chrome (marca +
+// avatar, ~64px de alto real: `--space-4` de padding arriba/abajo + el propio
+// icono/avatar) y el pin más alto — la parte NO ocupada por el disco del pin
+// (`PIN_HEIGHT`, que sigue intacto: reserva espacio real, no "aire" decorativo).
+// Medido con Playwright contra la galería (`home-con-datos`, ver PR #702): antes
+// el pin más alto arrancaba a ~130px (390×844) / ~123px (360×740) del borde
+// superior del lienzo; con 56 pasa a ~122px / ~107px — dentro del objetivo
+// 100–140px a ambos viewports, con margen de sobra antes de tocar el suelo de
+// 100px en el viewport más bajo (360×740, el más ajustado).
+const FIT_PADDING_TOP = 56 + PIN_HEIGHT
 const FIT_PADDING_SIDE = 48 + PIN_HALF_WIDTH
 // Aire entre el disco del pin y el canto del dock de HomeDashboard (chip "Te toca
 // jugar" + cabecera "Tus viajes" + filtros + carrusel — `bottomObscuredPx`, medido por
@@ -190,6 +214,15 @@ const SPIN_RESUME_DELAY_MS = 4000
 // Estilo base mínimo: sin sprite/glyphs; los rasters se añaden tras `load`.
 const BASE_STYLE: StyleSpecification = { version: 8, sources: {}, layers: [] }
 
+// Default ESTABLE de `routes` (issue #702): un default inline `routes = []` crearía
+// un array NUEVO en cada render de HomeGlobe cuando el padre no pasa la prop, y ese
+// array entra en las deps del efecto que repinta (`[pins, routes, repaint,
+// fitToPins]`) — dispararía un repaint de más en CUALQUIER re-render (no solo
+// cuando `routes` cambia de verdad), destruyendo y recreando los Markers sin que
+// sus datos hubieran cambiado. Con esta constante compartida, sin `routes` la
+// referencia es SIEMPRE la misma entre renders.
+const EMPTY_ROUTES: GlobeRoute[] = []
+
 type MapLibreModule = typeof import('maplibre-gl')
 
 function prefersReducedMotion(): boolean {
@@ -241,6 +274,46 @@ function applySky(map: MapLibreMap): void {
   }
 }
 
+/** Ids de fuente/capa de la ruta de un viaje (issue #702), únicos por `targetId`
+ * para que las constelaciones de dos viajes nunca colisionen entre sí. */
+function routeIds(targetId: string): { sourceId: string; layerId: string } {
+  return { sourceId: `lg-home-route-${targetId}`, layerId: `lg-home-route-line-${targetId}` }
+}
+
+/**
+ * Crea o actualiza una capa `line` de MapLibre con sus coordenadas — mismo patrón
+ * que `upsertLine` en `TripMapGlobe.tsx`, DUPLICADO a propósito aquí: el área
+ * declarada de la issue #702 es este fichero, y extraer un módulo compartido por
+ * ~15 líneas habría tocado un fichero de otra feature (`features/trip`) sin
+ * necesidad — más riesgo que beneficio para el tamaño del helper.
+ */
+function upsertLine(
+  map: MapLibreMap,
+  sourceId: string,
+  layerId: string,
+  coords: [number, number][],
+  color: string,
+): void {
+  const data: GeoJSON.Feature<GeoJSON.LineString> = {
+    type: 'Feature',
+    properties: {},
+    geometry: { type: 'LineString', coordinates: coords },
+  }
+  const existing = map.getSource(sourceId)
+  if (existing && 'setData' in existing) {
+    ;(existing as { setData: (d: typeof data) => void }).setData(data)
+    return
+  }
+  map.addSource(sourceId, { type: 'geojson', data })
+  map.addLayer({
+    id: layerId,
+    type: 'line',
+    source: sourceId,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': color, 'line-width': 3 },
+  })
+}
+
 /**
  * Globo HÉROE de la home — patrón "globo + hoja" (referencia Polarsteps). Reutiliza
  * el motor MapLibre GL con el preset `diario` (satélite Esri + etiquetas) y la proyección
@@ -253,6 +326,7 @@ function applySky(map: MapLibreMap): void {
  */
 export function HomeGlobe({
   pins,
+  routes = EMPTY_ROUTES,
   onOpenPin,
   framing = 'pins',
   relaxed = false,
@@ -274,14 +348,23 @@ export function HomeGlobe({
 
   // Props en refs: el handler `load` (async) lee siempre el último valor sin recrear.
   const pinsRef = useRef(pins)
+  // Rutas doradas por viaje (issue #702), mismo motivo que `pinsRef`.
+  const routesRef = useRef(routes)
   const onOpenRef = useRef(onOpenPin)
   const framingRef = useRef(framing)
   const activeTargetIdRef = useRef(activeTargetId)
   // Issue #693: alto medido del dock de HomeDashboard, en ref por el mismo motivo que
   // el resto (el handler `load`, async, siempre debe leer el último valor).
   const bottomObscuredRef = useRef(bottomObscuredPx)
+  // Fuentes/capas de línea YA creadas en el mapa, por `targetId` (issue #702): permite
+  // (1) recolorear una ruta existente vía `setPaintProperty` sin recrearla
+  // (`applyRouteEmphasis`) y (2) detectar rutas OBSOLETAS (un viaje que perdió su
+  // 2º punto, o desapareció del todo) para retirar su fuente/capa en vez de dejarla
+  // huérfana pintando una geometría vieja.
+  const routeLayersRef = useRef(new Map<string, { sourceId: string; layerId: string }>())
   useEffect(() => {
     pinsRef.current = pins
+    routesRef.current = routes
     onOpenRef.current = onOpenPin
     framingRef.current = framing
     relaxedRef.current = relaxed
@@ -342,6 +425,26 @@ export function HomeGlobe({
     return idx
   }, [])
 
+  // Recolorea las rutas YA creadas (issue #702) según `activeTargetId`, sin tocar su
+  // geometría ni recrear fuente/capa — `map.setPaintProperty` es barato, a diferencia
+  // de reconstruir un GeoJSON source cada vez que el carrusel cambia de protagonista
+  // (posiblemente varias veces por segundo al deslizar). Idempotente: recorre TODAS
+  // las rutas registradas (no solo "la anterior"), igual que `applyActiveLead`.
+  const applyRouteEmphasis = useCallback((): void => {
+    const map = mapRef.current
+    if (!map || !readyRef.current || routeLayersRef.current.size === 0) return
+    const css = getComputedStyle(map.getContainer())
+    // Fallback SOLO si el token faltara: el paint WebGL no entiende `var(--token)`,
+    // así que resolvemos a un color concreto leyendo la variable computada (mismo
+    // patrón que `TripMapGlobe.repaint`, ya grandfathered en el baseline de design-lint).
+    const goldColor = css.getPropertyValue('--route-gold').trim() || '#d9b25a' // design-lint-allow: fallback de paint WebGL, no admite var(--token)
+    const goldSoft = css.getPropertyValue('--route-gold-soft').trim() || 'rgba(217,178,90,0.5)' // design-lint-allow: fallback de paint WebGL, no admite var(--token)
+    const activeId = activeTargetIdRef.current
+    for (const [targetId, ids] of routeLayersRef.current) {
+      map.setPaintProperty(ids.layerId, 'line-color', targetId === activeId ? goldColor : goldSoft)
+    }
+  }, [])
+
   // Repinta los marcadores (pines-foto) desde las refs.
   const repaint = useCallback(() => {
     const map = mapRef.current
@@ -385,7 +488,44 @@ export function HomeGlobe({
     // perdería el aro dorado hasta el siguiente cambio de `activeTargetId` (los
     // elementos nuevos solo llevan el `lead` horneado desde el propio dato).
     applyActiveLead()
-  }, [applyActiveLead])
+
+    // Rutas doradas por viaje (issue #702): una polyline por viaje con ≥2 puntos
+    // visibles (el diario ya solo emite puntos VISIBLES vía `useWorldTrips`, así que
+    // el reto EN JUEGO nunca puede entrar aquí). Primero retira las rutas OBSOLETAS
+    // (un viaje que perdió su 2º punto, o que ya no está en `routes`) para no dejar
+    // fuentes/capas huérfanas pintando una geometría vieja.
+    const desiredRoutes = routesRef.current.filter((r) => r.points.length >= 2)
+    const desiredIds = new Set(desiredRoutes.map((r) => r.targetId))
+    for (const [targetId, ids] of routeLayersRef.current) {
+      if (!desiredIds.has(targetId)) {
+        map.removeLayer(ids.layerId)
+        map.removeSource(ids.sourceId)
+        routeLayersRef.current.delete(targetId)
+      }
+    }
+    // Jerarquía visual: tenues primero, protagonista AL FINAL — el orden de
+    // creación decide el apilado en MapLibre (capas añadidas después quedan
+    // ENCIMA) y las actualizaciones posteriores vía `setData` no reordenan capas
+    // ya creadas, así que basta fijar el orden la primera vez que aparecen juntas.
+    const activeId = activeTargetIdRef.current
+    const orderedRoutes = [
+      ...desiredRoutes.filter((r) => r.targetId !== activeId),
+      ...desiredRoutes.filter((r) => r.targetId === activeId),
+    ]
+    for (const route of orderedRoutes) {
+      const ids = routeIds(route.targetId)
+      // Color PROVISIONAL: `applyRouteEmphasis`, dos líneas más abajo, lo sobrescribe
+      // en el mismo repintado con el token resuelto — el valor de aquí nunca llega a
+      // pintarse en pantalla.
+      upsertLine(map, ids.sourceId, ids.layerId, route.points, '#d9b25a') // design-lint-allow: color provisional, sobrescrito por applyRouteEmphasis abajo
+      routeLayersRef.current.set(route.targetId, ids)
+    }
+    // Color definitivo (protagonista vs tenue) de TODAS las rutas, recién creadas o
+    // ya existentes: `upsertLine` de arriba pinta un color provisional al crear, y
+    // `applyRouteEmphasis` es la única fuente de verdad del color real — evita
+    // duplicar aquí la lógica de qué es protagonista (ya vive allí).
+    applyRouteEmphasis()
+  }, [applyActiveLead, applyRouteEmphasis])
 
   // Encuadra un RECORRIDO: un conjunto de pines (los de UN viaje, o todos como
   // fallback). Reutiliza el padding del dock (#696) y decide el gesto de cámara:
@@ -671,19 +811,26 @@ export function HomeGlobe({
     // deriva y el render sin recrear nada). El montaje lee su valor inicial vía `relaxedRef`.
   }, [webgl, repaint, fitToPins, startSpin, stopSpin])
 
-  // Repinta + reencuadra cuando cambian los pines (no recrea el mapa).
+  // Repinta + reencuadra cuando cambian los pines O las rutas (no recrea el mapa).
+  // `routes` en las deps (issue #702): `repaint` lee de la ref, pero el EFECTO
+  // necesita saber que el valor de la prop cambió para volver a dispararse.
   useEffect(() => {
     repaint()
     if (readyRef.current) fitToPins()
-  }, [pins, repaint, fitToPins])
+  }, [pins, routes, repaint, fitToPins])
 
   // Vuela/resalta al cambiar `activeTargetId` (no recrea nada; ver `flyToTarget`).
   // No hace falta comparar con el valor anterior: `flyToTarget` ya es un NO-OP total
   // si no hay id o no hay pin correspondiente, y el efecto solo se dispara cuando la
-  // prop CAMBIA de valor (dependencia `[activeTargetId]`).
+  // prop CAMBIA de valor (dependencia `[activeTargetId]`). `applyRouteEmphasis`
+  // (issue #702) recolorea las rutas sin reconstruirlas — el "recoloreo barato" al
+  // cambiar de protagonista (p.ej. al deslizar el carrusel de viajes).
   useEffect(() => {
-    if (readyRef.current) flyToTarget()
-  }, [activeTargetId, flyToTarget])
+    if (readyRef.current) {
+      flyToTarget()
+      applyRouteEmphasis()
+    }
+  }, [activeTargetId, flyToTarget, applyRouteEmphasis])
 
   // Issue #693: si el dock cambia de alto (aparece/desaparece el chip "Te toca jugar",
   // los chips de filtro, o el usuario cambia a un viaje con/sin fechas) el hueco visible

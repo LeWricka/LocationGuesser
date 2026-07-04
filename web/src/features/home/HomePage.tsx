@@ -15,7 +15,7 @@ import {
   Row,
   sortTrips,
 } from '../../ui'
-import type { GlobePin, HomeGroup, HomePinned } from '../../ui'
+import type { GlobePin, GlobeRoute, HomeGroup, HomePinned } from '../../ui'
 import { useSession } from '../../lib/session-context'
 import { supabase } from '../../lib/supabase'
 import { signedImageUrl } from '../../lib/storage'
@@ -176,6 +176,14 @@ export function HomePage() {
     }))
   })
 
+  // Rutas doradas del globo (issue #702): una polyline por viaje, en el mismo orden
+  // cronológico ASC que ya trae `trip.points` (ver `useWorldTrips.resolveTrip`). Sin
+  // reordenar aquí: HomeGlobe respeta el orden que le llega.
+  const routes: GlobeRoute[] = world.trips.map((trip) => ({
+    targetId: trip.groupId,
+    points: trip.points.map((p) => [p.lng, p.lat]),
+  }))
+
   // Reto fijado "Te toca jugar": traducimos el reto pendiente más urgente (ya firmado en
   // useHomeData) a la forma que consume el layout. Sin pendiente → null.
   const pinned: HomePinned | null = data.pinned
@@ -200,6 +208,7 @@ export function HomePage() {
           avatarUrl={profile?.avatar_url}
           groups={groups}
           pins={pins}
+          routes={routes}
           pinned={pinned}
           onOpenProfile={gotoProfile}
           onCreateGroup={onCreateGroup}
