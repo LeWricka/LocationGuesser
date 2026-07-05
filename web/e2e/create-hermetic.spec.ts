@@ -83,7 +83,7 @@ async function openCreateFromTrip(page: Page): Promise<void> {
 // `streetViewAvailable` controla si el mock de Maps devuelve panorama o rechaza.
 async function runCreateFlow(page: Page, opts: { streetViewAvailable: boolean }): Promise<void> {
   // Selector de tipo → ¿Dónde? → abre CreateLocationChallenge con el mapa.
-  await page.getByRole('button', { name: /Crear reto ¿Dónde\?/ }).click()
+  await page.getByRole('button', { name: /Crear reto ¿Dónde estamos\?/ }).click()
 
   // PASO 1 — el sitio: el mapa Leaflet es la escena (todo el alto disponible).
   const map = page.locator('.leaflet-container')
@@ -232,7 +232,7 @@ test.describe('crear reto (hermético)', () => {
     await primeHermeticCreate(page, { streetViewAvailable: true })
 
     await openCreateFromTrip(page)
-    await page.getByRole('button', { name: /Crear reto ¿Dónde\?/ }).click()
+    await page.getByRole('button', { name: /Crear reto ¿Dónde estamos\?/ }).click()
 
     // El mapa Leaflet es el protagonista del paso 1: carga a pantalla (todo el
     // alto bajo la cabecera, ya sin panel inferior que lo encoja).
@@ -265,7 +265,7 @@ test.describe('crear reto (hermético)', () => {
     await primeHermeticCreate(page, { streetViewAvailable: true })
     await openCreateFromTrip(page)
 
-    await page.getByRole('button', { name: /Crear reto ¿Dónde\?/ }).click()
+    await page.getByRole('button', { name: /Crear reto ¿Dónde estamos\?/ }).click()
     const map = page.locator('.leaflet-container')
     await expect(map).toBeVisible({ timeout: 20_000 })
     await map.click({ position: { x: 180, y: 200 } })
@@ -286,6 +286,6 @@ test.describe('crear reto (hermético)', () => {
     await expect(page.getByText('Plazo', { exact: true })).toBeVisible({ timeout: 10_000 })
     await page.goBack()
     await expect(map).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByRole('button', { name: /Crear reto ¿Dónde\?/ })).not.toBeVisible()
+    await expect(page.getByRole('button', { name: /Crear reto ¿Dónde estamos\?/ })).not.toBeVisible()
   })
 })
