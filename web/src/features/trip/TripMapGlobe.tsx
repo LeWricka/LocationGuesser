@@ -80,11 +80,12 @@ function safeFitZoom(naturalZoom: number, minFill: number, maxZoom: number): num
   return naturalZoom >= minFill ? Math.max(minFill, capped) : capped
 }
 
-// Entrada cinematográfica (Fase 2): arrancamos un punto MÁS lejos que WORLD_ZOOM
-// (vista de globo entero) y "aterrizamos" en el encuadre de la ruta. Duración corta
-// para que sea un gesto, no una espera. Con reduced-motion no se usa (salto directo).
-const INTRO_START_ZOOM = 0.6
-const INTRO_DURATION = 1500
+// La "entrada cinematográfica" de Fase 2 (vuelo animado de 1500ms desde zoom 0.6
+// hasta el encuadre) se RETIRÓ en "perf(cargas): entrada sin saltos": corría con el
+// MapSkeleton delante (nadie la veía) y solo retrasaba el primer `idle` — o sea, el
+// revelado — en ~1.5s. Ahora el encuadre inicial es instantáneo (`duration: 0`) y
+// ocurre ANTES de revelar: el skeleton se funde directamente sobre el mapa YA
+// encuadrado, sin que la escena se mueva sola al entrar.
 
 // Red de seguridad del skeleton: si el `idle` de MapLibre nunca llega (motor que
 // no lo soporta bien, teselas que fallan en bucle, o un doble de mapa en tests/
@@ -197,9 +198,12 @@ export function TripMapGlobe({
   const markersRef = useRef<MapLibreMarker[]>([])
   // Señal de que el estilo cargó: los efectos de pintado esperan a esto.
   const readyRef = useRef(false)
-  // La entrada cinematográfica corre UNA sola vez por montaje. Tras ella, el encuadre
-  // lo gobiernan los datos/selección como siempre.
-  const introDoneRef = useRef(false)
+  // Revelado hecho (primer `idle` o su red de seguridad): antes de esto, toda
+  // cámara es instantánea (el usuario no ve el lienzo aún) y los pines no montan.
+  const revealedRef = useRef(false)
+  // Entrada escalonada de los pines: solo en el PRIMER pintado tras el revelado
+  // (los repintados por datos/selección posteriores montan pines quietos).
+  const entranceDoneRef = useRef(false)
   // Un fallo al cargar/crear el mapa ocurre en un callback async, fuera del render,
   // así que el ErrorBoundary del selector NO lo vería. Lo guardamos en estado y lo
   // RE-LANZAMOS en render para que el boundary caiga al mapa plano (red de seguridad).
@@ -248,18 +252,34 @@ export function TripMapGlobe({
     // PUNTA del pin a la coordenada (el círculo queda arriba), igual que el plano.
     // El momento EN JUEGO NO tiene pin aquí (issue #593): mientras dura, su lugar es
     // secreto y no aparece en el mapa en absoluto (ni clavado ni flotando).
+    //
+    // Coreografía de entrada ("el mapa primero, los puntos después"): en el PRIMER
+    // pintado tras el revelado, cada pin entra con fade+scale escalonado (clase
+    // `lg-pin-enter` + retardo por índice sobre tokens --motion-*, CSS compartido en
+    // tripPins.css; reduced-motion lo anula). El retardo base espera el fundido del
+    // MapSkeleton, así la secuencia es: mapa fundido → pines → rutas encima.
+    const entering = revealedRef.current && !entranceDoneRef.current
+    if (entering) entranceDoneRef.current = true
     const selected = selectedRef.current
-    for (const p of pts) {
+    pts.forEach((p, i) => {
       const el = pinElement({
         imageUrl: p.imageUrl,
         title: p.title,
         featured: p.challengeId === selected,
       })
       el.addEventListener('click', () => onSelectRef.current(p.challengeId))
+      if (entering) {
+        el.classList.add('lg-pin-enter')
+        // Stagger capado a 10 pasos (mismo criterio que `.lg-stagger`, index.css).
+        el.style.setProperty(
+          '--pin-enter-delay',
+          `calc(var(--motion-duration-base) + var(--motion-stagger-step) * ${Math.min(i, 10)})`,
+        )
+      }
       markersRef.current.push(
         new gl.Marker({ element: el, anchor: 'bottom' }).setLngLat([p.lng, p.lat]).addTo(map),
       )
-    }
+    })
 
     // Ruta en ORO (token): el oro marca el recorrido "vivo". El paint WebGL no entiende
     // `var(--token)`, así que resolvemos el token a color concreto leyendo la variable
@@ -290,10 +310,21 @@ export function TripMapGlobe({
     const gl = glRef.current
     if (!map || !gl) return
     const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
-    if (pts.length === 0) return
-    const duration = prefersReducedMotion() ? 0 : 600
+    // Antes del REVELADO (skeleton delante), toda cámara es instantánea ("perf
+    // (cargas): entrada sin saltos"): el encuadre inicial aterriza oculto y el
+    // usuario nunca ve moverse la escena al entrar. La animación queda para los
+    // reencuadres provocados DESPUÉS (llega un momento nuevo, etc.).
+    const duration = prefersReducedMotion() || !revealedRef.current ? 0 : 600
     const rect = containerRef.current?.getBoundingClientRect()
     const minFill = computeMinFillZoom(rect?.width ?? 0, rect?.height ?? 0)
+    if (pts.length === 0) {
+      // Viaje vacío: no hay destino NI bounds que proteger (#640) — el suelo de
+      // relleno manda sin restricción (esfera a sangre, #593). Antes lo hacía la
+      // entrada cinematográfica; al retirarla, el caso vive aquí.
+      map.setMinZoom(minFill)
+      map.easeTo({ zoom: Math.max(WORLD_ZOOM, minFill), duration })
+      return
+    }
     if (pts.length === 1) {
       // Un solo punto: zoom de ciudad (no de continente). fitBounds con un único
       // punto degenera en un zoom máximo absurdo, así que centramos a mano.
@@ -319,64 +350,6 @@ export function TripMapGlobe({
     map.setMinZoom(Math.min(minFill, zoom))
     map.easeTo({ center: natural?.center ?? map.getCenter(), zoom, duration })
   }, [])
-
-  // Entrada cinematográfica: arranca en vista de globo (bien lejos) y "aterriza" en
-  // el encuadre de la ruta con un vuelo suave. Una sola vez por montaje. Con
-  // reduced-motion NO anima: salta directo al encuadre (respeta la preferencia).
-  // Si algo impide el vuelo, cae a `fitToPins` (que ya es seguro). Devuelve true si
-  // hizo el vuelo (para que el handler `load` no llame además a `fitToPins`).
-  const introFlight = useCallback((): boolean => {
-    const map = mapRef.current
-    const gl = glRef.current
-    if (!map || !gl) return false
-    if (prefersReducedMotion()) {
-      // Sin animación: encuadre directo (fitToPins ya respeta reduced-motion → 0 ms).
-      fitToPins()
-      return true
-    }
-    const rect = containerRef.current?.getBoundingClientRect()
-    const minFill = computeMinFillZoom(rect?.width ?? 0, rect?.height ?? 0)
-    const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
-    if (pts.length === 0) {
-      // Viaje vacío: no hay destino NI bounds que proteger (#640) — el suelo de
-      // relleno manda sin restricción. Igual hacemos un acercamiento sutil al
-      // globo para que la entrada no sea estática, sin reencuadrar nada.
-      map.setMinZoom(minFill)
-      map.easeTo({ zoom: Math.max(WORLD_ZOOM, minFill), duration: INTRO_DURATION, essential: true })
-      return true
-    }
-    // Punto de partida: globo entero (más lejos que el encuadre final). Lo fijamos sin
-    // animación y desde ahí volamos al destino, dando la sensación de aterrizar. El
-    // suelo aún no se ha tocado en este montaje (mapa recién creado, sin `minZoom`
-    // fijado): el `jumpTo` de partida nunca queda clampado.
-    map.jumpTo({ center: WORLD_CENTER, zoom: INTRO_START_ZOOM })
-    if (pts.length === 1) {
-      // Suelo ANTES del vuelo (#640, mismo motivo que `fitToPins`): nunca clampar
-      // el `flyTo` que viene justo debajo con un suelo más alto.
-      map.setMinZoom(Math.min(minFill, SINGLE_ZOOM))
-      map.flyTo({
-        center: pts[0],
-        zoom: SINGLE_ZOOM,
-        duration: INTRO_DURATION,
-        essential: true, // ignora reduced-motion del navegador: ya lo gestionamos arriba
-      })
-      return true
-    }
-    const bounds = new gl.LngLatBounds(pts[0], pts[0])
-    for (const p of pts) bounds.extend(p)
-    // Mismo criterio que `fitToPins` (#640): el suelo de relleno nunca recorta un
-    // bounds necesario — calculamos el zoom "seguro" ANTES de lanzar el vuelo.
-    const natural = map.cameraForBounds(bounds, { padding: FIT_PADDING })
-    const zoom = safeFitZoom(natural?.zoom ?? FIT_MAX_ZOOM, minFill, FIT_MAX_ZOOM)
-    map.setMinZoom(Math.min(minFill, zoom))
-    map.flyTo({
-      center: natural?.center ?? WORLD_CENTER,
-      zoom,
-      duration: INTRO_DURATION,
-      essential: true,
-    })
-    return true
-  }, [fitToPins])
 
   // ── Montaje: crea el mapa una sola vez (import dinámico de maplibre + su CSS). ──
   useEffect(() => {
@@ -473,29 +446,30 @@ export function TripMapGlobe({
           })
           map.addLayer({ id: 'labels', type: 'raster', source: 'labels' })
           readyRef.current = true
-          // Mapa "listo" para OCULTAR el skeleton: el primer `idle` tras añadir el
-          // raster = teselas del encuadre cargadas y sin transiciones en curso. Es
-          // el momento en que el lienzo ya muestra el satélite, no el hueco negro.
-          map.once('idle', () => {
+          // Coreografía de entrada ("perf(cargas): entrada sin saltos"):
+          //  1. CÁMARA YA: el encuadre corre AQUÍ, instantáneo (duration 0 vía
+          //     `revealedRef`, aún false) y con el skeleton delante — la escena
+          //     nunca se mueve sola al entrar (la "entrada cinematográfica" de
+          //     1.5s que había aquí corría oculta y solo retrasaba el revelado).
+          //  2. REVELADO: el primer `idle` (teselas del encuadre listas) funde el
+          //     skeleton sobre el mapa ya encuadrado.
+          //  3. PINES DESPUÉS: los markers montan en ese mismo revelado con
+          //     entrada escalonada (ver `repaint`); la ruta dorada se traza en el
+          //     mismo pintado — nunca antes del revelado.
+          fitToPins()
+          const reveal = () => {
+            if (disposed || revealedRef.current) return
             if (readyFallbackRef.current != null) {
               window.clearTimeout(readyFallbackRef.current)
               readyFallbackRef.current = null
             }
-            if (!disposed) setMapReady(true)
-          })
-          // Red de seguridad: si `idle` no llega, no dejamos el spinner colgado.
-          readyFallbackRef.current = window.setTimeout(() => {
-            readyFallbackRef.current = null
-            if (!disposed) setMapReady(true)
-          }, MAP_READY_FALLBACK_MS)
-          repaint()
-          // Entrada cinematográfica una sola vez; si no la hace, fitBounds normal.
-          if (!introDoneRef.current) {
-            introDoneRef.current = true
-            if (!introFlight()) fitToPins()
-          } else {
-            fitToPins()
+            revealedRef.current = true
+            repaint()
+            setMapReady(true)
           }
+          map.once('idle', reveal)
+          // Red de seguridad: si `idle` no llega, no dejamos el spinner colgado.
+          readyFallbackRef.current = window.setTimeout(reveal, MAP_READY_FALLBACK_MS)
         })
       } catch (err) {
         // Import o creación del mapa falló → que el boundary caiga al plano.
@@ -517,7 +491,7 @@ export function TripMapGlobe({
       mapRef.current = null
       glRef.current = null
     }
-  }, [repaint, fitToPins, introFlight])
+  }, [repaint, fitToPins])
 
   // Repinta cuando cambian los datos O el dibujado por etapas (selección/play). No-op
   // hasta que el estilo cargó; el handler `load` hace el primer pintado.
@@ -536,8 +510,10 @@ export function TripMapGlobe({
     const center: [number, number] = [target.lng, target.lat]
     // Tocar = ZOOM al punto (no solo pan): garantizamos al menos nivel ciudad.
     const zoom = Math.max(map.getZoom(), SELECT_ZOOM)
-    // Con reduced-motion saltamos sin vuelo (jumpTo); si no, vuelo suave.
-    if (prefersReducedMotion()) {
+    // Con reduced-motion saltamos sin vuelo (jumpTo); si no, vuelo suave. Antes del
+    // revelado (skeleton delante) también saltamos: un vuelo oculto solo retrasaría
+    // el primer `idle` — o sea, el propio revelado.
+    if (prefersReducedMotion() || !revealedRef.current) {
       map.jumpTo({ center, zoom })
     } else {
       map.flyTo({ center, zoom, duration: 800 })

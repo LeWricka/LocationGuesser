@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { render, waitFor, act } from '@testing-library/react'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { GlobePin, GlobeRoute } from './HomeGlobe'
@@ -10,7 +10,7 @@ import type { GlobePin, GlobeRoute } from './HomeGlobe'
 // El doble solo necesita registrar QUÉ se le pide (opciones del Marker, llamadas a
 // fitBounds/easeTo) para que los tests verifiquen el fix de #516 sin levantar WebGL
 // de verdad.
-type Handler = () => void
+type Handler = { handler: () => void; once?: boolean }
 
 /** Registro de un `addSource`/`addLayer` de línea (issue #702: rutas del globo). */
 interface AddSourceCall {
@@ -46,8 +46,15 @@ class MockMap {
     this.opts = opts
     mapInstances.push(this)
   }
-  on(event: string, handler: Handler) {
-    ;(this.handlers[event] ??= []).push(handler)
+  on(event: string, handler: () => void) {
+    ;(this.handlers[event] ??= []).push({ handler })
+    return this
+  }
+  // `once` (real API de MapLibre): HomeGlobe lo usa para el REVELADO del lienzo en
+  // el primer `idle` ("perf(cargas): entrada sin saltos") — mismo patrón que ya
+  // tenía el doble de TripMapGlobe.test.tsx.
+  once(event: string, handler: () => void) {
+    ;(this.handlers[event] ??= []).push({ handler, once: true })
     return this
   }
   off() {
@@ -107,9 +114,13 @@ class MockMap {
   getContainer(): HTMLElement | undefined {
     return this.opts.container as HTMLElement | undefined
   }
-  /** Dispara los handlers registrados con `on(event, …)` (simula 'load'/'dragstart'/… del mapa real). */
+  /** Dispara los handlers registrados con `on`/`once` (simula 'load'/'idle'/'dragstart'/…). */
   fire(event: string) {
-    for (const h of this.handlers[event] ?? []) h()
+    const list = this.handlers[event] ?? []
+    this.handlers[event] = list.filter((h) => {
+      h.handler()
+      return !h.once
+    })
   }
 }
 
@@ -187,6 +198,20 @@ function clusteredPins(): GlobePin[] {
   ]
 }
 
+// Arranque COMPLETO del mapa del doble: 'load' (estilo listo → cámara encuadrada,
+// instantánea) + 'idle' (primer frame con teselas → REVELADO del lienzo y montaje
+// de los pines). Desde "perf(cargas): entrada sin saltos" los markers montan en el
+// primer `idle`, no en `load`, y los vuelos animados (700ms) solo existen DESPUÉS
+// del revelado — antes, toda cámara es instantánea (duration 0). Los tests que
+// necesiten el estado intermedio (cargado pero sin revelar) disparan 'load' a pelo.
+// `act`: el revelado hace un setState (la clase del fundido del lienzo).
+function bootMap(map: MockMap) {
+  act(() => {
+    map.fire('load')
+    map.fire('idle')
+  })
+}
+
 // Simula prefers-reduced-motion (mismo patrón que CountUp.test.tsx/TripPage.test.tsx):
 // jsdom no implementa `matchMedia` por defecto.
 function mockReducedMotion(matches: boolean) {
@@ -211,7 +236,7 @@ describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
     render(<HomeGlobe pins={samplePins()} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
     for (const marker of markerInstances) {
@@ -228,7 +253,7 @@ describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
     render(<HomeGlobe pins={samplePins()} framing="world" />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
     expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
@@ -243,7 +268,7 @@ describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
     render(<HomeGlobe pins={iberia} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
     expect(mapInstances[0].easeToCalls).toHaveLength(0)
   })
@@ -267,7 +292,7 @@ describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
     render(<HomeGlobe pins={pins} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].easeToCalls).toHaveLength(1))
     expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
     const call = mapInstances[0].easeToCalls[0] as { center: [number, number] }
@@ -278,7 +303,7 @@ describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
     render(<HomeGlobe pins={samplePins()} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].easeToCalls).toHaveLength(1))
     const call = mapInstances[0].easeToCalls[0] as { center: [number, number] }
     expect(call.center).toEqual([-9.1393, 38.7223])
@@ -384,7 +409,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
     const [lisboaEl, romaEl] = markerInstances.map((m) => m.getElement())
@@ -408,7 +433,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
     rerender(<HomeGlobe pins={pins} activeTargetId={undefined} />)
@@ -425,7 +450,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
     rerender(<HomeGlobe pins={pins} activeTargetId="no-existe" />)
@@ -442,7 +467,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
     rerender(<HomeGlobe pins={pins} activeTargetId="t2" />)
@@ -464,7 +489,7 @@ describe('HomeGlobe — vuelo + "lead" reactivos a `activeTargetId` (#567)', () 
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId={null} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
     mapInstances[0].fire('dragstart')
@@ -517,7 +542,7 @@ describe('HomeGlobe — encuadre del recorrido del viaje protagonista (#700)', (
     render(<HomeGlobe pins={tripPins()} activeTargetId="t1" />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
     expect(mapInstances[0].easeToCalls).toHaveLength(0)
 
@@ -540,7 +565,7 @@ describe('HomeGlobe — encuadre del recorrido del viaje protagonista (#700)', (
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId="t1" />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
 
     rerender(<HomeGlobe pins={pins} activeTargetId="t3" />)
@@ -560,7 +585,7 @@ describe('HomeGlobe — encuadre del recorrido del viaje protagonista (#700)', (
     const { rerender } = render(<HomeGlobe pins={pins} activeTargetId="t1" />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].fitBoundsCalls).toHaveLength(1))
 
     rerender(<HomeGlobe pins={pins} activeTargetId="t2" />)
@@ -592,7 +617,7 @@ describe('HomeGlobe — encuadre del recorrido del viaje protagonista (#700)', (
     render(<HomeGlobe pins={pins} activeTargetId="t1" />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].easeToCalls).toHaveLength(1))
     expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
     const call = mapInstances[0].easeToCalls[0] as { center: [number, number] }
@@ -625,7 +650,7 @@ describe('HomeGlobe — rutas doradas por viaje (#702)', () => {
     render(<HomeGlobe pins={clusteredPins()} routes={routes} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].addSourceCalls).toHaveLength(1))
 
     // Sin reordenar: exactamente el mismo array de `points` que se le pasó.
@@ -639,7 +664,7 @@ describe('HomeGlobe — rutas doradas por viaje (#702)', () => {
     render(<HomeGlobe pins={clusteredPins()} routes={routes} />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(markerInstances).toHaveLength(2))
 
     expect(mapInstances[0].addSourceCalls).toHaveLength(0)
@@ -666,7 +691,7 @@ describe('HomeGlobe — rutas doradas por viaje (#702)', () => {
     render(<HomeGlobe pins={clusteredPins()} routes={routes} activeTargetId="t1" />)
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].addLayerCalls).toHaveLength(2))
 
     const map = mapInstances[0]
@@ -699,7 +724,7 @@ describe('HomeGlobe — rutas doradas por viaje (#702)', () => {
     )
 
     await waitFor(() => expect(mapInstances).toHaveLength(1))
-    mapInstances[0].fire('load')
+    bootMap(mapInstances[0])
     await waitFor(() => expect(mapInstances[0].addLayerCalls).toHaveLength(2))
 
     const map = mapInstances[0]
@@ -715,5 +740,72 @@ describe('HomeGlobe — rutas doradas por viaje (#702)', () => {
     const after2 = currentColor(map, 'lg-home-route-line-t2')
     expect(after1).toBe(before2)
     expect(after2).toBe(before1)
+  })
+})
+
+// --- "perf(cargas): entrada sin saltos" — el mapa primero, los puntos después -----
+//
+// La entrada de la home encadenaba varios pasos visibles que juntos leían como
+// "refrescos": lienzo negro → teselas a trozos → paneo de cámara de 700ms → pines
+// de golpe. La coreografía nueva: (1) la cámara encuadra INSTANTÁNEA en `load`,
+// con el lienzo aún a opacity 0; (2) el canvas funde a visible en el primer
+// `idle`; (3) los pines montan en ese revelado con entrada escalonada (CSS,
+// tokens --motion-*); los repintados posteriores no la repiten.
+describe('HomeGlobe — revelado del lienzo y entrada de pines (perf: cargas sin saltos)', () => {
+  test('los pines NO montan en `load`: montan en el primer `idle` (el revelado)', async () => {
+    render(<HomeGlobe pins={clusteredPins()} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    act(() => mapInstances[0].fire('load'))
+    // El estilo cargó y la cámara ya está encuadrada, pero el lienzo sigue oculto:
+    // ningún marker todavía ("el mapa primero…").
+    expect(markerInstances).toHaveLength(0)
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(1)
+
+    act(() => mapInstances[0].fire('idle'))
+    // …"los puntos después": el revelado monta los pines.
+    expect(markerInstances).toHaveLength(2)
+  })
+
+  test('el encuadre inicial es INSTANTÁNEO (duration 0) aunque NO haya reduced-motion', async () => {
+    // Sin stub de matchMedia (sin reduced-motion): la instantaneidad viene de que
+    // el lienzo aún no se ha revelado, no de la preferencia del usuario.
+    render(<HomeGlobe pins={clusteredPins()} activeTargetId={null} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    act(() => mapInstances[0].fire('load'))
+
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(1)
+    const { opts } = mapInstances[0].fitBoundsCalls[0] as { opts: { duration: number } }
+    expect(opts.duration).toBe(0)
+  })
+
+  test('primer pintado tras el revelado: entrada escalonada; repintados posteriores, sin ella', async () => {
+    const pins = clusteredPins()
+    const { rerender } = render(<HomeGlobe pins={pins} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    bootMap(mapInstances[0])
+    expect(markerInstances).toHaveLength(2)
+    markerInstances.forEach((marker, i) => {
+      const el = marker.getElement()
+      expect(el.classList.contains('lg-pin-enter')).toBe(true)
+      // Retardo escalonado por índice sobre los tokens de motion.
+      expect(el.style.getPropertyValue('--pin-enter-delay')).toContain(`* ${i}`)
+    })
+
+    // Repintado por DATOS (llega un pin nuevo): pines quietos, sin coreografía —
+    // reproducirla en mitad del uso sería un pop-in, no una entrada.
+    const more: GlobePin[] = [
+      ...pins,
+      { id: 'paris', lat: 48.8566, lng: 2.3522, title: 'París', imageUrl: null, targetId: 't3' },
+    ]
+    rerender(<HomeGlobe pins={more} />)
+    // markerInstances acumula TODAS las instancias creadas: 2 del arranque + 3 del
+    // repintado (repaint destruye y recrea).
+    await waitFor(() => expect(markerInstances).toHaveLength(5))
+    for (const marker of markerInstances.slice(2)) {
+      expect(marker.getElement().classList.contains('lg-pin-enter')).toBe(false)
+    }
   })
 })

@@ -7,12 +7,10 @@ import {
   GlobeSheet,
   HomeDashboard,
   HomeEmptyState,
+  HomeRouteSkeleton,
   Icon,
   LogoMomentu,
   WordmarkMomentu,
-  Skeleton,
-  Stack,
-  Row,
   sortTrips,
 } from '../../ui'
 import type { GlobePin, GlobeRoute, HomeGroup, HomePinned } from '../../ui'
@@ -115,7 +113,7 @@ export function HomePage() {
   // Mientras resolvemos la sesión persistida o cargamos la membresía → skeletons.
   // SIEMPRE damos feedback de carga (no pantalla en blanco).
   if (sessionLoading || dataLoading) {
-    return <HomeSkeleton />
+    return <HomeRouteSkeleton />
   }
 
   if (error) {
@@ -198,8 +196,8 @@ export function HomePage() {
     : null
 
   return (
-    // lg-content-in (issue #623): crossfade corto al relevar a HomeSkeleton, en
-    // vez de un swap seco.
+    // lg-content-in (issue #623): crossfade corto al relevar a HomeRouteSkeleton,
+    // en vez de un swap seco.
     <main className="lg-page lg-content-in">
       {hasGroups ? (
         <HomeDashboard
@@ -276,28 +274,9 @@ export function HomePage() {
   )
 }
 
-// Esqueleto que reproduce el layout de la home (globo + hoja con reto + feed) con shimmer:
-// el ojo "lee" la estructura antes de que lleguen los datos, así la espera se percibe más
-// corta. role=status anuncia la carga; los bloques van aria-hidden.
-function HomeSkeleton() {
-  return (
-    <main className="lg-page" role="status" aria-label="Cargando tu inicio">
-      <Stack gap={6}>
-        {/* Globo héroe (placeholder alto). */}
-        <Skeleton width="100%" height={260} radius="lg" />
-
-        {/* Banner del reto + feed de portadas. */}
-        <Row justify="between" align="center" gap={3}>
-          <Skeleton width={120} height={28} radius="md" />
-          <Skeleton width={64} height={16} />
-        </Row>
-        <Skeleton width="100%" height={88} radius="lg" />
-        <Stack gap={3}>
-          {[0, 1].map((i) => (
-            <Skeleton key={i} width="100%" height={240} radius="lg" />
-          ))}
-        </Stack>
-      </Stack>
-    </main>
-  )
-}
+// El esqueleto de la home (globo + banner del reto + feed) vive ahora en
+// `ui/RouteSkeletons.tsx` como `HomeRouteSkeleton`: lo reusa TAMBIÉN el
+// `<Suspense>` de App.tsx como fallback mientras llega el chunk de esta
+// pantalla, así el arranque logueado pinta UN SOLO layout de espera (nunca el
+// esqueleto genérico de formulario seguido de este) — ver el comentario junto
+// a `HomeRouteSkeleton` para el porqué completo.

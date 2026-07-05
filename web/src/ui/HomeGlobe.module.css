@@ -32,6 +32,24 @@
   width: 100%;
   height: 100%;
   background: var(--scene-bg);
+  /* Revelado del lienzo ("perf(cargas): entrada sin saltos"): el canvas arranca
+     OCULTO sobre el fondo de escena de `.globe` (nada de negro→teselas a trozos)
+     y funde a 1 cuando el mapa está listo (primer `idle`, con la cámara YA
+     encuadrada en el recorrido del protagonista). Un solo paso visual limpio. */
+  opacity: 0;
+  transition: opacity var(--motion-transition-base);
+}
+
+/* Mapa listo (primer `idle`): funde a visible. */
+.mapRevealed {
+  opacity: 1;
+}
+
+/* Menos movimiento: sin fundido, aparición directa al estar listo. */
+@media (prefers-reduced-motion: reduce) {
+  .map {
+    transition: none;
+  }
 }
 
 /* --- Globo EVOCADO (fallback sin WebGL): esfera nocturna con relieve, sin tiles ---
@@ -141,6 +159,16 @@
     transform: scale(1.7);
     opacity: 0;
   }
+}
+
+/* Coreografía de entrada ("perf(cargas): entrada sin saltos"): cuando el pin entra
+   escalonado tras el revelado (`lg-pin-enter`, ver tripPins.css), el aro de
+   bienvenida del "lead" espera a que SU pin termine de entrar (retardo del pin +
+   duración de la entrada) — el aro dorado llega AL FINAL de la secuencia. Fuera de
+   la entrada (sin `lg-pin-enter`) el pulso arranca al montar, como siempre. El
+   `opacity: 0` estático del ::before lo mantiene invisible durante la espera. */
+:global(.lg-pin-enter.lg-home-pin--lead)::before {
+  animation-delay: calc(var(--pin-enter-delay, 0s) + var(--motion-duration-slow));
 }
 
 /* Pin en la cara OCULTA del globo (#516): MapLibre pone esta clase cuando
