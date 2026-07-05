@@ -17,7 +17,7 @@
    `.fullscreenTop` (ahí SÍ debe crecer para ocupar el ancho). Pero en ESTE
    contenedor (columna), ese mismo `flex: 1` compite por ALTO con `.canvas`
    (también `flex: 1`) y los reparte a partes iguales — en un contenedor de
-   alto definido (p.ej. "¿Dónde?", con `height: 100%` forzado por
+   alto definido (p.ej. "¿Dónde estamos?", con `height: 100%` forzado por
    CreateLocationChallenge.module.css `.mapArea > :first-child`) el buscador
    se infla a ~345px de hueco muerto bajo el campo y el mapa se comprime a la
    mitad de su alto disponible (medido: 698px de alto total → 345/345 en vez
@@ -35,7 +35,7 @@
   flex: none;
 }
 
-/* `.wrap` puede recibir `height: 100%` desde fuera (pantalla "¿Dónde?", ver
+/* `.wrap` puede recibir `height: 100%` desde fuera (pantalla "¿Dónde estamos?", ver
    CreateLocationChallenge.module.css `.mapArea > :first-child`); sin
    `flex: 1; min-height: 0` en `.canvas` ese alto no llegaría al mapa. */
 .canvas {

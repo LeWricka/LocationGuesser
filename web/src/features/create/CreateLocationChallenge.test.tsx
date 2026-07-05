@@ -22,7 +22,7 @@ vi.mock('../../lib/storage', async (importOriginal) => {
 })
 
 // La hoja "¡Reto creado!" (ChallengeCreatedShare) genera una tarjeta-imagen
-// (issue #595): fuera del alcance de este test (foto opcional del reto ¿Dónde?),
+// (issue #595): fuera del alcance de este test (foto opcional del reto ¿Dónde estamos?),
 // dobles simples para no tocar Supabase/html-to-image reales.
 vi.mock('../group/shareLeaderboard', () => ({
   nodeToPngBlob: vi.fn().mockResolvedValue(new Blob()),
@@ -122,7 +122,7 @@ async function advanceToRules(user: ReturnType<typeof userEvent.setup>) {
 // EN UNA TARJETA FLOTANTE sobre el propio mapa — nunca cambia de paso para
 // eso. El CTA "Continuar" solo se habilita con cobertura y lleva al paso 2,
 // que queda SOLO con las reglas (plazo/tiempo) + Lanzar.
-describe('CreateLocationChallenge — ¿Dónde? v3 (#592)', () => {
+describe('CreateLocationChallenge — ¿Dónde estamos? v3 (#592)', () => {
   test('paso 1: mapa con buscador en overlay y sin CTA ni tarjeta SV hasta que hay pin', () => {
     renderScreen()
 
@@ -230,14 +230,14 @@ describe('CreateLocationChallenge — ¿Dónde? v3 (#592)', () => {
   })
 })
 
-// Foto opcional del reto ¿Dónde? (issue #595): un tile más en el paso 2, sin
+// Foto opcional del reto ¿Dónde estamos? (issue #595): un tile más en el paso 2, sin
 // tocar el paso 1 (el sitio lo fija el mapa, no el EXIF de esta foto).
 describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
   test('sin foto: se lanza el reto sin subir nada a Storage y sin image_path', async () => {
     createChallengeMock.mockResolvedValue({
       challenge: {
         id: 'reto-1',
-        title: '¿Dónde? · Japón 2026',
+        title: '¿Dónde estamos? · Japón 2026',
         image_path: null,
       } as ChallengeForPlay,
       groupId: 'g-1',
@@ -260,7 +260,7 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
     createChallengeMock.mockResolvedValue({
       challenge: {
         id: 'reto-2',
-        title: '¿Dónde? · Japón 2026',
+        title: '¿Dónde estamos? · Japón 2026',
         image_path: 'u-me/foto.jpg',
       } as ChallengeForPlay,
       groupId: 'g-1',
@@ -304,7 +304,7 @@ describe('CreateLocationChallenge — "La velocidad puntúa" (#628)', () => {
     createChallengeMock.mockResolvedValue({
       challenge: {
         id: 'reto-3',
-        title: '¿Dónde? · Japón 2026',
+        title: '¿Dónde estamos? · Japón 2026',
         image_path: null,
       } as ChallengeForPlay,
       groupId: 'g-1',

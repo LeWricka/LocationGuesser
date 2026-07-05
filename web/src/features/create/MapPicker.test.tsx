@@ -9,7 +9,7 @@ import path from 'node:path'
 // `.fullscreenTop`, donde SÍ debe crecer para ocupar el ancho). Pero en el
 // picker COMPACTO, `.wrap` (este fichero) es una COLUMNA: ese mismo `flex: 1`
 // competía por ALTO con `.canvas` (también `flex: 1`) y los repartía a partes
-// iguales — en un contenedor de alto definido (p.ej. la pantalla "¿Dónde?",
+// iguales — en un contenedor de alto definido (p.ej. la pantalla "¿Dónde estamos?",
 // con `height: 100%` forzado por CreateLocationChallenge.module.css
 // `.mapArea > :first-child`) el buscador se inflaba a ~345px de hueco muerto
 // bajo el campo y el mapa se comprimía a la mitad de su alto disponible

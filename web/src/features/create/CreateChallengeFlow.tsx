@@ -27,9 +27,9 @@ interface Props {
 
 // Entrada de "crear reto": el reto es una entidad de primera clase con DOS orígenes
 // que convergen en el MISMO formulario:
-//  (a) desde un recuerdo (`fromMomentId`) → va directo al asistente de ¿Dónde? con
+//  (a) desde un recuerdo (`fromMomentId`) → va directo al asistente de ¿Dónde estamos? con
 //      la foto y el lugar del recuerdo PRE-RELLENADOS.
-//  (b) desde el FAB "Reto" (sin id) → primero el selector de TIPO (¿Dónde? /
+//  (b) desde el FAB "Reto" (sin id) → primero el selector de TIPO (¿Dónde estamos? /
 //      ¿Adivinas?), luego el asistente propio de cada tipo, empezando vacío.
 // Atrás desde un asistente vuelve al selector (origen FAB) o sale (origen recuerdo).
 //
@@ -46,7 +46,7 @@ function CreateChallengeFlowInner({ groupId, groupName, fromMomentId, onBack, on
     fromMomentId ? undefined : null,
   )
 
-  // Origen recuerdo: cargamos su foto y lugar y entramos directos a ¿Dónde?. Un
+  // Origen recuerdo: cargamos su foto y lugar y entramos directos a ¿Dónde estamos?. Un
   // recuerdo se convierte en reto de UBICACIÓN (su lugar pasa a ser la respuesta).
   useEffect(() => {
     if (!fromMomentId) return
