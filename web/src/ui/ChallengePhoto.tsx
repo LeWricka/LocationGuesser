@@ -82,6 +82,14 @@ export function ChallengePhoto({
             src={src}
             alt={alt}
             loading="lazy"
+            // decoding="async" (issue #713, "el golpe post-carga"): sin él el navegador
+            // puede decodificar la foto de forma SÍNCRONA en el hilo principal justo
+            // al pintarla — con las miniaturas de la galería (SVG diminuto) no se nota,
+            // pero una foto real subida por el usuario (cientos de KB a varios MB) sí
+            // puede bloquear un frame entero. `BitacoraTab`/`LandingShowcase` ya lo
+            // llevan; `ChallengePhoto` (la más reutilizada: tarjetas del diario,
+            // podio, portadas…) se había quedado sin él.
+            decoding="async"
             onLoad={() => setLoaded(true)}
           />
         </>

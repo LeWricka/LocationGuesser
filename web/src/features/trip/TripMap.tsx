@@ -1,4 +1,5 @@
 import { Component, Suspense, lazy, useMemo, type ReactNode } from 'react'
+import { hasWebGL } from '../../lib/webglSupport'
 import type { TripMapProps as Props } from './TripMap.types'
 import { TripMapLeaflet } from './TripMapLeaflet'
 import styles from './TripMap.module.css'
@@ -7,27 +8,6 @@ import styles from './TripMap.module.css'
 // nunca lastra el bundle inicial. El plano (Leaflet) es síncrono: es la red de
 // seguridad y debe estar SIEMPRE disponible al instante.
 const TripMapGlobe = lazy(() => import('./TripMapGlobe').then((m) => ({ default: m.TripMapGlobe })))
-
-/**
- * ¿Soporta el navegador WebGL? Lo necesita el globo (MapLibre dibuja en WebGL).
- * Creamos un canvas de usar y tirar y pedimos un contexto 'webgl2'/'webgl'. Si el
- * navegador no lo da (móvil viejo, GPU bloqueada, WebGL desactivado) devolvemos
- * false y ni intentamos cargar MapLibre: vamos directos al plano.
- */
-function hasWebGL(): boolean {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return false
-  try {
-    const canvas = document.createElement('canvas')
-    const gl =
-      canvas.getContext('webgl2') ||
-      canvas.getContext('webgl') ||
-      canvas.getContext('experimental-webgl')
-    return gl != null
-  } catch {
-    // Algunos navegadores lanzan al pedir el contexto si WebGL está bloqueado.
-    return false
-  }
-}
 
 /**
  * Error boundary que cae al mapa plano si el globo revienta en runtime (fallo al
