@@ -140,3 +140,54 @@
   line-height: 1;
   letter-spacing: 0.01em;
 }
+
+/* ── Entrada de los pines tras el REVELADO del lienzo ("perf(cargas): entrada sin
+   saltos") — compartida por el globo de la home (HomeGlobe) y el del viaje
+   (TripMapGlobe). El consumidor añade `lg-pin-enter` + `--pin-enter-delay`
+   (retardo escalonado por índice, sobre tokens --motion-*) SOLO en el primer
+   pintado tras revelar el mapa: cada pin funde+crece brevemente en vez de
+   aparecer de golpe ("pop") a la vez que las teselas.
+
+   OJO — POR QUÉ se anima el DISCO y la puntita, y NUNCA el elemento raíz: el raíz
+   es el MISMO nodo que MapLibre posiciona con `style.transform` inline (Marker sin
+   wrapper, ver #523/#530) y cuya `opacity` inline gobierna el culling de la cara
+   oculta (`opacityWhenCovered`, #516). Una animación CSS gana a los estilos inline
+   mientras corre (y con `fill: both` para siempre): animar transform u opacity en
+   el raíz rompería el clavado o dejaría visibles pines de la cara trasera. El
+   disco (hijo) y la puntita (::after del raíz) son seguros. */
+.lg-pin-enter .lg-trip-pin__disc {
+  animation: lg-pin-enter var(--motion-duration-slow) var(--motion-ease-emphasized) both;
+  animation-delay: var(--pin-enter-delay, 0s);
+}
+/* La puntita: solo FUNDIDO (su transform propio —translateX+rotate, el rombo— no
+   se toca; una keyframe con transform lo machacaría y la descolocaría). */
+.lg-pin-enter::after {
+  animation: lg-pin-enter-fade var(--motion-duration-slow) var(--motion-ease-emphasized) both;
+  animation-delay: var(--pin-enter-delay, 0s);
+}
+@keyframes lg-pin-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes lg-pin-enter-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Menos movimiento: los pines aparecen quietos, sin coreografía. */
+@media (prefers-reduced-motion: reduce) {
+  .lg-pin-enter .lg-trip-pin__disc,
+  .lg-pin-enter::after {
+    animation: none;
+  }
+}

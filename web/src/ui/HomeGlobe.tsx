@@ -125,7 +125,17 @@ const SINGLE_ZOOM = 2.2
 // `--motion-ease-emphasized`; dejamos el easing por defecto (una curva ease-out
 // equivalente en sensación, arranca rápido y frena suave) en vez de reimplementar
 // un evaluador de Bézier solo para esto.
+// OJO ("perf(cargas): entrada sin saltos"): esta duración es SOLO para cambios
+// PROVOCADOS por el usuario DESPUÉS del arranque (tocar una tarjeta → cambia
+// `activeTargetId`, crece el dock…). El encuadre INICIAL es siempre instantáneo
+// (`duration: 0`) y ocurre con el lienzo aún OCULTO — la escena nunca se mueve
+// sola nada más entrar (ver `revealedRef`/`frameRoute`).
 const CAMERA_DURATION_MS = 700
+// Red de seguridad del REVELADO del lienzo: si el primer `idle` de MapLibre nunca
+// llega (teselas que fallan en bucle, o un motor que no lo emite), el globo no
+// puede quedarse invisible para siempre (opacity 0). Pasado este margen revelamos
+// igual — mismo criterio que MAP_READY_FALLBACK_MS en TripMapGlobe (#500).
+const REVEAL_FALLBACK_MS = 4000
 // Alto/ancho aproximado del pin de la home (disco + puntita + aro "lead") en px. El
 // marcador se ancla por la PUNTA (base) y el disco crece HACIA ARRIBA, así que el fit
 // necesita reservar ~este alto por ENCIMA de cada coordenada para que ningún disco quede
@@ -369,6 +379,21 @@ export function HomeGlobe({
   const [failed, setFailed] = useState(false)
   // Crédito de tiles (Esri): plegado a un "ⓘ"; al tocar se despliega el texto.
   const [creditOpen, setCreditOpen] = useState(false)
+  // Revelado del lienzo ("perf(cargas): entrada sin saltos"): el canvas arranca a
+  // opacity 0 sobre el fondo de escena (`.globe` ya pinta `--scene-bg`) y FUNDE a 1
+  // en el primer `idle` del mapa — teselas del viewport listas, cámara ya encuadrada
+  // (el fit inicial corre con `duration: 0` en `load`, antes de esto). Un solo paso
+  // visual limpio (fondo de escena → globo listo) en vez de negro → teselas a trozos
+  // → paneo de cámara. El estado pinta la clase CSS; la ref deja que los callbacks
+  // del mapa (async) y `frameRoute` lean el valor al día sin recrear nada.
+  const [revealed, setRevealed] = useState(false)
+  const revealedRef = useRef(false)
+  // Entrada escalonada de los pines: SOLO en el primer pintado tras el revelado.
+  // Los repintados posteriores (llega un momento nuevo, cambian las rutas) no deben
+  // reproducir la coreografía de entrada — serían pop-ins en mitad del uso.
+  const entranceDoneRef = useRef(false)
+  // Timer de la red de seguridad del revelado (REVEAL_FALLBACK_MS).
+  const revealFallbackRef = useRef<number | null>(null)
 
   // Props en refs: el handler `load` (async) lee siempre el último valor sin recrear.
   const pinsRef = useRef(pins)
@@ -480,10 +505,28 @@ export function HomeGlobe({
     for (const m of markersRef.current) m.remove()
     markersRef.current = []
 
-    for (const pin of pinsRef.current) {
+    // Coreografía de entrada ("el mapa primero, los puntos después"): SOLO en el
+    // primer pintado tras el revelado del lienzo, cada pin entra con un fade+scale
+    // corto escalonado (clase `lg-pin-enter` + retardo por índice, CSS en
+    // tripPins.css con tokens --motion-*; el retardo base espera al fundido del
+    // lienzo). reduced-motion lo anula en CSS. Los repintados posteriores montan
+    // los pines quietos, como siempre.
+    const entering = revealedRef.current && !entranceDoneRef.current
+    if (entering) entranceDoneRef.current = true
+
+    pinsRef.current.forEach((pin, i) => {
       const el = buildHomePinElement(pin)
       el.title = pin.title
       el.addEventListener('click', () => onOpenRef.current?.(pin.targetId))
+      if (entering) {
+        el.classList.add('lg-pin-enter')
+        // Stagger capado a 10 pasos (mismo criterio que `.lg-stagger` en index.css):
+        // con muchos pines, los últimos entran juntos en vez de arrastrar la cola.
+        el.style.setProperty(
+          '--pin-enter-delay',
+          `calc(var(--motion-duration-base) + var(--motion-stagger-step) * ${Math.min(i, 10)})`,
+        )
+      }
       // Ancla `'bottom'` (igual que el mapa de viaje, TripMapGlobe): la PUNTA del pin se
       // clava en la coordenada y el disco crece hacia arriba. Con el ancla por defecto
       // (`'center'`) el disco quedaba centrado en la coordenada y su mitad inferior + la
@@ -508,7 +551,7 @@ export function HomeGlobe({
           .setLngLat([pin.lng, pin.lat])
           .addTo(map),
       )
-    }
+    })
     // Reaplica el override de `activeTargetId` sobre los markers RECIÉN creados: sin
     // esto, un cambio de `pins` (nuevo momento subido, etc.) con un target ya activo
     // perdería el aro dorado hasta el siguiente cambio de `activeTargetId` (los
@@ -569,7 +612,11 @@ export function HomeGlobe({
     const map = mapRef.current
     const gl = glRef.current
     if (!map || !gl || route.length === 0) return
-    const duration = prefersReducedMotion() ? 0 : CAMERA_DURATION_MS
+    // Antes del REVELADO del lienzo, toda cámara es instantánea ("perf(cargas):
+    // entrada sin saltos"): el encuadre inicial (#700) aterriza con el globo aún
+    // oculto y el usuario nunca ve un paneo de 700ms nada más entrar. La animación
+    // queda para cambios provocados DESPUÉS (tocar tarjeta → activeTargetId, dock).
+    const duration = prefersReducedMotion() || !revealedRef.current ? 0 : CAMERA_DURATION_MS
     // Alto real del lienzo (issue #693): el fit/vuelo necesita saber cuánto reservar
     // abajo para el dock de HomeDashboard — sin el contenedor montado (aún no debería
     // pasar aquí, pero por robustez) cae a 0 y el padding/offset quedan en su mínimo.
@@ -793,12 +840,32 @@ export function HomeGlobe({
             map.addLayer({ id: 'labels', type: 'raster', source: 'labels' })
           }
           readyRef.current = true
-          // `repaint` ya aplica el "lead" del `activeTargetId` inicial (vía
-          // `applyActiveLead`) y `fitToPins` ya encuadra SU recorrido (#700), así
-          // que no hace falta un vuelo aparte al cargar: un solo movimiento de
-          // cámara, no dos idénticos encadenados.
-          repaint()
+          // Coreografía de entrada ("perf(cargas): entrada sin saltos"):
+          //  1. CÁMARA YA: el encuadre del recorrido del protagonista (#700) corre
+          //     AQUÍ, instantáneo (duration 0 vía `revealedRef`, aún false) y con
+          //     el lienzo a opacity 0 — nadie ve el salto de mundo→recorrido.
+          //  2. LIENZO EN FUNDIDO: al primer `idle` (teselas del viewport listas)
+          //     el canvas funde de 0 → 1 sobre el fondo de escena.
+          //  3. PINES DESPUÉS: los markers montan en ese mismo revelado, con
+          //     entrada escalonada (ver `repaint`); las rutas doradas (#703) se
+          //     trazan en el mismo pintado — nunca antes del revelado.
           fitToPins()
+          const reveal = () => {
+            if (disposed || revealedRef.current) return
+            if (revealFallbackRef.current != null) {
+              window.clearTimeout(revealFallbackRef.current)
+              revealFallbackRef.current = null
+            }
+            revealedRef.current = true
+            // `repaint` ya aplica el "lead" del `activeTargetId` inicial (vía
+            // `applyActiveLead`), así que no hace falta un vuelo aparte: la cámara
+            // quedó encuadrada en el paso 1.
+            repaint()
+            setRevealed(true)
+          }
+          map.once('idle', reveal)
+          // Red de seguridad: si `idle` no llega, no dejamos el globo invisible.
+          revealFallbackRef.current = window.setTimeout(reveal, REVEAL_FALLBACK_MS)
 
           // Deriva en reposo: solo en la landing decorativa (`world`); en la home con
           // viajes reales (`pins`) el globo queda encuadrado en los pines, sin girar. Si la
@@ -836,6 +903,10 @@ export function HomeGlobe({
       readyRef.current = false
       stopSpin()
       if (resumeTimer != null) clearTimeout(resumeTimer)
+      if (revealFallbackRef.current != null) {
+        window.clearTimeout(revealFallbackRef.current)
+        revealFallbackRef.current = null
+      }
       for (const m of markersRef.current) m.remove()
       markersRef.current = []
       mapRef.current?.remove()
@@ -906,7 +977,12 @@ export function HomeGlobe({
         </div>
       ) : (
         <>
-          <div ref={containerRef} className={styles.map} />
+          {/* Lienzo WebGL: arranca a opacity 0 sobre el fondo de escena y funde a 1
+              en el primer `idle` (revelado; reduced-motion aparece sin fundir). */}
+          <div
+            ref={containerRef}
+            className={[styles.map, revealed ? styles.mapRevealed : ''].filter(Boolean).join(' ')}
+          />
           {/* Crédito propio (NO control de MapLibre): "ⓘ" discreto que despliega el texto
               de Esri al tocar. `title` nativo como mínimo + popover visible. Cumple la
               atribución sin banda. Se monta sobre el lienzo, captura su propio click. */}

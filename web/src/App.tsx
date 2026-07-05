@@ -43,6 +43,7 @@ import {
   TripRouteSkeleton,
   PlayRouteSkeleton,
   UtilityRouteSkeleton,
+  HomeRouteSkeleton,
 } from './ui'
 import { needsProfileStep } from './features/auth'
 import styles from './App.module.css'
@@ -377,11 +378,15 @@ function LoggedIn({
   // Raíz sin hash → home/dashboard (centro de gravedad con sesión, §3). Para el
   // admin añadimos un acceso DISCRETO a `#admin` (un enlace flotante), invisible
   // para el resto. Solo en la home para no estorbar en grupo/jugar/perfil.
-  // La home no tiene familia propia de skeleton (no es viaje/jugar ni un
-  // formulario); usa el mismo Utility genérico como fallback mientras llega su
-  // chunk (una vez montada, HomePage pinta su propio HomeSkeleton por datos).
+  // Fallback `HomeRouteSkeleton` (issue "perf(cargas): entrada sin saltos"): antes
+  // este `<Suspense>` usaba el `UtilityRouteSkeleton` genérico (forma de
+  // FORMULARIO) mientras llegaba el chunk, y en cuanto `HomePage` montaba pintaba
+  // su PROPIO esqueleto (forma de globo+feed) mientras `useHomeData` resolvía —
+  // dos esqueletos de forma distinta en la misma carga es un doble-swap visible
+  // (form → globo → contenido). Con el mismo `HomeRouteSkeleton` en ambos sitios,
+  // el arranque logueado pinta un único layout de espera hasta el contenido real.
   return (
-    <Suspense fallback={<UtilityRouteSkeleton />}>
+    <Suspense fallback={<HomeRouteSkeleton />}>
       <HomePage />
       {isAdminEmail(user?.email) && <AdminLink />}
     </Suspense>
@@ -406,7 +411,7 @@ function RedirectHome() {
     goHome()
   }, [])
   return (
-    <Suspense fallback={<UtilityRouteSkeleton />}>
+    <Suspense fallback={<HomeRouteSkeleton />}>
       <HomePage />
     </Suspense>
   )

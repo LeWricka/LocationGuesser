@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, waitFor } from '@testing-library/react'
+import { render, waitFor, act } from '@testing-library/react'
 import type { RoutePoint } from '../../lib/trip'
 
 // --- Doble de maplibre-gl con un motor de proyección Mercator REAL --------------
@@ -191,6 +191,7 @@ class MockMarker {
   lngLat: LngLatTuple | null = null
   constructor(opts: Record<string, unknown>) {
     this.opts = opts
+    markerInstances.push(this)
   }
   setLngLat(ll: LngLatTuple) {
     this.lngLat = ll
@@ -199,10 +200,16 @@ class MockMarker {
   addTo() {
     return this
   }
+  /** Elemento HTML del marker (real API de maplibre-gl): los tests de la
+   * coreografía de entrada inspeccionan su clase/retardo (`lg-pin-enter`). */
+  getElement(): HTMLElement {
+    return this.opts.element as HTMLElement
+  }
   remove() {}
 }
 
 let mapInstances: MockMap[] = []
+let markerInstances: MockMarker[] = []
 
 vi.mock('maplibre-gl', () => ({
   Map: MockMap,
@@ -221,6 +228,7 @@ const MIN_FILL_ZOOM = 3.2
 
 beforeEach(() => {
   mapInstances = []
+  markerInstances = []
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
     width: CONTAINER.width,
     height: CONTAINER.height,
@@ -234,9 +242,11 @@ beforeEach(() => {
       return {}
     },
   } as DOMRect)
-  // reduced-motion=true: salta directo a `fitToPins` (sin el vuelo cinematográfico
-  // de `introFlight`), que es donde vive la lógica bajo prueba — mismo patrón que
-  // HomeGlobe.test.tsx.
+  // reduced-motion=true por defecto en estos tests (mismo patrón que
+  // HomeGlobe.test.tsx). Nota: desde "perf(cargas): entrada sin saltos" ya no hay
+  // vuelo cinematográfico que saltarse — el encuadre inicial es SIEMPRE
+  // instantáneo (corre oculto tras el skeleton); la preferencia solo sigue
+  // decidiendo los vuelos POSTERIORES al revelado.
   vi.stubGlobal('matchMedia', (query: string) => ({
     matches: true,
     media: query,
@@ -315,5 +325,62 @@ describe('TripMapGlobe — encuadre inicial no recorta el viaje (#640)', () => {
     expect(zoom).toBeLessThan(15)
     // El suelo nunca queda por encima del zoom usado.
     expect(map.getMinZoom()).toBeLessThanOrEqual(zoom)
+  })
+})
+
+// --- "perf(cargas): entrada sin saltos" — el mapa primero, los puntos después -----
+//
+// La "entrada cinematográfica" (vuelo de 1.5s desde zoom 0.6) corría OCULTA tras el
+// MapSkeleton: nadie la veía y solo retrasaba el primer `idle` (el revelado). Ahora
+// el encuadre inicial es instantáneo en `load` y los pines montan en el revelado
+// (primer `idle`) con entrada escalonada; los repintados posteriores, quietos.
+describe('TripMapGlobe — revelado y entrada de pines (perf: cargas sin saltos)', () => {
+  test('SIN reduced-motion, el encuadre inicial sigue siendo instantáneo (duration 0)', async () => {
+    // Anula el matches:true del beforeEach: aquí el usuario NO pide menos
+    // movimiento — la instantaneidad debe venir de que el lienzo aún está oculto.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }))
+    const route = [point('a', 42.8169, -1.6432, 'Pamplona'), point('b', 40.4168, -3.7038, 'Madrid')]
+    render(<TripMapGlobe route={route} selectedChallengeId={null} onSelectMoment={() => {}} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    mapInstances[0].fire('load')
+
+    expect(mapInstances[0].easeToCalls.length).toBeGreaterThan(0)
+    const last = mapInstances[0].easeToCalls.at(-1) as { duration?: number }
+    expect(last.duration).toBe(0)
+    // Y sin rastro del vuelo cinematográfico retirado.
+    expect(mapInstances[0].flyToCalls).toHaveLength(0)
+  })
+
+  test('los pines NO montan en `load`: montan en el primer `idle` con entrada escalonada', async () => {
+    const route = [point('a', 42.8169, -1.6432, 'Pamplona'), point('b', 40.4168, -3.7038, 'Madrid')]
+    render(<TripMapGlobe route={route} selectedChallengeId={null} onSelectMoment={() => {}} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    // `act`: el revelado hace un setState (oculta el MapSkeleton).
+    act(() => {
+      mapInstances[0].fire('load')
+    })
+    // Cámara encuadrada, lienzo tras el skeleton: aún sin pines.
+    expect(markerInstances).toHaveLength(0)
+
+    act(() => {
+      mapInstances[0].fire('idle')
+    })
+    expect(markerInstances).toHaveLength(2)
+    markerInstances.forEach((marker, i) => {
+      const el = marker.getElement()
+      expect(el.classList.contains('lg-pin-enter')).toBe(true)
+      expect(el.style.getPropertyValue('--pin-enter-delay')).toContain(`* ${i}`)
+    })
   })
 })

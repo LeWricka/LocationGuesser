@@ -1,4 +1,6 @@
 import { Skeleton } from './Skeleton'
+import { Stack } from './Stack'
+import { Row } from './Row'
 import styles from './RouteSkeletons.module.css'
 
 // Skeletons de fallback de <Suspense> POR FAMILIA de ruta (issue #526). Antes,
@@ -68,6 +70,43 @@ export function UtilityRouteSkeleton() {
           </div>
         ))}
       </div>
+    </main>
+  )
+}
+
+// ── Home (HomePage): globo + banner del reto + feed de portadas ─────────────
+//
+// Issue "perf(cargas): entrada sin saltos": la home logueada es la ÚNICA ruta
+// lazy de App.tsx sin familia de skeleton propia — antes caía al
+// `UtilityRouteSkeleton` genérico (cabecera + 4 campos, forma de FORMULARIO)
+// mientras se descargaba el chunk de `HomePage`, y en cuanto montaba pintaba
+// SU PROPIO esqueleto (globo + banner + tarjetas) mientras `useHomeData`
+// resolvía. Dos formas de esqueleto DISTINTAS en la misma carga son un
+// doble-swap visible (form → globo → contenido) — exactamente la clase de
+// "salto" que reporta el dueño. Sacamos el esqueleto de la home a esta familia
+// compartida para que el fallback de `<Suspense>` (mientras llega el chunk) y
+// el esqueleto por datos (mientras `useHomeData`/`useSession` resuelven, ver
+// `HomePage.tsx`) sean el MISMO layout: un solo paso visual hasta el contenido
+// real, no dos.
+export function HomeRouteSkeleton() {
+  return (
+    <main className="lg-page" role="status" aria-label="Cargando tu inicio">
+      <Stack gap={6}>
+        {/* Globo héroe (placeholder alto). */}
+        <Skeleton width="100%" height={260} radius="lg" />
+
+        {/* Banner del reto + feed de portadas. */}
+        <Row justify="between" align="center" gap={3}>
+          <Skeleton width={120} height={28} radius="md" />
+          <Skeleton width={64} height={16} />
+        </Row>
+        <Skeleton width="100%" height={88} radius="lg" />
+        <Stack gap={3}>
+          {[0, 1].map((i) => (
+            <Skeleton key={i} width="100%" height={240} radius="lg" />
+          ))}
+        </Stack>
+      </Stack>
     </main>
   )
 }
