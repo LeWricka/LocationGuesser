@@ -151,6 +151,25 @@ const MOMENT_SIN_FOTO: Moment = {
   country: null,
 }
 
+// RETO cerrado ajeno, ya jugado (issue #714 — la captura del dueño): kicker "Un
+// reto para el grupo", sello dorado "Reto" y "Tu resultado" con puntos. Antes NO
+// existía un caso de galería para este estado de `MomentSheet` (solo había
+// recuerdo con/sin foto) — sin él, el swipe-down para cerrar (#650) nunca se
+// validó visualmente sobre un reto, aunque el gesto vive en el MISMO componente
+// y no distingue por `isChallenge` (verificado con Playwright + emulación de
+// touch real: cierra igual desde el héroe en ambos casos).
+const MOMENT_RETO_CERRADO: Moment = {
+  ...MOMENT_CON_FOTO,
+  challengeId: 'ch-reto-cerrado-galeria',
+  title: 'La plaza del reloj',
+  description: 'Aquí quedamos cada tarde.',
+  status: 'closed',
+  isChallenge: true,
+  imageUrl: stubPhoto('La plaza del reloj'),
+  guessedCount: 3,
+  isOwn: false,
+}
+
 // Avatares del grupo (issue #543): los 4 miembros sembrados del viaje de Japón
 // (todos con `avatar: null` en fixtures.ts → 3 discos por defecto + chip "+1").
 const dashboardMembers = MEMBERS.map((m) => ({
@@ -473,6 +492,20 @@ export const cases: GalleryCase[] = [
     render: () => <MomentSheet moment={MOMENT_SIN_FOTO} canEdit onClose={noop} />,
   },
   {
+    id: 'reto-vista-cerrado',
+    title: 'Reto · Vista (cerrado, con resultado)',
+    section: 'Viaje',
+    render: () => (
+      <MomentSheet
+        moment={MOMENT_RETO_CERRADO}
+        canEdit={false}
+        myUserId="u1"
+        onClose={noop}
+        onViewMarcador={noop}
+      />
+    ),
+  },
+  {
     // La captura del dueño (#571): editar un recuerdo SIN foto ya NO hereda el
     // héroe de la escena (vacío negro + título gigante duplicado) — formulario de
     // papel, misma gramática que "Nuevo recuerdo".
@@ -534,7 +567,7 @@ export const cases: GalleryCase[] = [
     // recuerdo" conserva su buscador encima del mapa, la variante por
     // defecto). Sin pin todavía: solo el hint "Toca el mapa…", sin tarjeta SV.
     id: 'crear-donde',
-    title: 'Crear ¿Dónde? · Paso 1 (el sitio, sin pin)',
+    title: 'Crear ¿Dónde estamos? · Paso 1 (el sitio, sin pin)',
     section: 'Crear',
     render: () => (
       <CreateLocationChallenge
@@ -553,7 +586,7 @@ export const cases: GalleryCase[] = [
     // vacío enmarcado, pero el LAYOUT — tarjeta flotante, chip de privacidad,
     // CTA "Continuar" habilitado — es el real).
     id: 'crear-donde-sv',
-    title: 'Crear ¿Dónde? · Paso 1 (tarjeta SV inline)',
+    title: 'Crear ¿Dónde estamos? · Paso 1 (tarjeta SV inline)',
     section: 'Crear',
     render: () => (
       <CreateLocationChallenge
@@ -573,7 +606,7 @@ export const cases: GalleryCase[] = [
     // Street View aquí" vive EN LA MISMA tarjeta, sin forzar un cambio de
     // paso — el CTA "Continuar" queda deshabilitado hasta mover el pin.
     id: 'crear-donde-sin-cobertura',
-    title: 'Crear ¿Dónde? · Paso 1 (sin cobertura de Street View)',
+    title: 'Crear ¿Dónde estamos? · Paso 1 (sin cobertura de Street View)',
     section: 'Crear',
     render: () => (
       <CreateLocationChallenge
@@ -589,7 +622,7 @@ export const cases: GalleryCase[] = [
     // PASO 2 de 2 (issue #592): sin mapa ni previa (ya cumplieron su función
     // en el paso 1) — solo plazo/tiempo por jugada, privacidad y Lanzar.
     id: 'crear-donde-reglas',
-    title: 'Crear ¿Dónde? · Paso 2 (las reglas)',
+    title: 'Crear ¿Dónde estamos? · Paso 2 (las reglas)',
     section: 'Crear',
     render: () => (
       <CreateLocationChallenge

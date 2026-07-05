@@ -366,6 +366,29 @@ describe('MomentSheet', () => {
       expect(onClose).toHaveBeenCalledTimes(1)
     })
 
+    // Issue #714 (la captura del dueño): el gesto vive en el MISMO componente
+    // para recuerdo y reto — los handlers están en el `.panel`, no gateados por
+    // `isChallenge`/`isReto` — pero antes de este test SOLO se ejercitaba con un
+    // recuerdo, así que un reto cerrado (más secciones: "Tu resultado", "Ver
+    // marcador", acciones del dueño) nunca quedó cubierto. Verificado además con
+    // Playwright + emulación de touch real (mouse y touch) sobre un build servido:
+    // cierra exactamente igual que el recuerdo. Este test fija esa cobertura.
+    test('arrastre desde el héroe en un RETO CERRADO cierra la hoja igual que un recuerdo', () => {
+      const onClose = vi.fn()
+      renderSheet({ onClose, moment: RETO_CERRADO, canEdit: false, myUserId: 'u1' })
+
+      const hero = screen.getByAltText('La plaza del reloj')
+      fireEvent.pointerDown(hero, { clientY: 0 })
+      fireEvent.pointerMove(hero, { clientY: 400 })
+      fireEvent.pointerUp(hero)
+
+      expect(onClose).not.toHaveBeenCalled()
+      act(() => {
+        vi.advanceTimersByTime(400)
+      })
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+
     test('con scroll interno (scrollTop>0) el arrastre no cierra: manda el scroll nativo', () => {
       const onClose = vi.fn()
       renderSheet({ onClose })

@@ -79,7 +79,8 @@ type PanoState =
 // Estado del GPS (solo para centrar el mapa, no es la respuesta).
 type GpsState = 'idle' | 'locating' | 'done' | 'error'
 
-// Reto ¿Dónde? con selección MANUAL del punto en el mapa.
+// Reto ¿Dónde estamos? con selección MANUAL del punto en el mapa (label del
+// tipo, antes "¿Dónde?"; el `challenge_kind` interno sigue siendo 'location').
 //
 // Flujo EN DOS PASOS (issue #592 — rediseño sobre #585/#588 con feedback del
 // dueño):
@@ -281,7 +282,7 @@ export function CreateLocationChallenge({
       }
 
       setStatus('Lanzando el reto…')
-      const title = groupName ? `¿Dónde? · ${groupName}` : '¿Dónde?'
+      const title = groupName ? `¿Dónde estamos? · ${groupName}` : '¿Dónde estamos?'
       const { challenge } = await createChallenge({
         title,
         lat: pano.lat,
@@ -364,7 +365,7 @@ export function CreateLocationChallenge({
         onLead={step === 'previa' ? backToSitio : onBack}
         leadLabel="Atrás"
         kicker={groupName ?? undefined}
-        title="¿Dónde?"
+        title="¿Dónde estamos?"
         action={
           step === 'sitio' ? (
             <button

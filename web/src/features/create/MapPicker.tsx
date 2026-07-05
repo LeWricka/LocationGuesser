@@ -79,7 +79,7 @@ interface Props {
    *  - 'above' (default): fila propia ENCIMA del lienzo, en flujo — el picker
    *    COMPACTO que usan AddMoment/EditMomentForm (#574); NO cambia con esto.
    *  - 'overlay': barra de vidrio FLOTANDO dentro del lienzo (arriba), para
-   *    cuando el propio mapa ya ocupa toda la pantalla (paso 1 de ¿Dónde?) y no
+   *    cuando el propio mapa ya ocupa toda la pantalla (paso 1 de ¿Dónde estamos?) y no
    *    hay "encima" que gastar en el buscador. Recoloca el zoom de Leaflet
    *    (arriba-izq → abajo-izq) y el selector de capa (arriba-der → abajo-der,
    *    apilado sobre la atribución) para dejar libre la franja superior; el

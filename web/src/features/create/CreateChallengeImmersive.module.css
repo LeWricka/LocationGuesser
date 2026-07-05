@@ -340,7 +340,7 @@
   width: 0;
 }
 
-/* Dirección del paso (#531): compartida por CreateChallengeImmersive (¿Dónde?) y
+/* Dirección del paso (#531): compartida por CreateChallengeImmersive (¿Dónde estamos?) y
    CreateNumberChallenge (¿Adivinas?, importa este módulo como `sheet`). Avanzar
    entra desde la derecha, volver desde la izquierda. `animation-fill-mode:
    backwards` (nunca `forwards`/`both`) es lo que evita el transform residual del
