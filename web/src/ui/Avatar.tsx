@@ -42,7 +42,16 @@ export function Avatar({ userId, avatarUrl, name, size = 'md', className }: Prop
   if (resolved.kind === 'image' && !imageFailed) {
     const classes = [styles.avatar, styles[size], className].filter(Boolean).join(' ')
     return (
-      <img className={classes} src={resolved.src} alt={label} onError={() => setFailedSrc(src)} />
+      <img
+        className={classes}
+        src={resolved.src}
+        alt={label}
+        // decoding="async" (issue #713): mismo motivo que ChallengePhoto — el avatar
+        // se pinta en cabeceras que aparecen justo tras el revelado (home/viaje), y
+        // un decode síncrono de una foto de perfil grande no debe bloquear ese frame.
+        decoding="async"
+        onError={() => setFailedSrc(src)}
+      />
     )
   }
 

@@ -4,6 +4,7 @@ import { Info } from 'lucide-react'
 // import() dinámico dentro del efecto, para que quede en su propio chunk WebGL.
 import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
 import { MAP_PRESETS, SCENE_GLOBE } from '../lib/mapPresets'
+import { hasWebGL } from '../lib/webglSupport'
 import { Icon } from './Icon'
 import { buildHomePinElement } from '../features/trip/pinMarkers'
 import '../features/trip/tripPins.css'
@@ -261,21 +262,6 @@ type MapLibreModule = typeof import('maplibre-gl')
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !window.matchMedia) return false
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches
-}
-
-/** ¿Soporta el navegador WebGL? Sin él caemos al globo evocado en CSS (red de seguridad). */
-function hasWebGL(): boolean {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return false
-  try {
-    const canvas = document.createElement('canvas')
-    const gl =
-      canvas.getContext('webgl2') ||
-      canvas.getContext('webgl') ||
-      canvas.getContext('experimental-webgl')
-    return gl != null
-  } catch {
-    return false
-  }
 }
 
 // Aplica atmósfera/cielo NOCHE al globo (colores de escena tokenizados en mapPresets;
