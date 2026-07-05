@@ -447,16 +447,23 @@ Porkbun (crea `hola@momentu.art`), añadir sus MX/SPF/DKIM a la zona de Vercel, 
 Supabase usar host `smtp.porkbun.com`, puerto `587`, usuario el buzón completo y su
 contraseña.
 
-### 8.2 Plantilla con marca
+### 8.2 Plantillas con marca (las 6 de Supabase Auth)
 
-**Dashboard → Authentication → Email Templates → Magic Link**: pegar el HTML de
-[docs/plantillas/email-acceso-momentu.html](plantillas/email-acceso-momentu.html)
-(código grande + botón de enlace, paleta y serif de Momentu). Asunto sugerido:
-`Tu código para entrar en Momentu`.
+**Dashboard → Authentication → Email Templates**: pegar en cada plantilla el HTML
+de su fichero en [docs/plantillas/](plantillas/). Mismo diseño en todas (wordmark
+con punto teal, hilo dorado, código grande, botón); ninguna requiere tocar código.
 
-La plantilla usa `{{ .Token }}` (código de 6 dígitos) y `{{ .ConfirmationURL }}`
-(enlace de respaldo) — las mismas variables que ya usa el flujo actual
-(`sendEmailOtp`, lib/auth.ts): no hay que tocar código.
+| Plantilla de Supabase | Fichero | Asunto sugerido | En uso hoy |
+|---|---|---|---|
+| Magic Link | `email-acceso-momentu.html` | Tu código para entrar en Momentu | ✅ el login (OTP + enlace) |
+| Confirm signup | `email-confirmar-registro.html` | Bienvenido a Momentu — confirma tu correo | Según config de confirmación |
+| Change Email Address | `email-cambio-correo.html` | Confirma tu nuevo correo en Momentu | Si el usuario cambia el email |
+| Reauthentication | `email-reautenticacion.html` | Tu código de confirmación de Momentu | Acciones sensibles (solo código) |
+| Invite user | `email-invitacion.html` | Te esperan en Momentu | No (invitación desde el panel) |
+| Reset Password | `email-restablecer.html` | Restablece tu acceso a Momentu | No (Momentu es passwordless) |
+
+Variables por plantilla anotadas en la cabecera de cada fichero (`{{ .Token }}`,
+`{{ .ConfirmationURL }}`, y en el cambio de correo `{{ .Email }}`/`{{ .NewEmail }}`).
 
 ### 8.3 Después del cambio
 
