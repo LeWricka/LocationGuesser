@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { MomentGalleryPicker, type DraftPhoto } from './MomentGalleryPicker'
@@ -14,6 +14,17 @@ import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
 import { getGroup } from '../../lib/groupData'
 import { supabase } from '../../lib/supabase'
+import {
+  clearDraft,
+  deserializeBlob,
+  deserializeFile,
+  loadDraft,
+  serializeBlob,
+  serializeFile,
+  useDraftAutosave,
+  type SerializedBlob,
+  type SerializedFile,
+} from '../../lib/drafts'
 import {
   AppHeader,
   Badge,
@@ -154,6 +165,36 @@ async function fetchLatestMomentDate(groupId: string): Promise<string | null> {
   return data.happened_on ?? data.created_at
 }
 
+// BORRADOR PERSISTENTE (issue #718) — es el caso concreto del reporte del
+// dueño: "creando un momento con fotos, clips y descripción, salgo a mirar
+// una notificación y al volver todo perdido". Clave por viaje: un dueño solo
+// tiene UN "Nuevo recuerdo" a medias por viaje a la vez.
+function draftKey(groupId: string): string {
+  return `moment:${groupId}`
+}
+
+interface MomentDraft {
+  title: string
+  description: string
+  date: string
+  place: LatLng | null
+  // Fotos/clip/nota de voz van SERIALIZADOS (ArrayBuffer + metadatos, ver
+  // `SerializedFile`/`SerializedBlob` en lib/drafts.ts): el `File`/`Blob`
+  // original ya se copió a bytes propios al elegirlo (#644), así que
+  // persistir esos bytes es robusto en cualquier navegador.
+  photos: { id: string; file: SerializedFile }[]
+  video: { frameId: string; file: SerializedFile; mimeType: string } | null
+  voice: { blob: SerializedBlob; mimeType: string } | null
+}
+
+// Un draft sin nada real (ni texto, ni sitio, ni fotos/clip/voz) no merece
+// restaurarse ni avisar: es ruido.
+function hasContent(d: MomentDraft): boolean {
+  return Boolean(
+    d.title.trim() || d.description.trim() || d.place || d.photos.length > 0 || d.video || d.voice,
+  )
+}
+
 /**
  * AÑADIR RECUERDO — el camino feliz, limpio (rediseño Oleada 3). Un recuerdo es
  * SOLO foto + lugar + texto: se acabó el toggle "convertirlo en reto" (mezclaba dos
@@ -273,6 +314,160 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       cancelled = true
     }
   }, [groupId])
+
+  // Descarta el borrador restaurado a mano (acción "Descartar" del toast):
+  // vuelve el formulario a blanco y revoca los object URLs que la
+  // restauración había creado (fotos + nota de voz), igual que un
+  // quitar/desmontar normal.
+  function discardDraft() {
+    void clearDraft(draftKey(groupId))
+    setTitle('')
+    setDescription('')
+    setPlace(null)
+    setFlyTo(null)
+    setPhotos((prev) => {
+      prev.forEach((p) => URL.revokeObjectURL(p.previewUrl))
+      return []
+    })
+    setVideoDraft(null)
+    setVoice((prev) => {
+      if (prev.kind === 'draft') URL.revokeObjectURL(prev.url)
+      return { kind: 'none' }
+    })
+    setFailedPhotoIds(new Set())
+  }
+
+  // BORRADOR PERSISTENTE (issue #718): al montar, intenta restaurar. Ocurre
+  // aparte de (y no interfiere con) la cascada de fecha por defecto de arriba:
+  // si el draft trae fecha, marcamos `dateTouchedRef` para que esa cascada no
+  // la pise sea cual sea el orden en que resuelvan las dos promesas. `restored`
+  // desarma el autosave hasta que este intento termine — si no, el primer
+  // render (con los campos vacíos) pisaría un draft real antes de leerlo.
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void loadDraft<MomentDraft>(draftKey(groupId)).then((draft) => {
+      if (cancelled) return
+      if (draft && hasContent(draft)) {
+        setTitle(draft.title)
+        setDescription(draft.description)
+        if (draft.date) {
+          dateTouchedRef.current = true
+          setDate(draft.date)
+        }
+        if (draft.place) {
+          setPlace(draft.place)
+          setFlyTo(draft.place)
+        }
+        if (draft.photos.length > 0) {
+          setPhotos(
+            draft.photos.map((p) => {
+              const file = deserializeFile(p.file)
+              return { id: p.id, file, previewUrl: URL.createObjectURL(file) }
+            }),
+          )
+        }
+        if (draft.video) {
+          setVideoDraft({
+            frameId: draft.video.frameId,
+            file: deserializeFile(draft.video.file),
+            mimeType: draft.video.mimeType,
+          })
+        }
+        if (draft.voice) {
+          const blob = deserializeBlob(draft.voice.blob)
+          setVoice({
+            kind: 'draft',
+            blob,
+            mimeType: draft.voice.mimeType,
+            url: URL.createObjectURL(blob),
+          })
+        }
+        track('draft_restored', { form: 'moment', has_photos: draft.photos.length > 0 })
+        toast.show('Recuperado tu borrador del recuerdo.', {
+          tone: 'neutral',
+          action: { label: 'Descartar', onClick: discardDraft },
+        })
+      }
+      setRestored(true)
+    })
+    return () => {
+      cancelled = true
+    }
+    // Solo al montar: restaurar un draft es una operación de una sola vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
+
+  // Las fotos/clip/nota de voz se serializan APARTE (async, issue #718):
+  // `serializeFile`/`serializeBlob` leen bytes con `arrayBuffer()`, así que no
+  // pueden vivir en el `useMemo` síncrono del snapshot de más abajo. El
+  // debounce de `useDraftAutosave` absorbe ese pequeño desfase.
+  const [draftPhotos, setDraftPhotos] = useState<{ id: string; file: SerializedFile }[]>([])
+  useEffect(() => {
+    let cancelled = false
+    void Promise.all(
+      photos.map(async (p) => ({ id: p.id, file: await serializeFile(p.file) })),
+    ).then((serialized) => {
+      if (!cancelled) setDraftPhotos(serialized)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [photos])
+
+  const [draftVideo, setDraftVideo] = useState<{
+    frameId: string
+    file: SerializedFile
+    mimeType: string
+  } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    if (!videoDraft) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset síncrono al quitar el clip, no un derivado de otro estado
+      setDraftVideo(null)
+      return
+    }
+    void serializeFile(videoDraft.file).then((file) => {
+      if (!cancelled) {
+        setDraftVideo({ frameId: videoDraft.frameId, file, mimeType: videoDraft.mimeType })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [videoDraft])
+
+  const [draftVoice, setDraftVoice] = useState<{ blob: SerializedBlob; mimeType: string } | null>(
+    null,
+  )
+  useEffect(() => {
+    let cancelled = false
+    if (voice.kind !== 'draft') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset síncrono sin nota nueva, no un derivado de otro estado
+      setDraftVoice(null)
+      return
+    }
+    void serializeBlob(voice.blob).then((blob) => {
+      if (!cancelled) setDraftVoice({ blob, mimeType: voice.mimeType })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [voice])
+
+  const draftSnapshot = useMemo<MomentDraft>(
+    () => ({
+      title,
+      description,
+      date,
+      place,
+      photos: draftPhotos,
+      video: draftVideo,
+      voice: draftVoice,
+    }),
+    [title, description, date, place, draftPhotos, draftVideo, draftVoice],
+  )
+  useDraftAutosave(draftKey(groupId), draftSnapshot, restored)
 
   // Añadir fotos (selección múltiple del móvil). Se anexan al final. Si es la
   // PRIMERA tanda (galería vacía), leemos el GPS de la portada (File ORIGINAL,
@@ -515,6 +710,8 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       }
 
       setStatus(null)
+      // Recuerdo guardado con éxito: el borrador ya cumplió su función (issue #718).
+      void clearDraft(draftKey(groupId))
       track('moment_created', {
         group_id: groupId,
         challenge_id: challenge.id,

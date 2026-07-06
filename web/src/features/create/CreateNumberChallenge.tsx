@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Hash } from 'lucide-react'
 import { PhotoDropzone } from './PhotoDropzone'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
@@ -10,6 +10,14 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
+import {
+  clearDraft,
+  deserializeFile,
+  loadDraft,
+  serializeFile,
+  useDraftAutosave,
+  type SerializedFile,
+} from '../../lib/drafts'
 import {
   AppHeader,
   Button,
@@ -80,6 +88,31 @@ function symbolFor(unitKey: string, custom: string): string {
 // una tercera decisión que no aportaba al proceso de crear el reto).
 type Stage = 0 | 1
 const TOTAL_STAGES = 2
+
+// Borrador persistente (issue #718): clave por viaje — un dueño solo tiene UN
+// "¿Adivinas?" a medias por viaje a la vez, que es el caso real.
+function draftKey(groupId: string): string {
+  return `numberChallenge:${groupId}`
+}
+
+interface NumberChallengeDraft {
+  stage: Stage
+  title: string
+  question: string
+  answerRaw: string
+  unitKey: string
+  customUnit: string
+  deadlineIndex: number
+  guessIndex: number
+  photo: SerializedFile | null
+}
+
+// Un draft sin nada escrito ni foto no merece restaurarse ni avisar.
+function hasContent(d: NumberChallengeDraft): boolean {
+  return Boolean(
+    d.title.trim() || d.question.trim() || d.answerRaw.trim() || d.customUnit.trim() || d.photo,
+  )
+}
 
 /**
  * Parsea la respuesta escrita (formato es-ES: coma decimal) a número, infiriendo
@@ -157,6 +190,88 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
     setPhotoFile(file)
   }
 
+  // BORRADOR PERSISTENTE (issue #718). Restaura al montar; `restored` desarma
+  // el autosave hasta que este intento termine (mismo criterio que CreateGroup).
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void loadDraft<NumberChallengeDraft>(draftKey(groupId)).then((draft) => {
+      if (cancelled) return
+      if (draft && hasContent(draft)) {
+        setStage(draft.stage)
+        setTitle(draft.title)
+        setQuestion(draft.question)
+        setAnswerRaw(draft.answerRaw)
+        setUnitKey(draft.unitKey)
+        setCustomUnit(draft.customUnit)
+        setDeadlineIndex(draft.deadlineIndex)
+        setGuessIndex(draft.guessIndex)
+        if (draft.photo) pickPhoto(deserializeFile(draft.photo))
+        track('draft_restored', { form: 'number_challenge', has_photos: Boolean(draft.photo) })
+        toast.show('Recuperado tu borrador del reto.', {
+          tone: 'neutral',
+          action: {
+            label: 'Descartar',
+            onClick: () => {
+              void clearDraft(draftKey(groupId))
+              setStage(0)
+              setTitle('')
+              setQuestion('')
+              setAnswerRaw('')
+              setUnitKey('eur')
+              setCustomUnit('')
+              setDeadlineIndex(DEFAULT_DEADLINE_INDEX)
+              setGuessIndex(DEFAULT_GUESS_INDEX)
+              pickPhoto(null)
+            },
+          },
+        })
+      }
+      setRestored(true)
+    })
+    return () => {
+      cancelled = true
+    }
+    // Solo al montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
+
+  // La foto se serializa aparte (async, issue #718): `serializeFile` lee sus
+  // bytes con `arrayBuffer()`, así que no puede vivir en el `useMemo` síncrono
+  // de más abajo. El debounce de `useDraftAutosave` ya absorbe este pequeño
+  // desfase entre elegir la foto y tenerla lista para el draft.
+  const [draftPhoto, setDraftPhoto] = useState<SerializedFile | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    if (!photoFile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset síncrono al quitar la foto, no un derivado de otro estado
+      setDraftPhoto(null)
+      return
+    }
+    void serializeFile(photoFile).then((s) => {
+      if (!cancelled) setDraftPhoto(s)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [photoFile])
+
+  const draftSnapshot = useMemo<NumberChallengeDraft>(
+    () => ({
+      stage,
+      title,
+      question,
+      answerRaw,
+      unitKey,
+      customUnit,
+      deadlineIndex,
+      guessIndex,
+      photo: draftPhoto,
+    }),
+    [stage, title, question, answerRaw, unitKey, customUnit, deadlineIndex, guessIndex, draftPhoto],
+  )
+  useDraftAutosave(draftKey(groupId), draftSnapshot, restored)
+
   const usingCustomUnit = unitKey === 'custom'
   const effectiveUnit = symbolFor(unitKey, customUnit)
   const parsed = parseAnswer(answerRaw)
@@ -229,6 +344,8 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
         imagePath,
       })
       setStatus(null)
+      // Reto creado con éxito: el borrador ya cumplió su función (issue #718).
+      void clearDraft(draftKey(groupId))
       track('challenge_created', {
         group_id: groupId,
         challenge_id: challenge.id,

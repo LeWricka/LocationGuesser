@@ -74,6 +74,7 @@ vi.mock('../../lib/streetview', async (importOriginal) => {
 import { CreateLocationChallenge } from './CreateLocationChallenge'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
+import { loadDraft } from '../../lib/drafts'
 
 const session: SessionState = {
   session: null,
@@ -84,12 +85,12 @@ const session: SessionState = {
   refreshProfile: async () => {},
 }
 
-function renderScreen() {
+function renderScreen(groupId = 'g-1') {
   return render(
     <SessionContext.Provider value={session}>
       <ToastProvider>
         <CreateLocationChallenge
-          groupId="g-1"
+          groupId={groupId}
           groupName="Japón 2026"
           onBack={() => {}}
           onCreated={() => {}}
@@ -359,5 +360,54 @@ describe('CreateLocationChallenge — "La velocidad puntúa" (#628)', () => {
     expect(createChallengeMock).toHaveBeenCalledWith(
       expect.objectContaining({ timeScoring: false }),
     )
+  })
+})
+
+// --- Borrador persistente (issue #718) ---------------------------------------------
+
+describe('CreateLocationChallenge — borrador persistente (#718)', () => {
+  test('elegir un pin, desmontar y volver a montar restaura el punto y re-busca Street View', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    const user = userEvent.setup()
+    const { unmount } = renderScreen(groupId)
+
+    await user.click(screen.getByRole('button', { name: /simular tap/i }))
+    await screen.findByTestId('sv-preview')
+
+    await waitFor(
+      async () => expect(await loadDraft(`locationChallenge:${groupId}`)).not.toBeNull(),
+      {
+        timeout: 2000,
+      },
+    )
+    unmount()
+    findPanoramaMock.mockClear()
+
+    renderScreen(groupId)
+    // Re-busca la cobertura desde el punto guardado (no resucita el panoId a ciegas).
+    await waitFor(() =>
+      expect(findPanoramaMock).toHaveBeenCalledWith(41.38, 2.17, expect.any(Number)),
+    )
+    expect(await screen.findByTestId('sv-preview')).toBeInTheDocument()
+    expect(screen.getByText(/recuperado tu borrador/i)).toBeInTheDocument()
+    expect(trackMock).toHaveBeenCalledWith('draft_restored', {
+      form: 'location_challenge',
+      has_photos: false,
+    })
+  })
+
+  test('lanzar el reto con éxito limpia el borrador', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    createChallengeMock.mockResolvedValue({
+      challenge: { id: 'reto-clean', title: 'x', image_path: null } as ChallengeForPlay,
+      groupId,
+    })
+    const user = userEvent.setup()
+    renderScreen(groupId)
+    await advanceToRules(user)
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
+    expect(await loadDraft(`locationChallenge:${groupId}`)).toBeNull()
   })
 })

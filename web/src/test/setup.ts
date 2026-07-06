@@ -1,4 +1,11 @@
 import '@testing-library/jest-dom'
+// jsdom no implementa IndexedDB (ver jsdom#3363): `lib/drafts.ts` (issue #718,
+// borradores persistentes de los formularios de crear) lo usa para guardar
+// Blobs de fotos/clips que `localStorage` no podría. `fake-indexeddb/auto`
+// instala una implementación en memoria en `globalThis.indexedDB` antes de
+// que se cargue nada más, así cualquier test que toque un draft (o un
+// formulario con autosave) funciona sin mockear la lib a mano.
+import 'fake-indexeddb/auto'
 
 // jsdom (a fecha de esta versión) no implementa `Blob.prototype.arrayBuffer`/
 // `.text()` — ver jsdom#2555 — pero SÍ implementa `FileReader`. Los pickers de

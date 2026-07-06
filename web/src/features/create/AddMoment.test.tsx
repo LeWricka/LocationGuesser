@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import type { ChallengeForPlay } from '../../lib/challenges'
@@ -111,16 +111,21 @@ const session: SessionState = {
   refreshProfile: async () => {},
 }
 
-function renderAddMoment() {
+function renderAddMoment(groupId = 'g1') {
   const onCreated = vi.fn()
-  render(
+  const view = render(
     <SessionContext.Provider value={session}>
       <ToastProvider>
-        <AddMoment groupId="g1" onBack={vi.fn()} onCreated={onCreated} onAddChallenge={vi.fn()} />
+        <AddMoment
+          groupId={groupId}
+          onBack={vi.fn()}
+          onCreated={onCreated}
+          onAddChallenge={vi.fn()}
+        />
       </ToastProvider>
     </SessionContext.Provider>,
   )
-  return { onCreated }
+  return { onCreated, ...view }
 }
 
 function fakeFile(name: string): File {
@@ -558,5 +563,102 @@ describe('AddMoment — fecha elegida en happened_on (#566)', () => {
     expect(createMomentMock).toHaveBeenCalledWith(
       expect.objectContaining({ description: 'Un día genial' }),
     )
+  })
+})
+
+// --- Borrador persistente (issue #718) ---------------------------------------------
+//
+// El reporte del dueño: creando un momento con fotos, clips y descripción,
+// sale a mirar una notificación y al volver todo está perdido. Este bloque
+// cubre el caso estrella: un draft con fotos (Blobs reales) se restaura con
+// sus previews, no solo el texto.
+describe('AddMoment — borrador persistente (#718)', () => {
+  beforeEach(() => {
+    trackMock.mockClear()
+    reportErrorMock.mockClear()
+    createMomentMock.mockReset()
+    addMomentImagesMock.mockReset()
+    getGroupMock.mockReset().mockResolvedValue(null)
+    latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
+  })
+
+  test('caso estrella: título + 2 fotos, desmontar y volver a montar restaura ambas con previews', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    const { unmount } = renderAddMoment(groupId)
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Día de playa')
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [
+      fakeFile('playa.jpg'),
+      fakeFile('atardecer.jpg'),
+    ])
+    await screen.findByText('2 fotos · la 1ª es la portada')
+
+    const { loadDraft } = await import('../../lib/drafts')
+    await waitFor(async () => expect(await loadDraft(`moment:${groupId}`)).not.toBeNull(), {
+      timeout: 2000,
+    })
+    unmount()
+
+    renderAddMoment(groupId)
+    // La restauración es async: espera al toast (solo aparece tras aplicarla)
+    // antes de comprobar campos/galería.
+    await screen.findByText(/recuperado tu borrador/i)
+    expect(screen.getByLabelText(/título/i)).toHaveValue('Día de playa')
+    expect(screen.getByText('2 fotos · la 1ª es la portada')).toBeInTheDocument()
+    // Dos miniaturas con preview (object URL reconstruido, mismo criterio que
+    // el picker en vivo).
+    expect(screen.getAllByAltText('')).toHaveLength(2)
+    expect(screen.getByText(/recuperado tu borrador/i)).toBeInTheDocument()
+    expect(trackMock).toHaveBeenCalledWith('draft_restored', { form: 'moment', has_photos: true })
+  })
+
+  test('"Descartar" en el toast borra el draft y limpia el formulario (título y fotos)', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    const { unmount } = renderAddMoment(groupId)
+    await userEvent.type(screen.getByLabelText(/título/i), 'Borrador a descartar')
+    await userEvent.upload(screen.getByLabelText('Añadir fotos del día'), [fakeFile('foto.jpg')])
+
+    const { loadDraft } = await import('../../lib/drafts')
+    await waitFor(async () => expect(await loadDraft(`moment:${groupId}`)).not.toBeNull(), {
+      timeout: 2000,
+    })
+    unmount()
+
+    renderAddMoment(groupId)
+    await screen.findByText(/recuperado tu borrador/i)
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+
+    expect(screen.getByLabelText(/título/i)).toHaveValue('')
+    expect(screen.queryByText(/foto · la 1ª es la portada/)).not.toBeInTheDocument()
+    expect(await loadDraft(`moment:${groupId}`)).toBeNull()
+  })
+
+  test('guardar el recuerdo con éxito limpia el borrador', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    createMomentMock.mockResolvedValue({
+      challenge: { id: 'm-clean', title: 'x' } as ChallengeForPlay,
+      groupId,
+    })
+    renderAddMoment(groupId)
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'x')
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    await waitFor(() => expect(createMomentMock).toHaveBeenCalledTimes(1))
+    const { loadDraft } = await import('../../lib/drafts')
+    expect(await loadDraft(`moment:${groupId}`)).toBeNull()
+  })
+
+  test('un formulario en blanco no se guarda ni se restaura (nada que perder)', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    const { unmount } = renderAddMoment(groupId)
+    await act(() => new Promise((r) => setTimeout(r, 900)))
+    unmount()
+
+    const { unmount: unmountSecond } = renderAddMoment(groupId)
+    await act(() => new Promise((r) => setTimeout(r, 50)))
+    expect(screen.queryByText(/recuperado tu borrador/i)).not.toBeInTheDocument()
+    unmountSecond()
   })
 })

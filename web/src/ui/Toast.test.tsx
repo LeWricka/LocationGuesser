@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, act, fireEvent } from '@testing-library/react'
+import { render, screen, act, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -7,10 +7,18 @@ import { ToastProvider } from './ToastProvider'
 import { useToast } from './toast-context'
 
 // Botón de prueba que dispara un toast con las opciones que le pasemos.
-function Trigger({ message, duration }: { message: string; duration?: number }) {
+function Trigger({
+  message,
+  duration,
+  action,
+}: {
+  message: string
+  duration?: number
+  action?: { label: string; onClick: () => void }
+}) {
   const toast = useToast()
   return (
-    <button type="button" onClick={() => toast.show(message, { duration })}>
+    <button type="button" onClick={() => toast.show(message, { duration, action })}>
       mostrar
     </button>
   )
@@ -50,6 +58,36 @@ describe('Toast', () => {
     expect(screen.getByText('Bórrame')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Cerrar aviso' }))
     expect(screen.queryByText('Bórrame')).not.toBeInTheDocument()
+  })
+
+  // Issue #718: el toast de "Recuperado tu borrador" ofrece "Descartar" sin
+  // abrir un modal que interrumpa.
+  test('la acción del toast se pinta y dispara su callback + descarta el aviso', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    render(
+      <ToastProvider>
+        <Trigger message="Recuperado tu borrador" action={{ label: 'Descartar', onClick }} />
+      </ToastProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'mostrar' }))
+    expect(screen.getByText('Recuperado tu borrador')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Descartar' }))
+    expect(onClick).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Recuperado tu borrador')).not.toBeInTheDocument()
+  })
+
+  test('sin action no se pinta ningún botón extra (solo cerrar)', async () => {
+    const user = userEvent.setup()
+    render(
+      <ToastProvider>
+        <Trigger message="Aviso simple" />
+      </ToastProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'mostrar' }))
+    const toast = screen.getByText('Aviso simple').closest('[role="status"]') as HTMLElement
+    expect(within(toast).getAllByRole('button')).toHaveLength(1)
   })
 
   describe('auto-cierre con timers falsos', () => {

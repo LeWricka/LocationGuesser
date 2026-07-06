@@ -141,6 +141,12 @@ export type AnalyticsEvent =
   // co-dueño). Props: group_id. Sin el token ni datos del invitado.
   | 'owner_invite_created'
   | 'owner_invite_redeemed'
+  // Borrador restaurado (issue #718): un formulario de crear largo (recuerdo,
+  // viaje, reto) encontró un draft persistente al montar y lo restauró — mide
+  // cuánto contenido salvamos del descarte de pestaña de Android. Props:
+  // form ('moment'|'group'|'location_challenge'|'number_challenge'),
+  // has_photos (solo aplica a 'moment', que es el único con galería).
+  | 'draft_restored'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

@@ -6,6 +6,15 @@ export interface ToastOptions {
   tone?: ToastTone
   /** Milisegundos antes de auto-cerrar. 0 = persistente. */
   duration?: number
+  /**
+   * Acción secundaria del aviso (issue #718: el toast "Recuperado tu
+   * borrador" ofrece "Descartar" sin abrir un modal que interrumpa). Un solo
+   * botón, discreto, junto al de cerrar — no una fila de acciones.
+   */
+  action?: {
+    label: string
+    onClick: () => void
+  }
 }
 
 export interface ToastApi {
