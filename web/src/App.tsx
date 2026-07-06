@@ -230,8 +230,16 @@ function LoggedIn({
   // paralelo; la lectura ya exige ser miembro por RLS, por eso unimos primero.)
   if (route.challenge && route.group) {
     return (
-      <ReceptorWelcomeGate groupId={route.group} userId={user?.id}>
-        <OnboardingGate context="challenge" userId={user?.id}>
+      <ReceptorWelcomeGate
+        groupId={route.group}
+        userId={user?.id}
+        profileOnboarding={profile?.onboarding}
+      >
+        <OnboardingGate
+          context="challenge"
+          userId={user?.id}
+          profileOnboarding={profile?.onboarding}
+        >
           <GoogleMapsProvider>
             <Suspense fallback={<PlayRouteSkeleton />}>
               <PlayChallenge challengeId={route.challenge} groupId={route.group} />
@@ -249,7 +257,11 @@ function LoggedIn({
     // directo al asistente de reto clásico.
     if (route.groupAddMoment) {
       return (
-        <OnboardingGate context="add-moment" userId={user?.id}>
+        <OnboardingGate
+          context="add-moment"
+          userId={user?.id}
+          profileOnboarding={profile?.onboarding}
+        >
           <GoogleMapsProvider>
             <Suspense fallback={<UtilityRouteSkeleton />}>
               <AddMoment
@@ -277,7 +289,11 @@ function LoggedIn({
     // propio reto (#509); el enlace para compartir se ofrece desde el viaje.
     if (route.groupAddChallenge) {
       return (
-        <OnboardingGate context="create-challenge" userId={user?.id}>
+        <OnboardingGate
+          context="create-challenge"
+          userId={user?.id}
+          profileOnboarding={profile?.onboarding}
+        >
           <GoogleMapsProvider>
             <Suspense fallback={<UtilityRouteSkeleton />}>
               <CreateChallengeFlow
@@ -304,8 +320,12 @@ function LoggedIn({
     // viaje (GroupPage incrustada). Los enlaces viejos `#g=…&v=clasico` aterrizan
     // en esa pestaña (`groupView === 'marcador'`), así que no se rompe nada.
     return (
-      <ReceptorWelcomeGate groupId={groupId} userId={user?.id}>
-        <OnboardingGate context="group" userId={user?.id}>
+      <ReceptorWelcomeGate
+        groupId={groupId}
+        userId={user?.id}
+        profileOnboarding={profile?.onboarding}
+      >
+        <OnboardingGate context="group" userId={user?.id} profileOnboarding={profile?.onboarding}>
           {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos
               con Google Maps) y EditChallenge (preview Street View); por eso el
               viaje necesita el provider de Maps. */}
@@ -348,7 +368,11 @@ function LoggedIn({
     // sesión OTP verificada puede crear. La RLS `groups_insert_owner` es el candado
     // real; aquí ya no hay muro de "valida tu correo". CreateGate eliminado.
     return (
-      <OnboardingGate context="create-trip" userId={user?.id}>
+      <OnboardingGate
+        context="create-trip"
+        userId={user?.id}
+        profileOnboarding={profile?.onboarding}
+      >
         <Suspense fallback={<UtilityRouteSkeleton />}>
           <CreateGroup onBack={() => goHome()} />
         </Suspense>

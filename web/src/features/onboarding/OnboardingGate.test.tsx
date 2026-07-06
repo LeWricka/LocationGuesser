@@ -38,3 +38,36 @@ describe('OnboardingGate — analítica de recepción (#330)', () => {
     expect(trackMock).not.toHaveBeenCalledWith('receptor_welcome_shown', expect.anything())
   })
 })
+
+// Arreglo de RAÍZ (issue #717): el perfil de la cuenta gatea el slideshow,
+// aunque el localStorage de este navegador esté vacío.
+describe('OnboardingGate — perfil como fuente de la verdad (#717)', () => {
+  beforeEach(() => {
+    trackMock.mockClear()
+    localStorage.clear()
+  })
+
+  test('perfil visto para este contexto → no muestra el slideshow ni emite onboarding_started', () => {
+    const { queryByTestId } = render(
+      <OnboardingGate
+        context="group"
+        userId="u1"
+        profileOnboarding={{ group: '2026-07-01T00:00:00.000Z' }}
+      >
+        <div>contenido</div>
+      </OnboardingGate>,
+    )
+    expect(queryByTestId('slideshow')).toBeNull()
+    expect(trackMock).not.toHaveBeenCalled()
+  })
+
+  test('perfil limpio ({}) → sí muestra el slideshow', () => {
+    const { getByTestId } = render(
+      <OnboardingGate context="group" userId="u1" profileOnboarding={{}}>
+        <div>contenido</div>
+      </OnboardingGate>,
+    )
+    expect(getByTestId('slideshow')).toBeInTheDocument()
+    expect(trackMock).toHaveBeenCalledWith('onboarding_started', { context: 'group' })
+  })
+})

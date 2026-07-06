@@ -9,32 +9,42 @@
 // ve un "te invitan" y no parpadea un tutorial mientras resolvemos.
 
 import { useEffect, type ReactNode } from 'react'
-import { markOnboardingSeen } from '../../lib/onboardingFlags'
+import { persistOnboardingSeen } from '../../lib/profile'
+import type { ProfileOnboarding } from '../../lib/database.types'
 import { OnboardingGate } from './OnboardingGate'
 import { useReceptorWelcome } from './useReceptorWelcome'
 
 interface Props {
   groupId: string | undefined
   userId: string | null | undefined
+  /** Mapa de tutoriales ya vistos EN LA CUENTA (#717); ver OnboardingGate. */
+  profileOnboarding?: ProfileOnboarding | null
   children: ReactNode
 }
 
-export function ReceptorWelcomeGate({ groupId, userId, children }: Props) {
+export function ReceptorWelcomeGate({ groupId, userId, profileOnboarding, children }: Props) {
   const { show, tripName } = useReceptorWelcome(groupId ?? undefined, userId ?? undefined)
 
   // Para un receptor, la bienvenida HACE de intro del viaje: damos por visto el
   // tutorial genérico `group` para no encadenar dos slideshows ("te invitan" y
-  // luego "qué es Tabide"). La parte de cómo jugar (`challenge`) sí se mantiene
-  // aparte, porque es accionable y complementa el "por qué".
+  // luego "qué es Momentu"). La parte de cómo jugar (`challenge`) sí se mantiene
+  // aparte, porque es accionable y complementa el "por qué". Se persiste igual
+  // que cualquier otro "visto" (#717): caché local + intento en el perfil.
   useEffect(() => {
-    if (show) markOnboardingSeen('group', userId)
-  }, [show, userId])
+    if (show) void persistOnboardingSeen('group', userId, profileOnboarding)
+  }, [show, userId, profileOnboarding])
 
   // Hasta confirmar que es un receptor (no el dueño), pintamos solo el contenido.
   if (!show) return <>{children}</>
 
   return (
-    <OnboardingGate context="welcome" userId={userId} slideParams={{ tripName }} groupId={groupId}>
+    <OnboardingGate
+      context="welcome"
+      userId={userId}
+      profileOnboarding={profileOnboarding}
+      slideParams={{ tripName }}
+      groupId={groupId}
+    >
       {children}
     </OnboardingGate>
   )

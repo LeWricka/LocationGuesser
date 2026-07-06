@@ -1,0 +1,32 @@
+-- Onboarding "visto una sola vez" — arreglo de RAÍZ (issue #717, continúa #625/#630).
+--
+-- DIAGNÓSTICO de la repetición ("los tutoriales saltan de nuevo"): el flag
+-- "ya visto" vivía SOLO en localStorage (web/src/lib/onboardingFlags.ts), por
+-- usuario. Dos causas ya identificadas en #625/#630, ninguna arreglable desde
+-- el cliente:
+--   1. El navegador embebido de WhatsApp (sobre todo iOS) — el canal de
+--      distribución real del producto — puede abrir cada enlace compartido en
+--      un contexto de almacenamiento EFÍMERO: ni la sesión de Supabase ni el
+--      flag de onboarding (ambos en localStorage) sobreviven entre aperturas
+--      separadas del mismo enlace.
+--   2. Un reset one-off de la migración de sesiones anónimas heredadas (#514):
+--      al crear la cuenta permanente el user.id cambia y el flag antiguo
+--      (indexado por el id viejo) deja de casar.
+-- En ambos casos el storage del NAVEGADOR es el que falla, no la clave. La
+-- única solución de fondo es que el "visto" viaje con la CUENTA, en servidor.
+--
+-- Solución: columna jsonb en profiles — un mapa { "<contexto>": "<iso>" } con
+-- una entrada por tutorial (group, challenge, welcome, create-trip,
+-- add-moment, create-challenge…). Aditiva y sin migración de datos: los
+-- perfiles existentes arrancan en '{}' y su localStorage sigue cubriendo su
+-- "ya visto" anterior — el cliente combina ambas fuentes (ver
+-- web/src/lib/onboardingFlags.ts), así que no revienta un tutorial ya visto
+-- para nadie. Sumar un tutorial nuevo es una clave más del mismo mapa: no hace
+-- falta otra migración.
+--
+-- RLS: sin policies nuevas. "profiles_select_authenticated" y
+-- "profiles_update_self" (migración 0004) ya cubren la tabla/fila entera — el
+-- propio usuario lee y escribe su fila, nadie más; esta columna no necesita
+-- una regla distinta a nivel de fila.
+alter table public.profiles
+  add column if not exists onboarding jsonb not null default '{}';

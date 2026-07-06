@@ -2,9 +2,10 @@
  * El "escenario" toma prestados los tokens de ESCENA (--scene-*) que ya usa el
  * resto del sistema para componer sobre fondos oscuros tipo foto/mapa (ver
  * HowItWorksImmersive, LandingShowcase): así el mini-demo lee como una pantalla
- * real. `--stage-image` la fija el TSX (varía por slide, ver slides.ts); aquí solo
- * el material: escala, marco y el velo de contraste (regla dura #537: chrome sobre
- * FOTO usa vidrio, nunca un bloque opaco a mano — el badge de abajo es vidrio). */
+ * real. `--stage-image` la fija el TSX (varía por slide, ver slides.ts) sobre la
+ * capa `.image`; aquí el resto del material: escala, marco y el velo de
+ * contraste (regla dura #537: chrome sobre FOTO usa vidrio, nunca un bloque
+ * opaco a mano — el badge de abajo es vidrio). */
 
 .stage {
   position: relative;
@@ -16,13 +17,36 @@
   margin-inline: auto;
   border-radius: var(--radius-lg);
   background-color: var(--scene-bg);
-  background-image: var(--stage-image);
-  background-size: cover;
-  background-position: center;
   box-shadow: var(--scene-shadow);
   overflow: hidden;
   /* Reserva de espacio inherente vía var(--i) para la coreografía de entrada:
      el escenario SIEMPRE es el primer bloque revelado (ver OnboardingSlideshow). */
+}
+
+/* Capa de la foto, separada del resto del escenario (issue #717, "más
+   dinámicos"): así el Ken Burns (zoom lento) anima SOLO esta capa, sin mover
+   el badge/grid/ring que se posan encima. `inset` negativo = nace un poco más
+   grande que el escenario; con `overflow: hidden` en `.stage`, el zoom nunca
+   deja ver un borde vacío. UN solo ciclo (`both`, sin `infinite`): reinicia
+   por slide porque el padre remonta con `key={index}` (OnboardingSlideshow). */
+.image {
+  position: absolute;
+  inset: -6%;
+  background-image: var(--stage-image);
+  background-size: cover;
+  background-position: center;
+  transform-origin: center;
+  animation: stage-ken-burns calc(var(--motion-duration-slower) * 16) var(--motion-ease-standard)
+    both;
+}
+
+@keyframes stage-ken-burns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.08);
+  }
 }
 
 /* Velo de contraste sobre la foto real: sin él, el badge/grid/ring del gesto se
@@ -218,8 +242,10 @@
   }
 }
 
-/* Menos movimiento: el icono queda quieto y visible, sin ecos ni entrada. */
+/* Menos movimiento: el icono queda quieto y visible, sin ecos ni entrada; la
+   foto queda estática (sin Ken Burns). */
 @media (prefers-reduced-motion: reduce) {
+  .image,
   .badge,
   .echo {
     animation: none !important;

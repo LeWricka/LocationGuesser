@@ -58,3 +58,48 @@ describe('OnboardingSlideshow — render de pasos (#625)', () => {
     expect(screen.getByRole('heading', { name: /Japón 2026/ })).toBeInTheDocument()
   })
 })
+
+// Swipe entre slides (issue #717, "más dinámicos"): además del botón.
+describe('OnboardingSlideshow — swipe entre slides (#717)', () => {
+  function swipe(panel: HTMLElement, dx: number) {
+    fireEvent.pointerDown(panel, { clientX: 200, pointerId: 1 })
+    fireEvent.pointerUp(panel, { clientX: 200 + dx, pointerId: 1 })
+  }
+
+  test('arrastrar a la izquierda avanza a la siguiente slide', () => {
+    const slides = getSlides('group')
+    render(<OnboardingSlideshow slides={slides} onSkip={vi.fn()} onComplete={vi.fn()} />)
+
+    swipe(screen.getByRole('dialog'), -80)
+    expect(screen.getByRole('heading', { name: slides[1].title })).toBeInTheDocument()
+  })
+
+  test('arrastrar a la derecha retrocede a la slide anterior', () => {
+    const slides = getSlides('group')
+    render(<OnboardingSlideshow slides={slides} onSkip={vi.fn()} onComplete={vi.fn()} />)
+
+    swipe(screen.getByRole('dialog'), -80) // primero avanzamos a la 2
+    swipe(screen.getByRole('dialog'), 80) // y volvemos a la 1
+    expect(screen.getByRole('heading', { name: slides[0].title })).toBeInTheDocument()
+  })
+
+  test('un arrastre corto (bajo el umbral) no cambia de slide', () => {
+    const slides = getSlides('group')
+    render(<OnboardingSlideshow slides={slides} onSkip={vi.fn()} onComplete={vi.fn()} />)
+
+    swipe(screen.getByRole('dialog'), -10)
+    expect(screen.getByRole('heading', { name: slides[0].title })).toBeInTheDocument()
+  })
+
+  test('arrastrar a la izquierda en la última slide completa el tutorial', () => {
+    const slides = getSlides('group')
+    const onComplete = vi.fn()
+    render(<OnboardingSlideshow slides={slides} onSkip={vi.fn()} onComplete={onComplete} />)
+
+    for (let i = 0; i < slides.length - 1; i++) {
+      fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    }
+    swipe(screen.getByRole('dialog'), -80)
+    expect(onComplete).toHaveBeenCalledTimes(1)
+  })
+})

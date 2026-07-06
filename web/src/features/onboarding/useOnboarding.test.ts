@@ -90,3 +90,33 @@ describe('useOnboarding — persistencia por usuario (#625)', () => {
     expect(guest.result.current.shouldShow).toBe(true)
   })
 })
+
+// Arreglo de RAÍZ (issue #717): el perfil de la cuenta (no solo el localStorage
+// de este navegador) es la fuente de la verdad cuando hay sesión.
+describe('useOnboarding — arreglo de raíz por perfil (#717)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  test('perfil visto + storage vacío del navegador → NO se muestra', () => {
+    const { result } = renderHook(() =>
+      useOnboarding('group', 'u1', { group: '2026-07-01T00:00:00.000Z' }),
+    )
+    expect(result.current.shouldShow).toBe(false)
+  })
+
+  test('perfil limpio ({}) → se muestra UNA vez y persiste', () => {
+    const { result } = renderHook(() => useOnboarding('group', 'u1', {}))
+    expect(result.current.shouldShow).toBe(true)
+
+    act(() => result.current.markSeen())
+    expect(result.current.shouldShow).toBe(false)
+
+    // Nuevo montaje: aunque el perfil (pasado por prop) SIGA sin la clave — p.ej.
+    // el refresco de perfil desde servidor todavía no ha llegado — la caché
+    // local YA cubre el "visto" y no vuelve a aparecer (issue #625: sin esto,
+    // reaparecería mientras el perfil no se recargase).
+    const again = renderHook(() => useOnboarding('group', 'u1', {}))
+    expect(again.result.current.shouldShow).toBe(false)
+  })
+})
