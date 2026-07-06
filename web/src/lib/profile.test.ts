@@ -1,12 +1,17 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import type { Profile } from './database.types'
 
-const calls = { from: vi.fn(), upsert: vi.fn(), select: vi.fn(), eq: vi.fn() }
+const calls = { from: vi.fn(), upsert: vi.fn(), update: vi.fn(), select: vi.fn(), eq: vi.fn() }
 let result: { data: unknown; error: unknown } = { data: null, error: null }
+let updateResult: { error: unknown } = { error: null }
 
 const builder = {
   upsert: (...a: unknown[]) => {
     calls.upsert(...a)
+    return builder
+  },
+  update: (...a: unknown[]) => {
+    calls.update(...a)
     return builder
   },
   select: (...a: unknown[]) => {
@@ -19,6 +24,10 @@ const builder = {
   },
   single: () => Promise.resolve(result),
   maybeSingle: () => Promise.resolve(result),
+  // Thenable: `.update(...).eq(...)` (persistOnboardingSeen) se resuelve
+  // directo, SIN un terminal explícito como `.select().single()` — igual que
+  // el query builder real de supabase-js, que también es awaitable a pelo.
+  then: (resolve: (v: { error: unknown }) => void) => resolve(updateResult),
 }
 
 vi.mock('./supabase', () => ({
@@ -30,18 +39,21 @@ vi.mock('./supabase', () => ({
   },
 }))
 
-import { getProfile, upsertProfile } from './profile'
+import { getProfile, upsertProfile, persistOnboardingSeen } from './profile'
 
 const sample: Profile = {
   id: 'u1',
   display_name: 'Lewis',
   avatar_url: null,
   created_at: '2026-06-19T00:00:00.000Z',
+  onboarding: {},
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
   result = { data: null, error: null }
+  updateResult = { error: null }
 })
 
 describe('getProfile', () => {
@@ -78,5 +90,32 @@ describe('upsertProfile', () => {
   test('propaga el error', async () => {
     result = { data: null, error: new Error('boom') }
     await expect(upsertProfile({ id: 'u1', displayName: 'X' })).rejects.toThrow('boom')
+  })
+})
+
+// Arreglo de raíz del onboarding repetido (issue #717): "visto" persistido EN
+// EL PERFIL, no solo en localStorage.
+describe('persistOnboardingSeen', () => {
+  test('sin userId: solo localStorage, nunca toca la BD', async () => {
+    await persistOnboardingSeen('group', undefined, null)
+    expect(calls.from).not.toHaveBeenCalled()
+    expect(localStorage.getItem('lg:onboarding:group:seen:anon')).toBe('1')
+  })
+
+  test('con userId: localStorage + merge con lo que ya traía el perfil', async () => {
+    await persistOnboardingSeen('challenge', 'u1', { group: '2026-01-01T00:00:00.000Z' })
+    expect(localStorage.getItem('lg:onboarding:challenge:seen:u1')).toBe('1')
+    expect(calls.from).toHaveBeenCalledWith('profiles')
+    expect(calls.update).toHaveBeenCalledTimes(1)
+    const [payload] = calls.update.mock.calls[0] as [{ onboarding: Record<string, string> }]
+    expect(payload.onboarding.group).toBe('2026-01-01T00:00:00.000Z')
+    expect(typeof payload.onboarding.challenge).toBe('string')
+    expect(calls.eq).toHaveBeenCalledWith('id', 'u1')
+  })
+
+  test('degradación honesta: si la BD falla, no lanza (localStorage ya quedó marcado)', async () => {
+    updateResult = { error: new Error('column "onboarding" does not exist') }
+    await expect(persistOnboardingSeen('group', 'u1', {})).resolves.toBeUndefined()
+    expect(localStorage.getItem('lg:onboarding:group:seen:u1')).toBe('1')
   })
 })

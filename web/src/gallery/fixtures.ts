@@ -42,6 +42,7 @@ export const ME: Profile = {
   display_name: 'Lewis',
   avatar_url: null,
   created_at: isoFromNow(-30 * DAY),
+  onboarding: {},
 }
 
 interface GalleryMember {
@@ -63,6 +64,7 @@ export const PROFILES: Profile[] = MEMBERS.map((m) => ({
   display_name: m.name,
   avatar_url: m.avatar,
   created_at: isoFromNow(-30 * DAY),
+  onboarding: {},
 }))
 
 // ── El viaje (grupo) ──────────────────────────────────────────────────────────

@@ -17,6 +17,17 @@ export interface GroupPrizes {
   last?: string
 }
 
+/**
+ * Registro de tutoriales de onboarding ya vistos por el usuario — fuente de la
+ * VERDAD del "visto una sola vez" (issue #717, arreglo de raíz de #625/#630):
+ * mapa `{ contexto: isoTimestamp }`, una entrada por tutorial (creador,
+ * receptor…), extensible sin más migraciones (sumar un tutorial es una clave
+ * más). Se persiste como jsonb en `profiles.onboarding` (migración 0039).
+ */
+export interface ProfileOnboarding {
+  [context: string]: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -26,18 +37,21 @@ export interface Database {
           display_name: string
           avatar_url: string | null
           created_at: string
+          onboarding: ProfileOnboarding
         }
         Insert: {
           id: string
           display_name: string
           avatar_url?: string | null
           created_at?: string
+          onboarding?: ProfileOnboarding
         }
         Update: {
           id?: string
           display_name?: string
           avatar_url?: string | null
           created_at?: string
+          onboarding?: ProfileOnboarding
         }
         Relationships: []
       }

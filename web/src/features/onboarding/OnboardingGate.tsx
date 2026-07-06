@@ -6,6 +6,7 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { track } from '../../lib/analytics'
 import type { OnboardingContext } from '../../lib/onboardingFlags'
+import type { ProfileOnboarding } from '../../lib/database.types'
 import { useOnboarding } from './useOnboarding'
 import { OnboardingSlideshow } from './OnboardingSlideshow'
 import { getSlides, type SlideParams } from './slides'
@@ -14,6 +15,13 @@ interface Props {
   context: OnboardingContext
   /** Id del usuario (de useSession). Sin él, el flag cae a una clave global. */
   userId?: string | null
+  /**
+   * Mapa de tutoriales ya vistos EN LA CUENTA (`useSession().profile.onboarding`,
+   * issue #717). Fuente de la verdad cuando hay sesión: si trae este contexto,
+   * el tutorial no se muestra aunque el localStorage de este navegador esté
+   * vacío. Ver lib/onboardingFlags.ts para el diagnóstico completo.
+   */
+  profileOnboarding?: ProfileOnboarding | null
   /** Datos para personalizar las slides (p.ej. el nombre del viaje en el welcome). */
   slideParams?: SlideParams
   /**
@@ -24,8 +32,15 @@ interface Props {
   children: ReactNode
 }
 
-export function OnboardingGate({ context, userId, slideParams, groupId, children }: Props) {
-  const { shouldShow, markSeen, skip } = useOnboarding(context, userId)
+export function OnboardingGate({
+  context,
+  userId,
+  profileOnboarding,
+  slideParams,
+  groupId,
+  children,
+}: Props) {
+  const { shouldShow, markSeen, skip } = useOnboarding(context, userId, profileOnboarding)
 
   // Emite onboarding_started una sola vez al abrirse el tutorial (no en cada
   // render mientras está visible). En el contexto `welcome` (bienvenida del
