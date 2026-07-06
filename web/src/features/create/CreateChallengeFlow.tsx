@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { CreateChallengeKindPicker } from './CreateChallengeKindPicker'
-import { CreateChallengeImmersive, type ChallengePrefill } from './CreateChallengeImmersive'
 import { CreateLocationChallenge } from './CreateLocationChallenge'
 import { CreateNumberChallenge } from './CreateNumberChallenge'
+import type { ChallengePrefill } from './challengePrefill'
 import { getChallenge, type ChallengeForPlay, type ChallengeKind } from '../../lib/challenges'
 import { signedImageUrl } from '../../lib/storage'
 import { reportError } from '../../lib/observability'
@@ -26,9 +26,14 @@ interface Props {
 }
 
 // Entrada de "crear reto": el reto es una entidad de primera clase con DOS orígenes
-// que convergen en el MISMO formulario:
-//  (a) desde un recuerdo (`fromMomentId`) → va directo al asistente de ¿Dónde estamos? con
-//      la foto y el lugar del recuerdo PRE-RELLENADOS.
+// que convergen en el MISMO formulario — el MISMO asistente, sin excepciones
+// (unificación: antes el origen recuerdo abría `CreateChallengeImmersive`, un
+// asistente aparte y más limitado — solo foto, sin las opciones del completo —
+// eliminado):
+//  (a) desde un recuerdo (`fromMomentId`) → va directo al asistente completo de
+//      ¿Dónde estamos? (`CreateLocationChallenge`) con el pin, la foto (quitable,
+//      sigue opcional) y el título del recuerdo PRE-RELLENADOS. A partir de ahí,
+//      exactamente los mismos pasos y opciones que un reto nuevo.
 //  (b) desde el FAB "Reto" (sin id) → primero el selector de TIPO (¿Dónde estamos? /
 //      ¿Adivinas?), luego el asistente propio de cada tipo, empezando vacío.
 // Atrás desde un asistente vuelve al selector (origen FAB) o sale (origen recuerdo).
@@ -104,29 +109,16 @@ function CreateChallengeFlowInner({ groupId, groupName, fromMomentId, onBack, on
     )
   }
 
-  // Origen RECUERDO (fromMomentId): el reto nace de un momento existente con foto y
-  // lugar pre-rellenados. Seguimos usando el flujo clásico (CreateChallengeImmersive)
-  // porque el lugar ya viene dado y no necesita Street View desde GPS.
-  if (fromMomentId) {
-    return (
-      <CreateChallengeImmersive
-        groupId={groupId}
-        groupName={groupName}
-        prefill={prefill ?? undefined}
-        // Origen recuerdo: atrás sale del flujo (no hay selector de tipo que recuperar).
-        onBack={onBack}
-        onCreated={onCreated}
-      />
-    )
-  }
-
-  // Origen FAB (sin recuerdo): flujo GeoGuessr puro — Street View directo desde GPS.
-  // El usuario navega hasta su sitio exacto y lanza sin pasos intermedios.
+  // Origen RECUERDO o FAB: EL MISMO asistente completo (unificación). Con
+  // `fromMomentId` va prefijado (pin, foto quitable, título); atrás sale del
+  // flujo entero (no hay selector de tipo que recuperar, ver arriba). Sin él
+  // (FAB), empieza vacío; atrás vuelve al selector de tipo.
   return (
     <CreateLocationChallenge
       groupId={groupId}
       groupName={groupName}
-      onBack={() => setKind(null)}
+      prefill={fromMomentId ? (prefill ?? undefined) : undefined}
+      onBack={fromMomentId ? onBack : () => setKind(null)}
       onCreated={onCreated}
     />
   )

@@ -681,8 +681,15 @@ export const cases: GalleryCase[] = [
     render: () => <PlayChallenge challengeId={CH_CLOSED} groupId={GROUP_ID} />,
   },
   {
+    // CH_CLOSED (cerrado, con votos de #427 — bloquea también la ubicación):
+    // el plazo tampoco se puede reabrir desde aquí — "Cerró el…" + sin chips
+    // (cerrar es otra acción; issue: editar reto — ajustar la fecha). El
+    // estado EN JUEGO (chips de duración) queda cubierto por unit tests
+    // (EditChallenge.test.tsx): los fixtures "en juego" de la galería no
+    // llevan votos, así que la ubicación aparecería editable (rama ya
+    // existente, sin relación con el plazo) — confundiría esta captura.
     id: 'editar-reto',
-    title: 'Editar reto',
+    title: 'Editar reto (cerrado, plazo bloqueado)',
     section: 'Editar',
     render: () => (
       <EditChallenge challenge={challengeForPlay(CH_CLOSED)} onBack={noop} onSaved={noop} />
