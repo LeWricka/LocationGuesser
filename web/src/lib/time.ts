@@ -50,6 +50,26 @@ export function isPast(iso: string): boolean {
   return new Date(iso).getTime() < Date.now()
 }
 
+// Fecha+hora ABSOLUTA en español, instanciada una sola vez (mismo patrón que
+// `dateFmt`/`longFmt` en MomentCard/TripWrap): coste de parseo de Intl una vez,
+// no en cada llamada.
+const DEADLINE_DATETIME_FMT = new Intl.DateTimeFormat('es-ES', {
+  day: 'numeric',
+  month: 'long',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+/**
+ * Fecha y hora ABSOLUTA de un plazo ("6 de julio, 18:30"), a diferencia de
+ * `formatDeadline` (cuenta atrás RELATIVA, "quedan 3 h"). Sirve para mostrar
+ * "Cierra el …"/"Cerró el …" al editar el plazo (issue: editar reto — ajustar
+ * la fecha), donde el dueño necesita el instante concreto, no un contador.
+ */
+export function formatDeadlineDateTime(iso: string): string {
+  return DEADLINE_DATETIME_FMT.format(new Date(iso))
+}
+
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
 
 /**

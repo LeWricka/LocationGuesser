@@ -3,12 +3,12 @@ import { MapPicker } from '../create/MapPicker'
 import { StreetViewPreview } from '../create/StreetViewPreview'
 import type { LatLng } from '../../lib/geo'
 import { countVotes, getAnswer, updateChallenge, type ChallengeForPlay } from '../../lib/challenges'
-import { deadlineFromMinutes } from '../../lib/time'
+import { deadlineFromMinutes, formatDeadlineDateTime, isPast } from '../../lib/time'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { uploadImage } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { track } from '../../lib/analytics'
-import { Compass, Lock, MapPin, Trash2 } from 'lucide-react'
+import { Clock, Compass, Lock, MapPin, Trash2 } from 'lucide-react'
 import {
   AppHeader,
   Badge,
@@ -37,18 +37,25 @@ interface Props {
   onSaved: (challenge: ChallengeForPlay) => void
 }
 
-// "Paradas" de duración: editar la duración recoloca el plazo a "ahora + duración
-// elegida" (es lo único inequívoco; recalcular contra el created_at original
-// confundiría). El valor del segmento es la cifra de minutos en texto; el valor
-// especial '' = "sin cambios" (mantenemos el plazo actual).
+// PLAZO (issue: editar reto — ajustar la fecha): las MISMAS paradas que
+// `DEADLINE_OPTIONS` de `CreateLocationChallenge` (1h/4h/Hoy/3 días), MISMA
+// gramática — relativas a AHORA, no un date-picker. Elegir una recoloca el
+// plazo a "ahora + duración elegida" (es lo único inequívoco; recalcular
+// contra el created_at original confundiría).
+//
+// Sin chip de "sin cambios": a diferencia de crear (donde SIEMPRE hay que
+// fijar un plazo), aquí el plazo YA tiene un valor — los 4 chips solo
+// aparecen tras tocar "Cambiar plazo" (mismo patrón que "Cambiar el Street
+// View" más abajo). Meter un 5º chip ahí cabía justo en el borde y desbordaba
+// a 320px (issue de overflow); el botón de revelar evita el problema Y dejar
+// clara la intención de tocar el plazo.
 const KEEP_DURATION = ''
+const DEFAULT_DURATION_VALUE = '240' // 4 h, mismo default que crear
 const DURATION_OPTIONS: SegmentedOption<string>[] = [
-  { value: KEEP_DURATION, label: 'Sin cambios' },
   { value: '60', label: '1 h' },
   { value: '240', label: '4 h' },
-  { value: '720', label: '12 h' },
-  { value: '1440', label: '24 h' },
-  { value: '2880', label: '48 h' },
+  { value: '720', label: 'Hoy' },
+  { value: '4320', label: '3 días' },
 ]
 
 // Tiempo por jugada en segundos; '' = sin límite. El control segmentado trabaja con
@@ -90,6 +97,26 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
     challenge.guess_seconds == null ? NO_GUESS_LIMIT : String(challenge.guess_seconds),
   )
   const [durationValue, setDurationValue] = useState<string>(KEEP_DURATION)
+  // ¿El reto ya cerró? Calculado UNA vez al abrir el editor (lazy initializer,
+  // mismo patrón que el `now` de `Countdown`: evita leer el reloj en cada
+  // render, regla `react-hooks/purity`). Un reto cerrado no se reabre editando
+  // el plazo — "cerrar es otra acción" (issue: editar reto — ajustar la fecha);
+  // el resto de campos (título, foto…) se pueden seguir editando igual.
+  const [isClosed] = useState(() => challenge.deadline_at != null && isPast(challenge.deadline_at))
+  // "Ahora" capturado al ELEGIR una parada (no en cada render): la vista previa
+  // del plazo resultante ("Pasará a cerrar el…") se calcula con esto, no con
+  // `Date.now()` directo en el render.
+  const [previewNowMs, setPreviewNowMs] = useState<number | null>(null)
+
+  function onChangeDuration(v: string) {
+    setDurationValue(v)
+    setPreviewNowMs(v === KEEP_DURATION ? null : Date.now())
+  }
+
+  const previewDeadlineIso =
+    previewNowMs != null && durationValue !== KEEP_DURATION
+      ? new Date(previewNowMs + Number(durationValue) * 60_000).toISOString()
+      : null
 
   // Ubicación-respuesta editable solo sin votos. Mientras no lo sepamos, bloqueamos
   // por seguridad (locked = true) para no ofrecer un campo que el guardado rechazaría.
@@ -242,6 +269,21 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
   }
 
   async function save() {
+    // Defensa: un reto cerrado no reabre por aquí (gating también en la UI, más
+    // abajo, que ya oculta los chips). "Cerrar es otra acción": no tocamos
+    // deadline_at si isClosed, pase lo que pase con durationValue.
+    const changingDuration = !isClosed && durationValue !== KEEP_DURATION
+    let newDeadlineAt: string | undefined
+    if (changingDuration) {
+      newDeadlineAt = deadlineFromMinutes(Number(durationValue))
+      // Con los chips (siempre positivos desde AHORA) esto nunca debería darse;
+      // defensa explícita igualmente, tal y como pide la regla de producto.
+      if (isPast(newDeadlineAt)) {
+        toast.show('Ese plazo ya habría pasado. Elige una duración mayor.', { tone: 'danger' })
+        return
+      }
+    }
+
     setBusy(true)
     try {
       // Foto: subimos la nueva (sin EXIF) si la hay; null si el dueño la quitó.
@@ -268,9 +310,7 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
         guessSeconds,
         photoIsHint,
         ...(imagePath !== undefined ? { imagePath } : {}),
-        ...(durationValue !== KEEP_DURATION
-          ? { deadlineAt: deadlineFromMinutes(Number(durationValue)) }
-          : {}),
+        ...(newDeadlineAt !== undefined ? { deadlineAt: newDeadlineAt } : {}),
         ...(changingAnswer
           ? {
               location: {
@@ -291,7 +331,11 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
           : {}),
       })
       setStatus(null)
-      track('challenge_edited', { group_id: challenge.group_id, challenge_id: challenge.id })
+      track('challenge_edited', {
+        group_id: challenge.group_id,
+        challenge_id: challenge.id,
+        ...(changingDuration ? { deadline_changed: true } : {}),
+      })
       onSaved(updated)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -496,16 +540,62 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
         </Field>
 
         <Field
-          label="Duración del reto"
-          hint="Elige para reabrir el plazo desde ahora; «Sin cambios» lo deja como está."
+          label="Plazo"
+          hint={
+            isClosed
+              ? 'Cerrar es otra acción: un reto cerrado no se reabre editando el plazo.'
+              : undefined
+          }
         >
           {() => (
-            <SegmentedControl
-              label="Duración del reto"
-              options={DURATION_OPTIONS}
-              value={durationValue}
-              onChange={setDurationValue}
-            />
+            <Stack gap={2}>
+              <Row gap={2} className={styles.coords}>
+                <Icon icon={Clock} size={14} />
+                <span>
+                  {challenge.deadline_at
+                    ? `${isClosed ? 'Cerró' : 'Cierra'} el ${formatDeadlineDateTime(challenge.deadline_at)}.`
+                    : 'Sin plazo.'}
+                </span>
+              </Row>
+              {!isClosed &&
+                (durationValue === KEEP_DURATION ? (
+                  // Los chips solo aparecen tras tocar esto (mismo patrón que
+                  // "Cambiar el Street View"): evita un 5º chip de "sin
+                  // cambios" que desbordaba a 320px y deja clara la intención.
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onChangeDuration(DEFAULT_DURATION_VALUE)}
+                  >
+                    <Icon icon={Clock} size={16} />
+                    Cambiar plazo
+                  </Button>
+                ) : (
+                  <>
+                    <SegmentedControl
+                      label="Plazo del reto"
+                      options={DURATION_OPTIONS}
+                      value={durationValue}
+                      onChange={onChangeDuration}
+                    />
+                    {previewDeadlineIso && (
+                      <Row gap={2} className={styles.coords}>
+                        <Icon icon={Clock} size={14} />
+                        <span>
+                          Pasará a cerrar el {formatDeadlineDateTime(previewDeadlineIso)}.
+                        </span>
+                      </Row>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onChangeDuration(KEEP_DURATION)}
+                    >
+                      Deshacer cambio de plazo
+                    </Button>
+                  </>
+                ))}
+            </Stack>
           )}
         </Field>
 
