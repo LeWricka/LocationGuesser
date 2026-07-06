@@ -191,9 +191,12 @@ describe('CreateNumberChallenge — borrador persistente (#718)', () => {
     unmount()
 
     renderCreate(groupId)
-    expect(await screen.findByLabelText('Nombre del reto')).toHaveValue('La cuenta de la cena')
+    // El toast confirma que la restauración ASÍNCRONA terminó — solo entonces es
+    // seguro afirmar los valores (afirmarlos antes era una carrera: verde en
+    // local, rojo en CI). Mismo orden que los tests de AddMoment.
+    await screen.findByText(/recuperado tu borrador/i)
+    expect(screen.getByLabelText('Nombre del reto')).toHaveValue('La cuenta de la cena')
     expect(screen.getByLabelText('Tu pregunta')).toHaveValue('¿Cuánto costó?')
-    expect(screen.getByText(/recuperado tu borrador/i)).toBeInTheDocument()
     expect(trackMock).toHaveBeenCalledWith('draft_restored', {
       form: 'number_challenge',
       has_photos: false,

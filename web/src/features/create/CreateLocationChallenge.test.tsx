@@ -389,7 +389,7 @@ describe('CreateLocationChallenge — borrador persistente (#718)', () => {
       expect(findPanoramaMock).toHaveBeenCalledWith(41.38, 2.17, expect.any(Number)),
     )
     expect(await screen.findByTestId('sv-preview')).toBeInTheDocument()
-    expect(screen.getByText(/recuperado tu borrador/i)).toBeInTheDocument()
+    expect(await screen.findByText(/recuperado tu borrador/i)).toBeInTheDocument()
     expect(trackMock).toHaveBeenCalledWith('draft_restored', {
       form: 'location_challenge',
       has_photos: false,
