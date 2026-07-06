@@ -7,6 +7,7 @@ import {
   fotosGroupHash,
   addMomentHash,
   addChallengeHash,
+  promoteChallengeHash,
   ownerInviteHash,
   stripOwnerInviteToken,
 } from './route'
@@ -195,6 +196,21 @@ describe('marcadorGroupHash / classicGroupHash / addMomentHash', () => {
     const r = parseHash(addChallengeHash('abc123', 'm-1'))
     expect(r.groupAddChallenge).toBe(true)
     expect(r.groupChallengeFrom).toBe('m-1')
+  })
+
+  test('promoteChallengeHash abre el asistente en modo promoción (issue #723)', () => {
+    expect(promoteChallengeHash('abc123', 'm-1')).toBe('#g=abc123&add=reto&promote=m-1')
+    const r = parseHash(promoteChallengeHash('abc123', 'm-1'))
+    expect(r.group).toBe('abc123')
+    expect(r.groupAddChallenge).toBe(true)
+    expect(r.groupChallengePromote).toBe('m-1')
+    expect(r.groupChallengeFrom).toBeUndefined()
+  })
+
+  test('si coexisten promote y from, manda promote (no se duplica el recuerdo)', () => {
+    const r = parseHash('#g=abc123&add=reto&promote=m-1&from=m-2')
+    expect(r.groupChallengePromote).toBe('m-1')
+    expect(r.groupChallengeFrom).toBeUndefined()
   })
 })
 

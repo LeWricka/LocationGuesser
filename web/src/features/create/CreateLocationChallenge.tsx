@@ -4,7 +4,7 @@ import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
 import { PhotoDropzone } from './PhotoDropzone'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
-import { createChallenge, type ChallengeForPlay } from '../../lib/challenges'
+import { createChallenge, promoteToChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes } from '../../lib/time'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { uploadImage } from '../../lib/storage'
@@ -51,6 +51,15 @@ interface Props {
    * prefill manda siempre sobre un draft anterior.
    */
   prefill?: ChallengePrefill
+  /**
+   * Modo PROMOCIÓN (issue #723): id de un recuerdo YA guardado que se convierte
+   * en reto. El asistente es exactamente el mismo (con `prefill` del recuerdo),
+   * pero al lanzar NO crea un reto nuevo — PROMOCIONA esa fila
+   * (`promoteToChallenge`): el momento conserva su identidad (mismo
+   * `challengeId`), no se duplica. También manda sobre el borrador persistente
+   * (aunque el prefill fallara al cargar): promocionar trae una intención clara.
+   */
+  promoteMomentId?: string
   /**
    * SOLO galería/tests (issue #592): siembra el pin y el resultado de la
    * búsqueda de panorama YA RESUELTOS (sin red ni SDK de Maps), para capturas
@@ -143,6 +152,7 @@ export function CreateLocationChallenge({
   onBack,
   onCreated,
   prefill,
+  promoteMomentId,
   initialState,
 }: Props) {
   const [step, setStep] = useState<Step>(initialState?.step ?? 'sitio')
@@ -285,14 +295,17 @@ export function CreateLocationChallenge({
   }, [])
 
   // BORRADOR PERSISTENTE (issue #718). Se salta por completo con `initialState`
-  // (galería/tests) y con `prefill` (recuerdo de origen): el prefill MANDA
-  // siempre sobre un draft anterior de este viaje (no lo pisa ni lo restaura) —
-  // el dueño ya trae una intención clara (este recuerdo), no un formulario a
-  // medias. `restored` arranca ya cumplido en ambos casos: no hay nada que
-  // esperar antes de dejar que el autosave (más abajo) empiece a guardar.
-  const [restored, setRestored] = useState(initialState != null || prefill != null)
+  // (galería/tests), con `prefill` (recuerdo de origen) y en modo PROMOCIÓN
+  // (`promoteMomentId`, issue #723 — aunque su prefill fallara al cargar): el
+  // prefill/la promoción MANDAN siempre sobre un draft anterior de este viaje
+  // (no lo pisan ni lo restauran) — el dueño ya trae una intención clara (este
+  // recuerdo), no un formulario a medias. `restored` arranca ya cumplido en esos
+  // casos: no hay nada que esperar antes de dejar que el autosave (más abajo)
+  // empiece a guardar.
+  const skipDraft = initialState != null || prefill != null || promoteMomentId != null
+  const [restored, setRestored] = useState(skipDraft)
   useEffect(() => {
-    if (initialState || prefill) return
+    if (skipDraft) return
     let cancelled = false
     void loadDraft<LocationChallengeDraft>(draftKey(groupId)).then((draft) => {
       if (cancelled) return
@@ -358,10 +371,14 @@ export function CreateLocationChallenge({
         : null,
     [pickedPoint, deadlineIndex, guessIndex, timeScoring, draftPhoto],
   )
+  // Con `skipDraft` (prefill/promoción/galería) tampoco SE GUARDA borrador: en
+  // esos modos nunca se restauraría (el prefill manda) y, peor, se colaría en el
+  // draft del flujo NORMAL de este viaje — el siguiente reto en blanco del FAB
+  // "Reto" restauraría los datos del recuerdo convertido (fuga entre modos).
   useDraftAutosave(
     draftSnapshot ? draftKey(groupId) : null,
     draftSnapshot,
-    restored && draftSnapshot != null,
+    restored && draftSnapshot != null && !skipDraft,
   )
 
   const hasPano = panoState.kind === 'ready'
@@ -443,12 +460,11 @@ export function CreateLocationChallenge({
         : groupName
           ? `¿Dónde estamos? · ${groupName}`
           : '¿Dónde estamos?'
-      const { challenge } = await createChallenge({
-        title,
+      // Los ajustes del reto son idénticos en ambos modos: mismo asistente,
+      // mismos campos. Cambia solo el VERBO al lanzar (crear vs promocionar).
+      const settings = {
         lat: pano.lat,
         lng: pano.lng,
-        createdBy: user.id,
-        groupId,
         svPanoId: pano.panoId,
         svHeading: pov.heading,
         svPitch: pov.pitch,
@@ -457,7 +473,6 @@ export function CreateLocationChallenge({
         // La velocidad puntúa (issue #628): inerte sin límite ('Libre'), así que
         // se manda tal cual sin condicionar aquí (submit_vote ya lo filtra).
         timeScoring,
-        imagePath,
         // Decisión issue #595: sin toggle nuevo, se mantiene el comportamiento
         // MÁS SIMPLE ya existente en el resto de flujos de crear (default de
         // `createChallenge`/`CreateNumberChallenge`) — con foto, se enseña
@@ -465,23 +480,49 @@ export function CreateLocationChallenge({
         // `PlayChallenge` ya sabe pintarla así (hintPhotoUrl) sin cambios ahí.
         photoIsHint: true,
         // Ciudad como escala default (el GeoGuessr de la calle pide precisión de zona).
-        scoreScale: 'ciudad',
-      })
+        scoreScale: 'ciudad' as const,
+      }
+
+      let challenge: ChallengeForPlay
+      if (promoteMomentId) {
+        // Modo PROMOCIÓN (issue #723): el recuerdo SE CONVIERTE (un UPDATE sobre
+        // su propia fila, mismo challengeId — no se duplica). La respuesta la
+        // espeja el trigger `sync_challenge_answer` (0022) a challenge_answers;
+        // aquí nunca se lee de vuelta (RETURNING sin lat/lng). Foto: `undefined`
+        // = conservar la del recuerdo tal cual; `null` = el dueño la quitó en el
+        // asistente; string = nueva foto ya subida.
+        challenge = await promoteToChallenge(promoteMomentId, {
+          ...settings,
+          title,
+          imagePath: photoFile ? imagePath : reusesPrefilledPhoto ? undefined : null,
+        })
+      } else {
+        const created = await createChallenge({
+          ...settings,
+          title,
+          createdBy: user.id,
+          groupId,
+          imagePath,
+        })
+        challenge = created.challenge
+      }
       setStatus(null)
       // Reto lanzado con éxito: el borrador ya cumplió su función (issue #718).
       void clearDraft(draftKey(groupId))
       track('challenge_created', {
         group_id: groupId,
         challenge_id: challenge.id,
-        has_photo: Boolean(imagePath),
+        has_photo: Boolean(challenge.image_path),
         has_streetview: true,
         guess_seconds: GUESS_OPTIONS[guessIndex].value,
         time_scoring: timeScoring,
-        photo_is_hint: imagePath ? true : null,
+        photo_is_hint: challenge.image_path ? true : null,
         duration_hours: DEADLINE_OPTIONS[deadlineIndex].minutes / 60,
         difficulty: 'streetview',
         score_scale: 'ciudad',
         location_source: 'map_pick',
+        // Promoción de un recuerdo existente (issue #723) vs reto nuevo.
+        promoted_from_moment: Boolean(promoteMomentId),
       })
       setCelebrating(true)
       window.setTimeout(() => {

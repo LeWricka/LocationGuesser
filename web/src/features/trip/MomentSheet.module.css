@@ -641,57 +641,9 @@
   margin-top: var(--space-1);
 }
 
-/* ---- Convertir en reto (sub-flujo del dueño sobre un recuerdo) ---- */
-.promote {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-}
-.promoteHead {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.promoteTitle {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text);
-}
-.promoteHint {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-.promoteField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.promoteLabel {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-}
-.promoteWarn {
-  font-size: var(--font-size-sm);
-  color: var(--color-danger);
-}
-.promoteSlider {
-  width: 100%;
-  accent-color: var(--color-accent);
-}
-.promoteSlider:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 3px;
-}
-.promoteOptions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
+/* "Convertir en reto" YA NO es un sub-flujo aquí (issue #723): el botón navega
+   al asistente completo de crear reto en modo promoción. Las reglas `.promote*`
+   del formulario inline (mapa + slider) se retiraron con él. */
 
 /* Editar el recuerdo (título, fecha, lugar, descripción) YA NO vive aquí: es un
    formulario de PAPEL propio (`EditMomentForm`, issue #571), no un sub-estado de

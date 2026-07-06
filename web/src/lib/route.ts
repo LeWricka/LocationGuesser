@@ -50,6 +50,15 @@ export interface Route {
    */
   groupChallengeFrom?: string
   /**
+   * PROMOCIÓN de un recuerdo YA guardado a reto (`#g=…&add=reto&promote=<momentId>`,
+   * issue #723): abre el MISMO asistente completo que `from=`, pre-rellenado igual
+   * (pin, foto, título), pero al lanzar NO crea un reto nuevo — PROMOCIONA ese
+   * recuerdo (`promoteToChallenge`, mismo `challengeId`; el momento se convierte,
+   * no se duplica). Es la entrada del botón "Convertir en reto" de la hoja del
+   * momento. Solo se lee junto a `add=reto`; si coexiste con `from`, manda `promote`.
+   */
+  groupChallengePromote?: string
+  /**
    * Token de un enlace de CO-DUEÑO (`#g=…&adm=<token>`, issue #707): en vez del
    * alta normal de miembro, `useDeepLinkJoin` canjea este token
    * (`redeemOwnerInvite`) para ascender directo a co-dueño. Un solo uso; si el
@@ -112,10 +121,18 @@ export function parseHash(hash: string = window.location.hash): Route {
   // Flujo INMERSIVO de crear reto (`#g=…&add=reto`): la entrada del FAB "Reto".
   if (params.get('add')?.trim() === 'reto') {
     route.groupAddChallenge = true
-    // Origen del reto: si nace de un recuerdo, `from` trae su id para pre-rellenar
-    // foto y lugar. Solo tiene sentido junto a `add=reto`.
-    const from = params.get('from')?.trim()
-    if (from) route.groupChallengeFrom = from
+    // Promoción de un recuerdo YA guardado (issue #723): `promote` trae su id.
+    // Manda sobre `from` (no deberían coexistir; si lo hacen, promocionar es la
+    // intención más específica y evita duplicar el recuerdo).
+    const promote = params.get('promote')?.trim()
+    if (promote) {
+      route.groupChallengePromote = promote
+    } else {
+      // Origen del reto: si nace de un recuerdo NUEVO (desde "Recuerdo guardado"),
+      // `from` trae su id para pre-rellenar foto y lugar.
+      const from = params.get('from')?.trim()
+      if (from) route.groupChallengeFrom = from
+    }
   }
 
   // Enlace de co-dueño (`#g=…&adm=<token>`, issue #707): solo tiene sentido
@@ -179,6 +196,17 @@ export function addMomentHash(groupId: string): string {
 export function addChallengeHash(groupId: string, fromMomentId?: string): string {
   const base = `#g=${encodeURIComponent(groupId)}&add=reto`
   return fromMomentId ? `${base}&from=${encodeURIComponent(fromMomentId)}` : base
+}
+
+/**
+ * Hash de PROMOCIONAR un recuerdo ya guardado a reto (`#g=…&add=reto&promote=<id>`,
+ * issue #723). Es la entrada del botón "Convertir en reto" de la hoja del momento:
+ * abre el mismo asistente completo que `addChallengeHash(g, from)`, pre-rellenado
+ * igual, pero al lanzar PROMOCIONA ese recuerdo (mismo `challengeId`) en vez de
+ * crear un reto nuevo.
+ */
+export function promoteChallengeHash(groupId: string, momentId: string): string {
+  return `#g=${encodeURIComponent(groupId)}&add=reto&promote=${encodeURIComponent(momentId)}`
 }
 
 /**

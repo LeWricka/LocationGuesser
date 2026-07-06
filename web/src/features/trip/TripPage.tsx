@@ -19,7 +19,7 @@ import { useSession } from '../../lib/session-context'
 import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
-import { marcadorGroupHash } from '../../lib/route'
+import { marcadorGroupHash, promoteChallengeHash } from '../../lib/route'
 import type { Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
@@ -731,8 +731,9 @@ export function TripPage({
       </BottomSheet>
 
       {/* Hoja de detalle del momento: descripción editable + (en un recuerdo del
-          dueño) "Convertir en reto". Al promover, refrescamos el viaje para que el
-          momento aparezca ya como reto en el mapa y el carrusel. */}
+          dueño) "Convertir en reto", que NAVEGA al asistente completo de crear reto
+          en modo promoción (issue #723) — al volver, TripPage remonta con datos
+          frescos y el momento aparece ya como reto en el mapa y el carrusel. */}
       <MomentSheet
         moment={openMoment}
         canEdit={canCreate}
@@ -754,7 +755,16 @@ export function TripPage({
           setSection('marcador')
           location.hash = marcadorGroupHash(groupId)
         }}
-        onPromoted={() => void refresh()}
+        // "Convertir en reto" (issue #723): al asistente completo en modo promoción
+        // (`&add=reto&promote=<id>`), con el pin/foto/título del recuerdo prefijados.
+        onPromote={
+          openMoment
+            ? () => {
+                setOpenMoment(null)
+                location.hash = promoteChallengeHash(groupId, openMoment.challengeId)
+              }
+            : undefined
+        }
         onEdited={() => void refresh()}
         onEditChallenge={(challengeId) => void openChallengeEditor(challengeId)}
         onDeleted={() => void refresh()}
