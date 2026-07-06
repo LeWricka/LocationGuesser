@@ -10,6 +10,11 @@
 // producto de la landing — aquí compacto) para que lea como una demo del producto,
 // no como un simple icono decorativo.
 //
+// Ken Burns MUY sutil (issue #717, "más dinámicos"): la foto de fondo vive en su
+// propia capa (`.image`, ver el módulo CSS) para poder animar solo su escala sin
+// mover el badge/grid/ring que se posan encima. Un solo ciclo lento por slide
+// (reinicia porque el padre remonta con `key={index}`, ver OnboardingSlideshow).
+//
 // Toda la animación es de ENTRADA (un ciclo, o como mucho un puñado de pasadas
 // acotadas para el eco del pin/timer) — nunca decorativa en bucle. Se apaga entera
 // con prefers-reduced-motion (ver el módulo CSS).
@@ -28,18 +33,16 @@ interface Props {
 
 // La imagen llega por CSS custom property (no `style.backgroundImage` directo):
 // así el módulo CSS sigue siendo la única fuente de verdad del resto de capas
-// (escala, posición, velo de contraste) y el TSX solo aporta el dato que varía.
-function stageStyle(image: string): CSSProperties {
+// (escala, posición, velo de contraste, Ken Burns) y el TSX solo aporta el dato
+// que varía.
+function imageStyle(image: string): CSSProperties {
   return { '--stage-image': `url('${image}')` } as CSSProperties
 }
 
 export function OnboardingVisual({ visual, icon, image }: Props) {
   return (
-    <div
-      className={[styles.stage, styles[`stage-${visual}`]].join(' ')}
-      style={stageStyle(image)}
-      aria-hidden="true"
-    >
+    <div className={[styles.stage, styles[`stage-${visual}`]].join(' ')} aria-hidden="true">
+      <span className={styles.image} style={imageStyle(image)} />
       {/* El escenario del pin dibuja una retícula de mapa detrás del icono. */}
       {visual === 'pin' && <span className={styles.grid} />}
       {/* El escenario del timer dibuja el aro de cuenta atrás detrás del icono. */}

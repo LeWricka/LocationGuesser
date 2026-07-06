@@ -65,7 +65,7 @@ export interface SlideParams {
   tripName?: string
 }
 
-// Tutorial del viaje (issue #625): los 3 GESTOS clave de Tabide, ni uno más.
+// Tutorial del viaje (issue #625): los 3 GESTOS clave de Momentu, ni uno más.
 // Sustituye a la versión de 4 slides (más genérica); el dueño pidió recortar al
 // hueso: compartir un momento, invitar al grupo, jugar un reto.
 const GROUP_SLIDES: OnboardingSlide[] = [

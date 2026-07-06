@@ -12,8 +12,15 @@
 // bloque cambia con `index` (remonta el DOM, no solo actualiza el texto). Saltar
 // queda FUERA de la coreografía a propósito: siempre visible e interactuable
 // desde el primer frame.
+//
+// Swipe entre slides (issue #717, "más dinámicos"): además del botón, se puede
+// arrastrar el panel horizontalmente — mismo patrón Pointer Events que el asa
+// del flujo inmersivo (CreateChallengeImmersive/ImmersiveSheet): capturamos el
+// puntero al bajar y decidimos en el "up" según el desplazamiento total, sin
+// arrastre en vivo (mantiene el gesto predecible: o pasa de slide, o no pasa
+// nada, nunca un estado intermedio a medio camino).
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import { Button } from '../../ui'
 import type { OnboardingSlide } from './slides'
 import { OnboardingVisual } from './OnboardingVisual'
@@ -27,6 +34,11 @@ interface Props {
   onComplete: () => void
 }
 
+// Umbral (px) de arrastre horizontal para cambiar de slide (mismo criterio que
+// DRAG_THRESHOLD de ImmersiveSheet: ni tan bajo que un tap tembloroso navegue
+// solo, ni tan alto que el gesto se sienta duro).
+const SWIPE_THRESHOLD = 44
+
 // Índice de la coreografía → variable CSS `--i` que consume el retraso escalonado
 // (ver `.reveal` en el módulo CSS). Tipado con un cast puntual: las custom
 // properties no forman parte de CSSProperties.
@@ -37,6 +49,7 @@ function revealStyle(i: number): CSSProperties {
 export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
   const [index, setIndex] = useState(0)
   const panelRef = useRef<HTMLDivElement>(null)
+  const startX = useRef<number | null>(null)
 
   const isLast = index === slides.length - 1
   const slide = slides[index]
@@ -60,6 +73,22 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
     if (isLast) onComplete()
     else setIndex((i) => i + 1)
   }
+  const prev = () => setIndex((i) => Math.max(0, i - 1))
+
+  function onPointerDown(e: PointerEvent<HTMLDivElement>) {
+    startX.current = e.clientX
+    // guarda con feature-check: jsdom (tests) no implementa setPointerCapture.
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+
+  function onPointerUp(e: PointerEvent<HTMLDivElement>) {
+    if (startX.current === null) return
+    const dx = e.clientX - startX.current
+    startX.current = null
+    // Arrastre a la izquierda → siguiente; a la derecha → anterior.
+    if (dx <= -SWIPE_THRESHOLD) next()
+    else if (dx >= SWIPE_THRESHOLD) prev()
+  }
 
   return (
     <div className={styles.overlay} onClick={onSkip}>
@@ -71,6 +100,8 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
         tabIndex={-1}
         ref={panelRef}
         onClick={(e) => e.stopPropagation()}
+        onPointerDown={onPointerDown}
+        onPointerUp={onPointerUp}
       >
         <button type="button" className={[styles.skip, 'lg-press'].join(' ')} onClick={onSkip}>
           Saltar
@@ -78,7 +109,8 @@ export function OnboardingSlideshow({ slides, onSkip, onComplete }: Props) {
 
         {/* `key={index}`: cada paso es un montaje NUEVO, así la coreografía de
             entrada (escenario → titular → cuerpo → puntos → CTA) se repite en
-            cada paso, no solo al abrir el tutorial. */}
+            cada paso, no solo al abrir el tutorial — y el Ken Burns de la foto
+            (OnboardingVisual) reinicia también por slide. */}
         <div className={styles.slide} key={index}>
           <div className={styles.reveal} style={revealStyle(0)}>
             <OnboardingVisual visual={slide.visual} icon={slide.icon} image={slide.image} />
