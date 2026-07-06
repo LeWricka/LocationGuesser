@@ -25,6 +25,7 @@ import { AppHeader, SegmentedControl, Spinner, useToast } from '../../ui'
 import { IconGps } from '../../ui/icons/IconGps'
 import { IconCandado } from '../../ui/icons/IconCandado'
 import { IconPin } from '../../ui/icons/IconPin'
+import type { ChallengePrefill } from './challengePrefill'
 import styles from './CreateLocationChallenge.module.css'
 
 // Los DOS pasos del flujo (issue #592, antes #585): el mapa manda en el paso de
@@ -42,6 +43,14 @@ interface Props {
   onBack: () => void
   /** Reto creado: el viaje vuelve a la lista y ofrece su enlace. */
   onCreated: (challenge: ChallengeForPlay) => void
+  /**
+   * Pre-relleno cuando el reto NACE de un recuerdo guardado (unificación de los
+   * dos asistentes que antes divergían): siembra el pin, la foto (quitable,
+   * sigue opcional) y el título sugerido. Sin esto, el flujo empieza vacío
+   * (origen FAB "Reto"). Se salta el borrador persistente (ver más abajo): el
+   * prefill manda siempre sobre un draft anterior.
+   */
+  prefill?: ChallengePrefill
   /**
    * SOLO galería/tests (issue #592): siembra el pin y el resultado de la
    * búsqueda de panorama YA RESUELTOS (sin red ni SDK de Maps), para capturas
@@ -133,16 +142,21 @@ export function CreateLocationChallenge({
   groupName,
   onBack,
   onCreated,
+  prefill,
   initialState,
 }: Props) {
   const [step, setStep] = useState<Step>(initialState?.step ?? 'sitio')
   // Dirección del cambio de paso: avanzar entra desde la derecha, volver desde
   // la izquierda — mismo criterio que #531/#539.
   const [direction, setDirection] = useState<'forward' | 'backward'>('forward')
-  // Punto elegido por el usuario en el mapa (pin).
-  const [pickedPoint, setPickedPoint] = useState<LatLng | null>(initialState?.point ?? null)
-  // flyTo: coordenadas a las que debe volar el mapa (GPS o nada).
-  const [flyTo, setFlyTo] = useState<LatLng | null>(null)
+  // Punto elegido por el usuario en el mapa (pin). Con recuerdo de origen, arranca
+  // ya puesto en su lugar (si lo tenía) — el dueño puede ajustarlo igual que uno
+  // marcado a mano.
+  const [pickedPoint, setPickedPoint] = useState<LatLng | null>(
+    initialState?.point ?? prefill?.point ?? null,
+  )
+  // flyTo: coordenadas a las que debe volar el mapa (GPS, recuerdo de origen o nada).
+  const [flyTo, setFlyTo] = useState<LatLng | null>(prefill?.point ?? null)
 
   // Estado de la búsqueda de panorama.
   const [panoState, setPanoState] = useState<PanoState>(() => {
@@ -168,7 +182,12 @@ export function CreateLocationChallenge({
   // paso 1) — solo se comprime y se le estripa el EXIF al subir, misma tubería
   // que el resto de flujos (lib/storage).
   const [photoFile, setPhotoFile] = useState<File | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  // Con recuerdo de origen, arranca con SU foto de vista previa (URL firmada,
+  // no `blob:`) — el dueño puede quitarla igual (sigue siendo opcional).
+  const [photoPreview, setPhotoPreview] = useState<string | null>(prefill?.photoUrl ?? null)
+  // Foto YA SUBIDA del recuerdo de origen (path en Storage): si el dueño no la
+  // quita ni elige otra, se REUTILIZA tal cual al lanzar (no se vuelve a subir).
+  const [prefilledImagePath] = useState<string | null>(prefill?.imagePath ?? null)
 
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<string | null>(null)
@@ -227,27 +246,53 @@ export function CreateLocationChallenge({
   }, [])
 
   // Limpia el object URL de la foto al desmontar o al cambiarla (no fugar memoria).
+  // Solo revocamos los `blob:` que creamos nosotros: la URL firmada del recuerdo
+  // de origen (https) no es revocable y no la creamos con `createObjectURL`.
   useEffect(() => {
     return () => {
-      if (photoPreview) URL.revokeObjectURL(photoPreview)
+      if (photoPreview?.startsWith('blob:')) URL.revokeObjectURL(photoPreview)
     }
   }, [photoPreview])
 
   function pickPhoto(file: File | null) {
     setPhotoPreview((prev) => {
-      if (prev) URL.revokeObjectURL(prev)
+      if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev)
       return file ? URL.createObjectURL(file) : null
     })
     setPhotoFile(file)
   }
 
-  // BORRADOR PERSISTENTE (issue #718). Se salta por completo con
-  // `initialState` (galería/tests, capturas deterministas): un draft real
-  // interferiría con esos estados sembrados a mano. `restored` desarma el
-  // autosave hasta que este intento de restaurar termine.
-  const [restored, setRestored] = useState(initialState != null)
+  // ¿Se reutiliza la foto YA SUBIDA del recuerdo de origen? Solo mientras el
+  // dueño no elija otra ni la quite (`pickPhoto(null)` la descarta igual que a
+  // una nueva). Si es así, `save()` NO vuelve a subirla.
+  const reusesPrefilledPhoto =
+    prefilledImagePath != null && photoFile == null && photoPreview != null
+
+  // Al nacer de un recuerdo con lugar, lanzamos YA la búsqueda de Street View
+  // desde su punto (igual que si el dueño lo hubiera tocado a mano): sin esto,
+  // el pin aparecería puesto pero la tarjeta SV se quedaría en 'idle' hasta que
+  // alguien tocara el mapa. Se salta con `initialState` (galería/tests).
   useEffect(() => {
-    if (initialState) return
+    if (initialState || !prefill?.point) return
+    // `pickedPoint` YA arranca en `prefill.point` (estado inicial): el único
+    // efecto real de este `setPickedPoint` (dentro de `handlePick`) es
+    // re-asignar el mismo valor; lo que de verdad hace falta es lanzar
+    // `findPanorama`, igual que la restauración del borrador de más abajo.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void handlePick(prefill.point)
+    // Solo al montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // BORRADOR PERSISTENTE (issue #718). Se salta por completo con `initialState`
+  // (galería/tests) y con `prefill` (recuerdo de origen): el prefill MANDA
+  // siempre sobre un draft anterior de este viaje (no lo pisa ni lo restaura) —
+  // el dueño ya trae una intención clara (este recuerdo), no un formulario a
+  // medias. `restored` arranca ya cumplido en ambos casos: no hay nada que
+  // esperar antes de dejar que el autosave (más abajo) empiece a guardar.
+  const [restored, setRestored] = useState(initialState != null || prefill != null)
+  useEffect(() => {
+    if (initialState || prefill) return
     let cancelled = false
     void loadDraft<LocationChallengeDraft>(draftKey(groupId)).then((draft) => {
       if (cancelled) return
@@ -380,13 +425,24 @@ export function CreateLocationChallenge({
         // Foto opcional: se sube comprimida y sin EXIF (misma tubería que el
         // resto de flujos de crear, lib/storage). Si falla, el catch de fuera
         // aborta el lanzamiento entero con un mensaje genérico — es la misma
-        // política que CreateNumberChallenge/CreateChallengeImmersive.
+        // política que CreateNumberChallenge.
         setStatus('Subiendo la foto…')
         imagePath = await uploadImage(photoFile)
+      } else if (reusesPrefilledPhoto && prefilledImagePath) {
+        // Foto del recuerdo de origen: ya está subida (sin EXIF); la
+        // reutilizamos tal cual, sin volver a subirla.
+        imagePath = prefilledImagePath
       }
 
       setStatus('Lanzando el reto…')
-      const title = groupName ? `¿Dónde estamos? · ${groupName}` : '¿Dónde estamos?'
+      // Con recuerdo de origen, su título es la propuesta (más significativo
+      // que el genérico "¿Dónde estamos?"); sin él, el título por defecto de
+      // siempre. Ningún paso nuevo: el mismo asistente, solo cambia el texto.
+      const title = prefill?.title.trim()
+        ? prefill.title.trim()
+        : groupName
+          ? `¿Dónde estamos? · ${groupName}`
+          : '¿Dónde estamos?'
       const { challenge } = await createChallenge({
         title,
         lat: pano.lat,
@@ -404,8 +460,8 @@ export function CreateLocationChallenge({
         imagePath,
         // Decisión issue #595: sin toggle nuevo, se mantiene el comportamiento
         // MÁS SIMPLE ya existente en el resto de flujos de crear (default de
-        // `createChallenge`, CreateChallengeImmersive, CreateNumberChallenge) —
-        // con foto, se enseña como PISTA junto al Street View, nunca sorpresa.
+        // `createChallenge`/`CreateNumberChallenge`) — con foto, se enseña
+        // como PISTA junto al Street View, nunca sorpresa.
         // `PlayChallenge` ya sabe pintarla así (hintPhotoUrl) sin cambios ahí.
         photoIsHint: true,
         // Ciudad como escala default (el GeoGuessr de la calle pide precisión de zona).

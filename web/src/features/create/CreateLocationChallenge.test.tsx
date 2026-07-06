@@ -72,9 +72,10 @@ vi.mock('../../lib/streetview', async (importOriginal) => {
 })
 
 import { CreateLocationChallenge } from './CreateLocationChallenge'
+import type { ChallengePrefill } from './challengePrefill'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
-import { loadDraft } from '../../lib/drafts'
+import { loadDraft, saveDraft } from '../../lib/drafts'
 
 const session: SessionState = {
   session: null,
@@ -85,13 +86,14 @@ const session: SessionState = {
   refreshProfile: async () => {},
 }
 
-function renderScreen(groupId = 'g-1') {
+function renderScreen(groupId = 'g-1', prefill?: ChallengePrefill) {
   return render(
     <SessionContext.Provider value={session}>
       <ToastProvider>
         <CreateLocationChallenge
           groupId={groupId}
           groupName="Japón 2026"
+          prefill={prefill}
           onBack={() => {}}
           onCreated={() => {}}
         />
@@ -287,7 +289,7 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
     await expect(uploaded.text()).resolves.toBe('foto')
     // Decisión #595: sin toggle nuevo — comportamiento más simple ya existente
     // en el resto de flujos de crear (default `createChallenge`,
-    // CreateChallengeImmersive, CreateNumberChallenge): pista, nunca sorpresa.
+    // `CreateNumberChallenge`): pista, nunca sorpresa.
     expect(createChallengeMock).toHaveBeenCalledWith(
       expect.objectContaining({ imagePath: 'u-me/foto.jpg', photoIsHint: true }),
     )
@@ -409,5 +411,104 @@ describe('CreateLocationChallenge — borrador persistente (#718)', () => {
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     expect(await loadDraft(`locationChallenge:${groupId}`)).toBeNull()
+  })
+})
+
+// --- Unificación: reto desde un recuerdo guardado abre ESTE MISMO asistente ---
+// (antes `CreateChallengeImmersive`, eliminado — solo permitía foto y menos
+// opciones). Con `prefill`: el pin, la foto (quitable) y el título del
+// recuerdo llegan puestos; a partir de ahí, los mismos pasos que un reto nuevo.
+describe('CreateLocationChallenge — prefill desde un recuerdo (unificación)', () => {
+  const prefill: ChallengePrefill = {
+    point: { lat: 41.38, lng: 2.17 },
+    imagePath: 'u-me/recuerdo.jpg',
+    photoUrl: 'https://signed.example/recuerdo.jpg',
+    title: 'La Sagrada Família',
+  }
+
+  test('el pin llega puesto y se busca Street View YA, sin tocar el mapa', async () => {
+    renderScreen('g-1', prefill)
+
+    expect(await screen.findByTestId('sv-preview')).toBeInTheDocument()
+    expect(screen.getByTestId('map-picker')).toHaveAttribute('data-pin', '41.38,2.17')
+    expect(findPanoramaMock).toHaveBeenCalledWith(41.38, 2.17, expect.any(Number))
+    expect(screen.getByRole('button', { name: /continuar a las reglas/i })).toBeEnabled()
+  })
+
+  test('la foto del recuerdo llega puesta (quitable) en el paso de las reglas', async () => {
+    const user = userEvent.setup()
+    renderScreen('g-1', prefill)
+    await screen.findByTestId('sv-preview')
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+
+    expect(screen.getByRole('img', { name: 'Vista previa de la foto del reto' })).toHaveAttribute(
+      'src',
+      prefill.photoUrl,
+    )
+    // Sigue siendo opcional: se puede quitar como cualquier otra.
+    expect(screen.getByRole('button', { name: 'Quitar foto' })).toBeInTheDocument()
+  })
+
+  test('lanzar sin tocar la foto: NO se re-sube, se reutiliza el path ya subido', async () => {
+    createChallengeMock.mockResolvedValue({
+      challenge: { id: 'reto-4', title: prefill.title, image_path: prefill.imagePath },
+      groupId: 'g-1',
+    })
+    const user = userEvent.setup()
+    renderScreen('g-1', prefill)
+    await screen.findByTestId('sv-preview')
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
+    expect(uploadImageMock).not.toHaveBeenCalled()
+    expect(createChallengeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'La Sagrada Família',
+        imagePath: 'u-me/recuerdo.jpg',
+        photoIsHint: true,
+      }),
+    )
+  })
+
+  test('quitar la foto del recuerdo antes de lanzar: el reto se crea sin image_path', async () => {
+    createChallengeMock.mockResolvedValue({
+      challenge: { id: 'reto-5', title: prefill.title, image_path: null },
+      groupId: 'g-1',
+    })
+    const user = userEvent.setup()
+    renderScreen('g-1', prefill)
+    await screen.findByTestId('sv-preview')
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+
+    await user.click(screen.getByRole('button', { name: 'Quitar foto' }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
+    expect(uploadImageMock).not.toHaveBeenCalled()
+    expect(createChallengeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ imagePath: undefined }),
+    )
+  })
+
+  test('con prefill, un borrador anterior del viaje NO se restaura (el prefill manda)', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    await saveDraft(`locationChallenge:${groupId}`, {
+      point: { lat: 10, lng: 10 },
+      deadlineIndex: 0,
+      guessIndex: 0,
+      timeScoring: false,
+      photo: null,
+    })
+
+    renderScreen(groupId, prefill)
+
+    // El pin es el del recuerdo (2.17), no el del borrador viejo (10,10); y no
+    // aparece el toast de "borrador recuperado".
+    await waitFor(() =>
+      expect(screen.getByTestId('map-picker')).toHaveAttribute('data-pin', '41.38,2.17'),
+    )
+    expect(screen.queryByText(/recuperado tu borrador/i)).not.toBeInTheDocument()
   })
 })
