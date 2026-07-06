@@ -10,9 +10,14 @@ vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock
 vi.mock('../../lib/observability', () => ({ reportError: vi.fn() }))
 
 const createChallengeMock = vi.fn()
+const promoteToChallengeMock = vi.fn()
 vi.mock('../../lib/challenges', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../lib/challenges')>()
-  return { ...actual, createChallenge: (...args: unknown[]) => createChallengeMock(...args) }
+  return {
+    ...actual,
+    createChallenge: (...args: unknown[]) => createChallengeMock(...args),
+    promoteToChallenge: (...args: unknown[]) => promoteToChallengeMock(...args),
+  }
 })
 
 const uploadImageMock = vi.fn()
@@ -86,7 +91,7 @@ const session: SessionState = {
   refreshProfile: async () => {},
 }
 
-function renderScreen(groupId = 'g-1', prefill?: ChallengePrefill) {
+function renderScreen(groupId = 'g-1', prefill?: ChallengePrefill, promoteMomentId?: string) {
   return render(
     <SessionContext.Provider value={session}>
       <ToastProvider>
@@ -94,6 +99,7 @@ function renderScreen(groupId = 'g-1', prefill?: ChallengePrefill) {
           groupId={groupId}
           groupName="Japón 2026"
           prefill={prefill}
+          promoteMomentId={promoteMomentId}
           onBack={() => {}}
           onCreated={() => {}}
         />
@@ -107,6 +113,7 @@ beforeEach(() => {
   findPanoramaMock.mockResolvedValue({ panoId: 'pano-1', lat: 41.38, lng: 2.17 })
   trackMock.mockClear()
   createChallengeMock.mockReset()
+  promoteToChallengeMock.mockReset()
   uploadImageMock.mockReset()
   // jsdom no implementa createObjectURL/revokeObjectURL (solo la miniatura de la
   // foto opcional los usa; irrelevante para los tests de pasos/navegación).
@@ -510,5 +517,114 @@ describe('CreateLocationChallenge — prefill desde un recuerdo (unificación)',
       expect(screen.getByTestId('map-picker')).toHaveAttribute('data-pin', '41.38,2.17'),
     )
     expect(screen.queryByText(/recuperado tu borrador/i)).not.toBeInTheDocument()
+  })
+})
+
+// --- Modo PROMOCIÓN (issue #723): el asistente convierte, no duplica ------------
+describe('CreateLocationChallenge — modo promoción (promoteMomentId)', () => {
+  const prefill: ChallengePrefill = {
+    point: { lat: 41.38, lng: 2.17 },
+    imagePath: 'u-me/recuerdo.jpg',
+    photoUrl: 'https://signed.example/recuerdo.jpg',
+    title: 'La Sagrada Família',
+  }
+
+  function promoteResult() {
+    promoteToChallengeMock.mockResolvedValue({
+      id: 'm-9',
+      title: prefill.title,
+      image_path: prefill.imagePath,
+    } as ChallengeForPlay)
+  }
+
+  test('lanzar llama a promoteToChallenge sobre el MISMO momento (no a createChallenge), con todos los campos', async () => {
+    promoteResult()
+    const user = userEvent.setup()
+    renderScreen('g-1', prefill, 'm-9')
+    await screen.findByTestId('sv-preview')
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(promoteToChallengeMock).toHaveBeenCalledTimes(1))
+    // Identidad conservada: se promociona la fila del momento, no se crea otra.
+    expect(createChallengeMock).not.toHaveBeenCalled()
+    expect(promoteToChallengeMock).toHaveBeenCalledWith(
+      'm-9',
+      expect.objectContaining({
+        title: 'La Sagrada Família',
+        lat: 41.38,
+        lng: 2.17,
+        svPanoId: 'pano-1',
+        guessSeconds: 30,
+        timeScoring: true,
+        photoIsHint: true,
+        scoreScale: 'ciudad',
+        deadlineAt: expect.any(String),
+        // Foto del recuerdo sin tocar: NO se manda (conservar), ni se re-sube.
+        imagePath: undefined,
+      }),
+    )
+    expect(uploadImageMock).not.toHaveBeenCalled()
+    expect(trackMock).toHaveBeenCalledWith(
+      'challenge_created',
+      expect.objectContaining({ challenge_id: 'm-9', promoted_from_moment: true }),
+    )
+  })
+
+  test('quitar la foto del recuerdo al promocionar manda imagePath null (se limpia en la fila)', async () => {
+    promoteToChallengeMock.mockResolvedValue({
+      id: 'm-9',
+      title: prefill.title,
+      image_path: null,
+    } as ChallengeForPlay)
+    const user = userEvent.setup()
+    renderScreen('g-1', prefill, 'm-9')
+    await screen.findByTestId('sv-preview')
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+
+    await user.click(screen.getByRole('button', { name: 'Quitar foto' }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(promoteToChallengeMock).toHaveBeenCalledTimes(1))
+    expect(promoteToChallengeMock.mock.calls[0][1]).toMatchObject({ imagePath: null })
+  })
+
+  test('reemplazar la foto al promocionar la sube y manda el path nuevo', async () => {
+    promoteResult()
+    uploadImageMock.mockResolvedValue('u-me/nueva.jpg')
+    const user = userEvent.setup()
+    renderScreen('g-1', prefill, 'm-9')
+    await screen.findByTestId('sv-preview')
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+
+    const file = new File(['foto'], 'nueva.jpg', { type: 'image/jpeg' })
+    await user.upload(screen.getByLabelText('Cambiar foto del reto'), file)
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(promoteToChallengeMock).toHaveBeenCalledTimes(1))
+    expect(uploadImageMock).toHaveBeenCalledTimes(1)
+    expect(promoteToChallengeMock.mock.calls[0][1]).toMatchObject({ imagePath: 'u-me/nueva.jpg' })
+  })
+
+  test('en modo promoción un borrador anterior del viaje NO se restaura ni se pisa', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    await saveDraft(`locationChallenge:${groupId}`, {
+      point: { lat: 10, lng: 10 },
+      deadlineIndex: 0,
+      guessIndex: 0,
+      timeScoring: false,
+      photo: null,
+    })
+
+    renderScreen(groupId, prefill, 'm-9')
+
+    await waitFor(() =>
+      expect(screen.getByTestId('map-picker')).toHaveAttribute('data-pin', '41.38,2.17'),
+    )
+    expect(screen.queryByText(/recuperado tu borrador/i)).not.toBeInTheDocument()
+    // Y el borrador previo sigue intacto (no se pisa con los datos del recuerdo).
+    expect(await loadDraft(`locationChallenge:${groupId}`)).toMatchObject({
+      point: { lat: 10, lng: 10 },
+    })
   })
 })

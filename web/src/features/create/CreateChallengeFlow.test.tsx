@@ -147,3 +147,61 @@ describe('CreateChallengeFlow — origen FAB (sin recuerdo)', () => {
     )
   })
 })
+
+// --- Modo PROMOCIÓN (issue #723): "Convertir en reto" de un recuerdo guardado ---
+describe('CreateChallengeFlow — modo promoción (promoteMomentId)', () => {
+  test('carga el recuerdo, pre-rellena y pasa promoteMomentId al asistente (mismo challengeId)', async () => {
+    getChallengeMock.mockResolvedValue({
+      id: 'm-9',
+      title: 'La cala escondida',
+      image_path: 'u-me/cala.jpg',
+      place_lat: 39.9,
+      place_lng: 3.9,
+    })
+    signedImageUrlMock.mockResolvedValue('https://signed.example/cala.jpg')
+
+    render(
+      <CreateChallengeFlow
+        groupId="g-1"
+        groupName="España 2026"
+        promoteMomentId="m-9"
+        onBack={() => {}}
+        onCreated={() => {}}
+      />,
+    )
+
+    expect(await screen.findByTestId('create-location-challenge')).toBeInTheDocument()
+    // El prefill se carga del MISMO recuerdo que se va a promocionar…
+    expect(getChallengeMock).toHaveBeenCalledWith('m-9')
+    // …y el asistente recibe el id para promocionar ESA fila (no crear otra).
+    expect(createLocationChallengeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        promoteMomentId: 'm-9',
+        prefill: expect.objectContaining({
+          point: { lat: 39.9, lng: 3.9 },
+          imagePath: 'u-me/cala.jpg',
+          title: 'La cala escondida',
+        }),
+      }),
+    )
+  })
+
+  test('si el prefill falla, el asistente abre igualmente EN MODO promoción (el id viaja aparte)', async () => {
+    getChallengeMock.mockRejectedValue(new Error('red caída'))
+
+    render(
+      <CreateChallengeFlow
+        groupId="g-1"
+        groupName="España 2026"
+        promoteMomentId="m-9"
+        onBack={() => {}}
+        onCreated={() => {}}
+      />,
+    )
+
+    expect(await screen.findByTestId('create-location-challenge')).toBeInTheDocument()
+    expect(createLocationChallengeSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ promoteMomentId: 'm-9', prefill: undefined }),
+    )
+  })
+})

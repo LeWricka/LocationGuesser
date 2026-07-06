@@ -7,15 +7,15 @@ import type { Vote } from '../../lib/database.types'
 // Mocks de la capa de datos: la hoja solo orquesta estas funciones; aislamos la BD.
 const updateChallengeDescriptionMock = vi.fn<(id: string, desc: string) => Promise<void>>()
 const updateMomentMock = vi.fn<(...args: unknown[]) => Promise<unknown>>()
-const promoteToChallengeMock = vi.fn<(...args: unknown[]) => Promise<unknown>>()
 const deleteChallengeMock = vi.fn<(...args: unknown[]) => Promise<void>>()
 const getExistingVoteMock = vi.fn<(challengeId: string, userId: string) => Promise<Vote | null>>()
 
+// `promoteToChallenge` ya NO se llama desde la hoja (issue #723): "Convertir en
+// reto" solo navega (`onPromote`) al asistente completo, que es quien promociona.
 vi.mock('../../lib/challenges', () => ({
   updateChallengeDescription: (id: string, desc: string) =>
     updateChallengeDescriptionMock(id, desc),
   updateMoment: (...args: unknown[]) => updateMomentMock(...args),
-  promoteToChallenge: (...args: unknown[]) => promoteToChallengeMock(...args),
   deleteChallenge: (...args: unknown[]) => deleteChallengeMock(...args),
 }))
 
@@ -637,5 +637,34 @@ describe('MomentSheet — foto sorpresa (issue #655)', () => {
     const { container } = renderSheet({ moment: RETO_CERRADO })
     expect(container.querySelector('img')).toHaveAttribute('src', RETO_CERRADO.imageUrl)
     expect(screen.queryByRole('img', { name: SORPRESA_LABEL })).not.toBeInTheDocument()
+  })
+})
+
+// --- "Convertir en reto" solo NAVEGA (issue #723) ------------------------------
+// El sub-flujo inline (mapa + slider de duración, más limitado que el asistente)
+// se eliminó: la hoja dispara `onPromote` y el padre abre el asistente completo
+// de crear reto en modo promoción (mismo challengeId, no se duplica).
+describe('MomentSheet — convertir en reto navega (issue #723)', () => {
+  test('el botón llama a onPromote y NO abre ningún sub-flujo inline', async () => {
+    const user = userEvent.setup()
+    const onPromote = vi.fn()
+    renderSheet({ onPromote })
+
+    await user.click(screen.getByRole('button', { name: /convertir en reto/i }))
+
+    expect(onPromote).toHaveBeenCalledTimes(1)
+    // Nada del viejo formulario embebido: ni mapa de respuesta ni slider.
+    expect(screen.queryByText('Punto a adivinar')).not.toBeInTheDocument()
+    expect(screen.queryByRole('slider', { name: 'Duración del reto' })).not.toBeInTheDocument()
+  })
+
+  test('sin onPromote el botón no se muestra (p. ej. galería visual)', () => {
+    renderSheet()
+    expect(screen.queryByRole('button', { name: /convertir en reto/i })).not.toBeInTheDocument()
+  })
+
+  test('solo sobre un RECUERDO del dueño: un reto no ofrece convertir', () => {
+    renderSheet({ moment: RETO_CERRADO, onPromote: vi.fn() })
+    expect(screen.queryByRole('button', { name: /convertir en reto/i })).not.toBeInTheDocument()
   })
 })

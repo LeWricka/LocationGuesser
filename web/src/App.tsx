@@ -300,6 +300,9 @@ function LoggedIn({
                 groupId={groupId}
                 // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
                 fromMomentId={route.groupChallengeFrom}
+                // Promoción de un recuerdo YA guardado (`&promote=<id>`, issue #723):
+                // mismo asistente prefijado, pero el recuerdo SE CONVIERTE (no se duplica).
+                promoteMomentId={route.groupChallengePromote}
                 onBack={() => {
                   location.hash = groupHash(groupId)
                 }}

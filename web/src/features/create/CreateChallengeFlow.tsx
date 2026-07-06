@@ -19,22 +19,33 @@ interface Props {
    * Sin este id, el reto empieza vacío (origen FAB "Reto").
    */
   fromMomentId?: string
+  /**
+   * PROMOCIÓN de un recuerdo YA guardado (issue #723, botón "Convertir en reto"
+   * de la hoja del momento): mismo asistente y mismo pre-relleno que
+   * `fromMomentId`, pero al lanzar el recuerdo SE CONVIERTE
+   * (`promoteToChallenge`, mismo `challengeId`), no se crea un reto nuevo.
+   * Excluyente con `fromMomentId` (si vinieran ambos, manda este).
+   */
+  promoteMomentId?: string
   /** Sale del flujo de crear (cancelar / atrás desde el selector). */
   onBack: () => void
   /** Reto creado (de cualquier tipo): el viaje vuelve a la lista y ofrece su enlace. */
   onCreated: (challenge: ChallengeForPlay) => void
 }
 
-// Entrada de "crear reto": el reto es una entidad de primera clase con DOS orígenes
+// Entrada de "crear reto": el reto es una entidad de primera clase con TRES orígenes
 // que convergen en el MISMO formulario — el MISMO asistente, sin excepciones
-// (unificación: antes el origen recuerdo abría `CreateChallengeImmersive`, un
-// asistente aparte y más limitado — solo foto, sin las opciones del completo —
-// eliminado):
-//  (a) desde un recuerdo (`fromMomentId`) → va directo al asistente completo de
+// (unificación #722/#723: antes el origen recuerdo abría `CreateChallengeImmersive`
+// y el "Convertir en reto" de la hoja del momento un sub-flujo inline propio, ambos
+// más limitados — eliminados):
+//  (a) desde un recuerdo RECIÉN guardado (`fromMomentId`) → asistente completo de
 //      ¿Dónde estamos? (`CreateLocationChallenge`) con el pin, la foto (quitable,
-//      sigue opcional) y el título del recuerdo PRE-RELLENADOS. A partir de ahí,
-//      exactamente los mismos pasos y opciones que un reto nuevo.
-//  (b) desde el FAB "Reto" (sin id) → primero el selector de TIPO (¿Dónde estamos? /
+//      sigue opcional) y el título del recuerdo PRE-RELLENADOS. Al lanzar, crea un
+//      reto NUEVO además del recuerdo.
+//  (b) PROMOCIÓN de un recuerdo existente (`promoteMomentId`, issue #723) → mismo
+//      asistente y mismo pre-relleno, pero al lanzar el recuerdo SE CONVIERTE
+//      (`promoteToChallenge`, mismo `challengeId`), no se duplica.
+//  (c) desde el FAB "Reto" (sin id) → primero el selector de TIPO (¿Dónde estamos? /
 //      ¿Adivinas?), luego el asistente propio de cada tipo, empezando vacío.
 // Atrás desde un asistente vuelve al selector (origen FAB) o sale (origen recuerdo).
 //
@@ -43,22 +54,33 @@ interface Props {
 // `#g=…&add=reto`), en vez de tumbar toda la app con el boundary raíz ("Algo ha
 // fallado" a pantalla completa), mostramos un fallback recuperable que deja VOLVER
 // al viaje. El error se sigue reportando a la observabilidad (Sentry) igual.
-function CreateChallengeFlowInner({ groupId, groupName, fromMomentId, onBack, onCreated }: Props) {
+function CreateChallengeFlowInner({
+  groupId,
+  groupName,
+  fromMomentId,
+  promoteMomentId,
+  onBack,
+  onCreated,
+}: Props) {
   const [kind, setKind] = useState<ChallengeKind | null>(null)
+  // Recuerdo de ORIGEN del pre-relleno: promocionar manda sobre `from` (no
+  // deberían coexistir; promocionar es la intención más específica).
+  const sourceMomentId = promoteMomentId ?? fromMomentId
   // Pre-relleno cargado desde el recuerdo de origen (foto + lugar). `undefined`
   // mientras carga; `null` si no aplica o falló (el formulario empieza vacío).
   const [prefill, setPrefill] = useState<ChallengePrefill | null | undefined>(
-    fromMomentId ? undefined : null,
+    sourceMomentId ? undefined : null,
   )
 
-  // Origen recuerdo: cargamos su foto y lugar y entramos directos a ¿Dónde estamos?. Un
-  // recuerdo se convierte en reto de UBICACIÓN (su lugar pasa a ser la respuesta).
+  // Origen recuerdo (nuevo o a promocionar): cargamos su foto y lugar y entramos
+  // directos a ¿Dónde estamos?. Un recuerdo se convierte en reto de UBICACIÓN (su
+  // lugar pasa a ser la respuesta).
   useEffect(() => {
-    if (!fromMomentId) return
+    if (!sourceMomentId) return
     let alive = true
     void (async () => {
       try {
-        const moment = await getChallenge(fromMomentId)
+        const moment = await getChallenge(sourceMomentId)
         const photoUrl = moment.image_path ? await signedImageUrl(moment.image_path) : null
         if (!alive) return
         setPrefill({
@@ -74,6 +96,8 @@ function CreateChallengeFlowInner({ groupId, groupName, fromMomentId, onBack, on
       } catch (err) {
         reportError(err, { area: 'create_challenge_prefill' })
         // Si no podemos cargar el recuerdo, no bloqueamos: el reto empieza vacío.
+        // (En modo promoción el envío sigue promocionando la fila correcta: el id
+        // viaja aparte del prefill.)
         if (!alive) return
         setPrefill(null)
         setKind('location')
@@ -82,10 +106,10 @@ function CreateChallengeFlowInner({ groupId, groupName, fromMomentId, onBack, on
     return () => {
       alive = false
     }
-  }, [fromMomentId])
+  }, [sourceMomentId])
 
   // Cargando el recuerdo de origen: un spinner breve antes de abrir el asistente.
-  if (fromMomentId && prefill === undefined) {
+  if (sourceMomentId && prefill === undefined) {
     return (
       <div className={flow.loading} role="status">
         <Spinner size={28} />
@@ -109,16 +133,18 @@ function CreateChallengeFlowInner({ groupId, groupName, fromMomentId, onBack, on
     )
   }
 
-  // Origen RECUERDO o FAB: EL MISMO asistente completo (unificación). Con
-  // `fromMomentId` va prefijado (pin, foto quitable, título); atrás sale del
-  // flujo entero (no hay selector de tipo que recuperar, ver arriba). Sin él
-  // (FAB), empieza vacío; atrás vuelve al selector de tipo.
+  // Origen RECUERDO (nuevo o promoción) o FAB: EL MISMO asistente completo
+  // (unificación). Con recuerdo de origen va prefijado (pin, foto quitable,
+  // título) y atrás sale del flujo entero (no hay selector de tipo que
+  // recuperar, ver arriba). Sin él (FAB), empieza vacío; atrás vuelve al
+  // selector de tipo. `promoteMomentId` cambia solo el VERBO al lanzar.
   return (
     <CreateLocationChallenge
       groupId={groupId}
       groupName={groupName}
-      prefill={fromMomentId ? (prefill ?? undefined) : undefined}
-      onBack={fromMomentId ? onBack : () => setKind(null)}
+      prefill={sourceMomentId ? (prefill ?? undefined) : undefined}
+      promoteMomentId={promoteMomentId}
+      onBack={sourceMomentId ? onBack : () => setKind(null)}
       onCreated={onCreated}
     />
   )

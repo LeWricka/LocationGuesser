@@ -16,20 +16,14 @@ import {
 import { parseLegacyDescription, resolveMomentPhoto, type Moment } from '../../lib/trip'
 import type { LatLng } from '../../lib/geo'
 import { fmtDist, fmtNumber } from '../../lib/geo'
-import {
-  deleteChallenge,
-  promoteToChallenge,
-  updateChallengeDescription,
-  updateMoment,
-} from '../../lib/challenges'
+import { deleteChallenge, updateChallengeDescription, updateMoment } from '../../lib/challenges'
 import { getExistingVote } from '../../lib/votes'
 import type { Vote } from '../../lib/database.types'
-import { deadlineFromMinutes, parseMomentDate } from '../../lib/time'
+import { parseMomentDate } from '../../lib/time'
 import { lockBodyScroll } from '../../lib/scrollLock'
 import { uploadAudio } from '../../lib/storage'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
-import { MapPicker } from '../create/MapPicker'
 import { type VoiceValue } from '../create/VoiceRecorder'
 import { Countdown } from './Countdown'
 import { EditMomentForm } from './EditMomentForm'
@@ -70,12 +64,15 @@ interface Props {
    * del viaje. Sin esta prop el botón no se muestra (p. ej. en la galería visual).
    */
   onViewMarcador?: () => void
-  /** Tras convertir un recuerdo en reto: refresca el viaje (recarga datos). */
-  onPromoted?: () => void
   /**
-   * Tras editar un RECUERDO (título, fecha, lugar, descripción): refresca el viaje.
-   * Reutiliza `onPromoted` no sería claro, así que va aparte aunque haga lo mismo.
+   * "Convertir en reto" sobre un RECUERDO del dueño (issue #723): la hoja SOLO
+   * navega — el padre (TripPage) la lleva al asistente completo de crear reto en
+   * modo promoción (`promoteChallengeHash`). El sub-flujo inline que vivía aquí
+   * (mapa + slider de duración, más limitado que el asistente) se eliminó.
+   * Sin esta prop el botón no se muestra (p. ej. en la galería visual).
    */
+  onPromote?: () => void
+  /** Tras editar un RECUERDO (título, fecha, lugar, descripción): refresca el viaje. */
   onEdited?: () => void
   /**
    * Editar un RETO: lo lleva el padre (TripPage) al editor de reto completo
@@ -152,29 +149,6 @@ const MIN_VELOCITY_SAMPLE_MS = 4
 // falta (issue #605: el overlay se quedaba bloqueando la app para siempre).
 const CLOSE_SAFETY_MS = 400
 
-// Duración del reto al convertir: mismas paradas que el asistente de "Añadir
-// recuerdo" para coherencia. El plazo se calcula relativo a AHORA al guardar.
-const DURATION_STOPS: { minutes: number; label: string }[] = [
-  { minutes: 15, label: '15 min' },
-  { minutes: 30, label: '30 min' },
-  { minutes: 60, label: '1 h' },
-  { minutes: 240, label: '4 h' },
-  { minutes: 720, label: '12 h' },
-  { minutes: 1440, label: '24 h' },
-  { minutes: 2880, label: '48 h' },
-]
-const DEFAULT_DURATION_INDEX = DURATION_STOPS.findIndex((s) => s.minutes === 240)
-
-// Tiempo por jugada en segundos; null = sin límite. Default: 1 min.
-const GUESS_OPTIONS: { value: number | null; label: string }[] = [
-  { value: 60, label: '1 min' },
-  { value: 120, label: '2 min' },
-  { value: 180, label: '3 min' },
-  { value: null, label: 'Sin límite' },
-]
-
-const SPAIN: LatLng = { lat: 40.4, lng: -3.7 }
-
 /**
  * Hoja de detalle de un momento (bottom sheet, §2 del spec). AUTOCONTENIDA a
  * propósito: no usa el `Modal` compartido para poder subir desde abajo y cerrarse
@@ -198,7 +172,7 @@ export function MomentSheet({
   onClose,
   onPlay,
   onViewMarcador,
-  onPromoted,
+  onPromote,
   onEdited,
   onEditChallenge,
   onDeleted,
@@ -278,14 +252,9 @@ export function MomentSheet({
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // ── Convertir en reto (sub-flujo del dueño sobre un recuerdo) ───────────────
-  const [promoting, setPromoting] = useState(false)
-  // Punto-RESPUESTA del reto: arranca en el lugar visible del recuerdo (place_*), el
-  // dueño puede ajustarlo en el mapa. Al promover pasa a ser la coordenada OCULTA.
-  const [answer, setAnswer] = useState<LatLng | null>(null)
-  const [durationIndex, setDurationIndex] = useState(DEFAULT_DURATION_INDEX)
-  const [guessSeconds, setGuessSeconds] = useState<number | null>(60)
-  const [promoteBusy, setPromoteBusy] = useState(false)
+  // "Convertir en reto" ya no vive aquí (issue #723): el botón solo NAVEGA
+  // (`onPromote`) al asistente completo de crear reto en modo promoción. El
+  // sub-flujo inline (mapa + slider de duración) se eliminó.
 
   // ── "Tu resultado" en un reto CERRADO (#580) ────────────────────────────────
   // Mi voto en ESTE reto: undefined = cargando/no aplica, null = no jugué. Consulta
@@ -508,45 +477,6 @@ export function MomentSheet({
     }
   }
 
-  // Abre el sub-flujo de convertir: siembra el punto-respuesta con el lugar visible
-  // del recuerdo (si lo tiene), que el dueño puede ajustar antes de esconderlo.
-  const startPromote = () => {
-    if (!moment) return
-    setAnswer(
-      moment.lat != null && moment.lng != null ? { lat: moment.lat, lng: moment.lng } : null,
-    )
-    setPromoting(true)
-  }
-
-  // Convierte el recuerdo en reto: el lugar visible pasa a respuesta OCULTA, con
-  // plazo (relativo a ahora) y tiempo por jugada. Al terminar, refresca el viaje.
-  const confirmPromote = async () => {
-    if (!moment || !answer) return
-    setPromoteBusy(true)
-    try {
-      await promoteToChallenge(moment.challengeId, {
-        lat: answer.lat,
-        lng: answer.lng,
-        deadlineAt: deadlineFromMinutes(DURATION_STOPS[durationIndex].minutes),
-        guessSeconds,
-        photoIsHint: true,
-      })
-      toast.show('¡Reto creado! Ya pueden adivinar dónde es.', { tone: 'success' })
-      setPromoting(false)
-      onPromoted?.()
-      close()
-    } catch (err) {
-      toast.show(
-        `No se pudo convertir en reto: ${err instanceof Error ? err.message : String(err)}`,
-        {
-          tone: 'danger',
-        },
-      )
-    } finally {
-      setPromoteBusy(false)
-    }
-  }
-
   if (!moment) return null
 
   const isActive = moment.status === 'active'
@@ -557,7 +487,6 @@ export function MomentSheet({
   const date = formatMomentDate(moment.date)
   // País ya resuelto (recuerdos con lugar o cerrados con coord); con bandera válida.
   const country = moment.country?.flag ? moment.country : null
-  const durationStop = DURATION_STOPS[durationIndex]
   // Coordenada visible para la tarjeta-mapa (recuerdo con lugar o reto cerrado).
   const hasPlace = moment.lat != null && moment.lng != null
   const coordLabel = hasPlace
@@ -861,8 +790,7 @@ export function MomentSheet({
               <article className={`${styles.article} lg-stagger`}>
                 {/* EDITAR el recuerdo (título, fecha, lugar, descripción): ahora vive en
                 `EditMomentForm`, fuera de esta escena (#571) — este `article` solo
-                se renderiza en modo VISTA. Cada sección de abajo se oculta por su
-                cuenta mientras `promoting` (convertir en reto) es el foco. */}
+                se renderiza en modo VISTA. */}
                 <>
                   {/* Meta (bandera + lugar + fecha), issue #673: con héroe CON foto
                     vive AQUÍ, ya sobre el papel — no en el velo sobre la imagen, donde
@@ -888,9 +816,8 @@ export function MomentSheet({
                     haberlo en un RECUERDO: `moment.videoUrl` viene de una consulta APARTE
                     en `useTripData` que filtra `is_challenge = false` — un reto nunca lo
                     trae, ni siquiera si el recuerdo de origen tenía clip (el MP4 puede
-                    llevar su propio GPS en los metadatos, `promoteToChallenge` lo vacía).
-                    Se oculta durante "Convertir en reto", como el resto de la vista. */}
-                  {moment.videoUrl && !promoting && (
+                    llevar su propio GPS en los metadatos, `promoteToChallenge` lo vacía). */}
+                  {moment.videoUrl && (
                     <section className={styles.videoSection}>
                       <p className={styles.sectionLabel}>El clip</p>
                       <video
@@ -905,65 +832,63 @@ export function MomentSheet({
                   )}
 
                   {/* DESCRIPCIÓN: cuerpo de artículo con drop-cap sutil (injerto C).
-                    Se muestra a todos; el DUEÑO la edita en línea. Se oculta durante
-                    "Convertir en reto" para que ese flujo sea el foco. */}
-                  {!promoting &&
-                    (editing ? (
-                      <div className={styles.descEdit}>
-                        <textarea
-                          className={styles.descArea}
-                          value={description}
-                          onChange={(e) => setDescription(e.target.value)}
-                          placeholder="Cuenta el día: dónde fue, qué pasó…"
-                          rows={4}
-                          autoFocus
+                    Se muestra a todos; el DUEÑO la edita en línea. */}
+                  {editing ? (
+                    <div className={styles.descEdit}>
+                      <textarea
+                        className={styles.descArea}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Cuenta el día: dónde fue, qué pasó…"
+                        rows={4}
+                        autoFocus
+                        disabled={saving}
+                      />
+                      <div className={styles.descActions}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDescription(parseLegacyDescription(moment.description).text ?? '')
+                            setEditing(false)
+                          }}
                           disabled={saving}
-                        />
-                        <div className={styles.descActions}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setDescription(parseLegacyDescription(moment.description).text ?? '')
-                              setEditing(false)
-                            }}
-                            disabled={saving}
-                          >
-                            Cancelar
-                          </Button>
-                          <Button size="sm" onClick={() => void saveDescription()} loading={saving}>
-                            Guardar
-                          </Button>
-                        </div>
+                        >
+                          Cancelar
+                        </Button>
+                        <Button size="sm" onClick={() => void saveDescription()} loading={saving}>
+                          Guardar
+                        </Button>
                       </div>
-                    ) : trimmedDesc ? (
-                      <div className={styles.descBlock}>
-                        <p className={styles.description}>{trimmedDesc}</p>
-                        {canEdit && (
-                          <button
-                            type="button"
-                            className={styles.descEditBtn}
-                            onClick={() => setEditing(true)}
-                          >
-                            <Icon icon={Pencil} size={14} /> Editar
-                          </button>
-                        )}
-                      </div>
-                    ) : canEdit ? (
-                      <button
-                        type="button"
-                        className={[styles.descAdd, 'lg-press'].join(' ')}
-                        onClick={() => setEditing(true)}
-                      >
-                        <Icon icon={Pencil} size={14} /> Añadir descripción del día
-                      </button>
-                    ) : null)}
+                    </div>
+                  ) : trimmedDesc ? (
+                    <div className={styles.descBlock}>
+                      <p className={styles.description}>{trimmedDesc}</p>
+                      {canEdit && (
+                        <button
+                          type="button"
+                          className={styles.descEditBtn}
+                          onClick={() => setEditing(true)}
+                        >
+                          <Icon icon={Pencil} size={14} /> Editar
+                        </button>
+                      )}
+                    </div>
+                  ) : canEdit ? (
+                    <button
+                      type="button"
+                      className={[styles.descAdd, 'lg-press'].join(' ')}
+                      onClick={() => setEditing(true)}
+                    >
+                      <Icon icon={Pencil} size={14} /> Añadir descripción del día
+                    </button>
+                  ) : null}
 
                   {/* NOTA DE VOZ (issue #648): player del sistema bajo la
                     descripción — botón play/pausa + barra de progreso simple +
                     duración (tokens, sin waveform). URL YA firmada por
                     `useTripData` (mismo bucket/TTL que las fotos, #639). */}
-                  {moment.audioUrl && !promoting && (
+                  {moment.audioUrl && (
                     <AudioPlayer
                       src={moment.audioUrl}
                       onPlay={() =>
@@ -975,7 +900,7 @@ export function MomentSheet({
                   {/* GALERÍA "la serie": tira de fotogramas enmarcados (injerto C),
                     solo en un RECUERDO (un reto muestra una sola foto). El componente
                     trae el carrusel + los controles del dueño (portada/añadir/quitar). */}
-                  {isRecuerdo && !promoting && (
+                  {isRecuerdo && (
                     <section className={styles.gallerySection}>
                       <p className={styles.sectionLabel}>La serie</p>
                       <MomentGallery
@@ -991,7 +916,7 @@ export function MomentSheet({
                     en las coordenadas con el pin, para que se vea DÓNDE es. Antes era un
                     blob abstracto de CSS que no decía nada. Solo si hay lugar visible
                     (recuerdo con lugar o reto cerrado). */}
-                  {hasPlace && !promoting && (
+                  {hasPlace && (
                     <section className={styles.mapSection}>
                       <p className={styles.sectionLabel}>En el mapa</p>
                       <div className={styles.mapCard}>
@@ -1015,7 +940,7 @@ export function MomentSheet({
                     bloque "Tu resultado" de abajo (#580): aquí solo se muestra si el
                     reto sigue EN JUEGO o si lo creé YO (`isOwn`, #582 — no si soy el
                     dueño del viaje: un miembro cualquiera puede crear un reto). */}
-                  {(isActive || (isReto && moment.isOwn)) && !promoting ? (
+                  {isActive || (isReto && moment.isOwn) ? (
                     <p className={styles.social}>
                       <span className={styles.socialIcon} aria-hidden="true">
                         <Icon icon={User} size={15} />
@@ -1030,7 +955,7 @@ export function MomentSheet({
                     cómo me fue. Puntos (+ distancia, o cifra en un reto de número) con
                     la tipografía de datos (tabular) si jugué; "No participaste" si no.
                     Nunca para quien lo creó (`isOwn`): fingir un resultado sería falso. */}
-                  {isReto && !isActive && !moment.isOwn && !promoting && (
+                  {isReto && !isActive && !moment.isOwn && (
                     <section className={styles.resultSection}>
                       <p className={styles.sectionLabel}>Tu resultado</p>
                       {myVote === undefined ? (
@@ -1061,7 +986,7 @@ export function MomentSheet({
                   {/* CTA "Ver marcador" (#580): un reto CERRADO no llevaba a ningún
                     sitio para ver "cómo quedó" el grupo. Para cualquiera (dueño o
                     jugador), no solo para quien jugó. */}
-                  {isReto && !isActive && !promoting && onViewMarcador && (
+                  {isReto && !isActive && onViewMarcador && (
                     <Button
                       variant="secondary"
                       size="lg"
@@ -1074,109 +999,31 @@ export function MomentSheet({
                   )}
 
                   {/* CTA "Adivina dónde es →": el gancho del reto en juego. */}
-                  {isActive && onPlay && !promoting && (
+                  {isActive && onPlay && (
                     <Button size="lg" fullWidth onClick={onPlay} className={styles.cta}>
                       Adivina dónde es →
                     </Button>
                   )}
 
-                  {/* CONVERTIR EN RETO — solo el dueño, solo sobre un RECUERDO. */}
-                  {canEdit && isRecuerdo && !promoting && (
+                  {/* CONVERTIR EN RETO — solo el dueño, solo sobre un RECUERDO. La hoja
+                    SOLO navega (issue #723): el padre abre el asistente completo de
+                    crear reto en modo PROMOCIÓN (mismo challengeId, no se duplica). */}
+                  {canEdit && isRecuerdo && onPromote && (
                     <Button
                       size="lg"
                       fullWidth
                       variant="secondary"
-                      onClick={startPromote}
+                      onClick={onPromote}
                       className={styles.cta}
                     >
                       <IconDiana size={16} /> Convertir en reto
                     </Button>
                   )}
 
-                  {canEdit && isRecuerdo && promoting && (
-                    <section className={styles.promote}>
-                      <header className={styles.promoteHead}>
-                        <span className={styles.promoteTitle}>
-                          <IconDiana size={15} /> Convertir en reto
-                        </span>
-                        <span className={styles.promoteHint}>
-                          Esconde el lugar y que adivinen dónde es, con cuenta atrás.
-                        </span>
-                      </header>
-
-                      <div className={styles.promoteField}>
-                        <span className={styles.promoteLabel}>Punto a adivinar</span>
-                        <MapPicker
-                          value={answer}
-                          flyTo={answer}
-                          center={answer ?? SPAIN}
-                          zoom={answer ? 13 : 5}
-                          onPick={setAnswer}
-                        />
-                        {!answer && (
-                          <span className={styles.promoteWarn}>
-                            Marca en el mapa el sitio que habrá que adivinar.
-                          </span>
-                        )}
-                      </div>
-
-                      <div className={styles.promoteField}>
-                        <span className={styles.promoteLabel}>Duración: {durationStop.label}</span>
-                        <input
-                          type="range"
-                          className={styles.promoteSlider}
-                          min={0}
-                          max={DURATION_STOPS.length - 1}
-                          step={1}
-                          value={durationIndex}
-                          onChange={(e) => setDurationIndex(Number(e.target.value))}
-                          aria-label="Duración del reto"
-                          aria-valuetext={durationStop.label}
-                        />
-                      </div>
-
-                      <div className={styles.promoteField}>
-                        <span className={styles.promoteLabel}>Tiempo por jugada</span>
-                        <div className={styles.promoteOptions}>
-                          {GUESS_OPTIONS.map((opt) => (
-                            <Button
-                              key={opt.label}
-                              variant={guessSeconds === opt.value ? 'primary' : 'secondary'}
-                              size="sm"
-                              aria-pressed={guessSeconds === opt.value}
-                              onClick={() => setGuessSeconds(opt.value)}
-                            >
-                              {opt.label}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className={styles.descActions}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setPromoting(false)}
-                          disabled={promoteBusy}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          size="sm"
-                          onClick={() => void confirmPromote()}
-                          loading={promoteBusy}
-                          disabled={!answer}
-                        >
-                          Crear reto
-                        </Button>
-                      </div>
-                    </section>
-                  )}
-
                   {/* Acciones del DUEÑO al pie: editar y borrar. Para un RECUERDO,
                     "Editar" abre el formulario de datos aquí; para un RETO lo lleva al
                     editor completo. Borrar pide confirmación. */}
-                  {canEdit && !promoting && (
+                  {canEdit && (
                     <div className={styles.ownerActions}>
                       {isRecuerdo ? (
                         <button

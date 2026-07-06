@@ -357,6 +357,20 @@ export interface PromoteToChallengeInput {
   photoIsHint?: boolean
   /** Precisión del reto (0028); por defecto 'mundo' = scoring histórico. */
   scoreScale?: ScoreScale
+  /**
+   * Título del reto (issue #723: la promoción viene del asistente completo, que
+   * propone el título del recuerdo pero deja cambiarlo). `undefined` = conservar
+   * el título actual del recuerdo.
+   */
+  title?: string
+  /** ¿La velocidad puntúa? (issue #628). `undefined` = conservar el valor actual. */
+  timeScoring?: boolean
+  /**
+   * Foto del reto (issue #723): el asistente deja quitarla o reemplazarla al
+   * promocionar. `undefined` = conservar la foto actual del recuerdo (lo normal);
+   * `null` = quitarla; string = path en Storage de la nueva (ya subida, sin EXIF).
+   */
+  imagePath?: string | null
 }
 
 /**
@@ -395,6 +409,12 @@ export async function promoteToChallenge(
     video_path: null,
   }
   if (input.photoIsHint !== undefined) patch.photo_is_hint = input.photoIsHint
+  // Campos del asistente completo (issue #723): solo se escriben si vienen — así
+  // el llamador que no los conoce conserva el comportamiento histórico (el título
+  // y la foto del recuerdo sobreviven a la promoción tal cual).
+  if (input.title !== undefined) patch.title = input.title
+  if (input.timeScoring !== undefined) patch.time_scoring = input.timeScoring
+  if (input.imagePath !== undefined) patch.image_path = input.imagePath
 
   const { data, error } = await supabase
     .from('challenges')
