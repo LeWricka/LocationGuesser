@@ -286,6 +286,8 @@ test.describe('crear reto (hermético)', () => {
     await expect(page.getByText('Plazo', { exact: true })).toBeVisible({ timeout: 10_000 })
     await page.goBack()
     await expect(map).toBeVisible({ timeout: 10_000 })
-    await expect(page.getByRole('button', { name: /Crear reto ¿Dónde estamos\?/ })).not.toBeVisible()
+    await expect(
+      page.getByRole('button', { name: /Crear reto ¿Dónde estamos\?/ }),
+    ).not.toBeVisible()
   })
 })

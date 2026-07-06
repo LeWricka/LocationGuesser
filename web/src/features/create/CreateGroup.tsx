@@ -6,6 +6,7 @@ import { joinGroupAsOwner } from '../../lib/membership'
 import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
 import { tripShareUrl } from '../../lib/shareLinks'
+import { clearDraft, loadDraft, useDraftAutosave } from '../../lib/drafts'
 import { AppHeader, Button, Icon, Spinner, DatePicker, useToast } from '../../ui'
 import { ShellUtilitario } from '../../ui/shells'
 import { InviteModal } from '../group/InviteModal'
@@ -26,6 +27,29 @@ const TOTAL_STAGES = 2
 // Id del disparador de "Salida": Enter en el nombre lo usa para llevar el foco
 // ahí en vez de saltarse las fechas (ver el onKeyDown del input de nombre).
 const START_DATE_TRIGGER_ID = 'cg-starts-on'
+
+// Borrador persistente (issue #718): "Nuevo viaje" solo se puede crear una vez
+// a la vez (no hay id de viaje aún con el que distinguir varios en curso), así
+// que la clave es fija. Contenido puramente de texto (sin fotos), así que el
+// draft es la foto completa de los campos tal cual.
+const DRAFT_KEY = 'group:new'
+
+interface GroupDraft {
+  name: string
+  startsOn: string
+  endsOn: string
+  description: string
+  companions: string
+  moreOpen: boolean
+}
+
+// Un draft "vacío" (todo en blanco) no merece restaurarse ni avisar: es ruido,
+// no un recuerdo a medio escribir.
+function hasContent(d: GroupDraft): boolean {
+  return Boolean(
+    d.name.trim() || d.startsOn || d.endsOn || d.description.trim() || d.companions.trim(),
+  )
+}
 
 // Crear un viaje (flujo grupo-primero). El viaje es el contenedor social del
 // plan: lo creas, los invitas y lo viven contigo. No se crea ningún reto aquí;
@@ -77,6 +101,53 @@ export function CreateGroup({ onBack }: Props) {
 
   const toast = useToast()
   const { user } = useSession()
+
+  // BORRADOR PERSISTENTE (issue #718): al montar, intenta restaurar un draft
+  // pendiente. `restored` desarma el autosave hasta que este intento termine
+  // (encontrara algo o no) — si no, el primer render con campos vacíos
+  // pisaría un draft real antes de leerlo.
+  const [restored, setRestored] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void loadDraft<GroupDraft>(DRAFT_KEY).then((draft) => {
+      if (cancelled) return
+      if (draft && hasContent(draft)) {
+        setName(draft.name)
+        setStartsOn(draft.startsOn)
+        setEndsOn(draft.endsOn)
+        setDescription(draft.description)
+        setCompanions(draft.companions)
+        setMoreOpen(draft.moreOpen)
+        toast.show('Recuperado tu borrador del viaje.', {
+          tone: 'neutral',
+          action: {
+            label: 'Descartar',
+            onClick: () => {
+              void clearDraft(DRAFT_KEY)
+              setName('')
+              setStartsOn('')
+              setEndsOn('')
+              setDescription('')
+              setCompanions('')
+              setMoreOpen(false)
+            },
+          },
+        })
+      }
+      setRestored(true)
+    })
+    return () => {
+      cancelled = true
+    }
+    // Solo al montar: restaurar un draft es una operación de una sola vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const draftSnapshot = useMemo<GroupDraft>(
+    () => ({ name, startsOn, endsOn, description, companions, moreOpen }),
+    [name, startsOn, endsOn, description, companions, moreOpen],
+  )
+  useDraftAutosave(DRAFT_KEY, draftSnapshot, restored)
 
   const nameOk = name.trim().length > 0
   // El rango es válido salvo que la vuelta caiga antes de la salida (las dos son
@@ -134,6 +205,8 @@ export function CreateGroup({ onBack }: Props) {
       // Membresía 'owner' para que el viaje aparezca en "Tus viajes" (la home se
       // nutre de group_members). La fila propia la permite el RLS de inserción.
       await joinGroupAsOwner(groupId, user.id)
+      // Viaje creado con éxito: el borrador ya cumplió su función (issue #718).
+      void clearDraft(DRAFT_KEY)
       track('group_created', {
         group_id: groupId,
         has_dates: Boolean(startsOn || endsOn),

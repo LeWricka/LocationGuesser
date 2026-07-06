@@ -10,6 +10,7 @@ interface ToastItem {
   id: string
   message: string
   tone: ToastTone
+  action?: { label: string; onClick: () => void }
 }
 
 interface Props {
@@ -36,7 +37,7 @@ export function ToastProvider({ children }: Props) {
       const id = crypto.randomUUID()
       const tone = options?.tone ?? 'neutral'
       const duration = options?.duration ?? 3500
-      setToasts((prev) => [...prev, { id, message, tone }])
+      setToasts((prev) => [...prev, { id, message, tone, action: options?.action }])
       if (duration > 0) {
         timers.current.set(
           id,
@@ -56,6 +57,18 @@ export function ToastProvider({ children }: Props) {
         {toasts.map((t) => (
           <div key={t.id} className={[styles.toast, styles[t.tone]].join(' ')} role="status">
             <span className={styles.message}>{t.message}</span>
+            {t.action && (
+              <button
+                type="button"
+                className={[styles.action, 'lg-press'].join(' ')}
+                onClick={() => {
+                  t.action?.onClick()
+                  dismiss(t.id)
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
             <button
               type="button"
               className={[styles.close, 'lg-press'].join(' ')}

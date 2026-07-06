@@ -43,6 +43,7 @@ vi.mock('./challengeShareCover', () => ({
 import { CreateNumberChallenge } from './CreateNumberChallenge'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
+import { clearDraft, loadDraft } from '../../lib/drafts'
 
 const session: SessionState = {
   session: null,
@@ -53,14 +54,14 @@ const session: SessionState = {
   refreshProfile: async () => {},
 }
 
-function renderCreate() {
+function renderCreate(groupId = 'g1') {
   const onBack = vi.fn()
   const onCreated = vi.fn()
-  render(
+  const view = render(
     <SessionContext.Provider value={session}>
       <ToastProvider>
         <CreateNumberChallenge
-          groupId="g1"
+          groupId={groupId}
           groupName="Lisboa"
           onBack={onBack}
           onCreated={onCreated}
@@ -68,7 +69,7 @@ function renderCreate() {
       </ToastProvider>
     </SessionContext.Provider>,
   )
-  return { onBack, onCreated }
+  return { onBack, onCreated, ...view }
 }
 
 // Rellena el paso 1 (nombre + pregunta) y avanza al paso 2.
@@ -160,5 +161,81 @@ describe('CreateNumberChallenge — formulario de papel en 2 pasos (#586)', () =
     // El destino de crear es la hoja de Compartir (tarjeta-imagen, #595), no saltar a jugar.
     expect(await screen.findByText('¡Reto creado!')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /compartir/i })).toBeInTheDocument()
+  })
+})
+
+// --- Borrador persistente (issue #718) ---------------------------------------------
+
+describe('CreateNumberChallenge — borrador persistente (#718)', () => {
+  beforeEach(() => {
+    trackMock.mockClear()
+    createNumberChallengeMock.mockReset()
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
+  })
+
+  test('escribir, desmontar y volver a montar restaura el borrador con toast y draft_restored', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    const { unmount } = renderCreate(groupId)
+
+    await userEvent.type(screen.getByLabelText('Nombre del reto'), 'La cuenta de la cena')
+    await userEvent.type(screen.getByLabelText('Tu pregunta'), '¿Cuánto costó?')
+
+    // Espera a que el autosave debounced (800ms) persista antes de desmontar.
+    await waitFor(
+      async () => {
+        const draft = await loadDraft(`numberChallenge:${groupId}`)
+        expect(draft).not.toBeNull()
+      },
+      { timeout: 2000 },
+    )
+    unmount()
+
+    renderCreate(groupId)
+    // El toast confirma que la restauración ASÍNCRONA terminó — solo entonces es
+    // seguro afirmar los valores (afirmarlos antes era una carrera: verde en
+    // local, rojo en CI). Mismo orden que los tests de AddMoment.
+    await screen.findByText(/recuperado tu borrador/i)
+    expect(screen.getByLabelText('Nombre del reto')).toHaveValue('La cuenta de la cena')
+    expect(screen.getByLabelText('Tu pregunta')).toHaveValue('¿Cuánto costó?')
+    expect(trackMock).toHaveBeenCalledWith('draft_restored', {
+      form: 'number_challenge',
+      has_photos: false,
+    })
+  })
+
+  test('"Descartar" en el toast borra el draft y limpia el formulario', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    const { unmount } = renderCreate(groupId)
+    await userEvent.type(screen.getByLabelText('Nombre del reto'), 'Borrador a descartar')
+    await waitFor(
+      async () => expect(await loadDraft(`numberChallenge:${groupId}`)).not.toBeNull(),
+      { timeout: 2000 },
+    )
+    unmount()
+
+    renderCreate(groupId)
+    await screen.findByText(/recuperado tu borrador/i)
+    await userEvent.click(screen.getByRole('button', { name: 'Descartar' }))
+
+    expect(screen.getByLabelText('Nombre del reto')).toHaveValue('')
+    expect(await loadDraft(`numberChallenge:${groupId}`)).toBeNull()
+  })
+
+  test('crear el reto con éxito limpia el borrador', async () => {
+    const groupId = `g-draft-${crypto.randomUUID()}`
+    createNumberChallengeMock.mockResolvedValue({
+      challenge: { id: 'reto-x', title: 'x' } as ChallengeForPlay,
+      groupId,
+    })
+    renderCreate(groupId)
+    await userEvent.type(screen.getByLabelText('Nombre del reto'), 'x')
+    await userEvent.type(screen.getByLabelText('Tu pregunta'), 'y')
+    await userEvent.click(screen.getByRole('button', { name: /siguiente/i }))
+    await userEvent.type(screen.getByLabelText('Respuesta correcta'), '10')
+    await userEvent.click(screen.getByRole('button', { name: /crear el reto/i }))
+
+    await waitFor(() => expect(createNumberChallengeMock).toHaveBeenCalledTimes(1))
+    expect(await loadDraft(`numberChallenge:${groupId}`)).toBeNull()
+    await clearDraft(`numberChallenge:${groupId}`)
   })
 })

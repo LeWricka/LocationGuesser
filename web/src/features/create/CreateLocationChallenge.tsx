@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { MapPicker } from './MapPicker'
 import { StreetViewPreview } from './StreetViewPreview'
@@ -13,6 +13,14 @@ import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
 import { DEFAULT_TIME_SCORING, type LatLng } from '../../lib/geo'
+import {
+  clearDraft,
+  deserializeFile,
+  loadDraft,
+  serializeFile,
+  useDraftAutosave,
+  type SerializedFile,
+} from '../../lib/drafts'
 import { AppHeader, SegmentedControl, Spinner, useToast } from '../../ui'
 import { IconGps } from '../../ui/icons/IconGps'
 import { IconCandado } from '../../ui/icons/IconCandado'
@@ -78,6 +86,24 @@ type PanoState =
 
 // Estado del GPS (solo para centrar el mapa, no es la respuesta).
 type GpsState = 'idle' | 'locating' | 'done' | 'error'
+
+// Borrador persistente (issue #718): clave por viaje. NO guardamos `panoState`
+// (deriva de una búsqueda de red, `findPanorama`) ni el paso (`step`): al
+// restaurar, re-lanzamos la búsqueda desde el punto guardado (barato, y evita
+// resucitar un panoId que podría no seguir siendo el más cercano) y aterrizamos
+// siempre en el paso "sitio" — si el dueño ya había llegado a "las reglas",
+// un toque en "Continuar" en cuanto la cobertura resuelva le devuelve ahí.
+function draftKey(groupId: string): string {
+  return `locationChallenge:${groupId}`
+}
+
+interface LocationChallengeDraft {
+  point: LatLng
+  deadlineIndex: number
+  guessIndex: number
+  timeScoring: boolean
+  photo: SerializedFile | null
+}
 
 // Reto ¿Dónde estamos? con selección MANUAL del punto en el mapa (label del
 // tipo, antes "¿Dónde?"; el `challenge_kind` interno sigue siendo 'location').
@@ -215,6 +241,84 @@ export function CreateLocationChallenge({
     setPhotoFile(file)
   }
 
+  // BORRADOR PERSISTENTE (issue #718). Se salta por completo con
+  // `initialState` (galería/tests, capturas deterministas): un draft real
+  // interferiría con esos estados sembrados a mano. `restored` desarma el
+  // autosave hasta que este intento de restaurar termine.
+  const [restored, setRestored] = useState(initialState != null)
+  useEffect(() => {
+    if (initialState) return
+    let cancelled = false
+    void loadDraft<LocationChallengeDraft>(draftKey(groupId)).then((draft) => {
+      if (cancelled) return
+      if (draft) {
+        setDeadlineIndex(draft.deadlineIndex)
+        setGuessIndex(draft.guessIndex)
+        setTimeScoring(draft.timeScoring)
+        if (draft.photo) pickPhoto(deserializeFile(draft.photo))
+        // Re-lanza la búsqueda de Street View desde el punto guardado (no
+        // resucitamos el panoId a ciegas, ver comentario de `draftKey`).
+        void handlePick(draft.point)
+        track('draft_restored', { form: 'location_challenge', has_photos: Boolean(draft.photo) })
+        toast.show('Recuperado tu borrador del reto.', {
+          tone: 'neutral',
+          action: {
+            label: 'Descartar',
+            onClick: () => {
+              void clearDraft(draftKey(groupId))
+              setPickedPoint(null)
+              setPanoState({ kind: 'idle' })
+              setDeadlineIndex(DEFAULT_DEADLINE_INDEX)
+              setGuessIndex(DEFAULT_GUESS_INDEX)
+              setTimeScoring(DEFAULT_TIME_SCORING)
+              pickPhoto(null)
+            },
+          },
+        })
+      }
+      setRestored(true)
+    })
+    return () => {
+      cancelled = true
+    }
+    // Solo al montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId])
+
+  // La foto se serializa aparte (async, issue #718) — mismo motivo que en
+  // CreateNumberChallenge: `serializeFile` lee bytes con `arrayBuffer()`, no
+  // puede vivir en el `useMemo` síncrono del snapshot.
+  const [draftPhoto, setDraftPhoto] = useState<SerializedFile | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    if (!photoFile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset síncrono al quitar la foto, no un derivado de otro estado
+      setDraftPhoto(null)
+      return
+    }
+    void serializeFile(photoFile).then((s) => {
+      if (!cancelled) setDraftPhoto(s)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [photoFile])
+
+  // Solo guardamos con un PUNTO elegido: sin él no hay nada real que perder
+  // (reabrir el mapa vacío no cuesta nada).
+  const draftSnapshot = useMemo<LocationChallengeDraft | null>(
+    () =>
+      pickedPoint
+        ? { point: pickedPoint, deadlineIndex, guessIndex, timeScoring, photo: draftPhoto }
+        : null,
+    [pickedPoint, deadlineIndex, guessIndex, timeScoring, draftPhoto],
+  )
+  useDraftAutosave(
+    draftSnapshot ? draftKey(groupId) : null,
+    draftSnapshot,
+    restored && draftSnapshot != null,
+  )
+
   const hasPano = panoState.kind === 'ready'
 
   // Paso 1 → 2: solo alcanzable con cobertura confirmada (el CTA "Continuar"
@@ -308,6 +412,8 @@ export function CreateLocationChallenge({
         scoreScale: 'ciudad',
       })
       setStatus(null)
+      // Reto lanzado con éxito: el borrador ya cumplió su función (issue #718).
+      void clearDraft(draftKey(groupId))
       track('challenge_created', {
         group_id: groupId,
         challenge_id: challenge.id,

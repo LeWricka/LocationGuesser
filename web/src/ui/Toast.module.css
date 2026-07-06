@@ -49,6 +49,26 @@
   font-size: var(--font-size-sm);
 }
 
+.action {
+  flex: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.action:hover {
+  color: var(--color-accent-2);
+}
+.action:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
 .close {
   display: inline-flex;
   align-items: center;
