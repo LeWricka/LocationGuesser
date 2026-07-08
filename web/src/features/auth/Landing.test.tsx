@@ -47,8 +47,9 @@ describe('Landing (email-first, issue #506)', () => {
     expect(
       screen.getByRole('heading', { name: /Comparte tus momentos de una forma diferente/i }),
     ).toBeInTheDocument()
-    // Narrativa en dos partes (issue #731): Parte 1 "Guarda el viaje" (la esencia) y
-    // Parte 2 "Y luego, jugad" (el gancho social), cada una con capturas reales.
+    // Narrativa en dos partes (issue #731, reorientación de la Parte 2 en #733):
+    // Parte 1 "Guarda el viaje" (la esencia) y Parte 2 "Y que tu gente sea parte"
+    // (compartir; jugar es solo una forma), cada una con capturas reales.
     expect(
       screen.getByRole('heading', { name: 'Guarda el viaje mientras lo vives' }),
     ).toBeInTheDocument()
@@ -56,10 +57,10 @@ describe('Landing (email-first, issue #506)', () => {
     expect(screen.getByText('Cada momento, en su sitio')).toBeInTheDocument()
     expect(screen.getByText('Todo en el diario')).toBeInTheDocument()
     expect(screen.getByAltText(/Bitácora de un viaje bien llena/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Y de paso, un juego' })).toBeInTheDocument()
-    expect(screen.getByText('Reta a tus amigos')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Y que tu gente sea parte' })).toBeInTheDocument()
     expect(screen.getByText('Comparte el viaje')).toBeInTheDocument()
-    expect(screen.getByText('Clasificación')).toBeInTheDocument()
+    expect(screen.getByText('Reta a tus amigos')).toBeInTheDocument()
+    expect(screen.getByText('Clasificación y premios')).toBeInTheDocument()
     expect(screen.getByAltText(/Pantalla de jugar un reto/i)).toBeInTheDocument()
     // CTA único: "Empieza a compartir" (en el hero y al cierre de la narrativa). SIN
     // dos CTAs separados de signup/login.

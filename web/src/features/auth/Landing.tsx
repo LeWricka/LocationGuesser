@@ -35,6 +35,7 @@ import { Button, HomeGlobe, LogoMomentu, Stack, WordmarkMomentu, useToast } from
 import { takeLegacySessionNotice } from '../../lib/auth'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { LandingShowcase } from './LandingShowcase'
+import { LANDING_MAP_CREDIT } from './landingShowcaseData'
 import { LoginFlow } from './LoginFlow'
 import styles from './Landing.module.css'
 
@@ -159,13 +160,23 @@ export function Landing({ groupName, redirectTo }: Props) {
 
       {/* ── Scroll continuo, MISMA escena oscura (sin salto a papel) ───────────
           Narrativa en dos partes (issue #731): Parte 1 "Guarda el viaje" (la esencia)
-          y Parte 2 "Y luego, jugad" (el gancho social), cada una con su captura real
-          en tarjetas de vidrio sobre la escena. No la mostramos en el flujo de
-          invitación (ya vienen a un viaje concreto): ahí el hero + CTA bastan y la
-          narrativa distraería del "únete a <grupo>". */}
+          y Parte 2 "Y que tu gente sea parte" (compartir, jugar es solo UNA forma —
+          reorientación #733), cada una con su captura real en tarjetas de vidrio
+          sobre la escena. No la mostramos en el flujo de invitación (ya vienen a un
+          viaje concreto): ahí el hero + CTA bastan y la narrativa distraería del
+          "únete a <grupo>". */}
       {!joining && (
         <section className={styles.below}>
           <LandingShowcase className={styles.how} onStart={() => setShowAuth(true)} />
+
+          {/* Pie de página discreto (issue #733): el crédito de los tiles Esri de la
+              captura de la bitácora (Parte 1) YA NO va dentro de esa tarjeta (ensuciaba
+              la captura) — vive aquí, una vez, al fondo de toda la landing. No se puede
+              quitar (licencia Esri) pero sí apagar visualmente: tinta suave, texto
+              pequeño, sigue siendo texto real y legible (axe lo comprueba). */}
+          <footer className={styles.footer}>
+            <p className={styles.footerCredit}>{LANDING_MAP_CREDIT}</p>
+          </footer>
         </section>
       )}
     </main>
