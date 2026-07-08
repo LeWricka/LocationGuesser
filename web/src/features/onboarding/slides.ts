@@ -72,8 +72,8 @@ const GROUP_SLIDES: OnboardingSlide[] = [
   {
     icon: Camera,
     visual: 'card',
-    title: 'Comparte un momento',
-    body: 'Una foto y/o Street View del sitio donde estuviste.',
+    title: 'Sube una foto',
+    body: 'Del viaje, del finde, de donde sea. Con el sitio si te apetece.',
     // Sin captura real de "añadir momento" en LandingShowcase: foto de viaje bonita.
     image: lisboaPhoto,
   },
@@ -89,7 +89,7 @@ const GROUP_SLIDES: OnboardingSlide[] = [
     icon: MapPin,
     visual: 'pin',
     title: 'Juega un reto',
-    body: 'El guiño divertido: adivinar en el mapa dónde es. Gana quien más se acerca.',
+    body: '¿Dónde es? Marca en el mapa a contrarreloj. Gana quien más se acerca.',
     // Captura REAL de la pantalla de resultado (puntos + cercanía): es, literalmente,
     // jugar un reto.
     image: resultadoShot,

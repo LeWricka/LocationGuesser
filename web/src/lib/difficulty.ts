@@ -24,9 +24,9 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
 
 /** Frase de qué verán los participantes en cada dificultad. */
 export const DIFFICULTY_BLURB: Record<Difficulty, string> = {
-  facil: 'Les das una foto y pueden explorar el mapa de calles.',
-  medio: 'Exploran el panorama; sin foto.',
-  dificil: 'Una foto y a ojo, sin explorar.',
+  facil: 'Les das una foto y pueden mirar alrededor en la calle.',
+  medio: 'Solo la calle, sin foto.',
+  dificil: 'Solo la foto. A ojo, sin poder moverte.',
 }
 
 /** Qué medios componen una dificultad (lo que el creador se propone montar). */

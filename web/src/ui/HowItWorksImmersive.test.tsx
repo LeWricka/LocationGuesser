@@ -6,9 +6,9 @@ import { HowItWorksImmersive } from './HowItWorksImmersive'
 describe('HowItWorksImmersive', () => {
   test('renderiza los 3 pasos del bucle', () => {
     render(<HowItWorksImmersive />)
-    expect(screen.getByRole('heading', { name: 'Comparte un momento' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Lo viven y adivinan' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Queda en el viaje' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sube una foto' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Los tuyos adivinan' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Se queda para siempre' })).toBeInTheDocument()
   })
 
   test('cierra el bucle con el marcador del ganador', () => {
@@ -19,9 +19,7 @@ describe('HowItWorksImmersive', () => {
 
   test('remata con el pie de marca', () => {
     render(<HowItWorksImmersive />)
-    expect(
-      screen.getByText('Adivinar es solo el gancho. Compartir es lo que somos.'),
-    ).toBeInTheDocument()
+    expect(screen.getByText('Un diario de viaje que se juega.')).toBeInTheDocument()
   })
 
   test('el CTA solo aparece con handler y lo dispara', async () => {
