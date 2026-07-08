@@ -9,25 +9,24 @@ interface Props {
   className?: string
 }
 
-// Los 3 pasos del bucle, alineados al relato nuevo: la identidad es COMPARTIR tus
-// recuerdos y VIVIRLOS con los tuyos; adivinar en el mapa es el guiño que lo hace
-// divertido, no el qué somos. Texto directo, sin emojis sueltos en el copy (el
-// icono ya es el guiño visual).
+// Los 3 pasos del bucle. Mismo copy que HowItWorksImmersive (issue #729): las
+// dos versiones del bloque contaban el mismo bucle con palabras distintas y
+// una de ellas arrastraba los tics de IA — ahora una sola voz para ambas.
 const STEPS = [
   {
     icon: Camera,
-    title: 'Comparte un momento',
-    body: 'Una foto y/o Street View del sitio donde estuviste.',
+    title: 'Sube una foto',
+    body: 'Del viaje, del finde, de donde sea. Con el sitio si te apetece.',
   },
   {
     icon: MapIcon,
-    title: 'Lo viven contigo',
-    body: 'Los tuyos lo descubren y, de paso, adivinan dónde es.',
+    title: 'Los tuyos adivinan',
+    body: '¿Dónde es? Marcan en el mapa a contrarreloj. El que más se acerca, gana.',
   },
   {
     icon: Heart,
-    title: 'Guardáis el recuerdo',
-    body: 'Cada momento queda en el viaje. Gana quien más se acerca.',
+    title: 'Se queda para siempre',
+    body: 'Todo va al diario del viaje. Para volver cuando queráis.',
   },
 ] as const
 

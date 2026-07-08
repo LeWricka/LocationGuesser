@@ -792,7 +792,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 <IconDiana size={64} className={styles.introIcon} />
                 <p className={styles.introLine}>
                   {hasStreetView
-                    ? 'Explora el panorama y clava tu pin'
+                    ? 'Mira el panorama y clava tu pin'
                     : 'Mira la foto y clava tu pin'}
                 </p>
                 {challenge.guess_seconds != null && (

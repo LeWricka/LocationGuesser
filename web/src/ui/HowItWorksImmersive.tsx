@@ -10,23 +10,24 @@ interface Props {
   className?: string
 }
 
-// Los 3 pasos del bucle, con la identidad por delante: COMPARTIR un momento y
-// VIVIRLO con los tuyos; adivinar en el mapa es el gancho, no el qué somos.
+// Los 3 pasos del bucle. Copy revisado (issue #729): fuera el meta-discurso
+// ("el gancho", "lo que somos") y los verbos sentimentales forzados — la
+// gente no "siente" una foto, la mira y adivina.
 const STEPS = [
   {
     num: '01',
-    title: 'Comparte un momento',
-    body: 'Una foto del viaje. Si quieres, sumas tu ubicación real o un Street View.',
+    title: 'Sube una foto',
+    body: 'Del viaje, del finde, de donde sea. Con el sitio si te apetece.',
   },
   {
     num: '02',
-    title: 'Lo viven y adivinan',
-    body: 'Los tuyos lo sienten contigo y marcan en el mapa dónde creen que es. Con cuenta atrás.',
+    title: 'Los tuyos adivinan',
+    body: '¿Dónde es? Marcan en el mapa a contrarreloj. El que más se acerca, gana.',
   },
   {
     num: '03',
-    title: 'Queda en el viaje',
-    body: 'Cada momento se guarda en vuestro diario. Gana quien más se acerca.',
+    title: 'Se queda para siempre',
+    body: 'Todo va al diario del viaje. Para volver cuando queráis.',
   },
 ] as const
 
@@ -210,7 +211,7 @@ export function HowItWorksImmersive({ ctaLabel, onCta, className }: Props) {
               {ctaLabel ?? 'Empieza un viaje'}
             </button>
           )}
-          <p className={styles.foot}>Adivinar es solo el gancho. Compartir es lo que somos.</p>
+          <p className={styles.foot}>Un diario de viaje que se juega.</p>
         </div>
       </section>
     </div>
