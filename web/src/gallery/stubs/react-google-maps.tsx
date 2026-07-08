@@ -8,19 +8,39 @@
 // del mapa (overlays, hojas, botones) se ve igual. useMap/useMapsLibrary devuelven
 // null, que es lo que las pantallas esperan mientras el SDK "aún no cargó".
 
-import type { CSSProperties, ReactNode } from 'react'
+import { useEffect, type CSSProperties, type ReactNode } from 'react'
 
 interface MapProps {
   children?: ReactNode
   style?: CSSProperties
   className?: string
+  /**
+   * Google llama esto cuando las teselas visibles ya cargaron; `PlayMap` lo usa
+   * para ocultar `MapSkeleton` (fondo `--scene-bg` casi negro + spinner) una vez
+   * el mapa "está listo". El stub no pinta teselas de verdad, así que nadie lo
+   * disparaba nunca (issue #733): el skeleton se quedaba pegado para SIEMPRE
+   * tapando el lienzo de mentira de abajo — el mini-mapa de "Adivinar" salía negro
+   * en cualquier captura de la galería que lo montase (p. ej. `jugar.webp`, ver
+   * `landing-assets.spec.ts`/`gallery-capture.spec.ts`). Lo disparamos nosotros en
+   * cuanto se monta, igual que el 'load'/'idle' del stub hermano de maplibre-gl
+   * (`stubs/maplibre-gl.ts`) — mismo patrón, mismo motivo.
+   */
+  onTilesLoaded?: () => void
 }
 
 export function APIProvider({ children }: { children?: ReactNode }) {
   return <>{children}</>
 }
 
-export function Map({ children, style, className }: MapProps) {
+export function Map({ children, style, className, onTilesLoaded }: MapProps) {
+  // rAF (no microtask): deja pintar el gradiente ANTES de avisar "listo", pero
+  // sigue siendo determinista (mismo frame en cada corrida, sin `Math.random` ni
+  // temporizador con margen) — ver el porqué del disparo en el JSDoc de `onTilesLoaded`.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => onTilesLoaded?.())
+    return () => cancelAnimationFrame(raf)
+  }, [onTilesLoaded])
+
   return (
     <div
       className={className}

@@ -238,18 +238,6 @@
   pointer-events: none;
 }
 
-/* Crédito del mapa de repuesto (issue #695, ver `LandingStoryShot.mapCredit`):
- * micro-meta bajo el marco, discreto pero legible — solo aparece en la parte cuyo
- * crédito IN-CAPTURA queda tapado por el propio chrome de la pantalla. */
-.mapCredit {
-  margin: 0;
-  max-width: min(74%, 280px);
-  font-size: var(--font-size-xs);
-  line-height: var(--line-height-snug);
-  color: var(--scene-ink-soft);
-  opacity: 0.7;
-}
-
 /* ── Cierre + CTA ────────────────────────────────────────────────────────────── */
 /* Vidrio (issue #622, regla dura #537): flota sobre la escena oscura continua;
  * el material (fondo/blur/borde/tinta) lo aporta `.lg-glass` en el TSX, aquí solo

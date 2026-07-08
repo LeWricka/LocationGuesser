@@ -9,6 +9,7 @@
  *       .heroChrome    ← marca flotando sobre el globo (velo de escena)
  *       .heroContent   ← fondo PLANO --scene-bg (titular + CTA + hint), parte baja
  *     .below           ← scroll continuo, MISMA --scene-bg (cómo funciona + showcase)
+ *       .footer        ← pie discreto con el crédito de mapas (issue #733)
  *
  * Nunca se corta a papel: `.hero` y `.below` comparten el mismo `--scene-bg`, así
  * que el scroll pasa de la escena del héroe a la del showcase sin salto de fondo.
@@ -198,6 +199,28 @@
   width: 100%;
   max-width: var(--container-max);
   margin: 0 auto;
+}
+
+/* Pie de página discreto (issue #733): el crédito de los tiles Esri de la Parte 1
+ * (antes repetido bajo el marco de móvil de la captura, issue #695) vive aquí, una
+ * única vez, al final del scroll — fuera de cualquier tarjeta de captura. Mismo
+ * patrón que usaba `.mapCredit` en LandingShowcase (tinta suave + opacidad, atado
+ * al token de escena, no un color nuevo hardcodeado). */
+.footer {
+  width: 100%;
+  max-width: var(--container-max);
+  margin: var(--space-8) auto 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--scene-hairline);
+  text-align: center;
+}
+
+.footerCredit {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-snug);
+  color: var(--scene-ink-soft);
+  opacity: 0.7;
 }
 
 @media (min-width: 480px) {

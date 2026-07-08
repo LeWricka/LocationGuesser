@@ -1,7 +1,8 @@
 // Datos de la NARRATIVA en dos partes de la landing deslogueada (issue #731): tras el
 // héroe, la portada cuenta el producto en DOS BLOQUES —guardar el viaje (la esencia,
-// primero) y, luego, jugarlo con tu gente (el gancho social, después)— en vez del
-// carrusel plano de 4 capturas + lista de pasos del diseño anterior (#652/#695).
+// primero) y, luego, compartirlo para que tu gente sea parte (jugar es solo UNA
+// forma de estarlo, no el objetivo, ver la reorientación de la Parte 2 en #733)— en
+// vez del carrusel plano de 4 capturas + lista de pasos del diseño anterior (#652/#695).
 // Estructura y copy validados por el dueño.
 //
 // Reutiliza los MISMOS assets reales del diseño anterior (`assets/landing/*.webp`,
@@ -18,9 +19,12 @@ import { MAP_PRESETS } from '../../lib/mapPresets'
 
 // Mismo crédito de tiles que pintan HomeGlobe/TripMapGlobe (issue #695): la captura de
 // la bitácora (viaje.webp) tapa el propio botón "ⓘ" con el carril de tarjetas del
-// diario, así que el crédito de Esri se repite aquí, pequeño, bajo el marco.
+// diario. Antes se repetía este texto bajo el marco de móvil de la captura que lo
+// necesitaba (issue #695); el dueño pidió sacarlo de las capturas del todo (issue
+// #733): ahora vive UNA vez, como pie de página discreto de toda la landing (ver
+// `LANDING_MAP_CREDIT`, consumido por `Landing.tsx`), nunca dentro de una tarjeta.
 const { base: ESRI_SATELLITE, labels: ESRI_LABELS } = MAP_PRESETS.diario
-const ESRI_CREDIT = [ESRI_SATELLITE.attribution, ESRI_LABELS?.attribution]
+export const LANDING_MAP_CREDIT = [ESRI_SATELLITE.attribution, ESRI_LABELS?.attribution]
   .filter(Boolean)
   .join(' · ')
   .replace(/&copy;/g, '©')
@@ -39,9 +43,6 @@ export interface LandingStoryShot {
   /** Captura real (webp empaquetado), mostrada dentro del marco de móvil. */
   image: string
   alt: string
-  /** Crédito del mapa satélite (issue #695), solo cuando no queda legible en la
-   * propia captura (ver el mismo campo en el diseño anterior de este fichero). */
-  mapCredit?: string
 }
 
 // Una de las dos partes de la narrativa: separador + eyebrow + título + lede + tres
@@ -67,7 +68,7 @@ const GUARDAR: LandingStoryPart = {
   kicker: 'Parte 1 · Guarda el viaje',
   eyebrow: 'Tu viaje, para siempre',
   title: 'Guarda el viaje mientras lo vives',
-  lede: 'Fotos, clips, audios, un sitio en el mapa. Igual de fácil que mandarlo al grupo — pero se queda para siempre, no se pierde en el chat.',
+  lede: 'Foto, clip, audio, un sitio en el mapa. Todo lo del viaje, guardado como lo vivís.',
   items: [
     {
       icon: 'camara',
@@ -77,45 +78,49 @@ const GUARDAR: LandingStoryPart = {
     {
       icon: 'pin',
       title: 'Cada momento, en su sitio',
-      body: 'Se guarda en el mapa donde pasó. El viaje va dejando su rastro.',
+      body: 'Se guarda en el mapa donde pasó. Queda grabado ahí para siempre.',
     },
     {
       icon: 'calendario',
       title: 'Todo en el diario',
-      body: 'Fotos y momentos en orden, en la bitácora. Para volver cuando queráis.',
+      body: 'La bitácora lo reúne todo: fotos y momentos en orden. Para volver cuando queráis.',
     },
   ],
   shot: {
     image: viajeShot,
     alt: 'Bitácora de un viaje bien llena: varios momentos con sus fotos, en orden, y el recorrido sobre el mapa.',
-    mapCredit: ESRI_CREDIT,
   },
 }
 
-// PARTE 2 — el gancho social: cada sitio guardado se convierte en un reto para que tu
-// gente entre, mire el viaje y se pique.
+// PARTE 2 — REORIENTACIÓN (issue #733): el objetivo NO es jugar, es COMPARTIR y que
+// tu gente sea parte de la experiencia — jugar es solo UNA forma de estar dentro (la
+// otra es simplemente mirar el diario). El diseño anterior (#731) enmarcaba toda la
+// parte como "un juego" (kicker "jugad", título "de paso, un juego", cierre en
+// "pique"): el dueño pidió reescribirla alrededor de compartir, con jugar como el
+// segundo de tres escalones (Comparte → Reta → Clasificación), de lo más básico
+// (mirar) a lo más comprometido (competir por un premio).
 const JUGAR: LandingStoryPart = {
   id: 'jugar',
   tone: 'jugar',
   kicker: 'Parte 2 · Y luego, jugad',
   eyebrow: 'Con tu gente',
-  title: 'Y de paso, un juego',
-  lede: 'Cada sitio es un reto: los tuyos adivinan dónde es. El gancho para que el grupo entre, mire el viaje y se pique.',
+  title: 'Y que tu gente sea parte',
+  lede: 'Comparte el viaje y deja que se metan dentro: viéndolo, o siguiéndolo a su manera.',
   items: [
-    {
-      icon: 'reto',
-      title: 'Reta a tus amigos',
-      body: '¿Dónde tomé esta foto? Marcan en el mapa a contrarreloj. El que más se acerca, gana.',
-    },
     {
       icon: 'globo',
       title: 'Comparte el viaje',
-      body: 'Un enlace y ya están dentro. Ven el diario y juegan, sin instalar nada.',
+      body: 'Un enlace y están dentro. Ven el diario, las fotos y los momentos, sin instalar nada.',
+    },
+    {
+      icon: 'reto',
+      title: 'Reta a tus amigos',
+      body: 'Crea retos con tus fotos: ¿dónde es? Siguen el viaje adivinando en el mapa.',
     },
     {
       icon: 'trofeo',
-      title: 'Clasificación',
-      body: 'Puntos, ranking y pique sano. Que participen todos.',
+      title: 'Clasificación y premios',
+      body: 'Puntos, ranking y los premios que tú pongas. Para que lo sigan hasta el final.',
     },
   ],
   shot: {

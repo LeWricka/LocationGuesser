@@ -140,7 +140,10 @@ function StoryPart({ part }: { part: LandingStoryPart }) {
         </header>
 
         {/* Marco de móvil en CSS: la captura real vive dentro de la "pantalla".
-            El notch y el brillo se dibujan con pseudo-elementos, sin assets. */}
+            El notch y el brillo se dibujan con pseudo-elementos, sin assets. Issue
+            #733: el crédito del mapa satélite YA NO se repite bajo el marco (ensuciaba
+            la captura) — vive una única vez en el pie de página de la landing (ver
+            `LANDING_MAP_CREDIT` en `Landing.tsx`). */}
         <div className={styles.media}>
           <div className={styles.phone}>
             <div className={styles.phoneScreen}>
@@ -155,10 +158,6 @@ function StoryPart({ part }: { part: LandingStoryPart }) {
               />
             </div>
           </div>
-          {/* Crédito del mapa satélite de repuesto (issue #695): solo cuando la
-              propia captura no deja legible el crédito de Esri (ver
-              `LandingStoryShot.mapCredit`). */}
-          {part.shot.mapCredit && <p className={styles.mapCredit}>{part.shot.mapCredit}</p>}
         </div>
       </div>
     </section>
