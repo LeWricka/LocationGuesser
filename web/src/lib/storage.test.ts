@@ -42,6 +42,7 @@ import {
   ImageDecodeError,
   SIGNED_URL_TTL_SECONDS,
   markFileSelection,
+  clearSignedUrlCache,
 } from './storage'
 
 // Fake mínimo de `<img>`: el nuevo `decodeImage` (storage.ts) carga SIEMPRE un
@@ -221,6 +222,10 @@ beforeEach(() => {
     data: { signedUrl: 'https://firmada.example/x.jpg' },
     error: null,
   })
+  // Varios tests firman el MISMO path ('viajes/foto.jpg'): sin limpiar la
+  // caché entre casos, el segundo se serviría de la firma cacheada por el
+  // primero y `createSignedUrl` no se llamaría de nuevo (ver signedImageUrl).
+  clearSignedUrlCache()
 })
 
 // Issue #638: las tarjetas de la home se quedaban en blanco tras ~1h de PWA
@@ -243,6 +248,65 @@ describe('signedImageUrl — TTL por defecto (issue #638)', () => {
   test('si Storage devuelve error, resuelve null en vez de lanzar', async () => {
     createSignedUrl.mockResolvedValue({ data: null, error: new Error('boom') })
     await expect(signedImageUrl('viajes/foto.jpg')).resolves.toBeNull()
+  })
+})
+
+// Issue #725 ("Bitácora parpadea"): sin memoizar, cada llamada a
+// `createSignedUrl` para el MISMO path devolvía un token distinto — un `<img
+// src>` que ya apuntaba a esa foto la trataba como un recurso nuevo (recarga +
+// redecode) en cuanto `useTripData`/`BitacoraTab` volvían a firmar tras
+// cualquier evento de Realtime, aunque el fichero fuera el mismo de siempre
+// (los paths llevan UUID propio y nunca se sobrescriben).
+describe('signedImageUrl — caché por path (issue #725, Bitácora parpadea)', () => {
+  test('dos llamadas seguidas al MISMO path devuelven la MISMA URL sin volver a firmar', async () => {
+    createSignedUrl.mockResolvedValueOnce({
+      data: { signedUrl: 'https://firmada.example/una-vez.jpg' },
+      error: null,
+    })
+
+    const first = await signedImageUrl('viajes/estable.jpg')
+    const second = await signedImageUrl('viajes/estable.jpg')
+
+    expect(second).toBe(first)
+    expect(createSignedUrl).toHaveBeenCalledTimes(1)
+  })
+
+  test('paths distintos se firman cada uno por su cuenta, sin colisionar en caché', async () => {
+    createSignedUrl
+      .mockResolvedValueOnce({ data: { signedUrl: 'https://firmada.example/a.jpg' }, error: null })
+      .mockResolvedValueOnce({ data: { signedUrl: 'https://firmada.example/b.jpg' }, error: null })
+
+    const a = await signedImageUrl('viajes/a.jpg')
+    const b = await signedImageUrl('viajes/b.jpg')
+
+    expect(a).toBe('https://firmada.example/a.jpg')
+    expect(b).toBe('https://firmada.example/b.jpg')
+    expect(createSignedUrl).toHaveBeenCalledTimes(2)
+  })
+
+  test('pasado el margen de caducidad, SÍ re-firma (no sirve una URL a punto de caducar)', async () => {
+    vi.useFakeTimers()
+    try {
+      createSignedUrl
+        .mockResolvedValueOnce({
+          data: { signedUrl: 'https://firmada.example/v1.jpg' },
+          error: null,
+        })
+        .mockResolvedValueOnce({
+          data: { signedUrl: 'https://firmada.example/v2.jpg' },
+          error: null,
+        })
+
+      const first = await signedImageUrl('viajes/caduca.jpg', 10)
+      vi.advanceTimersByTime(11_000) // ya pasó el TTL de 10s + margen
+      const second = await signedImageUrl('viajes/caduca.jpg', 10)
+
+      expect(first).toBe('https://firmada.example/v1.jpg')
+      expect(second).toBe('https://firmada.example/v2.jpg')
+      expect(createSignedUrl).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

@@ -679,6 +679,34 @@ export async function uploadVideo(file: File, mimeType: string): Promise<string>
  */
 export const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24
 
+// Margen antes de la caducidad REAL en el que ya consideramos una URL cacheada
+// "a punto de caducar" y la renovamos por delante, en vez de arriesgarnos a
+// servir una que expire a medio uso.
+const SIGNED_URL_REFRESH_MARGIN_MS = 5 * 60 * 1000
+
+/**
+ * Caché de URLs firmadas por `path` (issue "Bitácora parpadea", #725): cada
+ * subida genera un `path` con UUID propio (`uploadImage`/`uploadAudio`/
+ * `uploadVideo` de más arriba) y el objeto en ese `path` NUNCA se sobrescribe,
+ * así que la MISMA URL firmada sigue siendo válida (y sirve el mismo
+ * contenido) hasta que caduca — no hace falta pedir una nueva cada vez.
+ *
+ * Sin esta caché, cada llamada a `createSignedUrl` para el mismo `path`
+ * devuelve un token distinto: `useTripData` se re-firma entera en cada evento
+ * de Realtime de `votes` (cualquier voto de cualquier jugador) y `BitacoraTab`
+ * hace lo mismo con su galería extra en cuanto `moments` cambia de referencia.
+ * El `<img>` de una foto YA CARGADA recibía entonces un `src` distinto para el
+ * MISMO fichero — el navegador lo trata como un recurso nuevo y lo
+ * recarga/redecodea, aunque el `key` de React sea estable y nada haya cambiado
+ * visualmente: eso era el parpadeo.
+ */
+const signedUrlCache = new Map<string, { url: string; expiresAt: number }>()
+
+/** Solo para tests: limpia la caché entre casos que reutilizan el mismo `path`. */
+export function clearSignedUrlCache(): void {
+  signedUrlCache.clear()
+}
+
 /**
  * URL firmada (temporal) de un objeto del bucket `images` a partir de su
  * `path` — sirve tanto para una foto como para una nota de voz (`audio/…`,
@@ -687,14 +715,24 @@ export const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24
  * sorpresa), así que no vale `getPublicUrl`: se firma con caducidad y solo un
  * usuario autenticado (miembro) puede generarla (RLS de storage). Null si no
  * se puede firmar. Async: se resuelve en el cliente.
+ *
+ * Memoizada por `path` (ver `signedUrlCache`): repetir la llamada para el
+ * mismo `path` antes de que caduque devuelve SIEMPRE la misma cadena, para que
+ * un `<img src>` que ya apuntaba a ella no la trate como un recurso nuevo.
  */
 export async function signedImageUrl(
   path: string,
   expiresIn = SIGNED_URL_TTL_SECONDS,
 ): Promise<string | null> {
+  const cached = signedUrlCache.get(path)
+  if (cached && cached.expiresAt - SIGNED_URL_REFRESH_MARGIN_MS > Date.now()) {
+    return cached.url
+  }
   const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, expiresIn)
   if (error) return null
-  return data?.signedUrl ?? null
+  const url = data?.signedUrl ?? null
+  if (url) signedUrlCache.set(path, { url, expiresAt: Date.now() + expiresIn * 1000 })
+  return url
 }
 
 /**
