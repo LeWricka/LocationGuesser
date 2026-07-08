@@ -126,6 +126,7 @@ const JUGAR: LandingStoryPart = {
 
 export const LANDING_STORY_PARTS: LandingStoryPart[] = [GUARDAR, JUGAR]
 
-// Pie de cierre tras la Parte 2: recuerda la identidad de producto (compartir, no
-// adivinar) justo antes del CTA final.
-export const LANDING_STORY_FOOT = 'Adivinar es solo el gancho. Compartir es lo que somos.'
+// Pie de cierre tras la Parte 2, justo antes del CTA final. NO meta-discurso de
+// marca ("lo que somos" hablándole al usuario, un tic que el dueño pidió erradicar
+// en #729): un lema concreto de lo que la app ES.
+export const LANDING_STORY_FOOT = 'Un diario de viaje que se juega.'
