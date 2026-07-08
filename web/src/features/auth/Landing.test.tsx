@@ -41,22 +41,29 @@ afterEach(() => {
 })
 
 describe('Landing (email-first, issue #506)', () => {
-  test('la portada muestra hero + showcase + CTA único email-first', () => {
+  test('la portada muestra hero + narrativa en dos partes + CTA único email-first', () => {
     renderLanding()
     // El hero lleva la frase ancla.
     expect(
       screen.getByRole('heading', { name: /Comparte tus momentos de una forma diferente/i }),
     ).toBeInTheDocument()
-    // El showcase ENSEÑA capturas reales del producto.
-    expect(screen.getByRole('heading', { name: 'Cada viaje deja su camino' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Cada momento, en su sitio' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Adivina dónde es' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Gana quien más se acerca' })).toBeInTheDocument()
-    expect(screen.getByAltText(/Pantalla de inicio de Momentu/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Así funciona Momentu' })).toBeInTheDocument()
-    // CTA único: "Empieza a compartir". SIN dos CTAs separados.
-    expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
-    // Ya NO hay separación signup/login.
+    // Narrativa en dos partes (issue #731): Parte 1 "Guarda el viaje" (la esencia) y
+    // Parte 2 "Y luego, jugad" (el gancho social), cada una con capturas reales.
+    expect(
+      screen.getByRole('heading', { name: 'Guarda el viaje mientras lo vives' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Foto, clip o audio')).toBeInTheDocument()
+    expect(screen.getByText('Cada momento, en su sitio')).toBeInTheDocument()
+    expect(screen.getByText('Todo en el diario')).toBeInTheDocument()
+    expect(screen.getByAltText(/Bitácora de un viaje bien llena/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Y de paso, un juego' })).toBeInTheDocument()
+    expect(screen.getByText('Reta a tus amigos')).toBeInTheDocument()
+    expect(screen.getByText('Comparte el viaje')).toBeInTheDocument()
+    expect(screen.getByText('Clasificación')).toBeInTheDocument()
+    expect(screen.getByAltText(/Pantalla de jugar un reto/i)).toBeInTheDocument()
+    // CTA único: "Empieza a compartir" (en el hero y al cierre de la narrativa). SIN
+    // dos CTAs separados de signup/login.
+    expect(screen.getAllByRole('button', { name: 'Empieza a compartir' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Crear tu viaje' })).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Ya tengo cuenta · Entrar' }),
@@ -71,7 +78,7 @@ describe('Landing (email-first, issue #506)', () => {
 
   test('"Empieza a compartir" abre el flujo de email (LoginFlow)', async () => {
     renderLanding()
-    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.click(screen.getByTestId('open-auth'))
     // LoginFlow paso 'email': LoginScreen con el campo de correo.
     expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
     // Sin campo de nombre: el modelo email-first no pide nombre al enviar el código.
@@ -81,17 +88,17 @@ describe('Landing (email-first, issue #506)', () => {
 
   test('"Atrás" desde el flujo de email vuelve a la landing', async () => {
     renderLanding()
-    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.click(screen.getByTestId('open-auth'))
     await expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
     // El LoginFlow tiene el botón "Atrás" que devuelve a la landing.
     await userEvent.click(screen.getByRole('button', { name: 'Atrás' }))
-    expect(screen.getByRole('button', { name: 'Empieza a compartir' })).toBeInTheDocument()
+    expect(screen.getByTestId('open-auth')).toBeInTheDocument()
     expect(screen.queryByLabelText('Tu correo')).not.toBeInTheDocument()
   })
 
   test('email válido envía el OTP y pasa al paso del código', async () => {
     renderLanding()
-    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.click(screen.getByTestId('open-auth'))
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     expect(sendOtp).toHaveBeenCalledWith('lewis@ej.com', undefined, undefined)
@@ -101,7 +108,7 @@ describe('Landing (email-first, issue #506)', () => {
 
   test('email inválido no envía OTP y muestra error', async () => {
     renderLanding()
-    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.click(screen.getByTestId('open-auth'))
     await userEvent.type(screen.getByLabelText('Tu correo'), 'noesemail')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     expect(sendOtp).not.toHaveBeenCalled()
@@ -110,7 +117,7 @@ describe('Landing (email-first, issue #506)', () => {
 
   test('pasa el redirectTo al enviar el OTP (preserva auto-join por deep link)', async () => {
     renderLanding({ redirectTo: 'https://app.example/' })
-    await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
+    await userEvent.click(screen.getByTestId('open-auth'))
     await userEvent.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await userEvent.click(screen.getByRole('button', { name: 'Empieza a compartir' }))
     expect(sendOtp).toHaveBeenCalledWith('lewis@ej.com', undefined, 'https://app.example/')

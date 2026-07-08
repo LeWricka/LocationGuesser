@@ -1,12 +1,13 @@
-/* Showcase de la landing deslogueada (issue #462): CAPTURAS REALES del producto en
- * marcos de móvil dibujados en CSS, estilo Polarsteps (imagen de producto real sobre
- * composición editorial). Sin imágenes externas ni CDNs: el teléfono es puro CSS.
- * Móvil-first, sin overflow a 320px, con tokens del sistema "Atelier/Pizarra".
+/* Narrativa en dos partes de la landing deslogueada (issue #731): CAPTURAS REALES
+ * del producto en marcos de móvil dibujados en CSS, estilo Polarsteps (imagen de
+ * producto real sobre composición editorial). Sin imágenes externas ni CDNs: el
+ * teléfono es puro CSS. Móvil-first, sin overflow a 320px, tokens del sistema
+ * "Atelier/Pizarra".
  *
- * REDISEÑO INMERSIVO (issue #622): vive sobre la escena oscura continua de la
- * landing (--scene-bg), no sobre papel — tinta `--scene-ink*` y la tarjeta del
- * bucle final en vidrio (`.lg-glass`, regla dura #537: chrome sobre foto/escena
- * usa vidrio, nunca un bloque opaco a mano). */
+ * REDISEÑO INMERSIVO (issue #622, heredado): vive sobre la escena oscura continua de
+ * la landing (--scene-bg), no sobre papel — tinta `--scene-ink*` y el cierre en
+ * vidrio (`.lg-glass`, regla dura #537: chrome sobre foto/escena usa vidrio, nunca un
+ * bloque opaco a mano). */
 
 .root {
   width: 100%;
@@ -14,17 +15,67 @@
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  /* Aire generoso ENTRE diapositivas: cada una respira como una página de revista. */
+  /* Aire generoso ENTRE partes: cada una respira como un capítulo. */
   gap: var(--space-9);
 }
 
-/* ── Diapositiva: texto editorial + móvil con captura ────────────────────────── */
-.slide {
+/* ── Una parte de la narrativa: separador + copy + puntos + móvil con captura ───
+ * Entra con un fundido sutil al hacer scroll (ver `StoryPart`, IntersectionObserver);
+ * `prefers-reduced-motion` la deja siempre visible sin transición. */
+.part {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  text-align: center;
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity var(--motion-duration-slower) var(--motion-ease-standard),
+    transform var(--motion-duration-slower) var(--motion-ease-standard);
+}
+
+.partIn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .part {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Separador de parte: "Parte 1 · Guarda el viaje" / "Parte 2 · Y luego, jugad".
+ * Tono por dato (`data-tone`), no por índice: teal (guardar) o dorado (jugar) —
+ * ambos ACLARADOS con blanco (igual que `.eyebrow`) porque el token de sistema está
+ * pensado para chrome sobre PAPEL y aquí vivimos sobre `--scene-bg` oscuro. */
+.kicker {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--scene-hairline);
+}
+
+.kicker[data-tone='guardar'] {
+  color: color-mix(in srgb, var(--accent) 55%, white);
+}
+
+.kicker[data-tone='jugar'] {
+  color: color-mix(in srgb, var(--route-gold) 55%, white);
+}
+
+.grid {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: var(--space-6);
-  text-align: center;
+  width: 100%;
 }
 
 .copy {
@@ -65,11 +116,72 @@
   text-wrap: pretty;
 }
 
+/* ── Tres puntos con icono custom ───────────────────────────────────────────────
+ * Lista SIEMPRE alineada a la izquierda (icono + título + cuerpo en fila), incluso
+ * cuando `.copy` está centrado en móvil — leer una lista centrada es incómodo. */
+.items {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 40ch;
+  text-align: left;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--scene-surface);
+  border: 1px solid var(--glass-border);
+  color: var(--scene-ink);
+}
+
+.itemText {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+
+.itemText strong {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  color: var(--scene-ink);
+}
+
+.itemText span {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--scene-ink-soft);
+}
+
 /* ── Marco de móvil (CSS puro) ────────────────────────────────────────────────
  * El teléfono es un bezel oscuro con esquinas de radio de sistema; la captura vive
  * dentro de la "pantalla" recortada. El altavoz y el brillo del cristal se dibujan
  * con pseudo-elementos —cero assets externos—. El fondo de escena da el aire
  * editorial (foto de producto flotando sobre panel oscuro, como Polarsteps). */
+.media {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .phone {
   position: relative;
   /* Anchura acotada para que quepa en 320px con margen; escala con la columna. */
@@ -126,9 +238,9 @@
   pointer-events: none;
 }
 
-/* Crédito del mapa de repuesto (issue #695, ver `ShowcaseShot.mapCredit`): micro-meta
- * bajo el marco, discreto pero legible — solo aparece en la diapositiva cuyo crédito
- * IN-CAPTURA queda tapado por el propio chrome de la pantalla. */
+/* Crédito del mapa de repuesto (issue #695, ver `LandingStoryShot.mapCredit`):
+ * micro-meta bajo el marco, discreto pero legible — solo aparece en la parte cuyo
+ * crédito IN-CAPTURA queda tapado por el propio chrome de la pantalla. */
 .mapCredit {
   margin: 0;
   max-width: min(74%, 280px);
@@ -138,81 +250,37 @@
   opacity: 0.7;
 }
 
-/* ── Relato del bucle + CTA ──────────────────────────────────────────────────── */
+/* ── Cierre + CTA ────────────────────────────────────────────────────────────── */
 /* Vidrio (issue #622, regla dura #537): flota sobre la escena oscura continua;
  * el material (fondo/blur/borde/tinta) lo aporta `.lg-glass` en el TSX, aquí solo
  * forma/espaciado. */
-.loopSection {
+.closeSection {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-4);
   padding: var(--space-6) var(--space-5);
   border-radius: var(--radius-lg);
   text-align: center;
 }
 
-.loopTitle {
-  margin: 0;
-  font-family: var(--font-serif);
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-xl);
-  line-height: var(--line-height-tight);
-  letter-spacing: var(--letter-spacing-tight);
-  color: var(--scene-ink);
-}
-
-.loop {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  text-align: left;
-}
-
-.loopStep {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.loopNum {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
-}
-
-.loopText {
-  font-size: var(--font-size-md);
-  line-height: var(--line-height-snug);
-  color: var(--scene-ink);
-}
-
-.loopFoot {
+.closeFoot {
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--scene-ink-soft);
 }
 
-/* Desktop: título con más aire y la diapositiva pasa a dos columnas (texto | móvil),
+/* Desktop: título con más aire y cada parte pasa a dos columnas (texto | móvil),
    alternando el lado para un ritmo editorial (zig-zag tipo Polarsteps). */
 @media (min-width: 600px) {
-  .title,
-  .loopTitle {
+  .title {
     font-size: var(--font-size-2xl);
   }
 
-  .slide {
+  .kicker {
+    align-self: stretch;
+  }
+
+  .grid {
     flex-direction: row;
     align-items: center;
     justify-content: center;
@@ -220,7 +288,7 @@
     text-align: left;
   }
 
-  .slide:nth-child(even) {
+  .part:nth-of-type(even) .grid {
     flex-direction: row-reverse;
   }
 
@@ -229,8 +297,11 @@
     align-items: flex-start;
   }
 
-  .phone {
+  .media {
     flex: none;
+  }
+
+  .phone {
     width: 240px;
   }
 }

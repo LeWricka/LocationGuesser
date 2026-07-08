@@ -7,10 +7,17 @@
 // continua —el globo de pines-foto ocupa la parte alta, marca + claim + CTA +
 // hint de enlace viven DEBAJO, en la propia escena (tokens --scene-*), sin
 // costura a papel—. El scroll sigue sobre la MISMA escena oscura (sin salto de
-// fondo): "cómo funciona" + el showcase de capturas, en tarjetas de vidrio
-// (`.lg-glass`, ver LandingShowcase). El acento en cursiva del claim usa un
-// teal ACLARADO (no el `--accent` de sistema, pensado para chrome sobre PAPEL)
-// para leer AA sobre el fondo oscuro (ver `.accent` en el CSS module).
+// fondo): la NARRATIVA en dos partes (issue #731) + el cierre con CTA, en
+// tarjetas de vidrio (`.lg-glass`, ver LandingShowcase). El acento en cursiva
+// del claim usa un teal ACLARADO (no el `--accent` de sistema, pensado para
+// chrome sobre PAPEL) para leer AA sobre el fondo oscuro (ver `.accent` en el
+// CSS module).
+//
+// NARRATIVA EN DOS PARTES (issue #731): tras el héroe, la portada cuenta el
+// producto en el orden de la identidad de producto — Parte 1 "Guarda el viaje"
+// (la esencia, primero) y Parte 2 "Y luego, jugad" (el gancho social, después).
+// Sustituye al carrusel plano de 4 capturas + lista de pasos anterior (#652/#695).
+// Ver `LandingShowcase`/`landingShowcaseData.ts` para el contenido de cada parte.
 //
 // La política es passwordless puro: sin contraseñas (cuentas-y-home.md §1.2).
 // MODELO EMAIL-FIRST (issue #506): un único CTA lleva a LoginFlow (email → código OTP).
@@ -21,7 +28,7 @@
 //    en vez del shell `GlobeSheet` (ese patrón queda para pantallas CON hoja de papel,
 //    p.ej. la bienvenida sin viajes de HomePage).
 //  - `LoginFlow` para el flujo de entrada (email → código OTP → sesión).
-//  - `LandingShowcase` para enseñar el producto en acción, ahora en vidrio sobre la escena.
+//  - `LandingShowcase` para la narrativa en dos partes, en vidrio sobre la escena.
 
 import { useEffect, useState } from 'react'
 import { Button, HomeGlobe, LogoMomentu, Stack, WordmarkMomentu, useToast } from '../../ui'
@@ -128,7 +135,7 @@ export function Landing({ groupName, redirectTo }: Props) {
                 Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
               </h1>
               <p className={styles.lead}>
-                Guarda tu viaje, comparte cada lugar y deja que tu gente lo viva contigo.
+                Guarda tus viajes para siempre y compártelos con tu gente.
               </p>
             </>
           )}
@@ -151,10 +158,11 @@ export function Landing({ groupName, redirectTo }: Props) {
       </section>
 
       {/* ── Scroll continuo, MISMA escena oscura (sin salto a papel) ───────────
-          Showcase de un VIAJE DE EJEMPLO (diario + reto + marcador): el visitante ve el
-          producto en acción de un vistazo, en tarjetas de vidrio sobre la escena. No lo
-          mostramos en el flujo de invitación (ya vienen a un viaje concreto): ahí el hero
-          + CTA bastan y el showcase distraería del "únete a <grupo>". */}
+          Narrativa en dos partes (issue #731): Parte 1 "Guarda el viaje" (la esencia)
+          y Parte 2 "Y luego, jugad" (el gancho social), cada una con su captura real
+          en tarjetas de vidrio sobre la escena. No la mostramos en el flujo de
+          invitación (ya vienen a un viaje concreto): ahí el hero + CTA bastan y la
+          narrativa distraería del "únete a <grupo>". */}
       {!joining && (
         <section className={styles.below}>
           <LandingShowcase className={styles.how} onStart={() => setShowAuth(true)} />
