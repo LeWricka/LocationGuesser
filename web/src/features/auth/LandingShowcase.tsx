@@ -1,48 +1,153 @@
-import { Button } from '../../ui'
-import { SHOWCASE_LOOP, SHOWCASE_SHOTS } from './landingShowcaseData'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
+import {
+  Button,
+  IconCalendario,
+  IconCamara,
+  IconGlobe,
+  IconPin,
+  IconReto,
+  IconTrofeo,
+  useReducedMotion,
+} from '../../ui'
+import {
+  LANDING_STORY_FOOT,
+  LANDING_STORY_PARTS,
+  type LandingStoryIcon,
+  type LandingStoryPart,
+} from './landingShowcaseData'
 import styles from './LandingShowcase.module.css'
 
 interface Props {
-  /** Acción de los CTA del showcase (abre el mismo popup de entrada de la landing). */
+  /** Acción del CTA de cierre (abre el mismo popup de entrada de la landing). */
   onStart: () => void
   className?: string
 }
 
+// Icono custom de marca por clave (ver `LandingStoryIcon`): resuelve aquí, en el
+// componente, para que `landingShowcaseData.ts` quede como datos puros sin JSX.
+const STORY_ICONS: Record<
+  LandingStoryIcon,
+  ComponentType<{ size?: number; className?: string }>
+> = {
+  camara: IconCamara,
+  pin: IconPin,
+  calendario: IconCalendario,
+  reto: IconReto,
+  globo: IconGlobe,
+  trofeo: IconTrofeo,
+}
+
 /**
- * SHOWCASE de la landing deslogueada (issue #462). El dueño pidió CAPTURAS REALES
- * del producto —"tipo la home de Polarsteps"— en vez del showcase de componentes
- * vivos (#452/#454): imagen de producto real dentro de un marco de móvil, sobre una
- * composición editorial cuidada.
+ * NARRATIVA en dos partes de la landing deslogueada (issue #731): tras el héroe, la
+ * portada cuenta el producto en DOS BLOQUES, en el orden de la identidad de producto
+ * —guardar el viaje es la ESENCIA (primero); jugar es el GANCHO social (después), no
+ * el qué somos—. Sustituye al carrusel plano de 4 capturas + lista de pasos del
+ * diseño anterior (#652/#695): ahora cada parte enfrenta un texto editorial (kicker +
+ * eyebrow + título serif + lede + tres puntos con icono custom) con UNA captura real
+ * del producto en un marco de móvil dibujado en CSS (self-contained, sin CDNs).
  *
- * Cada diapositiva enfrenta un texto editorial (eyebrow + título serif + lede) con
- * una captura real montada en un TELÉFONO dibujado en CSS (self-contained, sin CDNs
- * ni imágenes externas). Las tres pantallas cierran el bucle: home (globo + reto),
- * resultado (cercanía en puntos) y marcador (podio del viaje). Cierra con el relato
- * del bucle y un CTA que abre el mismo flujo de entrada.
- *
- * Presentacional puro: recibe el handler de entrada; sin estado ni red.
+ * Presentacional puro: recibe el handler del CTA de cierre; sin estado de red.
  */
 export function LandingShowcase({ onStart, className }: Props) {
   return (
     <div className={[styles.root, className].filter(Boolean).join(' ')}>
-      {SHOWCASE_SHOTS.map((shot) => (
-        <section key={shot.id} className={styles.slide} aria-labelledby={`showcase-${shot.id}`}>
-          <header className={styles.copy}>
-            <p className={styles.eyebrow}>{shot.eyebrow}</p>
-            <h2 id={`showcase-${shot.id}`} className={styles.title}>
-              {shot.title}
-            </h2>
-            <p className={styles.lede}>{shot.lede}</p>
-          </header>
+      {LANDING_STORY_PARTS.map((part) => (
+        <StoryPart key={part.id} part={part} />
+      ))}
 
-          {/* Marco de móvil en CSS: la captura real vive dentro de la "pantalla".
-              El notch y el brillo lo dibujamos con pseudo-elementos, sin assets. */}
+      {/* ── Cierre + CTA ─────────────────────────────────────────────────────── */}
+      {/* Tarjeta de VIDRIO (issue #622, regla dura #537): flota sobre la escena
+          oscura continua, no un bloque de papel opaco. */}
+      <section className={[styles.closeSection, 'lg-glass'].join(' ')} aria-label="Empezar">
+        <Button size="lg" fullWidth onClick={onStart}>
+          Empieza a compartir
+        </Button>
+        <p className={styles.closeFoot}>{LANDING_STORY_FOOT}</p>
+      </section>
+    </div>
+  )
+}
+
+/** Una parte de la narrativa: separador + copy + puntos + captura. Entra con un
+ * fundido sutil al hacer scroll (IntersectionObserver): arranca revelada si el
+ * usuario pide menos movimiento o si el navegador no soporta el observer (jsdom en
+ * tests, navegadores muy viejos). */
+function StoryPart({ part }: { part: LandingStoryPart }) {
+  const ref = useRef<HTMLElement>(null)
+  const reduced = useReducedMotion()
+  // Sin observer disponible (jsdom en tests, navegadores muy viejos) o con menos
+  // movimiento: arranca YA revelada — nada que suscribir, así que el bail-out vive en
+  // el inicializador perezoso, no en un `setState` síncrono dentro del efecto.
+  const canObserve = typeof IntersectionObserver !== 'undefined'
+  const [revealed, setRevealed] = useState(() => reduced || !canObserve)
+
+  useEffect(() => {
+    if (reduced || !canObserve) return
+    const node = ref.current
+    if (!node) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setRevealed(true)
+            observer.disconnect()
+          }
+        })
+      },
+      { threshold: 0.2, rootMargin: '0px 0px -10% 0px' },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [reduced, canObserve])
+
+  return (
+    <section
+      ref={ref}
+      className={[styles.part, revealed ? styles.partIn : null].filter(Boolean).join(' ')}
+      aria-labelledby={`landing-story-${part.id}`}
+    >
+      {/* Separador de parte: kicker teal (guardar) o dorado (jugar) — mismo idioma
+          visual de eyebrows sobre escena oscura (color-mix con blanco para AA). */}
+      <p className={styles.kicker} data-tone={part.tone}>
+        {part.kicker}
+      </p>
+
+      <div className={styles.grid}>
+        <header className={styles.copy}>
+          <p className={styles.eyebrow}>{part.eyebrow}</p>
+          <h2 id={`landing-story-${part.id}`} className={styles.title}>
+            {part.title}
+          </h2>
+          <p className={styles.lede}>{part.lede}</p>
+
+          <ul className={styles.items}>
+            {part.items.map((item) => {
+              const ItemIcon = STORY_ICONS[item.icon]
+              return (
+                <li key={item.title} className={styles.item}>
+                  <span className={styles.itemIcon}>
+                    <ItemIcon size={20} />
+                  </span>
+                  <span className={styles.itemText}>
+                    <strong>{item.title}</strong>
+                    <span>{item.body}</span>
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </header>
+
+        {/* Marco de móvil en CSS: la captura real vive dentro de la "pantalla".
+            El notch y el brillo se dibujan con pseudo-elementos, sin assets. */}
+        <div className={styles.media}>
           <div className={styles.phone}>
             <div className={styles.phoneScreen}>
               <img
                 className={styles.shot}
-                src={shot.image}
-                alt={shot.alt}
+                src={part.shot.image}
+                alt={part.shot.alt}
                 loading="lazy"
                 decoding="async"
                 width={390}
@@ -51,35 +156,11 @@ export function LandingShowcase({ onStart, className }: Props) {
             </div>
           </div>
           {/* Crédito del mapa satélite de repuesto (issue #695): solo cuando la
-              propia captura no deja legible el crédito de Esri que pinta el mapa
-              (ver `ShowcaseShot.mapCredit`). Ausente en el resto de diapositivas. */}
-          {shot.mapCredit && <p className={styles.mapCredit}>{shot.mapCredit}</p>}
-        </section>
-      ))}
-
-      {/* ── Relato del bucle + CTA ─────────────────────────────────────────────── */}
-      {/* Tarjeta de VIDRIO (issue #622, regla dura #537): flota sobre la escena
-          oscura continua, no un bloque de papel opaco. */}
-      <section
-        className={[styles.loopSection, 'lg-glass'].join(' ')}
-        aria-labelledby="showcase-bucle"
-      >
-        <h2 id="showcase-bucle" className={styles.loopTitle}>
-          Así funciona Momentu
-        </h2>
-        <ol className={styles.loop}>
-          {SHOWCASE_LOOP.map((line, i) => (
-            <li key={line} className={styles.loopStep}>
-              <span className={styles.loopNum}>{i + 1}</span>
-              <span className={styles.loopText}>{line}</span>
-            </li>
-          ))}
-        </ol>
-        <Button size="lg" fullWidth onClick={onStart}>
-          Empieza tu viaje
-        </Button>
-        <p className={styles.loopFoot}>Adivinar es solo el gancho. Compartir es lo que somos.</p>
-      </section>
-    </div>
+              propia captura no deja legible el crédito de Esri (ver
+              `LandingStoryShot.mapCredit`). */}
+          {part.shot.mapCredit && <p className={styles.mapCredit}>{part.shot.mapCredit}</p>}
+        </div>
+      </div>
+    </section>
   )
 }
