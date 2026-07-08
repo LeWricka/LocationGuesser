@@ -4,7 +4,7 @@
 // App.tsx lo hace la pieza #4; aquí solo el provider (lógica de sesión, sin UI
 // propia más allá de envolver a sus hijos).
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 import { onAuthStateChange, isVerifiedUser, clearLegacyAnonymousSession } from './auth'
@@ -22,6 +22,12 @@ export function AuthProvider({ children }: Props) {
   const [loading, setLoading] = useState(true)
 
   const user: User | null = session?.user ?? null
+
+  // Espejo síncrono de `session` (además del estado) para poder comparar el
+  // usuario ANTERIOR dentro del callback de `onAuthStateChange` sin depender de
+  // una closure obsoleta ni de un efecto adicional. Ver su uso más abajo (causa
+  // raíz de #647/#683/#720 — "refrescos y redirecciones al volver a la pestaña").
+  const sessionRef = useRef<Session | null>(null)
 
   // Recarga el perfil del usuario actual (o lo limpia si no hay sesión). Se llama
   // al cambiar de sesión y desde refreshProfile tras editar el perfil.
@@ -41,6 +47,11 @@ export function AuthProvider({ children }: Props) {
   useEffect(() => {
     let active = true
 
+    function applySession(next: Session | null) {
+      sessionRef.current = next
+      setSession(next)
+    }
+
     // Arranque: la sesión está persistida en localStorage (ver supabase.ts).
     // getSession la resuelve sin red. Cargamos también el perfil antes de quitar
     // el loading para que la primera pintada no parpadee "sin perfil".
@@ -53,7 +64,7 @@ export function AuthProvider({ children }: Props) {
       const legacy = await clearLegacyAnonymousSession(data.session)
       if (!active) return
       const validSession = legacy ? null : data.session
-      setSession(validSession)
+      applySession(validSession)
       await loadProfile(validSession?.user ?? null)
       if (active) setLoading(false)
     }
@@ -68,13 +79,49 @@ export function AuthProvider({ children }: Props) {
     // null → needsProfileStep(null)=true → ProfileGate aparecía un instante para
     // usuarios que SÍ tienen perfil (p.ej. vuelven por magic link). Con loading:true
     // App muestra BootScreen hasta que el perfil esté disponible: sin parpadeo.
-    const subscription = onAuthStateChange((_event, nextSession) => {
+    //
+    // CAUSA RAÍZ de "refrescos y redirecciones al salir/entrar" (reincidente,
+    // #647 → #683 → #720, ninguno la tocaba porque todos miraban el Service
+    // Worker, no este listener): `@supabase/supabase-js` (GoTrueClient)
+    // registra un `visibilitychange` propio y, en CADA vuelta de la pestaña a
+    // visible, llama a `_recoverAndRefresh()` — que si la sesión en storage
+    // sigue siendo válida (el caso normal: no ha expirado), emite un evento
+    // `SIGNED_IN` con el MISMO usuario, no solo cuando el token realmente se
+    // renueva (`TOKEN_REFRESHED`, que además también puede llegar por el mismo
+    // camino). Es decir: CADA vez que sales y vuelves a la pestaña, este
+    // callback se dispara con la MISMA identidad. Antes de este fix tratábamos
+    // ese evento igual que un login real: `loading=true` hacía que `AppRoutes`
+    // (App.tsx) desmontara TODO el árbol logueado (BootScreen) y lo remontara
+    // de cero al terminar — perdiendo cualquier estado de UI que no viva en el
+    // hash (la pestaña activa del viaje, un paso de asistente, una partida en
+    // curso…). Eso es la "REDIRECCIÓN" reportada: vuelves y apareces en otra
+    // pantalla aunque la URL nunca cambió, más el desmontaje visible por medio
+    // ("refresco"). Confirmado con test en session.test.tsx (mismo patrón que
+    // AppRoutes: `if (loading) <BootScreen/>`) y con el código de GoTrueClient
+    // en node_modules/@supabase/auth-js/dist/module/GoTrueClient.js
+    // (`_onVisibilityChanged` → `_recoverAndRefresh` → `_notifyAllSubscribers`).
+    //
+    // Arreglo: si el evento trae el MISMO usuario que ya teníamos (revalidación,
+    // no una transición real), actualizamos la sesión en el sitio, SIN loading
+    // ni recarga de perfil — no hay BootScreen, no hay remount, no se pierde
+    // nada. Solo pasamos por el camino "completo" (loading + perfil) cuando de
+    // verdad cambia la identidad (login real, logout, cambio de cuenta).
+    const subscription = onAuthStateChange((event, nextSession) => {
+      const previousUserId = sessionRef.current?.user?.id ?? null
+      const nextUserId = nextSession?.user?.id ?? null
+      const sameUser = previousUserId !== null && previousUserId === nextUserId
+
+      if (sameUser && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        applySession(nextSession)
+        return
+      }
+
       setLoading(true)
       void clearLegacyAnonymousSession(nextSession)
         .then((legacy) => {
           if (!active) return
           const validSession = legacy ? null : nextSession
-          setSession(validSession)
+          applySession(validSession)
           return loadProfile(validSession?.user ?? null)
         })
         .finally(() => {
