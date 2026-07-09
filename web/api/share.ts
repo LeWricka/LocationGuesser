@@ -12,18 +12,165 @@
 //
 // Los metadatos se leen con el SERVICE ROLE (env var en Vercel, NUNCA en repo): el
 // crawler es anónimo y la RLS le ocultaría todo; service_role la salta (migración 0025).
+//
+// ⚠️ P0 — ESTE FICHERO ES DELIBERADAMENTE AUTOCONTENIDO (sin imports relativos).
+// Causa del 500 `FUNCTION_INVOCATION_FAILED` que rompía TODO enlace compartido:
+// `@vercel/node` compila cada función con `ts.transpileModule` (NO bundlea) y luego
+// renombra los ficheros `.ts`→`.js`, pero `ts.transpileModule` deja los
+// especificadores de import VERBATIM. Así, un `import … from './_meta.ts'` (o sin
+// extensión) quedaba apuntando a un fichero que en runtime es `_meta.js` →
+// `ERR_MODULE_NOT_FOUND` al CARGAR el módulo, ANTES de ejecutar el handler, por lo
+// que ningún try/catch dentro del handler podía capturarlo. Sin import relativo no
+// hay nada que resolver en runtime: el módulo SIEMPRE carga. La lógica de metadatos
+// (antes en `_meta.ts`) va inline aquí y en `og.ts`; la duplicación es el precio de
+// que estas dos funciones de infraestructura no puedan volver a caerse al arrancar.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import {
-  resolveMeta,
-  ogHeadline,
-  ogDescription,
-  ogEyebrow,
-  type ShareKind,
-  type ShareMeta,
-} from './_meta.ts'
 
 const SITE_NAME = 'Momentu'
+
+type ShareKind = 'trip' | 'challenge'
+
+interface ShareMeta {
+  kind: ShareKind
+  /** Código (id de grupo o de reto) tal cual viene en la ruta limpia. */
+  code: string
+  /** id de grupo (para construir el hash de destino del cliente). */
+  groupId: string
+  /** id de reto, solo en `challenge`. */
+  challengeId?: string
+  /** Título a mostrar (nombre del viaje o título del reto). */
+  title: string
+  /** Nombre de quien comparte (display_name del dueño/creador), o null. */
+  authorName: string | null
+  /** Ruta de la portada en el bucket privado `images`, o null si no hay foto. */
+  coverPath: string | null
+}
+
+// ── Acceso a Supabase (REST + service role), leído PEREZOSAMENTE ──────────────
+// Nada de esto corre en la carga del módulo: `process.env` se lee dentro de las
+// funciones, así que aunque falten TODAS las env de servidor el módulo carga igual
+// (y `hasServerCreds()` devuelve false → servimos metas genéricas, nunca un throw).
+
+function serverCreds(): { url: string; key: string } {
+  return {
+    url: process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',
+    key: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  }
+}
+
+/** ¿Hay credenciales de servidor configuradas? Sin ellas servimos metas genéricas. */
+function hasServerCreds(): boolean {
+  const { url, key } = serverCreds()
+  return Boolean(url && key)
+}
+
+async function rest<T>(path: string): Promise<T[]> {
+  const { url, key } = serverCreds()
+  const res = await fetch(`${url}/rest/v1/${path}`, {
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+  })
+  if (!res.ok) return []
+  return (await res.json()) as T[]
+}
+
+async function displayName(userId: string | null): Promise<string | null> {
+  if (!userId) return null
+  const rows = await rest<{ display_name: string | null }>(
+    `profiles?id=eq.${encodeURIComponent(userId)}&select=display_name`,
+  )
+  return rows[0]?.display_name ?? null
+}
+
+/** Portada de un viaje: la foto del reto/recuerdo más reciente con imagen. */
+async function tripCover(groupId: string): Promise<string | null> {
+  const rows = await rest<{ image_path: string | null }>(
+    `challenges?group_id=eq.${encodeURIComponent(groupId)}&image_path=not.is.null&select=image_path&order=created_at.desc&limit=1`,
+  )
+  return rows[0]?.image_path ?? null
+}
+
+async function resolveTripMeta(code: string): Promise<ShareMeta | null> {
+  if (!hasServerCreds()) return null
+  const rows = await rest<{ id: string; name: string | null; created_by: string | null }>(
+    `groups?id=eq.${encodeURIComponent(code)}&select=id,name,created_by&limit=1`,
+  )
+  const group = rows[0]
+  if (!group) return null
+  const [authorName, coverPath] = await Promise.all([
+    displayName(group.created_by),
+    tripCover(group.id),
+  ])
+  return {
+    kind: 'trip',
+    code,
+    groupId: group.id,
+    title: group.name?.trim() || 'Un viaje en Momentu',
+    authorName,
+    coverPath,
+  }
+}
+
+async function resolveChallengeMeta(code: string): Promise<ShareMeta | null> {
+  if (!hasServerCreds()) return null
+  const rows = await rest<{
+    id: string
+    group_id: string
+    title: string | null
+    image_path: string | null
+    created_by: string | null
+  }>(
+    `challenges?id=eq.${encodeURIComponent(code)}&select=id,group_id,title,image_path,created_by&limit=1`,
+  )
+  const ch = rows[0]
+  if (!ch) return null
+  const authorName = await displayName(ch.created_by)
+  return {
+    kind: 'challenge',
+    code,
+    groupId: ch.group_id,
+    challengeId: ch.id,
+    title: ch.title?.trim() || '¿Dónde es esta foto?',
+    authorName,
+    coverPath: ch.image_path,
+  }
+}
+
+function resolveMeta(kind: ShareKind, code: string): Promise<ShareMeta | null> {
+  return kind === 'trip' ? resolveTripMeta(code) : resolveChallengeMeta(code)
+}
+
+// ── Copy de la tarjeta OG (mismo tono que la maqueta compartir.html) ──────────
+
+function ogHeadline(meta: ShareMeta): string {
+  if (meta.kind === 'challenge') {
+    return meta.authorName
+      ? `${meta.authorName} te reta: ¿dónde es esta foto?`
+      : '¿Dónde es esta foto?'
+  }
+  return meta.authorName
+    ? `Vive el viaje de ${meta.authorName} en el mapa`
+    : 'Vive este viaje en el mapa'
+}
+
+function ogDescription(meta: ShareMeta): string {
+  return meta.kind === 'challenge'
+    ? 'Clava el punto en el mapa antes de que acabe la cuenta atrás.'
+    : 'Mira cada parada y adivina dónde estaba. Sin instalar nada.'
+}
+
+function ogEyebrow(meta: ShareMeta): string {
+  if (meta.kind === 'challenge') {
+    return meta.authorName ? `Un reto de ${meta.authorName}` : 'Un reto en Momentu'
+  }
+  return meta.authorName ? `Un viaje de ${meta.authorName}` : 'Un viaje en Momentu'
+}
+
+// ── Construcción del shell HTML ───────────────────────────────────────────────
 
 function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
