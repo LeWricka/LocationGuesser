@@ -21,7 +21,7 @@ import {
   ogEyebrow,
   type ShareKind,
   type ShareMeta,
-} from './_meta'
+} from './_meta.ts'
 
 const SITE_NAME = 'Momentu'
 
@@ -124,15 +124,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   if (code) {
     try {
       meta = await resolveMeta(kind, code)
-    } catch {
+    } catch (err) {
       // Fallo de red/credenciales: caemos a metas genéricas (la app sigue abriendo).
+      console.error('[api/share] resolveMeta falló, usando metas genéricas', { kind, code, err })
       meta = null
     }
   }
 
-  // Cache moderada en el CDN: la tarjeta cambia poco (título/portada) y conviene que
-  // el crawler la sirva rápido. stale-while-revalidate refresca en segundo plano.
-  res.setHeader('Content-Type', 'text/html; charset=utf-8')
-  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400')
-  res.status(200).send(buildHtml(origin, kind, code, meta))
+  // Red de seguridad de P0: el enlace compartido NUNCA debe devolver 500 al
+  // receptor. Cualquier fallo inesperado al construir la tarjeta (no solo el de
+  // resolveMeta, ya cubierto arriba) cae aquí y servimos igualmente un redirect
+  // mínimo al hash de la app — el humano entra al viaje/reto aunque la
+  // previsualización enriquecida no se pueda montar.
+  try {
+    // Cache moderada en el CDN: la tarjeta cambia poco (título/portada) y conviene
+    // que el crawler la sirva rápido. stale-while-revalidate refresca en segundo plano.
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=86400')
+    res.status(200).send(buildHtml(origin, kind, code, meta))
+  } catch (err) {
+    console.error('[api/share] fallo inesperado construyendo la tarjeta', { kind, code, err })
+    const fallbackHash =
+      kind === 'trip' ? `#g=${encodeURIComponent(code)}` : `#c=${encodeURIComponent(code)}`
+    res.setHeader('Content-Type', 'text/html; charset=utf-8')
+    res
+      .status(200)
+      .send(
+        `<!doctype html><html lang="es"><head><meta charset="utf-8" />` +
+          `<meta http-equiv="refresh" content="0; url=${origin}/${fallbackHash}" /></head>` +
+          `<body><p>Abriendo Momentu…</p>` +
+          `<p><a href="${origin}/${fallbackHash}">Toca aquí si no se abre solo</a></p></body></html>`,
+      )
+  }
 }

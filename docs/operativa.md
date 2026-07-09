@@ -99,6 +99,34 @@ VITE_VAPID_PUBLIC_KEY=<clave VAPID pública>   # opcional (Web Push, §6)
 
 > ⚠️ **`VITE_SUPABASE_URL` debe ser EXACTA.** Un valor corrupto (espacio, salto de línea, URL mal copiada) **rompió producción** una vez: el cliente apunta a una URL inválida y todas las llamadas fallan. Copiar/pegar con cuidado y sin espacios al final.
 
+### 3.1 Variables de SERVIDOR para `web/api/*` (previsualización OG de enlaces compartidos)
+
+Las funciones serverless de Vercel `web/api/share.ts` y `web/api/og.ts` (sirven la
+tarjeta OG de `/v/:code` y `/j/:code`, ver `web/api/_meta.ts`) corren en el
+**runtime de función**, no en el bundle del cliente: **no reciben las `VITE_*`**
+del build de Vite. Necesitan sus PROPIAS variables de entorno de servidor,
+definidas aparte en Vercel:
+
+| Variable | Qué es | Origen |
+|----------|--------|--------|
+| `SUPABASE_URL` | URL del proyecto Supabase (igual valor que `VITE_SUPABASE_URL`, pero como var de servidor) | `https://ykquigyjvgxisgdxryxr.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key de Supabase (**SECRETA** — nunca en git, nunca en el cliente). Salta la RLS para que el crawler anónimo pueda leer título/portada (migración `0025`) | Dashboard Supabase → Project Settings → API → `service_role` |
+
+**Sin estas dos variables en Vercel, la previsualización NUNCA da 500** (el código
+en `web/api/_meta.ts` — `hasServerCreds()` — lo comprueba antes de tocar red y cae
+a metas genéricas de marca), pero la tarjeta que ve el receptor en WhatsApp/Telegram
+será genérica (sin título del viaje ni foto real) en vez de la enriquecida. Si a
+fecha de esta nota **no están configuradas en Vercel**, es la causa de que la
+previsualización salga siempre con el logo genérico — añadirlas (Production +
+Preview) y redeploy para activar la tarjeta enriquecida.
+
+> **Nota histórica (P0, jul 2026):** un 500 real (`FUNCTION_INVOCATION_FAILED`) en
+> estas mismas funciones vino de otra causa — un import relativo sin extensión
+> (`from './_meta'`) que el runtime de Vercel no resuelve al ejecutar el `.ts`
+> directamente (a diferencia de un bundler). Se arregló con la extensión explícita
+> (`from './_meta.ts'`) — ver PR que cierra el issue de P0. Este apartado documenta
+> la config de env pendiente que sigue siendo responsabilidad manual del dueño.
+
 ---
 
 ## 4. Despliegue de Edge Functions
