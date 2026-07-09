@@ -1,6 +1,7 @@
 // Tests del handler `api/og` (imagen OG: redirige a la portada real firmada o,
-// si falla, a la imagen de marca). Ver `share.test.ts` para el contexto del
-// bug de P0 (import sin extensión) que rompía TODA invocación en prod.
+// si falla, a la imagen de marca). Ver `share.test.ts` para el contexto del P0
+// (crash en la CARGA del módulo por un import relativo cuyo especificador quedaba
+// verbatim en Vercel); el fix es hacer el fichero autocontenido.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
@@ -59,6 +60,21 @@ describe('api/og handler', () => {
 
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }
+  })
+
+  it('el módulo carga SIN ninguna env de servidor (no lanza al importarse) y el handler redirige 302', async () => {
+    delete process.env.SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    const mod = await import('./og.ts')
+    expect(typeof mod.default).toBe('function')
+
+    const req = makeReq({ kind: 'trip', code: 'grupo-1' }, { host: 'www.momentu.art' })
+    const res = makeRes()
+    await expect(mod.default(req, res)).resolves.toBeUndefined()
+    expect(res._redirect?.code).toBe(302)
+    expect(res._redirect?.url).toBe('https://www.momentu.art/og-default.png')
   })
 
   it('happy path: código válido con portada redirige a la URL firmada del bucket', async () => {

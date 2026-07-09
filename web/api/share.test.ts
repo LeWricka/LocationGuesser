@@ -1,14 +1,16 @@
 // Tests del handler `api/share` (previsualización OG de /v/:code y /j/:code).
 //
-// Cubre el bug de P0 (#500-ish: 500 FUNCTION_INVOCATION_FAILED al abrir un
-// enlace compartido): la causa raíz fue un import relativo SIN extensión
-// (`from './_meta'`) que revienta bajo la ejecución nativa de TypeScript de
-// Vercel (a diferencia de un bundler, el resolver de módulos de Node exige la
-// extensión explícita). Ese fallo no lo puede cazar un test unitario del
-// handler (Vitest sí bundlea), así que la red de seguridad real es 1) el
-// import con extensión (`./_meta.ts`) y 2) el try/catch de última línea que
-// estos tests SÍ verifican: pase lo que pase dentro, nunca debe lanzar ni
-// devolver algo distinto de 200.
+// Contexto del P0 (500 FUNCTION_INVOCATION_FAILED al abrir un enlace compartido):
+// el crash era a NIVEL DE CARGA DE MÓDULO — `@vercel/node` compila con
+// `ts.transpileModule` (no bundlea) y renombra `.ts`→`.js`, pero deja los
+// especificadores de import verbatim, así que `import … from './_meta.ts'`
+// apuntaba a un fichero inexistente en runtime → `ERR_MODULE_NOT_FOUND` ANTES de
+// ejecutar el handler (ningún try/catch del handler lo captura). El fix: `share.ts`
+// es AUTOCONTENIDO (sin imports relativos) → no hay nada que resolver → el módulo
+// SIEMPRE carga. Un unit test no reproduce el fallo de Vercel (Vitest resuelve
+// TS), pero el test "el módulo carga sin ninguna env" abajo blinda la propiedad
+// que importa (importarlo nunca lanza), y el resto verifica la degradación: pase
+// lo que pase, el handler responde 200, nunca un 500.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
@@ -57,6 +59,24 @@ describe('api/share handler', () => {
 
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV }
+  })
+
+  it('el módulo carga SIN ninguna env de servidor (no lanza al importarse) y el handler responde 200', async () => {
+    // Reproduce el estado de Vercel hoy: sin SUPABASE_URL/KEY de servidor. El
+    // fichero autocontenido no debe tener NADA a nivel de módulo que dependa de
+    // esas env, así que importarlo no puede lanzar (era la causa raíz del 500).
+    delete process.env.SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY
+
+    const mod = await import('./share.ts')
+    expect(typeof mod.default).toBe('function')
+
+    const req = makeReq({ kind: 'trip', code: 'grupo-1' }, { host: 'www.momentu.art' })
+    const res = makeRes()
+    await expect(mod.default(req, res)).resolves.toBeUndefined()
+    expect(res._status).toBe(200)
+    expect(res._body).toContain('#g=grupo-1')
   })
 
   it('happy path: código válido devuelve 200 con metas del viaje y redirección al hash', async () => {
