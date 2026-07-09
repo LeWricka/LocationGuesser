@@ -11,7 +11,7 @@
 // El crawler sigue la redirección y cachea el PNG resultante.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { resolveMeta, signedCoverUrl, type ShareKind } from './_meta'
+import { resolveMeta, signedCoverUrl, type ShareKind } from './_meta.ts'
 
 // Imagen de marca por defecto (en /public): se usa cuando el viaje/reto no tiene
 // foto o no se puede firmar la portada. Así la tarjeta NUNCA queda sin imagen.
@@ -40,16 +40,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         if (signed) target = signed
       }
     }
-  } catch {
-    // Cualquier fallo (red, credenciales): caemos a la imagen de marca.
+  } catch (err) {
+    // Cualquier fallo (red, credenciales): caemos a la imagen de marca. Nunca 500:
+    // sin imagen real, la tarjeta muestra el logo, pero el enlace sigue vivo.
+    console.error('[api/og] fallo resolviendo portada, usando imagen de marca', {
+      kind,
+      code,
+      err,
+    })
     target = fallbackUrl
   }
 
-  // Cache en el CDN: la portada cambia poco; revalida en segundo plano. La propia
-  // redirección se cachea para no re-firmar en cada visita del crawler.
-  res.setHeader(
-    'Cache-Control',
-    'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
-  )
-  res.redirect(302, target)
+  try {
+    // Cache en el CDN: la portada cambia poco; revalida en segundo plano. La propia
+    // redirección se cachea para no re-firmar en cada visita del crawler.
+    res.setHeader(
+      'Cache-Control',
+      'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
+    )
+    res.redirect(302, target)
+  } catch (err) {
+    // Red de seguridad de P0: si incluso la redirección de marca fallara, no
+    // dejamos que la función explote — devolvemos 200 vacío antes que un 500.
+    console.error('[api/og] fallo inesperado sirviendo la imagen', { kind, code, err })
+    res.status(200).send('')
+  }
 }
