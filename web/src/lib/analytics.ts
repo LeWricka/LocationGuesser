@@ -147,6 +147,13 @@ export type AnalyticsEvent =
   // form ('moment'|'group'|'location_challenge'|'number_challenge'),
   // has_photos (solo aplica a 'moment', que es el único con galería).
   | 'draft_restored'
+  // Compartir UN RETO suelto (no el viaje entero) desde su detalle (issue
+  // #739): a diferencia de `invite_shared` (viaje completo / reto recién
+  // creado), este mide la acción "Compartir reto" sobre un reto YA existente
+  // y EN JUEGO. Props: group_id, challenge_id, surface
+  // ('shared'|'copied'|'downloaded'). SIN datos sensibles: nunca lat/lng ni
+  // el nombre del lugar (la respuesta oculta).
+  | 'challenge_shared'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

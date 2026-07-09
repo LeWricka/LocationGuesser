@@ -1,0 +1,71 @@
+/* Previa de la tarjeta-IMAGEN de "Compartir reto" (issue #739): mismo patrón que
+   `InviteModal`/`ChallengeCreatedShare` — previsualiza el PNG ya rasterizado,
+   con sus estados de carga/error. */
+.preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+}
+
+.previewImg {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.error {
+  margin: 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+.hint {
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+  color: var(--color-text-muted);
+}
+
+/* Pie de acciones (mismo patrón que InviteModal, issue #607): fila que ocupa
+   todo el ancho del footer del Modal y envuelve si no cabe, en vez de
+   desbordar el panel. */
+.footerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.footerButton {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Lienzo de captura: la tarjeta vive a tamaño real (1080px) fuera del viewport.
+   No usamos display:none (mediría 0 y html-to-image fallaría) ni
+   visibility:hidden; la sacamos del flujo con posición absoluta y un
+   desplazamiento grande. Mismo patrón que `InviteModal`/`ChallengeCreatedShare`. */
+.offscreen {
+  position: fixed;
+  top: 0;
+  left: -10000px;
+  width: 1080px;
+  pointer-events: none;
+  z-index: -1; /* design-lint-allow: lienzo de captura fuera de pantalla, mismo patrón que ShareLeaderboardModal */
+}

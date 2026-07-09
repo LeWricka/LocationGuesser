@@ -23,6 +23,7 @@ import { CreateChallengeKindPicker } from '../features/create/CreateChallengeKin
 import { EditChallenge } from '../features/group/EditChallenge'
 import { MomentGallery } from '../features/trip/MomentGallery'
 import { MomentSheet } from '../features/trip/MomentSheet'
+import { ShareChallengeModal } from '../features/trip/ShareChallengeModal'
 import { GroupSettingsModal } from '../features/group/GroupSettingsModal'
 import { InviteModal } from '../features/group/InviteModal'
 import { ResultCard } from '../features/play/ResultCard'
@@ -168,6 +169,27 @@ const MOMENT_RETO_CERRADO: Moment = {
   imageUrl: stubPhoto('La plaza del reloj'),
   guessedCount: 3,
   isOwn: false,
+}
+
+// RETO EN JUEGO ajeno, foto PISTA (issue #739): la captura del botón "Compartir
+// reto" en el detalle — solo debe aparecer mientras el reto sigue en juego (un
+// reto cerrado ya no se juega y ofrece "Ver marcador" en su lugar, ver el caso
+// `reto-vista-cerrado`). Anti-spoiler: sin lat/lng (la respuesta oculta).
+const MOMENT_RETO_ACTIVO: Moment = {
+  ...MOMENT_CON_FOTO,
+  challengeId: 'ch-reto-activo-galeria',
+  title: '¿Dónde tomó Marta esta foto?',
+  description: null,
+  status: 'active',
+  isChallenge: true,
+  deadlineAt: '2026-06-16T10:00:00.000Z',
+  imageUrl: stubPhoto('¿Dónde tomó Marta esta foto?'),
+  lat: null,
+  lng: null,
+  guessedCount: 1,
+  isOwn: false,
+  photoIsHint: true,
+  country: null,
 }
 
 // Avatares del grupo (issue #543): los 4 miembros sembrados del viaje de Japón
@@ -468,6 +490,29 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
+    // Issue #739: "Compartir reto" (UN reto suelto, no el viaje entero) desde
+    // su detalle — misma tarjeta-imagen que "¡Reto creado!" (#595), mismo
+    // patrón Copiar enlace/Compartir que InviteModal (#617). Reutiliza CH_ACTIVE
+    // (sembrado en el mundo falso) para que la cascada de portada rasterice de
+    // verdad su foto contra el Storage falso.
+    id: 'compartir-reto',
+    title: 'Compartir reto',
+    section: 'Viaje',
+    render: () => (
+      <div className="lg-page">
+        <h1>¿Dónde tomó Marta esta foto?</h1>
+        <ShareChallengeModal
+          groupId={GROUP_ID}
+          groupName={GROUP.name ?? GROUP_ID}
+          challengeId={CH_ACTIVE}
+          challengeTitle="¿Dónde tomó Marta esta foto?"
+          imagePath="photo-fushimi.jpg"
+          onClose={noop}
+        />
+      </div>
+    ),
+  },
+  {
     id: 'galeria-recuerdo-editar',
     title: 'Galería del recuerdo (dueño: portada / añadir / quitar)',
     section: 'Viaje',
@@ -502,6 +547,23 @@ export const cases: GalleryCase[] = [
         myUserId="u1"
         onClose={noop}
         onViewMarcador={noop}
+      />
+    ),
+  },
+  {
+    // Issue #739: "Compartir reto" solo aparece con el reto EN JUEGO (un reto
+    // cerrado ya no se juega; para ese caso está "Ver marcador" arriba, sin
+    // acción de compartir duplicada).
+    id: 'reto-vista-en-juego',
+    title: 'Reto · Vista (en juego, con "Compartir reto")',
+    section: 'Viaje',
+    render: () => (
+      <MomentSheet
+        moment={MOMENT_RETO_ACTIVO}
+        canEdit={false}
+        onClose={noop}
+        onPlay={noop}
+        onShareChallenge={noop}
       />
     ),
   },
