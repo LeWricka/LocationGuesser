@@ -20,7 +20,7 @@ import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { marcadorGroupHash, promoteChallengeHash } from '../../lib/route'
-import type { Moment } from '../../lib/trip'
+import { isMomentPhotoVisible, type Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
 import { MembersModal } from '../group/MembersModal'
@@ -31,6 +31,7 @@ import { BitacoraTab } from './BitacoraTab'
 import { MarcadorTab } from './MarcadorTab'
 import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
+import { ShareChallengeModal } from './ShareChallengeModal'
 import styles from './TripPage.module.css'
 
 /**
@@ -127,6 +128,16 @@ export function TripPage({
   const [section, setSection] = useState<Section>(initialSection)
   // Momento abierto en la hoja de detalle (null = cerrada).
   const [openMoment, setOpenMoment] = useState<Moment | null>(null)
+  // "Compartir reto" (issue #739): reto suelto a compartir desde su detalle
+  // (null = modal cerrado). El imagePath ya viene filtrado por el anti-spoiler
+  // de `isMomentPhotoVisible` (ver el botón en MomentSheet más abajo): una foto
+  // SORPRESA nunca llega aquí, ni siquiera si el que comparte es quien creó el
+  // reto (compartirlo destriparía la sorpresa al resto del grupo).
+  const [sharingChallenge, setSharingChallenge] = useState<{
+    id: string
+    title: string
+    imagePath: string | null
+  } | null>(null)
   // Reto en edición a pantalla completa (null = no editando). Editar un reto toca su
   // mecánica (plazo, Street View, votos), así que reutilizamos el editor completo
   // `EditChallenge` montado aquí en vez de hacerlo dentro de la hoja.
@@ -746,6 +757,23 @@ export function TripPage({
             ? () => onPlayChallenge(openMoment.challengeId)
             : undefined
         }
+        // "Compartir reto" (issue #739): solo con el reto EN JUEGO (un reto
+        // cerrado ya no se juega — para ese caso está "Ver marcador"). El
+        // imagePath se filtra aquí con el mismo anti-spoiler que el héroe de
+        // la propia hoja (`isMomentPhotoVisible`): una foto SORPRESA nunca
+        // llega a la tarjeta de compartir.
+        onShareChallenge={
+          openMoment?.status === 'active'
+            ? () => {
+                setSharingChallenge({
+                  id: openMoment.challengeId,
+                  title: openMoment.title,
+                  imagePath: isMomentPhotoVisible(openMoment) ? openMoment.imagePath : null,
+                })
+                setOpenMoment(null)
+              }
+            : undefined
+        }
         // "Ver marcador" (#580): cierra la hoja y salta a la pestaña Marcador. El
         // salto real es `setSection` (misma instancia de TripPage, igual que el
         // menú ⋯ → "Marcador"); actualizamos también el hash con `marcadorGroupHash`
@@ -769,6 +797,19 @@ export function TripPage({
         onEditChallenge={(challengeId) => void openChallengeEditor(challengeId)}
         onDeleted={() => void refresh()}
       />
+
+      {/* "Compartir reto" (issue #739): tarjeta-imagen + enlace `/j/<code>` de UN
+          reto suelto, no del viaje entero. Mismo patrón que InviteModal. */}
+      {sharingChallenge && (
+        <ShareChallengeModal
+          groupId={groupId}
+          groupName={group?.name ?? null}
+          challengeId={sharingChallenge.id}
+          challengeTitle={sharingChallenge.title}
+          imagePath={sharingChallenge.imagePath}
+          onClose={() => setSharingChallenge(null)}
+        />
+      )}
 
       {/* Miembros del viaje (#616): lista + gestión según rol. Tras salir, a la
           home; tras cambiar roles/expulsar/transferir, recargamos permisos

@@ -668,3 +668,36 @@ describe('MomentSheet — convertir en reto navega (issue #723)', () => {
     expect(screen.queryByRole('button', { name: /convertir en reto/i })).not.toBeInTheDocument()
   })
 })
+
+// --- "Compartir reto" solo con el reto EN JUEGO (issue #739) -------------------
+// El botón SOLO navega (llama a `onShareChallenge`, sin argumentos): el padre
+// (TripPage) decide qué imagePath es seguro pasar al modal de compartir
+// (anti-spoiler) y abre `ShareChallengeModal`. Aquí solo se prueba el GATING:
+// visible en juego, ausente cerrado/recuerdo o sin la prop.
+describe('MomentSheet — "Compartir reto" solo EN JUEGO (issue #739)', () => {
+  test('reto EN JUEGO con onShareChallenge: el botón llama al callback', async () => {
+    const user = userEvent.setup()
+    const onShareChallenge = vi.fn()
+    renderSheet({ moment: RETO_ACTIVO_SORPRESA, onShareChallenge })
+
+    await user.click(screen.getByRole('button', { name: /compartir reto/i }))
+
+    expect(onShareChallenge).toHaveBeenCalledTimes(1)
+  })
+
+  test('sin onShareChallenge el botón no se muestra (p. ej. galería visual)', () => {
+    renderSheet({ moment: RETO_ACTIVO_SORPRESA })
+    expect(screen.queryByRole('button', { name: /compartir reto/i })).not.toBeInTheDocument()
+  })
+
+  test('reto CERRADO: sin botón de compartir (ya no se juega; está "Ver marcador")', () => {
+    renderSheet({ moment: RETO_CERRADO, onShareChallenge: vi.fn(), onViewMarcador: vi.fn() })
+    expect(screen.queryByRole('button', { name: /compartir reto/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ver marcador/i })).toBeInTheDocument()
+  })
+
+  test('un RECUERDO (sin capa de reto): sin botón de compartir', () => {
+    renderSheet({ moment: RECUERDO, onShareChallenge: vi.fn() })
+    expect(screen.queryByRole('button', { name: /compartir reto/i })).not.toBeInTheDocument()
+  })
+})

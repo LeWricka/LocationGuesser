@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ListOrdered, Pencil, Trash2, User } from 'lucide-react'
+import { ArrowLeft, ListOrdered, Pencil, Share2, Trash2, User } from 'lucide-react'
 import {
   AudioPlayer,
   Badge,
@@ -59,6 +59,15 @@ interface Props {
   onClose: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
+  /**
+   * "Compartir reto" (issue #739): abre el modal de compartir ESTE reto suelto
+   * (tarjeta-imagen + enlace `/j/<code>`), no el viaje entero. Solo tiene
+   * sentido con el reto EN JUEGO — sin esta prop, o si el momento no está
+   * activo, el botón no se muestra. El padre (TripPage) decide el imagePath a
+   * pasar al modal aplicando el mismo anti-spoiler que el héroe de esta hoja
+   * (`isMomentPhotoVisible`): una foto SORPRESA nunca sale en la tarjeta.
+   */
+  onShareChallenge?: () => void
   /**
    * CTA "Ver marcador" en un reto CERRADO (#580): salta a la pestaña Marcador
    * del viaje. Sin esta prop el botón no se muestra (p. ej. en la galería visual).
@@ -171,6 +180,7 @@ export function MomentSheet({
   initialEditing = false,
   onClose,
   onPlay,
+  onShareChallenge,
   onViewMarcador,
   onPromote,
   onEdited,
@@ -1002,6 +1012,22 @@ export function MomentSheet({
                   {isActive && onPlay && (
                     <Button size="lg" fullWidth onClick={onPlay} className={styles.cta}>
                       Adivina dónde es →
+                    </Button>
+                  )}
+
+                  {/* "Compartir reto" (issue #739): un reto EN JUEGO se puede
+                    compartir suelto, no solo el viaje entero. Un reto CERRADO
+                    ya no se puede jugar — para ese caso ya está "Ver
+                    marcador" arriba, sin acción de compartir duplicada. */}
+                  {isActive && onShareChallenge && (
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      fullWidth
+                      onClick={onShareChallenge}
+                      className={styles.cta}
+                    >
+                      <Icon icon={Share2} size={16} /> Compartir reto
                     </Button>
                   )}
 
