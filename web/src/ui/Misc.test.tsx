@@ -24,14 +24,22 @@ describe('CreateGroupFab', () => {
 })
 
 describe('HomeEmptyState', () => {
-  test('saluda, explica el producto y ofrece crear viaje', async () => {
+  test('saluda y ofrece crear viaje como CTA primario, sin "cómo funciona" (#742)', async () => {
     const onCreateGroup = vi.fn()
     render(<HomeEmptyState name="Lewis" onCreateGroup={onCreateGroup} />)
     expect(screen.getByText('Hola, Lewis')).toBeInTheDocument()
-    // El hero explica el bucle en 3 pasos.
-    expect(screen.getByText('Cómo funciona')).toBeInTheDocument()
+    // El bloque de pasos "cómo funciona" se retiró (issue #742): ya no se repite el
+    // tutorial sobre la home vacía.
+    expect(screen.queryByText('Cómo funciona')).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Crear viaje' }))
     expect(onCreateGroup).toHaveBeenCalledOnce()
+  })
+
+  test('ofrece "Ver tutorial" para reabrir el tutorial de entrada (#742)', async () => {
+    const onOpenTutorial = vi.fn()
+    render(<HomeEmptyState name="Lewis" onOpenTutorial={onOpenTutorial} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Ver tutorial' }))
+    expect(onOpenTutorial).toHaveBeenCalledOnce()
   })
 
   test('"Unirme con un código" eliminado (#495): solo la nota de enlace', () => {

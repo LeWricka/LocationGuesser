@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { MemberAvatar, MyGroup, PendingChallenge } from '../../lib/membership'
 import type { Profile } from '../../lib/database.types'
 import type { ChallengeForPlay } from '../../lib/challenges'
@@ -71,9 +71,17 @@ import { HomePage } from './HomePage'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  localStorage.clear()
   sessionState.loading = false
   sessionState.user = { id: 'u1' }
-  sessionState.profile = { display_name: 'Lewis', avatar_url: null }
+  // Por defecto el tutorial de entrada consta como visto (issue #742): así los
+  // tests que no lo verifican no arrastran su overlay. Los tests del tutorial
+  // sobreescriben `onboarding` explícitamente.
+  sessionState.profile = {
+    display_name: 'Lewis',
+    avatar_url: null,
+    onboarding: { entry: '2026-01-01T00:00:00.000Z' },
+  }
   myGroupsMock.mockResolvedValue([])
   pendingChallengesMock.mockResolvedValue([])
   groupAvatarsMock.mockResolvedValue(new Map())
@@ -89,11 +97,16 @@ describe('HomePage', () => {
     expect(screen.getByRole('status', { name: 'Cargando tu inicio' })).toBeInTheDocument()
   })
 
-  test('usuario sin grupos → hero explicativo con "cómo funciona"', async () => {
+  test('usuario sin grupos → bienvenida con CTA "Crear viaje" y "Ver tutorial" (#742)', async () => {
     render(<HomePage />)
-    await waitFor(() => expect(screen.getByText('Cómo funciona')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Crear viaje' })).toBeInTheDocument(),
+    )
+    // El bloque "cómo funciona" se retiró (issue #742): no se repite el tutorial
+    // sobre la home vacía; queda a un toque en "Ver tutorial".
+    expect(screen.queryByText('Cómo funciona')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ver tutorial' })).toBeInTheDocument()
     // CTA de empezar: solo crear (el "Unirme con un código" se elimina en #495).
-    expect(screen.getByRole('button', { name: 'Crear viaje' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Unirme con un código' })).not.toBeInTheDocument()
     // La nota de enlace sí aparece.
     expect(screen.getByText(/Te han pasado un enlace/i)).toBeInTheDocument()
@@ -101,11 +114,33 @@ describe('HomePage', () => {
 
   test('usuario sin grupos (bienvenida) → un único acceso a perfil, vía avatar (#616)', async () => {
     render(<HomePage />)
-    await waitFor(() => expect(screen.getByText('Cómo funciona')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Crear viaje' })).toBeInTheDocument(),
+    )
     // Antes de #516 la variante de bienvenida no daba ningún acceso a perfil. #616
     // retira el engranaje duplicado (mismo destino que el avatar): solo queda el avatar.
     expect(screen.getByRole('button', { name: 'Abrir tu perfil' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Abrir tus ajustes' })).not.toBeInTheDocument()
+  })
+
+  test('sin grupos y tutorial no visto → auto-muestra el tutorial único de entrada (#742)', async () => {
+    // Perfil con onboarding vacío = tutorial de entrada aún no visto.
+    sessionState.profile = { display_name: 'Lewis', avatar_url: null, onboarding: {} }
+    render(<HomePage />)
+    // El slideshow es un diálogo modal; arranca en su primer paso (5 en total).
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
+    expect(screen.getByText(/1 de 5/)).toBeInTheDocument()
+  })
+
+  test('"Ver tutorial" reabre el tutorial aunque ya se haya visto (#742)', async () => {
+    // beforeEach deja el tutorial como visto → no hay auto-show.
+    render(<HomePage />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ver tutorial' })).toBeInTheDocument(),
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver tutorial' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
   test('con grupos → feed de portadas con el viaje, sin montar mapamundi', async () => {

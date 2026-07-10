@@ -22,6 +22,7 @@ import { useHomeData } from './useHomeData'
 import { useWorldTrips } from './useWorldTrips'
 import { HOME_DEMO_PINS } from './homeDemoPins'
 import { gotoChallenge, gotoCreateGroup, gotoGroup, gotoProfile } from './navigation'
+import { OnboardingSlideshow, getSlides, useOnboarding } from '../onboarding'
 import styles from './HomePage.module.css'
 
 // Home logueada (patrón GLOBO + HOJA, referencia Polarsteps): un globo héroe a sangre
@@ -33,6 +34,15 @@ import styles from './HomePage.module.css'
 export function HomePage() {
   const { user, profile, loading: sessionLoading } = useSession()
   const { loading: dataLoading, error, data, reload } = useHomeData(user?.id)
+
+  // Tutorial ÚNICO de entrada (issue #742): un solo tutorial cuenta el bucle
+  // completo. Se muestra una vez al aterrizar en la home vacía (persistido por
+  // cuenta, #717) y se puede reabrir con "Ver tutorial". Sustituye a los tutoriales
+  // por-pantalla que saltaban de más al crear viaje/reto (gates retirados de App).
+  const entryTutorial = useOnboarding('entry', user?.id, profile?.onboarding)
+  // Reapertura manual desde "Ver tutorial": fuerza el slideshow aunque ya se haya
+  // visto (el flag solo gobierna el auto-show de la primera vez).
+  const [tutorialForced, setTutorialForced] = useState(false)
 
   // Coordenadas de los viajes situados → pines-foto del globo héroe. Es presentación
   // derivada (anti-spoiler ya aplicado en useWorldTrips). La lista de grupos la trae
@@ -110,6 +120,16 @@ export function HomePage() {
     gotoCreateGroup()
   }
 
+  // "Ver tutorial" → reabre el tutorial único. Al cerrarlo (completar o saltar) lo
+  // marcamos visto (idempotente si ya lo estaba) y bajamos la reapertura forzada.
+  function openTutorial() {
+    setTutorialForced(true)
+  }
+  function closeTutorial() {
+    setTutorialForced(false)
+    entryTutorial.markSeen()
+  }
+
   // Mientras resolvemos la sesión persistida o cargamos la membresía → skeletons.
   // SIEMPRE damos feedback de carga (no pantalla en blanco).
   if (sessionLoading || dataLoading) {
@@ -142,6 +162,12 @@ export function HomePage() {
   // iniciada; el fallback evita un id vacío en el render transitorio.
   const userId = user?.id ?? ''
   const hasGroups = data.groups.length > 0
+
+  // Tutorial ÚNICO de entrada (issue #742): auto-show una sola vez para el recién
+  // llegado (home vacía, aún sin viajes); para quien ya tiene viajes NO se
+  // interpone (solo lo reabre a mano). `tutorialForced` cubre la reapertura desde
+  // "Ver tutorial", ignore el flag de "ya visto".
+  const showEntryTutorial = (!hasGroups && entryTutorial.shouldShow) || tutorialForced
 
   // Cascada de portada por viaje: (1) portada propia firmada; (2) foto del recuerdo más
   // reciente (ya resuelta por useWorldTrips para el pin del globo, ver arriba); (3) null →
@@ -221,10 +247,10 @@ export function HomePage() {
         />
       ) : (
         // Recién llegado: mismo patrón globo + hoja. El globo arranca con pines DEMO
-        // curados (aún no hay viajes) y la hoja lleva el hero de bienvenida (qué es +
-        // cómo funciona + crear/unirse). SIN FAB "+": aquí el CTA primario ya es "Crear
-        // viaje" dentro de la hoja, así que el FAB sería redundante y, peor, tapa la 3ª
-        // tarjeta de "cómo funciona". El FAB vuelve en el dashboard, donde sí aporta.
+        // curados (aún no hay viajes) y la hoja lleva la bienvenida + el CTA "Crear
+        // viaje" (issue #742: fuera el bloque de pasos, que empujaba el CTA fuera de
+        // la vista). SIN FAB "+": aquí el CTA primario ya es "Crear viaje" dentro de
+        // la hoja, así que el FAB sería redundante. El FAB vuelve en el dashboard.
         //
         // `framing="world"` (#516, no el 'pins' por defecto): los pines DEMO están
         // REPARTIDOS por todo el planeta a propósito (ver homeDemoPins.ts), así que un
@@ -266,9 +292,24 @@ export function HomePage() {
           }
         >
           <div className={styles.welcome}>
-            <HomeEmptyState name={displayName} onCreateGroup={onCreateGroup} />
+            <HomeEmptyState
+              name={displayName}
+              onCreateGroup={onCreateGroup}
+              onOpenTutorial={openTutorial}
+            />
           </div>
         </GlobeSheet>
+      )}
+
+      {/* Tutorial ÚNICO de entrada (issue #742): overlay modal sobre la home. Se
+          auto-muestra una vez en la home vacía y se reabre con "Ver tutorial".
+          Completar y saltar cierran igual (lo marcan visto). */}
+      {showEntryTutorial && (
+        <OnboardingSlideshow
+          slides={getSlides('entry')}
+          onComplete={closeTutorial}
+          onSkip={closeTutorial}
+        />
       )}
     </main>
   )

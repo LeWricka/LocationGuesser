@@ -33,12 +33,20 @@
 //    aún no tiene fila de perfil).
 
 // Contextos de onboarding. Cada uno tiene su tutorial y su flag "ya visto":
-//  - group / challenge: pantallas de viaje y de jugar (ya existían).
+//  - entry: tutorial ÚNICO de entrada (issue #742). Cubre el bucle completo
+//    (guardar un momento → verlo en la bitácora → compartir el viaje → crear un
+//    reto y compartirlo) y se muestra una sola vez al aterrizar en la home vacía;
+//    reabrible con "Ver tutorial". Sustituye a los tutoriales por-pantalla que
+//    saltaban de más al crear viaje/reto (gates retirados de App.tsx).
 //  - welcome: bienvenida del RECEPTOR que llega por un enlace compartido la
 //    primera vez (lo más importante: entender en 3 s qué es y por qué unirse).
-//  - create-trip / add-moment / create-challenge: intro de cada flujo de
-//    creación la primera vez que se entra en él.
+//  - group / challenge / create-trip / add-moment / create-challenge: contextos
+//    de los tutoriales por-pantalla ANTIGUOS (issue #742: ya no se disparan desde
+//    App.tsx). Se conservan para el flag "visto" del receptor (ReceptorWelcomeGate
+//    marca `group`) y para no romper histórico; el único tutorial en vivo es
+//    `entry` (+ `welcome` para el invitado).
 export type OnboardingContext =
+  | 'entry'
   | 'group'
   | 'challenge'
   | 'welcome'

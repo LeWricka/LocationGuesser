@@ -203,7 +203,22 @@ const CREATE_CHALLENGE_SLIDES: OnboardingSlide[] = [
   },
 ]
 
+// Tutorial ÚNICO de entrada (issue #742): un solo tutorial que cuenta el BUCLE
+// completo de una pasada —guardar un momento → verlo en la bitácora → compartir el
+// viaje → crear un reto y compartirlo—, una idea por slide. Sustituye a los
+// tutoriales por-pantalla que saltaban de más (al crear viaje, al compartir). No
+// reescribe copy: REUTILIZA las slides ya validadas de los flujos, ensartadas en el
+// arco pedido por el dueño (así el gesto/copy/imagen de cada paso ya está probado).
+const ENTRY_SLIDES: OnboardingSlide[] = [
+  ADD_MOMENT_SLIDES[0], // Guarda un momento
+  ADD_MOMENT_SLIDES[2], // Aparece en el viaje: verlo en la bitácora
+  CREATE_TRIP_SLIDES[1], // Invita a tu gente: comparte el viaje
+  CREATE_CHALLENGE_SLIDES[0], // Lánzales un reto: crear el reto
+  CREATE_CHALLENGE_SLIDES[2], // Comparte el enlace del reto
+]
+
 const SLIDES: Record<OnboardingContext, OnboardingSlide[]> = {
+  entry: ENTRY_SLIDES,
   group: GROUP_SLIDES,
   challenge: CHALLENGE_SLIDES,
   'create-trip': CREATE_TRIP_SLIDES,
