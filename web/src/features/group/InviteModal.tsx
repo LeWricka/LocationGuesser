@@ -270,16 +270,17 @@ export function InviteModal({
       <p className={styles.hint}>
         Comparte la tarjeta en el chat del grupo. Quien la abra entra directo al viaje.
       </p>
-      {/* Descubribilidad (#616): para alguien que YA es miembro, el sitio para
-          hacerlo co-dueño es la vista Miembros. Para alguien que aún no ha
-          entrado, la sección de abajo (#707) manda el enlace de co-dueño
-          directo, sin ese paso intermedio. */}
-      <p className={styles.hint}>¿Ya está en el viaje? Hazlo co-dueño desde «Miembros» (menú ⋯).</p>
 
       {/* Enlace de co-dueño (issue #707): sección discreta, SOLO para dueños —
           no es una invitación social (sin tarjeta-imagen), es un enlace
           operativo de un solo uso. Separada de las acciones principales del
-          pie: no compite con "Copiar enlace"/"Compartir". */}
+          pie: no compite con "Copiar enlace"/"Compartir".
+          Issue #741: aquí YA NO se menciona "hazlo co-dueño desde Miembros" —
+          esa mención y este botón, uno debajo del otro, leían como dos
+          caminos para lo mismo. El sitio para promover a quien YA está en el
+          viaje es Miembros (por fila) y se explica solo, sin necesitar un
+          puntero en Invitar; esta sección cubre el único caso que Miembros no
+          puede: alguien que aún no ha entrado. */}
       {isOwner && (
         <div className={styles.ownerInvite}>
           <p className={styles.ownerInviteHint}>

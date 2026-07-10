@@ -94,9 +94,14 @@ describe('InviteModal — invitación como tarjeta-imagen (#617)', () => {
     await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
   })
 
-  test('apunta a "Miembros" para dar la gestión (descubribilidad de co-dueños, #616)', async () => {
+  test('no repite el aviso de "Miembros": el enlace de co-dueño es la única mención (#741)', async () => {
     renderModal()
-    expect(screen.getByText(/Hazlo co-dueño desde «Miembros»/)).toBeInTheDocument()
+    // Antes convivían un texto-guía ("hazlo co-dueño desde Miembros") y el botón
+    // real ("Generar enlace de co-dueño") en el mismo modal — dos menciones de
+    // "hacer co-dueño" que leían como dos caminos para lo mismo. Issue #741: la
+    // única mención de co-dueño en Invitar es ahora el botón (feature real).
+    expect(screen.queryByText(/Hazlo co-dueño desde/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /generar enlace de co-dueño/i })).toBeInTheDocument()
     await waitFor(() => expect(nodeToPngBlobMock).toHaveBeenCalled())
   })
 
