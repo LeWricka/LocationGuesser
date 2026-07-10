@@ -16,6 +16,13 @@ vi.mock('../../lib/membership', () => ({
   joinGroupAsOwner: (...args: unknown[]) => joinGroupAsOwnerMock(...args),
 }))
 
+// jsdom no implementa scrollIntoView; el desplegable "Añadir una descripción"
+// lo usa para traer el campo a la vista tras expandirse (issue: el dueño
+// reportó que no veía nada al pulsar, tenía que buscar el campo con scroll
+// manual — ver el efecto en CreateGroup.tsx).
+const scrollIntoViewMock = vi.fn()
+Element.prototype.scrollIntoView = scrollIntoViewMock
+
 import { CreateGroup } from './CreateGroup'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
@@ -51,6 +58,7 @@ describe('CreateGroup — borrador persistente (#718)', () => {
     trackMock.mockClear()
     createGroupMock.mockReset()
     joinGroupAsOwnerMock.mockReset()
+    scrollIntoViewMock.mockClear()
     // Un solo "Nuevo viaje" a la vez (clave fija): limpiamos entre tests para
     // que no se contaminen entre sí.
     const { clearDraft } = await import('../../lib/drafts')
@@ -122,5 +130,15 @@ describe('CreateGroup — borrador persistente (#718)', () => {
     await act(() => new Promise((r) => setTimeout(r, 50)))
     expect(screen.queryByText(/recuperado tu borrador/i)).not.toBeInTheDocument()
     unmountSecond()
+  })
+
+  test('al desplegar "Añadir una descripción" el campo se lleva a la vista (antes había que buscarlo con scroll manual)', async () => {
+    const { unmount } = renderCreate()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir una descripción' }))
+    expect(screen.getByLabelText('Descripción · opcional')).toBeInTheDocument()
+
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalledTimes(1), { timeout: 2000 })
+    unmount()
   })
 })

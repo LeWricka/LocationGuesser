@@ -7,7 +7,7 @@ import { track } from '../../lib/analytics'
 import { useSession } from '../../lib/session-context'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { clearDraft, loadDraft, useDraftAutosave } from '../../lib/drafts'
-import { AppHeader, Button, Icon, Spinner, DatePicker, useToast } from '../../ui'
+import { AppHeader, Button, Icon, Spinner, DatePicker, useReducedMotion, useToast } from '../../ui'
 import { ShellUtilitario } from '../../ui/shells'
 import { InviteModal } from '../group/InviteModal'
 import { CalendarIcon, PeopleIcon, SparkIcon, TripPinIcon } from './CreateIcons'
@@ -101,6 +101,31 @@ export function CreateGroup({ onBack }: Props) {
 
   const toast = useToast()
   const { user } = useSession()
+  const reducedMotion = useReducedMotion()
+
+  // Al desplegar "Añadir una descripción" el campo aparece DEBAJO de nombre +
+  // fechas + acompañantes: en móvil cae fuera del viewport y, sin nada que lo
+  // traiga a la vista, parece que el botón no hace nada (reporte del dueño:
+  // "no se despliega, hay que hacer scroll para abajo"). Esperamos a que
+  // termine la transición CSS de `.more`/`.moreShow` (`max-height`, ver
+  // CreateGroup.module.css) antes de medir/desplazar: si llamamos a
+  // `scrollIntoView` nada más togglear el estado, el contenedor todavía está a
+  // media altura (la transición acaba de empezar) y el scroll se queda corto.
+  const descFieldRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!moreOpen) return
+    // Bajo `prefers-reduced-motion` la transición se acorta a 0.06s (ver el
+    // `@media` al final de CreateGroup.module.css); sin reducción, dura 0.5s
+    // (max-height) — el margen de 550ms cubre esa transición completa.
+    const delay = reducedMotion ? 80 : 550
+    const timer = window.setTimeout(() => {
+      descFieldRef.current?.scrollIntoView({
+        behavior: reducedMotion ? 'auto' : 'smooth',
+        block: 'nearest',
+      })
+    }, delay)
+    return () => window.clearTimeout(timer)
+  }, [moreOpen, reducedMotion])
 
   // BORRADOR PERSISTENTE (issue #718): al montar, intenta restaurar un draft
   // pendiente. `restored` desarma el autosave hasta que este intento termine
@@ -416,7 +441,7 @@ export function CreateGroup({ onBack }: Props) {
               <Chevron />
             </button>
             <div className={`${styles.more} ${moreOpen ? styles.moreShow : ''}`}>
-              <div className={styles.field} style={{ marginTop: 14 }}>
+              <div className={styles.field} style={{ marginTop: 14 }} ref={descFieldRef}>
                 <label className={styles.label} htmlFor="cg-desc">
                   Descripción <span>· opcional</span>
                 </label>
