@@ -792,6 +792,18 @@ export const cases: GalleryCase[] = [
       />
     ),
   },
+  // Tutorial ÚNICO de entrada (issue #742): el slideshow que cuenta el bucle
+  // completo (guardar → bitácora → compartir → reto → compartir reto). Es el único
+  // tutorial en vivo hoy; se muestra una vez en la home vacía y se reabre con "Ver
+  // tutorial". Lo capturamos en su primer paso.
+  {
+    id: 'onboarding-entrada',
+    title: 'Onboarding · tutorial único de entrada (paso 1)',
+    section: 'Onboarding',
+    render: () => (
+      <OnboardingSlideshow slides={getSlides('entry')} onSkip={noop} onComplete={noop} />
+    ),
+  },
   // Rediseño visual-first del onboarding (issue #625): los 3 gestos clave del
   // tutorial del viaje, cada uno con su mini-simulación CSS (ver
   // OnboardingVisual). Los pasos 2 y 3 se aíslan como slideshow de un único paso

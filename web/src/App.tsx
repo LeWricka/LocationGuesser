@@ -6,7 +6,7 @@
 // Flujos (email-first con código OTP, issue #506):
 //  - loading                  → spinner de arranque
 //  - sin sesión               → Landing (CTA único email-first → LoginFlow)
-//  - sesión OK, sin nombre    → ProfileGate (paso de nombre para cuentas nuevas)
+//  - sesión OK, sin nombre    → ProfileGate (paso de nombre) → HOME (issue #742)
 //  - sesión OK, con nombre    → router por hash:
 //       #g=&c=  → PlayChallenge (auto-join)          [permitido sin nombre también]
 //       #g=     → TripPage     (auto-join)            [permitido sin nombre también]
@@ -27,7 +27,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { isAdminEmail } from './lib/admin'
 import { Landing, ProfileGate, useDeepLinkJoin } from './features/auth'
-import { OnboardingGate, ReceptorWelcomeGate } from './features/onboarding'
+import { ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
@@ -221,7 +221,15 @@ function LoggedIn({
       <ProfileGate
         userId={user!.id}
         initialName={profile?.display_name ?? ''}
-        onDone={refreshProfile}
+        // Tras capturar el nombre, aterrizar SIEMPRE en la HOME (issue #742): el
+        // paso de nombre NO es "el perfil" ni una puerta a él. Refrescamos el
+        // perfil y limpiamos el hash para caer en la home (vacía si aún no hay
+        // viajes); el editor de perfil queda accesible solo bajo demanda (avatar →
+        // #perfil), nunca como paso obligado del alta.
+        onDone={() => {
+          refreshProfile()
+          goHome()
+        }}
       />
     )
   }
@@ -235,17 +243,11 @@ function LoggedIn({
         userId={user?.id}
         profileOnboarding={profile?.onboarding}
       >
-        <OnboardingGate
-          context="challenge"
-          userId={user?.id}
-          profileOnboarding={profile?.onboarding}
-        >
-          <GoogleMapsProvider>
-            <Suspense fallback={<PlayRouteSkeleton />}>
-              <PlayChallenge challengeId={route.challenge} groupId={route.group} />
-            </Suspense>
-          </GoogleMapsProvider>
-        </OnboardingGate>
+        <GoogleMapsProvider>
+          <Suspense fallback={<PlayRouteSkeleton />}>
+            <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+          </Suspense>
+        </GoogleMapsProvider>
       </ReceptorWelcomeGate>
     )
   }
@@ -257,30 +259,24 @@ function LoggedIn({
     // directo al asistente de reto clásico.
     if (route.groupAddMoment) {
       return (
-        <OnboardingGate
-          context="add-moment"
-          userId={user?.id}
-          profileOnboarding={profile?.onboarding}
-        >
-          <GoogleMapsProvider>
-            <Suspense fallback={<UtilityRouteSkeleton />}>
-              <AddMoment
-                groupId={groupId}
-                onBack={() => {
-                  location.hash = groupHash(groupId)
-                }}
-                onCreated={() => {
-                  location.hash = groupHash(groupId)
-                }}
-                // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
-                // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
-                onAddChallenge={(momentId) => {
-                  location.hash = addChallengeHash(groupId, momentId)
-                }}
-              />
-            </Suspense>
-          </GoogleMapsProvider>
-        </OnboardingGate>
+        <GoogleMapsProvider>
+          <Suspense fallback={<UtilityRouteSkeleton />}>
+            <AddMoment
+              groupId={groupId}
+              onBack={() => {
+                location.hash = groupHash(groupId)
+              }}
+              onCreated={() => {
+                location.hash = groupHash(groupId)
+              }}
+              // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
+              // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
+              onAddChallenge={(momentId) => {
+                location.hash = addChallengeHash(groupId, momentId)
+              }}
+            />
+          </Suspense>
+        </GoogleMapsProvider>
       )
     }
     // FAB "Reto" del viaje → flujo INMERSIVO de crear reto (mapa satélite a sangre
@@ -289,32 +285,26 @@ function LoggedIn({
     // propio reto (#509); el enlace para compartir se ofrece desde el viaje.
     if (route.groupAddChallenge) {
       return (
-        <OnboardingGate
-          context="create-challenge"
-          userId={user?.id}
-          profileOnboarding={profile?.onboarding}
-        >
-          <GoogleMapsProvider>
-            <Suspense fallback={<UtilityRouteSkeleton />}>
-              <CreateChallengeFlow
-                groupId={groupId}
-                // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
-                fromMomentId={route.groupChallengeFrom}
-                // Promoción de un recuerdo YA guardado (`&promote=<id>`, issue #723):
-                // mismo asistente prefijado, pero el recuerdo SE CONVIERTE (no se duplica).
-                promoteMomentId={route.groupChallengePromote}
-                onBack={() => {
-                  location.hash = groupHash(groupId)
-                }}
-                // El creador NO debe acabar jugando su propio reto (#509): tras crear,
-                // volvemos al viaje (diario), no al reto recién creado.
-                onCreated={() => {
-                  location.hash = groupHash(groupId)
-                }}
-              />
-            </Suspense>
-          </GoogleMapsProvider>
-        </OnboardingGate>
+        <GoogleMapsProvider>
+          <Suspense fallback={<UtilityRouteSkeleton />}>
+            <CreateChallengeFlow
+              groupId={groupId}
+              // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
+              fromMomentId={route.groupChallengeFrom}
+              // Promoción de un recuerdo YA guardado (`&promote=<id>`, issue #723):
+              // mismo asistente prefijado, pero el recuerdo SE CONVIERTE (no se duplica).
+              promoteMomentId={route.groupChallengePromote}
+              onBack={() => {
+                location.hash = groupHash(groupId)
+              }}
+              // El creador NO debe acabar jugando su propio reto (#509): tras crear,
+              // volvemos al viaje (diario), no al reto recién creado.
+              onCreated={() => {
+                location.hash = groupHash(groupId)
+              }}
+            />
+          </Suspense>
+        </GoogleMapsProvider>
       )
     }
     // UNA vista por viaje: el grupo SIEMPRE abre la pantalla "Viaje", que tiene TRES
@@ -328,41 +318,39 @@ function LoggedIn({
         userId={user?.id}
         profileOnboarding={profile?.onboarding}
       >
-        <OnboardingGate context="group" userId={user?.id} profileOnboarding={profile?.onboarding}>
-          {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos
-              con Google Maps) y EditChallenge (preview Street View); por eso el
-              viaje necesita el provider de Maps. */}
-          <GoogleMapsProvider>
-            <Suspense fallback={<TripRouteSkeleton />}>
-              <TripPage
-                groupId={groupId}
-                // Sección inicial: "Marcador" o "Fotos" si el enlace lo pide (legado
-                // v=clasico / v=marcador, o v=fotos), si no "Diario".
-                initialSection={
-                  route.groupView === 'marcador'
-                    ? 'marcador'
-                    : route.groupView === 'fotos'
-                      ? 'fotos'
-                      : 'diario'
-                }
-                // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
-                onPlayChallenge={(challengeId) => {
-                  location.hash = groupHash(groupId, challengeId)
-                }}
-                // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
-                // un momento sin reto por defecto (el reto es una capa opcional con toggle).
-                onAddMoment={() => {
-                  location.hash = addMomentHash(groupId)
-                }}
-                // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
-                onAddChallenge={() => {
-                  location.hash = addChallengeHash(groupId)
-                }}
-                onBack={() => goHome()}
-              />
-            </Suspense>
-          </GoogleMapsProvider>
-        </OnboardingGate>
+        {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos
+            con Google Maps) y EditChallenge (preview Street View); por eso el
+            viaje necesita el provider de Maps. */}
+        <GoogleMapsProvider>
+          <Suspense fallback={<TripRouteSkeleton />}>
+            <TripPage
+              groupId={groupId}
+              // Sección inicial: "Marcador" o "Fotos" si el enlace lo pide (legado
+              // v=clasico / v=marcador, o v=fotos), si no "Diario".
+              initialSection={
+                route.groupView === 'marcador'
+                  ? 'marcador'
+                  : route.groupView === 'fotos'
+                    ? 'fotos'
+                    : 'diario'
+              }
+              // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
+              onPlayChallenge={(challengeId) => {
+                location.hash = groupHash(groupId, challengeId)
+              }}
+              // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
+              // un momento sin reto por defecto (el reto es una capa opcional con toggle).
+              onAddMoment={() => {
+                location.hash = addMomentHash(groupId)
+              }}
+              // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
+              onAddChallenge={() => {
+                location.hash = addChallengeHash(groupId)
+              }}
+              onBack={() => goHome()}
+            />
+          </Suspense>
+        </GoogleMapsProvider>
       </ReceptorWelcomeGate>
     )
   }
@@ -371,15 +359,9 @@ function LoggedIn({
     // sesión OTP verificada puede crear. La RLS `groups_insert_owner` es el candado
     // real; aquí ya no hay muro de "valida tu correo". CreateGate eliminado.
     return (
-      <OnboardingGate
-        context="create-trip"
-        userId={user?.id}
-        profileOnboarding={profile?.onboarding}
-      >
-        <Suspense fallback={<UtilityRouteSkeleton />}>
-          <CreateGroup onBack={() => goHome()} />
-        </Suspense>
-      </OnboardingGate>
+      <Suspense fallback={<UtilityRouteSkeleton />}>
+        <CreateGroup onBack={() => goHome()} />
+      </Suspense>
     )
   }
   if (route.view === 'profile') {

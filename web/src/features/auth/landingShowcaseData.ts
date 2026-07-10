@@ -65,7 +65,9 @@ export interface LandingStoryPart {
 const GUARDAR: LandingStoryPart = {
   id: 'guardar',
   tone: 'guardar',
-  kicker: 'Parte 1 · Guarda el viaje',
+  // Sin numeración "Parte N ·" (issue #742): no es un temario, son dos bloques
+  // claros —una parte de GUARDAR, otra de COMPARTIR—. El kicker nombra el bloque.
+  kicker: 'Guarda los momentos',
   eyebrow: 'Tu viaje, para siempre',
   title: 'Guarda el viaje mientras lo vives',
   lede: 'Foto, clip, audio, un sitio en el mapa. Todo lo del viaje, guardado como lo vivís.',
@@ -102,7 +104,8 @@ const GUARDAR: LandingStoryPart = {
 const JUGAR: LandingStoryPart = {
   id: 'jugar',
   tone: 'jugar',
-  kicker: 'Parte 2 · Y luego, jugad',
+  // Segundo bloque: COMPARTIR (jugar/retos viven dentro de compartir, no aparte).
+  kicker: 'Comparte los momentos',
   eyebrow: 'Con tu gente',
   title: 'Y que tu gente sea parte',
   lede: 'Comparte el viaje y deja que se metan dentro: viéndolo, o siguiéndolo a su manera.',
