@@ -76,6 +76,30 @@ vi.mock('../../lib/streetview', async (importOriginal) => {
   return { ...actual, findPanorama: (...args: unknown[]) => findPanoramaMock(...args) }
 })
 
+// Cascada de fecha por defecto (issue fecha del reto, mismo criterio que
+// AddMoment/#553): `getGroup` (fechas del viaje) + la consulta mínima de
+// `fetchLatestMomentDate` (último momento) sobre `supabase` directo.
+const getGroupMock = vi.fn()
+vi.mock('../../lib/groupData', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/groupData')>()
+  return { ...actual, getGroup: (...args: unknown[]) => getGroupMock(...args) }
+})
+
+const latestMomentMock = vi.fn()
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn(() => ({ maybeSingle: latestMomentMock })),
+          })),
+        })),
+      })),
+    })),
+  },
+}))
+
 import { CreateLocationChallenge } from './CreateLocationChallenge'
 import type { ChallengePrefill } from './challengePrefill'
 import { SessionContext, type SessionState } from '../../lib/session-context'
@@ -115,6 +139,11 @@ beforeEach(() => {
   createChallengeMock.mockReset()
   promoteToChallengeMock.mockReset()
   uploadImageMock.mockReset()
+  // Cascada de fecha por defecto: sin momentos ni fechas del viaje por defecto
+  // (cae en "hoy", regla 3 de `computeDefaultDate`) — cada test que necesite
+  // otra cosa lo sobreescribe.
+  getGroupMock.mockReset().mockResolvedValue(null)
+  latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
   // jsdom no implementa createObjectURL/revokeObjectURL (solo la miniatura de la
   // foto opcional los usa; irrelevante para los tests de pasos/navegación).
   Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
@@ -304,6 +333,51 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
       'challenge_created',
       expect.objectContaining({ has_photo: true, photo_is_hint: true }),
     )
+  })
+})
+
+// Fecha ELEGIDA de cuándo ocurrió el reto (issue fecha del reto): el reto
+// CREADO desde cero (no promocionado) pide fecha con la misma cascada que
+// AddMoment, para que el diario ordene por `happened_on` y no por
+// `created_at` (cuándo se lanzó el reto).
+describe('CreateLocationChallenge — fecha del reto creado desde cero', () => {
+  test('el paso de reglas trae un selector de Fecha (por defecto hoy) y lo manda a createChallenge', async () => {
+    createChallengeMock.mockResolvedValue({
+      challenge: { id: 'reto-3', title: '¿Dónde estamos? · Japón 2026', image_path: null },
+      groupId: 'g-1',
+    })
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    // Sin momentos previos ni fechas del viaje (mocks por defecto de
+    // `beforeEach`), la cascada cae en "hoy" (regla 3 de `computeDefaultDate`).
+    await screen.findByLabelText('Fecha')
+
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
+    expect(createChallengeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ happenedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }),
+    )
+  })
+
+  test('con un viaje FUTURO sin momentos, la fecha por defecto cae en el inicio del viaje', async () => {
+    // Año claramente futuro (2030) para que la comparación con "hoy" sea
+    // estable sin mockear el reloj del sistema.
+    getGroupMock.mockResolvedValue({ starts_on: '2030-08-01', ends_on: '2030-08-15' })
+    createChallengeMock.mockResolvedValue({
+      challenge: { id: 'reto-4', title: 'x', image_path: null },
+      groupId: 'g-1',
+    })
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    const trigger = await screen.findByLabelText('Fecha')
+    // El viaje es futuro (starts_on tras "hoy"): la fecha por defecto cae en el
+    // inicio del viaje (regla 2 de `computeDefaultDate`), no en hoy.
+    await waitFor(() => expect(trigger).toHaveTextContent('1 ago 2030'))
   })
 })
 
@@ -569,6 +643,23 @@ describe('CreateLocationChallenge — modo promoción (promoteMomentId)', () => 
       'challenge_created',
       expect.objectContaining({ challenge_id: 'm-9', promoted_from_moment: true }),
     )
+  })
+
+  // El reto convertido desde un momento YA hereda la fecha del recuerdo
+  // (`promoteToChallenge` no toca `happened_on`): pedirla de nuevo aquí sería
+  // redundante y confuso. El asistente NO enseña el selector en este modo.
+  test('en modo promoción NO se pide Fecha (ya la hereda el recuerdo de origen)', async () => {
+    promoteResult()
+    const user = userEvent.setup()
+    renderScreen('g-1', prefill, 'm-9')
+    await screen.findByTestId('sv-preview')
+    await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
+
+    expect(screen.queryByLabelText('Fecha')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await waitFor(() => expect(promoteToChallengeMock).toHaveBeenCalledTimes(1))
+    expect(promoteToChallengeMock.mock.calls[0][1]).not.toHaveProperty('happenedOn')
   })
 
   test('quitar la foto del recuerdo al promocionar manda imagePath null (se limpia en la fila)', async () => {

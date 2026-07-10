@@ -40,6 +40,30 @@ vi.mock('./challengeShareCover', () => ({
   resolveChallengeShareCover: vi.fn().mockResolvedValue(null),
 }))
 
+// Cascada de fecha por defecto (issue fecha del reto, mismo criterio que
+// AddMoment/#553): `getGroup` (fechas del viaje) + la consulta mínima de
+// `fetchLatestMomentDate` (último momento) sobre `supabase` directo.
+const getGroupMock = vi.fn()
+vi.mock('../../lib/groupData', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/groupData')>()
+  return { ...actual, getGroup: (...args: unknown[]) => getGroupMock(...args) }
+})
+
+const latestMomentMock = vi.fn()
+vi.mock('../../lib/supabase', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          order: vi.fn(() => ({
+            limit: vi.fn(() => ({ maybeSingle: latestMomentMock })),
+          })),
+        })),
+      })),
+    })),
+  },
+}))
+
 import { CreateNumberChallenge } from './CreateNumberChallenge'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
@@ -85,6 +109,10 @@ describe('CreateNumberChallenge — formulario de papel en 2 pasos (#586)', () =
     reportErrorMock.mockClear()
     createNumberChallengeMock.mockReset()
     uploadImageMock.mockReset()
+    // Cascada de fecha por defecto: sin momentos ni fechas del viaje por
+    // defecto (cae en "hoy", regla 3 de `computeDefaultDate`).
+    getGroupMock.mockReset().mockResolvedValue(null)
+    latestMomentMock.mockReset().mockResolvedValue({ data: null, error: null })
     // jsdom no implementa createObjectURL/revokeObjectURL (solo la miniatura de
     // la foto opcional los usa; irrelevante para estos casos).
     Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
@@ -161,6 +189,40 @@ describe('CreateNumberChallenge — formulario de papel en 2 pasos (#586)', () =
     // El destino de crear es la hoja de Compartir (tarjeta-imagen, #595), no saltar a jugar.
     expect(await screen.findByText('¡Reto creado!')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /compartir/i })).toBeInTheDocument()
+  })
+
+  // Fecha ELEGIDA de cuándo ocurrió el reto (issue fecha del reto): sin esto
+  // el reto caía por `created_at` (cuándo se lanza) y desordenaba el diario.
+  test('el paso 2 trae un selector de Fecha (por defecto hoy) y lo manda a createNumberChallenge', async () => {
+    createNumberChallengeMock.mockResolvedValue({
+      challenge: { id: 'reto-2', title: 'La cuenta de la cena' } as ChallengeForPlay,
+      groupId: 'g1',
+    })
+    renderCreate()
+    await fillStepOneAndAdvance()
+
+    // Sin momentos previos ni fechas del viaje (mocks por defecto), la cascada
+    // cae en "hoy" (regla 3 de `computeDefaultDate`).
+    await screen.findByLabelText('Fecha')
+
+    await userEvent.type(screen.getByLabelText('Respuesta correcta'), '10')
+    await userEvent.click(screen.getByRole('button', { name: /crear el reto/i }))
+
+    await waitFor(() => expect(createNumberChallengeMock).toHaveBeenCalledTimes(1))
+    expect(createNumberChallengeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ happenedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }),
+    )
+  })
+
+  test('con un viaje FUTURO sin momentos, la fecha por defecto cae en el inicio del viaje', async () => {
+    // Año claramente futuro (2030) para que la comparación con "hoy" sea
+    // estable sin mockear el reloj del sistema.
+    getGroupMock.mockResolvedValue({ starts_on: '2030-08-01', ends_on: '2030-08-15' })
+    renderCreate()
+    await fillStepOneAndAdvance()
+
+    const trigger = await screen.findByLabelText('Fecha')
+    await waitFor(() => expect(trigger).toHaveTextContent('1 ago 2030'))
   })
 })
 

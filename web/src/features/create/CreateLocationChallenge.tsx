@@ -12,6 +12,8 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
+import { getGroup } from '../../lib/groupData'
+import { computeDefaultDate, fetchLatestMomentDate, todayIso } from '../../lib/defaultDate'
 import { DEFAULT_TIME_SCORING, type LatLng } from '../../lib/geo'
 import {
   clearDraft,
@@ -21,7 +23,7 @@ import {
   useDraftAutosave,
   type SerializedFile,
 } from '../../lib/drafts'
-import { AppHeader, SegmentedControl, Spinner, useToast } from '../../ui'
+import { AppHeader, DatePicker, SegmentedControl, Spinner, useToast } from '../../ui'
 import { IconGps } from '../../ui/icons/IconGps'
 import { IconCandado } from '../../ui/icons/IconCandado'
 import { IconPin } from '../../ui/icons/IconPin'
@@ -187,6 +189,18 @@ export function CreateLocationChallenge({
   // valor aunque se oculte — al volver a un límite, reaparece con lo elegido.
   const [timeScoring, setTimeScoring] = useState(DEFAULT_TIME_SCORING)
 
+  // Fecha ELEGIDA de cuándo OCURRIÓ el reto (`happened_on`, migración 0037):
+  // sin esto, un reto nuevo cae por `created_at` (cuándo se lanza) y desordena
+  // el diario si se documenta a posteriori — mismo reporte que motivó la fecha
+  // en AddMoment (#553/#566), ahora también en el reto CREADO DESDE CERO. En
+  // modo PROMOCIÓN (`promoteMomentId`) NO se pide: el reto hereda tal cual la
+  // fecha del recuerdo que se convierte (`promoteToChallenge` no toca
+  // `happened_on`), así que este campo ni se calcula ni se enseña.
+  const [happenedOn, setHappenedOn] = useState(todayIso)
+  const [maxHappenedOn, setMaxHappenedOn] = useState(todayIso)
+  // Si el dueño toca la fecha a mano, la cascada async ya no debe pisarla.
+  const dateTouchedRef = useRef(false)
+
   // Foto opcional del reto (issue #595): puro extra sobre el Street View, que ya
   // es la pista principal. NO se lee su EXIF (el sitio ya lo fija el mapa del
   // paso 1) — solo se comprime y se le estripa el EXIF al subir, misma tubería
@@ -293,6 +307,40 @@ export function CreateLocationChallenge({
     // Solo al montar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // FECHA POR DEFECTO en cascada (mismo criterio que AddMoment, #553/#566): al
+  // montar, resolvemos el valor inicial de "Fecha" con las mismas dos consultas
+  // ligeras (último momento del viaje + sus fechas). Se salta en modo PROMOCIÓN
+  // (el campo ni se enseña: la fecha la hereda el recuerdo original) y con
+  // `initialState` (galería/tests, sin red). Best-effort: si falla, se queda en
+  // "hoy" sin bloquear el asistente.
+  useEffect(() => {
+    if (initialState || promoteMomentId) return
+    let cancelled = false
+    async function loadDefaultDate() {
+      try {
+        const [latestDate, group] = await Promise.all([
+          fetchLatestMomentDate(groupId),
+          getGroup(groupId),
+        ])
+        if (cancelled) return
+        const { date, max } = computeDefaultDate(
+          latestDate,
+          group?.starts_on ?? null,
+          group?.ends_on ?? null,
+          todayIso(),
+        )
+        setMaxHappenedOn(max)
+        if (!dateTouchedRef.current) setHappenedOn(date)
+      } catch (err) {
+        reportError(err, { area: 'create_location_challenge', stage: 'default_date' })
+      }
+    }
+    void loadDefaultDate()
+    return () => {
+      cancelled = true
+    }
+  }, [groupId, initialState, promoteMomentId])
 
   // BORRADOR PERSISTENTE (issue #718). Se salta por completo con `initialState`
   // (galería/tests), con `prefill` (recuerdo de origen) y en modo PROMOCIÓN
@@ -503,6 +551,10 @@ export function CreateLocationChallenge({
           createdBy: user.id,
           groupId,
           imagePath,
+          // Fecha ELEGIDA de cuándo ocurrió (issue fecha del reto): solo aplica
+          // al reto CREADO (esta rama); en modo promoción se hereda del
+          // recuerdo, ver el `if (promoteMomentId)` de arriba.
+          happenedOn,
         })
         challenge = created.challenge
       }
@@ -680,6 +732,25 @@ export function CreateLocationChallenge({
                   label="Añadir foto (opcional)"
                 />
               </div>
+              {/* Fecha ELEGIDA de cuándo ocurrió (issue fecha del reto): SOLO en modo
+                  creación, no en promoción — un recuerdo promovido a reto ya hereda
+                  su fecha tal cual (`promoteToChallenge` no toca `happened_on`),
+                  pedirla de nuevo aquí sería redundante y confuso (¿cuál manda?). */}
+              {!promoteMomentId && (
+                <div className={styles.ruleRow}>
+                  <label className={styles.ruleLabel}>Fecha</label>
+                  <DatePicker
+                    aria-label="Fecha"
+                    placeholder="Elige el día"
+                    value={happenedOn}
+                    max={maxHappenedOn}
+                    onChange={(v) => {
+                      dateTouchedRef.current = true
+                      setHappenedOn(v ?? todayIso())
+                    }}
+                  />
+                </div>
+              )}
               <div className={styles.ruleRow}>
                 <label className={styles.ruleLabel}>Plazo</label>
                 <SegmentedControl
