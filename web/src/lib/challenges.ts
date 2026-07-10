@@ -99,6 +99,15 @@ export interface NewChallengeInput {
    * `guessSeconds` es null ('Libre'): no hay nada que medir.
    */
   timeScoring?: boolean
+  /**
+   * Fecha ELEGIDA por el creador (`YYYY-MM-DD`, sin hora ni huso): cuándo
+   * OCURRIÓ el reto, no cuándo se lanza. `null`/`undefined` = sin fecha propia
+   * (el diario cae a `created_at`). Migración 0037/#566 — el asistente de crear
+   * reto la pide con la misma cascada de fecha por defecto que `AddMoment`
+   * (`computeDefaultDate`, `lib/defaultDate.ts`) para que el reto quede bien
+   * ordenado en el diario/bitácora, no por cuándo se creó.
+   */
+  happenedOn?: string | null
 }
 
 // Plazo por defecto si el creador no eligió uno: 24 h desde ahora. La duración
@@ -150,6 +159,7 @@ export async function createChallenge(
       score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
       // La velocidad puntúa; true (default) = activada, como pide el issue #628.
       time_scoring: input.timeScoring ?? DEFAULT_TIME_SCORING,
+      happened_on: input.happenedOn ?? null,
       created_by: input.createdBy,
     })
     // RETURNING sin lat/lng: tras revocar la columna (0010), pedirlas aquí daría
@@ -200,6 +210,13 @@ export interface NewNumberChallengeInput {
   deadlineAt?: string
   /** Segundos por jugada; null = sin límite. */
   guessSeconds?: number | null
+  /**
+   * Fecha ELEGIDA por el creador (`YYYY-MM-DD`, sin hora ni huso): cuándo
+   * OCURRIÓ el reto, no cuándo se lanza. `null`/`undefined` = sin fecha propia
+   * (el diario cae a `created_at`). Migración 0037/#566, misma cascada de
+   * fecha por defecto que `AddMoment` (`computeDefaultDate`, `lib/defaultDate.ts`).
+   */
+  happenedOn?: string | null
 }
 
 /**
@@ -233,6 +250,7 @@ export async function createNumberChallenge(
       photo_is_hint: true,
       guess_seconds: input.guessSeconds ?? null,
       deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
+      happened_on: input.happenedOn ?? null,
       created_by: input.createdBy,
     })
     // RETURNING sin la respuesta (answer_number_src revocada; answer_number vive en

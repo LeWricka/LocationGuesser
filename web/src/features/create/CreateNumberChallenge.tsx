@@ -10,6 +10,8 @@ import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
+import { getGroup } from '../../lib/groupData'
+import { computeDefaultDate, fetchLatestMomentDate, todayIso } from '../../lib/defaultDate'
 import {
   clearDraft,
   deserializeFile,
@@ -21,6 +23,7 @@ import {
 import {
   AppHeader,
   Button,
+  DatePicker,
   Icon,
   SegmentedControl,
   Spinner,
@@ -159,6 +162,15 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
   const [deadlineIndex, setDeadlineIndex] = useState(DEFAULT_DEADLINE_INDEX)
   const [guessIndex, setGuessIndex] = useState(DEFAULT_GUESS_INDEX)
 
+  // Fecha ELEGIDA de cuándo OCURRIÓ el reto (`happened_on`, migración 0037): sin
+  // esto, el reto cae por `created_at` (cuándo se lanza) y desordena el diario
+  // si se documenta a posteriori — mismo motivo que AddMoment (#553/#566), ahora
+  // también en el reto de número. Cascada por defecto en el efecto de abajo.
+  const [happenedOn, setHappenedOn] = useState(todayIso)
+  const [maxHappenedOn, setMaxHappenedOn] = useState(todayIso)
+  // Si el dueño toca la fecha a mano, la cascada async ya no debe pisarla.
+  const dateTouchedRef = useRef(false)
+
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
 
@@ -174,6 +186,37 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0
   }, [stage])
+
+  // FECHA POR DEFECTO en cascada (mismo criterio que AddMoment, #553/#566): al
+  // montar, resolvemos el valor inicial de "Fecha" con las mismas dos consultas
+  // ligeras (último momento del viaje + sus fechas). Best-effort: si falla, se
+  // queda en "hoy" sin bloquear el asistente.
+  useEffect(() => {
+    let cancelled = false
+    async function loadDefaultDate() {
+      try {
+        const [latestDate, group] = await Promise.all([
+          fetchLatestMomentDate(groupId),
+          getGroup(groupId),
+        ])
+        if (cancelled) return
+        const { date, max } = computeDefaultDate(
+          latestDate,
+          group?.starts_on ?? null,
+          group?.ends_on ?? null,
+          todayIso(),
+        )
+        setMaxHappenedOn(max)
+        if (!dateTouchedRef.current) setHappenedOn(date)
+      } catch (err) {
+        reportError(err, { area: 'create_number_challenge', stage: 'default_date' })
+      }
+    }
+    void loadDefaultDate()
+    return () => {
+      cancelled = true
+    }
+  }, [groupId])
 
   // Limpia el object URL de la foto al desmontar (no fugar memoria).
   useEffect(() => {
@@ -342,6 +385,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
         deadlineAt: deadlineFromMinutes(DEADLINE_OPTIONS[deadlineIndex].minutes),
         guessSeconds,
         imagePath,
+        happenedOn,
       })
       setStatus(null)
       // Reto creado con éxito: el borrador ya cumplió su función (issue #718).
@@ -535,6 +579,22 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
                   onChange={(e) => setCustomUnit(e.target.value)}
                 />
               )}
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>
+                Fecha <span>· para el diario</span>
+              </label>
+              <DatePicker
+                aria-label="Fecha"
+                placeholder="Elige el día"
+                value={happenedOn}
+                max={maxHappenedOn}
+                onChange={(v) => {
+                  dateTouchedRef.current = true
+                  setHappenedOn(v ?? todayIso())
+                }}
+              />
             </div>
 
             <div className={styles.field}>
