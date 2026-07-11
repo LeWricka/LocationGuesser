@@ -419,29 +419,58 @@ email integrado de Supabase está limitado (~2/hora) → se usa **SMTP propio**.
 - **Config de redirect (URL Configuration):** Site URL + Redirect URLs
   (`https://locationguesser-sage.vercel.app/**`, `http://localhost:5173/**`).
 
-### Entrada de baja fricción (nombre + email, validación diferida) — issue #438
+### Entrada de baja fricción (nombre + email, validación diferida) — issue #438 (HISTÓRICO, superseded por #506)
 
-Modelo de entrada: **nombre + email → dentro al instante**, sin esperar código. Bajo
-el capó se crea una sesión **anónima** (`signInAnonymously`) y se le **enlaza el email**
-(`updateUser({email})`), que dispara el correo de validación. Ver/jugar/unirse va con el
-email **pendiente**; **crear viaje** exige el email **validado**.
+> **Ya no describe el modelo actual.** El modelo de entrada general pasó a
+> email-first con código OTP (issue #506): `Landing`/`LoginFlow` NO llaman a
+> `signInAnonymously` — usan `sendEmailOtp`/`verifyEmailOtp` (código de 6
+> dígitos + enlace mágico, `lib/auth.ts`). La sección de abajo se conserva por
+> trazabilidad histórica. La sesión anónima **sí** volvió (issue #758), pero
+> con un propósito distinto y más acotado: ver la sección siguiente.
 
-Prerrequisitos de PROD (los activa el dueño en el dashboard; el código ya está listo):
+Modelo de entrada (retirado): **nombre + email → dentro al instante**, sin esperar
+código. Bajo el capó se creaba una sesión **anónima** (`signInAnonymously`) y se le
+**enlazaba el email** (`updateUser({email})`), que disparaba el correo de validación.
+Ver/jugar/unirse iba con el email **pendiente**; **crear viaje** exigía el email
+**validado**.
+
+### Receptor sin cuenta (sesión anónima acotada al enlace) — issue #758
+
+Quien abre un enlace de viaje/reto **sin sesión** entra con una sesión **anónima**
+(`signInAnonymously`, `lib/auth.ts`) para poder **ver y jugar sin dar ningún dato**;
+su `auth.uid()` es real desde el primer segundo, así que su voto cuenta aunque nunca
+deje su email. El nombre se pide (un solo campo) justo antes de votar, para que
+aparezca en el marcador; el email es un CTA **opcional** ("Guarda tu cuenta") tras
+jugar o al intentar crear un viaje, que **vincula** la sesión anónima a un email
+**conservando el mismo uid** (`updateUser({email})` + `verifyOtp({type:
+'email_change'})`) — nunca crea una cuenta nueva ni pierde el voto ya emitido.
+
+Sigue siendo el MISMO mecanismo de Supabase que el modelo #438 retirado (sesiones
+anónimas), así que comparte el prerrequisito del toggle. Prerrequisitos de PROD (los
+activa el dueño en el dashboard; el código ya está listo):
 
 1. **Activar "Anonymous sign-ins":** Supabase → Authentication → Sign In / Providers →
-   **Allow anonymous sign-ins = ON**. Sin esto, la entrada de baja fricción no puede
-   crear la sesión anónima y `enterWithNameAndEmail` fallará.
-2. **Plantilla "Confirm signup" / "Change Email Address":** al enlazar el email a un
-   anónimo, Supabase manda el correo de **cambio/confirmación de email**. Revisar que la
-   plantilla (Authentication → Email Templates) tenga copy claro ("valida tu correo") y el
-   enlace `{{ .ConfirmationURL }}`. El mismo SMTP propio (arriba) la envía.
-3. **RLS (migración `0032_crear_exige_no_anonimo.sql`):** endurece `groups_insert_owner`
-   para exigir `is_anonymous = false` — un anónimo NO puede crear viajes a nivel de BD
-   (el gate del cliente es solo la cara amable). La aplica el pipeline `db-migrate` al
-   mergear (no a mano). No rompe a los usuarios ya registrados (su JWT no es anónimo).
-4. **Caso email ya registrado:** si en la entrada el correo ya pertenece a una cuenta, NO
-   se enlaza a un anónimo (fallaría con `email_exists`); en su lugar se manda un **magic
-   link de recuperación** (mismo flujo OTP/passwordless) para recuperar la cuenta original.
+   **Allow anonymous sign-ins = ON**. Sin esto, `signInAnonymously()` devuelve un
+   error que el cliente **degrada con gracia**: el receptor cae al flujo normal de
+   Landing + código OTP (nunca pantalla en blanco ni crash) — la feature simplemente
+   no ofrece "ver/jugar sin cuenta" hasta que se active.
+2. **Auto-borrado de usuarios anónimos (higiene):** Supabase →
+   Authentication → Sign In / Providers → **Anonymous Sign-Ins** trae un ajuste de
+   **días de expiración** para limpiar cuentas anónimas abandonadas (quien abrió un
+   enlace, vio el reto y nunca volvió). Fijar un valor razonable (p.ej. 30-90 días);
+   sin este ajuste, las sesiones anónimas sin actividad se acumulan indefinidamente
+   en `auth.users`. Un receptor que SÍ vincula su email (`AccountUpgradeModal`) deja
+   de ser anónimo y no le afecta el auto-borrado, aunque pasen los días.
+3. **RLS (migración `0032_crear_exige_no_anonimo.sql`):** sigue endureciendo
+   `groups_insert_owner` para exigir `is_anonymous = false` — un anónimo NO puede
+   crear viajes a nivel de BD. La UI ya lo intercepta ANTES (CTA "guárdate" en vez del
+   formulario, `App.tsx` → `AnonCreateGate`), pero el candado real sigue siendo esta
+   policy. No rompe a los usuarios ya registrados (su JWT no es anónimo).
+4. **Vincular con un email ya registrado:** si el receptor intenta "guardarse" con un
+   correo que ya tiene cuenta permanente, `updateUser({email})`/`verifyOtp` fallan (el
+   email ya está en uso) — el modal muestra el error y deja reintentar con otro correo
+   o seguir como está (su sesión anónima y su voto quedan intactos). No hay hoy un
+   flujo de "fusionar" el anónimo con la cuenta existente.
 
 ---
 

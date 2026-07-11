@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import { onAuthStateChange, isVerifiedUser, clearLegacyAnonymousSession } from './auth'
+import { onAuthStateChange, isVerifiedUser } from './auth'
 import { getProfile } from './profile'
 import type { Profile } from './database.types'
 import { SessionContext, type SessionState } from './session-context'
@@ -58,14 +58,12 @@ export function AuthProvider({ children }: Props) {
     async function bootstrap() {
       const { data } = await supabase.auth.getSession()
       if (!active) return
-      // Sesión anónima legada (issue #514): el modelo pre-#507 dejó sesiones
-      // anónimas vivas en localStorage que ya no sirven (la RLS de groups exige
-      // is_anonymous=false). Las descartamos aquí, ANTES de pintar nada logueado.
-      const legacy = await clearLegacyAnonymousSession(data.session)
-      if (!active) return
-      const validSession = legacy ? null : data.session
-      applySession(validSession)
-      await loadProfile(validSession?.user ?? null)
+      // Sesión anónima del receptor (issue #758): es una sesión válida de
+      // primera clase (ver docblock de `signInAnonymously` en lib/auth.ts), así
+      // que la aplicamos igual que cualquier otra — sin el force-signOut que
+      // hacía `clearLegacyAnonymousSession` (retirada).
+      applySession(data.session)
+      await loadProfile(data.session?.user ?? null)
       if (active) setLoading(false)
     }
     void bootstrap()
@@ -117,16 +115,10 @@ export function AuthProvider({ children }: Props) {
       }
 
       setLoading(true)
-      void clearLegacyAnonymousSession(nextSession)
-        .then((legacy) => {
-          if (!active) return
-          const validSession = legacy ? null : nextSession
-          applySession(validSession)
-          return loadProfile(validSession?.user ?? null)
-        })
-        .finally(() => {
-          if (active) setLoading(false)
-        })
+      applySession(nextSession)
+      void loadProfile(nextSession?.user ?? null).finally(() => {
+        if (active) setLoading(false)
+      })
     })
 
     return () => {
@@ -138,10 +130,14 @@ export function AuthProvider({ children }: Props) {
   // ¿Cuenta permanente con email validado? Gatea "crear" en la UI (issue #438).
   // Se deriva del user y cambia solo con él (onAuthStateChange repinta al validar).
   const verified = isVerifiedUser(user)
+  // ¿Sesión anónima del receptor? (issue #758). La UI la usa para: no exigir
+  // nombre al entrar por deep link, ofrecer el CTA "guárdate" tras jugar, y
+  // esconder de "Miembros" a quien aún no ha hecho nada con ella.
+  const isAnonymous = user?.is_anonymous === true
 
   const value = useMemo<SessionState>(
-    () => ({ session, user, profile, loading, verified, refreshProfile }),
-    [session, user, profile, loading, verified, refreshProfile],
+    () => ({ session, user, profile, loading, verified, isAnonymous, refreshProfile }),
+    [session, user, profile, loading, verified, isAnonymous, refreshProfile],
   )
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>

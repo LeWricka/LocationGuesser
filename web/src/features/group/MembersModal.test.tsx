@@ -150,6 +150,43 @@ describe('MembersModal — lista y roles', () => {
   })
 })
 
+// Issue #758: el receptor sin cuenta (sesión anónima) que aún NO ha jugado ni
+// guardado su cuenta no tiene display_name (PlayChallenge se lo pide justo
+// antes de votar); getGroupMembers ya resuelve ese hueco a '—'. La lista de
+// Miembros lo oculta hasta que tenga algo que mostrar.
+describe('MembersModal — oculta anónimos sin actividad (issue #758)', () => {
+  const LURKER: GroupMemberInfo = {
+    userId: 'u-lurker',
+    name: '—',
+    role: 'member',
+    isOwner: false,
+    isCreator: false,
+  }
+
+  test('un miembro sin nombre elegido no aparece en la lista', async () => {
+    getGroupMembersMock.mockResolvedValue([CREATOR, LURKER])
+    renderModal()
+
+    await screen.findByText('Ana')
+    expect(screen.queryByText('—')).not.toBeInTheDocument()
+  })
+
+  test('en cuanto tiene nombre (jugó o guardó su cuenta), aparece como cualquier otro', async () => {
+    getGroupMembersMock.mockResolvedValue([CREATOR, { ...LURKER, name: 'Ya jugué' }])
+    renderModal()
+
+    expect(await screen.findByText('Ya jugué')).toBeInTheDocument()
+  })
+
+  test('con solo el dueño visible, muestra la guía de invitar (cuenta visibles, no el total en BD)', async () => {
+    getGroupMembersMock.mockResolvedValue([CREATOR, LURKER])
+    renderModal({ onInvite: vi.fn() })
+
+    await screen.findByText('Ana')
+    expect(screen.getByText(/Aquí todavía estás tú/)).toBeInTheDocument()
+  })
+})
+
 describe('MembersModal — expulsar (RLS group_members_delete, 0033)', () => {
   test('el creador expulsa a un miembro con confirmación propia', async () => {
     getGroupMembersMock.mockResolvedValue([CREATOR, MEMBER])

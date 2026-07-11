@@ -102,38 +102,71 @@ export async function signOut(): Promise<void> {
   if (error) throw error
 }
 
-// ── Sesión anónima legada (issue #514) ───────────────────────────────────────
-// #507 eliminó la entrada anónima y CreateGate; la migración 0032 exige
-// `is_anonymous = false` para crear un grupo. Los navegadores que aún conservan
-// una sesión anónima del modelo viejo entraban a la home como si nada y solo
-// veían el error crudo de RLS al intentar crear. Estas sesiones ya no sirven en
-// el modelo nuevo: las tratamos como inválidas.
+// ── Sesión anónima del RECEPTOR (issue #758) ─────────────────────────────────
+// #507 eliminó la entrada anónima como modelo de ALTA general (esa vía sigue
+// siendo email-first con código, arriba en este fichero). Pero un RECEPTOR que
+// abre un enlace compartido (viaje/reto) debe poder VER y JUGAR sin dar ni un
+// dato: le damos una sesión anónima de Supabase Auth, acotada a ese enlace. Su
+// `auth.uid()` es real desde el primer segundo, así que su voto cuenta aunque
+// nunca deje su email; `isVerifiedUser` (arriba) sigue siendo el candado de
+// CAPACIDADES (crear un viaje exige is_anonymous=false, migración 0032), no de
+// acceso a la sesión: un anónimo SÍ tiene sesión, solo no puede crear.
+//
+// Antes (issue #514) tratábamos CUALQUIER sesión anónima como "legada" (del
+// modelo pre-#507) y la cerrábamos a la fuerza en el arranque
+// (`clearLegacyAnonymousSession`, retirada). Con las sesiones anónimas de
+// vuelta como ciudadanas de primera clase para el receptor, ese force-signOut
+// ya no tiene sentido: cerrar sesión a un receptor a mitad de partida le haría
+// perder su sesión (y con ella, la identidad de su voto) sin motivo. Se retiró
+// junto con el aviso "hemos mejorado el acceso" en Landing.
 
-const LEGACY_SESSION_KEY = 'lg.legacySessionCleared'
-
-/** Marca (una vez) que se cerró una sesión anónima legada, para avisar en la landing. */
-function markLegacySessionCleared(): void {
-  localStorage.setItem(LEGACY_SESSION_KEY, '1')
+/**
+ * Entra como usuario ANÓNIMO (Supabase Auth). Lo usa el router (App.tsx) cuando
+ * alguien sin sesión abre un enlace de viaje/reto: le da una identidad real
+ * (`auth.uid()`) sin pedirle nada. DEGRADA CON ELEGANCIA: si Supabase devuelve
+ * error (p.ej. el toggle "Allow anonymous sign-ins" está apagado en el
+ * dashboard, ver docs/operativa.md) NO lanzamos — devolvemos el error para que
+ * el llamante caiga al flujo de hoy (Landing + código OTP). Nunca debe dejar la
+ * pantalla en blanco ni romper la app.
+ */
+export async function signInAnonymously(): Promise<{ error: Error | null }> {
+  try {
+    const { error } = await supabase.auth.signInAnonymously()
+    return { error: error ?? null }
+  } catch (err) {
+    return { error: err instanceof Error ? err : new Error(String(err)) }
+  }
 }
 
-/** Lee y consume el aviso de sesión legada (uso único, evita repetir el toast). */
-export function takeLegacySessionNotice(): boolean {
-  const flag = localStorage.getItem(LEGACY_SESSION_KEY)
-  if (flag) localStorage.removeItem(LEGACY_SESSION_KEY)
-  return Boolean(flag)
+// ── Vincular anónimo → cuenta permanente (issue #758) ────────────────────────
+// "Guárdate / entra del todo": el receptor anónimo que ya vio/jugó puede, al
+// final y de forma OPCIONAL, convertir su sesión anónima en una cuenta
+// permanente con email SIN perder identidad — el `auth.uid()` (y con él, sus
+// votos y su puesto en el marcador) no cambia. Es un flujo DISTINTO de
+// `sendEmailOtp`/`verifyEmailOtp` (que crean o recuperan una cuenta desde
+// cero): aquí NO hay `signInWithOtp` de por medio, es `updateUser({ email })`
+// sobre la sesión anónima ya existente, que Supabase trata como un cambio de
+// email (manda un código/enlace de tipo `email_change`) y, al verificarlo, la
+// cuenta deja de ser anónima conservando el mismo id.
+export async function linkAnonymousEmail(email: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ email })
+  if (error) throw error
 }
 
 /**
- * Si la sesión es anónima (modelo pre-#507), la trata como inválida: cierra
- * sesión y deja marca para el aviso en la landing. Devuelve `true` si actuó
- * (el llamante debe descartar la sesión), `false` si la sesión es válida o no
- * hay sesión.
+ * Canjea el código de 6 dígitos del paso anterior. `type: 'email_change'` es
+ * el tipo de OTP que emite `updateUser({ email })` sobre una sesión ya
+ * iniciada (a diferencia de `verifyEmailOtp`, que usa `type: 'email'` para el
+ * alta/login desde cero vía `signInWithOtp`). Al verificar, `is_anonymous` pasa
+ * a `false` y `onAuthStateChange` repinta con la cuenta ya permanente.
  */
-export async function clearLegacyAnonymousSession(session: Session | null): Promise<boolean> {
-  if (!session?.user || session.user.is_anonymous !== true) return false
-  markLegacySessionCleared()
-  await signOut()
-  return true
+export async function verifyLinkEmailOtp(email: string, token: string): Promise<void> {
+  const { error } = await supabase.auth.verifyOtp({
+    email: email.trim(),
+    token: token.trim(),
+    type: 'email_change',
+  })
+  if (error) throw error
 }
 
 // Sesión actual (o null si no hay login). Útil para el gating inicial: antes de

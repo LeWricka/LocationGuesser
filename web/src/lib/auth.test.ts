@@ -1,22 +1,39 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import type { Session } from '@supabase/supabase-js'
 
 // auth.ts importa ./supabase, que lanza sin env vars. Mockeamos solo lo que
-// usan los helpers de destino (no tocan supabase, pero el import debe resolver).
-const signOutMock = vi.fn(async () => ({ error: null }))
-vi.mock('./supabase', () => ({ supabase: { auth: { signOut: () => signOutMock() } } }))
+// usan los helpers de destino/sesión anónima (no tocan supabase, pero el
+// import debe resolver).
+const signInAnonymouslyMock = vi.fn(async () => ({ data: {}, error: null as Error | null }))
+const updateUserMock = vi.fn<(...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>>(
+  async () => ({ data: {}, error: null }),
+)
+const verifyOtpMock = vi.fn<(...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>>(
+  async () => ({ data: {}, error: null }),
+)
+vi.mock('./supabase', () => ({
+  supabase: {
+    auth: {
+      signInAnonymously: () => signInAnonymouslyMock(),
+      updateUser: (...args: unknown[]) => updateUserMock(...args),
+      verifyOtp: (...args: unknown[]) => verifyOtpMock(...args),
+    },
+  },
+}))
 
 import {
   setNextDestination,
   getNextDestination,
   takeNextDestination,
-  clearLegacyAnonymousSession,
-  takeLegacySessionNotice,
+  signInAnonymously,
+  linkAnonymousEmail,
+  verifyLinkEmailOtp,
 } from './auth'
 
 beforeEach(() => {
   localStorage.clear()
-  signOutMock.mockClear()
+  signInAnonymouslyMock.mockClear()
+  updateUserMock.mockClear()
+  verifyOtpMock.mockClear()
 })
 
 describe('destino deep-link (lg.next)', () => {
@@ -38,41 +55,51 @@ describe('destino deep-link (lg.next)', () => {
   })
 })
 
-// Base mínima de sesión para las pruebas del gate de sesión legada.
-function fakeSession(userOverrides: Record<string, unknown>): Session {
-  return {
-    access_token: 't',
-    refresh_token: 'r',
-    token_type: 'bearer',
-    expires_in: 3600,
-    user: { id: 'u1', app_metadata: {}, user_metadata: {}, aud: 'authenticated', ...userOverrides },
-  } as unknown as Session
-}
-
-describe('clearLegacyAnonymousSession (issue #514)', () => {
-  test('sin sesión → no actúa', async () => {
-    expect(await clearLegacyAnonymousSession(null)).toBe(false)
-    expect(signOutMock).not.toHaveBeenCalled()
+// Sesión anónima del receptor (issue #758): reemplaza al viejo gate de sesión
+// legada (#514, retirado) — ahora un anónimo es una sesión válida de primera
+// clase, y `signInAnonymously` es el único wrapper que la crea.
+describe('signInAnonymously', () => {
+  test('éxito → sin error', async () => {
+    expect(await signInAnonymously()).toEqual({ error: null })
+    expect(signInAnonymouslyMock).toHaveBeenCalledTimes(1)
   })
 
-  test('sesión NO anónima → no actúa', async () => {
-    const session = fakeSession({ is_anonymous: false, email_confirmed_at: '2026-01-01' })
-    expect(await clearLegacyAnonymousSession(session)).toBe(false)
-    expect(signOutMock).not.toHaveBeenCalled()
+  test('DEGRADA CON ELEGANCIA si Supabase devuelve error (p.ej. toggle apagado): no lanza', async () => {
+    const err = new Error('Anonymous sign-ins are disabled')
+    signInAnonymouslyMock.mockResolvedValueOnce({ data: {}, error: err })
+    await expect(signInAnonymously()).resolves.toEqual({ error: err })
   })
 
-  test('sesión ANÓNIMA legada → cierra sesión y marca el aviso', async () => {
-    const session = fakeSession({ is_anonymous: true })
-    expect(await clearLegacyAnonymousSession(session)).toBe(true)
-    expect(signOutMock).toHaveBeenCalledTimes(1)
-    // El aviso queda pendiente para la landing, y se consume una sola vez.
-    expect(takeLegacySessionNotice()).toBe(true)
-    expect(takeLegacySessionNotice()).toBe(false)
+  test('DEGRADA si supabase.auth.signInAnonymously lanza en vez de devolver error: no propaga', async () => {
+    signInAnonymouslyMock.mockRejectedValueOnce(new Error('network'))
+    const { error } = await signInAnonymously()
+    expect(error).toBeInstanceOf(Error)
+    expect(error?.message).toBe('network')
   })
 })
 
-describe('takeLegacySessionNotice', () => {
-  test('sin aviso pendiente → false', () => {
-    expect(takeLegacySessionNotice()).toBe(false)
+describe('linkAnonymousEmail / verifyLinkEmailOtp (vincular anónimo → permanente, issue #758)', () => {
+  test('linkAnonymousEmail llama a updateUser({ email })', async () => {
+    await linkAnonymousEmail('lewis@ej.com')
+    expect(updateUserMock).toHaveBeenCalledWith({ email: 'lewis@ej.com' })
+  })
+
+  test('linkAnonymousEmail lanza si Supabase devuelve error', async () => {
+    updateUserMock.mockResolvedValueOnce({ data: {}, error: new Error('ya registrado') })
+    await expect(linkAnonymousEmail('lewis@ej.com')).rejects.toThrow('ya registrado')
+  })
+
+  test('verifyLinkEmailOtp canjea con type "email_change" (no "email"): distingue vincular de alta/login', async () => {
+    await verifyLinkEmailOtp('lewis@ej.com', '123456')
+    expect(verifyOtpMock).toHaveBeenCalledWith({
+      email: 'lewis@ej.com',
+      token: '123456',
+      type: 'email_change',
+    })
+  })
+
+  test('verifyLinkEmailOtp lanza si el código es incorrecto/caducado', async () => {
+    verifyOtpMock.mockResolvedValueOnce({ data: {}, error: new Error('código inválido') })
+    await expect(verifyLinkEmailOtp('lewis@ej.com', '000000')).rejects.toThrow('código inválido')
   })
 })

@@ -154,6 +154,14 @@ export type AnalyticsEvent =
   // ('shared'|'copied'|'downloaded'). SIN datos sensibles: nunca lat/lng ni
   // el nombre del lugar (la respuesta oculta).
   | 'challenge_shared'
+  // Receptor sin cuenta (issue #758): entra por enlace y ve/juega con una
+  // sesión ANÓNIMA (sin login/registro). `receptor_anon_signin`: se intentó el
+  // auto sign-in al abrir el deep link sin sesión. Props: outcome
+  // ('success'|'failed'), kind ('trip'|'challenge'). `account_upgraded`: el
+  // anónimo vinculó su sesión a un email (mismo uid, ya no anónima) — sin props
+  // (nada identificable; el email ya vive en Supabase, no en el evento).
+  | 'receptor_anon_signin'
+  | 'account_upgraded'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

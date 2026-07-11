@@ -5,12 +5,15 @@
 //
 // Flujos (email-first con código OTP, issue #506):
 //  - loading                  → spinner de arranque
-//  - sin sesión               → Landing (CTA único email-first → LoginFlow)
+//  - sin sesión, deep link    → AnonReceptorGate: auto sign-in ANÓNIMO (#758);
+//                                si falla, cae a Landing
+//  - sin sesión, sin deep link→ Landing (CTA único email-first → LoginFlow)
 //  - sesión OK, sin nombre    → ProfileGate (paso de nombre) → HOME (issue #742)
 //  - sesión OK, con nombre    → router por hash:
 //       #g=&c=  → PlayChallenge (auto-join)          [permitido sin nombre también]
 //       #g=     → TripPage     (auto-join)            [permitido sin nombre también]
-//       #nuevo  → CreateGroup (con sesión OTP verificada, sin muro adicional)
+//       #nuevo  → CreateGroup (con sesión OTP verificada, sin muro adicional);
+//                 un ANÓNIMO ve el CTA "guárdate" en vez del formulario (#758)
 //       #perfil → ProfileEditScreen  (acceso BAJO DEMANDA; no como puerta de entrada)
 //       #admin  → AdminPage (SOLO admin; un no-admin cae a la home)
 //       raíz    → HomePage
@@ -22,20 +25,40 @@
 // ProfileGate: solo se muestra a cuentas NUEVAS (sin display_name) como parte del
 // alta, tras el código. Una vez elegido el nombre, no vuelve a aparecer.
 // La edición de perfil es accesible bajo demanda vía #perfil, no como paso forzado.
+//
+// RECEPTOR SIN CUENTA (issue #758, enfoque A): quien abre un enlace de
+// viaje/reto SIN sesión ya no cae directo a la Landing/email — primero
+// intentamos darle una sesión ANÓNIMA (`signInAnonymously`, lib/auth.ts). Con
+// ella ve y juega el reto (el auto-join de `LoggedIn` ya lo da de alta como
+// miembro) sin dar ni un dato; el nombre solo se le pide al votar
+// (PlayChallenge) y el email es un CTA opcional tras jugar o al intentar crear
+// (AccountUpgradeModal). Si el sign-in anónimo falla (toggle "Allow anonymous
+// sign-ins" apagado en el dashboard, ver docs/operativa.md), degradamos con
+// gracia al flujo de hoy (Landing + código OTP): nunca pantalla en blanco.
 
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Settings } from 'lucide-react'
 import { isAdminEmail } from './lib/admin'
-import { Landing, ProfileGate, useDeepLinkJoin } from './features/auth'
+import {
+  AccountUpgradeModal,
+  Landing,
+  ProfileGate,
+  useDeepLinkJoin,
+  needsProfileStep,
+} from './features/auth'
 import { ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
 import { GoogleMapsProvider } from './lib/GoogleMapsProvider'
-import { setNextDestination, takeNextDestination } from './lib/auth'
+import { setNextDestination, takeNextDestination, signInAnonymously } from './lib/auth'
 import { getGroup } from './lib/groupData'
+import { track } from './lib/analytics'
+import { reportError } from './lib/observability'
 import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
 import {
+  BackHomeButton,
+  Card,
   Icon,
   Spinner,
   Stack,
@@ -44,8 +67,8 @@ import {
   PlayRouteSkeleton,
   UtilityRouteSkeleton,
   HomeRouteSkeleton,
+  useToast,
 } from './ui'
-import { needsProfileStep } from './features/auth'
 import styles from './App.module.css'
 
 // CODE-SPLITTING POR RUTA (perf): las pantallas pesadas (mapas Leaflet/Google,
@@ -123,15 +146,51 @@ function AppRoutes() {
   if (loading) return <BootScreen />
 
   // ── Sin sesión ──────────────────────────────────────────────────────────────
-  // Cualquier ruta cae a la landing pública. Si la URL trae un deep link de
-  // grupo, guardamos el destino para restaurarlo tras el email y adaptamos el
-  // copy ("Vive los viajes de <grupo>") con el nombre del grupo.
+  // Un deep link de viaje/reto intenta ANTES una sesión anónima (issue #758):
+  // el receptor ve/juega sin dar ningún dato. Sin deep link (home a secas) cae
+  // directo a la landing pública de siempre.
   if (!user) {
+    if (route.group) {
+      return <AnonReceptorGate route={route} />
+    }
     return <LoggedOut route={route} />
   }
 
   // ── Sesión OK → router por hash ──────────────────────────────────────────────
   return <LoggedIn route={route} adminRoute={adminRoute} />
+}
+
+// Deep link SIN sesión (issue #758): antes de caer a la Landing, intentamos dar
+// una sesión ANÓNIMA al receptor para que vea/juegue sin dar ni un dato.
+// Mientras se resuelve, el esqueleto de la pantalla de destino (no un spinner
+// genérico: issue #526, cada ruta anticipa su propia forma). Éxito →
+// `onAuthStateChange` dispara, `AuthProvider` actualiza `user` y `AppRoutes`
+// vuelve a evaluar con sesión — este componente se desmonta solo, no navega él
+// mismo. Fallo (p.ej. el toggle "Allow anonymous sign-ins" está apagado en el
+// dashboard) → degradación con gracia a la Landing/login de siempre.
+function AnonReceptorGate({ route }: { route: ReturnType<typeof parseHash> }) {
+  const [failed, setFailed] = useState(false)
+  // Evita relanzar el sign-in en cada re-render (p.ej. si `route` cambia de
+  // identidad por un hashchange mientras la promesa sigue en vuelo).
+  const attempted = useRef(false)
+
+  useEffect(() => {
+    if (attempted.current) return
+    attempted.current = true
+    const kind = route.challenge ? 'challenge' : 'trip'
+    void signInAnonymously().then(({ error }) => {
+      if (error) {
+        reportError(error, { area: 'receptor_anon_signin' })
+        track('receptor_anon_signin', { outcome: 'failed', kind })
+        setFailed(true)
+        return
+      }
+      track('receptor_anon_signin', { outcome: 'success', kind })
+    })
+  }, [route.challenge])
+
+  if (failed) return <LoggedOut route={route} />
+  return route.challenge ? <PlayRouteSkeleton /> : <TripRouteSkeleton />
 }
 
 // Spinner de arranque, mientras AuthProvider resuelve la sesión persistida.
@@ -179,7 +238,7 @@ function LoggedIn({
   route: ReturnType<typeof parseHash>
   adminRoute: boolean
 }) {
-  const { user, profile, refreshProfile } = useSession()
+  const { user, profile, isAnonymous, refreshProfile } = useSession()
   const joinIfGroup = useDeepLinkJoin(user?.id)
 
   // Al volver del email: si guardamos un destino (#g…), lo restauramos (auto-join
@@ -358,6 +417,18 @@ function LoggedIn({
     // Crear viaje: con el modelo email-first (issue #506), cualquier usuario con
     // sesión OTP verificada puede crear. La RLS `groups_insert_owner` es el candado
     // real; aquí ya no hay muro de "valida tu correo". CreateGate eliminado.
+    //
+    // EXCEPCIÓN (issue #758): un receptor ANÓNIMO no puede crear (migración
+    // 0032 lo impide en RLS). En vez de dejarlo rellenar el formulario entero
+    // para chocar al final con el error crudo de RLS, se lo decimos ANTES con
+    // el mismo CTA "guárdate" que ofrecemos tras jugar.
+    if (isAnonymous) {
+      return (
+        <Suspense fallback={<UtilityRouteSkeleton />}>
+          <AnonCreateGate onBack={() => goHome()} />
+        </Suspense>
+      )
+    }
     return (
       <Suspense fallback={<UtilityRouteSkeleton />}>
         <CreateGroup onBack={() => goHome()} />
@@ -409,6 +480,39 @@ function AdminLink() {
     <a className={styles.adminLink} href="#admin" aria-label="Abrir administración">
       <Icon icon={Settings} size={18} /> Admin
     </a>
+  )
+}
+
+// CTA "guárdate" cuando un receptor ANÓNIMO llega a `#nuevo` (issue #758): crear
+// un viaje exige cuenta permanente (RLS `groups_insert_owner`, migración 0032),
+// así que en vez de dejarlo rellenar el formulario para chocar al final con un
+// error crudo, se lo decimos aquí y le ofrecemos vincular su sesión (mismo uid,
+// no pierde nada de lo que ya vio/jugó). Cerrar el modal sin vincular vuelve a
+// la home: esta pantalla no tiene nada más que ofrecer a quien no quiere seguir.
+function AnonCreateGate({ onBack }: { onBack: () => void }) {
+  const toast = useToast()
+  return (
+    <main className="lg-page">
+      <Stack gap={4}>
+        <BackHomeButton onClick={onBack} label="Volver" />
+        <Card padding="md" raised>
+          <Stack gap={3} align="center">
+            <strong>Guarda tu cuenta para crear un viaje</strong>
+            <p>
+              Estás entrando como invitado. Para crear un viaje nuevo, guarda tu cuenta con tu
+              correo: no pierdes nada de lo que ya has visto o jugado.
+            </p>
+          </Stack>
+        </Card>
+      </Stack>
+      <AccountUpgradeModal
+        open
+        onClose={onBack}
+        onUpgraded={() => {
+          toast.show('Cuenta guardada. Ya puedes crear tu viaje.', { tone: 'success' })
+        }}
+      />
+    </main>
   )
 }
 

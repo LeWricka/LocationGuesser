@@ -90,6 +90,17 @@ export function MembersModal({ groupId, meId, onClose, onLeft, onChanged, onInvi
   const meIsCreator = me?.isCreator ?? false
   const candidates = (members ?? []).filter((m) => m.userId !== meId)
 
+  // Ocultar de la LISTA (issue #758) a receptores anónimos SIN actividad: aún
+  // no han jugado un reto (PlayChallenge pide el nombre justo antes de votar,
+  // ver NamePromptModal) ni han guardado su cuenta (ProfileGate exige nombre en
+  // cualquier alta normal, incluida la del dueño). `getGroupMembers` ya resuelve
+  // ese "sin nombre" a `'—'`, así que es un proxy barato de "anónimo sin
+  // actividad" sin tener que exponer `is_anonymous` de OTROS usuarios al
+  // cliente (no hay vista/RPC para eso hoy: seguiría siendo un follow-up si
+  // hiciera falta distinguirlo mejor, p.ej. para impedir hacerlos co-dueños).
+  // El marcador no necesita este filtro: ya es por-voto (sin voto, no aparece).
+  const visibleMembers = (members ?? []).filter((m) => m.name !== '—')
+
   async function run(action: () => Promise<void>) {
     setBusy(true)
     try {
@@ -225,7 +236,7 @@ export function MembersModal({ groupId, meId, onClose, onLeft, onChanged, onInvi
             </div>
           ) : (
             <ul className={styles.list}>
-              {members.map((m) => {
+              {visibleMembers.map((m) => {
                 const isMe = meId != null && m.userId === meId
                 return (
                   <li key={m.userId} className={styles.row}>
@@ -291,7 +302,7 @@ export function MembersModal({ groupId, meId, onClose, onLeft, onChanged, onInvi
               co-dueño) desde la propia hoja de Invitar. */}
           {members != null && meIsOwner && onInvite && (
             <div className={styles.inviteGuide}>
-              {members.length <= 1 && (
+              {visibleMembers.length <= 1 && (
                 <p className={styles.inviteHint}>
                   Aquí todavía estás tú. Invita a los tuyos con el enlace del viaje; cuando entren,
                   desde esta lista podrás hacerlos co-dueños. O mándale directamente un enlace de

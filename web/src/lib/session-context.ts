@@ -21,6 +21,16 @@ export interface SessionState {
    * Solo para la UI; la seguridad real la impone la RLS `groups_insert_owner`.
    */
   verified: boolean
+  /**
+   * ¿Sesión ANÓNIMA (issue #758)? El receptor que abre un enlace de viaje/reto
+   * entra así, sin dar ningún dato: puede ver/jugar/unirse igual que cualquier
+   * miembro (RLS `to authenticated` los cubre tras el auto-join), pero NO puede
+   * crear (RLS `groups_insert_owner`, migración 0032) ni aparece en "Miembros"
+   * hasta que juega o guarda su cuenta. `verified` (arriba) ya cubre "cuenta
+   * permanente con email"; este flag es el complementario "sigue siendo un
+   * invitado de paso".
+   */
+  isAnonymous: boolean
   /** Vuelve a leer el perfil de BD (tras editar display_name/avatar en el onboarding o la home). */
   refreshProfile: () => Promise<void>
 }

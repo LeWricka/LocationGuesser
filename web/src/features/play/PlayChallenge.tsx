@@ -14,6 +14,7 @@ import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { GameScene, type GameSceneData } from './GameScene'
 import { CountdownOverlay } from './CountdownOverlay'
 import { ExitConfirmModal } from './ExitConfirmModal'
+import { NamePromptModal } from './NamePromptModal'
 import { sceneMedium } from './sceneMedium'
 import { PlayNumberChallenge } from './PlayNumberChallenge'
 import { ResultCard } from './ResultCard'
@@ -29,6 +30,7 @@ import {
 } from '../../lib/challenges'
 import { deleteMyVote, getExistingVote, getVotes, startPlay, submitVote } from '../../lib/votes'
 import { getGroup } from '../../lib/groupData'
+import { upsertProfile } from '../../lib/profile'
 import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
@@ -43,6 +45,10 @@ import { describeChallengeClosure } from './challengeClosure'
 // Rasterización + compartir reutilizadas de la tarjeta de clasificación (import
 // READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
+// "Guárdate / entra del todo" (issue #758): CTA opcional tras jugar, para el
+// receptor ANÓNIMO. Vive en features/auth (vincula uid), esta pantalla solo la
+// invoca.
+import { AccountUpgradeModal } from '../auth'
 import {
   BackHomeButton,
   Button,
@@ -171,7 +177,24 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const panoRef = useRef<StreetViewPanoHandle>(null)
   // La identidad es la sesión: el voto se atribuye a `user.id` (no a un nombre).
   // El perfil aporta el avatar para pintar la burbuja del pin del propio jugador.
-  const { user, profile } = useSession()
+  // `isAnonymous`/`refreshProfile` alimentan el receptor sin cuenta (issue #758):
+  // pedir el nombre antes de revelar y ofrecer "guárdate" tras el resultado.
+  const { user, profile, isAnonymous, refreshProfile } = useSession()
+  // Nombre antes de revelar (issue #758): un receptor ANÓNIMO sin display_name
+  // aún elegido vería "—" en el marcador. Se pide UNA vez, justo antes de
+  // llamar a `submitVote`; `pendingRevealRef` guarda la jugada en curso mientras
+  // el modal está abierto y la retoma al guardar el nombre.
+  const [nameOpen, setNameOpen] = useState(false)
+  const [nameValue, setNameValue] = useState('')
+  const [nameSaving, setNameSaving] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const pendingRevealRef = useRef<{ current: ChallengeForPlay; playedGuess: LatLng | null } | null>(
+    null,
+  )
+  // "Guárdate / entra del todo" (issue #758): CTA opcional en el resultado para
+  // el receptor anónimo. Sin relación con el nombre de arriba: se puede jugar
+  // con nombre y seguir sin cuenta permanente indefinidamente.
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
   // Respeto de reduced-motion: sin animaciones ⇒ tampoco háptica (un golpe de
   // vibración es "movimiento" para quien lo desactiva). Guardamos en un ref para
   // leerlo dentro de callbacks memoizados sin cambiar su identidad.
@@ -297,6 +320,57 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     },
     [toast, user],
   )
+
+  // Puerta previa al revelado (issue #758): si el jugador es un receptor
+  // ANÓNIMO que aún no ha elegido nombre, abre el modal de nombre y APARCA la
+  // jugada (NO llama a `reveal`); `submitName` la retoma al guardar. Mientras
+  // el modal sigue abierto (needsName true) esta función es un no-op: la
+  // cuenta atrás sigue llamándola cada 250ms una vez el tiempo llega a cero
+  // (mientras `phase` siga en `playing`) y NO debe colarse a `reveal` sin
+  // nombre solo porque el modal ya estaba abierto. Con nombre ya elegido (o
+  // cuenta permanente), va directa a `reveal` como siempre.
+  const maybeReveal = useCallback(
+    (current: ChallengeForPlay, playedGuess: LatLng | null) => {
+      const needsName = isAnonymous && !profile?.display_name?.trim()
+      if (needsName) {
+        if (!nameOpen) {
+          pendingRevealRef.current = { current, playedGuess }
+          setNameValue(profile?.display_name ?? '')
+          setNameError(null)
+          setNameOpen(true)
+        }
+        return
+      }
+      void reveal(current, playedGuess)
+    },
+    [reveal, isAnonymous, profile, nameOpen],
+  )
+
+  // Guarda el nombre y retoma la jugada aparcada. `upsertProfile` además del
+  // trigger `handle_new_user`: para un anónimo, `profiles` ya existe (fila
+  // vacía) desde el alta anónima, así que esto es un UPDATE de display_name.
+  async function submitName() {
+    const name = nameValue.trim()
+    if (name.length < 2) {
+      setNameError('Pon al menos 2 caracteres.')
+      return
+    }
+    if (!user) return
+    setNameSaving(true)
+    setNameError(null)
+    try {
+      await upsertProfile({ id: user.id, displayName: name })
+      await refreshProfile()
+      setNameOpen(false)
+      const pending = pendingRevealRef.current
+      pendingRevealRef.current = null
+      if (pending) void reveal(pending.current, pending.playedGuess)
+    } catch (err) {
+      setNameError(describeError(err))
+    } finally {
+      setNameSaving(false)
+    }
+  }
 
   // Carga del reto. Si el usuario ya votó, salta directo a revelado mostrando
   // su jugada (no se re-vota: regla anti-trampas + upsert por user_id).
@@ -432,13 +506,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       const left = remainingSeconds(total, startAt, Date.now())
       setRemaining(left)
       if (left <= 0) {
-        void reveal(challenge, guess)
+        maybeReveal(challenge, guess)
       }
     }
     tick()
     const id = window.setInterval(tick, 250)
     return () => window.clearInterval(id)
-  }, [phase, challenge, guess, reveal])
+  }, [phase, challenge, guess, maybeReveal])
 
   // Anti-trampa (issue #200): SOLO durante `playing` (reloj corriendo, antes de
   // votar) escuchamos `visibilitychange`. Si la pestaña/app se oculta (el jugador
@@ -508,7 +582,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         challenge_id: challenge.id,
         challenge_kind: 'location',
       })
-      void reveal(challenge, guess)
+      maybeReveal(challenge, guess)
     }
   }
 
@@ -818,6 +892,18 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           onConfirm={confirmExit}
           onCancel={() => setConfirmingExit(false)}
         />
+
+        {/* Nombre antes de revelar (issue #758): solo se monta si hace falta
+            (maybeReveal lo abre). No es descartable: sin nombre, el marcador
+            no sabría de quién es este puesto. */}
+        <NamePromptModal
+          open={nameOpen}
+          name={nameValue}
+          onNameChange={setNameValue}
+          onSubmit={() => void submitName()}
+          saving={nameSaving}
+          error={nameError}
+        />
       </>
     )
   }
@@ -954,6 +1040,21 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               </p>
             )}
 
+            {/* "Guárdate / entra del todo" (issue #758): CTA OPCIONAL solo para el
+                receptor ANÓNIMO — vincula su sesión a un email sin perder su voto
+                ni su puesto (mismo uid). Saltable: no vincular no le quita nada de
+                lo que ya jugó. No se ofrece a quien ya tiene cuenta permanente. */}
+            {isAnonymous && (
+              <Button
+                variant="secondary"
+                fullWidth
+                onClick={() => setUpgradeOpen(true)}
+                className={styles.actionsIn}
+              >
+                Guarda tu cuenta
+              </Button>
+            )}
+
             {/* Compartir MI resultado (apuesta viral): pica al resto a jugar con la
                 tarjeta de mi rendimiento, SIN revelar la ubicación. Solo si jugué
                 (hay resultado, no timeout) y vengo de un grupo (para el enlace al
@@ -1083,6 +1184,19 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             domain={shareDomain(buildChallengeLink(groupId, challenge.id))}
           />
         </div>
+      )}
+
+      {isAnonymous && (
+        <AccountUpgradeModal
+          open={upgradeOpen}
+          onClose={() => setUpgradeOpen(false)}
+          onUpgraded={() => {
+            setUpgradeOpen(false)
+            toast.show('Cuenta guardada. Tu voto y tu puesto siguen siendo tuyos.', {
+              tone: 'success',
+            })
+          }}
+        />
       )}
     </main>
   )

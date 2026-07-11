@@ -39,6 +39,7 @@ const session: SessionState = {
   profile: { display_name: 'Iker' } as SessionState['profile'],
   loading: false,
   verified: true,
+  isAnonymous: false,
   refreshProfile: async () => {},
 }
 
