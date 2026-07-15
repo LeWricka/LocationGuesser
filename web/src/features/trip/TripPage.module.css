@@ -330,8 +330,14 @@
   justify-content: center;
   font-size: var(--font-size-xl);
   color: var(--color-on-accent);
-  background: var(--color-accent);
-  border: none;
+  /* Vidrio con tinte de acento (petición del dueño, estilo macOS): deja ver la
+     foto/mapa de detrás sin perder la identidad teal del CTA. El blur lleva el
+     grueso de la legibilidad; el borde de contacto define el disco sobre fotos
+     claras. Fallback: sin soporte de backdrop-filter, acento sólido (abajo). */
+  background: color-mix(in srgb, var(--color-accent) 62%, transparent);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
   cursor: pointer;
@@ -340,11 +346,22 @@
     transform var(--transition-fast) var(--ease-emphasized);
 }
 .fab:hover {
-  background: var(--color-accent-hover);
+  /* Hover: el vidrio se densifica (más tinte), no se vuelve opaco. */
+  background: color-mix(in srgb, var(--color-accent-hover) 78%, transparent);
   transform: translateY(-2px);
 }
 .fab:active {
   transform: scale(0.94);
+}
+/* Sin backdrop-filter (navegadores viejos): un 62% translúcido SIN esmerilado no
+   garantiza la legibilidad del icono sobre fotos — vuelta al acento sólido. */
+@supports not (backdrop-filter: blur(1px)) {
+  .fab {
+    background: var(--color-accent);
+  }
+  .fab:hover {
+    background: var(--color-accent-hover);
+  }
 }
 .fabActive {
   transform: rotate(45deg);
@@ -373,8 +390,11 @@
   align-items: center;
   justify-content: center;
   color: var(--color-on-accent);
-  background: var(--color-accent);
-  border: none;
+  /* Mismo vidrio de acento que `.fab` (gramática: los dos flotantes son gemelos). */
+  background: color-mix(in srgb, var(--color-accent) 62%, transparent);
+  border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
   cursor: pointer;
@@ -383,11 +403,19 @@
     transform var(--transition-fast) var(--ease-emphasized);
 }
 .shareFab:hover {
-  background: var(--color-accent-hover);
+  background: color-mix(in srgb, var(--color-accent-hover) 78%, transparent);
   transform: translateY(-2px);
 }
 .shareFab:active {
   transform: scale(0.94);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .shareFab {
+    background: var(--color-accent);
+  }
+  .shareFab:hover {
+    background: var(--color-accent-hover);
+  }
 }
 
 /* Hoja "Compartir" (issue #758): vista 'pick' — elegir un reto cuando hay más de
