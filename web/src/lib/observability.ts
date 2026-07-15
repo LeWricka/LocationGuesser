@@ -95,3 +95,15 @@ export function clearObservabilityUser(): void {
 export function reportError(error: unknown, context?: Record<string, unknown>): void {
   enqueue((s) => s.captureException(error, context ? { extra: context } : undefined))
 }
+
+/**
+ * Deja constancia de un fallo NO crítico (mejora progresiva: registro/
+ * actualización del service worker, precarga de un chunk…) sin mandarlo a
+ * Sentry como error — solo un breadcrumb, visible en el timeline de la
+ * siguiente captura real (`reportError`) pero sin generar una alerta por algo
+ * transitorio (red, ventana de deploy). Se encola si el SDK aún no cargó.
+ * No-op si la observabilidad no está activa.
+ */
+export function reportSilentWarning(message: string, data?: Record<string, unknown>): void {
+  enqueue((s) => s.addBreadcrumb({ category: 'silent-warning', level: 'warning', message, data }))
+}

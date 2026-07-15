@@ -5,9 +5,10 @@ import App from './App.tsx'
 import { ToastProvider, UpdateBanner } from './ui'
 import { RootErrorBoundary } from './lib/RootErrorBoundary'
 import { initAnalytics } from './lib/analytics'
-import { initObservability } from './lib/observability'
+import { initObservability, reportSilentWarning } from './lib/observability'
 import { applyCleanRoute } from './lib/cleanRoute'
 import { isSafeUpdateRoute } from './lib/safeUpdateRoute'
+import { shouldReloadOnPreloadError } from './lib/reloadOnPreloadError'
 import { registerSW } from 'virtual:pwa-register'
 
 // Observabilidad + analítica: init idempotente antes de montar la app (no-op en
@@ -23,6 +24,22 @@ initAnalytics()
 // URL ya trae hash (enlace viejo) o no es una ruta limpia; aun así mide la
 // recepción del enlace.
 void applyCleanRoute()
+
+// #761: cada deploy cambia los hashes de los assets (chunks JS/CSS). Un
+// cliente con el `index.html` viejo en una pestaña ya abierta pide un chunk
+// que ya no existe → Vite lo detecta y dispara `vite:preloadError`
+// ("Failed to fetch dynamically imported module" — LOCATIONGUESSER-H;
+// "Unable to preload CSS" — LOCATIONGUESSER-J). `event.preventDefault()`
+// evita que ese rechazo se propague como error sin manejar (lo que hoy llega
+// a Sentry); recargamos para traer el `index.html` nuevo con los hashes
+// correctos. Guard de una recarga por sesión (`shouldReloadOnPreloadError`,
+// puro y testeado aparte): si tras recargar el error VUELVE, no es un desfase
+// de deploy sino un fallo real — dejamos que fluya en vez de ciclar recargas.
+window.addEventListener('vite:preloadError', (event) => {
+  if (!shouldReloadOnPreloadError(sessionStorage)) return
+  event.preventDefault()
+  window.location.reload()
+})
 
 // PWA: registra el service worker y SONDEA actualizaciones cada 60 s. Tabide es un
 // SPA (no navega entre páginas), así que sin este sondeo el navegador no detecta un
@@ -119,12 +136,30 @@ function applyUpdate() {
   void updateSW(true)
 }
 
+// #761: el registro/actualización del SW es mejora progresiva (#237 pendiente)
+// — si falla, la app funciona igual sin él. `registration.update()` se
+// llamaba con `void`, que descarta el VALOR de la promesa pero NO atrapa su
+// rechazo: un `update()` fallido (fetch de sw.js caído, 403 transitorio en
+// ventana de deploy…) se convertía en un rechazo SIN MANEJAR, capturado por
+// los global handlers de Sentry como error (LOCATIONGUESSER-S "Failed to
+// update a ServiceWorker..."). Mismo origen para el registro inicial
+// (LOCATIONGUESSER-Y "Script sw.js load failed"): sin `onRegisterError`,
+// vite-plugin-pwa lo atrapa pero no hacíamos nada con él. Ambos casos quedan
+// ahora en un warning de consola + breadcrumb de Sentry, nunca `captureException`.
+function reportSwNoise(error: unknown): void {
+  console.warn('[sw] registro/actualización falló (mejora progresiva, no crítico):', error)
+  reportSilentWarning('sw_register_or_update_failed', {
+    error: error instanceof Error ? error.message : String(error),
+  })
+}
+
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return
-    setInterval(() => void registration.update(), SW_UPDATE_INTERVAL_MS)
+    setInterval(() => void registration.update().catch(reportSwNoise), SW_UPDATE_INTERVAL_MS)
   },
+  onRegisterError: reportSwNoise,
   onNeedRefresh() {
     updateAvailable = true
     // La pestaña ya está oculta (p.ej. el sondeo de 60 s la encontró mientras el
