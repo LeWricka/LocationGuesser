@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { prizeForRow } from './prizes'
+import { prizeForRow, prizesLine } from './prizes'
 
 // Mapea premio↔fila en la clasificación: índice 0/1/2 = 1º/2º/3º; la última fila
 // = `last`. Cubre los casos delicados (sin premios, premios parciales, y el
@@ -36,5 +36,27 @@ describe('prizeForRow', () => {
 
   test('solo `last` definido y un jugador: la única fila lleva `last`', () => {
     expect(prizeForRow({ last: 'invita' }, 0, 1)).toBe('invita')
+  })
+})
+
+// Centralizada (issues #752/#753) desde `LeaderboardCard.tsx`: la reutilizan la
+// tarjeta para compartir y la bienvenida del receptor.
+describe('prizesLine', () => {
+  test('sin premios → null', () => {
+    expect(prizesLine(null)).toBeNull()
+  })
+
+  test('todos vacíos/en blanco → null', () => {
+    expect(prizesLine({ first: '   ', second: '' })).toBeNull()
+  })
+
+  test('junta los puestos definidos, en orden, separados por "·"', () => {
+    expect(prizesLine({ first: 'manda', last: 'invita' })).toBe('1º manda  ·  Último invita')
+  })
+
+  test('incluye 2º/3º cuando están definidos', () => {
+    expect(prizesLine({ first: 'manda', second: 'plata', third: 'bronce', last: 'invita' })).toBe(
+      '1º manda  ·  2º plata  ·  3º bronce  ·  Último invita',
+    )
   })
 })

@@ -38,4 +38,20 @@ describe('getSlides', () => {
     const blank = getSlides('welcome', { tripName: '   ' }).at(0)?.title
     expect(blank).toBe(generic)
   })
+
+  // Issue #752: si el dueño ya definió qué se juega, el receptor lo ve desde el
+  // primer paso de su bienvenida — el gancho de motivación no puede esperar a
+  // que entre al viaje.
+  test('welcome añade los premios al cuerpo del primer paso si los hay', () => {
+    const slides = getSlides('welcome', {
+      tripName: 'Japón 2026',
+      prizesSummary: '1º manda  ·  Último invita',
+    })
+    expect(slides[0].body).toContain('En juego: 1º manda  ·  Último invita')
+  })
+
+  test('welcome sin premios no menciona "En juego"', () => {
+    const slides = getSlides('welcome', { tripName: 'Japón 2026' })
+    expect(slides[0].body).not.toContain('En juego')
+  })
 })

@@ -16,12 +16,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { getGroup } from '../../lib/groupData'
+import { prizesLine } from '../group/prizes'
 
 interface ReceptorWelcome {
   /** ¿Mostrar la bienvenida del receptor para este grupo? */
   show: boolean
   /** Nombre del viaje para personalizar el saludo (o undefined → copy genérico). */
   tripName?: string
+  /** Resumen de premios "en juego" (issue #752), o undefined si el dueño no
+   * definió ninguno — la bienvenida del receptor lo añade a su saludo. */
+  prizesSummary?: string
 }
 
 export function useReceptorWelcome(
@@ -46,10 +50,11 @@ export function useReceptorWelcome(
         setState({ show: false })
         return
       }
-      // Nombre del viaje para personalizar el saludo (best-effort).
-      const name = await resolveTripName(groupId)
+      // Nombre del viaje (y premios, issue #752) para personalizar el saludo
+      // (best-effort): una sola lectura de `groups` cubre ambos.
+      const { tripName, prizesSummary } = await resolveTripInfo(groupId)
       if (!active) return
-      setState({ show: true, tripName: name })
+      setState({ show: true, tripName, prizesSummary })
     })()
 
     return () => {
@@ -75,11 +80,16 @@ async function isOwner(groupId: string, userId: string): Promise<boolean> {
   }
 }
 
-async function resolveTripName(groupId: string): Promise<string | undefined> {
+async function resolveTripInfo(
+  groupId: string,
+): Promise<{ tripName?: string; prizesSummary?: string }> {
   try {
     const group = await getGroup(groupId)
-    return group?.name ?? undefined
+    return {
+      tripName: group?.name ?? undefined,
+      prizesSummary: prizesLine(group?.prizes ?? null) ?? undefined,
+    }
   } catch {
-    return undefined
+    return {}
   }
 }

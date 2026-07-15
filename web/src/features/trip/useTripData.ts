@@ -73,6 +73,11 @@ export interface PastChallengeSummary {
   winner: (PastChallengeResult & { name: string }) | null
   /** Mi resultado en este reto, o null si no jugué (o es mío). */
   myResult: PastChallengeResult | null
+  /** Foto del reto ya firmada (issue #753, thumbnail de "Retos anteriores"). El
+   * reto ya está CERRADO (ver el filtro de `pastChallenges` abajo), así que su
+   * foto siempre está revelada — nunca hace falta el anti-spoiler de
+   * `resolveMomentPhoto`. Null si no tiene foto (la fila cae al placeholder). */
+  imageUrl: string | null
 }
 
 interface TripData {
@@ -482,6 +487,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         isOwn: m.isOwn,
         winner,
         myResult,
+        imageUrl: m.imageUrl,
       }
     })
   }, [moments, votes, myUserId])

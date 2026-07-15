@@ -198,6 +198,10 @@ export type AnalyticsEvent =
   // ni 'own': ese entró para VER un resultado ya jugado, no para jugar).
   // Props: group_id, challenge_id, challenge_kind ('location'|'number').
   | 'challenge_opened'
+  // Premios del viaje guardados con al menos uno definido (issues #752/#753):
+  // mide desde dónde se define "qué se juega". Props: group_id, origin
+  // ('marcador'|'create_group_nudge').
+  | 'prizes_defined'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

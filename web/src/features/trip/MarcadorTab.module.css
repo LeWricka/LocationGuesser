@@ -138,6 +138,33 @@
     0 0 0 3px var(--medal-bronze);
 }
 
+/* Hueco de avatar del podio VACÍO (issue #753): círculo discontinuo en vez de
+ * una foto — la promesa de quién ocupará el puesto, no un dato real todavía.
+ * Mismo tamaño base que `Avatar` `lg` (64px): el anillo/escala de `.anilloX` de
+ * arriba lo agranda/achica igual que al avatar real, así el podio vacío y el
+ * jugado comparten proporción exacta. */
+.avatarHueco {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  border: 2px dashed var(--color-border-strong);
+  background: var(--surface);
+}
+.avatarHuecoIcono {
+  color: var(--color-text-faint);
+}
+
+/* Sin nombre/puntos en el podio vacío (esas filas no existen aún): el premio o
+ * la CTA necesitan algo más de aire bajo el hueco de avatar que en el podio real
+ * (donde ya viene precedido por nombre+puntos). */
+.podioItemVacio .podioPremio,
+.podioItemVacio .podioPremioCta {
+  margin-top: var(--space-3);
+}
+
 .podioNombreFila {
   display: flex;
   align-items: baseline;
@@ -185,12 +212,17 @@
 }
 
 /* Chip de premio del puesto (issue #123/#608, rescatado de GroupPage): dato
- * descriptivo bajo los puntos, truncado a una línea (la columna del podio es
- * angosta, máx. 112px — envolver aquí rompería la altura escalonada). */
+ * descriptivo bajo los puntos. El premio es el GANCHO de motivación, así que
+ * debe leerse ENTERO: envuelve hasta 2 líneas centradas (la columna es angosta,
+ * máx. 112px — una sola línea con ellipsis lo dejaba en "Elige el próxim…").
+ * Envolver no rompe la altura escalonada del podio: `.podio` alinea las columnas
+ * por su base (`align-items: flex-end`), así que un chip más alto solo alarga su
+ * propia columna hacia arriba. Solo un premio larguísimo (>2 líneas) recorta. */
 .podioPremio {
-  display: inline-flex;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
   max-width: 100%;
   margin-top: var(--space-1);
   color: var(--color-text-muted);
@@ -200,12 +232,84 @@
   color: var(--accent);
 }
 .podioPremioTexto {
-  min-width: 0;
+  max-width: 100%;
   font-family: var(--font-sans);
   font-size: var(--font-size-xs);
-  white-space: nowrap;
+  line-height: var(--line-height-snug);
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+/* CTA "¿Qué se juega?" (issues #752/#753): hueco del 1º cuando el dueño AÚN no
+ * definió ningún premio — sustituye al enlace de texto de la esquina (issue
+ * #123/#608) que el dueño real no encontró. En cuanto exista un premio, esta
+ * CTA desaparece y la edición pasa a vivir en tocar el chip (`PremioTappable`). */
+.podioPremioCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: var(--space-2);
+  padding: 2px var(--space-2);
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--motion-transition-fast);
+}
+.podioPremioCta:hover {
+  background: var(--accent-tint);
+}
+.podioPremioCta > svg {
+  flex-shrink: 0;
+}
+
+/* Reset del `<button>` de un chip de premio tappable (issue #752, dueño): mismo
+ * aspecto que el `<span>` de solo lectura — no debe leerse como un botón para
+ * el resto de miembros (issue #608). */
+.premioBtn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+/* Píldora del premio del ÚLTIMO, centrada BAJO el podio vacío (issue #753 v2):
+ * colgado del 3er pedestal se leía contradictorio ("¿el 3º es el último?") — el
+ * último puesto aún no existe, así que su premio vive fuera de la composición.
+ * El selector anidado (`.marcador .ultimoPill`) gana a la regla de reset de
+ * `.premioBtn` (que borra borde/fondo/padding) cuando el dueño la puede tocar. */
+.marcador .ultimoPill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: center;
+  max-width: 100%;
+  margin-top: calc(-1 * var(--space-2));
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+}
+.marcador .ultimoPill > svg {
+  flex-shrink: 0;
+  color: var(--color-text-faint);
+}
+.ultimoPillTexto {
+  min-width: 0;
+  text-align: center;
 }
 
 /* Pedestal: cerrado y teñido por puesto, con altura escalonada (la del 1º, la
@@ -428,17 +532,14 @@
 
 /* ───────────────────────── Estado vacío ───────────────────────── */
 
+/* Copy de una sola línea bajo el podio vacío (issue #753): el podio YA es la
+ * promesa visual, este texto solo confirma qué falta — nunca un párrafo largo. */
 .vacio {
   text-align: center;
-  padding: var(--space-7) var(--space-4);
+  padding: var(--space-4) var(--space-4) 0;
   color: var(--color-text-muted);
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
-}
-
-.vacioCabeza {
-  display: block;
-  margin-bottom: var(--space-2);
 }
 
 /* Acciones del vacío: invitar (siempre) + crear un reto (solo dueño). */
@@ -458,50 +559,6 @@
   .barraFill {
     animation: none;
   }
-}
-
-/* ───────────────────── Editar premios (issue #123/#608) ───────────────────── */
-
-/* Botón discreto arriba del todo (dueño únicamente): invita a añadir premios si
- * aún no hay, o a editarlos. Mismo look que GroupPage.module.css .editPrizesBtn. */
-.editPrizesBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
-  background: none;
-  border: 1px solid transparent;
-  border-radius: var(--radius-full);
-  color: var(--accent);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition:
-    background-color var(--motion-transition-fast),
-    border-color var(--motion-transition-fast);
-}
-.editPrizesBtn:hover {
-  background: var(--accent-tint);
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-/* Campos del modal "Premios del viaje": etiqueta del puesto sobre el Input. */
-.prizeHint {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-.prizeField {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-.prizeFieldLabel {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
 }
 
 /* ───────────────────── Retos anteriores (issue #608) ───────────────────── */
@@ -531,14 +588,17 @@
   list-style: none;
 }
 
-/* Fila-botón: pulsable entera (tap abre el detalle del reto por su hash). */
+/* Fila-botón: pulsable entera (tap abre el detalle del reto por su hash). Foto
+ * miniatura + texto en fila (issue #753: la fila era texto plano; el reto
+ * "casi siempre" tiene foto real, así que la miniatura la vende de un vistazo).
+ * `ChallengePhoto` ya trae su propio placeholder de marca cuando no hay foto —
+ * nunca un icono de "imagen rota". */
 .anteriorFila {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
+  align-items: center;
+  gap: var(--space-3);
   width: 100%;
-  padding: var(--space-3);
+  padding: var(--space-2);
   background: var(--surface);
   border: 1px solid var(--hairline-soft);
   border-radius: var(--radius-md);
@@ -550,6 +610,19 @@
 }
 .anteriorFila:hover {
   box-shadow: var(--shadow-sm);
+}
+
+/* Miniatura fija (72px, `ChallengePhoto` size="sm"): no crece con el ancho de
+ * la fila, el texto ocupa el resto. */
+.anteriorFoto {
+  flex-shrink: 0;
+}
+
+.anteriorTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .anteriorTitulo {
