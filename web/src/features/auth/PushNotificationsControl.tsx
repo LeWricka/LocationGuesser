@@ -10,16 +10,10 @@
 //   · soportado + configurado → toggle real (denegado / activar / desactivar).
 // El ENVÍO real de notificaciones lo hace la Edge Function send-push (Fase 2).
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Button, Stack, useToast } from '../../ui'
-import {
-  getPermission,
-  isBrowserPushCapable,
-  isPushConfigured,
-  subscribeToPush,
-  unsubscribeFromPush,
-  type PushStatus,
-} from '../../lib/push'
+import { subscribeToPush, unsubscribeFromPush, type PushStatus } from '../../lib/push'
+import { usePushAvailability } from './usePushAvailability'
 import styles from './PushNotificationsControl.module.css'
 
 interface Props {
@@ -31,33 +25,28 @@ type UiState = 'loading' | 'denied' | 'on' | 'off'
 
 export function PushNotificationsControl({ userId }: Props) {
   const toast = useToast()
-  const [capable] = useState(() => isBrowserPushCapable())
-  const [configured] = useState(() => isPushConfigured())
-  const supported = capable && configured
-  const [uiState, setUiState] = useState<UiState>('loading')
+  // Capacidad/config/permiso/suscripción (issue #769): antes se resolvía aquí
+  // mismo; ahora vive en `usePushAvailability`, compartido con los pre-prompts
+  // de descubrimiento (banner del viaje y post-reveal) para no duplicar la
+  // resolución "¿qué estado tiene el push en este dispositivo?".
+  const { capable, configured, permission, subscribed, loading } = usePushAvailability()
+  // Derivado del gate compartido: denegado se marca tal cual; concedido pero
+  // sin suscripción cuenta como "off" (se ofrece activar). `override` manda
+  // tras una acción LOCAL (activar/desactivar): el hook no sabe que este mismo
+  // componente acaba de suscribir/desuscribir, así que la respuesta de
+  // subscribeToPush/unsubscribeFromPush (`applyStatus`) toma el mando hasta que
+  // el componente se desmonte — sin esto, derivedState no reflejaría el cambio
+  // (usePushAvailability solo resuelve una vez al montar).
+  const derivedState: UiState = loading
+    ? 'loading'
+    : permission === 'denied'
+      ? 'denied'
+      : subscribed
+        ? 'on'
+        : 'off'
+  const [override, setOverride] = useState<UiState | null>(null)
+  const uiState = override ?? derivedState
   const [busy, setBusy] = useState(false)
-
-  // Estado inicial: si ya está denegado lo marcamos; si está concedido, miramos si
-  // hay una suscripción activa en este dispositivo (permiso concedido pero sin
-  // suscripción cuenta como "off", la ofreceremos activar).
-  useEffect(() => {
-    if (!supported) return
-    let cancelled = false
-    async function resolveInitial() {
-      const permission = getPermission()
-      if (permission === 'denied') {
-        if (!cancelled) setUiState('denied')
-        return
-      }
-      const registration = await navigator.serviceWorker.ready
-      const subscription = await registration.pushManager.getSubscription()
-      if (!cancelled) setUiState(permission === 'granted' && subscription ? 'on' : 'off')
-    }
-    void resolveInitial()
-    return () => {
-      cancelled = true
-    }
-  }, [supported])
 
   // Navegador sin APIs de push: el control no existe (la app no ofrece la opción).
   if (!capable) return null
@@ -75,16 +64,16 @@ export function PushNotificationsControl({ userId }: Props) {
 
   function applyStatus(status: PushStatus) {
     if (status === 'subscribed') {
-      setUiState('on')
+      setOverride('on')
       toast.show('Avisos activados', { tone: 'success' })
     } else if (status === 'unsubscribed') {
-      setUiState('off')
+      setOverride('off')
       toast.show('Avisos desactivados')
     } else if (status === 'denied') {
-      setUiState('denied')
+      setOverride('denied')
     } else {
       // 'default' (cerró el prompt sin decidir) o 'unsupported' inesperado.
-      setUiState('off')
+      setOverride('off')
     }
   }
 

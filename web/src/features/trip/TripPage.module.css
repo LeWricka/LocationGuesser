@@ -530,6 +530,19 @@
   letter-spacing: 0.01em;
 }
 
+/* Pre-prompt de push (issue #769): misma franja flotante que .wrapBanner
+   (mutuamente excluyentes, ver el JSX — nunca compiten por el hueco). El
+   propio PushOptInPrompt decide si hay algo dentro; este wrapper solo fija la
+   posición para cuando sí lo hay. */
+.pushBannerWrap {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  top: calc(env(safe-area-inset-top) + 4.5rem);
+  /* design-lint-allow: capa local de la página (misma franja que .wrapBanner) */
+  z-index: 3;
+}
+
 @keyframes lg-fab-menu-in {
   from {
     opacity: 0;
