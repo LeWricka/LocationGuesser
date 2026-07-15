@@ -6,22 +6,24 @@
 //
 // Contrato:
 //   POST /functions/v1/send-push   (cabecera X-Push-Token con el token compartido)
-//     { "challenge_id": "<uuid>", "kind": "created" | "closing" }
+//     { "challenge_id": "<uuid>", "kind": "created" | "closing" | "memory" }
 //       200 -> { sent, failed, removed }   (resumen del envío)
 //       400 -> { error }   (body inválido)
 //       401 -> { error }   (token ausente o incorrecto)
-//       404 -> { error }   (reto no encontrado)
+//       404 -> { error }   (reto/recuerdo no encontrado)
 //       500 -> { error }   (config incompleta / fallo interno)
 //
 // A diferencia de `resolve-maps-url` (la llama el front, CORS abierto), a ESTA solo
-// la invoca la BASE DE DATOS (Database Webhook AFTER INSERT on challenges, o pg_cron
-// para los recordatorios de cierre). Por eso NO es endpoint público de usuario: se
-// protege con un secreto compartido (PUSH_SEND_TOKEN) en la cabecera, además del
-// `--verify-jwt` por defecto. NUNCA expone la respuesta del reto (lat/lng): el
-// payload solo dice "hay reto" / "cierra pronto".
+// la invoca la BASE DE DATOS (trigger AFTER INSERT on challenges — retos Y
+// recuerdos desde 0041/issue #775 —, o pg_cron para los recordatorios de cierre).
+// Por eso NO es endpoint público de usuario: se protege con un secreto compartido
+// (PUSH_SEND_TOKEN) en la cabecera, además del `--verify-jwt` por defecto. NUNCA
+// expone la respuesta oculta de un reto (lat/lng): el payload solo dice "hay
+// reto" / "cierra pronto" / "hay un momento nuevo".
 
 import webpush from 'npm:web-push@3.6.7'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { buildPushPayload, shouldNotifyCreator, type PushKind } from './payload.ts'
 
 // ── Config (secrets de Supabase) ─────────────────────────────────────────────
 // VAPID_PRIVATE_KEY: SECRETA, solo aquí (firma los push). VAPID_PUBLIC_KEY: la misma
@@ -47,20 +49,6 @@ interface StoredSubscription {
   endpoint: string
   p256dh: string
   auth: string
-}
-
-// Construye el payload SIN spoiler (nunca lat/lng): título + cuerpo + deep-link al
-// reto, que `notificationclick` (en el SW) abrirá. El grupo es el código que viaja
-// en el enlace (#g=<code>); el reto va en &c=<uuid>.
-function buildPayload(kind: string, groupCode: string, challengeId: string, title: string): string {
-  const isCreated = kind === 'created'
-  return JSON.stringify({
-    title: isCreated ? 'Nuevo reto en tu viaje' : 'Un reto está por cerrar',
-    body: isCreated ? `Te retan en «${title}». ¿Aciertas dónde es?` : `Aún puedes jugar «${title}».`,
-    url: `/#g=${groupCode}&c=${challengeId}`,
-    // Colapsa avisos del mismo reto+tipo (no apila duplicados en el dispositivo).
-    tag: `challenge-${challengeId}-${kind}`,
-  })
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -92,9 +80,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (typeof challengeId !== 'string' || challengeId.trim() === '') {
     return json({ error: "Falta 'challenge_id' (string)" }, 400)
   }
-  if (kind !== 'created' && kind !== 'closing') {
-    return json({ error: "'kind' debe ser 'created' o 'closing'" }, 400)
+  if (kind !== 'created' && kind !== 'closing' && kind !== 'memory') {
+    return json({ error: "'kind' debe ser 'created', 'closing' o 'memory'" }, 400)
   }
+  const pushKind: PushKind = kind
 
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
 
@@ -103,19 +92,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
     auth: { persistSession: false },
   })
 
-  // 1. Reto -> grupo + creador + título.
+  // 1. Fila (reto o recuerdo, misma tabla desde 0022) -> grupo + creador + título.
   const { data: challenge, error: challengeErr } = await admin
     .from('challenges')
     .select('id, group_id, title, created_by')
     .eq('id', challengeId)
     .maybeSingle()
   if (challengeErr) return json({ error: challengeErr.message }, 500)
-  if (!challenge) return json({ error: 'Reto no encontrado' }, 404)
+  if (!challenge) return json({ error: 'Reto/recuerdo no encontrado' }, 404)
 
-  // 2. Miembros del grupo. En 'created' excluimos al creador (no se avisa a sí mismo);
-  //    en 'closing' avisamos a todos los que aún no han jugado sería lo ideal, pero
-  //    aquí avisamos a todos los miembros (filtrar por votantes pendientes es una
-  //    mejora posterior; el `tag` evita duplicar y el cron controla la frecuencia).
+  // 1b. Nombre del viaje: solo hace falta para el copy de 'memory' ("Momento nuevo
+  //     en {viaje}"); en 'created'/'closing' el copy no lo usa, así que no se pide.
+  let groupName: string | null = null
+  if (pushKind === 'memory') {
+    const { data: group, error: groupErr } = await admin
+      .from('groups')
+      .select('name')
+      .eq('id', challenge.group_id)
+      .maybeSingle()
+    if (groupErr) return json({ error: groupErr.message }, 500)
+    groupName = group?.name ?? null
+  }
+
+  // 2. Miembros del grupo. En 'created'/'memory' excluimos al creador (no se avisa
+  //    a sí mismo de su propio reto/recuerdo); en 'closing' avisamos a todos los
+  //    miembros (filtrar por votantes pendientes es una mejora posterior; el `tag`
+  //    evita duplicar y el cron controla la frecuencia).
   const { data: members, error: membersErr } = await admin
     .from('group_members')
     .select('user_id')
@@ -124,7 +126,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const recipientIds = (members ?? [])
     .map((m) => m.user_id as string)
-    .filter((id) => kind === 'created' ? id !== challenge.created_by : true)
+    .filter((id) => shouldNotifyCreator(pushKind) || id !== challenge.created_by)
 
   if (recipientIds.length === 0) {
     return json({ sent: 0, failed: 0, removed: 0 })
@@ -142,7 +144,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ sent: 0, failed: 0, removed: 0 })
   }
 
-  const payload = buildPayload(kind, challenge.group_id, challenge.id, challenge.title)
+  const payload = JSON.stringify(
+    buildPushPayload(pushKind, challenge.group_id, challenge.id, challenge.title, groupName),
+  )
 
   // 4. Enviar a cada endpoint. 404/410 = suscripción muerta => borrarla para no
   //    reintentar eternamente contra un dispositivo que ya no existe.
