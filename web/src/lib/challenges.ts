@@ -463,6 +463,26 @@ export async function getChallenge(id: string): Promise<ChallengeForPlay> {
 }
 
 /**
+ * HERMANA de `getChallenge`, pero para el camino de JUGAR (issue #760, caso
+ * real: un dueño compartió un reto, lo borró, y quien abrió el enlace se comió
+ * un PGRST116 crudo). `.single()` lanza si hay 0 filas; aquí usamos
+ * `.maybeSingle()` y devolvemos `null` para que PlayChallenge/PlayNumberChallenge
+ * puedan distinguir "el reto ya no existe" (ESPERABLE, pantalla amable) de un
+ * error de red genérico. El resto de lectores (editor, promoción de un
+ * recuerdo) siguen usando `getChallenge`: ahí "no existe" sigue siendo
+ * excepcional y no necesitan este matiz.
+ */
+export async function getChallengeOrNull(id: string): Promise<ChallengeForPlay | null> {
+  const { data, error } = await supabase
+    .from('challenges')
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .eq('id', id)
+    .maybeSingle<ChallengeForPlay>()
+  if (error) throw error
+  return data
+}
+
+/**
  * Respuestas (lat/lng) de varios retos a la vez, indexadas por challenge_id. La RLS
  * de `challenge_answers` solo devuelve las que el solicitante puede ver (reto cerrado
  * o ya votado; el dueño, las suyas). La usa la página del grupo para pintar el pin de

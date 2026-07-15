@@ -29,16 +29,30 @@ vi.mock('../../ui', () => ({
   useToast: () => ({ show: toastShow, dismiss: vi.fn() }),
 }))
 
+// Observabilidad (issue #760): espiamos reportError/addBreadcrumb para
+// comprobar que un viaje borrado (ESPERABLE) deja breadcrumb, NUNCA una
+// excepción, mientras que un fallo genérico sí se reporta.
+const reportError = vi.fn()
+const addBreadcrumb = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportError: (...args: unknown[]) => reportError(...args),
+  addBreadcrumb: (...args: unknown[]) => addBreadcrumb(...args),
+}))
+
 import { useDeepLinkJoin } from './useDeepLinkJoin'
+import { ResourceGoneError } from '../../lib/errors'
 
 beforeEach(() => {
   joinGroup.mockClear()
+  joinGroup.mockResolvedValue(undefined)
   isMember.mockClear()
   isMember.mockResolvedValue(false)
   track.mockClear()
   redeemOwnerInvite.mockClear()
   redeemOwnerInvite.mockResolvedValue('ABC')
   toastShow.mockClear()
+  reportError.mockClear()
+  addBreadcrumb.mockClear()
   window.location.hash = ''
 })
 
@@ -163,6 +177,55 @@ describe('useDeepLinkJoin', () => {
       )
       // El token consumido tampoco sobrevive en el hash tras el fallback.
       expect(window.location.hash).toBe('#g=ABC')
+    })
+  })
+
+  // Issue #760 (LOCATIONGUESSER-5, caso real: 4 usuarios/22 eventos): el viaje
+  // se borró entre que se compartió el enlace y que se abrió — el upsert de
+  // `joinGroup` viola la FK hacia `groups` y ANTES viajaba como unhandled
+  // rejection (no había catch alrededor de esta lógica). Ahora se captura,
+  // lleva a la home y NO se reporta como excepción (esperable).
+  describe('viaje borrado (issue #760)', () => {
+    test('joinGroup rechaza con ResourceGoneError: toast amable + home, sin excepción a Sentry', async () => {
+      joinGroup.mockRejectedValue(new ResourceGoneError('Este viaje ya no existe'))
+      window.location.hash = '#g=BORRADO'
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await result.current('#g=BORRADO')
+
+      expect(window.location.hash).toBe('')
+      expect(toastShow).toHaveBeenCalledWith(
+        'Este viaje ya no existe',
+        expect.objectContaining({ tone: 'neutral' }),
+      )
+      expect(reportError).not.toHaveBeenCalled()
+      expect(addBreadcrumb).toHaveBeenCalledWith(
+        'group_gone_on_join',
+        expect.objectContaining({ groupId: 'BORRADO' }),
+      )
+    })
+
+    test('un fallo genérico (no ResourceGoneError) también lleva a home, pero SÍ se reporta', async () => {
+      joinGroup.mockRejectedValue(new Error('network down'))
+      window.location.hash = '#g=ABC'
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await result.current('#g=ABC')
+
+      expect(window.location.hash).toBe('')
+      expect(toastShow).toHaveBeenCalledWith(
+        expect.stringContaining('No se pudo unir'),
+        expect.objectContaining({ tone: 'danger' }),
+      )
+      expect(reportError).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ area: 'deep_link_join', groupId: 'ABC' }),
+      )
+      expect(addBreadcrumb).not.toHaveBeenCalled()
+    })
+
+    test('nunca deja un rechazo sin capturar (la promesa de joinIfGroup siempre resuelve)', async () => {
+      joinGroup.mockRejectedValue(new ResourceGoneError('Este viaje ya no existe'))
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await expect(result.current('#g=BORRADO')).resolves.toBeUndefined()
     })
   })
 })

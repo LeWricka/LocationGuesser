@@ -66,6 +66,7 @@ import {
   deleteMyVote,
   startPlay,
 } from './votes'
+import { ResourceGoneError } from './errors'
 
 const sampleVote: Vote = {
   id: 'v1',
@@ -207,6 +208,16 @@ describe('submitVote', () => {
       /no devolvió/,
     )
   })
+
+  // Issue #760 (LOCATIONGUESSER-10, caso real): el reto se borró con la pantalla
+  // de jugar ya abierta — P0002 de la RPC. Debe distinguirse de un error genérico
+  // (por CÓDIGO, no por texto) para que el llamador muestre un estado amable.
+  test('P0002 (reto borrado): lanza ResourceGoneError, no un Error genérico', async () => {
+    rpcResult = { data: null, error: { code: 'P0002', message: 'Reto no encontrado' } }
+    await expect(submitVote({ challengeId: 'c1', guessLat: 0, guessLng: 0 })).rejects.toThrow(
+      ResourceGoneError,
+    )
+  })
 })
 
 describe('submitNumberVote', () => {
@@ -257,6 +268,14 @@ describe('submitNumberVote', () => {
   test('propaga el error de la RPC', async () => {
     rpcResult = { data: null, error: new Error('boom') }
     await expect(submitNumberVote({ challengeId: 'n1', guess: 1 })).rejects.toThrow('boom')
+  })
+
+  // Issue #760: HERMANA del caso de submitVote — mismo código P0002, mismo trato.
+  test('P0002 (reto borrado): lanza ResourceGoneError, no un Error genérico', async () => {
+    rpcResult = { data: null, error: { code: 'P0002', message: 'Reto no encontrado' } }
+    await expect(submitNumberVote({ challengeId: 'n1', guess: 1 })).rejects.toThrow(
+      ResourceGoneError,
+    )
   })
 })
 

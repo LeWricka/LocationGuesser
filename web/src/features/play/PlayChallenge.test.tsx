@@ -7,7 +7,7 @@ import type { ChallengeForPlay } from '../../lib/challenges'
 // Mocks de la capa de datos: aislamos Supabase. Solo cubrimos la guarda "es
 // tuyo" (#509); el resto del flujo de jugar (mapa, Street View) no se llega a
 // montar en ese camino, así que no hace falta mockear PlayMap/StreetViewPano.
-const getChallengeMock = vi.fn<() => Promise<ChallengeForPlay>>()
+const getChallengeMock = vi.fn<() => Promise<ChallengeForPlay | null>>()
 const getExistingVoteMock = vi.fn<() => Promise<unknown>>()
 const getVotesMock = vi.fn<() => Promise<unknown[]>>()
 const getAnswerMock = vi.fn<() => Promise<unknown>>()
@@ -17,7 +17,7 @@ vi.mock('../../lib/challenges', async (importActual) => {
   const actual = await importActual<typeof import('../../lib/challenges')>()
   return {
     ...actual,
-    getChallenge: () => getChallengeMock(),
+    getChallengeOrNull: () => getChallengeMock(),
     getAnswer: () => getAnswerMock(),
   }
 })
@@ -78,7 +78,14 @@ vi.mock('../auth', () => ({
 // evento se emita.
 const trackMock = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
-vi.mock('../../lib/observability', () => ({ reportError: vi.fn() }))
+// Issue #760: espiamos ambas para comprobar que un recurso borrado (esperable)
+// deja breadcrumb, NUNCA una excepción — el resto de tests no las inspecciona.
+const reportErrorMock = vi.fn()
+const addBreadcrumbMock = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportError: (...args: unknown[]) => reportErrorMock(...args),
+  addBreadcrumb: (...args: unknown[]) => addBreadcrumbMock(...args),
+}))
 vi.mock('../../lib/useSignedImage', () => ({ useSignedImage: () => null }))
 // El flujo normal (no-guard) monta GameScene, que renderiza SIEMPRE el mini-mapa
 // (colapsado o no); PlayMap exige un <ApiProvider> de Google Maps que este test no
@@ -102,6 +109,7 @@ function mockMatchMedia(matches: boolean) {
 import { PlayChallenge } from './PlayChallenge'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
+import { ResourceGoneError } from '../../lib/errors'
 
 const baseChallenge: ChallengeForPlay = {
   id: 'c1',
@@ -211,6 +219,73 @@ describe('PlayChallenge — guarda "es tuyo" (#509)', () => {
 
     expect(await screen.findByRole('button', { name: 'Empezar' })).toBeInTheDocument()
     expect(screen.queryByText('Este reto es tuyo')).not.toBeInTheDocument()
+  })
+})
+
+// Issue #760 (caso real: LOCATIONGUESSER-Z/-10 en un mismo usuario iPhone que
+// abrió un enlace a un reto ya borrado): estado amable en vez de error crudo,
+// tanto al CARGAR (0 filas) como al VOTAR (P0002, se borró con la pantalla
+// abierta).
+describe('PlayChallenge — reto borrado (issue #760)', () => {
+  test('al cargar (0 filas): "Este reto ya no existe" + CTA al viaje, sin excepción a Sentry', async () => {
+    getChallengeMock.mockResolvedValue(null)
+
+    renderPlay()
+
+    expect(await screen.findByText('Este reto ya no existe')).toBeInTheDocument()
+    // Con groupId, tanto el "atrás" de arriba como la CTA dicen "Volver al
+    // viaje": comprobamos las DOS apariciones en vez de una sola, ambigua.
+    expect(screen.getAllByRole('button', { name: 'Volver al viaje' })).toHaveLength(2)
+    // Nunca pantalla en blanco / esqueleto colgado.
+    expect(screen.queryByRole('status', { name: 'Cargando el reto' })).not.toBeInTheDocument()
+    expect(reportErrorMock).not.toHaveBeenCalled()
+    expect(addBreadcrumbMock).toHaveBeenCalledWith(
+      'challenge_gone_on_load',
+      expect.objectContaining({ challengeId: 'c1' }),
+    )
+  })
+
+  test('sin groupId (enlace suelto): la CTA del estado borrado va a Inicio', async () => {
+    getChallengeMock.mockResolvedValue(null)
+
+    render(
+      <SessionContext.Provider value={session}>
+        <ToastProvider>
+          <PlayChallenge challengeId="c1" />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+
+    expect(await screen.findByText('Este reto ya no existe')).toBeInTheDocument()
+    // Sin groupId, tanto el "atrás" de arriba como la CTA caen a "Inicio" (no
+    // "Volver al viaje"): comprobamos las DOS apariciones en vez de una sola,
+    // ambigua por `getByRole`.
+    expect(screen.getAllByRole('button', { name: 'Inicio' })).toHaveLength(2)
+    expect(screen.queryByText('Volver al viaje')).not.toBeInTheDocument()
+  })
+
+  test('al votar (P0002, se borró con la pantalla abierta): mismo estado amable, sin excepción a Sentry', async () => {
+    // guess_seconds: 0 + reduced-motion (salta la cuenta atrás 3·2·1) hace que el
+    // reloj llegue a cero en el primer tick sin pin colocado → dispara el voto de
+    // timeout, el mismo patrón que usan los tests de "nombre antes de revelar"
+    // más abajo para forzar `reveal()` sin depender del mapa (stubeado).
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    submitVoteMock.mockRejectedValue(new ResourceGoneError('Este reto ya no existe'))
+    const u = userEvent.setup()
+    renderPlay()
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+
+    expect(await screen.findByText('Este reto ya no existe')).toBeInTheDocument()
+    expect(submitVoteMock).toHaveBeenCalledTimes(1)
+    expect(reportErrorMock).not.toHaveBeenCalled()
+    expect(addBreadcrumbMock).toHaveBeenCalledWith(
+      'challenge_gone_on_vote',
+      expect.objectContaining({ challengeId: 'c1' }),
+    )
+    // No se cuela el toast crudo de "No se pudo guardar: …".
+    expect(screen.queryByText(/No se pudo guardar/)).not.toBeInTheDocument()
   })
 })
 

@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Eye,
   EyeOff,
+  Ghost,
   RotateCcw,
   Share2,
   Timer,
@@ -24,7 +25,7 @@ import { SceneImage } from './SceneImage'
 import { buildChallengeLink, buildResultShareText } from './shareResult'
 import {
   getAnswer,
-  getChallenge,
+  getChallengeOrNull,
   isPracticeChallenge,
   type ChallengeForPlay,
 } from '../../lib/challenges'
@@ -37,8 +38,8 @@ import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
-import { describeError } from '../../lib/errors'
-import { reportError } from '../../lib/observability'
+import { describeError, ResourceGoneError } from '../../lib/errors'
+import { addBreadcrumb, reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { useVisualViewport } from '../../lib/useVisualViewport'
@@ -87,8 +88,10 @@ interface Props {
 // pasa por `countdown` (3·2·1 sobre la foto del reto) antes de `playing`; el reloj
 // de la jugada solo corre en `playing`; tras `revealed` el voto queda fijo. `own`
 // es la guarda defensiva (#509): el creador del reto no juega el suyo propio, ni
-// aunque llegue por un enlace directo.
-type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own'
+// aunque llegue por un enlace directo. `gone` (issue #760): el reto se borró
+// entre que se compartió el enlace y que se abrió/jugó (0 filas al cargar, o
+// P0002 de la RPC al votar) — pantalla amable, no un error crudo.
+type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own' | 'gone'
 
 // `start_at` por reto en localStorage: recargar durante la jugada no regala
 // tiempo (el reloj se reconstruye desde el instante en que se pulsó Empezar).
@@ -324,6 +327,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         })
         toast.show('¡Voto guardado!', { tone: 'success' })
       } catch (err) {
+        if (err instanceof ResourceGoneError) {
+          // Esperable (issue #760, LOCATIONGUESSER-10): el reto se borró con la
+          // pantalla de jugar ya abierta. Breadcrumb, no excepción — no es un
+          // fallo real de la app.
+          addBreadcrumb('challenge_gone_on_vote', { challengeId: current.id })
+          setPhase('gone')
+          return
+        }
         // Registramos el fallo en Sentry con contexto (el toast lo maneja para el
         // usuario, pero queremos verlo en el dashboard pase lo que pase).
         reportError(err, { area: 'submit_vote', challengeId: current.id })
@@ -465,8 +476,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     let cancelled = false
     async function load() {
       try {
-        const c = await getChallenge(challengeId)
+        const c = await getChallengeOrNull(challengeId)
         if (cancelled) return
+        if (!c) {
+          // Esperable (issue #760, LOCATIONGUESSER-Z): el dueño borró el reto
+          // tras compartir el enlace. Breadcrumb, no excepción.
+          addBreadcrumb('challenge_gone_on_load', { challengeId })
+          setPhase('gone')
+          return
+        }
         setChallenge(c)
 
         // Guarda defensiva (#509): el creador no juega su propio reto, ni aunque
@@ -890,6 +908,32 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               </Stack>
             </Card>
           </Stack>
+        </div>
+      </main>
+    )
+  }
+
+  // Reto/viaje borrado (issue #760): el dueño lo borró tras compartir el enlace
+  // (al cargar) o mientras la pantalla estaba abierta (al votar). Va ANTES del
+  // resto de fases: en `gone`, `challenge` puede ser `null` (borrado al cargar),
+  // así que no podemos depender de él para el copy — mensaje genérico visual-first
+  // (icono + una línea), mismo patrón de tarjeta centrada que la guarda "es tuyo".
+  if (phase === 'gone') {
+    const backLabelGone = groupId ? 'Volver al viaje' : 'Inicio'
+    return (
+      <main className={`lg-page ${styles.ownPage}`}>
+        <BackHomeButton onClick={goBack} label={backLabelGone} />
+        <div className={styles.ownCenter}>
+          <Card padding="md" raised>
+            <Stack gap={3} align="center">
+              <Icon icon={Ghost} size={40} />
+              <strong>Este reto ya no existe</strong>
+              <p className={styles.status}>Puede que quien lo compartió lo haya borrado.</p>
+              <Button fullWidth size="lg" onClick={goBack}>
+                {backLabelGone}
+              </Button>
+            </Stack>
+          </Card>
         </div>
       </main>
     )

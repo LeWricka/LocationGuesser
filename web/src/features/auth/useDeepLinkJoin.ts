@@ -9,6 +9,8 @@ import { isMember, joinGroup } from '../../lib/membership'
 import { parseHash, stripOwnerInviteToken } from '../../lib/route'
 import { track } from '../../lib/analytics'
 import { redeemOwnerInvite } from '../../lib/ownerInvites'
+import { ResourceGoneError } from '../../lib/errors'
+import { addBreadcrumb, reportError } from '../../lib/observability'
 import { useToast } from '../../ui'
 
 /**
@@ -98,6 +100,21 @@ export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false)
         if (window.location.hash !== target) {
           window.location.hash = target
         }
+      } catch (err) {
+        // Antes esto NO se capturaba: un fallo aquí (p.ej. la FK de group_members
+        // violada) viajaba como unhandled rejection (issue #760, LOCATIONGUESSER-5,
+        // 4 usuarios / 22 eventos). Nunca dejamos al receptor en un callejón sin
+        // salida: pase lo que pase, aterriza en la home (hash vacío).
+        if (err instanceof ResourceGoneError) {
+          // Esperable: el viaje se borró entre que se compartió el enlace y que
+          // se abrió. Breadcrumb, NO excepción — no es un fallo real de la app.
+          addBreadcrumb('group_gone_on_join', { groupId: route.group })
+          toast.show(err.message, { tone: 'neutral' })
+        } else {
+          reportError(err, { area: 'deep_link_join', groupId: route.group })
+          toast.show('No se pudo unir al viaje.', { tone: 'danger' })
+        }
+        if (window.location.hash !== '') window.location.hash = ''
       } finally {
         inFlight.current = null
       }

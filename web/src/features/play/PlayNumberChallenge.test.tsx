@@ -11,6 +11,8 @@ const submitNumberVoteMock = vi.fn<() => Promise<SubmitNumberVoteResultClient>>(
 const getExistingVoteMock = vi.fn<() => Promise<unknown>>()
 const getVotesWithNamesMock = vi.fn<() => Promise<unknown[]>>()
 const getNumberAnswerMock = vi.fn<() => Promise<number | null>>()
+// Issue #760: sin `preloaded`, el componente carga el reto él mismo.
+const getChallengeOrNullMock = vi.fn<() => Promise<ChallengeForPlay | null>>()
 
 vi.mock('../../lib/votes', () => ({
   submitNumberVote: () => submitNumberVoteMock(),
@@ -23,13 +25,20 @@ vi.mock('../../lib/challenges', async (importActual) => {
   const actual = await importActual<typeof import('../../lib/challenges')>()
   return {
     ...actual,
-    getChallenge: vi.fn(),
+    getChallengeOrNull: () => getChallengeOrNullMock(),
     getNumberAnswer: () => getNumberAnswerMock(),
   }
 })
 
 vi.mock('../../lib/analytics', () => ({ track: vi.fn() }))
-vi.mock('../../lib/observability', () => ({ reportError: vi.fn() }))
+// Issue #760: espiamos ambas para comprobar que un recurso borrado (esperable)
+// deja breadcrumb, NUNCA una excepción.
+const reportErrorMock = vi.fn()
+const addBreadcrumbMock = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportError: (...args: unknown[]) => reportErrorMock(...args),
+  addBreadcrumb: (...args: unknown[]) => addBreadcrumbMock(...args),
+}))
 vi.mock('../../lib/useSignedImage', () => ({ useSignedImage: () => null }))
 
 // matchMedia (useReducedMotion). Sin reduced-motion para un flujo normal.
@@ -49,6 +58,7 @@ function mockMatchMedia(matches: boolean) {
 import { PlayNumberChallenge } from './PlayNumberChallenge'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
+import { ResourceGoneError } from '../../lib/errors'
 
 const numberChallenge: ChallengeForPlay = {
   id: 'n1',
@@ -103,11 +113,23 @@ function renderPlay() {
   )
 }
 
+// Issue #760: SIN `preloaded`, para probar la carga propia (getChallengeOrNull).
+function renderPlayFresh(groupId: string | undefined = 'g1') {
+  return render(
+    <SessionContext.Provider value={session}>
+      <ToastProvider>
+        <PlayNumberChallenge challengeId="n1" groupId={groupId} />
+      </ToastProvider>
+    </SessionContext.Provider>,
+  )
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockMatchMedia(false)
   getExistingVoteMock.mockResolvedValue(null)
   getVotesWithNamesMock.mockResolvedValue([])
+  getChallengeOrNullMock.mockResolvedValue(numberChallenge)
   localStorage.clear()
 })
 
@@ -207,4 +229,45 @@ describe('PlayNumberChallenge — guarda "es tuyo" (#509)', () => {
     await u.click(await screen.findByRole('button', { name: 'Ver marcador' }))
     expect(window.location.hash).toBe('#g=g1&v=marcador')
   })
+})
+
+// Issue #760: HERMANA de los tests de PlayChallenge — mismo estado amable en el
+// reto de NÚMERO, tanto al cargar (0 filas, sin `preloaded`) como al votar
+// (P0002, se borró con la pantalla abierta).
+describe('PlayNumberChallenge — reto borrado (issue #760)', () => {
+  test('al cargar sin preloaded (0 filas): "Este reto ya no existe", sin excepción a Sentry', async () => {
+    getChallengeOrNullMock.mockResolvedValue(null)
+
+    renderPlayFresh()
+
+    expect(await screen.findByText('Este reto ya no existe')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Volver al viaje' })).toHaveLength(2)
+    expect(reportErrorMock).not.toHaveBeenCalled()
+    expect(addBreadcrumbMock).toHaveBeenCalledWith(
+      'challenge_gone_on_load',
+      expect.objectContaining({ challengeId: 'n1', kind: 'number' }),
+    )
+  })
+
+  test('al votar (P0002, se borró con la pantalla abierta): mismo estado amable, sin excepción a Sentry', async () => {
+    submitNumberVoteMock.mockRejectedValue(new ResourceGoneError('Este reto ya no existe'))
+    const u = userEvent.setup()
+    renderPlay()
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+    const key7 = await screen.findByRole('button', { name: '7' }, { timeout: 5000 })
+    await waitFor(() => expect(key7).toBeEnabled(), { timeout: 5000 })
+    await u.click(screen.getByRole('button', { name: '7' }))
+    await u.click(screen.getByRole('button', { name: '2' }))
+    await u.click(screen.getByRole('button', { name: /Bloquear mi respuesta/ }))
+
+    expect(await screen.findByText('Este reto ya no existe')).toBeInTheDocument()
+    expect(submitNumberVoteMock).toHaveBeenCalledTimes(1)
+    expect(reportErrorMock).not.toHaveBeenCalled()
+    expect(addBreadcrumbMock).toHaveBeenCalledWith(
+      'challenge_gone_on_vote',
+      expect.objectContaining({ challengeId: 'n1', kind: 'number' }),
+    )
+    expect(screen.queryByText(/No se pudo guardar/)).not.toBeInTheDocument()
+  }, 15000)
 })

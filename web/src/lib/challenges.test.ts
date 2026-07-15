@@ -68,6 +68,7 @@ import {
   createMoment,
   promoteToChallenge,
   getChallenge,
+  getChallengeOrNull,
   getAnswer,
   getNumberAnswer,
   getAnswers,
@@ -515,6 +516,30 @@ describe('getChallenge', () => {
   test('propaga el error de Supabase (reto inexistente)', async () => {
     results['challenges'] = { data: null, error: new Error('no rows') }
     await expect(getChallenge('nope')).rejects.toThrow('no rows')
+  })
+})
+
+// Issue #760 (LOCATIONGUESSER-Z): HERMANA de `getChallenge` para el camino de
+// JUGAR — 0 filas (reto borrado) es `null`, NO una excepción PGRST116.
+describe('getChallengeOrNull', () => {
+  test('reto existente: se comporta igual que getChallenge', async () => {
+    const { lat: _lat, lng: _lng, ...play } = sampleChallenge
+    void _lat
+    void _lng
+    results['challenges'] = { data: play, error: null }
+    const out = await getChallengeOrNull('c1')
+    expect(calls.eq).toHaveBeenCalledWith('challenges', 'id', 'c1')
+    expect(out).toEqual(play)
+  })
+
+  test('reto borrado (0 filas): devuelve null, no lanza', async () => {
+    results['challenges'] = { data: null, error: null }
+    await expect(getChallengeOrNull('borrado')).resolves.toBeNull()
+  })
+
+  test('error real de Supabase (no "sin filas"): sigue propagándolo', async () => {
+    results['challenges'] = { data: null, error: new Error('network down') }
+    await expect(getChallengeOrNull('c1')).rejects.toThrow('network down')
   })
 })
 
