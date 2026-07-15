@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  ChevronLeft,
   Flag,
   Globe,
   ImagePlus,
@@ -11,7 +12,7 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
-import { EmptyState, Icon, IconDiana, useReducedMotion, useToast } from '../../ui'
+import { ChallengePhoto, EmptyState, Icon, IconDiana, useReducedMotion, useToast } from '../../ui'
 import { AppHeader } from '../../ui/AppHeader'
 import { BottomSheet } from '../../ui/BottomSheet'
 import { SegmentedControl } from '../../ui/SegmentedControl'
@@ -25,6 +26,7 @@ import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
 import { MembersModal } from '../group/MembersModal'
 import { GroupSettingsModal, type SettingsSection } from '../group/GroupSettingsModal'
+import { ShareLeaderboardModal } from '../group/ShareLeaderboardModal'
 import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
 import { BitacoraTab } from './BitacoraTab'
@@ -95,8 +97,11 @@ const PLAYBACK_INTERVAL_MS = 1100
  * aterrizan en la pestaña Marcador (compatibilidad).
  *
  * Un solo chrome: la cabecera es el `AppHeader` (atrás · nombre del viaje · ⋯). El
- * menú ⋯ tiene contenido FIJO (Invitar · Miembros · Marcador · Ajustes · Cerrar viaje · Borrar)
- * y el FAB "＋" es el ÚNICO punto de crear (Recuerdo / Reto).
+ * menú ⋯ tiene contenido FIJO (Miembros · Marcador · Ajustes · Cerrar viaje · Borrar),
+ * el FAB "＋" (abajo-derecha) es el ÚNICO punto de crear (Recuerdo / Reto) y el FAB
+ * "Compartir" (abajo-izquierda, issue #758 — misma posición/aspecto en los 3 tabs,
+ * para cualquier miembro) abre Invitar al viaje / Compartir un reto / Compartir
+ * clasificación: derecha crea, izquierda comparte.
  *
  * La lógica de selección carrusel↔mapa y de reproducción del recorrido vive aquí
  * (es transversal a la sección Diario) y se delega a TripDiario por props.
@@ -132,11 +137,15 @@ export function TripPage({
   // (null = modal cerrado). El imagePath ya viene filtrado por el anti-spoiler
   // de `isMomentPhotoVisible` (ver el botón en MomentSheet más abajo): una foto
   // SORPRESA nunca llega aquí, ni siquiera si el que comparte es quien creó el
-  // reto (compartirlo destriparía la sorpresa al resto del grupo).
+  // reto (compartirlo destriparía la sorpresa al resto del grupo). `origin`
+  // (issue #758) distingue en analítica desde dónde se abrió: la hoja "Compartir"
+  // nueva ('share_fab'), el icono de 1 tap del carrusel ('diario_card') o el
+  // detalle del momento (undefined, entrada previa sin etiquetar).
   const [sharingChallenge, setSharingChallenge] = useState<{
     id: string
     title: string
     imagePath: string | null
+    origin?: string
   } | null>(null)
   // Reto en edición a pantalla completa (null = no editando). Editar un reto toca su
   // mecánica (plazo, Street View, votos), así que reutilizamos el editor completo
@@ -164,9 +173,31 @@ export function TripPage({
 
   // Menú ⋯ de la cabecera (hoja inferior con acciones fijas del viaje).
   const [menuOpen, setMenuOpen] = useState(false)
-  // Invitar al viaje: hoja de compartir (reusa InviteModal). Cuelga del menú ⋯ y
-  // es SIEMPRE accesible (P0): cualquier miembro puede repartir el enlace.
+  // Invitar al viaje: hoja de compartir (reusa InviteModal). Es SIEMPRE
+  // accesible (P0): cualquier miembro puede repartir el enlace. Se abre desde
+  // varios sitios (CTAs del vacío, Miembros, la hoja "Compartir" nueva); `inviteOrigin`
+  // (issue #758) guarda desde cuál para etiquetar la analítica, y se resetea en
+  // CADA apertura (openInvite) para que no quede un valor de una apertura previa.
   const [inviting, setInviting] = useState(false)
+  const [inviteOrigin, setInviteOrigin] = useState<string | undefined>(undefined)
+  const openInvite = (origin?: string) => {
+    setInviteOrigin(origin)
+    setInviting(true)
+  }
+  // Hoja "Compartir" del viaje (issue #758): FAB abajo-izquierda, espejo del "＋"
+  // de crear, visible en los 3 tabs para CUALQUIER miembro. `shareView` alterna
+  // entre la lista de acciones ('root') y el selector de reto cuando hay más de
+  // uno en juego ('pick'); se resetea a 'root' en cada apertura/cierre.
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareView, setShareView] = useState<'root' | 'pick'>('root')
+  const closeShareSheet = () => {
+    setShareOpen(false)
+    setShareView('root')
+  }
+  // "Compartir clasificación" (issue #758, rescatado del FAB que vivía en
+  // MarcadorTab, issue #608): ahora es un item de la hoja "Compartir" del
+  // viaje, montado aquí porque ya tenemos leaderboard/prizes/groupName.
+  const [sharingLeaderboard, setSharingLeaderboard] = useState(false)
   // Miembros del viaje (#616): lista + gestión (co-dueños, expulsar, salir,
   // transferir). Cuelga del menú ⋯ y la ve CUALQUIER miembro (las acciones de
   // gestión ya se filtran dentro según el rol).
@@ -232,6 +263,13 @@ export function TripPage({
   const activeMoment = useMemo(() => moments.find((m) => m.status === 'active') ?? null, [moments])
   // Nº de RETOS (no recuerdos) para el preview de la hoja de invitar.
   const challengeCount = useMemo(() => moments.filter((m) => m.isChallenge).length, [moments])
+  // Retos EN JUEGO (issue #758): gobierna el item "Compartir un reto" de la hoja
+  // "Compartir" — oculto sin ninguno, directo a `ShareChallengeModal` con uno,
+  // selector con miniaturas con varios. Un reto CERRADO no aparece aquí: ya no
+  // se juega, compartirlo no lleva a ninguna acción (mismo criterio que
+  // `ShareChallengeModal`, que solo tiene sentido con el reto en juego).
+  const activeChallenges = useMemo(() => moments.filter((m) => m.status === 'active'), [moments])
+  const hasLeaderboard = leaderboard.length > 0
 
   const subtitle = useMemo(
     () => membersLine(memberNames, profile?.display_name ?? null),
@@ -363,6 +401,19 @@ export function TripPage({
   }, [])
 
   const togglePlay = () => setPlaying((p) => !p)
+
+  // Abre "Compartir reto" para UN momento (issue #739/#758): centraliza el
+  // filtro anti-spoiler (`isMomentPhotoVisible`) que antes vivía solo en línea
+  // en `onShareChallenge` de `MomentSheet` — ahora lo reutilizan también el
+  // icono de 1 tap del carrusel (`TripDiario`) y la hoja "Compartir" nueva.
+  const openShareChallenge = (moment: Moment, origin?: string) => {
+    setSharingChallenge({
+      id: moment.challengeId,
+      title: moment.title,
+      imagePath: isMomentPhotoVisible(moment) ? moment.imagePath : null,
+      origin,
+    })
+  }
 
   // Editar un RETO: cargamos su fila completa (sin la respuesta oculta; el editor
   // la pide aparte con derecho del dueño) y abrimos el editor a pantalla completa.
@@ -545,7 +596,8 @@ export function TripPage({
               onExpand={(m) => setOpenMoment(m)}
               onPlay={onPlayChallenge}
               onAddMoment={onAddMoment}
-              onInvite={() => setInviting(true)}
+              onInvite={() => openInvite()}
+              onShareChallenge={(m) => openShareChallenge(m, 'diario_card')}
             />
           </section>
         )}
@@ -584,11 +636,10 @@ export function TripPage({
             <MarcadorTab
               leaderboard={leaderboard}
               myUserId={user?.id ?? null}
-              onInvite={() => setInviting(true)}
+              onInvite={() => openInvite()}
               onAddChallenge={onAddChallenge}
               canCreate={canCreate}
               groupId={groupId}
-              groupName={title}
               prizes={group?.prizes ?? null}
               pastChallenges={pastChallenges}
               // Mismo hash `#g=…&c=…` que "Adivina"/"Ya jugaste" (issue #608): un
@@ -651,9 +702,138 @@ export function TripPage({
         </div>
       )}
 
-      {/* Menú ⋯ del viaje: hoja inferior con contenido FIJO. Invitar · Miembros ·
-          Marcador · Ajustes · Cerrar viaje · Borrar. Ajustes/Cerrar/Borrar viven
-          dentro del modal de ajustes (solo dueño); aquí enlazamos a él. */}
+      {/* FAB "Compartir" flotante abajo-IZQUIERDA (issue #758): espejo del "＋" de
+          crear (misma posición/aspecto en los 3 tabs), pero para CUALQUIER
+          miembro (sin gate de canCreate) — compartir no es una acción de dueño.
+          Abre la hoja "Compartir" (Invitar al viaje / Compartir un reto /
+          Compartir clasificación). Nunca dos flotantes a la vez en el mismo tab:
+          sustituye al FAB de clasificación que vivía solo en Marcador (issue
+          #608) y al item "Invitar" del menú ⋯. */}
+      {!wrapOpen && (
+        <div className={styles.shareFabWrap}>
+          <button
+            type="button"
+            className={styles.shareFab}
+            onClick={() => {
+              setShareView('root')
+              setShareOpen(true)
+            }}
+            aria-label="Compartir"
+            aria-haspopup="dialog"
+          >
+            <Icon icon={Share2} size={24} />
+          </button>
+        </div>
+      )}
+
+      {/* Hoja "Compartir" del viaje (issue #758): mismo componente que el menú ⋯
+          (`BottomSheet`, `.menu`/`.menuItem`), con dos vistas — 'root' (lista de
+          acciones) y 'pick' (elegir un reto cuando hay más de uno en juego). */}
+      <BottomSheet
+        open={shareOpen}
+        onClose={closeShareSheet}
+        title={shareView === 'root' ? 'Compartir' : 'Elige un reto'}
+        ariaLabel="Compartir"
+      >
+        {shareView === 'root' ? (
+          <nav className={styles.menu} aria-label="Compartir">
+            <button
+              type="button"
+              className={[styles.menuItem, 'lg-press'].join(' ')}
+              onClick={() => {
+                closeShareSheet()
+                openInvite('share_fab')
+              }}
+            >
+              <span className={styles.menuItemIcon}>
+                <Icon icon={Share2} size={18} />
+              </span>
+              Invitar al viaje
+            </button>
+
+            {/* Oculto sin ningún reto en juego: compartir uno cerrado no lleva a
+                ninguna acción. Con uno solo, directo a ShareChallengeModal; con
+                varios, la vista 'pick' con miniaturas. */}
+            {activeChallenges.length > 0 && (
+              <button
+                type="button"
+                className={[styles.menuItem, 'lg-press'].join(' ')}
+                onClick={() => {
+                  if (activeChallenges.length === 1) {
+                    openShareChallenge(activeChallenges[0], 'share_fab')
+                    closeShareSheet()
+                  } else {
+                    setShareView('pick')
+                  }
+                }}
+              >
+                <span className={styles.menuItemIcon}>
+                  <IconDiana size={18} />
+                </span>
+                Compartir un reto
+              </button>
+            )}
+
+            {/* Solo con clasificación: nada que enseñar sin ella. */}
+            {hasLeaderboard && (
+              <button
+                type="button"
+                className={[styles.menuItem, 'lg-press'].join(' ')}
+                onClick={() => {
+                  closeShareSheet()
+                  setSharingLeaderboard(true)
+                }}
+              >
+                <span className={styles.menuItemIcon}>
+                  <Icon icon={ListOrdered} size={18} />
+                </span>
+                Compartir clasificación
+              </button>
+            )}
+          </nav>
+        ) : (
+          <div className={styles.sharePicker}>
+            <button
+              type="button"
+              className={[styles.sharePickerBack, 'lg-press'].join(' ')}
+              onClick={() => setShareView('root')}
+            >
+              <Icon icon={ChevronLeft} size={18} />
+              Volver
+            </button>
+            <ol className={styles.sharePickerList} aria-label="Elige un reto para compartir">
+              {activeChallenges.map((m) => (
+                <li key={m.challengeId}>
+                  <button
+                    type="button"
+                    className={[styles.sharePickerItem, 'lg-press'].join(' ')}
+                    onClick={() => {
+                      openShareChallenge(m, 'share_fab')
+                      closeShareSheet()
+                    }}
+                  >
+                    <ChallengePhoto
+                      src={isMomentPhotoVisible(m) ? m.imageUrl : null}
+                      alt={m.title}
+                      ratio="square"
+                      size="sm"
+                      zoomable={false}
+                      className={styles.sharePickerThumb}
+                    />
+                    <span className={styles.sharePickerTitle}>{m.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+      </BottomSheet>
+
+      {/* Menú ⋯ del viaje: hoja inferior con contenido FIJO. Miembros · Marcador ·
+          Ajustes · Cerrar viaje · Borrar. Ajustes/Cerrar/Borrar viven dentro del
+          modal de ajustes (solo dueño); aquí enlazamos a él. "Invitar" vivía aquí
+          (2 taps tras el ⋯) y se retiró en el issue #758: ahora es el primer item
+          de la hoja "Compartir" del FAB nuevo (visible sin abrir este menú). */}
       <BottomSheet
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
@@ -661,19 +841,6 @@ export function TripPage({
         ariaLabel="Opciones del viaje"
       >
         <nav className={styles.menu} aria-label="Opciones del viaje">
-          <button
-            type="button"
-            className={[styles.menuItem, 'lg-press'].join(' ')}
-            onClick={() => {
-              setMenuOpen(false)
-              setInviting(true)
-            }}
-          >
-            <span className={styles.menuItemIcon}>
-              <Icon icon={Share2} size={18} />
-            </span>
-            Invitar
-          </button>
           {/* Miembros (#616): quién está en el viaje y su gestión (co-dueños,
               expulsar, salir, transferir). Visible para cualquier miembro. */}
           <button
@@ -758,18 +925,11 @@ export function TripPage({
             : undefined
         }
         // "Compartir reto" (issue #739): solo con el reto EN JUEGO (un reto
-        // cerrado ya no se juega — para ese caso está "Ver marcador"). El
-        // imagePath se filtra aquí con el mismo anti-spoiler que el héroe de
-        // la propia hoja (`isMomentPhotoVisible`): una foto SORPRESA nunca
-        // llega a la tarjeta de compartir.
+        // cerrado ya no se juega — para ese caso está "Ver marcador").
         onShareChallenge={
           openMoment?.status === 'active'
             ? () => {
-                setSharingChallenge({
-                  id: openMoment.challengeId,
-                  title: openMoment.title,
-                  imagePath: isMomentPhotoVisible(openMoment) ? openMoment.imagePath : null,
-                })
+                openShareChallenge(openMoment)
                 setOpenMoment(null)
               }
             : undefined
@@ -807,9 +967,24 @@ export function TripPage({
           challengeId={sharingChallenge.id}
           challengeTitle={sharingChallenge.title}
           imagePath={sharingChallenge.imagePath}
+          origin={sharingChallenge.origin}
           onClose={() => setSharingChallenge(null)}
         />
       )}
+
+      {/* "Compartir clasificación" (issue #758, rescatado del FAB de MarcadorTab
+          — issue #608): item de la hoja "Compartir" del viaje, montado aquí
+          porque ya tenemos leaderboard/prizes/groupName sin pedírselos a la
+          pestaña Marcador. */}
+      <ShareLeaderboardModal
+        open={sharingLeaderboard}
+        onClose={() => setSharingLeaderboard(false)}
+        groupName={title}
+        entries={leaderboard}
+        prizes={group?.prizes ?? null}
+        link={tripShareUrl(location.origin, groupId)}
+        origin="share_fab"
+      />
 
       {/* Miembros del viaje (#616): lista + gestión según rol. Tras salir, a la
           home; tras cambiar roles/expulsar/transferir, recargamos permisos
@@ -828,7 +1003,7 @@ export function TripPage({
             // El camino a "otra persona dueña": invitar → promover. Cerramos
             // Miembros y abrimos la hoja de invitar en un solo gesto (#689).
             setMembersOpen(false)
-            setInviting(true)
+            openInvite()
           }}
         />
       )}
@@ -880,6 +1055,7 @@ export function TripPage({
         link={tripShareUrl(location.origin, groupId)}
         challengeCount={challengeCount}
         isOwner={canCreate}
+        origin={inviteOrigin}
       />
     </div>
   )

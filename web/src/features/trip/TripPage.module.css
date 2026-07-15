@@ -353,6 +353,97 @@
   transform: rotate(45deg) translateY(-2px);
 }
 
+/* FAB "Compartir" flotante FIJO abajo-IZQUIERDA (issue #758): espejo del FAB "＋"
+   de crear (mismo tamaño/sombra/piso `z-sticky`), pero para CUALQUIER miembro
+   (sin gate de `canCreate`) — compartir no es una acción de dueño. Nunca dos
+   flotantes a la vez en el mismo tab: sustituye al FAB de clasificación que
+   vivía solo en Marcador (`MarcadorTab`, issue #608) y al item "Invitar" del
+   menú ⋯. Sin menú propio (a diferencia de `.fabWrap`): un tap abre directo la
+   hoja "Compartir" (`BottomSheet`). */
+.shareFabWrap {
+  position: fixed;
+  left: var(--space-4);
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-5));
+  z-index: var(--z-sticky);
+}
+.shareFab {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-base),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.shareFab:hover {
+  background: var(--color-accent-hover);
+  transform: translateY(-2px);
+}
+.shareFab:active {
+  transform: scale(0.94);
+}
+
+/* Hoja "Compartir" (issue #758): vista 'pick' — elegir un reto cuando hay más de
+   uno en juego. La vista 'root' reutiliza `.menu`/`.menuItem` tal cual (mismo
+   componente que el menú ⋯, "items grandes con icono" del spec). */
+.sharePicker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.sharePickerBack {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-2) var(--space-2) 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.sharePickerList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.sharePickerItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2);
+  border: none;
+  border-radius: var(--radius-md);
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+.sharePickerItem:hover {
+  background: var(--color-surface-hover);
+}
+.sharePickerThumb {
+  flex-shrink: 0;
+}
+.sharePickerTitle {
+  font-weight: var(--font-weight-medium);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Menú de acciones: dos pastillas (Momento / Reto) que surgen sobre el FAB. */
 .fabMenu {
   display: flex;
@@ -454,11 +545,14 @@
   .panelEnter {
     animation: none;
   }
-  .fab {
+  .fab,
+  .shareFab {
     transition: none;
   }
   .fab:hover,
-  .fab:active {
+  .fab:active,
+  .shareFab:hover,
+  .shareFab:active {
     transform: none;
   }
   /* El FAB abierto mantiene la "×" girada (es estado, no animación). */

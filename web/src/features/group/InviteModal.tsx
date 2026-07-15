@@ -33,6 +33,14 @@ interface Props {
    * "Generar enlace de co-dueño"; el resto del modal es igual para todos.
    */
   isOwner: boolean
+  /**
+   * Desde dónde se abrió esta hoja (issue #758): distingue en analítica el FAB
+   * "Compartir" nuevo (`'share_fab'`) de las otras entradas ya existentes (CTA
+   * del vacío, menú de Miembros…), que no pasan nada y quedan sin etiquetar.
+   * Viaja junto a `surface` (que sigue siendo el MECANISMO: shared/copied/
+   * downloaded) en vez de sustituirlo — son dos preguntas distintas.
+   */
+  origin?: string
 }
 
 // Modal de "Invitar al viaje" (issue #617): "Compartir" genera y comparte una
@@ -51,6 +59,7 @@ export function InviteModal({
   link,
   challengeCount,
   isOwner,
+  origin,
 }: Props) {
   const { user, profile } = useSession()
   const cardRef = useRef<HTMLDivElement>(null)
@@ -167,7 +176,7 @@ export function InviteModal({
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(caption)
-      track('group_link_copied', { surface: 'copied', group_id: groupId })
+      track('group_link_copied', { surface: 'copied', group_id: groupId, origin })
       toast.show('Mensaje copiado, pégalo en el chat', { tone: 'success' })
     } catch {
       toast.show('No se pudo copiar el enlace', { tone: 'danger' })
@@ -206,10 +215,10 @@ export function InviteModal({
     try {
       const result = await shareLeaderboardImage(blob, caption, `Invitación · ${groupName}`)
       if (result === 'shared') {
-        track('invite_shared', { surface: 'shared', group_id: groupId })
+        track('invite_shared', { surface: 'shared', group_id: groupId, origin })
         onClose()
       } else if (result === 'downloaded') {
-        track('invite_shared', { surface: 'downloaded', group_id: groupId })
+        track('invite_shared', { surface: 'downloaded', group_id: groupId, origin })
         toast.show('Imagen descargada y mensaje copiado, pégalos en el chat', { tone: 'success' })
       }
       // 'cancelled': el usuario cerró la hoja de compartir del SO; dejamos el modal abierto.

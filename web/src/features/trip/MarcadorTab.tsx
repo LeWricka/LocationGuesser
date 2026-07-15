@@ -9,16 +9,16 @@ import type { GroupPrizes } from '../../lib/database.types'
 // "Retos anteriores" (inline, pequeño): ese contexto no es ambiguo; el que sí lo
 // era es el pedestal del podio de arriba (ver comentario del componente).
 import { Medal } from '../../ui/Medal'
-import { tripShareUrl } from '../../lib/shareLinks'
 import type { PastChallengeResult, PastChallengeSummary } from './useTripData'
-// Rescatados de GroupPage (código muerto, issue #608): PREMIOS por puesto y el
-// modal de "Compartir clasificación como imagen" existían solo ahí, así que se
-// perdieron al pasar el marcador a esta pestaña. Se REUTILIZAN tal cual (sin
-// tocarlos): `prizes.ts` es la misma tabla de puestos premiables que editaba
-// GroupSettingsModal-adyacente, y `ShareLeaderboardModal` es el mismo modal que
-// rasteriza `LeaderboardCard` a PNG.
+// Rescatado de GroupPage (código muerto, issue #608): PREMIOS por puesto
+// existía solo ahí, así que se perdió al pasar el marcador a esta pestaña. Se
+// REUTILIZA tal cual (sin tocarlo): `prizes.ts` es la misma tabla de puestos
+// premiables que editaba GroupSettingsModal-adyacente. El FAB "Compartir
+// clasificación" (`ShareLeaderboardModal`) que vivía aquí junto a los premios
+// se retiró en el issue #758: su acción pasó a ser un item de la hoja
+// "Compartir" nueva del viaje (`TripPage`), que ya tiene los datos (leaderboard,
+// prizes, groupName) para montar el modal sin pedírselos a esta pestaña.
 import { PRIZE_SLOTS, prizeForRow } from '../group/prizes'
-import { ShareLeaderboardModal } from '../group/ShareLeaderboardModal'
 // Editor de premios (issues #123/#608): extraído a fichero propio (issues
 // #752/#753) para que también lo abra el nudge post-creación del viaje
 // (`CreateGroup`), no solo el Marcador.
@@ -37,10 +37,8 @@ interface Props {
   /** ¿Puede el usuario crear retos? (dueño) — también gobierna la edición de
    * premios (issue #608): es el mismo permiso que en GroupPage/GroupSettings. */
   canCreate: boolean
-  /** Código del viaje: arma el enlace de compartir y guarda los premios. */
+  /** Código del viaje: guarda los premios (`PrizesEditorModal`). */
   groupId: string
-  /** Nombre del viaje, para el título de la tarjeta de compartir. */
-  groupName: string
   /** Premios por puesto (`groups.prizes`, issue #123). null = sin premios. */
   prizes: GroupPrizes | null
   /** Retos anteriores del viaje (issue #608, rescatado de GroupPage/PastSection). */
@@ -128,8 +126,11 @@ function PremioTappable({
  *     el aviso "salió de la app" si aplica) y tu resultado breve. Tocar la fila
  *     abre el detalle del reto (mismo hash `#g=…&c=…` que "Adivina"/"Ya jugaste"
  *     en el reto en vivo: revelado si ya jugaste o el reto ya cerró).
- *  4. COMPARTIR (rescatado de GroupPage): un FAB abre la vista previa de la
- *     tarjeta de clasificación (imagen) para compartirla en el chat.
+ *
+ * COMPARTIR (issue #758): el FAB "Compartir clasificación" que vivía aquí junto
+ * a los premios se retiró — su acción (`ShareLeaderboardModal`) pasó a ser un
+ * item de la hoja "Compartir" del viaje (visible en los 3 tabs, `TripPage`),
+ * que ya tiene el leaderboard/prizes/groupName para montar el modal ella misma.
  *
  * Con ≤3 jugadores solo hay podio (sin lista vacía debajo); con 1 jugador, el líder
  * va solo y centrado (issue #594, punto 3).
@@ -157,14 +158,12 @@ export function MarcadorTab({
   onAddChallenge,
   canCreate,
   groupId,
-  groupName,
   prizes,
   pastChallenges,
   onOpenChallenge,
   onPrizesSaved,
 }: Props) {
   const [editingPrizes, setEditingPrizes] = useState(false)
-  const [sharing, setSharing] = useState(false)
   const hasEntries = leaderboard.length > 0
   const hasPrizes = PRIZE_SLOTS.some(({ key }) => (prizes?.[key]?.trim() ?? '') !== '')
   const openPrizeEditor = () => setEditingPrizes(true)
@@ -507,32 +506,6 @@ export function MarcadorTab({
             ))}
           </ol>
         </section>
-      )}
-
-      {/* FAB "Compartir clasificación" (issue #608, rescatado de GroupPage): abre
-          la previa de la tarjeta (imagen) para compartirla en el chat, el motor
-          del bucle social. Solo con clasificación (nada que enseñar sin ella). */}
-      {hasEntries && (
-        <>
-          <button
-            type="button"
-            className={styles.shareFab}
-            onClick={() => setSharing(true)}
-            aria-label="Compartir clasificación"
-          >
-            <Icon icon={Share2} size={18} />
-            <span className={styles.shareFabLabel}>Compartir</span>
-          </button>
-
-          <ShareLeaderboardModal
-            open={sharing}
-            onClose={() => setSharing(false)}
-            groupName={groupName}
-            entries={leaderboard}
-            prizes={prizes}
-            link={tripShareUrl(location.origin, groupId)}
-          />
-        </>
       )}
 
       {canCreate && editingPrizes && (
