@@ -122,6 +122,7 @@ describe('AppRoutes — receptor sin cuenta en deep link (issue #758)', () => {
       expect(trackMock).toHaveBeenCalledWith('receptor_anon_signin', {
         outcome: 'success',
         kind: 'trip',
+        group_id: 'ABC',
       }),
     )
     // Sin cambiar `user` (aquí no hay AuthProvider real que lo actualice), el
@@ -132,12 +133,22 @@ describe('AppRoutes — receptor sin cuenta en deep link (issue #758)', () => {
 
   test('deep link de reto SIN sesión: usa el esqueleto de "jugar" (kind=challenge)', async () => {
     window.location.hash = '#g=ABC&c=uuid-reto'
-    signInAnonymouslyMock.mockReturnValue(new Promise(() => {}))
+    signInAnonymouslyMock.mockResolvedValue({ error: null })
 
     renderApp()
 
     expect(signInAnonymouslyMock).toHaveBeenCalledTimes(1)
     expect(screen.getByRole('status', { name: 'Cargando…' })).toBeInTheDocument()
+    // group_id/challenge_id (issue #751): sin ellos no se puede cruzar este
+    // intento con el resto del funnel de ese mismo reto.
+    await waitFor(() =>
+      expect(trackMock).toHaveBeenCalledWith('receptor_anon_signin', {
+        outcome: 'success',
+        kind: 'challenge',
+        group_id: 'ABC',
+        challenge_id: 'uuid-reto',
+      }),
+    )
   })
 
   test('si signInAnonymously falla (p.ej. toggle apagado), degrada a la Landing sin crash', async () => {
@@ -152,6 +163,7 @@ describe('AppRoutes — receptor sin cuenta en deep link (issue #758)', () => {
     expect(trackMock).toHaveBeenCalledWith('receptor_anon_signin', {
       outcome: 'failed',
       kind: 'trip',
+      group_id: 'ABC',
     })
   })
 

@@ -16,8 +16,12 @@ import { useToast } from '../../ui'
  * navega a ese hash; si no, navega a la home (hash vacío). Idempotente y a prueba
  * de reentradas (no relanza para el mismo destino mientras una llamada está en
  * curso). Errores de join se devuelven al llamante para que decida (toast, etc.).
+ *
+ * `isAnonymous` (issue #751) solo alimenta la prop `is_anonymous` de
+ * `group_joined`: sin ella no se distingue un alta de miembro con cuenta
+ * permanente de un receptor sin cuenta (#758) que se une al abrir el enlace.
  */
-export function useDeepLinkJoin(userId: string | undefined) {
+export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false) {
   // Evita carreras: si ya estamos uniéndonos a un destino, no lo repetimos.
   const inFlight = useRef<string | null>(null)
   const toast = useToast()
@@ -63,7 +67,7 @@ export function useDeepLinkJoin(userId: string | undefined) {
           // Solo contamos `group_joined` cuando el usuario REALMENTE se une (no en
           // reentradas: abrir el mismo link otra vez no es un join nuevo).
           if (!alreadyMember) {
-            track('group_joined', { group_id: route.group })
+            track('group_joined', { group_id: route.group, is_anonymous: isAnonymous })
           }
         }
         // Restaurar el destino: el router por hash repinta la pantalla correcta a
@@ -98,7 +102,7 @@ export function useDeepLinkJoin(userId: string | undefined) {
         inFlight.current = null
       }
     },
-    [userId, toast],
+    [userId, isAnonymous, toast],
   )
 
   return joinIfGroup

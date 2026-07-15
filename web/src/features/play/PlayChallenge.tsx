@@ -255,6 +255,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             challenge_id: current.id,
             timed_out: true,
             points: 0,
+            is_anonymous: isAnonymous,
           })
           return
         }
@@ -296,6 +297,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           timed_out: false,
           points: res.points,
           distance_km: km,
+          is_anonymous: isAnonymous,
           // Solo si se pudo calcular (no rompemos el evento si falla la consulta).
           ...(rankPosition != null && { rank_in_challenge: rankPosition }),
         })
@@ -318,7 +320,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         setSaving(false)
       }
     },
-    [toast, user],
+    [toast, user, isAnonymous],
   )
 
   // Puerta previa al revelado (issue #758): si el jugador es un receptor
@@ -338,6 +340,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           setNameValue(profile?.display_name ?? '')
           setNameError(null)
           setNameOpen(true)
+          // Paso ciego del funnel (issue #751): sin esto no se sabe cuánta
+          // gente ve este modal antes de aparcarse a votar.
+          track('name_prompt_shown', { group_id: current.group_id, challenge_id: current.id })
         }
         return
       }
@@ -358,14 +363,29 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     if (!user) return
     setNameSaving(true)
     setNameError(null)
+    const pendingForAnalytics = pendingRevealRef.current?.current
     try {
       await upsertProfile({ id: user.id, displayName: name })
       await refreshProfile()
+      track('name_prompt_submitted', {
+        outcome: 'success',
+        ...(pendingForAnalytics && {
+          group_id: pendingForAnalytics.group_id,
+          challenge_id: pendingForAnalytics.id,
+        }),
+      })
       setNameOpen(false)
       const pending = pendingRevealRef.current
       pendingRevealRef.current = null
       if (pending) void reveal(pending.current, pending.playedGuess)
     } catch (err) {
+      track('name_prompt_submitted', {
+        outcome: 'error',
+        ...(pendingForAnalytics && {
+          group_id: pendingForAnalytics.group_id,
+          challenge_id: pendingForAnalytics.id,
+        }),
+      })
       setNameError(describeError(err))
     } finally {
       setNameSaving(false)
@@ -455,6 +475,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         // `playing`. Aplica también a retos sin límite (antes solo a los timed).
         const resuming = localStorage.getItem(startKey(c.id)) != null
         setPhase(resuming ? 'playing' : 'idle')
+        // Entró a la pantalla del reto SIN haber votado aún (issue #751): mide la
+        // caída "entró pero no jugó" (challenge_opened → challenge_played). No se
+        // emite en los caminos de arriba (own/ya votado): ahí no entra A JUGAR.
+        track('challenge_opened', {
+          group_id: c.group_id,
+          challenge_id: c.id,
+          challenge_kind: 'location',
+        })
       } catch (err) {
         if (cancelled) return
         reportError(err, { area: 'load_challenge', challengeId })
@@ -581,6 +609,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         group_id: challenge.group_id,
         challenge_id: challenge.id,
         challenge_kind: 'location',
+        is_anonymous: isAnonymous,
       })
       maybeReveal(challenge, guess)
     }
@@ -676,6 +705,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       track('challenge_replayed', {
         group_id: challenge.group_id,
         challenge_id: challenge.id,
+        challenge_kind: 'location',
       })
     } catch (err) {
       reportError(err, { area: 'replay_challenge', challengeId: challenge.id })
@@ -1048,7 +1078,16 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               <Button
                 variant="secondary"
                 fullWidth
-                onClick={() => setUpgradeOpen(true)}
+                onClick={() => {
+                  // Numerador del clic (issue #751): `upgrade_cta_shown` (la
+                  // impresión del modal) lo emite AccountUpgradeModal al abrir.
+                  track('upgrade_cta_clicked', {
+                    origin: 'play_result',
+                    group_id: groupId,
+                    challenge_id: challenge.id,
+                  })
+                  setUpgradeOpen(true)
+                }}
                 className={styles.actionsIn}
               >
                 Guarda tu cuenta
@@ -1190,6 +1229,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         <AccountUpgradeModal
           open={upgradeOpen}
           onClose={() => setUpgradeOpen(false)}
+          origin="play_result"
+          groupId={groupId}
+          challengeId={challenge.id}
           onUpgraded={() => {
             setUpgradeOpen(false)
             toast.show('Cuenta guardada. Tu voto y tu puesto siguen siendo tuyos.', {

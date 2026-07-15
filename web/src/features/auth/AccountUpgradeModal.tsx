@@ -10,9 +10,10 @@
 // de entrada. Presentacional + wiring de `useAccountUpgrade`; sin llamadas a
 // Supabase aquí.
 
-import type { FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent } from 'react'
 import { Modal, Button, Field, Input, Row, Stack } from '../../ui'
-import { useAccountUpgrade } from './useAccountUpgrade'
+import { track } from '../../lib/analytics'
+import { useAccountUpgrade, type AccountUpgradeContext } from './useAccountUpgrade'
 
 interface Props {
   open: boolean
@@ -23,9 +24,24 @@ interface Props {
    * para que el llamante cierre el modal y, si quiere, muestre un toast.
    */
   onUpgraded?: () => void
+  /**
+   * De dónde se abrió el CTA (issue #751): viaja a `account_upgraded` y a los
+   * eventos de impresión/abandono, para poder cruzar el funnel por superficie.
+   * Ver `AccountUpgradeContext`.
+   */
+  origin: AccountUpgradeContext['origin']
+  groupId?: string
+  challengeId?: string
 }
 
-export function AccountUpgradeModal({ open, onClose, onUpgraded }: Props) {
+export function AccountUpgradeModal({
+  open,
+  onClose,
+  onUpgraded,
+  origin,
+  groupId,
+  challengeId,
+}: Props) {
   const {
     step,
     email,
@@ -40,7 +56,38 @@ export function AccountUpgradeModal({ open, onClose, onUpgraded }: Props) {
     resend,
     verify,
     reset,
-  } = useAccountUpgrade()
+  } = useAccountUpgrade({ origin, groupId, challengeId })
+
+  // Impresión del CTA (issue #751): denominador del funnel, hoy solo teníamos
+  // el numerador (`account_upgraded`). Una vez por apertura (no en cada
+  // repintado mientras sigue abierto).
+  const shownRef = useRef(false)
+  useEffect(() => {
+    if (!open) {
+      shownRef.current = false
+      return
+    }
+    if (shownRef.current) return
+    shownRef.current = true
+    track('upgrade_cta_shown', {
+      origin,
+      ...(groupId && { group_id: groupId }),
+      ...(challengeId && { challenge_id: challengeId }),
+    })
+  }, [open, origin, groupId, challengeId])
+
+  // Abandono (issue #751): se cierra sin completar (botón "Ahora no", la X del
+  // header o Escape — las tres rutas de `Modal.onClose`). NO se llama tras un
+  // `onUpgraded` con éxito: el llamante deja de montar el modal (o cambia
+  // `open`) en vez de invocar este cierre.
+  function handleClose() {
+    track('upgrade_abandoned', {
+      origin,
+      ...(groupId && { group_id: groupId }),
+      ...(challengeId && { challenge_id: challengeId }),
+    })
+    onClose()
+  }
 
   function handleSubmitEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -59,12 +106,12 @@ export function AccountUpgradeModal({ open, onClose, onUpgraded }: Props) {
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={handleClose}
       title="Guarda tu cuenta"
       footer={
         step === 'email' ? (
           <Row gap={2} justify="end">
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={handleClose}>
               Ahora no
             </Button>
             <Button size="sm" loading={loading} onClick={() => void submit()}>

@@ -10,7 +10,8 @@ vi.mock('../../lib/auth', () => ({
   verifyLinkEmailOtp: (email: string, token: string) => verifyLinkEmailOtp(email, token),
 }))
 
-vi.mock('../../lib/analytics', () => ({ track: vi.fn() }))
+const track = vi.fn()
+vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => track(...args) }))
 
 import { useAccountUpgrade } from './useAccountUpgrade'
 
@@ -19,11 +20,12 @@ beforeEach(() => {
   linkAnonymousEmail.mockResolvedValue(undefined)
   verifyLinkEmailOtp.mockClear()
   verifyLinkEmailOtp.mockResolvedValue(undefined)
+  track.mockClear()
 })
 
 describe('useAccountUpgrade (issue #758, vincular anónimo → permanente)', () => {
   test('email inválido: no llama a linkAnonymousEmail y fija un error', async () => {
-    const { result } = renderHook(() => useAccountUpgrade())
+    const { result } = renderHook(() => useAccountUpgrade({ origin: 'play_result' }))
     act(() => result.current.setEmail('noesemail'))
     await act(async () => {
       await result.current.submit()
@@ -34,7 +36,7 @@ describe('useAccountUpgrade (issue #758, vincular anónimo → permanente)', () 
   })
 
   test('email válido: llama a linkAnonymousEmail (NO a sendEmailOtp) y pasa a "code"', async () => {
-    const { result } = renderHook(() => useAccountUpgrade())
+    const { result } = renderHook(() => useAccountUpgrade({ origin: 'play_result' }))
     act(() => result.current.setEmail('lewis@ej.com'))
     await act(async () => {
       await result.current.submit()
@@ -44,7 +46,7 @@ describe('useAccountUpgrade (issue #758, vincular anónimo → permanente)', () 
   })
 
   test('código inválido (no 6 dígitos): no llama a verifyLinkEmailOtp, devuelve false', async () => {
-    const { result } = renderHook(() => useAccountUpgrade())
+    const { result } = renderHook(() => useAccountUpgrade({ origin: 'play_result' }))
     act(() => result.current.setEmail('lewis@ej.com'))
     await act(async () => {
       await result.current.submit()
@@ -59,7 +61,7 @@ describe('useAccountUpgrade (issue #758, vincular anónimo → permanente)', () 
   })
 
   test('código correcto: canjea con verifyLinkEmailOtp y devuelve true (mismo uid, sesión pasa a permanente)', async () => {
-    const { result } = renderHook(() => useAccountUpgrade())
+    const { result } = renderHook(() => useAccountUpgrade({ origin: 'play_result' }))
     act(() => result.current.setEmail('lewis@ej.com'))
     await act(async () => {
       await result.current.submit()
@@ -73,9 +75,46 @@ describe('useAccountUpgrade (issue #758, vincular anónimo → permanente)', () 
     expect(verifyLinkEmailOtp).toHaveBeenCalledWith('lewis@ej.com', '123456')
   })
 
+  // Issue #751: `account_upgraded` sin props no se podía cruzar con el resto
+  // del funnel (qué superficie convierte). El contexto viaja desde el llamante
+  // (AccountUpgradeModal ← PlayChallenge/App.tsx).
+  describe('account_upgraded lleva el contexto de origen (issue #751)', () => {
+    test('origin play_result con group_id/challenge_id', async () => {
+      const { result } = renderHook(() =>
+        useAccountUpgrade({ origin: 'play_result', groupId: 'g1', challengeId: 'c1' }),
+      )
+      act(() => result.current.setEmail('lewis@ej.com'))
+      await act(async () => {
+        await result.current.submit()
+      })
+      act(() => result.current.setCode('123456'))
+      await act(async () => {
+        await result.current.verify()
+      })
+      expect(track).toHaveBeenCalledWith('account_upgraded', {
+        origin: 'play_result',
+        group_id: 'g1',
+        challenge_id: 'c1',
+      })
+    })
+
+    test('origin anon_create_gate SIN group_id/challenge_id: no manda esas props', async () => {
+      const { result } = renderHook(() => useAccountUpgrade({ origin: 'anon_create_gate' }))
+      act(() => result.current.setEmail('lewis@ej.com'))
+      await act(async () => {
+        await result.current.submit()
+      })
+      act(() => result.current.setCode('123456'))
+      await act(async () => {
+        await result.current.verify()
+      })
+      expect(track).toHaveBeenCalledWith('account_upgraded', { origin: 'anon_create_gate' })
+    })
+  })
+
   test('código incorrecto/caducado: verify devuelve false y fija un error legible', async () => {
     verifyLinkEmailOtp.mockRejectedValueOnce(new Error('otp_expired'))
-    const { result } = renderHook(() => useAccountUpgrade())
+    const { result } = renderHook(() => useAccountUpgrade({ origin: 'play_result' }))
     act(() => result.current.setEmail('lewis@ej.com'))
     await act(async () => {
       await result.current.submit()
@@ -90,7 +129,7 @@ describe('useAccountUpgrade (issue #758, vincular anónimo → permanente)', () 
   })
 
   test('reset vuelve al paso de email y limpia el código/error', async () => {
-    const { result } = renderHook(() => useAccountUpgrade())
+    const { result } = renderHook(() => useAccountUpgrade({ origin: 'play_result' }))
     act(() => result.current.setEmail('lewis@ej.com'))
     await act(async () => {
       await result.current.submit()

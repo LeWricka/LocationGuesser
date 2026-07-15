@@ -10,7 +10,8 @@ vi.mock('../../lib/auth', () => ({
   linkAnonymousEmail: (email: string) => linkAnonymousEmail(email),
   verifyLinkEmailOtp: (email: string, token: string) => verifyLinkEmailOtp(email, token),
 }))
-vi.mock('../../lib/analytics', () => ({ track: vi.fn() }))
+const track = vi.fn()
+vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => track(...args) }))
 
 import { AccountUpgradeModal } from './AccountUpgradeModal'
 
@@ -19,18 +20,19 @@ beforeEach(() => {
   linkAnonymousEmail.mockResolvedValue(undefined)
   verifyLinkEmailOtp.mockClear()
   verifyLinkEmailOtp.mockResolvedValue(undefined)
+  track.mockClear()
 })
 
 describe('AccountUpgradeModal (issue #758, "guárdate")', () => {
   test('cerrado: no pinta el diálogo', () => {
-    render(<AccountUpgradeModal open={false} onClose={vi.fn()} />)
+    render(<AccountUpgradeModal open={false} onClose={vi.fn()} origin="play_result" />)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   test('abierto: pide el correo; "Ahora no" cierra sin vincular', async () => {
     const onClose = vi.fn()
     const u = userEvent.setup()
-    render(<AccountUpgradeModal open onClose={onClose} />)
+    render(<AccountUpgradeModal open onClose={onClose} origin="play_result" />)
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
@@ -42,7 +44,9 @@ describe('AccountUpgradeModal (issue #758, "guárdate")', () => {
   test('correo válido → código → confirmar: vincula y avisa con onUpgraded', async () => {
     const onUpgraded = vi.fn()
     const u = userEvent.setup()
-    render(<AccountUpgradeModal open onClose={vi.fn()} onUpgraded={onUpgraded} />)
+    render(
+      <AccountUpgradeModal open onClose={vi.fn()} onUpgraded={onUpgraded} origin="play_result" />,
+    )
 
     await u.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await u.click(screen.getByRole('button', { name: 'Mandar código' }))
@@ -60,7 +64,9 @@ describe('AccountUpgradeModal (issue #758, "guárdate")', () => {
     verifyLinkEmailOtp.mockRejectedValueOnce(new Error('otp_expired'))
     const onUpgraded = vi.fn()
     const u = userEvent.setup()
-    render(<AccountUpgradeModal open onClose={vi.fn()} onUpgraded={onUpgraded} />)
+    render(
+      <AccountUpgradeModal open onClose={vi.fn()} onUpgraded={onUpgraded} origin="play_result" />,
+    )
 
     await u.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
     await u.click(screen.getByRole('button', { name: 'Mandar código' }))
@@ -70,5 +76,62 @@ describe('AccountUpgradeModal (issue #758, "guárdate")', () => {
 
     expect(await screen.findByText(/incorrecto o caducado/i)).toBeInTheDocument()
     expect(onUpgraded).not.toHaveBeenCalled()
+  })
+})
+
+// Issue #751: funnel del CTA — antes solo existía `account_upgraded` (el
+// numerador), sin saber a cuánta gente se le ofreció ni cuántos lo cerraron
+// sin completar.
+describe('AccountUpgradeModal — funnel del CTA (issue #751)', () => {
+  test('al abrir, emite upgrade_cta_shown con el origen y los ids', () => {
+    render(
+      <AccountUpgradeModal
+        open
+        onClose={vi.fn()}
+        origin="play_result"
+        groupId="g1"
+        challengeId="c1"
+      />,
+    )
+    expect(track).toHaveBeenCalledWith('upgrade_cta_shown', {
+      origin: 'play_result',
+      group_id: 'g1',
+      challenge_id: 'c1',
+    })
+  })
+
+  test('no repite upgrade_cta_shown en repintados mientras sigue abierto', () => {
+    const { rerender } = render(
+      <AccountUpgradeModal open onClose={vi.fn()} origin="anon_create_gate" />,
+    )
+    track.mockClear()
+    rerender(<AccountUpgradeModal open onClose={vi.fn()} origin="anon_create_gate" />)
+    expect(track).not.toHaveBeenCalledWith('upgrade_cta_shown', expect.anything())
+  })
+
+  test('"Ahora no" emite upgrade_abandoned antes de cerrar', async () => {
+    const onClose = vi.fn()
+    const u = userEvent.setup()
+    render(<AccountUpgradeModal open onClose={onClose} origin="anon_create_gate" />)
+    track.mockClear()
+
+    await u.click(screen.getByRole('button', { name: 'Ahora no' }))
+
+    expect(track).toHaveBeenCalledWith('upgrade_abandoned', { origin: 'anon_create_gate' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('vincular con éxito NO emite upgrade_abandoned', async () => {
+    const u = userEvent.setup()
+    render(<AccountUpgradeModal open onClose={vi.fn()} origin="play_result" groupId="g1" />)
+
+    await u.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
+    await u.click(screen.getByRole('button', { name: 'Mandar código' }))
+    const code = await screen.findByLabelText('Código de 6 dígitos')
+    await u.type(code, '123456')
+    track.mockClear()
+    await u.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(track).not.toHaveBeenCalledWith('upgrade_abandoned', expect.anything())
   })
 })
