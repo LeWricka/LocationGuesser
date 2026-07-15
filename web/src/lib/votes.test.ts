@@ -66,7 +66,7 @@ import {
   deleteMyVote,
   startPlay,
 } from './votes'
-import { ResourceGoneError } from './errors'
+import { ChallengeClosedError, ResourceGoneError } from './errors'
 
 const sampleVote: Vote = {
   id: 'v1',
@@ -218,6 +218,30 @@ describe('submitVote', () => {
       ResourceGoneError,
     )
   })
+
+  // LOCATIONGUESSER-8: el servidor usa P0001 para VARIOS rechazos de negocio,
+  // así que se afina por código + mensaje. Solo los "cerrado" (reto o grupo)
+  // acaban en ChallengeClosedError; el resto sigue el camino genérico.
+  test('P0001 "El reto ya está cerrado": lanza ChallengeClosedError', async () => {
+    rpcResult = { data: null, error: { code: 'P0001', message: 'El reto ya está cerrado' } }
+    await expect(submitVote({ challengeId: 'c1', guessLat: 0, guessLng: 0 })).rejects.toThrow(
+      ChallengeClosedError,
+    )
+  })
+
+  test('P0001 "El grupo está cerrado": también ChallengeClosedError', async () => {
+    rpcResult = { data: null, error: { code: 'P0001', message: 'El grupo está cerrado' } }
+    await expect(submitVote({ challengeId: 'c1', guessLat: 0, guessLng: 0 })).rejects.toThrow(
+      ChallengeClosedError,
+    )
+  })
+
+  test('P0001 con otro mensaje ("no es un reto"): Error genérico, no cerrado', async () => {
+    rpcResult = { data: null, error: { code: 'P0001', message: 'Este contenido no es un reto' } }
+    const p = submitVote({ challengeId: 'c1', guessLat: 0, guessLng: 0 })
+    await expect(p).rejects.toThrow(Error)
+    await expect(p).rejects.not.toBeInstanceOf(ChallengeClosedError)
+  })
 })
 
 describe('submitNumberVote', () => {
@@ -275,6 +299,14 @@ describe('submitNumberVote', () => {
     rpcResult = { data: null, error: { code: 'P0002', message: 'Reto no encontrado' } }
     await expect(submitNumberVote({ challengeId: 'n1', guess: 1 })).rejects.toThrow(
       ResourceGoneError,
+    )
+  })
+
+  // LOCATIONGUESSER-8: hermana del caso de submitVote — P0001 + mensaje de cierre.
+  test('P0001 "El reto ya está cerrado": lanza ChallengeClosedError', async () => {
+    rpcResult = { data: null, error: { code: 'P0001', message: 'El reto ya está cerrado' } }
+    await expect(submitNumberVote({ challengeId: 'n1', guess: 1 })).rejects.toThrow(
+      ChallengeClosedError,
     )
   })
 })

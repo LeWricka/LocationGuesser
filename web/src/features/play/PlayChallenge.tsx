@@ -5,6 +5,7 @@ import {
   Eye,
   EyeOff,
   Ghost,
+  Lock,
   RotateCcw,
   Share2,
   Timer,
@@ -38,13 +39,13 @@ import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
-import { describeError, ResourceGoneError } from '../../lib/errors'
+import { ChallengeClosedError, describeError, ResourceGoneError } from '../../lib/errors'
 import { addBreadcrumb, reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { useVisualViewport } from '../../lib/useVisualViewport'
 import { useOwnChallengeGuard } from './useOwnChallengeGuard'
-import { describeChallengeClosure } from './challengeClosure'
+import { describeChallengeClosure, isChallengeClosed } from './challengeClosure'
 // Rasterización + compartir reutilizadas de la tarjeta de clasificación (import
 // READ-ONLY: no se edita ese módulo). Mismo estándar de snapshot y Web Share API.
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
@@ -91,7 +92,7 @@ interface Props {
 // aunque llegue por un enlace directo. `gone` (issue #760): el reto se borró
 // entre que se compartió el enlace y que se abrió/jugó (0 filas al cargar, o
 // P0002 de la RPC al votar) — pantalla amable, no un error crudo.
-type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own' | 'gone'
+type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own' | 'gone' | 'closed'
 
 // `start_at` por reto en localStorage: recargar durante la jugada no regala
 // tiempo (el reloj se reconstruye desde el instante en que se pulsó Empezar).
@@ -335,6 +336,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           setPhase('gone')
           return
         }
+        if (err instanceof ChallengeClosedError) {
+          // Esperable (LOCATIONGUESSER-8): el plazo venció (o el dueño cerró el
+          // grupo) con la pantalla de jugar abierta — el voto llegó tarde.
+          addBreadcrumb('challenge_closed_on_vote', { challengeId: current.id })
+          setPhase('closed')
+          return
+        }
         // Registramos el fallo en Sentry con contexto (el toast lo maneja para el
         // usuario, pero queremos verlo en el dashboard pase lo que pase).
         reportError(err, { area: 'submit_vote', challengeId: current.id })
@@ -558,6 +566,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         // limpio saliendo y reentrando. Con tiempo, el reloj se reconstruye desde
         // el instante original (no se regala ni recorta); sin tiempo, sigue en
         // `playing`. Aplica también a retos sin límite (antes solo a los timed).
+        // Reto ya CERRADO y sin voto propio (LOCATIONGUESSER-8): antes se entraba
+        // a jugar igualmente y el choque llegaba al votar (P0001 del servidor).
+        // Espejo cliente de la guarda `v_open` de submit_vote.
+        if (isChallengeClosed(c.deadline_at)) {
+          addBreadcrumb('challenge_closed_on_load', { challengeId })
+          setPhase('closed')
+          return
+        }
         const resuming = localStorage.getItem(startKey(c.id)) != null
         setPhase(resuming ? 'playing' : 'idle')
         // Entró a la pantalla del reto SIN haber votado aún (issue #751): mide la
@@ -931,6 +947,32 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               <p className={styles.status}>Puede que quien lo compartió lo haya borrado.</p>
               <Button fullWidth size="lg" onClick={goBack}>
                 {backLabelGone}
+              </Button>
+            </Stack>
+          </Card>
+        </div>
+      </main>
+    )
+  }
+
+  // Reto CERRADO sin voto propio (LOCATIONGUESSER-8): el plazo venció antes de
+  // llegar (al cargar) o mientras se jugaba (al votar). Mismo patrón de tarjeta
+  // que `gone`; los resultados viven en el marcador del viaje.
+  if (phase === 'closed') {
+    const backLabelClosed = groupId ? 'Volver al viaje' : 'Inicio'
+    return (
+      <main className={`lg-page ${styles.ownPage}`}>
+        <BackHomeButton onClick={goBack} label={backLabelClosed} />
+        <div className={styles.ownCenter}>
+          <Card padding="md" raised>
+            <Stack gap={3} align="center">
+              <Icon icon={Lock} size={40} />
+              <strong>Este reto ya está cerrado</strong>
+              <p className={styles.status}>
+                Se acabó el tiempo para jugarlo. El marcador del viaje tiene los resultados.
+              </p>
+              <Button fullWidth size="lg" onClick={goBack}>
+                {backLabelClosed}
               </Button>
             </Stack>
           </Card>

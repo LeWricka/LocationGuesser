@@ -5,6 +5,15 @@ import { isPracticeChallenge } from '../../lib/challenges'
 // (no la jugada, con reloj en vivo) — basta una lectura al montar, sin tic-tac.
 // Un reto de PRÁCTICA (plazo a años vista, ver isPracticeChallenge) o un
 // recuerdo (deadline null) no tienen un cierre real que anunciar.
+// ¿Está el reto ya CERRADO para votar? Espejo cliente de la guarda `v_open` de
+// la RPC submit_vote (issue LOCATIONGUESSER-8): sin esto, la carga dejaba entrar
+// a jugar un reto vencido y el choque solo aparecía al votar (P0001 del server).
+// Un recuerdo (deadline null) o un reto de práctica nunca están cerrados.
+export function isChallengeClosed(deadlineAt: string | null): boolean {
+  if (deadlineAt == null || isPracticeChallenge(deadlineAt)) return false
+  return new Date(deadlineAt).getTime() - Date.now() <= 0
+}
+
 export function describeChallengeClosure(deadlineAt: string | null): string {
   if (deadlineAt == null || isPracticeChallenge(deadlineAt)) return 'Sin plazo'
   const remainingMs = new Date(deadlineAt).getTime() - Date.now()

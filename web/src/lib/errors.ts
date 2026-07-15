@@ -97,3 +97,17 @@ export class ResourceGoneError extends Error {
     this.name = 'ResourceGoneError'
   }
 }
+
+/**
+ * Error ESPERABLE (issue LOCATIONGUESSER-8, hermano de #760): el reto (o su
+ * grupo) se CERRÓ antes de que el voto llegara al servidor — el plazo venció con
+ * la pantalla abierta, o el dueño cerró el grupo. No es un fallo: la UI debe
+ * llevar a un estado amable ("ya está cerrado" + volver al viaje), no a un toast
+ * crudo, y la observabilidad lo trata como breadcrumb.
+ */
+export class ChallengeClosedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ChallengeClosedError'
+  }
+}

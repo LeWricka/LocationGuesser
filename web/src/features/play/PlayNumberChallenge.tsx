@@ -27,12 +27,12 @@ import { deleteMyVote, getExistingVote, getVotesWithNames, submitNumberVote } fr
 import type { VoteWithName } from '../../lib/leaderboard'
 import { fmtNumber, signedRelErrorPct } from '../../lib/geo'
 import { track } from '../../lib/analytics'
-import { describeError, ResourceGoneError } from '../../lib/errors'
+import { ChallengeClosedError, describeError, ResourceGoneError } from '../../lib/errors'
 import { addBreadcrumb, reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { useOwnChallengeGuard } from './useOwnChallengeGuard'
-import { describeChallengeClosure } from './challengeClosure'
+import { describeChallengeClosure, isChallengeClosed } from './challengeClosure'
 import { AppHeader } from '../../ui/AppHeader'
 import {
   Avatar,
@@ -68,7 +68,7 @@ interface Props {
 // PlayChallenge, que ya corta antes de delegar). `gone` (issue #760): el reto
 // se borró entre que se compartió el enlace y que se abrió/jugó — pantalla
 // amable, no un error crudo. Ver la HERMANA de este tipo en PlayChallenge.
-type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own' | 'gone'
+type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own' | 'gone' | 'closed'
 
 const startKey = (challengeId: string) => `lg.play.startAt.${challengeId}`
 
@@ -218,6 +218,12 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
           setPhase('gone')
           return
         }
+        if (err instanceof ChallengeClosedError) {
+          // Esperable (LOCATIONGUESSER-8): el plazo venció con la pantalla abierta.
+          addBreadcrumb('challenge_closed_on_vote', { challengeId: current.id, kind: 'number' })
+          setPhase('closed')
+          return
+        }
         reportError(err, { area: 'submit_number_vote', challengeId: current.id })
         if (played == null) {
           setTimedOut(true)
@@ -287,6 +293,13 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
             }
           }
           setPhase('revealed')
+          return
+        }
+        // Reto ya CERRADO y sin voto propio (LOCATIONGUESSER-8): espejo cliente
+        // de la guarda `v_open` de la RPC — no se entra a jugar un reto vencido.
+        if (isChallengeClosed(c.deadline_at)) {
+          addBreadcrumb('challenge_closed_on_load', { challengeId, kind: 'number' })
+          setPhase('closed')
           return
         }
         const resuming = localStorage.getItem(startKey(c.id)) != null
@@ -484,6 +497,31 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               <p className={styles.status}>Puede que quien lo compartió lo haya borrado.</p>
               <Button fullWidth size="lg" onClick={goBack}>
                 {backLabelGone}
+              </Button>
+            </Stack>
+          </Card>
+        </div>
+      </main>
+    )
+  }
+
+  // Reto CERRADO sin voto propio (LOCATIONGUESSER-8): mismo patrón de tarjeta
+  // que `gone`; los resultados viven en el marcador del viaje.
+  if (phase === 'closed') {
+    const backLabelClosed = groupId ? 'Volver al viaje' : 'Inicio'
+    return (
+      <main className={`lg-page ${styles.ownPage}`}>
+        <BackHomeButton onClick={goBack} label={backLabelClosed} />
+        <div className={styles.ownCenter}>
+          <Card padding="md" raised>
+            <Stack gap={3} align="center">
+              <Icon icon={Lock} size={40} />
+              <strong>Este reto ya está cerrado</strong>
+              <p className={styles.status}>
+                Se acabó el tiempo para jugarlo. El marcador del viaje tiene los resultados.
+              </p>
+              <Button fullWidth size="lg" onClick={goBack}>
+                {backLabelClosed}
               </Button>
             </Stack>
           </Card>

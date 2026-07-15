@@ -1,5 +1,26 @@
 import { describe, test, expect } from 'vitest'
-import { describeChallengeClosure } from './challengeClosure'
+import { describeChallengeClosure, isChallengeClosed } from './challengeClosure'
+
+// Espejo cliente de la guarda `v_open` de la RPC (LOCATIONGUESSER-8): decide si
+// se puede entrar a jugar sin esperar al rechazo del servidor.
+describe('isChallengeClosed', () => {
+  test('sin plazo (recuerdo) → nunca cerrado', () => {
+    expect(isChallengeClosed(null)).toBe(false)
+  })
+
+  test('reto de práctica (plazo a años vista) → nunca cerrado', () => {
+    expect(isChallengeClosed('2999-12-31T23:59:59.999Z')).toBe(false)
+  })
+
+  test('plazo vencido → cerrado', () => {
+    expect(isChallengeClosed('2020-01-01T00:00:00.000Z')).toBe(true)
+  })
+
+  test('plazo futuro (reto en vivo) → abierto', () => {
+    const in5h = new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString()
+    expect(isChallengeClosed(in5h)).toBe(false)
+  })
+})
 
 describe('describeChallengeClosure', () => {
   test('sin plazo (recuerdo) → "Sin plazo"', () => {
