@@ -40,11 +40,21 @@ loadDotEnvLocal()
 const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:5173'
 const isLocal = !process.env.E2E_BASE_URL
 
+// Specs con config PROPIA (hermetic/gallery/landing-assets/prod-logged): nunca van
+// con esta config. Además, el hermético de auth necesita el dev server con stubs,
+// así que contra prod (E2E_BASE_URL) también se excluye.
+const dedicatedConfigSpecs = [
+  /create-hermetic\.spec\.ts/,
+  /gallery-.*\.spec\.ts/,
+  /landing-assets\.spec\.ts/,
+  /prod-logged-smoke\.spec\.ts/,
+]
+
 export default defineConfig({
   testDir: 'e2e',
-  // El E2E hermético de crear reto corre con su PROPIA config (build de prod +
-  // preview, sin StrictMode): ver playwright.hermetic.config.ts y `npm run e2e:create`.
-  testIgnore: /create-hermetic\.spec\.ts/,
+  testIgnore: isLocal
+    ? dedicatedConfigSpecs
+    : [...dedicatedConfigSpecs, /auth-flujo-hermetic\.spec\.ts/],
   // global-setup genera el storageState autenticado SOLO si hay E2E_USER_*. Sin
   // credenciales no hace nada y la suite autenticada se salta (guard en sus specs).
   globalSetup: './e2e/global-setup.ts',
