@@ -9,6 +9,13 @@
 // Modal (no a pantalla completa): esto es un empujón contextual, no una puerta
 // de entrada. Presentacional + wiring de `useAccountUpgrade`; sin llamadas a
 // Supabase aquí.
+//
+// Copy reencuadrado al BENEFICIO (issue #756): "guarda tu cuenta" suena a
+// burocracia; con `groupName`/`points` (el llamante los pasa cuando vienen de
+// jugar un reto) el copy pasa a "no pierdas tus puntos de {viaje}", mostrando
+// la cifra recién ganada (o acumulada, según decida el llamante). Sin esos
+// props (p.ej. origin 'anon_create_gate', sin reto jugado) cae al copy
+// genérico de progreso.
 
 import { useEffect, useRef, type FormEvent } from 'react'
 import { Modal, Button, Field, Input, Row, Stack } from '../../ui'
@@ -32,6 +39,15 @@ interface Props {
   origin: AccountUpgradeContext['origin']
   groupId?: string
   challengeId?: string
+  /**
+   * Nombre del viaje y puntos a enseñar en el copy de beneficio (issue #756):
+   * "no pierdas tus puntos de {viaje}" en vez de la burocracia de "guarda tu
+   * cuenta". Solo el llamante de 'play_result' los tiene (viene de jugar un
+   * reto); en 'anon_create_gate' no hay reto jugado, así que quedan undefined
+   * y el copy cae a la versión genérica de progreso.
+   */
+  groupName?: string
+  points?: number
 }
 
 export function AccountUpgradeModal({
@@ -41,6 +57,8 @@ export function AccountUpgradeModal({
   origin,
   groupId,
   challengeId,
+  groupName,
+  points,
 }: Props) {
   const {
     step,
@@ -107,7 +125,7 @@ export function AccountUpgradeModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Guarda tu cuenta"
+      title={groupName ? `Guarda tus puntos de ${groupName}` : 'Guarda tu cuenta'}
       footer={
         step === 'email' ? (
           <Row gap={2} justify="end">
@@ -133,11 +151,19 @@ export function AccountUpgradeModal({
       {step === 'email' ? (
         <form onSubmit={handleSubmitEmail} noValidate>
           <Stack gap={3}>
-            <p>
-              Guarda tu progreso con tu correo: no pierdes tu voto ni tu puesto, y podrás entrar
-              desde cualquier dispositivo. Es opcional — si prefieres seguir como estás ahora,
-              cierra esto sin más.
-            </p>
+            {groupName && points != null ? (
+              <p>
+                No pierdas tus <strong>{points} puntos</strong> de {groupName}: con tu correo, tu
+                voto y tu puesto siguen siendo tuyos aunque cambies de móvil. Es opcional — si
+                prefieres seguir como estás, cierra esto sin más.
+              </p>
+            ) : (
+              <p>
+                Guarda tu progreso con tu correo: no pierdes tu voto ni tu puesto, y podrás entrar
+                desde cualquier dispositivo. Es opcional — si prefieres seguir como estás ahora,
+                cierra esto sin más.
+              </p>
+            )}
             <Field label="Tu correo" error={error}>
               {(fieldProps) => (
                 <Input

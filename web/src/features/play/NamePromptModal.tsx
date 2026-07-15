@@ -8,6 +8,18 @@ interface Props {
   onSubmit: () => void
   saving?: boolean
   error?: string | null
+  /**
+   * Colisión de nombre (issue #756): nombre de un miembro YA existente del
+   * viaje que coincide (sin mayúsculas ni espacios) con el que se acaba de
+   * intentar guardar. Con valor no-null, el modal deja de pedir el nombre y
+   * pasa a la puerta "¿Eres tú?" (dos salidas, ver `onDismissConflict` /
+   * `onConfirmIsMe`). null = sin conflicto, paso normal de pedir nombre.
+   */
+  conflictName?: string | null
+  /** "No soy yo": vuelve al paso de nombre para elegir otro. */
+  onDismissConflict?: () => void
+  /** "Soy yo": abre el login con correo para recuperar la cuenta existente. */
+  onConfirmIsMe?: () => void
 }
 
 /**
@@ -21,6 +33,12 @@ interface Props {
  * No es saltable a propósito: sin nombre el resto del grupo no sabría de quién
  * es ese puesto en el marcador. Es el único dato que pedimos ANTES del
  * resultado; el email sigue siendo opcional y llega después (AccountUpgradeModal).
+ *
+ * Nombre repetido = puerta de recuperación, no duplicado (issue #756): si el
+ * nombre coincide con el de otro miembro del viaje, `PlayChallenge.submitName`
+ * NO lo guarda sin más — aparca la decisión aquí ("¿Eres tú?") en vez de dejar
+ * que el marcador acabe con dos entradas del mismo humano. Es lo mismo o menos
+ * texto que antes, solo cambia la pregunta que se hace.
  */
 export function NamePromptModal({
   open,
@@ -29,16 +47,46 @@ export function NamePromptModal({
   onSubmit,
   saving = false,
   error,
+  conflictName = null,
+  onDismissConflict,
+  onConfirmIsMe,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (open) inputRef.current?.focus()
-  }, [open])
+    if (open && !conflictName) inputRef.current?.focus()
+  }, [open, conflictName])
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     onSubmit()
+  }
+
+  if (conflictName) {
+    return (
+      <Modal
+        open={open}
+        title="¿Eres tú?"
+        footer={
+          <Row gap={2} justify="end">
+            <Button variant="secondary" size="sm" onClick={onDismissConflict}>
+              No soy yo
+            </Button>
+            <Button size="sm" onClick={onConfirmIsMe}>
+              Soy yo, entrar con mi correo
+            </Button>
+          </Row>
+        }
+      >
+        <Stack gap={3}>
+          <p>
+            Ya hay un <strong>{conflictName}</strong> en este viaje. Si eres tú volviendo desde otro
+            móvil, entra con tu correo y recuperas tus puntos y tu puesto. Si no, elige otro nombre
+            para no confundiros en el marcador.
+          </p>
+        </Stack>
+      </Modal>
+    )
   }
 
   return (

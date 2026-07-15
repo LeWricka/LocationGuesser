@@ -37,6 +37,26 @@ vi.mock('../../lib/groupData', () => ({
   getGroup: () => getGroupMock(),
 }))
 
+// Nombre repetido = puerta de recuperación (issue #756): `getGroupMembers`
+// alimenta la comprobación de colisión en `submitName`; por defecto sin
+// miembros (sin colisión posible) salvo que un test la sobreescriba.
+const getGroupMembersMock = vi.fn<() => Promise<{ userId: string; name: string }[]>>()
+vi.mock('../../lib/membership', () => ({
+  getGroupMembers: () => getGroupMembersMock(),
+}))
+
+// Intensidad del CTA a partir de la 2ª partida (issue #756): `getGroupVotes`
+// alimenta el tally del anónimo; `aggregateLeaderboard` se deja REAL (función
+// pura, ya probada en leaderboard.test.ts) para no reimplementar su lógica aquí.
+const getGroupVotesMock = vi.fn<() => Promise<unknown[]>>()
+vi.mock('../../lib/leaderboard', async (importActual) => {
+  const actual = await importActual<typeof import('../../lib/leaderboard')>()
+  return {
+    ...actual,
+    getGroupVotes: () => getGroupVotesMock(),
+  }
+})
+
 // Nombre antes de revelar (issue #758): `upsertProfile` real toca Supabase (lanza
 // sin env vars en test); lo aislamos igual que el resto de la capa de datos.
 const upsertProfileMock = vi.fn<(...args: unknown[]) => Promise<unknown>>()
@@ -46,9 +66,18 @@ vi.mock('../../lib/profile', () => ({
 
 // "Guárdate" (issue #758): stub sin comportamiento — el flujo de vincular email
 // se prueba en useAccountUpgrade.test.ts/AccountUpgradeModal, no aquí.
-vi.mock('../auth', () => ({ AccountUpgradeModal: () => null }))
+// "¿Eres tú?" (issue #756): stub también — el login de recuperación se prueba
+// en useMagicLink/RecoverIdentityModal, no aquí (solo el wiring del conflicto).
+vi.mock('../auth', () => ({
+  AccountUpgradeModal: () => null,
+  RecoverIdentityModal: () => null,
+}))
 
-vi.mock('../../lib/analytics', () => ({ track: vi.fn() }))
+// Referencia estable al mock de `track` (issue #756): la necesitamos para
+// comprobar el outcome 'conflict' de `name_prompt_submitted`, no solo que el
+// evento se emita.
+const trackMock = vi.fn()
+vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
 vi.mock('../../lib/observability', () => ({ reportError: vi.fn() }))
 vi.mock('../../lib/useSignedImage', () => ({ useSignedImage: () => null }))
 // El flujo normal (no-guard) monta GameScene, que renderiza SIEMPRE el mini-mapa
@@ -142,6 +171,8 @@ beforeEach(() => {
     speedFactor: 1,
   })
   upsertProfileMock.mockResolvedValue({})
+  getGroupMembersMock.mockResolvedValue([])
+  getGroupVotesMock.mockResolvedValue([])
   localStorage.clear()
 })
 
@@ -308,8 +339,12 @@ describe('PlayChallenge — nombre antes de revelar para el receptor anónimo (i
     // Retoma la jugada aparcada: vota (timeout, sin pin) y revela.
     await screen.findByText('No diste a tiempo')
     expect(submitVoteMock).toHaveBeenCalledTimes(1)
-    // Tras jugar, el receptor anónimo ve el CTA opcional de guardar cuenta.
-    expect(screen.getByRole('button', { name: 'Guarda tu cuenta' })).toBeInTheDocument()
+    // Tras jugar, el receptor anónimo ve el CTA opcional de guardar puntos
+    // (issue #756: reencuadrado al beneficio; sin puntos por timeout, cae al
+    // copy de "guarda tu progreso").
+    expect(
+      screen.getByRole('button', { name: 'Guarda tu progreso en Viaje a Iruña' }),
+    ).toBeInTheDocument()
   })
 
   test('anónimo CON nombre ya elegido: vota directo, sin pedir nombre de nuevo', async () => {
@@ -345,6 +380,134 @@ describe('PlayChallenge — nombre antes de revelar para el receptor anónimo (i
 
     await screen.findByText('No diste a tiempo')
     expect(screen.queryByText('¿Con qué nombre juegas?')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Guarda tu cuenta' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Guarda tu progreso/)).not.toBeInTheDocument()
+  })
+})
+
+// Issue #756: nombre repetido = puerta de recuperación, no duplicado en el
+// marcador. La colisión se comprueba contra `getGroupMembers` (miembros YA
+// existentes del viaje), case-insensitive y con trim.
+describe('PlayChallenge — nombre repetido = puerta de recuperación (issue #756)', () => {
+  test('el nombre coincide con otro miembro (case-insensitive/trim): "¿Eres tú?" en vez de guardarlo', async () => {
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    getGroupMembersMock.mockResolvedValue([{ userId: 'u-otro-movil', name: 'Ane' }])
+    const u = userEvent.setup()
+    renderPlay({ isAnonymous: true, profile: null })
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+    await screen.findByText('¿Con qué nombre juegas?')
+
+    // Con espacios y mayúsculas distintas: la comprobación es trim + lowercase.
+    await u.type(screen.getByLabelText('Tu nombre'), '  ANE  ')
+    await u.click(screen.getByRole('button', { name: 'Ver mi resultado' }))
+
+    expect(await screen.findByText('¿Eres tú?')).toBeInTheDocument()
+    expect(screen.getByText(/Ya hay un/)).toBeInTheDocument()
+    // No se guarda el nombre ni se vota mientras la decisión está pendiente.
+    expect(upsertProfileMock).not.toHaveBeenCalled()
+    expect(submitVoteMock).not.toHaveBeenCalled()
+    // Outcome 'conflict' en el mismo evento (issue #751), no uno nuevo.
+    expect(trackMock).toHaveBeenCalledWith('name_prompt_submitted', {
+      outcome: 'conflict',
+      group_id: 'g1',
+      challenge_id: 'c1',
+    })
+  })
+
+  test('"No soy yo": vuelve al paso de nombre para elegir otro', async () => {
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    getGroupMembersMock.mockResolvedValue([{ userId: 'u-otro-movil', name: 'Ane' }])
+    const u = userEvent.setup()
+    renderPlay({ isAnonymous: true, profile: null })
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+    await screen.findByText('¿Con qué nombre juegas?')
+    await u.type(screen.getByLabelText('Tu nombre'), 'Ane')
+    await u.click(screen.getByRole('button', { name: 'Ver mi resultado' }))
+    await screen.findByText('¿Eres tú?')
+
+    await u.click(screen.getByRole('button', { name: 'No soy yo' }))
+
+    expect(await screen.findByText('¿Con qué nombre juegas?')).toBeInTheDocument()
+    expect(upsertProfileMock).not.toHaveBeenCalled()
+  })
+
+  test('sin colisión (nombre libre): se guarda normal, sin pasar por "¿Eres tú?"', async () => {
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    getGroupMembersMock.mockResolvedValue([{ userId: 'u-otro-movil', name: 'Beñat' }])
+    const u = userEvent.setup()
+    renderPlay({ isAnonymous: true, profile: null })
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+    await screen.findByText('¿Con qué nombre juegas?')
+    await u.type(screen.getByLabelText('Tu nombre'), 'Ane')
+    await u.click(screen.getByRole('button', { name: 'Ver mi resultado' }))
+
+    expect(upsertProfileMock).toHaveBeenCalledWith({ id: 'u-me', displayName: 'Ane' })
+    await screen.findByText('No diste a tiempo')
+    expect(screen.queryByText('¿Eres tú?')).not.toBeInTheDocument()
+  })
+})
+
+// Issue #756: a partir de la 2ª partida como anónimo EN ESTE VIAJE, el CTA de
+// guardar puntos sube de intensidad (acumulado del viaje + variant primaria),
+// reusando `getGroupVotes`/`aggregateLeaderboard` (ya existen para el
+// marcador) en vez de una consulta nueva.
+describe('PlayChallenge — intensidad del CTA a partir de la 2ª partida (issue #756)', () => {
+  test('2ª partida o más: el CTA enseña el acumulado del viaje', async () => {
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    getGroupVotesMock.mockResolvedValue([
+      { user_id: 'u-me', points: 500, display_name: 'Ane', avatar: null },
+      { user_id: 'u-me', points: 300, display_name: 'Ane', avatar: null },
+    ])
+    const u = userEvent.setup()
+    renderPlay({
+      isAnonymous: true,
+      profile: {
+        id: 'u-me',
+        display_name: 'Ane',
+        avatar_url: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+        onboarding: {},
+      },
+    })
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+    await screen.findByText('No diste a tiempo')
+
+    expect(
+      await screen.findByRole('button', { name: 'Llevas 2 partidas y 800 puntos — guárdalos' }),
+    ).toBeInTheDocument()
+  })
+
+  test('1ª partida (sin tally de 2+): el CTA se queda en la versión de esta partida', async () => {
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    getGroupVotesMock.mockResolvedValue([
+      { user_id: 'u-me', points: 0, display_name: 'Ane', avatar: null },
+    ])
+    const u = userEvent.setup()
+    renderPlay({
+      isAnonymous: true,
+      profile: {
+        id: 'u-me',
+        display_name: 'Ane',
+        avatar_url: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+        onboarding: {},
+      },
+    })
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+    await screen.findByText('No diste a tiempo')
+
+    expect(screen.queryByRole('button', { name: /Llevas \d+ partidas/ })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Guarda tu progreso en Viaje a Iruña' }),
+    ).toBeInTheDocument()
   })
 })

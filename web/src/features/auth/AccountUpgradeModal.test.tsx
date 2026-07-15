@@ -79,6 +79,33 @@ describe('AccountUpgradeModal (issue #758, "guárdate")', () => {
   })
 })
 
+// Issue #756: el copy se reencuadra al BENEFICIO (puntos del viaje) en vez de
+// la burocracia de "cuenta", cuando el llamante trae `groupName`/`points`
+// (viene de jugar un reto). Sin esos props, cae al copy genérico de progreso.
+describe('AccountUpgradeModal — copy reencuadrado al beneficio (issue #756)', () => {
+  test('con groupName + points: título y cuerpo mencionan el viaje y la cifra', () => {
+    render(
+      <AccountUpgradeModal
+        open
+        onClose={vi.fn()}
+        origin="play_result"
+        groupName="Viaje a Iruña"
+        points={1500}
+      />,
+    )
+    expect(
+      screen.getByRole('heading', { name: 'Guarda tus puntos de Viaje a Iruña' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/1500 puntos/)).toBeInTheDocument()
+  })
+
+  test('sin groupName/points (p.ej. anon_create_gate): cae al copy genérico de progreso', () => {
+    render(<AccountUpgradeModal open onClose={vi.fn()} origin="anon_create_gate" />)
+    expect(screen.getByRole('heading', { name: 'Guarda tu cuenta' })).toBeInTheDocument()
+    expect(screen.getByText(/Guarda tu progreso con tu correo/)).toBeInTheDocument()
+  })
+})
+
 // Issue #751: funnel del CTA — antes solo existía `account_upgraded` (el
 // numerador), sin saber a cuánta gente se le ofreció ni cuántos lo cerraron
 // sin completar.
