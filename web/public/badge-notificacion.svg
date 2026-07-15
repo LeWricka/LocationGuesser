@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Momentu">
+  <!-- Badge de notificación Android (barra de estado): MONOCROMO por obligación —
+       Android tiñe todos los píxeles opacos de un solo color y solo respeta el
+       canal alfa, así que un icono a color se ve como un cuadrado blanco. Silueta
+       del pin con "el camino" recortado en transparente para que se reconozca. -->
+  <mask id="camino">
+    <rect width="64" height="64" fill="white"/>
+    <path
+      d="M20 40 C20 30, 30 34, 32 26 C34 19, 40 20, 42 15"
+      fill="none"
+      stroke="black"
+      stroke-width="4.2"
+      stroke-linecap="round"
+      stroke-dasharray="0.5 7.5"
+    />
+    <circle cx="43" cy="14" r="5.2" fill="black"/>
+  </mask>
+  <path
+    d="M32 4C19.3 4 9 14.1 9 26.6 9 42 32 60 32 60s23-18 23-33.4C55 14.1 44.7 4 32 4Z"
+    fill="white"
+    mask="url(#camino)"
+  />
+</svg>
