@@ -245,15 +245,28 @@ El aviso "nuevo reto" lo dispara la **BD**, no el cliente (así `features/create
 `lib/challenges.ts` no cambian — ver pwa-push.md §1.3/§4). Dos formas equivalentes,
 **usa solo una** (si no, doble aviso):
 
-**Opción A — trigger SQL + `pg_net` (migración `0025_notify_challenge_created.sql`).**
-La migración crea el trigger; falta darle la URL de la función y el token vía GUC:
+**Opción A — trigger SQL + `pg_net` + tabla de config (migraciones
+`0030_notify_challenge_created.sql` + `0040_push_config_tabla.sql`). ✅ Es la que
+está ACTIVA en prod (2026-07-15).**
+
+> ⚠️ Los GUC (`alter database/role ... set app.*`) que pedía 0030 **ya no se pueden
+> fijar en Supabase** (error `42501: permission denied to set parameter`, capado por
+> la plataforma). La config vive ahora en la tabla `private.push_config` (0040).
+
+Tras aplicar las migraciones, insertar la fila de config (SQL Editor):
 
 ```sql
-alter database postgres set app.push_fn_url     = 'https://ykquigyjvgxisgdxryxr.functions.supabase.co/send-push';
-alter database postgres set app.push_send_token = '<el mismo PUSH_SEND_TOKEN>';
+insert into private.push_config (id, fn_url, send_token, anon_key) values (
+  true,
+  'https://ykquigyjvgxisgdxryxr.supabase.co/functions/v1/send-push',
+  '<el mismo PUSH_SEND_TOKEN que el secret de la función>',
+  '<publishable key del proyecto>'  -- el gateway exige clave de API; la real es X-Push-Token
+)
+on conflict (id) do update
+  set fn_url = excluded.fn_url, send_token = excluded.send_token, anon_key = excluded.anon_key;
 ```
 
-Mientras esos GUC no estén, el trigger es **no-op**: el reto se crea igual, no se
+Mientras la fila no esté completa, el trigger es **no-op**: el reto se crea igual, no se
 envía nada (y nunca bloquea el INSERT — el envío es best-effort).
 
 **Opción B — Database Webhook del dashboard.** Database → Webhooks → `AFTER INSERT on
