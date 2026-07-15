@@ -75,7 +75,16 @@ describe('useDeepLinkJoin', () => {
     isMember.mockResolvedValue(false)
     const { result } = renderHook(() => useDeepLinkJoin('u1'))
     await result.current('#g=ABC')
-    expect(track).toHaveBeenCalledWith('group_joined', { group_id: 'ABC' })
+    expect(track).toHaveBeenCalledWith('group_joined', { group_id: 'ABC', is_anonymous: false })
+  })
+
+  // Issue #751: receptor sin cuenta (#758) que se une por enlace — sin esta
+  // prop no se distingue su alta de la de un usuario con cuenta permanente.
+  test('alta real de un receptor ANÓNIMO: group_joined lleva is_anonymous:true', async () => {
+    isMember.mockResolvedValue(false)
+    const { result } = renderHook(() => useDeepLinkJoin('u1', true))
+    await result.current('#g=ABC')
+    expect(track).toHaveBeenCalledWith('group_joined', { group_id: 'ABC', is_anonymous: true })
   })
 
   test('reentrada (ya era miembro): no trackea group_joined', async () => {

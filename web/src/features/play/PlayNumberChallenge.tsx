@@ -108,7 +108,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
   const [confirmingExit, setConfirmingExit] = useState(false)
 
   const toast = useToast()
-  const { user } = useSession()
+  const { user, isAnonymous } = useSession()
   const reducedMotion = useReducedMotion()
   const reducedMotionRef = useRef(reducedMotion)
   useEffect(() => {
@@ -163,6 +163,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
             challenge_kind: 'number',
             timed_out: true,
             points: 0,
+            is_anonymous: isAnonymous,
           })
           return
         }
@@ -194,6 +195,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
           challenge_kind: 'number',
           timed_out: false,
           points: res.points,
+          is_anonymous: isAnonymous,
           ...(rankPosition != null && { rank_in_challenge: rankPosition }),
         })
         toast.show('¡Número bloqueado!', { tone: 'success' })
@@ -208,7 +210,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
         setSaving(false)
       }
     },
-    [toast, user],
+    [toast, user, isAnonymous],
   )
 
   // Carga del reto (si no vino preloaded) + estado del voto previo.
@@ -264,6 +266,13 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
         }
         const resuming = localStorage.getItem(startKey(c.id)) != null
         setPhase(resuming ? 'playing' : 'idle')
+        // Entró a la pantalla del reto SIN haber votado aún (issue #751): mide la
+        // caída "entró pero no jugó" (challenge_opened → challenge_played).
+        track('challenge_opened', {
+          group_id: c.group_id,
+          challenge_id: c.id,
+          challenge_kind: 'number',
+        })
       } catch (err) {
         if (cancelled) return
         reportError(err, { area: 'load_number_challenge', challengeId })
@@ -324,6 +333,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
         group_id: challenge.group_id,
         challenge_id: challenge.id,
         challenge_kind: 'number',
+        is_anonymous: isAnonymous,
       })
       void reveal(challenge, guessNumber)
     }

@@ -4,12 +4,12 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 // usan los helpers de destino/sesión anónima (no tocan supabase, pero el
 // import debe resolver).
 const signInAnonymouslyMock = vi.fn(async () => ({ data: {}, error: null as Error | null }))
-const updateUserMock = vi.fn<(...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>>(
-  async () => ({ data: {}, error: null }),
-)
-const verifyOtpMock = vi.fn<(...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>>(
-  async () => ({ data: {}, error: null }),
-)
+const updateUserMock = vi.fn<
+  (...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>
+>(async () => ({ data: {}, error: null }))
+const verifyOtpMock = vi.fn<
+  (...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>
+>(async () => ({ data: {}, error: null }))
 vi.mock('./supabase', () => ({
   supabase: {
     auth: {

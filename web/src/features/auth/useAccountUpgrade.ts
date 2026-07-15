@@ -19,6 +19,19 @@ import { describeError } from '../../lib/errors'
 
 export type AccountUpgradeStep = 'email' | 'code'
 
+/**
+ * Contexto de dónde se ofreció el CTA (issue #751): sin esto `account_upgraded`
+ * no se puede cruzar con el resto del funnel (qué superficie convierte más).
+ * `groupId`/`challengeId` solo tienen sentido con origin 'play_result' (se
+ * jugó un reto concreto); en 'anon_create_gate' (intento de crear un viaje sin
+ * cuenta) no hay grupo/reto todavía.
+ */
+export interface AccountUpgradeContext {
+  origin: 'play_result' | 'anon_create_gate'
+  groupId?: string
+  challengeId?: string
+}
+
 export interface AccountUpgrade {
   step: AccountUpgradeStep
   email: string
@@ -54,7 +67,7 @@ function isValidCode(value: string): boolean {
   return /^\d{6}$/.test(value.trim())
 }
 
-export function useAccountUpgrade(): AccountUpgrade {
+export function useAccountUpgrade(context: AccountUpgradeContext): AccountUpgrade {
   const [step, setStep] = useState<AccountUpgradeStep>('email')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
@@ -106,7 +119,11 @@ export function useAccountUpgrade(): AccountUpgrade {
       // Al verificar, la sesión pasa de anónima a permanente CON EL MISMO uid:
       // onAuthStateChange dispara y AuthProvider repinta solo (no hay que navegar).
       await verifyLinkEmailOtp(email, code)
-      track('account_upgraded')
+      track('account_upgraded', {
+        origin: context.origin,
+        ...(context.groupId && { group_id: context.groupId }),
+        ...(context.challengeId && { challenge_id: context.challengeId }),
+      })
       return true
     } catch {
       setError('Código incorrecto o caducado. Revísalo o reenvía uno nuevo.')
