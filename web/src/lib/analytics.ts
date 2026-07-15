@@ -59,6 +59,8 @@ export type AnalyticsEvent =
   // Props: reenvio (false = submit inicial, true = botón reenviar).
   | 'login_email_solicitado'
   | 'group_created'
+  // `group_joined`: alta real como miembro (no reentradas). Props: group_id,
+  // is_anonymous (issue #751 — si el receptor entra sin cuenta permanente).
   | 'group_joined'
   | 'challenge_created'
   // Recuerdo creado (momento SIN reto, separación contenido/reto). Props:
@@ -66,6 +68,11 @@ export type AnalyticsEvent =
   // #648), promoted_to_challenge (¿se convirtió en reto al crearlo?). SIN
   // lat/lng ni nombre del lugar.
   | 'moment_created'
+  // `challenge_played`: se envió una adivinanza (con pin/número). Props:
+  // group_id, challenge_id, challenge_kind, is_anonymous (issue #751).
+  // `result_revealed`: se reveló el resultado (jugado o timeout). Props:
+  // group_id, challenge_id, timed_out, points, distance_km/rank_in_challenge
+  // cuando aplica, is_anonymous (issue #751).
   | 'challenge_played'
   | 'result_revealed'
   // Compartir MI resultado tras revelar (apuesta viral nº1). Props: surface
@@ -81,7 +88,6 @@ export type AnalyticsEvent =
   | 'onboarding_skipped'
   | 'home_viewed'
   | 'create_group_cta'
-  | 'join_group_cta'
   // CRUD de gestión (#146): editar/borrar reto, renombrar/borrar grupo y gestión
   // de miembros. Props: group_id siempre; challenge_id cuando aplique.
   | 'challenge_edited'
@@ -110,7 +116,8 @@ export type AnalyticsEvent =
   | 'avatar_changed'
   // "Volver a jugar" en un reto de práctica (#181): borra el voto propio y
   // reinicia el juego. Solo en retos de práctica (plazo lejano). Props: group_id,
-  // challenge_id.
+  // challenge_id, challenge_kind ('location'|'number' — issue #751, antes solo
+  // lo llevaba el de número; se homogeneiza con el de lugar).
   | 'challenge_replayed'
   // Fin de temporada (#236): cerrar/reabrir el grupo. Props: group_id.
   | 'group_closed'
@@ -157,11 +164,40 @@ export type AnalyticsEvent =
   // Receptor sin cuenta (issue #758): entra por enlace y ve/juega con una
   // sesión ANÓNIMA (sin login/registro). `receptor_anon_signin`: se intentó el
   // auto sign-in al abrir el deep link sin sesión. Props: outcome
-  // ('success'|'failed'), kind ('trip'|'challenge'). `account_upgraded`: el
-  // anónimo vinculó su sesión a un email (mismo uid, ya no anónima) — sin props
-  // (nada identificable; el email ya vive en Supabase, no en el evento).
+  // ('success'|'failed'), kind ('trip'|'challenge'), group_id, challenge_id
+  // (issue #751 — faltaban, sin ellos no se puede cruzar con el resto del
+  // funnel de ese mismo viaje/reto). `account_upgraded`: el anónimo vinculó su
+  // sesión a un email (mismo uid, ya no anónima). Props (issue #751): origin
+  // ('play_result' = tras jugar | 'anon_create_gate' = al intentar crear sin
+  // cuenta), group_id, challenge_id (solo con 'play_result'). Sin el email:
+  // ya vive en Supabase, no hace falta en el evento.
   | 'receptor_anon_signin'
   | 'account_upgraded'
+  // Funnel del CTA "Guarda tu cuenta" (issue #751): antes solo existía el
+  // numerador (`account_upgraded`), sin saber a cuánta gente se le ofreció.
+  // `upgrade_cta_shown`: el CTA se muestra (botón tras jugar, o al aterrizar en
+  // el gate de crear sin cuenta). `upgrade_cta_clicked`: se pulsa el botón
+  // (solo aplica a 'play_result'; en 'anon_create_gate' llegar a la pantalla
+  // YA es la intención, así que 'shown' hace de proxy del click ahí).
+  // `upgrade_abandoned`: se cierra el modal sin completar (botón "Ahora no",
+  // X o Escape). Props en los tres: origin ('play_result'|'anon_create_gate'),
+  // group_id, challenge_id (solo con 'play_result').
+  | 'upgrade_cta_shown'
+  | 'upgrade_cta_clicked'
+  | 'upgrade_abandoned'
+  // Nombre antes de revelar para el receptor anónimo (issue #758/#751):
+  // `name_prompt_shown` al abrir el modal (PlayChallenge.maybeReveal).
+  // `name_prompt_submitted` al intentar guardarlo, con outcome
+  // ('success'|'error') — sin esto no se ve dónde abandona ese paso ciego del
+  // funnel. Props: group_id, challenge_id (además de outcome).
+  | 'name_prompt_shown'
+  | 'name_prompt_submitted'
+  // Se entra en la pantalla de un reto (issue #751): antes de jugar, para ver
+  // la caída "entró pero no jugó" (challenge_opened → challenge_played). Se
+  // emite una vez por cada montaje que llega a idle/playing (no en 'revealed'
+  // ni 'own': ese entró para VER un resultado ya jugado, no para jugar).
+  // Props: group_id, challenge_id, challenge_kind ('location'|'number').
+  | 'challenge_opened'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

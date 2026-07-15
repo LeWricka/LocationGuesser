@@ -23,7 +23,7 @@ function isFreshSignup(createdAt?: string, lastSignInAt?: string): boolean {
 }
 
 export function useAnalyticsIdentity(): void {
-  const { user, profile } = useSession()
+  const { user, profile, isAnonymous } = useSession()
   // Evita re-emitir login/identify en cada repintado: solo al cambiar de usuario
   // (o entre login y logout). Guardamos el último id procesado.
   const lastIdentified = useRef<string | null>(null)
@@ -53,16 +53,24 @@ export function useAnalyticsIdentity(): void {
     setObservabilityUser(user.id)
 
     // Alta (primer sign-in) vs login recurrente: una u otra, no ambas.
-    if (isFreshSignup(user.created_at, user.last_sign_in_at)) {
-      track('signup_completed')
-    } else {
-      track('login')
+    // EXCEPCIÓN (issue #751): una sesión ANÓNIMA (`signInAnonymously`, receptor
+    // sin cuenta #758) también pasa la guarda `isFreshSignup` — created_at y
+    // last_sign_in_at distan segundos igual que en un alta real — y contaba
+    // como `signup_completed` sin que el receptor hubiera dado ningún dato. No
+    // es un alta real: esa señal es `account_upgraded`, cuando vincula su email
+    // (useAccountUpgrade). Mientras siga anónima, no emitimos ni signup ni login.
+    if (!isAnonymous) {
+      if (isFreshSignup(user.created_at, user.last_sign_in_at)) {
+        track('signup_completed')
+      } else {
+        track('login')
+      }
     }
     // `profile` puede llegar después del user; no queremos re-disparar login por
     // eso (el efecto de abajo se encarga de actualizar el nombre/avatar). Un
     // cambio de display_name no debe contar como nuevo login.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user])
+  }, [user, isAnonymous])
 
   // BUG (#166): el efecto de arriba corre con deps `[user]`, pero `profile`
   // (con `display_name`) suele cargar DESPUÉS del `user`, así que el primer

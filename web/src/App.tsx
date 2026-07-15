@@ -178,16 +178,23 @@ function AnonReceptorGate({ route }: { route: ReturnType<typeof parseHash> }) {
     if (attempted.current) return
     attempted.current = true
     const kind = route.challenge ? 'challenge' : 'trip'
+    // group_id/challenge_id (issue #751): no son sensibles (ya viajan en el
+    // resto de eventos del funnel) y sin ellos no se puede cruzar este intento
+    // con lo que pasa después en el mismo viaje/reto.
+    const ids = {
+      group_id: route.group,
+      ...(route.challenge && { challenge_id: route.challenge }),
+    }
     void signInAnonymously().then(({ error }) => {
       if (error) {
         reportError(error, { area: 'receptor_anon_signin' })
-        track('receptor_anon_signin', { outcome: 'failed', kind })
+        track('receptor_anon_signin', { outcome: 'failed', kind, ...ids })
         setFailed(true)
         return
       }
-      track('receptor_anon_signin', { outcome: 'success', kind })
+      track('receptor_anon_signin', { outcome: 'success', kind, ...ids })
     })
-  }, [route.challenge])
+  }, [route.challenge, route.group])
 
   if (failed) return <LoggedOut route={route} />
   return route.challenge ? <PlayRouteSkeleton /> : <TripRouteSkeleton />
@@ -239,7 +246,7 @@ function LoggedIn({
   adminRoute: boolean
 }) {
   const { user, profile, isAnonymous, refreshProfile } = useSession()
-  const joinIfGroup = useDeepLinkJoin(user?.id)
+  const joinIfGroup = useDeepLinkJoin(user?.id, isAnonymous)
 
   // Al volver del email: si guardamos un destino (#g…), lo restauramos (auto-join
   // + navegación). Lo consumimos una sola vez. Si el destino no era de grupo,
@@ -508,6 +515,7 @@ function AnonCreateGate({ onBack }: { onBack: () => void }) {
       <AccountUpgradeModal
         open
         onClose={onBack}
+        origin="anon_create_gate"
         onUpgraded={() => {
           toast.show('Cuenta guardada. Ya puedes crear tu viaje.', { tone: 'success' })
         }}
