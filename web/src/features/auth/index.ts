@@ -10,3 +10,8 @@ export { useAccountUpgrade } from './useAccountUpgrade'
 // Identidad del receptor durante todo el viaje (issue #756): nombre repetido →
 // puerta de recuperación en vez de duplicado en el marcador.
 export { RecoverIdentityModal } from './RecoverIdentityModal'
+// Capacidad/config/permiso/suscripción de push (issue #769): compartido entre
+// `PushNotificationsControl` (gestión, en el perfil) y los pre-prompts de
+// descubrimiento (`PushOptInPrompt`, en features/trip).
+export { usePushAvailability } from './usePushAvailability'
+export type { PushAvailability } from './usePushAvailability'

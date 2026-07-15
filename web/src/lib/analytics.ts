@@ -208,6 +208,19 @@ export type AnalyticsEvent =
   // mide desde dónde se define "qué se juega". Props: group_id, origin
   // ('marcador'|'create_group_nudge').
   | 'prizes_defined'
+  // Pre-prompt visual propio de push (issue #769): "¿Te avisamos cuando haya un
+  // reto nuevo?" ANTES de disparar el prompt NATIVO del navegador (irreversible
+  // si se deniega, así que nunca se lanza a bocajarro). Dos superficies con el
+  // MISMO trío de eventos — `push_prompt_shown` (se muestra el aviso propio),
+  // `push_prompt_accepted` (el usuario pulsó "Sí, avisadme": dispara el prompt
+  // nativo; añade `outcome` con lo que resolvió ESE prompt — 'granted'|'denied'|
+  // 'default' si lo cerró sin decidir), `push_prompt_dismissed` (la X, snoozea 7
+  // días). Props comunes: surface ('trip_banner' = banner del viaje en TripPage |
+  // 'post_play' = tras revelar un reto, solo cuentas — el anónimo ya tiene ahí el
+  // CTA "no pierdas tus puntos"), group_id.
+  | 'push_prompt_shown'
+  | 'push_prompt_accepted'
+  | 'push_prompt_dismissed'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

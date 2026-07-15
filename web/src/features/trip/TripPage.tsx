@@ -34,6 +34,7 @@ import { MarcadorTab } from './MarcadorTab'
 import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import { ShareChallengeModal } from './ShareChallengeModal'
+import { PushOptInPrompt } from './PushOptInPrompt'
 import styles from './TripPage.module.css'
 
 /**
@@ -566,6 +567,19 @@ export function TripPage({
             <Icon icon={Flag} size={16} /> Viaje cerrado — Ver resumen
           </span>
         </button>
+      )}
+
+      {/* Pre-prompt de push (issue #769): "¿Te avisamos cuando haya un reto
+          nuevo?" — banner descartable, la superficie PRINCIPAL (cubre invitado
+          nuevo y miembro existente). Comparte la misma franja flotante que la
+          cinta de cierre de arriba: son mutuamente excluyentes (un viaje
+          cerrado ya tiene su propio aviso ahí) así que nunca compiten por el
+          hueco. `PushOptInPrompt` decide en solitario si renderiza algo
+          (returns null sin condición); este wrapper solo fija la posición. */}
+      {!isClosed && (
+        <div className={styles.pushBannerWrap}>
+          <PushOptInPrompt surface="trip_banner" groupId={groupId} />
+        </div>
       )}
 
       {/* Viewport de UN SOLO panel: renderizamos SOLO la sección activa (la inactiva

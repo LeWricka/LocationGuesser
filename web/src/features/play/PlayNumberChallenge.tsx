@@ -33,6 +33,11 @@ import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { useOwnChallengeGuard } from './useOwnChallengeGuard'
 import { describeChallengeClosure, isChallengeClosed } from './challengeClosure'
+// Pre-prompt de push (issue #769): tras revelar, SOLO para cuentas. Este reto
+// (a diferencia de PlayChallenge) no tiene hoy CTA de "guárdate" para el
+// anónimo; el guard `!isAnonymous` de abajo evita mostrar el prompt de push a
+// quien no tiene aún ni cuenta ni identidad guardada.
+import { PushOptInPrompt } from '../trip/PushOptInPrompt'
 import { AppHeader } from '../../ui/AppHeader'
 import {
   Avatar,
@@ -748,6 +753,15 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               <p className={styles.leftAppNotice} role="note">
                 <Icon icon={AlertTriangle} size={16} /> Saliste de la app durante la jugada
               </p>
+            )}
+
+            {/* Pre-prompt de push (issue #769): SOLO cuentas y solo con viaje
+                (el aviso es "reto nuevo en tu viaje"). Este reto no tiene hoy
+                CTA de "guárdate" para el anónimo (a diferencia de
+                PlayChallenge); el guard evita mostrárselo a quien aún no
+                tiene identidad guardada. */}
+            {!isAnonymous && groupId && (
+              <PushOptInPrompt surface="post_play" groupId={groupId} className={styles.actionsIn} />
             )}
 
             {/* Marcador del reto: cada jugador con su número y su error relativo. */}

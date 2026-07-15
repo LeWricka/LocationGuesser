@@ -55,6 +55,10 @@ import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shar
 // "nombre repetido": en vez de vincular el uid anónimo actual a un email
 // nuevo, RECUPERA el uid de una cuenta ya existente (mismo nombre en el viaje).
 import { AccountUpgradeModal, RecoverIdentityModal } from '../auth'
+// Pre-prompt de push (issue #769): tras revelar, SOLO para cuentas (el
+// anónimo ya tiene aquí mismo el CTA "no pierdas tus puntos" de arriba —
+// AccountUpgradeModal/RecoverIdentityModal — y nunca se apilan dos prompts).
+import { PushOptInPrompt } from '../trip/PushOptInPrompt'
 import {
   BackHomeButton,
   Button,
@@ -1300,7 +1304,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 lo que ya jugó. No se ofrece a quien ya tiene cuenta permanente.
                 Reencuadrado al beneficio + intensidad progresiva (issue #756):
                 variant primaria a partir de la 2ª partida como anónimo. */}
-            {isAnonymous && (
+            {isAnonymous ? (
               <Button
                 variant={intensifiedUpgrade ? 'primary' : 'secondary'}
                 fullWidth
@@ -1318,6 +1322,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               >
                 {upgradeCtaLabel}
               </Button>
+            ) : (
+              // Pre-prompt de push (issue #769): SOLO cuentas (el anónimo ve el
+              // CTA de arriba) y solo con viaje (el aviso es "reto nuevo en tu
+              // viaje" — un reto de práctica suelto, sin groupId, no aplica).
+              groupId && (
+                <PushOptInPrompt
+                  surface="post_play"
+                  groupId={groupId}
+                  className={styles.actionsIn}
+                />
+              )
             )}
 
             {/* Compartir MI resultado (apuesta viral): pica al resto a jugar con la

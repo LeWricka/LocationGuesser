@@ -68,9 +68,22 @@ vi.mock('../../lib/profile', () => ({
 // se prueba en useAccountUpgrade.test.ts/AccountUpgradeModal, no aquí.
 // "¿Eres tú?" (issue #756): stub también — el login de recuperación se prueba
 // en useMagicLink/RecoverIdentityModal, no aquí (solo el wiring del conflicto).
+// Pre-prompt de push (issue #769): `PushOptInPrompt` importa `usePushAvailability`
+// de este mismo barrel — sin el export, el mock incompleto revienta al montar
+// (aunque en MODE='test' el hook real ya sería no-op, ver push.ts). Devolvemos un
+// gate que nunca ofrece el prompt: este archivo prueba PlayChallenge, no el
+// descubrimiento de push (eso vive en PushOptInPrompt.test.tsx).
 vi.mock('../auth', () => ({
   AccountUpgradeModal: () => null,
   RecoverIdentityModal: () => null,
+  usePushAvailability: () => ({
+    capable: false,
+    configured: false,
+    supported: false,
+    permission: 'unsupported',
+    subscribed: false,
+    loading: false,
+  }),
 }))
 
 // Referencia estable al mock de `track` (issue #756): la necesitamos para
