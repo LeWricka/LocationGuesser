@@ -3,24 +3,19 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ToastProvider } from '../../ui'
 
-// auth.ts importa ./supabase (lanza sin env). Mockeamos los helpers de OTP y el
-// aviso de sesión legada (issue #514; sin aviso pendiente por defecto).
+// auth.ts importa ./supabase (lanza sin env). Mockeamos los helpers de OTP.
 const sendOtp = vi.fn<(email: string, displayName?: string, redirectTo?: string) => Promise<void>>(
   async () => {},
 )
 const verifyOtp = vi.fn<(email: string, token: string) => Promise<void>>(async () => {})
-const takeLegacySessionNotice = vi.fn<() => boolean>(() => false)
 vi.mock('../../lib/auth', () => ({
   sendEmailOtp: (email: string, displayName?: string, redirectTo?: string) =>
     sendOtp(email, displayName, redirectTo),
   verifyEmailOtp: (email: string, token: string) => verifyOtp(email, token),
-  takeLegacySessionNotice: () => takeLegacySessionNotice(),
 }))
 
 import { Landing } from './Landing'
 
-// Landing usa useToast (issue #514: aviso de sesión legada); lo envolvemos en
-// ToastProvider para que el hook no lance fuera de contexto.
 function renderLanding(props: Parameters<typeof Landing>[0] = {}) {
   return render(
     <ToastProvider>
@@ -32,8 +27,6 @@ function renderLanding(props: Parameters<typeof Landing>[0] = {}) {
 beforeEach(() => {
   sendOtp.mockClear()
   verifyOtp.mockClear()
-  takeLegacySessionNotice.mockClear()
-  takeLegacySessionNotice.mockReturnValue(false)
 })
 
 afterEach(() => {
@@ -145,18 +138,5 @@ describe('Landing (email-first, issue #506)', () => {
     expect(screen.getByLabelText('Tu correo')).toBeInTheDocument()
     // Sin campo de nombre.
     expect(screen.queryByLabelText('Tu nombre')).not.toBeInTheDocument()
-  })
-
-  // Issue #514: AuthProvider cerró una sesión anónima legada (modelo pre-#507)
-  // y dejó el aviso pendiente; Landing debe mostrarlo una vez al aterrizar.
-  test('con aviso de sesión legada pendiente, muestra el toast de aviso', () => {
-    takeLegacySessionNotice.mockReturnValue(true)
-    renderLanding()
-    expect(screen.getByText(/Hemos mejorado el acceso/i)).toBeInTheDocument()
-  })
-
-  test('sin aviso de sesión legada pendiente, no muestra el toast', () => {
-    renderLanding()
-    expect(screen.queryByText(/Hemos mejorado el acceso/i)).not.toBeInTheDocument()
   })
 })

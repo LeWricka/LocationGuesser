@@ -35,6 +35,7 @@ const session: SessionState = {
   profile: { display_name: 'Iker' } as SessionState['profile'],
   loading: false,
   verified: true,
+  isAnonymous: false,
   refreshProfile: async () => {},
 }
 
@@ -95,11 +96,7 @@ describe('ShareChallengeModal — compartir un reto suelto (#739)', () => {
   test('sin foto visible (imagePath null: sorpresa aún oculta, o sin foto): cae a la cascada del viaje', async () => {
     renderModal(vi.fn(), null)
     await waitFor(() =>
-      expect(resolveChallengeShareCoverMock).toHaveBeenCalledWith(
-        null,
-        'g1',
-        'Japón en primavera',
-      ),
+      expect(resolveChallengeShareCoverMock).toHaveBeenCalledWith(null, 'g1', 'Japón en primavera'),
     )
   })
 

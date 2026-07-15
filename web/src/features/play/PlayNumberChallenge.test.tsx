@@ -89,6 +89,7 @@ const session: SessionState = {
   profile: null,
   loading: false,
   verified: true,
+  isAnonymous: false,
   refreshProfile: async () => {},
 }
 

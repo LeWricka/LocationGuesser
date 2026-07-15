@@ -30,9 +30,8 @@
 //  - `LoginFlow` para el flujo de entrada (email → código OTP → sesión).
 //  - `LandingShowcase` para la narrativa en dos partes, en vidrio sobre la escena.
 
-import { useEffect, useState } from 'react'
-import { Button, HomeGlobe, LogoMomentu, Stack, WordmarkMomentu, useToast } from '../../ui'
-import { takeLegacySessionNotice } from '../../lib/auth'
+import { useState } from 'react'
+import { Button, HomeGlobe, LogoMomentu, Stack, WordmarkMomentu } from '../../ui'
 import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { LandingShowcase } from './LandingShowcase'
 import { LANDING_MAP_CREDIT } from './landingShowcaseData'
@@ -55,19 +54,6 @@ interface Props {
 export function Landing({ groupName, redirectTo }: Props) {
   // Cuando el usuario pulsa el CTA se muestra el flujo de entrada a pantalla completa.
   const [showAuth, setShowAuth] = useState(false)
-  // Solo `show`: es estable (useCallback en ToastProvider); el objeto del contexto
-  // NO lo es (se recrea en cada render del provider) y como dependencia haría
-  // re-correr este efecto tras cada toast.
-  const { show } = useToast()
-
-  // Aviso de sesión anónima legada (issue #514): AuthProvider cerró una sesión
-  // del modelo viejo (pre-#507) porque ya no vale para crear (RLS exige
-  // is_anonymous=false). Se muestra UNA vez, al aterrizar aquí tras el cierre.
-  useEffect(() => {
-    if (takeLegacySessionNotice()) {
-      show('Hemos mejorado el acceso: entra de nuevo con tu correo.', { tone: 'neutral' })
-    }
-  }, [show])
 
   const joining = Boolean(groupName)
 

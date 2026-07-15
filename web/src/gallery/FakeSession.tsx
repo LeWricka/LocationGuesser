@@ -43,6 +43,9 @@ export function AuthProvider({ children }: Props) {
       // Usuario permanente validado en la galería: las pantallas logueadas (crear
       // viaje incluido) se pintan sin toparse con el gate de "valida tu correo".
       verified: true,
+      // No es el receptor anónimo (issue #758): la galería sigue con una cuenta
+      // permanente por defecto.
+      isAnonymous: false,
       refreshProfile: async () => {},
     }),
     [],

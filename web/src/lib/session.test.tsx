@@ -30,13 +30,13 @@ import { useSession } from './session-context'
 let authCallback: ((event: AuthChangeEvent, session: Session | null) => void) | null = null
 const unsubscribeMock = vi.fn()
 
-// Delay real (macrotask, no microtask) para que `clearLegacyAnonymousSession` y
-// `getProfile` NO resuelvan en el mismo tick: en producción son de red (REST a
-// Supabase), así que SIEMPRE hay un hueco asíncrono real entre `setLoading(true)`
-// y `setLoading(false)`. Con mocks 100% síncronos, React 18 puede COALESCER
-// ambos `setLoading` en un único commit final y el flash intermedio nunca se
-// pinta — lo que ocultaría el bug en vez de reproducirlo. Con este hueco, el
-// commit `loading:true` (BootScreen) SÍ se pinta, igual que en el navegador real.
+// Delay real (macrotask, no microtask) para que `getProfile` NO resuelva en el
+// mismo tick: en producción es de red (REST a Supabase), así que SIEMPRE hay un
+// hueco asíncrono real entre `setLoading(true)` y `setLoading(false)`. Con
+// mocks 100% síncronos, React 18 puede COALESCER ambos `setLoading` en un único
+// commit final y el flash intermedio nunca se pinta — lo que ocultaría el bug
+// en vez de reproducirlo. Con este hueco, el commit `loading:true` (BootScreen)
+// SÍ se pinta, igual que en el navegador real.
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 vi.mock('./auth', () => ({
@@ -45,10 +45,6 @@ vi.mock('./auth', () => ({
     return { unsubscribe: unsubscribeMock }
   },
   isVerifiedUser: () => true,
-  clearLegacyAnonymousSession: vi.fn(async () => {
-    await delay(10)
-    return false
-  }),
 }))
 
 vi.mock('./profile', () => ({
@@ -63,7 +59,11 @@ vi.mock('./profile', () => ({
   }),
 }))
 
-function fakeSession(userId: string, accessToken: string): Session {
+function fakeSession(
+  userId: string,
+  accessToken: string,
+  userOverrides: Record<string, unknown> = {},
+): Session {
   return {
     access_token: accessToken,
     refresh_token: `refresh-${accessToken}`,
@@ -76,6 +76,7 @@ function fakeSession(userId: string, accessToken: string): Session {
       user_metadata: {},
       aud: 'authenticated',
       created_at: '2026-01-01T00:00:00.000Z',
+      ...userOverrides,
     },
   } as unknown as Session
 }
@@ -175,5 +176,45 @@ describe('AuthProvider — revalidación de sesión en foco (bug reincidente #64
     await screen.findByTestId('boot')
     await waitFor(() => expect(screen.queryByTestId('boot')).toBeNull())
     expect(screen.getByTestId('tab')).toHaveTextContent('diario')
+  })
+})
+
+// Sesión anónima del receptor (issue #758): antes (#514) el bootstrap cerraba a
+// la fuerza CUALQUIER sesión con `is_anonymous=true` (modelo pre-#507). Ahora es
+// una sesión de primera clase — se aplica igual que cualquier otra, sin
+// signOut, y el contexto expone `isAnonymous` para que la UI la use.
+function AnonConsumer() {
+  const { loading, isAnonymous, user } = useSession()
+  if (loading) return <div data-testid="boot">cargando…</div>
+  return (
+    <div>
+      <div data-testid="anon">{String(isAnonymous)}</div>
+      <div data-testid="uid">{user?.id}</div>
+    </div>
+  )
+}
+
+describe('AuthProvider — sesión anónima del receptor (issue #758)', () => {
+  test('el bootstrap NO cierra una sesión anónima: la aplica y expone isAnonymous=true', async () => {
+    currentSession = fakeSession('u-anon', 'token-anon', { is_anonymous: true })
+    render(
+      <AuthProvider>
+        <AnonConsumer />
+      </AuthProvider>,
+    )
+    await waitFor(() => expect(screen.queryByTestId('boot')).toBeNull())
+    expect(screen.getByTestId('anon')).toHaveTextContent('true')
+    expect(screen.getByTestId('uid')).toHaveTextContent('u-anon')
+  })
+
+  test('una sesión NO anónima expone isAnonymous=false', async () => {
+    currentSession = fakeSession('u1', 'token-a', { is_anonymous: false })
+    render(
+      <AuthProvider>
+        <AnonConsumer />
+      </AuthProvider>,
+    )
+    await waitFor(() => expect(screen.queryByTestId('boot')).toBeNull())
+    expect(screen.getByTestId('anon')).toHaveTextContent('false')
   })
 })

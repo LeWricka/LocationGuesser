@@ -23,18 +23,30 @@ vi.mock('../../lib/challenges', async (importActual) => {
 })
 
 const startPlayMock = vi.fn<() => Promise<void>>()
+const submitVoteMock = vi.fn<(...args: unknown[]) => Promise<unknown>>()
 
 vi.mock('../../lib/votes', () => ({
   getExistingVote: () => getExistingVoteMock(),
   getVotes: () => getVotesMock(),
   deleteMyVote: vi.fn(),
-  submitVote: vi.fn(),
+  submitVote: (...args: unknown[]) => submitVoteMock(...args),
   startPlay: () => startPlayMock(),
 }))
 
 vi.mock('../../lib/groupData', () => ({
   getGroup: () => getGroupMock(),
 }))
+
+// Nombre antes de revelar (issue #758): `upsertProfile` real toca Supabase (lanza
+// sin env vars en test); lo aislamos igual que el resto de la capa de datos.
+const upsertProfileMock = vi.fn<(...args: unknown[]) => Promise<unknown>>()
+vi.mock('../../lib/profile', () => ({
+  upsertProfile: (...args: unknown[]) => upsertProfileMock(...args),
+}))
+
+// "Guárdate" (issue #758): stub sin comportamiento — el flujo de vincular email
+// se prueba en useAccountUpgrade.test.ts/AccountUpgradeModal, no aquí.
+vi.mock('../auth', () => ({ AccountUpgradeModal: () => null }))
 
 vi.mock('../../lib/analytics', () => ({ track: vi.fn() }))
 vi.mock('../../lib/observability', () => ({ reportError: vi.fn() }))
@@ -101,12 +113,13 @@ const session: SessionState = {
   profile: null,
   loading: false,
   verified: true,
+  isAnonymous: false,
   refreshProfile: async () => {},
 }
 
-function renderPlay() {
+function renderPlay(overrides: Partial<SessionState> = {}) {
   return render(
-    <SessionContext.Provider value={session}>
+    <SessionContext.Provider value={{ ...session, ...overrides }}>
       <ToastProvider>
         <PlayChallenge challengeId="c1" groupId="g1" />
       </ToastProvider>
@@ -121,6 +134,14 @@ beforeEach(() => {
   getVotesMock.mockResolvedValue([])
   getGroupMock.mockResolvedValue({ id: 'g1', name: 'Viaje a Iruña' })
   startPlayMock.mockResolvedValue(undefined)
+  submitVoteMock.mockResolvedValue({
+    distanceKm: null,
+    points: 0,
+    answerLat: null,
+    answerLng: null,
+    speedFactor: 1,
+  })
+  upsertProfileMock.mockResolvedValue({})
   localStorage.clear()
 })
 
@@ -258,5 +279,72 @@ describe('PlayChallenge — la velocidad puntúa (#628)', () => {
 
     await screen.findByText('Resultado')
     expect(screen.queryByText(/Respondiste en/)).not.toBeInTheDocument()
+  })
+})
+
+// Issue #758: el receptor sin cuenta vota con una sesión ANÓNIMA; el nombre
+// para el marcador se pide una sola vez, justo antes de revelar.
+describe('PlayChallenge — nombre antes de revelar para el receptor anónimo (issue #758)', () => {
+  // guess_seconds: 0 + reduced-motion (salta la cuenta atrás 3·2·1) hace que el
+  // reloj de la jugada llegue a cero en el primer tick, sin pin colocado: un
+  // voto de timeout. Sirve igual para probar la puerta del nombre (no depende
+  // de si hubo pin o no) sin tener que simular un clic en el mapa real.
+  test('anónimo SIN nombre: al agotarse el tiempo, pide nombre ANTES de votar; al guardarlo, revela y ofrece "guárdate"', async () => {
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    const u = userEvent.setup()
+    renderPlay({ isAnonymous: true, profile: null })
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+
+    // El nombre se pide ANTES de votar.
+    expect(await screen.findByText('¿Con qué nombre juegas?')).toBeInTheDocument()
+    expect(submitVoteMock).not.toHaveBeenCalled()
+
+    await u.type(screen.getByLabelText('Tu nombre'), 'Ane')
+    await u.click(screen.getByRole('button', { name: 'Ver mi resultado' }))
+
+    expect(upsertProfileMock).toHaveBeenCalledWith({ id: 'u-me', displayName: 'Ane' })
+    // Retoma la jugada aparcada: vota (timeout, sin pin) y revela.
+    await screen.findByText('No diste a tiempo')
+    expect(submitVoteMock).toHaveBeenCalledTimes(1)
+    // Tras jugar, el receptor anónimo ve el CTA opcional de guardar cuenta.
+    expect(screen.getByRole('button', { name: 'Guarda tu cuenta' })).toBeInTheDocument()
+  })
+
+  test('anónimo CON nombre ya elegido: vota directo, sin pedir nombre de nuevo', async () => {
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    const u = userEvent.setup()
+    renderPlay({
+      isAnonymous: true,
+      profile: {
+        id: 'u-me',
+        display_name: 'Ya tengo nombre',
+        avatar_url: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+        onboarding: {},
+      },
+    })
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+
+    await screen.findByText('No diste a tiempo')
+    expect(screen.queryByText('¿Con qué nombre juegas?')).not.toBeInTheDocument()
+    expect(upsertProfileMock).not.toHaveBeenCalled()
+    expect(submitVoteMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('usuario con cuenta permanente (no anónimo): vota directo, sin nombre ni CTA de guardar', async () => {
+    mockMatchMedia(true)
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 0 })
+    const u = userEvent.setup()
+    renderPlay()
+
+    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+
+    await screen.findByText('No diste a tiempo')
+    expect(screen.queryByText('¿Con qué nombre juegas?')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Guarda tu cuenta' })).not.toBeInTheDocument()
   })
 })
