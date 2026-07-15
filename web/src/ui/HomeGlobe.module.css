@@ -161,6 +161,36 @@
   }
 }
 
+/* Anillos de sónar del pin "Te toca jugar" SIN JUGAR (issue #776): 2 ondas que nacen
+   del disco y se desvanecen — la metáfora de "adivina dónde" en el globo. Los
+   `<span class="lg-home-pin__sonar">` los añade HomeGlobe.tsx (`appendSonarRings`),
+   como hermanos del disco dentro del WRAPPER (`.lg-trip-pin`, sin `overflow` propio;
+   el disco sí recorta con `overflow: hidden`, ver tripPins.css) — así el anillo puede
+   crecer más allá del círculo sin recortarse. Compatible con `--lead` a la vez (un
+   viaje protagonista puede ser también el del reto pendiente): son elementos propios,
+   no pisan el aro/pulso de bienvenida del "lead" (ese vive en pseudo-elementos del
+   wrapper, `::before`/`::after`). Solo transform/opacity: cero layout shift. */
+:global(.lg-home-pin__sonar) {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--route-gold);
+  opacity: 0;
+  pointer-events: none;
+  animation: lg-home-sonar 2.5s var(--motion-ease-standard) infinite; /* design-lint-allow: ciclo de sónar ~2.5s pedido explícitamente (issue #776); bucle acotado a "reto pendiente sin jugar" — mismo precedente que homePulse/liveDotPulse, no decoración ambiental */
+  animation-delay: var(--sonar-delay, 0s);
+}
+@keyframes lg-home-sonar {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+
 /* Coreografía de entrada ("perf(cargas): entrada sin saltos"): cuando el pin entra
    escalonado tras el revelado (`lg-pin-enter`, ver tripPins.css), el aro de
    bienvenida del "lead" espera a que SU pin termine de entrar (retardo del pin +
@@ -193,6 +223,10 @@
   :global(.lg-home-pin--lead)::before,
   :global(.lg-home-globe-breathe) {
     animation: none;
+  }
+  /* Sin movimiento: el pin pendiente queda quieto, sin anillos (estado actual). */
+  :global(.lg-home-pin__sonar) {
+    display: none;
   }
 }
 

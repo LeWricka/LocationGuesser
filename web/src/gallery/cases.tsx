@@ -263,6 +263,10 @@ const dashboardPins: GlobePin[] = [
     imageUrl: null,
     targetId: GROUP_ID,
     lead: true,
+    // Reto "Te toca jugar" pendiente de este mismo viaje (issue #776): el pin lleva
+    // A LA VEZ el aro "lead" (protagonista) y los anillos de sónar — el caso real
+    // más común (el reto pendiente suele vivir en el viaje que ya manda el carrusel).
+    pending: true,
   },
   {
     id: 'p-alpes',

@@ -113,6 +113,7 @@
 
 /* ===== Chip "Te toca jugar": vidrio flotante, corto, todo el chip es el botón ===== */
 .pinnedChip {
+  position: relative; /* ancla el halo respirando (::before, issue #776) */
   z-index: 3; /* design-lint-allow: capa local de la escena (chip sobre el globo) */
   flex: none;
   align-self: center;
@@ -142,6 +143,34 @@
   outline-offset: 3px;
 }
 
+/* Halo respirando (issue #776): el acento sube y baja de presencia detrás del vidrio
+   para que el ojo caiga SOLO en el reto pendiente ("hay algo vivo esperándote"). Vive
+   en ::before, DETRÁS del propio chip (z-index -1 dentro de su stacking context —
+   `.pinnedChip` ya levanta uno con su z-index 3 — no compite con el resto del chrome).
+   Solo transform/opacity: cero layout shift, composición GPU. */
+.pinnedChip::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  z-index: -1; /* design-lint-allow: capa local del propio chip (halo detrás de su vidrio) */
+  border-radius: inherit;
+  background: var(--gradient-accent);
+  opacity: 0.3;
+  pointer-events: none;
+  animation: lg-pinned-breathe 2.6s var(--motion-ease-standard) infinite; /* design-lint-allow: respiración del reto pendiente (issue #776), ciclo largo sin token — bucle acotado a "hay algo vivo esperándote", mismo precedente que homePulse/liveDotPulse */
+}
+@keyframes lg-pinned-breathe {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.04);
+  }
+}
+
 .pinnedIcon {
   display: grid;
   place-items: center;
@@ -151,6 +180,18 @@
   background: var(--gradient-accent);
   color: var(--color-on-accent);
   flex: none;
+  /* Micro-pulso del play (issue #776): mismo ritmo que el halo del chip, un pelín más
+     discreto — el ojo cae en el chip entero, el icono solo lo refuerza. */
+  animation: lg-pinned-icon-pulse 2.6s var(--motion-ease-standard) infinite; /* design-lint-allow: micro-pulso del play del reto pendiente (issue #776), mismo precedente de bucle acotado a un estado vivo */
+}
+@keyframes lg-pinned-icon-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
 }
 .pinnedBody {
   min-width: 0;
@@ -673,5 +714,13 @@
   .avatarButton,
   .pinnedChip {
     transition: none;
+  }
+  /* Sin movimiento: el chip pendiente queda quieto (estado actual, issue #776). */
+  .pinnedChip::before {
+    animation: none;
+    opacity: 0;
+  }
+  .pinnedIcon {
+    animation: none;
   }
 }

@@ -177,6 +177,30 @@ export function HomePage() {
     coverUrl: coverByGroup.get(g.id) ?? worldCoverByGroup.get(g.id) ?? null,
   }))
 
+  // Reto fijado "Te toca jugar": traducimos el reto pendiente más urgente (ya firmado en
+  // useHomeData) a la forma que consume el layout. Sin pendiente → null.
+  const pinned: HomePinned | null = data.pinned
+    ? {
+        groupId: data.pinned.groupId,
+        challengeId: data.pinned.challengeId,
+        title: data.pinned.title,
+        groupName: data.pinned.groupName,
+        deadlineAt: data.pinned.deadlineAt,
+        coverUrl: data.pinned.coverUrl,
+      }
+    : null
+
+  // Pin "pendiente" del globo (issue #776, anillos de sónar): el reto "Te toca jugar"
+  // NO tiene coordenada propia (sería spoiler, ver la regla anti-spoiler de
+  // useWorldTrips) — señalamos en su lugar el punto MÁS RECIENTE del viaje al que
+  // pertenece (mismo criterio que el "lead" de abajo). Sin reto pendiente, o sin
+  // puntos situados de ese viaje (aún no hay recuerdos/retos cerrados) → ningún pin
+  // se marca; el globo queda igual que hoy.
+  const pendingTrip = pinned ? world.trips.find((t) => t.groupId === pinned.groupId) : undefined
+  const pendingPointId = pendingTrip?.points.length
+    ? pendingTrip.points[pendingTrip.points.length - 1].id
+    : null
+
   // Pines-foto del globo: un pin por punto situado de cada viaje — el "mapamundi
   // poblado" (#700). El anillo cálido ("lead") lo lleva SOLO el momento más reciente
   // del viaje PROTAGONISTA (el primero del carrusel, mismo orden `sortTrips` que usa
@@ -197,6 +221,7 @@ export function HomePage() {
       imageUrl: p.imageUrl,
       targetId: trip.groupId,
       lead: p.id === leadId,
+      pending: trip.groupId === pinned?.groupId && p.id === pendingPointId,
     }))
   })
 
@@ -207,19 +232,6 @@ export function HomePage() {
     targetId: trip.groupId,
     points: trip.points.map((p) => [p.lng, p.lat]),
   }))
-
-  // Reto fijado "Te toca jugar": traducimos el reto pendiente más urgente (ya firmado en
-  // useHomeData) a la forma que consume el layout. Sin pendiente → null.
-  const pinned: HomePinned | null = data.pinned
-    ? {
-        groupId: data.pinned.groupId,
-        challengeId: data.pinned.challengeId,
-        title: data.pinned.title,
-        groupName: data.pinned.groupName,
-        deadlineAt: data.pinned.deadlineAt,
-        coverUrl: data.pinned.coverUrl,
-      }
-    : null
 
   return (
     // lg-content-in (issue #623): crossfade corto al relevar a HomeRouteSkeleton,

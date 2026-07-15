@@ -96,6 +96,11 @@ class MockMap {
     this.removeSourceCalls.push(id)
   }
   setProjection() {}
+  // El componente saca el canvas del tab-order (a11y aria-hidden-focus, #622).
+  canvas = { tabIndex: 0 }
+  getCanvas() {
+    return this.canvas
+  }
   fitBounds(bounds: unknown, opts: unknown) {
     this.fitBoundsCalls.push({ bounds, opts })
   }
@@ -307,6 +312,54 @@ describe('HomeGlobe — culling de la cara oculta del globo (#516)', () => {
     await waitFor(() => expect(mapInstances[0].easeToCalls).toHaveLength(1))
     const call = mapInstances[0].easeToCalls[0] as { center: [number, number] }
     expect(call.center).toEqual([-9.1393, 38.7223])
+  })
+})
+
+// --- Anillos de sónar del pin "Te toca jugar" sin jugar (issue #776) --------------
+describe('HomeGlobe — pin "pending" (reto pendiente): anillos de sónar (#776)', () => {
+  test('pin con `pending`: clase + 2 anillos de sónar desfasados; el resto, sin ellos', async () => {
+    const pins: GlobePin[] = [
+      { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+      {
+        id: 'sidney',
+        lat: -33.8688,
+        lng: 151.2093,
+        title: 'Sídney',
+        imageUrl: null,
+        targetId: 't2',
+        pending: true,
+      },
+    ]
+    render(<HomeGlobe pins={pins} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    bootMap(mapInstances[0])
+    await waitFor(() => expect(markerInstances).toHaveLength(2))
+
+    const [lisboaEl, sidneyEl] = markerInstances.map((m) => m.getElement())
+    expect(lisboaEl.classList.contains('lg-home-pin--pending')).toBe(false)
+    expect(lisboaEl.querySelectorAll('.lg-home-pin__sonar')).toHaveLength(0)
+
+    expect(sidneyEl.classList.contains('lg-home-pin--pending')).toBe(true)
+    const rings = sidneyEl.querySelectorAll<HTMLElement>('.lg-home-pin__sonar')
+    expect(rings).toHaveLength(2)
+    // Desfasados a mitad de ciclo (no sincronizados): la onda se lee continua.
+    expect(rings[0].style.getPropertyValue('--sonar-delay')).toBe('0s')
+    expect(rings[1].style.getPropertyValue('--sonar-delay')).toBe('1.25s')
+  })
+
+  test('sin `pending` en ningún pin: ningún marker lleva la clase ni anillos', async () => {
+    render(<HomeGlobe pins={samplePins()} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    bootMap(mapInstances[0])
+    await waitFor(() => expect(markerInstances).toHaveLength(2))
+
+    for (const marker of markerInstances) {
+      const el = marker.getElement()
+      expect(el.classList.contains('lg-home-pin--pending')).toBe(false)
+      expect(el.querySelectorAll('.lg-home-pin__sonar')).toHaveLength(0)
+    }
   })
 })
 
