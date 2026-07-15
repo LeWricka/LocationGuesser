@@ -23,7 +23,10 @@ interface Props {
 }
 
 export function ReceptorWelcomeGate({ groupId, userId, profileOnboarding, children }: Props) {
-  const { show, tripName } = useReceptorWelcome(groupId ?? undefined, userId ?? undefined)
+  const { show, tripName, prizesSummary } = useReceptorWelcome(
+    groupId ?? undefined,
+    userId ?? undefined,
+  )
 
   // Para un receptor, la bienvenida HACE de intro del viaje: damos por visto el
   // tutorial genérico `group` para no encadenar dos slideshows ("te invitan" y
@@ -42,7 +45,7 @@ export function ReceptorWelcomeGate({ groupId, userId, profileOnboarding, childr
       context="welcome"
       userId={userId}
       profileOnboarding={profileOnboarding}
-      slideParams={{ tripName }}
+      slideParams={{ tripName, prizesSummary }}
       groupId={groupId}
     >
       {children}

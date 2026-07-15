@@ -56,6 +56,8 @@ import {
   GALLERY_NOW,
   GROUP,
   GROUP_ID,
+  GROUP_NUEVO_ID,
+  GROUP_NUEVO_PREMIOS_ID,
   ME_ID,
   MEMBERS,
   setEmptyWorld,
@@ -454,6 +456,42 @@ export const cases: GalleryCase[] = [
     render: () => (
       <TripPage
         groupId={GROUP_ID}
+        initialSection="marcador"
+        onPlayChallenge={noop}
+        onAddMoment={noop}
+        onAddChallenge={noop}
+        onBack={noop}
+      />
+    ),
+  },
+  {
+    // Issues #752/#753: viaje recién creado, nadie ha jugado todavía y el dueño
+    // AÚN no definió premios — el podio vacío ofrece la CTA "¿Qué se juega?" en
+    // el hueco del 1º (sustituye al enlace de texto de la esquina).
+    id: 'viaje-marcador-vacio',
+    title: 'Viaje · Marcador vacío (dueño, sin premios)',
+    section: 'Viaje',
+    render: () => (
+      <TripPage
+        groupId={GROUP_NUEVO_ID}
+        initialSection="marcador"
+        onPlayChallenge={noop}
+        onAddMoment={noop}
+        onAddChallenge={noop}
+        onBack={noop}
+      />
+    ),
+  },
+  {
+    // Issues #752/#753: mismo viaje recién creado, pero el dueño YA definió
+    // premios — el podio vacío cuelga los chips de 1º/último (visibles para
+    // cualquier miembro, tappables solo para el dueño).
+    id: 'viaje-marcador-vacio-premios',
+    title: 'Viaje · Marcador vacío (con premios ya definidos)',
+    section: 'Viaje',
+    render: () => (
+      <TripPage
+        groupId={GROUP_NUEVO_PREMIOS_ID}
         initialSection="marcador"
         onPlayChallenge={noop}
         onAddMoment={noop}

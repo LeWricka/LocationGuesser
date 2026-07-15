@@ -63,6 +63,10 @@ export interface OnboardingSlide {
 export interface SlideParams {
   /** Nombre del viaje, para personalizar la bienvenida del receptor. */
   tripName?: string
+  /** Premios "en juego" ya resumidos en texto (issue #752, `prizesLine`), o
+   * undefined si el dueño no definió ninguno — solo lo usa la bienvenida del
+   * receptor (`welcome`). */
+  prizesSummary?: string
 }
 
 // Tutorial del viaje (issue #625): los 3 GESTOS clave de Momentu, ni uno más.
@@ -233,14 +237,19 @@ const SLIDES: Record<OnboardingContext, OnboardingSlide[]> = {
 // para que el saludo sea suyo ("Estás invitado a <viaje>"). Solo el PRIMER paso se
 // adapta al contexto de invitación; los otros dos son el mismo cierre "mira y
 // juega" que el resto de tutoriales (issue #625).
-function welcomeSlides(tripName?: string): OnboardingSlide[] {
+//
+// Premios (issue #752): si el dueño ya definió qué se juega, se añade al cuerpo
+// del primer paso ("En juego: …") — es el gancho de motivación, tiene que verse
+// desde el primer segundo del receptor, no solo tras entrar al viaje.
+function welcomeSlides(tripName?: string, prizesSummary?: string): OnboardingSlide[] {
   const trip = tripName?.trim()
+  const baseBody = 'Te comparten dónde estuvieron para que lo vivas con ellos.'
   return [
     {
       icon: Sparkles,
       visual: 'spark',
       title: trip ? `Te invitan a vivir ${trip}` : 'Te invitan a un viaje',
-      body: 'Te comparten dónde estuvieron para que lo vivas con ellos.',
+      body: prizesSummary ? `${baseBody} En juego: ${prizesSummary}.` : baseBody,
       // Captura REAL de la home: literalmente lo que se van a encontrar al entrar.
       image: homeShot,
     },
@@ -263,6 +272,6 @@ function welcomeSlides(tripName?: string): OnboardingSlide[] {
 }
 
 export function getSlides(context: OnboardingContext, params?: SlideParams): OnboardingSlide[] {
-  if (context === 'welcome') return welcomeSlides(params?.tripName)
+  if (context === 'welcome') return welcomeSlides(params?.tripName, params?.prizesSummary)
   return SLIDES[context]
 }

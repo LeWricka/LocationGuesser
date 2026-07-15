@@ -1,19 +1,7 @@
 import { useState } from 'react'
-import type { CSSProperties } from 'react'
-import { AlertTriangle, Crown, Gift, Share2 } from 'lucide-react'
-import {
-  Avatar,
-  Button,
-  CountUp,
-  Icon,
-  IconDiana,
-  IconTrofeo,
-  Input,
-  Modal,
-  Row,
-  Stack,
-  useToast,
-} from '../../ui'
+import type { CSSProperties, ReactNode } from 'react'
+import { AlertTriangle, Crown, Gift, Share2, User } from 'lucide-react'
+import { Avatar, Button, ChallengePhoto, CountUp, Icon, IconDiana } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 // `Medal` no está en el barril de `../../ui` — se importa igual que en el podio
@@ -21,7 +9,6 @@ import type { GroupPrizes } from '../../lib/database.types'
 // "Retos anteriores" (inline, pequeño): ese contexto no es ambiguo; el que sí lo
 // era es el pedestal del podio de arriba (ver comentario del componente).
 import { Medal } from '../../ui/Medal'
-import { updateGroupPrizes } from '../../lib/groupData'
 import { tripShareUrl } from '../../lib/shareLinks'
 import type { PastChallengeResult, PastChallengeSummary } from './useTripData'
 // Rescatados de GroupPage (código muerto, issue #608): PREMIOS por puesto y el
@@ -32,6 +19,10 @@ import type { PastChallengeResult, PastChallengeSummary } from './useTripData'
 // rasteriza `LeaderboardCard` a PNG.
 import { PRIZE_SLOTS, prizeForRow } from '../group/prizes'
 import { ShareLeaderboardModal } from '../group/ShareLeaderboardModal'
+// Editor de premios (issues #123/#608): extraído a fichero propio (issues
+// #752/#753) para que también lo abra el nudge post-creación del viaje
+// (`CreateGroup`), no solo el Marcador.
+import { PrizesEditorModal } from '../group/PrizesEditorModal'
 import styles from './MarcadorTab.module.css'
 
 interface Props {
@@ -67,6 +58,10 @@ const PODIO_ENTRY_ORDER: Record<1 | 2 | 3, number> = { 3: 0, 2: 1, 1: 2 }
 
 const ORDINAL: Record<1 | 2 | 3, string> = { 1: '1º', 2: '2º', 3: '3º' }
 
+// Puestos del podio VACÍO (promesa de lo que habrá, issue #753): mismo orden de
+// entrada/pedestal que el podio real, sin datos de jugador todavía.
+const EMPTY_PODIO_RANKS: (1 | 2 | 3)[] = [1, 2, 3]
+
 // Icono discreto "salió de la app durante la jugada" (issue #200, rescatado de
 // GroupPage:965/1230 — vivía solo en el marcador EN VIVO, que ya no se usaba).
 // title + aria-label duplican el aviso para ratón y lector de pantalla, igual
@@ -80,6 +75,32 @@ function LeftAppFlag() {
     >
       <Icon icon={AlertTriangle} size={13} />
     </span>
+  )
+}
+
+// Chip de premio de un puesto (podio o lista): dato descriptivo, no una acción,
+// salvo que el dueño pueda editar premios (issues #752/#753) — en ese caso es un
+// <button> real (mismo aspecto, sin pinta de botón para el resto de miembros:
+// "cuando haya premios, la edición vive en tocar los chips siendo dueño", sin el
+// enlace de texto de la esquina que el dueño real no encontró). `premioBtn`
+// resetea la apariencia nativa del <button> para que sea indistinguible del
+// <span> de solo lectura.
+function PremioTappable({
+  className,
+  canEdit,
+  onEdit,
+  children,
+}: {
+  className: string
+  canEdit: boolean
+  onEdit: () => void
+  children: ReactNode
+}) {
+  if (!canEdit) return <span className={className}>{children}</span>
+  return (
+    <button type="button" className={`${className} ${styles.premioBtn}`} onClick={onEdit}>
+      {children}
+    </button>
   )
 }
 
@@ -100,10 +121,10 @@ function LeftAppFlag() {
  *     ("1º"/"2º"/"3º", con el símbolo de grado — nunca un "1" bare, que se leyó
  *     como una "I" mayúscula, issue #594) es inequívoco a cualquier tamaño.
  *  2. PREMIOS por puesto (issue #123, rescatado de GroupPage): un chip junto al
- *     puesto (podio y lista) cuando el dueño definió premio para esa posición;
- *     el dueño lo edita con un botón discreto arriba del todo.
+ *     puesto (podio y lista) cuando el dueño definió premio para esa posición.
  *  3. RETOS ANTERIORES (rescatado de GroupPage/PastSection): los retos ya
- *     CERRADOS del viaje, más reciente primero — nombre, ganador con medalla (y
+ *     CERRADOS del viaje, más reciente primero — thumbnail de su foto (issue
+ *     #753; placeholder de marca si no tiene), nombre, ganador con medalla (y
  *     el aviso "salió de la app" si aplica) y tu resultado breve. Tocar la fila
  *     abre el detalle del reto (mismo hash `#g=…&c=…` que "Adivina"/"Ya jugaste"
  *     en el reto en vivo: revelado si ya jugaste o el reto ya cerró).
@@ -111,15 +132,22 @@ function LeftAppFlag() {
  *     tarjeta de clasificación (imagen) para compartirla en el chat.
  *
  * Con ≤3 jugadores solo hay podio (sin lista vacía debajo); con 1 jugador, el líder
- * va solo y centrado (issue #594, punto 3). Sin ninguna jugada, el estado vacío
- * sigue mostrando premios/retos anteriores si ya existieran (un dueño puede fijar
- * premios o cerrar un reto sin votos antes de que nadie juegue).
+ * va solo y centrado (issue #594, punto 3).
  *
- * Motion: la columna de cada puesto entra escalonada en el orden 3º→2º→1º
- * (`PODIO_ENTRY_ORDER` alimenta `--i`); el líder usa un easing "spring" sutil
- * (`--motion-ease-spring`) para que se note quién ganó. `animation-fill-mode:
- * backwards` SIEMPRE (nunca `both`/`forwards`, ver gotcha en el .css). Reduced-motion
- * apaga toda animación (igual que la lista de #547).
+ * v4 (issues #752/#753 — rediseño visual del vacío + premios descubribles): el
+ * vacío (nadie ha jugado) YA NO es un párrafo con un icono: es un podio VACÍO
+ * (huecos de avatar discontinuos, misma composición 2-1-3 y mismos pedestales
+ * que el podio real) — la promesa visual de lo que habrá, con copy de una sola
+ * línea. Los premios se integran EN el podio (real o vacío) en vez de vivir tras
+ * un enlace de texto en la esquina (el dueño real no lo encontró):
+ *  - si hay premio para el puesto (1º/último), un chip igual que en el podio
+ *    real, colgando del hueco;
+ *  - si NO hay ningún premio definido y el usuario es dueño, el hueco del 1º
+ *    ofrece la CTA "¿Qué se juega?" que abre `PrizesEditorModal`.
+ * Una vez hay AL MENOS un premio, la edición vive en TOCAR el chip (dueño):
+ * `PremioTappable` lo convierte en un `<button>` real solo para el dueño, con el
+ * mismo aspecto que el texto plano (issue #608: para el resto de miembros nunca
+ * debe leerse como un botón).
  */
 export function MarcadorTab({
   leaderboard,
@@ -138,6 +166,7 @@ export function MarcadorTab({
   const [sharing, setSharing] = useState(false)
   const hasEntries = leaderboard.length > 0
   const hasPrizes = PRIZE_SLOTS.some(({ key }) => (prizes?.[key]?.trim() ?? '') !== '')
+  const openPrizeEditor = () => setEditingPrizes(true)
 
   // El líder marca el 100% de la barra de la lista compacta; el resto (4º+) es
   // relativo a él (leaderboard ya viene ordenado desc por puntos —
@@ -158,174 +187,266 @@ export function MarcadorTab({
 
   return (
     <div className={styles.marcador}>
-      {/* Editar/añadir premios (issue #123, rescatado de GroupPage): solo el
-          dueño, visible aunque nadie haya jugado aún (puede fijarlos por
-          adelantado). Discreto, arriba del todo — no compite con el podio. */}
-      {canCreate && (
-        <Row justify="end">
-          <button
-            type="button"
-            className={styles.editPrizesBtn}
-            onClick={() => setEditingPrizes(true)}
-          >
-            <Icon icon={Gift} size={15} /> {hasPrizes ? 'Editar premios' : 'Añadir premios'}
-          </button>
-        </Row>
-      )}
+      {hasEntries ? (
+        <>
+          <ol className={styles.podio} aria-label="Podio">
+            {podio.map((entry, i) => {
+              const rank = (i + 1) as 1 | 2 | 3
+              const esMio = entry.userId === myUserId
+              const esLider = rank === 1
+              const rankClass =
+                rank === 1 ? styles.podio1 : rank === 2 ? styles.podio2 : styles.podio3
+              const anilloClass =
+                rank === 1 ? styles.anillo1 : rank === 2 ? styles.anillo2 : styles.anillo3
+              const premio = prizeForRow(prizes, i, leaderboard.length)
 
-      <>
-        {hasEntries ? (
-          <>
-            <ol className={styles.podio} aria-label="Podio">
-              {podio.map((entry, i) => {
-                const rank = (i + 1) as 1 | 2 | 3
+              return (
+                <li
+                  key={entry.userId}
+                  className={[styles.podioItem, rankClass].filter(Boolean).join(' ')}
+                  style={{ '--i': PODIO_ENTRY_ORDER[rank] } as CSSProperties}
+                  aria-current={esMio ? 'true' : undefined}
+                >
+                  {/* Corona SOLO en el líder (igual que Podium.tsx): 2º/3º no llevan
+                   * insignia sobre el avatar — su puesto ya lo lee el pedestal. */}
+                  {esLider && (
+                    <span className={styles.corona} aria-hidden="true">
+                      <Icon icon={Crown} size={22} />
+                    </span>
+                  )}
+
+                  {/* Avatar grande con anillo de medalla: mismo componente del UI kit
+                   * (tamaño `lg`) escalado por CSS para no tocar Avatar.tsx — el
+                   * líder ~72px, 2º/3º ~56px (issue #594, punto 1). */}
+                  <span className={[styles.avatarRing, anilloClass].join(' ')}>
+                    <Avatar
+                      userId={entry.userId}
+                      avatarUrl={entry.avatar}
+                      name={entry.name}
+                      size="lg"
+                    />
+                  </span>
+
+                  <span className={styles.podioNombreFila}>
+                    <span className={styles.podioNombre}>{entry.name}</span>
+                    {/* "Tú" en vez de teñir toda la columna de teal: en el podio ese
+                     * acento competiría con el oro/plata/bronce del puesto. */}
+                    {esMio && <span className={styles.tuTag}>Tú</span>}
+                  </span>
+
+                  <span role="img" aria-label={`${entry.points.toLocaleString('es')} puntos`}>
+                    <CountUp value={entry.points} className={styles.podioPuntos} />
+                  </span>
+
+                  {premio ? (
+                    <PremioTappable
+                      className={styles.podioPremio}
+                      canEdit={canCreate}
+                      onEdit={openPrizeEditor}
+                    >
+                      <Icon icon={Gift} size={12} />
+                      <span className={styles.podioPremioTexto}>{premio}</span>
+                    </PremioTappable>
+                  ) : (
+                    // Sin NINGÚN premio definido, el dueño ve en el hueco del 1º la
+                    // única entrada para fijarlos (issue #752): en cuanto exista
+                    // uno, la edición pasa a vivir en tocar ese chip.
+                    esLider &&
+                    canCreate &&
+                    !hasPrizes && (
+                      <button
+                        type="button"
+                        className={styles.podioPremioCta}
+                        onClick={openPrizeEditor}
+                      >
+                        <Icon icon={Gift} size={12} />
+                        ¿Qué se juega?
+                      </button>
+                    )
+                  )}
+
+                  {/* Pedestal: cerrado y teñido por puesto, con altura escalonada (la
+                   * del 1º, la más alta) — el gesto que lee "podio" de un vistazo. Un
+                   * ORDINAL de texto ("1º"/"2º"/"3º") lleva la posición: nunca un
+                   * icono (issue #608 — el `Medal` a este tamaño, dentro de una peana
+                   * de color, se leyó como una carita/avatar fantasma) ni un "1" bare
+                   * (se leyó como "I" mayúscula, issue #594). */}
+                  <div className={styles.podioPeana}>
+                    <span className={styles.podioPeanaTexto}>{ORDINAL[rank]}</span>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
+
+          {resto.length > 0 && (
+            <ol className={listaClasses} aria-label="Resto de la clasificación">
+              {resto.map((entry, i) => {
+                const rank = i + 4
                 const esMio = entry.userId === myUserId
-                const esLider = rank === 1
-                const rankClass =
-                  rank === 1 ? styles.podio1 : rank === 2 ? styles.podio2 : styles.podio3
-                const anilloClass =
-                  rank === 1 ? styles.anillo1 : rank === 2 ? styles.anillo2 : styles.anillo3
-                const premio = prizeForRow(prizes, i, leaderboard.length)
+                const barPct = topPoints > 0 ? Math.max(0.08, entry.points / topPoints) : 0
+                const premio = prizeForRow(prizes, i + 3, leaderboard.length)
 
                 return (
                   <li
                     key={entry.userId}
-                    className={[styles.podioItem, rankClass].filter(Boolean).join(' ')}
-                    style={{ '--i': PODIO_ENTRY_ORDER[rank] } as CSSProperties}
+                    className={[styles.fila, esMio ? styles.miPosicion : '']
+                      .filter(Boolean)
+                      .join(' ')}
+                    style={{ '--i': i } as CSSProperties}
                     aria-current={esMio ? 'true' : undefined}
                   >
-                    {/* Corona SOLO en el líder (igual que Podium.tsx): 2º/3º no llevan
-                     * insignia sobre el avatar — su puesto ya lo lee el pedestal. */}
-                    {esLider && (
-                      <span className={styles.corona} aria-hidden="true">
-                        <Icon icon={Crown} size={22} />
+                    <div className={styles.filaTop}>
+                      <span className={styles.posicion} role="img" aria-label={`Posición ${rank}`}>
+                        {rank}
                       </span>
-                    )}
 
-                    {/* Avatar grande con anillo de medalla: mismo componente del UI kit
-                     * (tamaño `lg`) escalado por CSS para no tocar Avatar.tsx — el
-                     * líder ~72px, 2º/3º ~56px (issue #594, punto 1). */}
-                    <span className={[styles.avatarRing, anilloClass].join(' ')}>
                       <Avatar
                         userId={entry.userId}
                         avatarUrl={entry.avatar}
                         name={entry.name}
-                        size="lg"
+                        size="sm"
                       />
-                    </span>
 
-                    <span className={styles.podioNombreFila}>
-                      <span className={styles.podioNombre}>{entry.name}</span>
-                      {/* "Tú" en vez de teñir toda la columna de teal: en el podio ese
-                       * acento competiría con el oro/plata/bronce del puesto. */}
-                      {esMio && <span className={styles.tuTag}>Tú</span>}
-                    </span>
+                      {/* Nombre + nº de partidas (+ premio del puesto, si lo hay). */}
+                      <div className={styles.info}>
+                        <div className={styles.nombre}>{entry.name}</div>
+                        <div className={styles.partidas}>
+                          {entry.plays} {entry.plays === 1 ? 'partida' : 'partidas'}
+                        </div>
+                        {/* Premio: dato descriptivo (qué se lleva); tappable solo para
+                            el dueño (issue #752), igual criterio que el podio. */}
+                        {premio && (
+                          <PremioTappable
+                            className={styles.filaPremio}
+                            canEdit={canCreate}
+                            onEdit={openPrizeEditor}
+                          >
+                            <Icon icon={Gift} size={12} />
+                            <span className={styles.filaPremioLabel}>Premio</span>
+                            <span className={styles.filaPremioTexto}>{premio}</span>
+                          </PremioTappable>
+                        )}
+                      </div>
 
-                    <span role="img" aria-label={`${entry.points.toLocaleString('es')} puntos`}>
-                      <CountUp value={entry.points} className={styles.podioPuntos} />
-                    </span>
-
-                    {premio && (
-                      <span className={styles.podioPremio}>
-                        <Icon icon={Gift} size={12} />
-                        <span className={styles.podioPremioTexto}>{premio}</span>
+                      {/* Puntos: count-up al entrar; teal si es la propia fila. */}
+                      <span role="img" aria-label={`${entry.points.toLocaleString('es')} puntos`}>
+                        <CountUp
+                          value={entry.points}
+                          className={[styles.puntos, esMio ? styles.destaca : '']
+                            .filter(Boolean)
+                            .join(' ')}
+                        />
                       </span>
-                    )}
+                    </div>
 
-                    {/* Pedestal: cerrado y teñido por puesto, con altura escalonada (la
-                     * del 1º, la más alta) — el gesto que lee "podio" de un vistazo. Un
-                     * ORDINAL de texto ("1º"/"2º"/"3º") lleva la posición: nunca un
-                     * icono (issue #608 — el `Medal` a este tamaño, dentro de una peana
-                     * de color, se leyó como una carita/avatar fantasma) ni un "1" bare
-                     * (se leyó como "I" mayúscula, issue #594). */}
-                    <div className={styles.podioPeana}>
-                      <span className={styles.podioPeanaTexto}>{ORDINAL[rank]}</span>
+                    {/* Barra de puntuación: proporcional al líder del viaje (no solo
+                     * del resto), decorativa (los puntos ya están anunciados arriba). */}
+                    <div className={styles.barraTrack} aria-hidden="true">
+                      <div
+                        className={styles.barraFill}
+                        style={{ '--bar-pct': barPct } as CSSProperties}
+                      />
                     </div>
                   </li>
                 )
               })}
             </ol>
+          )}
+        </>
+      ) : (
+        <>
+          {/* Podio VACÍO (issue #753): la promesa visual de lo que habrá, no un
+              párrafo. Huecos de avatar discontinuos en la misma composición 2-1-3;
+              los premios YA integrados (chip en 1º/último si existen, o la CTA
+              "¿Qué se juega?" del dueño en el hueco del 1º si aún no hay ninguno). */}
+          <ol className={styles.podio} aria-label="Podio">
+            {EMPTY_PODIO_RANKS.map((rank) => {
+              const esLider = rank === 1
+              const rankClass =
+                rank === 1 ? styles.podio1 : rank === 2 ? styles.podio2 : styles.podio3
+              const anilloClass =
+                rank === 1 ? styles.anillo1 : rank === 2 ? styles.anillo2 : styles.anillo3
+              // Solo 1º/último llevan la promesa de premio (issue #753): el 2º/3º
+              // del podio vacío no significan nada todavía, así que quedan limpios.
+              const premio =
+                rank === 1
+                  ? (prizes?.first?.trim() ?? null)
+                  : rank === 3
+                    ? (prizes?.last?.trim() ?? null)
+                    : null
 
-            {resto.length > 0 && (
-              <ol className={listaClasses} aria-label="Resto de la clasificación">
-                {resto.map((entry, i) => {
-                  const rank = i + 4
-                  const esMio = entry.userId === myUserId
-                  const barPct = topPoints > 0 ? Math.max(0.08, entry.points / topPoints) : 0
-                  const premio = prizeForRow(prizes, i + 3, leaderboard.length)
+              return (
+                <li
+                  key={rank}
+                  className={[styles.podioItem, styles.podioItemVacio, rankClass]
+                    .filter(Boolean)
+                    .join(' ')}
+                  style={{ '--i': PODIO_ENTRY_ORDER[rank] } as CSSProperties}
+                >
+                  {esLider && (
+                    <span className={styles.corona} aria-hidden="true">
+                      <Icon icon={Crown} size={22} />
+                    </span>
+                  )}
 
-                  return (
-                    <li
-                      key={entry.userId}
-                      className={[styles.fila, esMio ? styles.miPosicion : '']
-                        .filter(Boolean)
-                        .join(' ')}
-                      style={{ '--i': i } as CSSProperties}
-                      aria-current={esMio ? 'true' : undefined}
-                    >
-                      <div className={styles.filaTop}>
-                        <span
-                          className={styles.posicion}
-                          role="img"
-                          aria-label={`Posición ${rank}`}
-                        >
-                          {rank}
+                  {/* Hueco de avatar (círculo discontinuo): mismo anillo/escala que el
+                      podio real, sin foto ni nombre — la promesa de quién ganará. */}
+                  <span className={[styles.avatarRing, anilloClass].join(' ')} aria-hidden="true">
+                    <span className={styles.avatarHueco}>
+                      <Icon icon={User} size={26} className={styles.avatarHuecoIcono} />
+                    </span>
+                  </span>
+
+                  {premio ? (
+                    rank === 3 ? (
+                      <PremioTappable
+                        className={styles.podioPremioUltimo}
+                        canEdit={canCreate}
+                        onEdit={openPrizeEditor}
+                      >
+                        <span className={styles.podioPremioEyebrow}>Último</span>
+                        <span className={styles.podioPremioLinea}>
+                          <Icon icon={Gift} size={12} />
+                          <span className={styles.podioPremioTexto}>{premio}</span>
                         </span>
+                      </PremioTappable>
+                    ) : (
+                      <PremioTappable
+                        className={styles.podioPremio}
+                        canEdit={canCreate}
+                        onEdit={openPrizeEditor}
+                      >
+                        <Icon icon={Gift} size={12} />
+                        <span className={styles.podioPremioTexto}>{premio}</span>
+                      </PremioTappable>
+                    )
+                  ) : (
+                    esLider &&
+                    canCreate &&
+                    !hasPrizes && (
+                      <button
+                        type="button"
+                        className={styles.podioPremioCta}
+                        onClick={openPrizeEditor}
+                      >
+                        <Icon icon={Gift} size={12} />
+                        ¿Qué se juega?
+                      </button>
+                    )
+                  )}
 
-                        <Avatar
-                          userId={entry.userId}
-                          avatarUrl={entry.avatar}
-                          name={entry.name}
-                          size="sm"
-                        />
+                  <div className={styles.podioPeana}>
+                    <span className={styles.podioPeanaTexto}>{ORDINAL[rank]}</span>
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
 
-                        {/* Nombre + nº de partidas (+ premio del puesto, si lo hay). */}
-                        <div className={styles.info}>
-                          <div className={styles.nombre}>{entry.name}</div>
-                          <div className={styles.partidas}>
-                            {entry.plays} {entry.plays === 1 ? 'partida' : 'partidas'}
-                          </div>
-                          {/* Premio: dato descriptivo (qué se lleva), no una acción —
-                              se etiqueta para no confundirse con un botón. */}
-                          {premio && (
-                            <span className={styles.filaPremio}>
-                              <Icon icon={Gift} size={12} />
-                              <span className={styles.filaPremioLabel}>Premio</span>
-                              <span className={styles.filaPremioTexto}>{premio}</span>
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Puntos: count-up al entrar; teal si es la propia fila. */}
-                        <span role="img" aria-label={`${entry.points.toLocaleString('es')} puntos`}>
-                          <CountUp
-                            value={entry.points}
-                            className={[styles.puntos, esMio ? styles.destaca : '']
-                              .filter(Boolean)
-                              .join(' ')}
-                          />
-                        </span>
-                      </div>
-
-                      {/* Barra de puntuación: proporcional al líder del viaje (no solo
-                       * del resto), decorativa (los puntos ya están anunciados arriba). */}
-                      <div className={styles.barraTrack} aria-hidden="true">
-                        <div
-                          className={styles.barraFill}
-                          style={{ '--bar-pct': barPct } as CSSProperties}
-                        />
-                      </div>
-                    </li>
-                  )
-                })}
-              </ol>
-            )}
-          </>
-        ) : (
           <div className={styles.vacio} role="status">
-            <IconTrofeo size={32} className={styles.vacioCabeza} />
-            <p>Cuando alguien adivine un reto, aquí aparecerá la clasificación.</p>
-            {/* Poco texto, visual-first: acción, no solo un párrafo sin salida. */}
+            {/* Poco texto, visual-first (issue #753): una línea, el podio ya habla. */}
+            <p>Aún no hay clasificación. Juega el primer reto y aparecerá aquí.</p>
             <div className={styles.vacioAcciones}>
               <Button variant="secondary" size="sm" onClick={onInvite}>
                 <Icon icon={Share2} size={16} /> Invitar
@@ -337,24 +458,35 @@ export function MarcadorTab({
               )}
             </div>
           </div>
-        )}
+        </>
+      )}
 
-        {/* "Retos anteriores" (issue #608, rescatado de GroupPage/PastSection):
-            resumen breve, más reciente primero. Tocar la fila abre el detalle
-            completo (foto, mapa, listado de votos) por el mismo hash que
-            "Adivina"/"Ya jugaste". Solo se muestra si ya hay algo cerrado: no
-            añade ruido a un viaje que aún no ha jugado nada. */}
-        {pastChallenges.length > 0 && (
-          <section className={styles.anteriores}>
-            <h2 className={styles.anterioresTitulo}>Retos anteriores</h2>
-            <ol className={styles.anterioresLista}>
-              {pastChallenges.map((c) => (
-                <li key={c.challengeId}>
-                  <button
-                    type="button"
-                    className={[styles.anteriorFila, 'lg-press'].join(' ')}
-                    onClick={() => onOpenChallenge(c.challengeId)}
-                  >
+      {/* "Retos anteriores" (issue #608, rescatado de GroupPage/PastSection):
+          resumen breve, más reciente primero, con thumbnail de la foto del reto
+          (issue #753 — placeholder de marca si no tiene). Tocar la fila abre el
+          detalle completo (foto, mapa, listado de votos) por el mismo hash que
+          "Adivina"/"Ya jugaste". Solo se muestra si ya hay algo cerrado: no
+          añade ruido a un viaje que aún no ha jugado nada. */}
+      {pastChallenges.length > 0 && (
+        <section className={styles.anteriores}>
+          <h2 className={styles.anterioresTitulo}>Retos anteriores</h2>
+          <ol className={styles.anterioresLista}>
+            {pastChallenges.map((c) => (
+              <li key={c.challengeId}>
+                <button
+                  type="button"
+                  className={[styles.anteriorFila, 'lg-press'].join(' ')}
+                  onClick={() => onOpenChallenge(c.challengeId)}
+                >
+                  <ChallengePhoto
+                    src={c.imageUrl}
+                    alt={c.title}
+                    ratio="square"
+                    size="sm"
+                    zoomable={false}
+                    className={styles.anteriorFoto}
+                  />
+                  <span className={styles.anteriorTexto}>
                     <span className={styles.anteriorTitulo}>{c.title}</span>
                     <span className={styles.anteriorGanador}>
                       {c.winner ? (
@@ -370,13 +502,13 @@ export function MarcadorTab({
                     <span className={styles.anteriorResultado}>
                       <PastResultLabel isOwn={c.isOwn} result={c.myResult} />
                     </span>
-                  </button>
-                </li>
-              ))}
-            </ol>
-          </section>
-        )}
-      </>
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
 
       {/* FAB "Compartir clasificación" (issue #608, rescatado de GroupPage): abre
           la previa de la tarjeta (imagen) para compartirla en el chat, el motor
@@ -408,6 +540,7 @@ export function MarcadorTab({
         <PrizesEditorModal
           groupId={groupId}
           prizes={prizes}
+          origin="marcador"
           onClose={() => setEditingPrizes(false)}
           onSaved={() => {
             setEditingPrizes(false)
@@ -436,77 +569,5 @@ function PastResultLabel({
       {result.points.toLocaleString('es-ES')} pts
       {result.leftApp && <LeftAppFlag />}
     </>
-  )
-}
-
-// Editor de premios (solo dueño): un campo opcional por puesto (1º/2º/3º/último).
-// Ninguno es obligatorio. Rescatado tal cual de GroupPage (issue #608, #123): el
-// RLS de `groups` respalda la edición en servidor (solo el dueño puede escribir).
-function PrizesEditorModal({
-  groupId,
-  prizes,
-  onClose,
-  onSaved,
-}: {
-  groupId: string
-  prizes: GroupPrizes | null
-  onClose: () => void
-  onSaved: () => void
-}) {
-  // Arranca del valor actual para que el dueño edite sin reescribir todo.
-  const [draft, setDraft] = useState<GroupPrizes>(() => ({ ...(prizes ?? {}) }))
-  const [busy, setBusy] = useState(false)
-  const toast = useToast()
-
-  async function save() {
-    setBusy(true)
-    try {
-      await updateGroupPrizes(groupId, draft)
-      toast.show('Premios guardados', { tone: 'success' })
-      onSaved()
-    } catch (err) {
-      toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
-        tone: 'danger',
-      })
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Modal
-      open
-      onClose={busy ? undefined : onClose}
-      title={
-        <>
-          <Icon icon={Gift} size={18} /> Premios del viaje
-        </>
-      }
-      footer={
-        <Row gap={2} justify="end">
-          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button size="sm" loading={busy} onClick={() => void save()}>
-            Guardar
-          </Button>
-        </Row>
-      }
-    >
-      <Stack gap={3}>
-        <p className={styles.prizeHint}>Opcionales. Se marcan en la fila de cada puesto.</p>
-        {PRIZE_SLOTS.map(({ key, label }, i) => (
-          <label key={key} className={styles.prizeField}>
-            <span className={styles.prizeFieldLabel}>{label}</span>
-            <Input
-              value={draft[key] ?? ''}
-              onChange={(e) => setDraft((d) => ({ ...d, [key]: e.target.value }))}
-              maxLength={120}
-              autoFocus={i === 0}
-              placeholder="Ej: elige restaurante"
-            />
-          </label>
-        ))}
-      </Stack>
-    </Modal>
   )
 }

@@ -32,6 +32,19 @@ function entry(overrides: Partial<LeaderboardEntry>): LeaderboardEntry {
   return { userId: 'u1', name: 'Ana', avatar: null, points: 100, plays: 2, ...overrides }
 }
 
+function pastChallenge(overrides: Partial<PastChallengeSummary>): PastChallengeSummary {
+  return {
+    challengeId: 'c1',
+    title: 'El bosque de bambú',
+    closedAt: '2026-06-10T10:00:00.000Z',
+    isOwn: false,
+    winner: null,
+    myResult: null,
+    imageUrl: null,
+    ...overrides,
+  }
+}
+
 const noop = () => {}
 
 // Props obligatorias de rescate (issue #608: premios, retos anteriores,
@@ -63,13 +76,23 @@ function renderMarcador(
 }
 
 describe('MarcadorTab', () => {
-  test('estado vacío: mensaje + invitar (y crear reto si puede)', () => {
+  // --- Vacío (issue #753: podio visual, no párrafo) --------------------------
+
+  test('vacío: podio de 3 huecos de avatar + copy de una línea + invitar (y crear reto si puede)', () => {
     renderMarcador({ leaderboard: [], canCreate: true })
+    // El podio "promesa" existe aunque no haya jugadores (mismo landmark que el real).
+    const podio = screen.getByRole('list', { name: 'Podio' })
+    expect(podio.querySelectorAll('li')).toHaveLength(3)
     expect(
-      screen.getByText('Cuando alguien adivine un reto, aquí aparecerá la clasificación.'),
+      screen.getByText('Aún no hay clasificación. Juega el primer reto y aparecerá aquí.'),
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Invitar/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Crear un reto/ })).toBeInTheDocument()
+  })
+
+  test('vacío: sin poder crear, no se ofrece "Crear un reto"', () => {
+    renderMarcador({ leaderboard: [], canCreate: false })
+    expect(screen.queryByRole('button', { name: /Crear un reto/ })).not.toBeInTheDocument()
   })
 
   test('con ≤3 jugadores solo hay podio (sin lista compacta debajo)', () => {
@@ -190,23 +213,46 @@ describe('MarcadorTab', () => {
     expect(screen.queryByText('Beto')?.closest('li')).not.toHaveTextContent('Premio')
   })
 
-  test('premios: el dueño ve "Añadir premios" cuando aún no hay ninguno', () => {
+  test('premios: un miembro (no dueño) ve el chip como texto plano, no como botón', () => {
+    mockReducedMotion(true)
+    const board = [
+      entry({ userId: 'u1', name: 'Ana', points: 400 }),
+      entry({ userId: 'u2', name: 'Beto', points: 300 }),
+      entry({ userId: 'u3', name: 'Caro', points: 200 }),
+    ]
+    renderMarcador({ leaderboard: board, canCreate: false, prizes: { first: 'Elige destino' } })
+    expect(screen.getByText('Elige destino').closest('button')).toBeNull()
+  })
+
+  test('premios (issues #752/#753): sin ninguno definido, el dueño ve la CTA "¿Qué se juega?" en el podio vacío y abre el editor', async () => {
+    const user = userEvent.setup()
     renderMarcador({ leaderboard: [], canCreate: true })
-    expect(screen.getByRole('button', { name: /Añadir premios/ })).toBeInTheDocument()
+    const cta = screen.getByRole('button', { name: /¿Qué se juega\?/ })
+    await user.click(cta)
+    expect(screen.getByText('Premios del viaje')).toBeInTheDocument()
   })
 
-  test('premios: un miembro (no dueño) no ve el botón de editar premios', () => {
+  test('premios: un miembro (no dueño) no ve la CTA del vacío', () => {
     renderMarcador({ leaderboard: [], canCreate: false })
-    expect(screen.queryByRole('button', { name: /premios/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /¿Qué se juega\?/ })).not.toBeInTheDocument()
   })
 
-  test('premios: con premios ya definidos, el dueño ve "Editar premios" y abre el editor', async () => {
+  test('premios: en el podio vacío con premios ya definidos, el dueño edita tocando el chip', async () => {
     const user = userEvent.setup()
     renderMarcador({ leaderboard: [], canCreate: true, prizes: { first: 'Elige destino' } })
-    const btn = screen.getByRole('button', { name: /Editar premios/ })
-    await user.click(btn)
+    // Sin premios, no debería quedar la CTA de "¿Qué se juega?".
+    expect(screen.queryByRole('button', { name: /¿Qué se juega\?/ })).not.toBeInTheDocument()
+    const chip = screen.getByText('Elige destino').closest('button')
+    expect(chip).not.toBeNull()
+    await user.click(chip as HTMLButtonElement)
     expect(screen.getByText('Premios del viaje')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Elige destino')).toBeInTheDocument()
+  })
+
+  test('premios: en el podio vacío, el "último" se distingue con la etiqueta "Último"', () => {
+    renderMarcador({ leaderboard: [], canCreate: false, prizes: { last: 'Invita a las cañas' } })
+    expect(screen.getByText('Último')).toBeInTheDocument()
+    expect(screen.getByText('Invita a las cañas')).toBeInTheDocument()
   })
 
   test('retos anteriores: no se muestra la sección sin retos cerrados', () => {
@@ -218,22 +264,18 @@ describe('MarcadorTab', () => {
     const user = userEvent.setup()
     const onOpenChallenge = vi.fn()
     const pastChallenges: PastChallengeSummary[] = [
-      {
+      pastChallenge({
         challengeId: 'c1',
         title: 'El bosque de bambú',
-        closedAt: '2026-06-10T10:00:00.000Z',
-        isOwn: false,
         winner: { name: 'Marta', points: 4880, distanceKm: 1.2, leftApp: true },
         myResult: { points: 3100, distanceKm: 42, leftApp: false },
-      },
-      {
+      }),
+      pastChallenge({
         challengeId: 'c2',
         title: 'El Pabellón Dorado',
         closedAt: '2026-06-08T10:00:00.000Z',
         isOwn: true,
-        winner: null,
-        myResult: null,
-      },
+      }),
     ]
     renderMarcador({ leaderboard: [], canCreate: false, pastChallenges, onOpenChallenge })
     expect(screen.getByText('Retos anteriores')).toBeInTheDocument()
@@ -246,6 +288,20 @@ describe('MarcadorTab', () => {
 
     await user.click(screen.getByText('El bosque de bambú'))
     expect(onOpenChallenge).toHaveBeenCalledWith('c1')
+  })
+
+  test('retos anteriores (issue #753): thumbnail con la foto del reto, o placeholder si no tiene', () => {
+    const pastChallenges: PastChallengeSummary[] = [
+      pastChallenge({ challengeId: 'c1', title: 'Con foto', imageUrl: 'https://x/foto.jpg' }),
+      pastChallenge({ challengeId: 'c2', title: 'Sin foto', imageUrl: null }),
+    ]
+    renderMarcador({ leaderboard: [], canCreate: false, pastChallenges })
+    // La fila entera es un botón (abre el detalle); dentro, el marco de la foto de
+    // ChallengePhoto es un <div> (no anida <button>, zoomable=false).
+    const conFoto = screen.getByText('Con foto').closest('button')
+    expect(conFoto?.querySelector('img')).toHaveAttribute('src', 'https://x/foto.jpg')
+    const sinFoto = screen.getByText('Sin foto').closest('button')
+    expect(sinFoto?.querySelector('img')).toBeNull()
   })
 
   test('compartir: el FAB solo aparece con clasificación', () => {

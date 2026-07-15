@@ -113,6 +113,18 @@ export const GROUP: GalleryGroupRow = {
 export const GROUP_ANDES_ID = 'viaje-andes'
 export const GROUP_LISBOA_ID = 'viaje-lisboa'
 
+// Viajes RECIÉN creados, sin ningún reto ni voto todavía (issues #752/#753): el
+// Marcador de un viaje así muestra el podio VACÍO (huecos de avatar, la promesa
+// visual) — dos variantes para capturar el hueco del 1º con la CTA "¿Qué se
+// juega?" (sin premios) y con el chip ya colgando (con premios), ambos como
+// dueño (created_by = ME_ID, igual que el resto de EXTRA_GROUPS).
+export const GROUP_NUEVO_ID = 'viaje-nuevo'
+export const GROUP_NUEVO_PREMIOS_ID = 'viaje-nuevo-premios'
+const NUEVO_PRIZES: GroupPrizes = {
+  first: 'Elige el próximo restaurante',
+  last: 'Paga la siguiente ronda',
+}
+
 export const EXTRA_GROUPS: GalleryGroupRow[] = [
   {
     id: GROUP_ANDES_ID,
@@ -136,6 +148,32 @@ export const EXTRA_GROUPS: GalleryGroupRow[] = [
     closed_at: isoFromNow(-145 * DAY),
     starts_on: '2026-01-16',
     ends_on: '2026-01-18',
+    description: null,
+    companions: null,
+    cover_image_path: null,
+  },
+  {
+    id: GROUP_NUEVO_ID,
+    name: 'Escapada de otoño',
+    prizes: null,
+    created_by: ME_ID,
+    created_at: isoFromNow(-2 * HOUR),
+    closed_at: null,
+    starts_on: null,
+    ends_on: null,
+    description: null,
+    companions: null,
+    cover_image_path: null,
+  },
+  {
+    id: GROUP_NUEVO_PREMIOS_ID,
+    name: 'Puente de mayo',
+    prizes: NUEVO_PRIZES,
+    created_by: ME_ID,
+    created_at: isoFromNow(-2 * HOUR),
+    closed_at: null,
+    starts_on: null,
+    ends_on: null,
     description: null,
     companions: null,
     cover_image_path: null,

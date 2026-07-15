@@ -1,0 +1,20 @@
+/* Editor de premios (issues #123/#608/#752/#753): campos del modal "Premios del
+ * viaje" — etiqueta del puesto sobre el Input. Extraído de MarcadorTab.module.css
+ * al mover el componente a su propio fichero (reutilizable desde el Marcador y el
+ * nudge post-creación del viaje). */
+.prizeHint {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.prizeField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.prizeFieldLabel {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}

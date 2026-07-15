@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Share2 } from 'lucide-react'
+import { Gift, Share2 } from 'lucide-react'
 import { newGroupCode } from '../../lib/group'
 import { createGroup } from '../../lib/groupData'
 import { joinGroupAsOwner } from '../../lib/membership'
@@ -10,6 +10,9 @@ import { clearDraft, loadDraft, useDraftAutosave } from '../../lib/drafts'
 import { AppHeader, Button, Icon, Spinner, DatePicker, useReducedMotion, useToast } from '../../ui'
 import { ShellUtilitario } from '../../ui/shells'
 import { InviteModal } from '../group/InviteModal'
+// Nudge post-creación "¿Qué se juega?" (issue #752): reutiliza el mismo editor
+// de premios del Marcador, sin duplicar el formulario.
+import { PrizesEditorModal } from '../group/PrizesEditorModal'
 import { CalendarIcon, PeopleIcon, SparkIcon, TripPinIcon } from './CreateIcons'
 import { formatTripDates } from './tripDates'
 import styles from './CreateGroup.module.css'
@@ -84,6 +87,9 @@ export function CreateGroup({ onBack }: Props) {
   // microcelebración (el resto del flujo navega por hash, sin guardar estado).
   const [createdGroupId, setCreatedGroupId] = useState<string | null>(null)
   const [inviteOpen, setInviteOpen] = useState(false)
+  // Nudge "¿Qué se juega?" (issue #752): opcional y saltable, un toque desde la
+  // microcelebración — el mismo `PrizesEditorModal` que usa el Marcador.
+  const [prizesOpen, setPrizesOpen] = useState(false)
   // Temporizador que lleva al viaje tras la microcelebración: si el dueño toca
   // "Invitar ahora" lo cancelamos para no navegar debajo del modal de invitar.
   const navigateTimer = useRef<number | null>(null)
@@ -529,16 +535,34 @@ export function CreateGroup({ onBack }: Props) {
               Comparte el enlace y empezad a llenar el diario.
             </p>
             {createdGroupId && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  if (navigateTimer.current != null) window.clearTimeout(navigateTimer.current)
-                  setInviteOpen(true)
-                }}
-              >
-                <Icon icon={Share2} size={16} /> Invitar ahora
-              </Button>
+              <div className={styles.celebrateActions}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    if (navigateTimer.current != null) window.clearTimeout(navigateTimer.current)
+                    setInviteOpen(true)
+                  }}
+                >
+                  <Icon icon={Share2} size={16} /> Invitar ahora
+                </Button>
+                {/* Nudge "¿Qué se juega?" (issue #752): opcional y saltable — no
+                    cancela el paso automático al viaje, así que si no se toca
+                    nada, el flujo sigue igual que antes. Mismo `variant`
+                    "secondary" que "Invitar ahora" (no "ghost"): sobre el
+                    fondo oscuro de la microcelebración, "ghost" hereda
+                    `--color-text` (grafito) y quedaría invisible. */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    if (navigateTimer.current != null) window.clearTimeout(navigateTimer.current)
+                    setPrizesOpen(true)
+                  }}
+                >
+                  <Icon icon={Gift} size={16} /> ¿Qué se juega?
+                </Button>
+              </div>
             )}
           </div>
         </div>
@@ -557,6 +581,22 @@ export function CreateGroup({ onBack }: Props) {
           challengeCount={0}
           // El creador SIEMPRE es dueño de su propio grupo recién creado.
           isOwner
+        />
+      )}
+
+      {createdGroupId && prizesOpen && (
+        <PrizesEditorModal
+          groupId={createdGroupId}
+          prizes={null}
+          origin="create_group_nudge"
+          onClose={() => {
+            setPrizesOpen(false)
+            location.hash = `#g=${createdGroupId}`
+          }}
+          onSaved={() => {
+            setPrizesOpen(false)
+            location.hash = `#g=${createdGroupId}`
+          }}
         />
       )}
     </div>

@@ -162,6 +162,10 @@ export type AnalyticsEvent =
   // (nada identificable; el email ya vive en Supabase, no en el evento).
   | 'receptor_anon_signin'
   | 'account_upgraded'
+  // Premios del viaje guardados con al menos uno definido (issues #752/#753):
+  // mide desde dónde se define "qué se juega". Props: group_id, origin
+  // ('marcador'|'create_group_nudge').
+  | 'prizes_defined'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {

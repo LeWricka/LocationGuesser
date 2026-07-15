@@ -34,3 +34,18 @@ export function prizeForRow(
   if (index === total - 1 && prizes.last?.trim()) return prizes.last.trim()
   return null
 }
+
+// Línea de premios "en juego" para superficies de solo lectura (pie de la
+// tarjeta para compartir, bienvenida del receptor #752): un resumen de texto,
+// puesto a puesto, sin depender de una clasificación real. Antes vivía
+// duplicada en `LeaderboardCard.tsx`; centralizada aquí para que cualquier
+// superficie nueva la reutilice sin desincronizarse.
+export function prizesLine(prizes: GroupPrizes | null): string | null {
+  if (!prizes) return null
+  const parts: string[] = []
+  if (prizes.first?.trim()) parts.push(`1º ${prizes.first.trim()}`)
+  if (prizes.second?.trim()) parts.push(`2º ${prizes.second.trim()}`)
+  if (prizes.third?.trim()) parts.push(`3º ${prizes.third.trim()}`)
+  if (prizes.last?.trim()) parts.push(`Último ${prizes.last.trim()}`)
+  return parts.length > 0 ? parts.join('  ·  ') : null
+}
