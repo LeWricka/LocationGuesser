@@ -96,9 +96,11 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: payload.body ?? FALLBACK_BODY,
-      // Iconos del propio manifest (ya en dist/). Badge monocromo para Android.
+      // `icon` = logo a color (notificación expandida). `badge` = silueta
+      // MONOCROMA aparte: Android tiñe los píxeles opacos y solo respeta el
+      // alfa — con el icono a color pintaba un cuadrado blanco en la barra.
       icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
+      badge: '/badge-notificacion.png',
       // `tag` colapsa notificaciones del mismo reto (no apilar duplicados).
       tag: payload.tag,
       // Guardamos la URL para abrirla en notificationclick.
