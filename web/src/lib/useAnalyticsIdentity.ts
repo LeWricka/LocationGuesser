@@ -54,7 +54,7 @@ export function useAnalyticsIdentity(): void {
 
     // Alta (primer sign-in) vs login recurrente: una u otra, no ambas.
     // EXCEPCIÓN (issue #751): una sesión ANÓNIMA (`signInAnonymously`, receptor
-    // sin cuenta #758) también pasa la guarda `isFreshSignup` — created_at y
+    // sin cuenta #748) también pasa la guarda `isFreshSignup` — created_at y
     // last_sign_in_at distan segundos igual que en un alta real — y contaba
     // como `signup_completed` sin que el receptor hubiera dado ningún dato. No
     // es un alta real: esa señal es `account_upgraded`, cuando vincula su email
