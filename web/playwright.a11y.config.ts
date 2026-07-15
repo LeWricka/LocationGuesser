@@ -26,8 +26,9 @@ export default defineConfig({
   fullyParallel: false,
   reporter: 'list',
   // Un único spec recorre todos los casos × comprobaciones; subimos el límite por
-  // test para que quepan axe + overflow sobre ~18 casos.
-  timeout: 180_000,
+  // test para que quepan axe + overflow sobre ~18 casos (y margen: el runner de CI
+  // va ~3× más lento que local y la galería crece con cada feature).
+  timeout: 360_000,
   use: {
     baseURL,
     ...devices['Desktop Chrome'],
