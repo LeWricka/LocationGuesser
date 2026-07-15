@@ -70,3 +70,30 @@ export function describeError(err: unknown): string {
   }
   return 'Error desconocido'
 }
+
+/**
+ * Código de error de Postgres/PostgREST (p.ej. `P0002` de una excepción de RPC,
+ * `23503` de una FK violada), o `null` si el error no tiene esa forma. Distinguir
+ * por CÓDIGO (no por el texto del mensaje, que puede cambiar de idioma o de
+ * redacción en el servidor) es lo que permite tratar un recurso borrado como un
+ * caso ESPERABLE en vez de un error genérico (issue #760).
+ */
+export function getErrorCode(err: unknown): string | null {
+  return isPostgrestLike(err) ? asText(err.code) : null
+}
+
+/**
+ * Error ESPERABLE (issue #760): el recurso (reto o viaje) fue borrado entre que
+ * se abrió la pantalla/enlace y que el usuario actuó (cargar, votar, auto-join).
+ * Se distingue de un fallo genérico de red/RLS con una CLASE propia (no un
+ * string) para que:
+ *  - la UI muestre un estado amable ("ya no existe" + CTA), no un toast crudo;
+ *  - la observabilidad lo trate como esperable (breadcrumb, no excepción) — ver
+ *    `reportError`/`addBreadcrumb` en `observability.ts`.
+ */
+export class ResourceGoneError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'ResourceGoneError'
+  }
+}

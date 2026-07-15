@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { describeError } from './errors'
+import { describeError, getErrorCode, ResourceGoneError } from './errors'
 import type { Vote } from './database.types'
 import type { VoteWithName } from './leaderboard'
 
@@ -61,10 +61,15 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
     p_left_app: input.leftApp ?? false,
     p_elapsed_seconds: input.elapsedSeconds ?? null,
   })
-  // El error de la RPC es un objeto de PostgREST (no Error nativo): lo
-  // re-lanzamos como Error con mensaje legible (describeError combina
-  // message/details/hint/code) para que el toast no muestre '[object Object]'.
-  if (error) throw new Error(describeError(error))
+  if (error) {
+    // P0002 (issue #760, LOCATIONGUESSER-10): el reto se borró con la pantalla
+    // de jugar ya abierta — ESPERABLE, no un fallo genérico. Se distingue por
+    // CÓDIGO (no por texto) antes de envolver el resto de errores en un mensaje
+    // legible (describeError combina message/details/hint/code) para que el
+    // toast genérico no muestre '[object Object]'.
+    if (getErrorCode(error) === 'P0002') throw new ResourceGoneError('Este reto ya no existe')
+    throw new Error(describeError(error))
+  }
   // La RPC `returns table` llega como array de una fila.
   const row = Array.isArray(data) ? data[0] : data
   if (!row) throw new Error('La RPC submit_vote no devolvió resultado')
@@ -138,7 +143,12 @@ export async function submitNumberVote(
     p_left_app: input.leftApp ?? false,
     p_elapsed_seconds: input.elapsedSeconds ?? null,
   })
-  if (error) throw new Error(describeError(error))
+  if (error) {
+    // Mismo caso ESPERABLE que en `submitVote` (issue #760): el reto de número
+    // se borró con la pantalla abierta.
+    if (getErrorCode(error) === 'P0002') throw new ResourceGoneError('Este reto ya no existe')
+    throw new Error(describeError(error))
+  }
   const row = Array.isArray(data) ? data[0] : data
   if (!row) throw new Error('La RPC submit_number_vote no devolvió resultado')
   return {

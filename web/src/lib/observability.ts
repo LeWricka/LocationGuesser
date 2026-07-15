@@ -95,3 +95,14 @@ export function clearObservabilityUser(): void {
 export function reportError(error: unknown, context?: Record<string, unknown>): void {
   enqueue((s) => s.captureException(error, context ? { extra: context } : undefined))
 }
+
+/**
+ * Deja constancia de un evento ESPERABLE (issue #760: recurso borrado entre que
+ * se abrió la pantalla y se actuó) sin mandarlo como excepción — así no infla el
+ * dashboard de errores con algo que no es un fallo, pero sigue siendo rastreable
+ * si aparece justo antes de una excepción real. Se encola si el SDK aún no
+ * cargó. No-op si la observabilidad no está activa.
+ */
+export function addBreadcrumb(message: string, data?: Record<string, unknown>): void {
+  enqueue((s) => s.addBreadcrumb({ message, level: 'info', data }))
+}

@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, ArrowRight, Hash, Lock, RotateCcw, Timer, TimerOff } from 'lucide-react'
+import {
+  AlertTriangle,
+  ArrowRight,
+  Ghost,
+  Hash,
+  Lock,
+  RotateCcw,
+  Timer,
+  TimerOff,
+} from 'lucide-react'
 import { useVisualViewport } from '../../lib/useVisualViewport'
 import { marcadorGroupHash } from '../../lib/route'
 import { CountdownOverlay } from './CountdownOverlay'
@@ -10,7 +19,7 @@ import { SceneImage } from './SceneImage'
 import { remainingSeconds } from './resumeState'
 import {
   getNumberAnswer,
-  getChallenge,
+  getChallengeOrNull,
   isPracticeChallenge,
   type ChallengeForPlay,
 } from '../../lib/challenges'
@@ -18,8 +27,8 @@ import { deleteMyVote, getExistingVote, getVotesWithNames, submitNumberVote } fr
 import type { VoteWithName } from '../../lib/leaderboard'
 import { fmtNumber, signedRelErrorPct } from '../../lib/geo'
 import { track } from '../../lib/analytics'
-import { describeError } from '../../lib/errors'
-import { reportError } from '../../lib/observability'
+import { describeError, ResourceGoneError } from '../../lib/errors'
+import { addBreadcrumb, reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { useOwnChallengeGuard } from './useOwnChallengeGuard'
@@ -56,8 +65,10 @@ interface Props {
 
 // `own` es la guarda defensiva (#509): el creador del reto no juega el suyo
 // propio, ni aunque llegue aquí directamente (sin pasar por el guard de
-// PlayChallenge, que ya corta antes de delegar).
-type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own'
+// PlayChallenge, que ya corta antes de delegar). `gone` (issue #760): el reto
+// se borró entre que se compartió el enlace y que se abrió/jugó — pantalla
+// amable, no un error crudo. Ver la HERMANA de este tipo en PlayChallenge.
+type Phase = 'loading' | 'idle' | 'countdown' | 'playing' | 'revealed' | 'own' | 'gone'
 
 const startKey = (challengeId: string) => `lg.play.startAt.${challengeId}`
 
@@ -200,6 +211,13 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
         })
         toast.show('¡Número bloqueado!', { tone: 'success' })
       } catch (err) {
+        if (err instanceof ResourceGoneError) {
+          // Esperable (issue #760): el reto se borró con la pantalla de jugar ya
+          // abierta. Breadcrumb, no excepción — no es un fallo real de la app.
+          addBreadcrumb('challenge_gone_on_vote', { challengeId: current.id, kind: 'number' })
+          setPhase('gone')
+          return
+        }
         reportError(err, { area: 'submit_number_vote', challengeId: current.id })
         if (played == null) {
           setTimedOut(true)
@@ -218,8 +236,15 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
     let cancelled = false
     async function load() {
       try {
-        const c = preloaded ?? (await getChallenge(challengeId))
+        const c = preloaded ?? (await getChallengeOrNull(challengeId))
         if (cancelled) return
+        if (!c) {
+          // Esperable (issue #760): el dueño borró el reto tras compartir el
+          // enlace. Breadcrumb, no excepción.
+          addBreadcrumb('challenge_gone_on_load', { challengeId, kind: 'number' })
+          setPhase('gone')
+          return
+        }
         setChallenge(c)
 
         // Guarda defensiva (#509): el creador no juega su propio reto. En el flujo
@@ -434,6 +459,31 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
               )}
               <Button variant="secondary" fullWidth onClick={goBack}>
                 Volver al viaje
+              </Button>
+            </Stack>
+          </Card>
+        </div>
+      </main>
+    )
+  }
+
+  // Reto borrado (issue #760): el dueño lo borró tras compartir el enlace (al
+  // cargar) o mientras la pantalla estaba abierta (al bloquear el número). Va
+  // ANTES del resto de fases: en `gone`, `challenge` puede ser `null`, así que
+  // el copy no depende de él — mismo patrón visual que la guarda "es tuyo".
+  if (phase === 'gone') {
+    const backLabelGone = groupId ? 'Volver al viaje' : 'Inicio'
+    return (
+      <main className={`lg-page ${styles.ownPage}`}>
+        <BackHomeButton onClick={goBack} label={backLabelGone} />
+        <div className={styles.ownCenter}>
+          <Card padding="md" raised>
+            <Stack gap={3} align="center">
+              <Icon icon={Ghost} size={40} />
+              <strong>Este reto ya no existe</strong>
+              <p className={styles.status}>Puede que quien lo compartió lo haya borrado.</p>
+              <Button fullWidth size="lg" onClick={goBack}>
+                {backLabelGone}
               </Button>
             </Stack>
           </Card>

@@ -5,6 +5,7 @@
 import { supabase } from './supabase'
 import { isLive } from './groupData'
 import { CHALLENGE_COLUMNS_NO_ANSWER, type ChallengeForPlay } from './challenges'
+import { getErrorCode, ResourceGoneError } from './errors'
 
 /** Estado de un grupo en la home (cuentas-y-home.md §3.1, tarjetas "Tus grupos"). */
 export type GroupStatus =
@@ -50,7 +51,14 @@ export async function joinGroup(groupId: string, userId: string): Promise<void> 
       { group_id: groupId, user_id: userId },
       { onConflict: 'group_id,user_id', ignoreDuplicates: true },
     )
-  if (error) throw error
+  if (error) {
+    // 23503 (issue #760, LOCATIONGUESSER-5): el viaje se borró entre que se
+    // compartió el enlace y que el receptor lo abrió — el insert viola la FK
+    // hacia `groups`. ESPERABLE, no un fallo genérico: `useDeepLinkJoin` lo usa
+    // para llevar al usuario a un estado amable en vez de una unhandled rejection.
+    if (getErrorCode(error) === '23503') throw new ResourceGoneError('Este viaje ya no existe')
+    throw error
+  }
 }
 
 /**

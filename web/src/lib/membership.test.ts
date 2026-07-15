@@ -52,6 +52,7 @@ import {
   setMemberRole,
   transferOwnership,
 } from './membership'
+import { ResourceGoneError } from './errors'
 
 const FAR_FUTURE = '2999-01-01T00:00:00.000Z'
 const PAST = '2000-01-01T00:00:00.000Z'
@@ -75,6 +76,19 @@ describe('joinGroup', () => {
   test('propaga el error', async () => {
     results['group_members'] = { data: null, error: new Error('boom') }
     await expect(joinGroup('g1', 'u1')).rejects.toThrow('boom')
+  })
+
+  // Issue #760 (LOCATIONGUESSER-5, 4 usuarios/22 eventos): el viaje se borró
+  // entre que se compartió el enlace y que se abrió — el upsert viola la FK
+  // hacia `groups` (23503, "Key is not present in table groups"). Se distingue
+  // por CÓDIGO para que `useDeepLinkJoin` muestre un estado amable en vez de
+  // dejar viajar el fallo como unhandled rejection.
+  test('23503 (viaje borrado): lanza ResourceGoneError, no el error crudo', async () => {
+    results['group_members'] = {
+      data: null,
+      error: { code: '23503', message: 'insert or update on table "group_members" violates FK' },
+    }
+    await expect(joinGroup('g-borrado', 'u1')).rejects.toThrow(ResourceGoneError)
   })
 })
 
