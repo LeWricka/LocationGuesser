@@ -30,6 +30,8 @@ import {
 } from '../../lib/challenges'
 import { deleteMyVote, getExistingVote, getVotes, startPlay, submitVote } from '../../lib/votes'
 import { getGroup } from '../../lib/groupData'
+import { getGroupMembers } from '../../lib/membership'
+import { aggregateLeaderboard, getGroupVotes } from '../../lib/leaderboard'
 import { upsertProfile } from '../../lib/profile'
 import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
@@ -47,8 +49,10 @@ import { describeChallengeClosure } from './challengeClosure'
 import { nodeToPngBlob, shareDomain, shareLeaderboardImage } from '../group/shareLeaderboard'
 // "Guárdate / entra del todo" (issue #758): CTA opcional tras jugar, para el
 // receptor ANÓNIMO. Vive en features/auth (vincula uid), esta pantalla solo la
-// invoca.
-import { AccountUpgradeModal } from '../auth'
+// invoca. `RecoverIdentityModal` (issue #756) es su hermana para el caso
+// "nombre repetido": en vez de vincular el uid anónimo actual a un email
+// nuevo, RECUPERA el uid de una cuenta ya existente (mismo nombre en el viaje).
+import { AccountUpgradeModal, RecoverIdentityModal } from '../auth'
 import {
   BackHomeButton,
   Button,
@@ -191,10 +195,27 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const pendingRevealRef = useRef<{ current: ChallengeForPlay; playedGuess: LatLng | null } | null>(
     null,
   )
+  // Nombre repetido = puerta de recuperación (issue #756): si el nombre
+  // coincide con el de otro miembro del viaje, `submitName` NO lo guarda —
+  // aparca la decisión aquí. No-null cambia `NamePromptModal` al paso "¿Eres
+  // tú?"; `recoverOpen` abre el login OTP normal (RecoverIdentityModal) si
+  // elige "Soy yo". `recoveringRef` es la señal para el efecto de abajo: tras
+  // verificar el código, la sesión cambia de uid de forma asíncrona
+  // (`onAuthStateChange`), así que no podemos retomar la jugada aparcada en el
+  // mismo tick — esperamos a que `user` cambie de verdad.
+  const [conflictName, setConflictName] = useState<string | null>(null)
+  const [recoverOpen, setRecoverOpen] = useState(false)
+  const recoveringRef = useRef(false)
   // "Guárdate / entra del todo" (issue #758): CTA opcional en el resultado para
   // el receptor anónimo. Sin relación con el nombre de arriba: se puede jugar
   // con nombre y seguir sin cuenta permanente indefinidamente.
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  // Intensidad del CTA a partir de la 2ª partida (issue #756): recuento del
+  // receptor anónimo EN ESTE VIAJE (no solo este reto). Se resuelve reusando
+  // `getGroupVotes`/`aggregateLeaderboard` (ya existen para el marcador, sin
+  // query nueva) solo tras revelar y solo para anónimos — no es un dato que
+  // haga falta en el camino de jugar.
+  const [anonTally, setAnonTally] = useState<{ plays: number; points: number } | null>(null)
   // Respeto de reduced-motion: sin animaciones ⇒ tampoco háptica (un golpe de
   // vibración es "movimiento" para quien lo desactiva). Guardamos en un ref para
   // leerlo dentro de callbacks memoizados sin cambiar su identidad.
@@ -354,6 +375,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // Guarda el nombre y retoma la jugada aparcada. `upsertProfile` además del
   // trigger `handle_new_user`: para un anónimo, `profiles` ya existe (fila
   // vacía) desde el alta anónima, así que esto es un UPDATE de display_name.
+  //
+  // Nombre repetido = puerta de recuperación, no duplicado (issue #756): antes
+  // de guardar, comprobamos si YA hay un miembro del viaje con este nombre
+  // (case-insensitive, trim). Si lo hay, NO lo guardamos — aparcamos la
+  // decisión en el paso "¿Eres tú?" del propio modal (`conflictName`); el
+  // usuario elige entre recuperar su cuenta (RecoverIdentityModal) o elegir
+  // otro nombre. Solo aplica con un viaje real (`groupId`): un reto de
+  // práctica suelto no tiene "miembros" con los que chocar.
   async function submitName() {
     const name = nameValue.trim()
     if (name.length < 2) {
@@ -364,32 +393,70 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     setNameSaving(true)
     setNameError(null)
     const pendingForAnalytics = pendingRevealRef.current?.current
-    try {
-      await upsertProfile({ id: user.id, displayName: name })
-      await refreshProfile()
+    const trackOutcome = (outcome: 'success' | 'error' | 'conflict') =>
       track('name_prompt_submitted', {
-        outcome: 'success',
+        outcome,
         ...(pendingForAnalytics && {
           group_id: pendingForAnalytics.group_id,
           challenge_id: pendingForAnalytics.id,
         }),
       })
+    try {
+      if (groupId) {
+        const members = await getGroupMembers(groupId)
+        const collision = members.find(
+          (m) => m.userId !== user.id && m.name.trim().toLowerCase() === name.toLowerCase(),
+        )
+        if (collision) {
+          trackOutcome('conflict')
+          setConflictName(collision.name)
+          return
+        }
+      }
+      await upsertProfile({ id: user.id, displayName: name })
+      await refreshProfile()
+      trackOutcome('success')
       setNameOpen(false)
       const pending = pendingRevealRef.current
       pendingRevealRef.current = null
       if (pending) void reveal(pending.current, pending.playedGuess)
     } catch (err) {
-      track('name_prompt_submitted', {
-        outcome: 'error',
-        ...(pendingForAnalytics && {
-          group_id: pendingForAnalytics.group_id,
-          challenge_id: pendingForAnalytics.id,
-        }),
-      })
+      trackOutcome('error')
       setNameError(describeError(err))
     } finally {
       setNameSaving(false)
     }
+  }
+
+  // "No soy yo": vuelve al paso de nombre para elegir otro (issue #756). Deja
+  // `nameOpen` intacto (sigue abierto) — solo se limpia el conflicto.
+  function dismissConflict() {
+    setConflictName(null)
+    setNameError(null)
+  }
+
+  // "Soy yo": cede el paso a `RecoverIdentityModal` (login OTP normal). El
+  // nombre en conflicto (`conflictName`) NO se limpia aquí a propósito: sigue
+  // haciendo falta para el copy de ese modal ("Ya hay un X..."); se limpia al
+  // recuperar con éxito o si se cierra (`dismissConflict`).
+  function confirmIsMe() {
+    setNameOpen(false)
+    setRecoverOpen(true)
+  }
+
+  // Cerrar `RecoverIdentityModal` sin completar (X/Escape/"Ahora no"): nunca
+  // dejar al jugador en un callejón sin salida — vuelve al paso "¿Eres tú?"
+  // (el conflicto sigue vivo) para que pueda reintentar o elegir otro nombre.
+  function cancelRecover() {
+    setRecoverOpen(false)
+    setNameOpen(true)
+  }
+
+  // Código verificado con éxito (issue #756): la sesión YA es la de la cuenta
+  // existente, pero el cambio de uid llega async vía `onAuthStateChange` — el
+  // efecto de arriba (dependiente de `user`) hace el resto en cuanto se nota.
+  function handleRecovered() {
+    recoveringRef.current = true
   }
 
   // Carga del reto. Si el usuario ya votó, salta directo a revelado mostrando
@@ -512,6 +579,48 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       cancelled = true
     }
   }, [groupId])
+
+  // Recuento del receptor anónimo EN EL VIAJE, para intensificar el CTA de
+  // guardar cuenta a partir de la 2ª partida (issue #756). Solo tras revelar
+  // (no hace falta antes) y solo para anónimos (quien ya tiene cuenta no ve
+  // este CTA). Reutiliza `getGroupVotes`/`aggregateLeaderboard` — el mismo par
+  // que ya alimenta el marcador — en vez de una consulta nueva. Falla en
+  // silencio: sin tally, el CTA cae a la versión de "esta partida" (aún
+  // correcta, solo menos intensa).
+  useEffect(() => {
+    if (phase !== 'revealed' || !isAnonymous || !groupId || !user) return
+    let cancelled = false
+    void getGroupVotes(groupId)
+      .then((votes) => {
+        if (cancelled) return
+        const mine = aggregateLeaderboard(votes).find((entry) => entry.userId === user.id)
+        if (mine) setAnonTally({ plays: mine.plays, points: mine.points })
+      })
+      .catch(() => {
+        // Sin tally: el CTA usa el fallback de "esta partida" (result.points).
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [phase, isAnonymous, groupId, user])
+
+  // Recuperación de identidad (issue #756): tras verificar el código de
+  // `RecoverIdentityModal`, la sesión pasa a ser la de la cuenta EXISTENTE
+  // (otro uid) vía `onAuthStateChange` — asíncrono, no ocurre en el mismo tick
+  // que `onRecovered()`. Marcamos la intención con el ref y esperamos a que
+  // `user` cambie de verdad para retomar la jugada aparcada (mismo patrón que
+  // `maybeReveal`/`submitName`, pero como el nuevo usuario YA tiene nombre en
+  // este viaje —así lo detectamos—, no hace falta volver a pedirlo ni tocar su
+  // perfil.
+  useEffect(() => {
+    if (!recoveringRef.current) return
+    recoveringRef.current = false
+    setRecoverOpen(false)
+    setConflictName(null)
+    const pending = pendingRevealRef.current
+    pendingRevealRef.current = null
+    if (pending) void reveal(pending.current, pending.playedGuess)
+  }, [user, reveal])
 
   // Inicio del cronómetro de respuesta (issue #214). Al entrar en `playing`
   // fijamos el origen desde el `start_at` persistido (el mismo que reconstruye la
@@ -828,6 +937,20 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // Reto de práctica: plazo lejano (>1 año). Solo en estos mostramos "volver a
   // jugar" tras revelar; en un reto real rejugar tras ver la respuesta sería trampa.
   const isPractice = isPracticeChallenge(challenge.deadline_at)
+  // Copy del CTA "guárdate" reencuadrado al beneficio (issue #756): puntos, no
+  // "cuenta". Por defecto enseña los puntos de ESTA partida (ya en pantalla);
+  // a partir de la 2ª partida como anónimo EN ESTE VIAJE (`anonTally`) sube de
+  // intensidad con el acumulado del viaje y variant primaria.
+  const groupLabel = groupName ?? 'tu viaje'
+  const intensifiedUpgrade = anonTally && anonTally.plays >= 2 ? anonTally : null
+  const upgradeCtaLabel = intensifiedUpgrade
+    ? `Llevas ${intensifiedUpgrade.plays} partidas y ${intensifiedUpgrade.points} puntos — guárdalos`
+    : result
+      ? `No pierdas tus ${result.points} puntos de ${groupLabel}`
+      : `Guarda tu progreso en ${groupLabel}`
+  const upgradePoints = intensifiedUpgrade
+    ? intensifiedUpgrade.points
+    : (result?.points ?? undefined)
 
   // --------------------------------------------------------------------------
   // Fase de JUGAR: experiencia inmersiva a pantalla completa.
@@ -925,7 +1048,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
 
         {/* Nombre antes de revelar (issue #758): solo se monta si hace falta
             (maybeReveal lo abre). No es descartable: sin nombre, el marcador
-            no sabría de quién es este puesto. */}
+            no sabría de quién es este puesto. Nombre repetido = puerta de
+            recuperación (issue #756): `conflictName` cambia el modal al paso
+            "¿Eres tú?" en vez de guardar un duplicado. */}
         <NamePromptModal
           open={nameOpen}
           name={nameValue}
@@ -933,6 +1058,19 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           onSubmit={() => void submitName()}
           saving={nameSaving}
           error={nameError}
+          conflictName={conflictName}
+          onDismissConflict={dismissConflict}
+          onConfirmIsMe={confirmIsMe}
+        />
+
+        {/* "Soy yo" (issue #756): login OTP normal para recuperar la cuenta
+            existente que juega con este nombre en el viaje. Cancelar vuelve al
+            paso "¿Eres tú?" (nunca a un callejón sin salida). */}
+        <RecoverIdentityModal
+          open={recoverOpen}
+          matchedName={conflictName ?? ''}
+          onClose={cancelRecover}
+          onRecovered={handleRecovered}
         />
       </>
     )
@@ -1073,10 +1211,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             {/* "Guárdate / entra del todo" (issue #758): CTA OPCIONAL solo para el
                 receptor ANÓNIMO — vincula su sesión a un email sin perder su voto
                 ni su puesto (mismo uid). Saltable: no vincular no le quita nada de
-                lo que ya jugó. No se ofrece a quien ya tiene cuenta permanente. */}
+                lo que ya jugó. No se ofrece a quien ya tiene cuenta permanente.
+                Reencuadrado al beneficio + intensidad progresiva (issue #756):
+                variant primaria a partir de la 2ª partida como anónimo. */}
             {isAnonymous && (
               <Button
-                variant="secondary"
+                variant={intensifiedUpgrade ? 'primary' : 'secondary'}
                 fullWidth
                 onClick={() => {
                   // Numerador del clic (issue #751): `upgrade_cta_shown` (la
@@ -1090,7 +1230,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 }}
                 className={styles.actionsIn}
               >
-                Guarda tu cuenta
+                {upgradeCtaLabel}
               </Button>
             )}
 
@@ -1232,9 +1372,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           origin="play_result"
           groupId={groupId}
           challengeId={challenge.id}
+          groupName={groupLabel}
+          points={upgradePoints}
           onUpgraded={() => {
             setUpgradeOpen(false)
-            toast.show('Cuenta guardada. Tu voto y tu puesto siguen siendo tuyos.', {
+            toast.show(`Guardado. Tus puntos de ${groupLabel} siguen siendo tuyos.`, {
               tone: 'success',
             })
           }}

@@ -41,8 +41,15 @@ export interface MagicLink {
   submit: () => Promise<void>
   /** Reenvía el email al mismo correo sin cambiar de paso. */
   resend: () => Promise<void>
-  /** Verifica el código tecleado; si va bien, la sesión se crea sola. */
-  verify: () => Promise<void>
+  /**
+   * Verifica el código tecleado; si va bien, la sesión se crea sola y devuelve
+   * `true` (el llamante puede reaccionar, p.ej. cerrar un modal). `false` si el
+   * código era inválido/caducado (el error ya queda fijado para la UI). Antes no
+   * devolvía nada porque `LoginFlow` no lo necesitaba (`onAuthStateChange` ya
+   * repinta solo); `RecoverIdentityModal` (issue #756) sí necesita saber el
+   * éxito para retomar la jugada aparcada tras recuperar la cuenta.
+   */
+  verify: () => Promise<boolean>
   /** Vuelve al paso de email (p.ej. para cambiar el correo). */
   reset: () => void
 }
@@ -102,19 +109,21 @@ export function useMagicLink({ redirectTo }: Options = {}): MagicLink {
     setResending(false)
   }
 
-  async function verify(): Promise<void> {
+  async function verify(): Promise<boolean> {
     setError(null)
     if (!isValidCode(code)) {
       setError('El código son 6 dígitos.')
-      return
+      return false
     }
     setVerifying(true)
     try {
       // Al verificar, supabase.auth emite el evento de sesión y AuthProvider
       // repinta logueado: este flujo se desmonta solo, no hay que navegar.
       await verifyEmailOtp(email, code)
+      return true
     } catch {
       setError('Código incorrecto o caducado. Revísalo o reenvía uno nuevo.')
+      return false
     } finally {
       setVerifying(false)
     }
