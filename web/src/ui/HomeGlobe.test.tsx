@@ -96,6 +96,11 @@ class MockMap {
     this.removeSourceCalls.push(id)
   }
   setProjection() {}
+  // El componente saca el canvas del tab-order (a11y aria-hidden-focus, #622).
+  canvas = { tabIndex: 0 }
+  getCanvas() {
+    return this.canvas
+  }
   fitBounds(bounds: unknown, opts: unknown) {
     this.fitBoundsCalls.push({ bounds, opts })
   }

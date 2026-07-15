@@ -837,6 +837,13 @@ export function HomeGlobe({
         })
         mapRef.current = map
 
+        // a11y (deuda de #622, aflorada al cambiar el hash del CSS module): el
+        // canvas de MapLibre trae tabindex="0" de serie, pero este globo es un
+        // héroe visual dentro de un contenedor aria-hidden — un elemento
+        // enfocable ahí dentro es una violación aria-hidden-focus (axe, serious).
+        // Fuera del orden de tabulación: el globo nunca se navegó por teclado.
+        map.getCanvas().tabIndex = -1
+
         map.on('load', () => {
           if (disposed) return
           // Globo 3D (proyección que llegó en v4) + atmósfera noche tokenizada.
@@ -991,19 +998,26 @@ export function HomeGlobe({
   const evoked = !webgl || failed
 
   return (
-    <div className={[styles.globe, className].filter(Boolean).join(' ')} aria-hidden="true">
+    // a11y (deuda de #622, cerrada aquí): el aria-hidden vivía en el wrapper y se
+    // tragaba también el botón real del crédito "ⓘ" (enfocable dentro de un árbol
+    // oculto = aria-hidden-focus). Ahora lo decorativo (lienzo/evocado) se oculta
+    // pieza a pieza y el crédito queda visible para lectores de pantalla.
+    <div className={[styles.globe, className].filter(Boolean).join(' ')}>
       {evoked ? (
         // Globo EVOCADO (sin tiles): red de seguridad cuando no hay WebGL. Mantiene
         // el héroe visual; los pines reales viven en el motor MapLibre.
-        <div className={styles.evoked}>
+        <div className={styles.evoked} aria-hidden="true">
           <div className={`${styles.evokedGlobe} lg-home-globe-breathe`} />
         </div>
       ) : (
         <>
           {/* Lienzo WebGL: arranca a opacity 0 sobre el fondo de escena y funde a 1
-              en el primer `idle` (revelado; reduced-motion aparece sin fundir). */}
+              en el primer `idle` (revelado; reduced-motion aparece sin fundir).
+              aria-hidden: es un héroe visual (los pines-marker viven aquí dentro y
+              se operan con click/touch; el canvas sale del tab-order arriba). */}
           <div
             ref={containerRef}
+            aria-hidden="true"
             className={[styles.map, revealed ? styles.mapRevealed : ''].filter(Boolean).join(' ')}
           />
           {/* Crédito propio (NO control de MapLibre): "ⓘ" discreto que despliega el texto
