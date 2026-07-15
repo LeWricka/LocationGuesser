@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import type { ChallengeForPlay } from '../../lib/challenges'
+import { ImageDecodeError } from '../../lib/storage'
 
 const trackMock = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
@@ -213,6 +214,31 @@ describe('CreateNumberChallenge — formulario de papel en 2 pasos (#586)', () =
     expect(createNumberChallengeMock).toHaveBeenCalledWith(
       expect.objectContaining({ happenedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) }),
     )
+  })
+
+  // Issue #762: `uploadImage` (lib/storage) ya reporta el `ImageDecodeError` a
+  // Sentry con el detalle rico; duplicarlo aquí (como antes) lo tapaba con un
+  // segundo evento más pobre. El toast, además, debe ser el mensaje corto y
+  // accionable de la foto — no el genérico "no se pudo crear el reto".
+  test('si la foto falla al decodificar, NO duplica el reporte a Sentry y el toast es el mensaje corto de la foto', async () => {
+    uploadImageMock.mockRejectedValue(new ImageDecodeError('1000155420.jpg'))
+    renderCreate()
+
+    // La foto opcional se elige en el PASO 1 (junto a nombre/pregunta).
+    await userEvent.type(screen.getByLabelText('Nombre del reto'), 'La cuenta de la cena')
+    await userEvent.type(screen.getByLabelText('Tu pregunta'), '¿Cuánto costó la cena?')
+    const file = new File(['heic-disfrazado'], '1000155420.jpg', { type: 'image/jpeg' })
+    await userEvent.upload(screen.getByLabelText('Añadir foto del sitio'), file)
+    await userEvent.click(screen.getByRole('button', { name: /siguiente/i }))
+
+    await userEvent.type(screen.getByLabelText('Respuesta correcta'), '10')
+    await userEvent.click(screen.getByRole('button', { name: /crear el reto/i }))
+
+    expect(
+      await screen.findByText(/no se pudo leer la imagen «1000155420\.jpg»/i),
+    ).toBeInTheDocument()
+    expect(createNumberChallengeMock).not.toHaveBeenCalled()
+    expect(reportErrorMock).not.toHaveBeenCalled()
   })
 
   test('con un viaje FUTURO sin momentos, la fecha por defecto cae en el inicio del viaje', async () => {

@@ -5,7 +5,7 @@ import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import { createNumberChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { DEFAULT_NUMBER_TOLERANCE } from '../../lib/geo'
 import { deadlineFromMinutes } from '../../lib/time'
-import { uploadImage } from '../../lib/storage'
+import { ImageDecodeError, uploadImage } from '../../lib/storage'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
@@ -403,10 +403,15 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
       // los flujos de crear reto (qué se comparte, a quién, y cómo volver al viaje).
       setCreated(challenge)
     } catch (err) {
-      reportError(err, { area: 'create_number_challenge' })
+      // Mismo motivo que en CreateLocationChallenge (#762/#642): `uploadImage`
+      // ya reportó el `ImageDecodeError` con el detalle rico; no lo duplicamos
+      // aquí con un segundo evento más pobre.
+      if (!(err instanceof ImageDecodeError)) reportError(err, { area: 'create_number_challenge' })
       const msg = describeError(err)
       setStatus(null)
-      toast.show(`No se pudo crear el reto: ${msg}`, { tone: 'danger' })
+      toast.show(err instanceof ImageDecodeError ? msg : `No se pudo crear el reto: ${msg}`, {
+        tone: 'danger',
+      })
       setBusy(false)
     }
   }

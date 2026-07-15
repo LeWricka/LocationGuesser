@@ -526,11 +526,16 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
           paths.push(await uploadImage(photos[i].file))
         } catch (err) {
           if (!(err instanceof ImageDecodeError)) throw err
+          // `storage.ts` YA reportó este error con el detalle rico (MIME,
+          // tamaño, magic bytes, vía que falló, #762) — reenviamos ESE mismo
+          // detalle (`err.diagnostics`) en vez de reconstruir uno más pobre,
+          // para no clobbearlo con un segundo evento peor (mismo fallo que
+          // #642 arregló para el reporte interno de storage.ts).
           reportError(err, {
+            ...err.diagnostics,
             area: 'add_moment',
-            stage: 'upload_photo',
+            callSite: 'upload_photo',
             groupId,
-            fileName: err.fileName,
           })
           failedFileNames.push(err.fileName)
           failedIds.push(photos[i].id)

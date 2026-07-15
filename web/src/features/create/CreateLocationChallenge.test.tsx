@@ -4,10 +4,15 @@ import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import type { LatLng } from '../../lib/geo'
 import type { ChallengeForPlay } from '../../lib/challenges'
+import { ImageDecodeError } from '../../lib/storage'
 
 const trackMock = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
-vi.mock('../../lib/observability', () => ({ reportError: vi.fn() }))
+
+const reportErrorMock = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportError: (...args: unknown[]) => reportErrorMock(...args),
+}))
 
 const createChallengeMock = vi.fn()
 const promoteToChallengeMock = vi.fn()
@@ -137,6 +142,7 @@ beforeEach(() => {
   findPanoramaMock.mockReset()
   findPanoramaMock.mockResolvedValue({ panoId: 'pano-1', lat: 41.38, lng: 2.17 })
   trackMock.mockClear()
+  reportErrorMock.mockClear()
   createChallengeMock.mockReset()
   promoteToChallengeMock.mockReset()
   uploadImageMock.mockReset()
@@ -334,6 +340,28 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
       'challenge_created',
       expect.objectContaining({ has_photo: true, photo_is_hint: true }),
     )
+  })
+
+  // Issue #762: `uploadImage` (lib/storage) ya reporta el `ImageDecodeError` a
+  // Sentry con el detalle rico (MIME, tamaño, magic bytes, vía que falló).
+  // Reportarlo OTRA VEZ aquí, como se hacía antes, lo duplicaba con MENOS
+  // contexto — y ese segundo evento pobre era el que se veía en Sentry en
+  // producción (LOCATIONGUESSER-T, sin fileName/stage/magicBytesHex).
+  test('si la foto falla al decodificar, NO duplica el reporte a Sentry y el toast es el mensaje corto y accionable de la foto (sin el prefijo "no se pudo lanzar el reto")', async () => {
+    uploadImageMock.mockRejectedValue(new ImageDecodeError('IMG_6756.HEIC'))
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    const file = new File(['heic-bytes'], 'IMG_6756.HEIC', { type: 'image/heic' })
+    await user.upload(screen.getByLabelText('Añadir foto del sitio'), file)
+    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+
+    expect(
+      await screen.findByText(/no se pudo leer la imagen «img_6756\.heic»/i),
+    ).toBeInTheDocument()
+    expect(createChallengeMock).not.toHaveBeenCalled()
+    expect(reportErrorMock).not.toHaveBeenCalled()
   })
 })
 

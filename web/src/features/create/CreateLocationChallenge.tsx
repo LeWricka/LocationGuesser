@@ -7,7 +7,7 @@ import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import { createChallenge, promoteToChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes } from '../../lib/time'
 import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
-import { uploadImage } from '../../lib/storage'
+import { ImageDecodeError, uploadImage } from '../../lib/storage'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
@@ -582,14 +582,23 @@ export function CreateLocationChallenge({
         setCreated(challenge)
       }, 1400)
     } catch (err) {
-      reportError(err, { area: 'create_location_challenge' })
+      // `uploadImage` (lib/storage) YA reportó un `ImageDecodeError` con el
+      // detalle rico (MIME, tamaño, magic bytes, vía que falló, #762);
+      // reportarlo OTRA VEZ aquí con solo `{area}` lo duplicaba con MENOS
+      // contexto — y ese segundo evento pobre era el que se acababa viendo en
+      // Sentry, tapando el rico (mismo problema que #642 arregló para el
+      // reporte interno de storage.ts).
+      if (!(err instanceof ImageDecodeError))
+        reportError(err, { area: 'create_location_challenge' })
       const msg = describeError(err)
       setStatus(null)
       const networkish = /failed to fetch|networkerror|load failed/i.test(msg)
       toast.show(
-        networkish
-          ? 'Sin conexión. Prueba con datos o WiFi y reinténtalo.'
-          : `No se pudo lanzar el reto: ${msg}`,
+        err instanceof ImageDecodeError
+          ? msg // Ya es un mensaje corto y accionable ("prueba con otra foto…"); no hace falta el prefijo "No se pudo lanzar el reto".
+          : networkish
+            ? 'Sin conexión. Prueba con datos o WiFi y reinténtalo.'
+            : `No se pudo lanzar el reto: ${msg}`,
         { tone: 'danger' },
       )
       setBusy(false)
