@@ -1,4 +1,4 @@
-import { Play, User } from 'lucide-react'
+import { Play, Share2, User } from 'lucide-react'
 import { Badge, Button, ChallengePhoto, Icon, IconCandado, IconDiana } from '../../ui'
 import { resolveMomentPhoto, type Moment } from '../../lib/trip'
 import { parseMomentDate } from '../../lib/time'
@@ -12,6 +12,12 @@ interface Props {
   onExpand: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
+  /**
+   * Icono "compartir" a 1 tap (issue #758): solo se ofrece cuando el llamador lo
+   * pasa, y el llamador (`TripDiario`) solo lo hace para el reto EN JUEGO
+   * seleccionado — compartir un reto cerrado no lleva a ninguna acción.
+   */
+  onShare?: () => void
 }
 
 // Fecha compacta del momento ("8 abr"). Sin año: el viaje suele caber en uno y la
@@ -57,7 +63,7 @@ function formatMomentDate(value: string): string | null {
  * ve su propia foto en preview, con el mismo sello para que sepa que el resto
  * del grupo aún no la ve.
  */
-export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
+export function MomentCard({ moment, selected, onExpand, onPlay, onShare }: Props) {
   const isActive = moment.status === 'active'
   // Lleva capa de reto (en juego, cerrado o práctica) → chip "🎯 Reto". Un recuerdo
   // puro no lo lleva: la tarjeta lee como contenido, no como juego.
@@ -100,6 +106,21 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
         <div className={styles.videoBadge} data-testid="video-badge" aria-hidden="true">
           <Icon icon={Play} size={16} fill="currentColor" />
         </div>
+      )}
+
+      {/* Icono "Compartir reto" (issue #758): 1 tap en la tarjeta SELECCIONADA de
+          un reto EN JUEGO → `ShareChallengeModal` directo (lo cablea TripDiario).
+          Misma esquina sup-izq que la bandera de país: nunca colisionan, un reto
+          activo todavía no tiene país resuelto (solo los CERRADOS lo tienen). */}
+      {selected && isActive && onShare && (
+        <button
+          type="button"
+          className={styles.shareBtn}
+          onClick={onShare}
+          aria-label="Compartir reto"
+        >
+          <Icon icon={Share2} size={16} />
+        </button>
       )}
 
       {/* Bandera del país en disco de vidrio, esquina sup-izq (estilo Polarsteps).

@@ -180,6 +180,39 @@
   min-width: 0;
 }
 
+/* Icono "Compartir reto" (issue #758): mismo lenguaje "glass" que `.flag`, en su
+ * misma esquina sup-izq — nunca colisionan (un reto activo no tiene país
+ * resuelto todavía). A diferencia de `.flag`/`.surprise` SÍ es interactivo. */
+.shareBtn {
+  position: absolute;
+  top: var(--space-3);
+  left: var(--space-3);
+  /* design-lint-allow: capa local de la tarjeta (chrome flotante sobre la foto) */
+  z-index: 1;
+  width: var(--tap-target-sm);
+  height: var(--tap-target-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-on-photo);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-chrome), var(--ring-contact);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    transform var(--transition-fast) var(--ease-emphasized);
+}
+.shareBtn:hover {
+  background: var(--glass-bg-strong);
+}
+.shareBtn:active {
+  transform: scale(0.92);
+}
+
 /* Bandera del país: disco de vidrio esmerilado arriba a la izquierda (estilo
    Polarsteps, regla dura #537: flota sobre la foto). Mismo lenguaje que el botón
    "expandir" para que la tarjeta lea coherente. */
@@ -369,6 +402,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .shareBtn {
+    transition: none;
+  }
+  .shareBtn:active {
+    transform: none;
+  }
   .card {
     transition: none;
     /* Sin escala (nada de "zoom" para quien pide menos movimiento): la tarjeta

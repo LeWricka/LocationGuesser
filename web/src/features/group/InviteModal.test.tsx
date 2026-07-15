@@ -53,7 +53,7 @@ const session: SessionState = {
   refreshProfile: async () => {},
 }
 
-function renderModal(onClose = vi.fn(), isOwner = true) {
+function renderModal(onClose = vi.fn(), isOwner = true, origin?: string) {
   render(
     <SessionContext.Provider value={session}>
       <ToastProvider>
@@ -65,6 +65,7 @@ function renderModal(onClose = vi.fn(), isOwner = true) {
           link="https://momentu.art/v/abc123"
           challengeCount={3}
           isOwner={isOwner}
+          origin={origin}
         />
       </ToastProvider>
     </SessionContext.Provider>,
@@ -156,6 +157,25 @@ describe('InviteModal — invitación como tarjeta-imagen (#617)', () => {
       expect.objectContaining({ surface: 'shared', group_id: 'g1' }),
     )
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('con origin="share_fab" (issue #758): viaja en invite_shared sin tocar el "surface" (mecanismo)', async () => {
+    shareLeaderboardImageMock.mockResolvedValue('shared')
+    renderModal(vi.fn(), true, 'share_fab')
+
+    const shareBtn = await waitFor(() => {
+      const btn = screen.getByRole('button', { name: /compartir/i })
+      expect(btn).toBeEnabled()
+      return btn
+    })
+    await userEvent.click(shareBtn)
+
+    await waitFor(() =>
+      expect(trackMock).toHaveBeenCalledWith(
+        'invite_shared',
+        expect.objectContaining({ surface: 'shared', group_id: 'g1', origin: 'share_fab' }),
+      ),
+    )
   })
 
   test('"Compartir" sin Web Share (escritorio): descarga la imagen y copia el mensaje, sin cerrar el modal', async () => {

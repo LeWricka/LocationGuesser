@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest'
-import { render, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Moment } from '../../lib/trip'
 
@@ -54,6 +54,7 @@ function renderDiario(props: Partial<Parameters<typeof TripDiario>[0]> = {}) {
       onPlay={vi.fn()}
       onAddMoment={vi.fn()}
       onInvite={vi.fn()}
+      onShareChallenge={vi.fn()}
       {...props}
     />,
   )
@@ -88,5 +89,35 @@ describe('TripDiario — tap en el carrusel (#605)', () => {
 
     expect(onExpand).toHaveBeenCalledWith(MOMENTS[0])
     expect(onSelectFromMap).not.toHaveBeenCalled()
+  })
+})
+
+// Issue #758: icono "Compartir" de 1 tap, SOLO en la tarjeta seleccionada de un
+// reto EN JUEGO (compartir uno cerrado no lleva a ninguna acción).
+describe('TripDiario — icono "Compartir" del carrusel (#758)', () => {
+  test('reto EN JUEGO seleccionado: pinta el icono y dispara onShareChallenge con el momento', async () => {
+    const user = userEvent.setup()
+    const onShareChallenge = vi.fn()
+    const activo = moment({ challengeId: 'a', title: 'Playa', status: 'active', isChallenge: true })
+    renderDiario({ moments: [activo, MOMENTS[1]], selectedId: 'a', onShareChallenge })
+
+    await user.click(screen.getByRole('button', { name: 'Compartir reto' }))
+    expect(onShareChallenge).toHaveBeenCalledWith(activo)
+  })
+
+  test('recuerdo (no reto) seleccionado: sin icono de compartir', () => {
+    renderDiario({ selectedId: 'a' })
+    expect(screen.queryByRole('button', { name: 'Compartir reto' })).not.toBeInTheDocument()
+  })
+
+  test('reto EN JUEGO pero NO seleccionado: sin icono de compartir', () => {
+    const activo = moment({
+      challengeId: 'b',
+      title: 'Montaña',
+      status: 'active',
+      isChallenge: true,
+    })
+    renderDiario({ moments: [MOMENTS[0], activo], selectedId: 'a' })
+    expect(screen.queryByRole('button', { name: 'Compartir reto' })).not.toBeInTheDocument()
   })
 })

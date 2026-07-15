@@ -51,7 +51,6 @@ const noop = () => {}
 // compartir) con valores neutros — cada test override solo lo que le importa.
 const baseProps = {
   groupId: 'g1',
-  groupName: 'Japón en primavera',
   prizes: null,
   pastChallenges: [] as PastChallengeSummary[],
   onOpenChallenge: noop,
@@ -61,10 +60,11 @@ const baseProps = {
   canCreate: false,
 }
 
-// Monta SIEMPRE dentro de `<ToastProvider>`: el marcador rescató de GroupPage el
-// FAB "Compartir" (ShareLeaderboardModal) y el editor de premios, y ambos usan
-// `useToast()` en su cuerpo — se montan (aunque cerrados) siempre que hay
-// clasificación o el dueño edita, así que el test necesita el provider real.
+// Monta SIEMPRE dentro de `<ToastProvider>`: el editor de premios
+// (`PrizesEditorModal`, rescatado de GroupPage) usa `useToast()` en su cuerpo
+// — se monta (aunque cerrado) cuando el dueño edita, así que el test necesita
+// el provider real. El FAB "Compartir clasificación" que vivía aquí se retiró
+// en el issue #758 (ahora es un item de la hoja "Compartir" de `TripPage`).
 function renderMarcador(
   props: Partial<ComponentProps<typeof MarcadorTab>> & { leaderboard: LeaderboardEntry[] },
 ) {
@@ -318,19 +318,5 @@ describe('MarcadorTab', () => {
     expect(conFoto?.querySelector('img')).toHaveAttribute('src', 'https://x/foto.jpg')
     const sinFoto = screen.getByText('Sin foto').closest('button')
     expect(sinFoto?.querySelector('img')).toBeNull()
-  })
-
-  test('compartir: el FAB solo aparece con clasificación', () => {
-    const { rerender } = renderMarcador({ leaderboard: [], canCreate: false })
-    expect(
-      screen.queryByRole('button', { name: /Compartir clasificación/ }),
-    ).not.toBeInTheDocument()
-
-    rerender(
-      <ToastProvider>
-        <MarcadorTab {...baseProps} leaderboard={[entry({})]} canCreate={false} />
-      </ToastProvider>,
-    )
-    expect(screen.getByRole('button', { name: /Compartir clasificación/ })).toBeInTheDocument()
   })
 })

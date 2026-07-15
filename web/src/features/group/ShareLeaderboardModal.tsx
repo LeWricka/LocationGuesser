@@ -22,6 +22,13 @@ interface Props {
   prizes: GroupPrizes | null
   /** Enlace del grupo (#g=…) — va en el caption, no dibujado en la imagen. */
   link: string
+  /**
+   * Desde dónde se abrió este modal (issue #758): hoy siempre `'share_fab'` (el
+   * FAB de compartir de MarcadorTab que vivía aquí se retiró; esta acción solo
+   * se abre ya desde la hoja nueva). Viaja junto a `method` (el MECANISMO:
+   * shared/downloaded), no lo sustituye.
+   */
+  origin?: string
 }
 
 /** Id del grupo a partir del enlace (#g=CODE[&c=…]). Lo extraemos aquí para no
@@ -37,7 +44,15 @@ function groupIdFromLink(link: string): string {
 // abrir. Muestra una previa de la imagen y deja Compartir / Descargar. El caption
 // (buildShareText) es mínimo: solo enlace + gancho (la tabla va en la imagen).
 // Compartir directo a ciegas sería confuso: aquí el usuario ve la tarjeta antes.
-export function ShareLeaderboardModal({ open, onClose, groupName, entries, prizes, link }: Props) {
+export function ShareLeaderboardModal({
+  open,
+  onClose,
+  groupName,
+  entries,
+  prizes,
+  link,
+  origin,
+}: Props) {
   const cardRef = useRef<HTMLDivElement>(null)
   const [pngUrl, setPngUrl] = useState<string | null>(null)
   const [blob, setBlob] = useState<Blob | null>(null)
@@ -129,6 +144,7 @@ export function ShareLeaderboardModal({ open, onClose, groupName, entries, prize
           method: 'downloaded',
           group_id: groupId,
           players: entries.length,
+          origin,
         })
         toast.show('Imagen descargada y enlace copiado, pégalos en el chat', { tone: 'success' })
         onClose()
@@ -137,6 +153,7 @@ export function ShareLeaderboardModal({ open, onClose, groupName, entries, prize
           method: 'shared',
           group_id: groupId,
           players: entries.length,
+          origin,
         })
         onClose()
       }

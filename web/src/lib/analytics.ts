@@ -109,6 +109,9 @@ export type AnalyticsEvent =
   // Invitación al grupo con preview (#155, OP2/I4). Props: surface
   // ('shared'|'copied'|'downloaded'), group_id. `invite_shared` = se abrió la
   // hoja de compartir del SO; `group_link_copied` = fallback de copiar enlace.
+  // Prop opcional origin (issue #758): 'share_fab' cuando se abre desde el FAB
+  // de compartir del viaje; ausente en el resto de entradas (CTA del vacío,
+  // menú de Miembros…), sin tocar el significado de `surface` (el mecanismo).
   | 'invite_shared'
   | 'group_link_copied'
   // Cambio de avatar desde el perfil (#168). Props: has_emoji (eligió un animal
@@ -159,7 +162,10 @@ export type AnalyticsEvent =
   // creado), este mide la acción "Compartir reto" sobre un reto YA existente
   // y EN JUEGO. Props: group_id, challenge_id, surface
   // ('shared'|'copied'|'downloaded'). SIN datos sensibles: nunca lat/lng ni
-  // el nombre del lugar (la respuesta oculta).
+  // el nombre del lugar (la respuesta oculta). Prop opcional origin (issue
+  // #758): 'share_fab' (hoja de compartir del viaje) | 'diario_card' (icono de
+  // 1 tap en la tarjeta seleccionada del carrusel); ausente desde la entrada
+  // previa (detalle del momento).
   | 'challenge_shared'
   // Receptor sin cuenta (issue #758): entra por enlace y ve/juega con una
   // sesión ANÓNIMA (sin login/registro). `receptor_anon_signin`: se intentó el

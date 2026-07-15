@@ -34,6 +34,14 @@ interface Props {
    * decide esa regla por su cuenta, confía en lo que le pasan.
    */
   imagePath: string | null
+  /**
+   * Desde dónde se abrió este modal (issue #758): `'share_fab'` (hoja nueva) o
+   * `'diario_card'` (icono de 1 tap en la tarjeta seleccionada del carrusel);
+   * `undefined` para la entrada previa (detalle del momento, `MomentSheet`),
+   * que sigue sin etiquetar. Viaja junto a `surface` (el MECANISMO: shared/
+   * copied/downloaded), no lo sustituye — son dos preguntas distintas.
+   */
+  origin?: string
   onClose: () => void
 }
 
@@ -54,6 +62,7 @@ export function ShareChallengeModal({
   challengeId,
   challengeTitle,
   imagePath,
+  origin,
   onClose,
 }: Props) {
   const { profile } = useSession()
@@ -126,7 +135,12 @@ export function ShareChallengeModal({
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(caption)
-      track('challenge_shared', { surface: 'copied', group_id: groupId, challenge_id: challengeId })
+      track('challenge_shared', {
+        surface: 'copied',
+        group_id: groupId,
+        challenge_id: challengeId,
+        origin,
+      })
       toast.show('Mensaje copiado, pégalo en el chat', { tone: 'success' })
     } catch {
       toast.show('No se pudo copiar el enlace', { tone: 'danger' })
@@ -150,6 +164,7 @@ export function ShareChallengeModal({
           surface: 'shared',
           group_id: groupId,
           challenge_id: challengeId,
+          origin,
         })
         onClose()
       } else if (result === 'downloaded') {
@@ -157,6 +172,7 @@ export function ShareChallengeModal({
           surface: 'downloaded',
           group_id: groupId,
           challenge_id: challengeId,
+          origin,
         })
         toast.show('Imagen descargada y mensaje copiado, pégalos en el chat', { tone: 'success' })
       }

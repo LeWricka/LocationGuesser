@@ -39,7 +39,7 @@ const session: SessionState = {
   refreshProfile: async () => {},
 }
 
-function renderModal(onClose = vi.fn(), imagePath: string | null = null) {
+function renderModal(onClose = vi.fn(), imagePath: string | null = null, origin?: string) {
   render(
     <SessionContext.Provider value={session}>
       <ToastProvider>
@@ -49,6 +49,7 @@ function renderModal(onClose = vi.fn(), imagePath: string | null = null) {
           challengeId="reto-9"
           challengeTitle="¿Dónde comimos ramen?"
           imagePath={imagePath}
+          origin={origin}
           onClose={onClose}
         />
       </ToastProvider>
@@ -136,6 +137,25 @@ describe('ShareChallengeModal — compartir un reto suelto (#739)', () => {
       expect.objectContaining({ surface: 'shared', group_id: 'g1', challenge_id: 'reto-9' }),
     )
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('con origin="share_fab" (issue #758): viaja en challenge_shared sin tocar el "surface" (mecanismo)', async () => {
+    shareLeaderboardImageMock.mockResolvedValue('shared')
+    renderModal(vi.fn(), null, 'share_fab')
+
+    const shareBtn = await waitFor(() => {
+      const btn = screen.getByRole('button', { name: /compartir/i })
+      expect(btn).toBeEnabled()
+      return btn
+    })
+    await userEvent.click(shareBtn)
+
+    await waitFor(() =>
+      expect(trackMock).toHaveBeenCalledWith(
+        'challenge_shared',
+        expect.objectContaining({ surface: 'shared', challenge_id: 'reto-9', origin: 'share_fab' }),
+      ),
+    )
   })
 
   test('"Compartir" sin Web Share: descarga + copia, sin cerrar el modal', async () => {
