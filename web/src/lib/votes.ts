@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { describeError, getErrorCode, ResourceGoneError } from './errors'
+import { ChallengeClosedError, describeError, getErrorCode, ResourceGoneError } from './errors'
 import type { Vote } from './database.types'
 import type { VoteWithName } from './leaderboard'
 
@@ -68,6 +68,12 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
     // legible (describeError combina message/details/hint/code) para que el
     // toast genérico no muestre '[object Object]'.
     if (getErrorCode(error) === 'P0002') throw new ResourceGoneError('Este reto ya no existe')
+    // P0001 (issue LOCATIONGUESSER-8): el servidor lo usa para VARIOS rechazos de
+    // negocio ("El reto ya está cerrado", "El grupo está cerrado", "no es un
+    // reto"), así que el código solo no basta — se afina con el mensaje. Los dos
+    // "cerrado" acaban en el mismo estado amable; el resto sigue el camino genérico.
+    if (getErrorCode(error) === 'P0001' && /cerrado/i.test(describeError(error)))
+      throw new ChallengeClosedError('El reto ya está cerrado')
     throw new Error(describeError(error))
   }
   // La RPC `returns table` llega como array de una fila.
@@ -147,6 +153,9 @@ export async function submitNumberVote(
     // Mismo caso ESPERABLE que en `submitVote` (issue #760): el reto de número
     // se borró con la pantalla abierta.
     if (getErrorCode(error) === 'P0002') throw new ResourceGoneError('Este reto ya no existe')
+    // P0001 con mensaje de cierre: mismo criterio que en `submitVote` (ver ahí).
+    if (getErrorCode(error) === 'P0001' && /cerrado/i.test(describeError(error)))
+      throw new ChallengeClosedError('El reto ya está cerrado')
     throw new Error(describeError(error))
   }
   const row = Array.isArray(data) ? data[0] : data
