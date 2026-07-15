@@ -249,10 +249,26 @@ describe('MarcadorTab', () => {
     expect(screen.getByDisplayValue('Elige destino')).toBeInTheDocument()
   })
 
-  test('premios: en el podio vacío, el "último" se distingue con la etiqueta "Último"', () => {
+  test('premios: en el vacío, el premio del último vive en una píldora BAJO el podio, no en el 3er pedestal', () => {
     renderMarcador({ leaderboard: [], canCreate: false, prizes: { last: 'Invita a las cañas' } })
-    expect(screen.getByText('Último')).toBeInTheDocument()
-    expect(screen.getByText('Invita a las cañas')).toBeInTheDocument()
+    const pill = screen.getByText(/Último: Invita a las cañas/)
+    expect(pill).toBeInTheDocument()
+    // Fuera del podio: dentro (colgado del 3er pedestal) se leía contradictorio
+    // ("¿el 3º es el último?").
+    const podio = screen.getByRole('list', { name: 'Podio' })
+    expect(podio.contains(pill)).toBe(false)
+    // Miembro no dueño: la píldora es texto plano, no un botón.
+    expect(pill.closest('button')).toBeNull()
+  })
+
+  test('premios: el dueño edita el premio del último tocando la píldora', async () => {
+    const user = userEvent.setup()
+    renderMarcador({ leaderboard: [], canCreate: true, prizes: { last: 'Invita a las cañas' } })
+    const pill = screen.getByText(/Último: Invita a las cañas/).closest('button')
+    expect(pill).not.toBeNull()
+    await user.click(pill as HTMLButtonElement)
+    expect(screen.getByText('Premios del viaje')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Invita a las cañas')).toBeInTheDocument()
   })
 
   test('retos anteriores: no se muestra la sección sin retos cerrados', () => {

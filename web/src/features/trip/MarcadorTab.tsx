@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { AlertTriangle, Crown, Gift, Share2, User } from 'lucide-react'
+import { AlertTriangle, Crown, Gift, Share2, Skull, User } from 'lucide-react'
 import { Avatar, Button, ChallengePhoto, CountUp, Icon, IconDiana } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
@@ -140,8 +140,9 @@ function PremioTappable({
  * que el podio real) — la promesa visual de lo que habrá, con copy de una sola
  * línea. Los premios se integran EN el podio (real o vacío) en vez de vivir tras
  * un enlace de texto en la esquina (el dueño real no lo encontró):
- *  - si hay premio para el puesto (1º/último), un chip igual que en el podio
- *    real, colgando del hueco;
+ *  - si hay premio del 1º, un chip igual que en el podio real, colgando del hueco;
+ *  - el premio del ÚLTIMO va en una píldora propia BAJO el podio (colgado del 3er
+ *    pedestal se leía contradictorio: "¿el 3º es el último?");
  *  - si NO hay ningún premio definido y el usuario es dueño, el hueco del 1º
  *    ofrece la CTA "¿Qué se juega?" que abre `PrizesEditorModal`.
  * Una vez hay AL MENOS un premio, la edición vive en TOCAR el chip (dueño):
@@ -367,14 +368,11 @@ export function MarcadorTab({
                 rank === 1 ? styles.podio1 : rank === 2 ? styles.podio2 : styles.podio3
               const anilloClass =
                 rank === 1 ? styles.anillo1 : rank === 2 ? styles.anillo2 : styles.anillo3
-              // Solo 1º/último llevan la promesa de premio (issue #753): el 2º/3º
-              // del podio vacío no significan nada todavía, así que quedan limpios.
-              const premio =
-                rank === 1
-                  ? (prizes?.first?.trim() ?? null)
-                  : rank === 3
-                    ? (prizes?.last?.trim() ?? null)
-                    : null
+              // Solo el 1º lleva la promesa de premio EN el podio (issue #753):
+              // 2º/3º del podio vacío no significan nada todavía, y el premio del
+              // ÚLTIMO va en su propia píldora bajo el podio — colgado del 3er
+              // pedestal se leía contradictorio ("¿el 3º es el último?").
+              const premio = esLider ? (prizes?.first?.trim() ?? null) : null
 
               return (
                 <li
@@ -399,28 +397,14 @@ export function MarcadorTab({
                   </span>
 
                   {premio ? (
-                    rank === 3 ? (
-                      <PremioTappable
-                        className={styles.podioPremioUltimo}
-                        canEdit={canCreate}
-                        onEdit={openPrizeEditor}
-                      >
-                        <span className={styles.podioPremioEyebrow}>Último</span>
-                        <span className={styles.podioPremioLinea}>
-                          <Icon icon={Gift} size={12} />
-                          <span className={styles.podioPremioTexto}>{premio}</span>
-                        </span>
-                      </PremioTappable>
-                    ) : (
-                      <PremioTappable
-                        className={styles.podioPremio}
-                        canEdit={canCreate}
-                        onEdit={openPrizeEditor}
-                      >
-                        <Icon icon={Gift} size={12} />
-                        <span className={styles.podioPremioTexto}>{premio}</span>
-                      </PremioTappable>
-                    )
+                    <PremioTappable
+                      className={styles.podioPremio}
+                      canEdit={canCreate}
+                      onEdit={openPrizeEditor}
+                    >
+                      <Icon icon={Gift} size={12} />
+                      <span className={styles.podioPremioTexto}>{premio}</span>
+                    </PremioTappable>
                   ) : (
                     esLider &&
                     canCreate &&
@@ -443,6 +427,21 @@ export function MarcadorTab({
               )
             })}
           </ol>
+
+          {/* Premio del ÚLTIMO en su propia píldora, centrada BAJO el podio: dentro
+              del podio (colgado del 3er pedestal) se leía contradictorio — "¿el 3º
+              es el último?". Skull, no Gift: el premio del último es castigo-broma,
+              no regalo. Tappable por el dueño, igual criterio que los chips. */}
+          {prizes?.last?.trim() && (
+            <PremioTappable
+              className={styles.ultimoPill}
+              canEdit={canCreate}
+              onEdit={openPrizeEditor}
+            >
+              <Icon icon={Skull} size={14} />
+              <span className={styles.ultimoPillTexto}>Último: {prizes.last.trim()}</span>
+            </PremioTappable>
+          )}
 
           <div className={styles.vacio} role="status">
             {/* Poco texto, visual-first (issue #753): una línea, el podio ya habla. */}

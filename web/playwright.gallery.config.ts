@@ -21,7 +21,9 @@ export default defineConfig({
   reporter: 'list',
   // Un único test recorre todos los casos × todos los viewports, así que el límite
   // por test de 30s se queda corto: lo subimos para que quepan las ~3× capturas.
-  timeout: 180_000,
+  // 360s (antes 180s): los casos nuevos del marcador (issues #752/#753) empujaron
+  // el total por encima de los 180s — mismo fix que playwright.a11y.config.ts.
+  timeout: 360_000,
   use: {
     baseURL,
     ...devices['Desktop Chrome'],
