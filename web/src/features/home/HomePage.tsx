@@ -183,6 +183,7 @@ export function HomePage() {
     ? {
         groupId: data.pinned.groupId,
         challengeId: data.pinned.challengeId,
+        pendingCount: data.pinned.pendingCount,
         title: data.pinned.title,
         groupName: data.pinned.groupName,
         deadlineAt: data.pinned.deadlineAt,

@@ -82,44 +82,6 @@ describe('MomentCard — reto EN JUEGO (issue #578)', () => {
   })
 })
 
-describe('MomentCard — icono "Compartir" (issue #758)', () => {
-  test('seleccionada + EN JUEGO + onShare: pinta el icono y lo dispara al tocarlo', async () => {
-    const user = userEvent.setup()
-    const onShare = vi.fn()
-    render(
-      <MomentCard
-        moment={activeChallenge({})}
-        selected
-        onExpand={() => {}}
-        onPlay={vi.fn()}
-        onShare={onShare}
-      />,
-    )
-    const btn = screen.getByRole('button', { name: 'Compartir reto' })
-    await user.click(btn)
-    expect(onShare).toHaveBeenCalledTimes(1)
-  })
-
-  test('NO seleccionada: sin icono aunque el reto esté en juego y haya onShare', () => {
-    render(
-      <MomentCard
-        moment={activeChallenge({})}
-        selected={false}
-        onExpand={() => {}}
-        onShare={vi.fn()}
-      />,
-    )
-    expect(screen.queryByRole('button', { name: 'Compartir reto' })).not.toBeInTheDocument()
-  })
-
-  test('sin onShare (p.ej. reto CERRADO en TripDiario): sin icono aunque esté seleccionada', () => {
-    render(
-      <MomentCard moment={activeChallenge({ status: 'closed' })} selected onExpand={() => {}} />,
-    )
-    expect(screen.queryByRole('button', { name: 'Compartir reto' })).not.toBeInTheDocument()
-  })
-})
-
 describe('MomentCard — foto sorpresa (issue #655, spoiler del carrusel)', () => {
   const SORPRESA_LABEL = 'Foto sorpresa: se revela al cerrar el reto'
   const FOTO = 'https://example.test/foto.jpg'
