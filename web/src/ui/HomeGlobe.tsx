@@ -24,6 +24,13 @@ export interface GlobePin {
   targetId: string
   /** Marca el pin "lead" del grupo (anillo cálido pulsante). */
   lead?: boolean
+  /**
+   * Marca el pin del reto "Te toca jugar" SIN JUGAR (issue #776): anillos de sónar
+   * expandiéndose (la metáfora de "adivina dónde"). El reto en sí no tiene
+   * coordenada propia (sería spoiler, ver useWorldTrips) — HomePage lo traduce al
+   * punto MÁS RECIENTE del viaje al que pertenece (mismo criterio que `lead`).
+   */
+  pending?: boolean
 }
 
 /** Ruta dorada de un viaje del globo (issue #702): los puntos VISIBLES de ese
@@ -144,6 +151,11 @@ const REVEAL_FALLBACK_MS = 4000
 // pulso de bienvenida sobresalen un poco más: redondeamos al alza.
 const PIN_HEIGHT = 56
 const PIN_HALF_WIDTH = 28
+// Anillos de sónar del pin "Te toca jugar" (issue #776): 2 ondas, desfasadas a
+// mitad de su propio ciclo (ver `lg-home-sonar` en HomeGlobe.module.css) para que
+// se lea como una onda continua emanando del disco, no dos anillos sincronizados.
+const SONAR_RING_COUNT = 2
+const SONAR_CYCLE_S = 2.5
 // Padding SUPERIOR/lateral del fit, ya con el TAMAÑO DEL PIN reservado (el fit encuadra
 // las COORDENADAS, no las cajas de los pines; sin este colchón el disco del pin más alto
 // o el de los laterales se sale del encuadre y el lienzo lo recorta). Deja aire arriba
@@ -290,6 +302,27 @@ function applySky(map: MapLibreMap): void {
     } catch {
       // No disponible: ignorar.
     }
+  }
+}
+
+/**
+ * Anillos de sónar del pin "Te toca jugar" sin jugar (issue #776): 2 `<span>`
+ * hermanos del disco, añadidos AQUÍ (no en `pinMarkers.ts`, fuera del área de esta
+ * issue) para no tocar el markup compartido con el mapa de Viaje. Viven en el
+ * WRAPPER del pin (`.lg-trip-pin`, sin `overflow` propio) y no en el disco
+ * (`.lg-trip-pin__disc` recorta con `overflow: hidden`, ver tripPins.css) — así
+ * pueden crecer más allá del círculo sin recortarse. Cada uno arranca desfasado a
+ * mitad de su propio ciclo (ver `lg-home-sonar` en HomeGlobe.module.css) para leerse
+ * como una onda continua, no dos anillos sincronizados. Solo transform/opacity: cero
+ * layout shift.
+ */
+function appendSonarRings(el: HTMLElement): void {
+  for (let i = 0; i < SONAR_RING_COUNT; i++) {
+    const ring = document.createElement('span')
+    ring.className = 'lg-home-pin__sonar'
+    ring.setAttribute('aria-hidden', 'true')
+    ring.style.setProperty('--sonar-delay', `${(i * SONAR_CYCLE_S) / SONAR_RING_COUNT}s`)
+    el.appendChild(ring)
   }
 }
 
@@ -504,6 +537,10 @@ export function HomeGlobe({
       const el = buildHomePinElement(pin)
       el.title = pin.title
       el.addEventListener('click', () => onOpenRef.current?.(pin.targetId))
+      if (pin.pending) {
+        el.classList.add('lg-home-pin--pending')
+        appendSonarRings(el)
+      }
       if (entering) {
         el.classList.add('lg-pin-enter')
         // Stagger capado a 10 pasos (mismo criterio que `.lg-stagger` en index.css):
