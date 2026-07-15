@@ -82,6 +82,16 @@ function fakeImageClassBySrcPrefix(succeedsFor: (src: string) => boolean) {
   }
 }
 
+// Guardamos el `FileReader` REAL antes de que ningún test lo stubee (más
+// abajo, `vi.stubGlobal('FileReader', ...)`): `readAsArrayBuffer` lo delega
+// aquí en vez de fingirlo, porque el propio jsdom implementa
+// `Blob.prototype.arrayBuffer()` (usado por `readHeaderBytes`/magic bytes,
+// #762) internamente CON `FileReader.readAsArrayBuffer` — si lo dejamos
+// fingido, cualquier lectura de bytes de cabecera revienta con
+// "reader.readAsArrayBuffer is not a function" en TODOS los tests, no solo en
+// los que a propósito prueban el fallback de dataURL.
+const RealFileReader = globalThis.FileReader
+
 // Fake mínimo de `FileReader`: el fallback de `decodeImage` (#550) lo usa
 // SOLO cuando el `<img>` por objectURL ya falló, para intentar una segunda vía
 // (dataURL) — cubre File/Blob raros de content-providers de Android.
@@ -102,6 +112,19 @@ function fakeFileReaderClass(opts: { fails?: boolean } = {}) {
         this.result = 'data:image/jpeg;base64,eHh4'
         this.onload?.()
       })
+    }
+    // NO fingido (ver comentario de `RealFileReader` arriba): delega en el
+    // FileReader real para que `Blob.prototype.arrayBuffer()` (magic bytes)
+    // siga funcionando con el contenido REAL del archivo, sin acoplarse al
+    // `fails` de este fake (que solo gobierna la vía dataURL).
+    readAsArrayBuffer(blob: Blob) {
+      const real = new RealFileReader()
+      real.onload = () => {
+        this.result = real.result
+        this.onload?.()
+      }
+      real.onerror = () => this.onerror?.()
+      real.readAsArrayBuffer(blob)
     }
   }
 }
@@ -413,6 +436,110 @@ describe('uploadImage — enrutado HEIC vs. JPEG/PNG', () => {
     const heic = new File(['x'], 'live.heic', { type: 'image/heic' })
     await expect(uploadImage(heic)).resolves.toMatch(/\.jpg$/)
     expect(upload).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Issue #762: un usuario real se pegó ~190 intentos sin poder subir fotos.
+// Diagnóstico confirmado con los datos de Sentry (LOCATIONGUESSER-R/N/Q/P):
+// fotos de Android con `file.type` "image/jpeg" y nombre numérico (patrón
+// típico del content-resolver del dispositivo) cuyo contenido real era HEIC —
+// la detección por MIME/extensión nunca las reconocía como HEIC, así que el
+// pipeline las mandaba directas a `<img>`, que agotaba TODAS sus vías
+// (objectURL y FileReader→dataURL) sin nunca intentar la conversión. La
+// detección ahora TAMBIÉN mira los primeros bytes del contenedor ISO-BMFF
+// (caja `ftyp` + "major brand") cuando el MIME/extensión no lo delatan.
+// TS tipa `Uint8Array` como genérico sobre su buffer (`ArrayBufferLike`), y
+// `BlobPart` (constructor de `File`) solo acepta el caso fijo `ArrayBuffer` —
+// en RUNTIME un `Uint8Array` normal siempre vale como parte de un `File`; el
+// cast es puramente para satisfacer ese tipo más estricto.
+function bytesFrom(values: number[]): BlobPart {
+  return new Uint8Array(values) as unknown as BlobPart
+}
+
+function ftypHeaderBytes(brand: string): BlobPart {
+  // Caja `ftyp` mínima y sintética (no hace falta un HEIC real/pesado para
+  // probar la detección): [tamaño de caja, 4 bytes][ 'ftyp' ][ brand, 4 bytes ].
+  const brandBytes = Array.from(brand).map((c) => c.charCodeAt(0))
+  return bytesFrom([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, ...brandBytes])
+}
+
+describe('uploadImage — HEIC detectado por magic bytes, no por extensión/MIME (issue #762)', () => {
+  test('un .jpg con MIME "image/jpeg" pero bytes reales de HEIC (major brand "heic") se detecta y convierte con heic2any', async () => {
+    heic2any.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }))
+    // Nombre numérico (patrón Android real de los eventos LOCATIONGUESSER-R/N).
+    const disguised = new File([ftypHeaderBytes('heic')], '1000155420.jpg', {
+      type: 'image/jpeg',
+    })
+
+    await uploadImage(disguised)
+
+    expect(heic2any).toHaveBeenCalledTimes(1)
+    expect(upload).toHaveBeenCalledTimes(1)
+  })
+
+  test('el "major brand" genérico HEIF ("mif1") también se reconoce como HEIC', async () => {
+    heic2any.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }))
+    const disguised = new File([ftypHeaderBytes('mif1')], 'foto.jpg', { type: 'image/jpeg' })
+
+    await uploadImage(disguised)
+
+    expect(heic2any).toHaveBeenCalledTimes(1)
+  })
+
+  test('un .jpg con magic bytes JPEG reales (FF D8 FF) nunca entra por la rama HEIC, aunque el nombre sea el patrón Android sospechoso', async () => {
+    const realJpegBytes = bytesFrom([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0])
+    const jpeg = new File([realJpegBytes], '1000155420.jpg', { type: 'image/jpeg' })
+
+    await uploadImage(jpeg)
+
+    expect(heic2any).not.toHaveBeenCalled()
+    expect(upload).toHaveBeenCalledTimes(1)
+  })
+
+  test('si no se pueden leer los bytes de cabecera, cae a la señal de MIME/extensión de siempre sin romper', async () => {
+    const original = Blob.prototype.arrayBuffer
+    Blob.prototype.arrayBuffer = () => Promise.reject(new Error('no soportado en este navegador'))
+    try {
+      heic2any.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }))
+      const heic = new File(['x'], 'viejo.heic', { type: 'image/heic' })
+
+      await uploadImage(heic)
+
+      expect(heic2any).toHaveBeenCalledTimes(1)
+    } finally {
+      Blob.prototype.arrayBuffer = original
+    }
+  })
+
+  test('el reporte a Sentry de un fallo de decodificación incluye los magic bytes de cabecera en hex', async () => {
+    vi.stubGlobal('Image', fakeImageClass({ fails: true }))
+    vi.stubGlobal('createImageBitmap', vi.fn())
+    const bytes = bytesFrom([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+    ])
+    const jpeg = new File([bytes], 'con-hex.jpg', { type: 'image/jpeg' })
+
+    await uploadImage(jpeg).catch(() => {})
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ magicBytesHex: 'ff d8 ff e0 00 10 4a 46 49 46 00 01' }),
+    )
+  })
+
+  test('el reporte a Sentry de un fallo de conversión HEIC también incluye los magic bytes', async () => {
+    heic2any.mockRejectedValue(new Error('libheif boom'))
+    const heic = new File([ftypHeaderBytes('heic')], 'roto.heic', { type: 'image/heic' })
+
+    await uploadImage(heic).catch(() => {})
+
+    expect(reportError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        stage: 'heic_convert',
+        magicBytesHex: expect.stringMatching(/^00 00 00 18 66 74 79 70/),
+      }),
+    )
   })
 })
 

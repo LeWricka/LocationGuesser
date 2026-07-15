@@ -118,17 +118,86 @@ class DecodeFailure extends Error {
   }
 }
 
+// "Major brand" de la caja `ftyp` (ISO-BMFF) que identifica un HEIC/HEIF real,
+// independientemente de lo que digan la extensión o el `file.type`. `heic`/`heix`/
+// `heim`/`heis` son las variantes de imagen única (fotos de iPhone/Android);
+// `hevc`/`hevx`/`hevm`/`hevs` las de códec HEVC; `mif1`/`msf1` el contenedor
+// HEIF genérico (multi-imagen/secuencia) que también usan cámaras Android.
+const HEIC_FTYP_BRANDS = new Set([
+  'heic',
+  'heix',
+  'heim',
+  'heis',
+  'hevc',
+  'hevx',
+  'hevm',
+  'hevs',
+  'mif1',
+  'msf1',
+])
+
+/** Primeros bytes de un archivo, en hex (p.ej. "66 74 79 70…"), para diagnóstico
+ * en Sentry (#762) y detección de formato real. Nunca lanza: si el navegador no
+ * puede leerlos, devuelve un array vacío. */
+async function readHeaderBytes(file: File, length = 12): Promise<Uint8Array> {
+  try {
+    return new Uint8Array(await file.slice(0, length).arrayBuffer())
+  } catch {
+    return new Uint8Array(0)
+  }
+}
+
+function headerBytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join(' ')
+}
+
 /**
- * ¿Es la foto un HEIC/HEIF de iPhone? Los navegadores que no lo decodifican
- * nativamente (Chrome, Firefox de escritorio) no pueden con `createImageBitmap`
- * ni `<img>.decode()`, así que hay que convertirla antes. Detectamos por MIME
- * (`image/heic`/`image/heif`) y, como respaldo, por extensión: en algunos
- * navegadores el `file.type` de un HEIC viene vacío.
+ * "Major brand" de la caja `ftyp` si los bytes de cabecera la contienen
+ * (offset 4 = 'ftyp', offset 8 = brand de 4 caracteres), o `null` si no hay
+ * caja `ftyp` reconocible (archivo demasiado corto o no es ISO-BMFF).
  */
-function isHeic(file: File): boolean {
+function ftypBrand(bytes: Uint8Array): string | null {
+  if (bytes.length < 12) return null
+  if (String.fromCharCode(...bytes.slice(4, 8)) !== 'ftyp') return null
+  return String.fromCharCode(...bytes.slice(8, 12)).toLowerCase()
+}
+
+interface FileSignature {
+  isHeic: boolean
+  /** Primeros 12 bytes en hex; cadena vacía si no se pudieron leer. Va SIEMPRE
+   * a los diagnósticos de Sentry (#762), sea HEIC o no, para diagnosticar el
+   * PRÓXIMO caso raro sin depender de adivinar por el nombre. */
+  headerHex: string
+}
+
+/**
+ * ¿Es la foto un HEIC/HEIF? Dos señales, cualquiera basta (issue #762):
+ * 1) MIME (`image/heic`/`image/heif`) o extensión — la señal de siempre;
+ *    en algunos navegadores el `file.type` de un HEIC viene vacío.
+ * 2) Magic bytes: la caja `ftyp` (ISO-BMFF) con un "major brand" de HEIC/HEIF
+ *    en los primeros 12 bytes del archivo — detecta el caso confirmado en
+ *    producción de fotos Android cuyo content-resolver MIENTE: `file.type`
+ *    "image/jpeg" y nombre ".jpg", pero el contenido real es HEIC. Antes esto
+ *    agotaba TODAS las vías de `<img>` sin que el pipeline llegara siquiera a
+ *    intentar la conversión HEIC (LOCATIONGUESSER-R/N/Q/P). Confiamos en la
+ *    señal MIME/extensión primero (más barata, sin I/O) y solo miramos los
+ *    bytes cuando esa señal no lo delata; si la lectura de bytes falla
+ *    (navegador raro), nos quedamos con lo que ya sabíamos.
+ */
+async function detectFileSignature(file: File): Promise<FileSignature> {
   const type = file.type.toLowerCase()
-  if (type === 'image/heic' || type === 'image/heif') return true
-  return /\.(heic|heif)$/i.test(file.name)
+  const byNameOrMime =
+    type === 'image/heic' || type === 'image/heif' || /\.(heic|heif)$/i.test(file.name)
+
+  const header = await readHeaderBytes(file)
+  const headerHex = headerBytesToHex(header)
+
+  if (byNameOrMime) return { isHeic: true, headerHex }
+
+  const brand = ftypBrand(header)
+  return { isHeic: brand !== null && HEIC_FTYP_BRANDS.has(brand), headerHex }
 }
 
 /**
@@ -343,9 +412,11 @@ function reportAndThrow(
 /**
  * `decodeImage` falló por completo (ni `<img>` ni el fallback de `createImageBitmap`
  * pudieron con el archivo, #550). Envuelve `reportAndThrow` con el detalle del
- * `DecodeFailure`, si lo hay, y el mensaje accionable para el caso de 0 bytes.
+ * `DecodeFailure`, si lo hay, el mensaje accionable para el caso de 0 bytes, y
+ * los magic bytes de cabecera (#762) para diagnosticar el próximo caso raro
+ * (p.ej. un formato que ni el nombre ni el MIME delatan) sin adivinar.
  */
-function reportAndThrowDecodeFailure(err: unknown, file: File): never {
+function reportAndThrowDecodeFailure(err: unknown, file: File, magicBytesHex: string): never {
   const detail = err instanceof DecodeFailure ? err.detail : undefined
   // Caso específico (#550): archivo de 0 bytes, típico de una foto de Google
   // Photos que vive solo en la nube. Mensaje accionable en vez del genérico.
@@ -353,7 +424,7 @@ function reportAndThrowDecodeFailure(err: unknown, file: File): never {
     detail?.reason === 'empty_file'
       ? `«${file.name}» parece no estar descargada en el dispositivo (fotos de Google Photos guardadas solo en la nube). Descárgala y vuelve a intentarlo.`
       : undefined
-  reportAndThrow(err, file, 'decode', detail, message)
+  reportAndThrow(err, file, 'decode', { ...detail, magicBytesHex }, message)
 }
 
 /**
@@ -362,17 +433,21 @@ function reportAndThrowDecodeFailure(err: unknown, file: File): never {
  * foto sube sin GPS ni orientación original.
  */
 async function compressAndStripExif(file: File): Promise<Blob> {
-  // HEIC/HEIF (iPhone): muchos navegadores no lo decodifican; lo convertimos a
-  // JPEG antes de entrar en el pipeline de canvas. Las fotos JPEG/PNG/WebP NO
-  // pasan por aquí (no engordan ni se ralentizan con la conversión).
+  // HEIC/HEIF (iPhone/Android): muchos navegadores no lo decodifican; lo
+  // convertimos a JPEG antes de entrar en el pipeline de canvas. Las fotos
+  // JPEG/PNG/WebP NO pasan por aquí (no engordan ni se ralentizan con la
+  // conversión). `detectFileSignature` mira MIME/extensión Y magic bytes
+  // (#762): un archivo cuyo content-resolver miente (MIME "image/jpeg" pero
+  // bytes HEIC reales) entra igual por esta rama.
+  const signature = await detectFileSignature(file)
   let decodable = file
-  if (isHeic(file)) {
+  if (signature.isHeic) {
     try {
       decodable = await heicToJpeg(file)
     } catch (err) {
       // La conversión falló: reportamos metadatos NO sensibles (sin subir la
       // imagen) y lanzamos el error legible para el toast.
-      reportAndThrow(err, file, 'heic_convert')
+      reportAndThrow(err, file, 'heic_convert', { magicBytesHex: signature.headerHex })
     }
   }
 
@@ -384,7 +459,7 @@ async function compressAndStripExif(file: File): Promise<Blob> {
     // con el archivo. Reportamos para tener visibilidad del caso concreto en
     // Sentry (#550); el error de cara al usuario lleva el nombre para saber
     // cuál foto fue (si hay varias, como en la galería de un recuerdo).
-    reportAndThrowDecodeFailure(err, file)
+    reportAndThrowDecodeFailure(err, file, signature.headerHex)
   }
   try {
     const { width, height } = scaledSize(img.width, img.height)
@@ -406,12 +481,13 @@ async function compressAndStripExif(file: File): Promise<Blob> {
  * EXIF (orientación y GPS) y reusa la conversión de HEIC del pipeline general.
  */
 async function squareCropToJpeg(file: File): Promise<Blob> {
+  const signature = await detectFileSignature(file)
   let decodable = file
-  if (isHeic(file)) {
+  if (signature.isHeic) {
     try {
       decodable = await heicToJpeg(file)
     } catch (err) {
-      reportAndThrow(err, file, 'heic_convert')
+      reportAndThrow(err, file, 'heic_convert', { magicBytesHex: signature.headerHex })
     }
   }
 
@@ -419,7 +495,7 @@ async function squareCropToJpeg(file: File): Promise<Blob> {
   try {
     img = await decodeImage(decodable)
   } catch (err) {
-    reportAndThrowDecodeFailure(err, file)
+    reportAndThrowDecodeFailure(err, file, signature.headerHex)
   }
   try {
     // Cuadrado centrado: tomamos el lado corto y descartamos los bordes del lado
