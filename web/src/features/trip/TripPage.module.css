@@ -334,7 +334,7 @@
      foto/mapa de detrás sin perder la identidad teal del CTA. El blur lleva el
      grueso de la legibilidad; el borde de contacto define el disco sobre fotos
      claras. Fallback: sin soporte de backdrop-filter, acento sólido (abajo). */
-  background: color-mix(in srgb, var(--color-accent) 62%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 45%, transparent);
   border: 1px solid var(--glass-border);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
@@ -347,13 +347,13 @@
 }
 .fab:hover {
   /* Hover: el vidrio se densifica (más tinte), no se vuelve opaco. */
-  background: color-mix(in srgb, var(--color-accent-hover) 78%, transparent);
+  background: color-mix(in srgb, var(--color-accent-hover) 62%, transparent);
   transform: translateY(-2px);
 }
 .fab:active {
   transform: scale(0.94);
 }
-/* Sin backdrop-filter (navegadores viejos): un 62% translúcido SIN esmerilado no
+/* Sin backdrop-filter (navegadores viejos): un tinte translúcido SIN esmerilado no
    garantiza la legibilidad del icono sobre fotos — vuelta al acento sólido. */
 @supports not (backdrop-filter: blur(1px)) {
   .fab {
@@ -391,7 +391,7 @@
   justify-content: center;
   color: var(--color-on-accent);
   /* Mismo vidrio de acento que `.fab` (gramática: los dos flotantes son gemelos). */
-  background: color-mix(in srgb, var(--color-accent) 62%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 45%, transparent);
   border: 1px solid var(--glass-border);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
@@ -403,7 +403,7 @@
     transform var(--transition-fast) var(--ease-emphasized);
 }
 .shareFab:hover {
-  background: color-mix(in srgb, var(--color-accent-hover) 78%, transparent);
+  background: color-mix(in srgb, var(--color-accent-hover) 62%, transparent);
   transform: translateY(-2px);
 }
 .shareFab:active {
@@ -566,7 +566,10 @@
   position: absolute;
   left: var(--space-4);
   right: var(--space-4);
-  top: calc(env(safe-area-inset-top) + 4.5rem);
+  /* 7.5rem, no 4.5: la cabecera del viaje tiene DOS filas (título + píldora de
+     pestañas); a 4.5rem el banner se montaba encima de las pestañas (visto en el
+     móvil del dueño). Debajo de ambas, con aire. */
+  top: calc(env(safe-area-inset-top) + 7.5rem);
   /* design-lint-allow: capa local de la página (misma franja que .wrapBanner) */
   z-index: 3;
 }
