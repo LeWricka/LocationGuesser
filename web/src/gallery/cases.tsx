@@ -28,6 +28,7 @@ import { ShareChallengeModal } from '../features/trip/ShareChallengeModal'
 import { GroupSettingsModal } from '../features/group/GroupSettingsModal'
 import { InviteModal } from '../features/group/InviteModal'
 import { ResultCard } from '../features/play/ResultCard'
+import { LeaderboardCard } from '../features/group/LeaderboardCard'
 import { GameScene } from '../features/play/GameScene'
 import { TripDiario } from '../features/trip/TripDiario'
 import { OnboardingSlideshow, getSlides } from '../features/onboarding'
@@ -846,6 +847,32 @@ export const cases: GalleryCase[] = [
       />
     ),
   },
+  {
+    // Issue #801: caso de galería para la tarjeta-IMAGEN de "Compartir
+    // clasificación" (LeaderboardCard/Podium) — antes no existía ninguno, por
+    // eso el avatar-emoji-crudo-sobre-círculo pasó desapercibido (design-lint no
+    // caza un emoji que llega por variable, solo literales; y sin caso de
+    // galería nadie veía el PÓSTER rasterizado, solo la pantalla en vivo). Todos
+    // sin foto propia (`avatar: null`): fuerza el camino del animal por defecto
+    // en el podio, el que antes se pintaba como emoji.
+    id: 'tarjeta-clasificacion',
+    title: 'Tarjeta de clasificación (para compartir, podio con avatares)',
+    section: 'Grupo',
+    render: () => (
+      <LeaderboardCard
+        groupName="Japón en primavera"
+        entries={[
+          { userId: 'user-marta-0001', name: 'Marta', avatar: null, points: 4880, plays: 5 },
+          { userId: 'user-iker-0002', name: 'Iker', avatar: null, points: 4210, plays: 5 },
+          { userId: ME_ID, name: 'Lewis', avatar: null, points: 3890, plays: 5 },
+          { userId: 'user-noa-0003', name: 'Noa', avatar: null, points: 2100, plays: 4 },
+        ]}
+        prizes={{ first: 'Elige el próximo reto', last: 'Paga las cervezas' }}
+        domain="momentu.art"
+        photoDataUrl={null}
+      />
+    ),
+  },
   // Tutorial ÚNICO de entrada (issue #742): el slideshow que cuenta el bucle
   // completo (guardar → bitácora → compartir → reto → compartir reto). Es el único
   // tutorial en vivo hoy; se muestra una vez en la home vacía y se reabre con "Ver
@@ -989,7 +1016,7 @@ export const cases: GalleryCase[] = [
   {
     // Mapa EXPANDIDO de "Adivinar" (issue #789): el mapa domina la pantalla, con
     // el contador siempre visible arriba y las dos acciones de primera clase
-    // debajo — "Volver a la foto" (sigue explorando) y "Clavar tiro" (confirma).
+    // debajo — "Volver a la foto" (sigue explorando) y "Confirmar posición" (confirma).
     // `guess` ya puesto: comprueba que el botón de confirmar se habilita.
     id: 'showcase-jugar-mapa-expandido',
     title: 'Showcase · Jugar (mapa expandido, ida y vuelta)',
