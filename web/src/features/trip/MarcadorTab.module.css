@@ -625,11 +625,24 @@
   min-width: 0;
 }
 
+/* Título + chip "EN JUEGO" (issue #800): en fila, el chip se envuelve a su
+ * propia línea si el título es largo (`flex-wrap`) — nunca recorta el título. */
+.anteriorTituloFila {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
 .anteriorTitulo {
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
   color: var(--color-text);
+}
+
+.anteriorBadge {
+  flex-shrink: 0;
 }
 
 .anteriorGanador,

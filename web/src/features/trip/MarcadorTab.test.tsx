@@ -36,6 +36,7 @@ function pastChallenge(overrides: Partial<PastChallengeSummary>): PastChallengeS
   return {
     challengeId: 'c1',
     title: 'El bosque de bambú',
+    status: 'closed',
     closedAt: '2026-06-10T10:00:00.000Z',
     isOwn: false,
     winner: null,
@@ -53,7 +54,8 @@ const baseProps = {
   groupId: 'g1',
   prizes: null,
   pastChallenges: [] as PastChallengeSummary[],
-  onOpenChallenge: noop,
+  onPlayChallenge: noop,
+  onViewChallenge: noop,
   onPrizesSaved: noop,
   onInvite: noop,
   onAddChallenge: noop,
@@ -306,9 +308,10 @@ describe('MarcadorTab', () => {
     expect(screen.queryByText('Retos anteriores')).not.toBeInTheDocument()
   })
 
-  test('retos anteriores: ganador, mi resultado y el aviso anti-trampa; tocar abre el detalle', async () => {
+  test('retos anteriores: ganador, mi resultado y el aviso anti-trampa; tocar un CERRADO abre el detalle', async () => {
     const user = userEvent.setup()
-    const onOpenChallenge = vi.fn()
+    const onViewChallenge = vi.fn()
+    const onPlayChallenge = vi.fn()
     const pastChallenges: PastChallengeSummary[] = [
       pastChallenge({
         challengeId: 'c1',
@@ -323,7 +326,13 @@ describe('MarcadorTab', () => {
         isOwn: true,
       }),
     ]
-    renderMarcador({ leaderboard: [], canCreate: false, pastChallenges, onOpenChallenge })
+    renderMarcador({
+      leaderboard: [],
+      canCreate: false,
+      pastChallenges,
+      onViewChallenge,
+      onPlayChallenge,
+    })
     expect(screen.getByText('Retos anteriores')).toBeInTheDocument()
     expect(screen.getByText(/Marta · 4.?880 pts/)).toBeInTheDocument()
     expect(screen.getByText(/^3.?100 pts$/)).toBeInTheDocument()
@@ -333,7 +342,8 @@ describe('MarcadorTab', () => {
     expect(screen.getByText('Tu reto')).toBeInTheDocument()
 
     await user.click(screen.getByText('El bosque de bambú'))
-    expect(onOpenChallenge).toHaveBeenCalledWith('c1')
+    expect(onViewChallenge).toHaveBeenCalledWith('c1')
+    expect(onPlayChallenge).not.toHaveBeenCalled()
   })
 
   test('retos anteriores (issue #753): thumbnail con la foto del reto, o placeholder si no tiene', () => {
@@ -348,5 +358,74 @@ describe('MarcadorTab', () => {
     expect(conFoto?.querySelector('img')).toHaveAttribute('src', 'https://x/foto.jpg')
     const sinFoto = screen.getByText('Sin foto').closest('button')
     expect(sinFoto?.querySelector('img')).toBeNull()
+  })
+
+  // --- Retos EN JUEGO en la lista (issue #800) --------------------------------
+
+  test('retos anteriores (issue #800): un EN JUEGO lleva el chip "EN JUEGO" y cuenta atrás, sin ganador', () => {
+    const pastChallenges: PastChallengeSummary[] = [
+      pastChallenge({
+        challengeId: 'c1',
+        title: 'El templo dorado',
+        status: 'active',
+        closedAt: '2026-06-15T13:00:00.000Z', // +3h desde el "ahora" congelado abajo
+      }),
+    ]
+    vi.useFakeTimers().setSystemTime(new Date('2026-06-15T10:00:00.000Z'))
+    renderMarcador({ leaderboard: [], canCreate: false, pastChallenges })
+    expect(screen.getByText('EN JUEGO')).toBeInTheDocument()
+    expect(screen.getByText(/quedan 3 h/)).toBeInTheDocument()
+    expect(screen.queryByText('Se cerró sin votos')).not.toBeInTheDocument()
+    expect(screen.getByText('Aún sin jugar')).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  test('retos anteriores (issue #800, anti-spoiler): un EN JUEGO sin jugar va a JUGAR, no al detalle', async () => {
+    const user = userEvent.setup()
+    const onPlayChallenge = vi.fn()
+    const onViewChallenge = vi.fn()
+    const pastChallenges: PastChallengeSummary[] = [
+      pastChallenge({
+        challengeId: 'c1',
+        title: 'El templo dorado',
+        status: 'active',
+        myResult: null,
+      }),
+    ]
+    renderMarcador({
+      leaderboard: [],
+      canCreate: false,
+      pastChallenges,
+      onPlayChallenge,
+      onViewChallenge,
+    })
+    await user.click(screen.getByText('El templo dorado'))
+    expect(onPlayChallenge).toHaveBeenCalledWith('c1')
+    expect(onViewChallenge).not.toHaveBeenCalled()
+  })
+
+  test('retos anteriores (issue #800, anti-spoiler): un EN JUEGO YA jugado abre el detalle, no a jugar', async () => {
+    const user = userEvent.setup()
+    const onPlayChallenge = vi.fn()
+    const onViewChallenge = vi.fn()
+    const pastChallenges: PastChallengeSummary[] = [
+      pastChallenge({
+        challengeId: 'c1',
+        title: 'El templo dorado',
+        status: 'active',
+        myResult: { points: 2200, distanceKm: 8, leftApp: false },
+      }),
+    ]
+    renderMarcador({
+      leaderboard: [],
+      canCreate: false,
+      pastChallenges,
+      onPlayChallenge,
+      onViewChallenge,
+    })
+    expect(screen.getByText(/^2.?200 pts$/)).toBeInTheDocument()
+    await user.click(screen.getByText('El templo dorado'))
+    expect(onViewChallenge).toHaveBeenCalledWith('c1')
+    expect(onPlayChallenge).not.toHaveBeenCalled()
   })
 })

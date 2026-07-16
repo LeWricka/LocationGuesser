@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { AlertTriangle, Crown, Gift, Share2, Skull, User } from 'lucide-react'
-import { Avatar, Button, ChallengePhoto, CountUp, Icon, IconDiana } from '../../ui'
+import { Avatar, Badge, Button, ChallengePhoto, CountUp, Icon, IconDiana } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
+import { formatDeadline } from '../../lib/time'
 // `Medal` no está en el barril de `../../ui` — se importa igual que en el podio
 // de temporada de GroupPage/Podium.tsx. Aquí SOLO junto al nombre del ganador en
 // "Retos anteriores" (inline, pequeño): ese contexto no es ambiguo; el que sí lo
@@ -45,11 +46,15 @@ interface Props {
   groupId: string
   /** Premios por puesto (`groups.prizes`, issue #123). null = sin premios. */
   prizes: GroupPrizes | null
-  /** Retos anteriores del viaje (issue #608, rescatado de GroupPage/PastSection). */
+  /** Retos anteriores del viaje (issue #608, rescatado de GroupPage/PastSection;
+   * ampliado en el #800 a los EN JUEGO). */
   pastChallenges: PastChallengeSummary[]
-  /** Abre el detalle de un reto (mismo hash `#g=…&c=…` que "Adivina"/"Ya jugaste":
-   * revelado si ya está cerrado o jugado). */
-  onOpenChallenge: (challengeId: string) => void
+  /** Reto EN JUEGO sin jugar (issue #800, anti-spoiler): al flujo de jugar, el
+   * mismo que "Adivina" del Diario — nunca al detalle, que revelaría el mapa. */
+  onPlayChallenge: (challengeId: string) => void
+  /** Reto CERRADO, o EN JUEGO ya jugado: abre el detalle completo (issue #800) —
+   * clasificación del reto, mapa con todas las jugadas y la foto. */
+  onViewChallenge: (challengeId: string) => void
   /** Tras guardar los premios: refresca el viaje para que los chips reflejen el cambio. */
   onPrizesSaved: () => void
 }
@@ -159,6 +164,13 @@ function PremioTappable({
  * pasa a ser "soy miembro del viaje"; los premios (chips tappables, CTA "¿Qué
  * se juega?" y el editor) siguen siendo cosa del dueño, ahora tras `isOwner`
  * — un prop nuevo y separado.
+ *
+ * v6 (issue #800 — detalle del reto): "Retos anteriores" pasa a incluir los
+ * retos EN JUEGO además de los cerrados (chip "EN JUEGO" + cuenta atrás, sin
+ * "ganador" — el resultado aún no es definitivo), y la fila ya no navega
+ * siempre al mismo sitio: `onPlayChallenge` (anti-spoiler, un EN JUEGO sin
+ * jugar) u `onViewChallenge` (el detalle nuevo — clasificación, mapa de
+ * jugadas, foto — para cualquier CERRADO o un EN JUEGO ya jugado).
  */
 export function MarcadorTab({
   leaderboard,
@@ -170,7 +182,8 @@ export function MarcadorTab({
   groupId,
   prizes,
   pastChallenges,
-  onOpenChallenge,
+  onPlayChallenge,
+  onViewChallenge,
   onPrizesSaved,
 }: Props) {
   const [editingPrizes, setEditingPrizes] = useState(false)
@@ -469,51 +482,74 @@ export function MarcadorTab({
         </>
       )}
 
-      {/* "Retos anteriores" (issue #608, rescatado de GroupPage/PastSection):
-          resumen breve, más reciente primero, con thumbnail de la foto del reto
-          (issue #753 — placeholder de marca si no tiene). Tocar la fila abre el
-          detalle completo (foto, mapa, listado de votos) por el mismo hash que
-          "Adivina"/"Ya jugaste". Solo se muestra si ya hay algo cerrado: no
-          añade ruido a un viaje que aún no ha jugado nada. */}
+      {/* "Retos anteriores" (issue #608, rescatado de GroupPage/PastSection;
+          ampliado en el #800 a los EN JUEGO): resumen breve — primero los EN
+          JUEGO (chip "EN JUEGO" + cuenta atrás, el que cierra antes primero),
+          luego los CERRADOS del más reciente al más antiguo — con thumbnail de
+          la foto del reto (issue #753 — placeholder de marca si no tiene, o si
+          toca ocultarla por anti-spoiler). Tocar la fila decide DÓNDE entrar
+          (issue #800, anti-spoiler): un EN JUEGO sin jugar va a JUGAR (mismo
+          destino que "Adivina" del Diario — nunca se revela el mapa antes de
+          tiempo); cualquier otro (cerrado, o EN JUEGO ya jugado) abre el
+          detalle completo (clasificación, mapa de jugadas, foto). Solo se
+          muestra si hay algún reto: no añade ruido a un viaje sin ninguno. */}
       {pastChallenges.length > 0 && (
         <section className={styles.anteriores}>
           <h2 className={styles.anterioresTitulo}>Retos anteriores</h2>
           <ol className={styles.anterioresLista}>
-            {pastChallenges.map((c) => (
-              <li key={c.challengeId}>
-                <button
-                  type="button"
-                  className={[styles.anteriorFila, 'lg-press'].join(' ')}
-                  onClick={() => onOpenChallenge(c.challengeId)}
-                >
-                  <ChallengePhoto
-                    src={c.imageUrl}
-                    alt={c.title}
-                    ratio="square"
-                    size="sm"
-                    zoomable={false}
-                    className={styles.anteriorFoto}
-                  />
-                  <span className={styles.anteriorTexto}>
-                    <span className={styles.anteriorTitulo}>{c.title}</span>
-                    <span className={styles.anteriorGanador}>
-                      {c.winner ? (
-                        <>
-                          <Medal rank={1} size={14} />
-                          {c.winner.name} · {c.winner.points.toLocaleString('es-ES')} pts
-                          {c.winner.leftApp && <LeftAppFlag />}
-                        </>
-                      ) : (
-                        'Se cerró sin votos'
-                      )}
+            {pastChallenges.map((c) => {
+              const antiSpoiler = c.status === 'active' && c.myResult == null
+              return (
+                <li key={c.challengeId}>
+                  <button
+                    type="button"
+                    className={[styles.anteriorFila, 'lg-press'].join(' ')}
+                    onClick={() =>
+                      antiSpoiler ? onPlayChallenge(c.challengeId) : onViewChallenge(c.challengeId)
+                    }
+                  >
+                    <ChallengePhoto
+                      src={c.imageUrl}
+                      alt={c.title}
+                      ratio="square"
+                      size="sm"
+                      zoomable={false}
+                      className={styles.anteriorFoto}
+                    />
+                    <span className={styles.anteriorTexto}>
+                      <span className={styles.anteriorTituloFila}>
+                        <span className={styles.anteriorTitulo}>{c.title}</span>
+                        {c.status === 'active' && (
+                          <Badge tone="live" dot className={styles.anteriorBadge}>
+                            EN JUEGO
+                          </Badge>
+                        )}
+                      </span>
+                      <span className={styles.anteriorGanador}>
+                        {c.status === 'closed' ? (
+                          c.winner ? (
+                            <>
+                              <Medal rank={1} size={14} />
+                              {c.winner.name} · {c.winner.points.toLocaleString('es-ES')} pts
+                              {c.winner.leftApp && <LeftAppFlag />}
+                            </>
+                          ) : (
+                            'Se cerró sin votos'
+                          )
+                        ) : (
+                          // EN JUEGO: cuenta atrás relativa (`formatDeadline`), NUNCA
+                          // un "ganador" — el resultado todavía no es definitivo.
+                          formatDeadline(c.closedAt)
+                        )}
+                      </span>
+                      <span className={styles.anteriorResultado}>
+                        <PastResultLabel isOwn={c.isOwn} status={c.status} result={c.myResult} />
+                      </span>
                     </span>
-                    <span className={styles.anteriorResultado}>
-                      <PastResultLabel isOwn={c.isOwn} result={c.myResult} />
-                    </span>
-                  </span>
-                </button>
-              </li>
-            ))}
+                  </button>
+                </li>
+              )
+            })}
           </ol>
         </section>
       )}
@@ -535,17 +571,21 @@ export function MarcadorTab({
 }
 
 // "Tu resultado" corto en una fila de "Retos anteriores": puntos (+ el aviso
-// anti-trampa si salió de la app), "No jugaste" si no participé, o "Tu reto" si
-// lo creé yo (nadie vota su propio reto, así que "No jugaste" ahí sería confuso).
+// anti-trampa si salió de la app), "Tu reto" si lo creé yo (nadie vota su propio
+// reto, así que "No jugaste" ahí sería confuso), o sin jugar — en presente
+// ("Aún sin jugar", issue #800) si el reto sigue EN JUEGO (todavía se puede),
+// en pasado ("No jugaste") si ya CERRÓ (la ventana ya se cerró).
 function PastResultLabel({
   isOwn,
+  status,
   result,
 }: {
   isOwn: boolean
+  status: 'active' | 'closed'
   result: PastChallengeResult | null
 }) {
   if (isOwn) return <>Tu reto</>
-  if (!result) return <>No jugaste</>
+  if (!result) return status === 'active' ? <>Aún sin jugar</> : <>No jugaste</>
   return (
     <>
       {result.points.toLocaleString('es-ES')} pts
