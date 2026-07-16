@@ -76,11 +76,28 @@ export function CountdownOverlay({ photoUrl, onDone }: Props) {
       role="status"
       aria-label={`Empezando en ${value}`}
     >
-      {/* Fondo: la foto del reto a pantalla completa (si la hay) o un degradado
-          neutro de la marca. Velo oscuro encima para que los números resalten. */}
+      {/* Fondo: la foto del reto (si la hay) o un degradado neutro de la marca.
+          Velo oscuro encima para que los números resalten.
+          Encuadre (issue #789): con fotos VERTICALES, `object-fit: cover` a solas
+          recortaba la foto a una franja plana y "zoomeadísima" (con frecuencia
+          cielo/pared liso) — se perdía casi toda la imagen. En vez de eso, dos
+          capas: un relleno DESENFOCADO en `cover` (la misma foto, de fondo,
+          decorativo — cubre el encuadre sin dejar barras vacías) y la foto NÍTIDA
+          completa en `contain` encima (se ve entera, sin recortar). Mismo patrón
+          que usan Spotify/Apple Music para portadas verticales sobre pantallas
+          panorámicas; aquí resuelve lo simétrico (fotos verticales sobre un
+          contenedor más ancho que ellas). */}
       <div className={styles.bg} aria-hidden="true">
         {photoUrl ? (
-          <SceneImage src={photoUrl} alt="" className={styles.bgImg} skeletonRadius="sm" />
+          <>
+            {/* Relleno decorativo: ya desenfocado, un pop-in leve al cargar es
+                imperceptible — por eso un <img> normal y no <SceneImage> (sin
+                esqueleto propio, que solo duplicaría el de la foto nítida). */}
+            <img src={photoUrl} alt="" className={styles.bgBlur} />
+            <div className={styles.bgPhotoWrap}>
+              <SceneImage src={photoUrl} alt="" className={styles.bgImg} skeletonRadius="sm" />
+            </div>
+          </>
         ) : (
           <div className={styles.bgNeutral} />
         )}

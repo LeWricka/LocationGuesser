@@ -58,22 +58,47 @@
   inset: 0;
 }
 
-.bgImg {
+/* Relleno desenfocado en `cover` (issue #789): rellena el encuadre completo sin
+   recortar la foto nítida de encima a una franja plana. Escalado un poco de más
+   para que el desenfoque no deje ver su propio borde nítido en las esquinas.
+   Oscurecido (`brightness`): es puro relleno, no debe competir con la foto real
+   ni con los números — el `.scrim` de abajo ya no tiene que cargar solo con eso. */
+.bgBlur {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* Zoom-out lento de la foto durante la cuenta: da vida y "presencia" al fondo sin
-     distraer, y encadena con el montaje suave de la escena al entrar en juego. */
+  filter: blur(32px) brightness(0.55);
+  transform: scale(1.15);
+  /* Mismo zoom-out lento que antes llevaba la foto nítida: la vida/presencia del
+     fondo ahora vive en esta capa (la nítida, en `contain`, se queda quieta para
+     leerse completa y nítida desde el primer fotograma). */
   animation: countBgSettle calc(var(--duration-slower) * 6) var(--ease-smooth) both;
 }
 
 @keyframes countBgSettle {
   from {
-    transform: scale(1.12);
+    transform: scale(1.3);
   }
   to {
-    transform: scale(1);
+    transform: scale(1.15);
   }
+}
+
+.bgPhotoWrap {
+  position: absolute;
+  inset: 0;
+}
+
+.bgImg {
+  width: 100%;
+  height: 100%;
+  /* `contain`, NO `cover` (issue #789): con fotos VERTICALES, `cover` recortaba
+     a una franja plana y "zoomeadísima" (a menudo cielo/pared liso, perdiendo
+     casi toda la foto). `contain` la muestra ENTERA; el relleno de detrás
+     (`.bgBlur`) evita que se vean barras vacías a los lados. */
+  object-fit: contain;
 }
 
 /* Sin foto: degradado sobrio de la marca (mismo tono que el placeholder de escena). */
@@ -133,7 +158,7 @@
 @media (prefers-reduced-motion: reduce) {
   .overlay,
   .overlayExit,
-  .bgImg,
+  .bgBlur,
   .number {
     animation: none;
   }

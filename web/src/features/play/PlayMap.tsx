@@ -83,6 +83,15 @@ interface Props {
    * mano en móvil. Opt-in; sin esto, el comportamiento clásico (tocar para marcar).
    */
   fixedCenterPin?: boolean
+  /**
+   * Mantiene la vista CENTRADA en esta coordenada mientras cambie (issue #789).
+   * Para lienzos no interactivos que deben ENSEÑAR un punto — el thumbnail
+   * colapsado de "Adivinar" (GameScene) centra aquí el pin provisional: si el
+   * jugador ya apuntó, la miniatura lo muestra (el pin podría caer fuera de sus
+   * 128px si la vista se quedara donde estaba). No usar en mapas interactivos:
+   * pelearía con el arrastre del jugador.
+   */
+  centerOn?: LatLng | null
 }
 
 // Capa base del mapa interactivo (issue #602): satélite por defecto, coherente
@@ -156,6 +165,19 @@ function CenterPinTracker({ locked, onPick }: { locked: boolean; onPick: (p: Lat
     })
     return () => listener.remove()
   }, [map, locked, onPick])
+  return null
+}
+
+// Sigue a `centerOn` (issue #789): re-centra la vista cada vez que cambia la
+// coordenada. Sin animación (setCenter, no panTo): el thumbnail que lo usa vive
+// bajo `pointer-events: none` y el salto ocurre tapado por el mapa expandido,
+// así que animarlo solo gastaría frames (y panTo ignora reduced-motion).
+function CenterOn({ position }: { position: LatLng }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!map) return
+    map.setCenter(position)
+  }, [map, position])
   return null
 }
 
@@ -297,6 +319,7 @@ export function PlayMap({
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- ver comentario arriba
   preset: _preset = 'jugar',
   fixedCenterPin = false,
+  centerOn = null,
 }: Props) {
   // En modo pin de centro fijo no se ve el pin-avatar (lo sustituye el pin clavado
   // al centro de la pantalla); tampoco se marca tocando, sino moviendo el mapa.
@@ -357,6 +380,7 @@ export function PlayMap({
         {guess && answer && <DrawnLine guess={guess} answer={answer} />}
         {guess && answer && <FitToReveal guess={guess} answer={answer} />}
         {centerPinMode && <CenterPinTracker locked={locked} onPick={onPick} />}
+        {centerOn && <CenterOn position={centerOn} />}
       </Map>
 
       {/* Estado de carga: tapa el lienzo hasta que Google pinta sus teselas
@@ -368,9 +392,10 @@ export function PlayMap({
       {/* Toggle Satélite/Mapa (issue #602): solo en modo interactivo (adivinando);
           el mapa bloqueado (revelado) no lo necesita, su capa es siempre satélite
           (ver JSDoc de `preset`). Arriba-IZQUIERDA, NO arriba-derecha como en
-          MapPicker: en el mapa expandido de "Adivinar" (GameScene), esa esquina ya
-          la ocupa el botón de cerrar (`mapaExpandidoCerrar`, fuera de este
-          componente) — para no taparlo ("sin tapar controles") se cambia de lado.
+          MapPicker: se mantiene el lado histórico para no mover un control ya
+          aprendido; las acciones de "volver"/"clavar tiro" del mapa expandido de
+          "Adivinar" (GameScene, issue #789) viven fuera de este componente, en
+          una fila debajo del mapa, así que ya no compiten por ninguna esquina.
           Se esconde con `@container` en el thumbnail colapsado (128px, PlayMap
           dentro de `.miniMapaScene`): ahí no cabe ni hace falta, y ese contenedor
           ya es `pointer-events: none` (solo abre el mapa al tocar). */}
