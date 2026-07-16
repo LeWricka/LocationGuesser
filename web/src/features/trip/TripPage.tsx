@@ -154,8 +154,14 @@ export function TripPage({
   const [editingChallenge, setEditingChallenge] = useState<ChallengeForPlay | null>(null)
   // Momento seleccionado (centra su pin en el mapa). Se sincroniza carrusel↔mapa.
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  // ¿Puede el usuario añadir/editar? (dueño del viaje). El RLS lo respalda igual.
+  // ¿Puede el usuario crear momentos/retos? (issue #783: cualquier MIEMBRO, ya
+  // no solo el dueño — el RLS `challenges_insert_member` lo respalda igual). Es
+  // siempre true una vez `reloadMembership` confirma la membresía.
   const [canCreate, setCanCreate] = useState(false)
+  // ¿Es DUEÑO del viaje? (premios, ajustes, cerrar/reabrir, borrar, enlace de
+  // co-dueño, editar/borrar momentos ajenos). Antes era lo que calculaba
+  // `canCreate`; separado en el issue #783 porque crear ya no es de dueño.
+  const [isOwner, setIsOwner] = useState(false)
   const [memberNames, setMemberNames] = useState<string[]>([])
 
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -242,14 +248,17 @@ export function TripPage({
   // Permisos + miembros (tolerante: si falla, no bloquea ver el viaje). En
   // useCallback para poder RE-cargar tras gestionar miembros desde el modal
   // "Miembros" (#616): expulsar/transferir cambian la línea de gente y mis
-  // propios permisos (canCreate) sin cambiar groupId/user.
+  // propios permisos (isOwner) sin cambiar groupId/user.
   const reloadMembership = useCallback(async () => {
     if (!user) return
     try {
       const member = await isMember(groupId, user.id)
       if (!member) return
       const [mine, members] = await Promise.all([myGroups(user.id), getGroupMembers(groupId)])
-      setCanCreate(mine.find((g) => g.id === groupId)?.isOwner ?? false)
+      // Issue #783: crear ya es de cualquier MIEMBRO — `isMember` de arriba ya lo
+      // confirmó, así que canCreate es simplemente true a partir de aquí.
+      setCanCreate(true)
+      setIsOwner(mine.find((g) => g.id === groupId)?.isOwner ?? false)
       setMemberNames(members.map((m) => m.name))
     } catch {
       // Permisos/miembros no resueltos: tratamos como miembro sin gestión.
@@ -652,6 +661,7 @@ export function TripPage({
               onInvite={() => openInvite()}
               onAddChallenge={onAddChallenge}
               canCreate={canCreate}
+              isOwner={isOwner}
               groupId={groupId}
               prizes={group?.prizes ?? null}
               pastChallenges={pastChallenges}
@@ -666,8 +676,9 @@ export function TripPage({
       </div>
 
       {/* FAB "＋" flotante con menú de dos acciones: Momento (recuerdo) o Reto (a
-          adivinar). ÚNICO punto de crear del viaje. Solo el dueño y siempre disponible
-          (fijo abajo), salvo con el recap abierto (es una pantalla de cierre). */}
+          adivinar). ÚNICO punto de crear del viaje. Issue #783: CUALQUIER miembro
+          (ya no solo el dueño) y siempre disponible (fijo abajo), salvo con el
+          recap abierto (es una pantalla de cierre). */}
       {canCreate && !wrapOpen && (
         <div className={styles.fabWrap} ref={fabWrapRef}>
           {fabOpen && (
@@ -883,8 +894,10 @@ export function TripPage({
             Marcador
           </button>
           {/* Ajustes (renombrar), Cerrar/Reabrir temporada y Borrar son del dueño y
-              viven en el modal de ajustes; los miembros no ven estas tres acciones. */}
-          {canCreate && (
+              viven en el modal de ajustes; los miembros no ven estas tres acciones.
+              Issue #783: gate por `isOwner` (ya NO `canCreate`, que ahora es
+              "soy miembro") — si no, cualquier miembro vería borrar el viaje. */}
+          {isOwner && (
             <>
               <button
                 type="button"
@@ -924,10 +937,13 @@ export function TripPage({
       {/* Hoja de detalle del momento: descripción editable + (en un recuerdo del
           dueño) "Convertir en reto", que NAVEGA al asistente completo de crear reto
           en modo promoción (issue #723) — al volver, TripPage remonta con datos
-          frescos y el momento aparece ya como reto en el mapa y el carrusel. */}
+          frescos y el momento aparece ya como reto en el mapa y el carrusel.
+          Issue #783: `canEdit` sigue siendo de DUEÑO (`isOwner`) — el RLS
+          (`challenges_update_owner`/`_delete_owner`) solo deja editar/borrar al
+          dueño; crear es lo único que se abrió a cualquier miembro. */}
       <MomentSheet
         moment={openMoment}
-        canEdit={canCreate}
+        canEdit={isOwner}
         myUserId={user?.id ?? null}
         tripStartsOn={group?.starts_on ?? null}
         tripEndsOn={group?.ends_on ?? null}
@@ -1001,7 +1017,7 @@ export function TripPage({
 
       {/* Miembros del viaje (#616): lista + gestión según rol. Tras salir, a la
           home; tras cambiar roles/expulsar/transferir, recargamos permisos
-          (canCreate puede cambiar al transferir) y el viaje. */}
+          (isOwner puede cambiar al transferir) y el viaje. */}
       {membersOpen && (
         <MembersModal
           groupId={groupId}
@@ -1022,8 +1038,9 @@ export function TripPage({
       )}
 
       {/* Ajustes del viaje (solo dueño): renombrar, cerrar/reabrir temporada y borrar.
-          Reutiliza el modal de la GroupPage; al cambiar algo refrescamos el viaje. */}
-      {canCreate && settingsOpen && (
+          Reutiliza el modal de la GroupPage; al cambiar algo refrescamos el viaje.
+          Issue #783: gate por `isOwner`. */}
+      {isOwner && settingsOpen && (
         <GroupSettingsModal
           groupId={groupId}
           currentName={group?.name ?? null}
@@ -1067,7 +1084,7 @@ export function TripPage({
         groupName={title}
         link={tripShareUrl(location.origin, groupId)}
         challengeCount={challengeCount}
-        isOwner={canCreate}
+        isOwner={isOwner}
         origin={inviteOrigin}
       />
     </div>

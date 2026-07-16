@@ -58,6 +58,7 @@ const baseProps = {
   onInvite: noop,
   onAddChallenge: noop,
   canCreate: false,
+  isOwner: false,
 }
 
 // Monta SIEMPRE dentro de `<ToastProvider>`: el editor de premios
@@ -220,26 +221,45 @@ describe('MarcadorTab', () => {
       entry({ userId: 'u2', name: 'Beto', points: 300 }),
       entry({ userId: 'u3', name: 'Caro', points: 200 }),
     ]
-    renderMarcador({ leaderboard: board, canCreate: false, prizes: { first: 'Elige destino' } })
+    renderMarcador({
+      leaderboard: board,
+      canCreate: true,
+      isOwner: false,
+      prizes: { first: 'Elige destino' },
+    })
     expect(screen.getByText('Elige destino').closest('button')).toBeNull()
   })
 
   test('premios (issues #752/#753): sin ninguno definido, el dueño ve la CTA "¿Qué se juega?" en el podio vacío y abre el editor', async () => {
     const user = userEvent.setup()
-    renderMarcador({ leaderboard: [], canCreate: true })
+    renderMarcador({ leaderboard: [], canCreate: true, isOwner: true })
     const cta = screen.getByRole('button', { name: /¿Qué se juega\?/ })
     await user.click(cta)
     expect(screen.getByText('Premios del viaje')).toBeInTheDocument()
   })
 
   test('premios: un miembro (no dueño) no ve la CTA del vacío', () => {
-    renderMarcador({ leaderboard: [], canCreate: false })
+    renderMarcador({ leaderboard: [], canCreate: true, isOwner: false })
+    expect(screen.queryByRole('button', { name: /¿Qué se juega\?/ })).not.toBeInTheDocument()
+  })
+
+  // Issue #783: separación explícita canCreate (crear, miembro) vs isOwner
+  // (premios, dueño) — un miembro que NO es dueño ve "Crear un reto" pero no
+  // la CTA de premios en el mismo podio vacío.
+  test('issue #783: un miembro ve "Crear un reto" pero NO la CTA de premios', () => {
+    renderMarcador({ leaderboard: [], canCreate: true, isOwner: false })
+    expect(screen.getByRole('button', { name: /Crear un reto/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /¿Qué se juega\?/ })).not.toBeInTheDocument()
   })
 
   test('premios: en el podio vacío con premios ya definidos, el dueño edita tocando el chip', async () => {
     const user = userEvent.setup()
-    renderMarcador({ leaderboard: [], canCreate: true, prizes: { first: 'Elige destino' } })
+    renderMarcador({
+      leaderboard: [],
+      canCreate: true,
+      isOwner: true,
+      prizes: { first: 'Elige destino' },
+    })
     // Sin premios, no debería quedar la CTA de "¿Qué se juega?".
     expect(screen.queryByRole('button', { name: /¿Qué se juega\?/ })).not.toBeInTheDocument()
     const chip = screen.getByText('Elige destino').closest('button')
@@ -250,7 +270,12 @@ describe('MarcadorTab', () => {
   })
 
   test('premios: en el vacío, el premio del último vive en una píldora BAJO el podio, no en el 3er pedestal', () => {
-    renderMarcador({ leaderboard: [], canCreate: false, prizes: { last: 'Invita a las cañas' } })
+    renderMarcador({
+      leaderboard: [],
+      canCreate: true,
+      isOwner: false,
+      prizes: { last: 'Invita a las cañas' },
+    })
     const pill = screen.getByText(/Último: Invita a las cañas/)
     expect(pill).toBeInTheDocument()
     // Fuera del podio: dentro (colgado del 3er pedestal) se leía contradictorio
@@ -263,7 +288,12 @@ describe('MarcadorTab', () => {
 
   test('premios: el dueño edita el premio del último tocando la píldora', async () => {
     const user = userEvent.setup()
-    renderMarcador({ leaderboard: [], canCreate: true, prizes: { last: 'Invita a las cañas' } })
+    renderMarcador({
+      leaderboard: [],
+      canCreate: true,
+      isOwner: true,
+      prizes: { last: 'Invita a las cañas' },
+    })
     const pill = screen.getByText(/Último: Invita a las cañas/).closest('button')
     expect(pill).not.toBeNull()
     await user.click(pill as HTMLButtonElement)

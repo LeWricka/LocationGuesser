@@ -19,7 +19,8 @@ interface Props {
   /** Momentos del viaje en orden cronológico ASC — el mismo dato que ya carga
    * `useTripData` para el Diario: no se vuelve a pedir el grupo/los retos aquí. */
   moments: Moment[]
-  /** ¿Puede añadir momentos? (dueño del viaje) — gobierna el CTA del vacío. */
+  /** ¿Puede añadir momentos? (issue #783: cualquier MIEMBRO del viaje) —
+   * gobierna el CTA del vacío. */
   canCreate: boolean
   /** Abre el flujo de "Añadir recuerdo" (CTA del estado vacío). */
   onAddMoment: () => void

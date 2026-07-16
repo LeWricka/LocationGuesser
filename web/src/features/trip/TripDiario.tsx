@@ -24,7 +24,8 @@ interface Props {
   moments: Moment[]
   route: RoutePoint[]
   selectedId: string | null
-  /** ¿Puede el usuario añadir momentos? (dueño) — gobierna el CTA del vacío. */
+  /** ¿Puede el usuario añadir momentos? (issue #783: cualquier MIEMBRO del
+   * viaje) — gobierna el CTA del vacío. */
   canCreate: boolean
   /** Reproducción del recorrido (undefined bajo reduced-motion: sin control). */
   playing?: boolean
