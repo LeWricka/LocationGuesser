@@ -1,141 +1,176 @@
-// Burbuja del pin para el mapa: un SVG en forma de teardrop (círculo arriba con
-// el emoji del avatar sobre su fondo, punta abajo) servido como data-URI.
+// Fábrica ÚNICA de los pines de mapa (issue #794): disco con anillo blanco + pie
+// corto (rombo) — la MISMA familia visual que los pines-foto del globo de la home
+// (ver `pinMarkers.ts`/`tripPins.css`: `.lg-trip-pin` + `.lg-trip-pin__disc`), pero
+// servida como SVG data-URI (no como elemento DOM) porque el consumidor es un
+// Marker CLÁSICO de Google Maps: `icon.url` acepta un data-URI. Así evitamos
+// AdvancedMarker, que exige un Map ID y un mapa vectorial (más setup y coste).
 //
-// PORQUÉ data-URI sobre un Marker CLÁSICO (no AdvancedMarker): el Marker clásico
-// de Google Maps pinta su icono desde `icon.url`, que acepta un data-URI. Así
-// evitamos AdvancedMarker, que exige un Map ID y un mapa vectorial (más setup,
-// estilos remotos y coste). Con esto el pin es 100% autocontenido: el SVG lleva
-// dentro su color/gradiente y el emoji, sin assets externos ni Map ID.
+// Antes (era anterior, issue #794): un teardrop con el EMOJI crudo como `<text>` y
+// una diana de círculos concéntricos sueltos — nada que ver con el resto de la
+// app, que desde el pivote "Grafito+teal" dibuja SIEMPRE el animal por defecto
+// como trazo de línea sobre tinte claro (ver `Avatar.tsx`/`Avatar.module.css`,
+// nunca emoji suelto). Estos pines ahora hacen lo mismo: incrustan el MISMO path
+// de `ANIMAL_SVGS` (línea, no emoji) sobre un disco de tinte teal uniforme — el
+// color deja de variar por avatar (ya no es la señal de "quién es quién"; esa
+// señal pasa a ser el NOMBRE bajo el pin, issue #795) y así el pin del jugador
+// encaja con el resto del sistema.
+//
+// Todas las entradas a este módulo son literales o vienen de `ANIMAL_SVGS`
+// (nuestro propio set, nunca texto de usuario): no hace falta escapar nada al
+// construir el SVG.
 
-import { parseAvatar } from './avatar'
+import { parseAvatar, svgForEmoji } from './avatar'
 
 /** Tamaño del icono del pin en px (el componente lo pasa a `google.maps.Size`). */
-export const PIN_SIZE = { width: 48, height: 60 } as const
+export const PIN_SIZE = { width: 40, height: 42 } as const
 
-/** Punta del pin (abajo-centro): ancla que se clava en la coordenada exacta. */
-export const PIN_ANCHOR = { x: 24, y: 60 } as const
+/** Punta del pin (abajo-centro, la puntita del rombo): ancla que se clava en la
+ * coordenada exacta — mismo criterio que el pin-foto del globo/viaje. */
+export const PIN_ANCHOR = { x: 20, y: 40 } as const
 
 /** Origen de la etiqueta (debajo de la punta), para pintar el nombre bajo el pin. */
-export const PIN_LABEL_ORIGIN = { x: 24, y: 74 } as const
+export const PIN_LABEL_ORIGIN = { x: 20, y: 50 } as const
 
-// Geometría del teardrop. La burbuja es un círculo de radio R centrado en
-// (CX, CY); la punta baja hasta `PIN_SIZE.height`. El emoji se centra en la
-// burbuja. Mantener los números cuadrados con PIN_SIZE/PIN_ANCHOR de arriba.
-const CX = 24
-const CY = 22
-const R = 21
+// Geometría del disco + rombo, calcada de `.lg-trip-pin`/`.lg-trip-pin__disc` en
+// tripPins.css (disco + puntita que se solapa un poco en su base) pero a la
+// escala de este pin más compacto (40×42 frente a los 48px del pin-foto: aquí no
+// hay foto, así que no hace falta el mismo margen para miniatura/sombra).
+const CX = 20
+const CY = 19
+const DISC_R = 15 // radio de RELLENO del disco (el trazo del anillo añade RING_W/2 más)
+const RING_W = 3 // = --pin-ring-width
+const TAIL_SIDE = 9 // lado del rombo (rect rotado 45°) que hace de puntita
+const TAIL_CENTER_Y = CY + DISC_R + RING_W / 2 - TAIL_SIDE / 2 + 2.5 // solape con la base del disco
 
-/**
- * SVG del pin (teardrop con el emoji sobre `bgCss`) como data-URI listo para
- * `icon.url` de un Marker clásico de Google Maps.
- *
- * - Si `bgCss` parece un gradiente CSS (contiene `gradient(`), se define un
- *   `<linearGradient>` en `<defs>` aproximando los stops; si es color sólido se
- *   usa tal cual como `fill`.
- * - El emoji va como `<text>` centrado en la burbuja.
- * - El resultado se URL-encodea para no romper el data-URI (`#`, `<`, `>`...).
- */
-export function avatarPinSvg(emoji: string, bgCss: string): string {
-  const isGradient = /gradient\(/i.test(bgCss)
-  const fill = isGradient ? 'url(#g)' : escapeXml(bgCss)
-  const defs = isGradient ? `<defs>${gradientDef(bgCss)}</defs>` : ''
+// Colores de marca (literales: un data-URI SVG no puede leer `var(--token)`,
+// Google necesita el string final). Mantener en sync con `tokens.css`.
+const RING_WHITE = '#ffffff' // --pin-ring-closed // design-lint-allow: SVG data-URI, no lee var(--)
+const RING_ACTIVE = '#0f766e' // --pin-ring-active/--accent // design-lint-allow: SVG data-URI, no lee var(--)
+const AVATAR_FILL = '#e6f2f1' // --accent-tint // design-lint-allow: SVG data-URI, no lee var(--)
+const AVATAR_ICON = '#0f766e' // --color-accent // design-lint-allow: SVG data-URI, no lee var(--)
+const ANSWER_FILL = '#c9a24b' // --medal-gold // design-lint-allow: SVG data-URI, no lee var(--)
+const ANSWER_ICON = '#ffffff' // design-lint-allow: SVG data-URI, no lee var(--)
 
-  // Camino del teardrop: arco superior (la burbuja) que se cierra en la punta
-  // inferior. Dibujado con dos arcos desde la punta para que el contorno sea
-  // continuo (sin solaparse con el círculo).
-  const tipX = CX
-  const tipY = PIN_SIZE.height
-  const path =
-    `M ${tipX} ${tipY} ` +
-    `C ${CX - R * 0.55} ${CY + R * 0.9}, ${CX - R} ${CY + R * 0.6}, ${CX - R} ${CY} ` +
-    `A ${R} ${R} 0 1 1 ${CX + R} ${CY} ` +
-    `C ${CX + R} ${CY + R * 0.6}, ${CX + R * 0.55} ${CY + R * 0.9}, ${tipX} ${tipY} Z`
+// Escala del glifo (viewBox 24×24, el de ANIMAL_SVGS/IconDiana) dentro del disco:
+// ~66% de su diámetro, mismo criterio proporcional que `Avatar.module.css` (.svg
+// al 62% del disco del avatar "de verdad"; un pelín más grande aquí porque este
+// disco es más pequeño y un trazo muy diminuto se perdería en el mapa).
+const ICON_SCALE = (2 * DISC_R * 0.66) / 24
+// Grosor de trazo VISUAL deseado tras aplicar `ICON_SCALE`: se compensa
+// dividiendo por la propia escala (el `transform: scale()` encoge también el
+// stroke-width), para que el trazo se lea igual de nítido que en el resto de la
+// app (Avatar.module.css usa 1.4; aquí 1.8 — el pin es más pequeño y sin el
+// resto del disco alrededor para dar contexto, un trazo algo más grueso ayuda).
+const ICON_STROKE = 1.8 / ICON_SCALE
 
+// Rombo (puntita) rotado 45° desde un `<rect>` cuadrado — mismo truco que el
+// `::after` de `.lg-trip-pin` en tripPins.css. `rx` redondea ligeramente las
+// esquinas (equivalente a `--radius-xs` en el pin-foto).
+function tailSvg(ringColor: string): string {
+  const half = TAIL_SIDE / 2
+  return (
+    `<rect x="${CX - half}" y="${TAIL_CENTER_Y - half}" width="${TAIL_SIDE}" height="${TAIL_SIDE}" ` +
+    `rx="1.5" transform="rotate(45 ${CX} ${TAIL_CENTER_Y})" fill="${ringColor}"/>`
+  )
+}
+
+// Disco: relleno + anillo (stroke centrado en el trazo del círculo, como
+// `border` en CSS — el radio de relleno queda igual y el anillo "crece" hacia
+// fuera y hacia dentro por igual).
+function discSvg(fill: string, ringColor: string): string {
+  return `<circle cx="${CX}" cy="${CY}" r="${DISC_R}" fill="${fill}" stroke="${ringColor}" stroke-width="${RING_W}"/>`
+}
+
+// Envuelve el path del glifo (animal o diana) centrado y escalado dentro del
+// disco. El grosor de trazo se fija en el propio `<g>` como DEFECTO: los paths
+// de `ANIMAL_SVGS` no traen `stroke-width` propio (dependen de él); si un path sí
+// trae su propio atributo (no es el caso aquí), ganaría igualmente por
+// especificidad SVG normal.
+function iconGroup(pathMarkup: string, color: string): string {
+  const offset = 12 * ICON_SCALE
+  return (
+    `<g transform="translate(${CX - offset} ${CY - offset}) scale(${ICON_SCALE})" ` +
+    `fill="none" stroke="${color}" stroke-width="${ICON_STROKE}" ` +
+    `stroke-linecap="round" stroke-linejoin="round">${pathMarkup}</g>`
+  )
+}
+
+function wrapSvg(body: string): string {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_SIZE.width}" height="${PIN_SIZE.height}" ` +
-    `viewBox="0 0 ${PIN_SIZE.width} ${PIN_SIZE.height}">` +
-    defs +
-    `<path d="${path}" fill="${fill}" stroke="#ffffff" stroke-width="2"/>` +
-    `<text x="${CX}" y="${CY}" font-size="22" text-anchor="middle" dominant-baseline="central">` +
-    `${escapeXml(emoji)}</text>` +
-    `</svg>`
-
+    `viewBox="0 0 ${PIN_SIZE.width} ${PIN_SIZE.height}">${body}</svg>`
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
+/**
+ * SVG del pin de un ANIMAL del set por defecto (issue #794): disco de tinte
+ * teal + el mismo dibujo de línea que `Avatar.tsx` (nunca el emoji crudo) +
+ * anillo (blanco, o teal profundo con `ring: 'active'` — el jugador destaca su
+ * PROPIO pin entre los del resto, issue #795) + puntita corta.
+ * `emoji` debe ser una clave de `ANIMAL_SVGS` (ver `svgForEmoji`); las llamadas
+ * de la app siempre pasan por `parseAvatar`/`canonicalEmoji`, que lo garantizan.
+ */
+export function avatarPinSvg(emoji: string, ring: 'default' | 'active' = 'default'): string {
+  const ringColor = ring === 'active' ? RING_ACTIVE : RING_WHITE
+  const path = svgForEmoji(emoji) ?? ''
+  return wrapSvg(
+    tailSvg(ringColor) + discSvg(AVATAR_FILL, ringColor) + iconGroup(path, AVATAR_ICON),
+  )
+}
+
+// Fallback de un avatar-imagen: el animal por defecto del id (siempre 'emoji').
+// El '🦊' de más abajo es una llave interna hacia `ANIMAL_SVGS`/`svgForEmoji`
+// (nunca se pinta como texto/emoji suelto), red de seguridad si `parseAvatar`
+// devolviera 'image' incluso con `avatarUrl: null` (no debería pasar nunca).
+function defaultEmojiFor(userId: string): string {
+  const fallback = parseAvatar(null, userId)
+  return fallback.kind === 'emoji' ? fallback.emoji : '🦊' // design-lint-allow: llave interna a ANIMAL_SVGS, no UI
 }
 
 /**
  * Resuelve un avatar de perfil a un pin SVG. `parseAvatar` normaliza el animal
  * al set canónico de 8 (un token antiguo fuera del set se proyecta de forma
- * estable a uno de los 8), así que el emoji del teardrop siempre pertenece al
- * set nuevo y su color sale de la paleta del set — nunca un emoji retirado. Si
- * el avatar es una imagen (foto de perfil subida) no se puede meter en el SVG
- * sin assets externos, así que se cae al animal POR DEFECTO del `userId`: el pin
- * sigue siendo autocontenido y estable por usuario.
+ * estable a uno de los 8), así que el glifo del pin siempre pertenece al set
+ * nuevo. Si el avatar es una imagen (foto de perfil subida) no se puede meter en
+ * el SVG sin assets externos, así que cae al animal POR DEFECTO del `userId`: el
+ * pin sigue siendo autocontenido y estable por usuario.
+ *
+ * `own` (issue #795): true para el pin del PROPIO jugador en un mapa con varios
+ * jugadores (el resultado post-partida) — anillo teal profundo en vez de blanco,
+ * para encontrarse un vistazo más rápido entre los pines del resto.
  */
-export function avatarPinFromProfile(avatarUrl: string | null, userId: string): string {
+export function avatarPinFromProfile(
+  avatarUrl: string | null,
+  userId: string,
+  own = false,
+): string {
   const resolved = parseAvatar(avatarUrl, userId)
-  if (resolved.kind === 'emoji') return avatarPinSvg(resolved.emoji, resolved.bg.background)
-  // Imagen: fallback al emoji por defecto del id (resuelve siempre a `emoji`).
-  const fallback = parseAvatar(null, userId)
-  const emoji = fallback.kind === 'emoji' ? fallback.emoji : '📍'
-  const bg = fallback.kind === 'emoji' ? fallback.bg.background : '#5b8def'
-  return avatarPinSvg(emoji, bg)
+  const emoji = resolved.kind === 'emoji' ? resolved.emoji : defaultEmojiFor(userId)
+  return avatarPinSvg(emoji, own ? 'active' : 'default')
 }
+
+// Diana (mismo trazo que `IconDiana` del set custom de iconos): dos anillos +
+// mira de 4 brazos + punto central relleno. Sin trazo propio por elemento (a
+// diferencia del componente React): hereda el grosor por defecto de `iconGroup`,
+// igual que los animales, para que ambos glifos se lean con el mismo peso visual.
+const DIANA_PATH =
+  '<circle cx="12" cy="12" r="9"/>' +
+  '<circle cx="12" cy="12" r="5.5"/>' +
+  '<line x1="12" y1="2" x2="12" y2="6"/>' +
+  '<line x1="12" y1="18" x2="12" y2="22"/>' +
+  '<line x1="2" y1="12" x2="6" y2="12"/>' +
+  '<line x1="18" y1="12" x2="22" y2="12"/>' +
+  '<circle cx="12" cy="12" r="2.2" fill="currentColor"/>'
 
 /**
  * Pin de la RESPUESTA real (la diana del reto) como data-URI para `icon.url` de
- * un Marker clásico de Google Maps. Antes era el emoji 🎯 servido como `label`;
- * ahora es el glifo `Target` de lucide dibujado a mano (mismo trazo y color de
- * marca que el resto del set de iconos), centrado dentro de un teardrop como el
- * de los avatares. Autocontenido (sin assets externos ni AdvancedMarker).
+ * un Marker clásico de Google Maps. Disco de ORO (en vez del tinte teal de los
+ * jugadores) para que se distinga a un vistazo de cualquier pin de jugador —
+ * MISMA geometría de disco+anillo+puntita que `avatarPinSvg` (una sola fábrica,
+ * issue #794), solo cambian el relleno y el glifo.
  */
 export function targetPinSvg(): string {
-  const tipX = CX
-  const tipY = PIN_SIZE.height
-  const path =
-    `M ${tipX} ${tipY} ` +
-    `C ${CX - R * 0.55} ${CY + R * 0.9}, ${CX - R} ${CY + R * 0.6}, ${CX - R} ${CY} ` +
-    `A ${R} ${R} 0 1 1 ${CX + R} ${CY} ` +
-    `C ${CX + R} ${CY + R * 0.6}, ${CX + R * 0.55} ${CY + R * 0.9}, ${tipX} ${tipY} Z`
-
-  // El glifo Target: tres círculos concéntricos centrados en la burbuja (CX, CY).
-  const target =
-    `<circle cx="${CX}" cy="${CY}" r="10" fill="none" stroke="#ffffff" stroke-width="2.5"/>` +
-    `<circle cx="${CX}" cy="${CY}" r="6" fill="none" stroke="#ffffff" stroke-width="2.5"/>` +
-    `<circle cx="${CX}" cy="${CY}" r="2" fill="#ffffff"/>`
-
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_SIZE.width}" height="${PIN_SIZE.height}" ` +
-    `viewBox="0 0 ${PIN_SIZE.width} ${PIN_SIZE.height}">` +
-    `<path d="${path}" fill="#b23a36" stroke="#ffffff" stroke-width="2"/>` +
-    target +
-    `</svg>`
-
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`
-}
-
-// Escapa los caracteres XML peligrosos del contenido inyectado (emoji y color).
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-}
-
-// Aproxima un `linear-gradient(...)` CSS a un `<linearGradient>` SVG: extrae los
-// colores hex y los reparte uniformemente como stops (suficiente para el pin;
-// no soporta ángulos ni posiciones de stop, que no necesitamos visualmente).
-function gradientDef(bgCss: string): string {
-  const colors = bgCss.match(/#[0-9a-fA-F]{3,8}/g) ?? ['#5b8def', '#3a5fd9']
-  const last = colors.length - 1 || 1
-  const stops = colors
-    .map((color, i) => {
-      const offset = last === 0 ? 0 : Math.round((i / last) * 100)
-      return `<stop offset="${offset}%" stop-color="${escapeXml(color)}"/>`
-    })
-    .join('')
-  // x1/y1 -> x2/y2 diagonal, acorde al 135deg habitual de la paleta.
-  return `<linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">${stops}</linearGradient>`
+  return wrapSvg(
+    tailSvg(RING_WHITE) + discSvg(ANSWER_FILL, RING_WHITE) + iconGroup(DIANA_PATH, ANSWER_ICON),
+  )
 }

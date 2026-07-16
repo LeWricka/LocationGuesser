@@ -12,6 +12,10 @@ import {
   TimerOff,
 } from 'lucide-react'
 import { PlayMap } from './PlayMap'
+// Mapa de RESULTADO (issue #795): pines de TODOS los que ya jugaron, con su
+// nombre — no solo el propio + la respuesta. Reutiliza la fábrica de pines
+// (issue #794) y el criterio de labels ya resueltos en `AllGuessesMap`.
+import { AllGuessesMap, type GuessMarker } from '../group/AllGuessesMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { GameScene, type GameSceneData } from './GameScene'
 import { CountdownOverlay } from './CountdownOverlay'
@@ -30,10 +34,17 @@ import {
   isPracticeChallenge,
   type ChallengeForPlay,
 } from '../../lib/challenges'
-import { deleteMyVote, getExistingVote, getVotes, startPlay, submitVote } from '../../lib/votes'
+import {
+  deleteMyVote,
+  getExistingVote,
+  getVotes,
+  getVotesWithNames,
+  startPlay,
+  submitVote,
+} from '../../lib/votes'
 import { getGroup } from '../../lib/groupData'
 import { getGroupMembers } from '../../lib/membership'
-import { aggregateLeaderboard, getGroupVotes } from '../../lib/leaderboard'
+import { aggregateLeaderboard, getGroupVotes, type VoteWithName } from '../../lib/leaderboard'
 import { upsertProfile } from '../../lib/profile'
 import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
@@ -112,6 +123,15 @@ function distanceLabel(km: number): string {
   return 'Muy lejos'
 }
 
+// Guarda de tipo (issue #795): un voto de TIMEOUT ajeno no trae guess_lat/lng
+// (jugó pero no marcó), así que no hay dónde clavar su pin en el mapa de
+// resultado — se filtra antes de construir `GuessMarker[]`.
+function hasGuessLocation(
+  v: VoteWithName,
+): v is VoteWithName & { guess_lat: number; guess_lng: number } {
+  return v.guess_lat != null && v.guess_lng != null
+}
+
 // Háptica sutil (solo donde el navegador la soporte; iOS Safari la ignora). El
 // llamador ya filtra reduced-motion: aquí solo disparamos el patrón si existe la
 // API. Un toque corto al colocar el pin; un patrón al revelar un gran acierto.
@@ -139,6 +159,15 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // propiedad de analítica `rank_in_challenge` y el texto "Nº de N" del resultado.
   // Se calcula con los votos del reto tras revelar (no se conoce antes de votar).
   const [rank, setRank] = useState<{ position: number; total: number } | null>(null)
+  // Votos con nombre de TODOS los que ya jugaron este reto (issue #795): pinta
+  // sus pines en el mapa del resultado. Se resuelve tras revelar (fresco o al
+  // recargar un voto ya emitido) — nunca antes: la RLS ya exige haber votado
+  // para leer `votes`, pero además NO llamamos a esta consulta en ninguna fase
+  // previa (`idle`/`playing`), así que quien no ha jugado no ve nada aunque la
+  // policy se lo permitiera. Reutiliza la MISMA consulta que ya alimentaba el
+  // ranking (antes `getVotes`, ahora `getVotesWithNames`: una sola llamada para
+  // las dos cosas, no dos).
+  const [allGuesses, setAllGuesses] = useState<VoteWithName[]>([])
   // Tiempo de respuesta + factor de velocidad para el revelado (issue #628). Solo
   // tiene sentido con límite por jugada (guess_seconds no null): sin límite
   // ("Libre") no hay contra qué medir. `factor` es null cuando no se puede
@@ -286,6 +315,23 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             points: 0,
             is_anonymous: isAnonymous,
           })
+          // Aunque no marcó pin, SÍ jugó (issue #795): con el voto ya
+          // persistido por submitVote de arriba, la RLS de challenge_answers
+          // ya le deja ver la respuesta (condición "ya tiene un voto en este
+          // reto"), así que puede ver el mapa de resultado con las jugadas del
+          // resto igual que quien sí llegó a tiempo. Falla en silencio: sin
+          // esto, simplemente no se pinta el mapa (ver el render de abajo).
+          try {
+            const ans = await getAnswer(current.id)
+            if (ans) setAnswer(ans)
+          } catch {
+            // Sin respuesta: el resultado se muestra igual, sin mapa.
+          }
+          try {
+            setAllGuesses(await getVotesWithNames(current.id))
+          } catch {
+            // Sin jugadas del resto: el resultado se muestra igual.
+          }
           return
         }
         // El servidor devuelve distancia + puntos + la respuesta real para el pin.
@@ -306,19 +352,22 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         }
         // Posición en el reto: ranking estándar por puntos (1 + nº de votos con
         // MÁS puntos que el mío). Mi voto ya está persistido por submitVote, así
-        // que getVotes lo incluye. Falla en silencio: el revelado no se bloquea
-        // por esto y, sin rango, simplemente no añadimos la propiedad.
+        // que getVotesWithNames lo incluye. Misma consulta que alimenta el mapa
+        // de resultado (issue #795, `allGuesses`) — una sola llamada para las
+        // dos cosas. Falla en silencio: el revelado no se bloquea por esto y,
+        // sin rango, simplemente no añadimos la propiedad (tampoco el mapa).
         let rankPosition: number | null = null
         let rankTotal: number | null = null
         try {
-          const votes = await getVotes(current.id)
+          const votes = await getVotesWithNames(current.id)
+          setAllGuesses(votes)
           if (votes.length > 0) {
             rankTotal = votes.length
             rankPosition = 1 + votes.filter((v) => v.points > res.points).length
             setRank({ position: rankPosition, total: rankTotal })
           }
         } catch {
-          // Sin rango: el resultado se muestra igual; omitimos rank_in_challenge.
+          // Sin rango ni mapa de resultado: el resultado se muestra igual.
         }
         track('result_revealed', {
           group_id: current.group_id,
@@ -543,24 +592,31 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     : null,
               })
             }
-            // Ya votó: tiene derecho a ver la respuesta. La pedimos aparte (no viaja
-            // en el payload del reto); la RLS de challenge_answers la sirve por voto.
-            const ans = await getAnswer(challengeId)
+          }
+          // Ya votó (con pin o de timeout): tiene derecho a ver la respuesta y las
+          // jugadas del resto (issue #795) — la RLS de challenge_answers/votes las
+          // sirve por tener un voto propio, con o sin pin. La pedimos aparte (no
+          // viaja en el payload del reto). Fuera del if/else de arriba a propósito:
+          // antes solo se pedía si el voto tenía pin; un timeout se quedaba sin
+          // mapa de resultado aunque la policy ya se lo permitiera.
+          const ans = await getAnswer(challengeId)
+          if (cancelled) return
+          if (ans) setAnswer(ans)
+          // Posición en el reto para el texto "Nº de N" (recarga de un voto ya
+          // emitido) + jugadas de todos para el mapa de resultado. Mismo ranking
+          // por puntos; falla en silencio.
+          try {
+            const votes = await getVotesWithNames(challengeId)
             if (cancelled) return
-            if (ans) setAnswer(ans)
-            // Posición en el reto para el texto "Nº de N" (recarga de un voto ya
-            // emitido). Mismo ranking por puntos; falla en silencio.
-            try {
-              const votes = await getVotes(challengeId)
-              if (!cancelled && votes.length > 0) {
-                setRank({
-                  position: 1 + votes.filter((v) => v.points > existing.points).length,
-                  total: votes.length,
-                })
-              }
-            } catch {
-              // Sin rango: el resultado se muestra igual.
+            setAllGuesses(votes)
+            if (votes.length > 0) {
+              setRank({
+                position: 1 + votes.filter((v) => v.points > existing.points).length,
+                total: votes.length,
+              })
             }
+          } catch {
+            // Sin rango ni mapa de resultado: el resultado se muestra igual.
           }
           setPhase('revealed')
           return
@@ -1024,6 +1080,20 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // revelar; al jugar es null y NO debe alimentar la escena.
   const panoFallback: LatLng = answer ?? { lat: 0, lng: 0 }
   const backLabel = groupId ? 'Volver al viaje' : 'Inicio'
+  // Pines de TODOS los que ya jugaron, para el mapa de resultado (issue #795).
+  // Filtra los votos de TIMEOUT (propio o ajeno): jugaron pero no marcaron pin,
+  // no hay dónde clavarlos. Con MI timeout, `resultGuesses` simplemente no
+  // lleva mi pin (correcto: no marqué) — el mapa se pinta igual con quien sí
+  // marcó, siempre que la respuesta llegara a resolverse (ver el render de
+  // abajo: sin `answer` cae al PlayMap de siempre).
+  const resultGuesses: GuessMarker[] = allGuesses.filter(hasGuessLocation).map((v) => ({
+    userId: v.user_id,
+    name: v.display_name,
+    avatar: v.avatar,
+    lat: v.guess_lat,
+    lng: v.guess_lng,
+    points: v.points,
+  }))
   // Reto de práctica: plazo lejano (>1 año). Solo en estos mostramos "volver a
   // jugar" tras revelar; en un reto real rejugar tras ver la respuesta sería trampa.
   const isPractice = isPracticeChallenge(challenge.deadline_at)
@@ -1187,18 +1257,26 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         </Stack>
 
         <div className={`${styles.resultMap} lg-rise`}>
-          <PlayMap
-            guess={guess}
-            answer={answer}
-            locked
-            onPick={setGuess}
-            meAvatar={profile?.avatar_url}
-            meUserId={user?.id ?? ''}
-            // Revelado = "ver dónde era": lienzo DIARIO (satélite con etiquetas), que
-            // sitúa el resultado sobre la foto aérea. El lienzo JUGAR (callejero
-            // etiquetado) es el de colocar el pin, no el de revelar.
-            preset="diario"
-          />
+          {/* Issue #795: con respuesta conocida, el mapa de resultado enseña el
+              pin de TODOS los que ya jugaron (con su nombre), no solo el mío.
+              Sin respuesta todavía (p.ej. un fallo puntual al pedirla) cae al
+              PlayMap de siempre — mi pin + el mundo, sin bloquear el resultado. */}
+          {answer ? (
+            <AllGuessesMap answer={answer} guesses={resultGuesses} meUserId={user?.id ?? ''} />
+          ) : (
+            <PlayMap
+              guess={guess}
+              answer={answer}
+              locked
+              onPick={setGuess}
+              meAvatar={profile?.avatar_url}
+              meUserId={user?.id ?? ''}
+              // Revelado = "ver dónde era": lienzo DIARIO (satélite con etiquetas), que
+              // sitúa el resultado sobre la foto aérea. El lienzo JUGAR (callejero
+              // etiquetado) es el de colocar el pin, no el de revelar.
+              preset="diario"
+            />
+          )}
         </div>
 
         <Card padding="md" raised>

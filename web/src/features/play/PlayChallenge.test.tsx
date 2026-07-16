@@ -10,6 +10,9 @@ import type { ChallengeForPlay } from '../../lib/challenges'
 const getChallengeMock = vi.fn<() => Promise<ChallengeForPlay | null>>()
 const getExistingVoteMock = vi.fn<() => Promise<unknown>>()
 const getVotesMock = vi.fn<() => Promise<unknown[]>>()
+// Issue #795: el mapa de resultado ("jugadas de todos") se alimenta de
+// getVotesWithNames (rank + pines), mismo criterio de mock que getVotesMock.
+const getVotesWithNamesMock = vi.fn<() => Promise<unknown[]>>()
 const getAnswerMock = vi.fn<() => Promise<unknown>>()
 const getGroupMock = vi.fn<() => Promise<unknown>>()
 
@@ -28,6 +31,7 @@ const submitVoteMock = vi.fn<(...args: unknown[]) => Promise<unknown>>()
 vi.mock('../../lib/votes', () => ({
   getExistingVote: () => getExistingVoteMock(),
   getVotes: () => getVotesMock(),
+  getVotesWithNames: () => getVotesWithNamesMock(),
   deleteMyVote: vi.fn(),
   submitVote: (...args: unknown[]) => submitVoteMock(...args),
   startPlay: () => startPlayMock(),
@@ -105,6 +109,10 @@ vi.mock('../../lib/useSignedImage', () => ({ useSignedImage: () => null }))
 // monta (fuera de alcance: solo verificamos que el guard "es tuyo" no rompe el
 // camino feliz). Stub sin comportamiento.
 vi.mock('./PlayMap', () => ({ PlayMap: () => null }))
+// Mapa de resultado (issue #795): igual que PlayMap, exige un <ApiProvider> de
+// Google Maps que este test no monta; el wiring de "quién ve qué pin" ya se
+// prueba en AllGuessesMap.test.tsx. Stub sin comportamiento.
+vi.mock('../group/AllGuessesMap', () => ({ AllGuessesMap: () => null }))
 
 function mockMatchMedia(matches: boolean) {
   vi.stubGlobal('matchMedia', (query: string) => ({
@@ -182,6 +190,7 @@ beforeEach(() => {
   mockMatchMedia(false)
   getExistingVoteMock.mockResolvedValue(null)
   getVotesMock.mockResolvedValue([])
+  getVotesWithNamesMock.mockResolvedValue([])
   getGroupMock.mockResolvedValue({ id: 'g1', name: 'Viaje a Iruña' })
   startPlayMock.mockResolvedValue(undefined)
   submitVoteMock.mockResolvedValue({
