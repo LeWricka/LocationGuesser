@@ -36,11 +36,6 @@ interface Props {
   /** Abre la hoja de invitar (CTA secundario del vacío: invitar es tan visible
    * como añadir el primer momento — issue #510, invitar quedaba escondido tras el ···). */
   onInvite: () => void
-  /**
-   * Compartir el reto EN JUEGO (issue #758): TripDiario solo ofrece el icono de
-   * 1 tap en la tarjeta SELECCIONADA cuando está en juego (ver `MomentCard`).
-   */
-  onShareChallenge: (moment: Moment) => void
 }
 
 /**
@@ -67,7 +62,6 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
     onPlay,
     onAddMoment,
     onInvite,
-    onShareChallenge,
   },
   carouselRef,
 ) {
@@ -134,14 +128,6 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
                   // jugadas en su lugar cuando `moment.isOwn` (#578).
                   onPlay={
                     m.status === 'active' && !m.isOwn ? () => onPlay(m.challengeId) : undefined
-                  }
-                  // Icono "compartir" a 1 tap (issue #758): solo en la tarjeta
-                  // SELECCIONADA de un reto EN JUEGO — compartir uno cerrado no
-                  // lleva a ninguna acción (ver `ShareChallengeModal`).
-                  onShare={
-                    m.challengeId === selectedId && m.status === 'active'
-                      ? () => onShareChallenge(m)
-                      : undefined
                   }
                 />
               </div>

@@ -152,6 +152,10 @@ export interface HomeGroup {
 export interface HomePinned {
   groupId: string
   challengeId: string
+  /** Nº total de retos pendientes (opcional: sin él, la etiqueta clásica).
+   * Con >1, la etiqueta anuncia el lote: "Te tocan 4 retos" (issue del dueño:
+   * la píldora solo mencionaba uno aunque esperasen varios). */
+  pendingCount?: number
   /** Título del reto (la pregunta corta del chip). */
   title: string
   /** Nombre del viaje al que pertenece (subtítulo). */
@@ -573,7 +577,11 @@ function PinnedChip({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => voi
         <Icon icon={Play} size={16} />
       </span>
       <span className={styles.pinnedBody}>
-        <span className={styles.pinnedLabel}>Te toca jugar</span>
+        <span className={styles.pinnedLabel}>
+          {(pinned.pendingCount ?? 1) > 1
+            ? `Te tocan ${pinned.pendingCount} retos`
+            : 'Te toca jugar'}
+        </span>
         <span className={styles.pinnedTitle}>{pinned.title}</span>
         {meta && <span className={styles.pinnedMeta}>{meta}</span>}
       </span>

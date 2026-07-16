@@ -941,7 +941,6 @@ export const cases: GalleryCase[] = [
           onPlay={noop}
           onAddMoment={noop}
           onInvite={noop}
-          onShareChallenge={noop}
         />
       </div>
     ),

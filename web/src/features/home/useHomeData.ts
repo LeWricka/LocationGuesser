@@ -19,6 +19,9 @@ import { useVisibilityReload } from '../../lib/useVisibilityReload'
 export interface PinnedChallenge {
   groupId: string
   challengeId: string
+  /** Nº TOTAL de retos pendientes de jugar (en todos los viajes): la píldora
+   * muestra el más urgente, pero anuncia cuántos esperan ("Te tocan 4 retos"). */
+  pendingCount: number
   /** Título del reto (p.ej. "¿Dónde tomé esta foto?"). */
   title: string
   /** Nombre del viaje al que pertenece el reto (subtítulo de la tarjeta). */
@@ -97,6 +100,7 @@ async function loadPinned(userId: string): Promise<PinnedChallenge | null> {
   return {
     groupId: top.groupId,
     challengeId: top.challenge.id,
+    pendingCount: pending.length,
     title: top.challenge.title,
     groupName: top.groupName,
     deadlineAt: top.challenge.deadline_at,

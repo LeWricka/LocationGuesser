@@ -611,7 +611,6 @@ export function TripPage({
               onPlay={onPlayChallenge}
               onAddMoment={onAddMoment}
               onInvite={() => openInvite()}
-              onShareChallenge={(m) => openShareChallenge(m, 'diario_card')}
             />
           </section>
         )}
