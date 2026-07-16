@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Hash } from 'lucide-react'
 import { PhotoDropzone } from './PhotoDropzone'
+import { describeDeadlineEcho } from './deadlineEcho'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
 import { createNumberChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { DEFAULT_NUMBER_TOLERANCE } from '../../lib/geo'
@@ -49,7 +50,8 @@ interface Props {
 const DEADLINE_OPTIONS: { minutes: number; label: string }[] = [
   { minutes: 60, label: '1 h' },
   { minutes: 240, label: '4 h' },
-  { minutes: 720, label: 'Hoy' },
+  // "12 h" se llamó "Hoy" y liaba (era 12 h fijas, ni 24 h ni fin del día).
+  { minutes: 720, label: '12 h' },
   { minutes: 4320, label: '3 días' },
 ]
 const DEFAULT_DEADLINE_INDEX = 1
@@ -612,6 +614,9 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
                 value={String(deadlineIndex)}
                 onChange={(v) => setDeadlineIndex(Number(v))}
               />
+              <p className={styles.hint}>
+                {describeDeadlineEcho(DEADLINE_OPTIONS[deadlineIndex].minutes)}
+              </p>
             </div>
 
             <div className={styles.field}>
