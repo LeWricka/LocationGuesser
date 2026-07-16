@@ -151,23 +151,28 @@
 .pinnedChip::before {
   content: '';
   position: absolute;
-  inset: -8px;
+  inset: -6px;
   z-index: -1; /* design-lint-allow: capa local del propio chip (halo detrás de su vidrio) */
   border-radius: inherit;
-  background: var(--gradient-accent);
-  opacity: 0.3;
+  /* ORO, no --gradient-accent (grafito): un halo oscuro tras vidrio oscuro sobre
+     el globo oscuro era invisible — "que se entere el jugador". El oro ya marca
+     "lo vivo" en el sistema (rutas del globo, --route-gold); el blur lo convierte
+     en resplandor en vez de en un borde duro. */
+  background: var(--route-gold);
+  filter: blur(14px);
+  opacity: 0.45;
   pointer-events: none;
   animation: lg-pinned-breathe 2.6s var(--motion-ease-standard) infinite; /* design-lint-allow: respiración del reto pendiente (issue #776), ciclo largo sin token — bucle acotado a "hay algo vivo esperándote", mismo precedente que homePulse/liveDotPulse */
 }
 @keyframes lg-pinned-breathe {
   0%,
   100% {
-    opacity: 0.22;
+    opacity: 0.3;
     transform: scale(0.97);
   }
   50% {
-    opacity: 0.5;
-    transform: scale(1.04);
+    opacity: 0.75;
+    transform: scale(1.05);
   }
 }
 
@@ -204,7 +209,9 @@
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: var(--letter-spacing-wide);
-  color: var(--scene-ink-soft);
+  /* Oro, como el halo: "TE TOCAN 3 RETOS" es la llamada a jugar — en gris se
+     camuflaba con la meta del chip y el jugador no se enteraba. */
+  color: var(--route-gold);
 }
 .pinnedTitle {
   font-family: var(--font-serif);
