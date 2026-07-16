@@ -975,6 +975,36 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
+    // Mapa EXPANDIDO de "Adivinar" (issue #789): el mapa domina la pantalla, con
+    // el contador siempre visible arriba y las dos acciones de primera clase
+    // debajo — "Volver a la foto" (sigue explorando) y "Clavar tiro" (confirma).
+    // `guess` ya puesto: comprueba que el botón de confirmar se habilita.
+    id: 'showcase-jugar-mapa-expandido',
+    title: 'Showcase · Jugar (mapa expandido, ida y vuelta)',
+    section: 'Showcase',
+    render: () => (
+      <GameScene
+        title={SHOWCASE_JUGAR_TITLE}
+        scene={SHOWCASE_JUGAR_SCENE}
+        sceneReady
+        remaining={22}
+        guessSeconds={30}
+        backLabel="Salir (sigue el tiempo)"
+        onBack={noop}
+        guess={{ lat: 41.9, lng: 12.5 }}
+        onGuess={noop}
+        mapOpen
+        onOpenMap={noop}
+        onCloseMap={noop}
+        meUserId={ME_ID}
+        onConfirm={noop}
+        photoExpanded={false}
+        onExpandPhoto={noop}
+        onClosePhoto={noop}
+      />
+    ),
+  },
+  {
     // Reveal recortado al bloque que SÍ luce (issue #652): el revelado real de
     // PlayChallenge antepone un mapa a 62svh (rectángulo azul pizarra liso bajo el
     // stub de la galería) que se come media pantalla sin vender nada. Aquí solo el

@@ -291,6 +291,14 @@ export function GameScene({
           aria-label="Abrir el mapa para clavar el tiro"
         >
           <div className={styles.miniMapaScene} aria-hidden="true">
+            {/* SIN `fixedCenterPin` a propósito (issue #789): esta miniatura no es
+                interactiva (`pointer-events: none`, el botón padre abre el mapa
+                grande) así que el modo "pin de centro fijo" no aporta nada — su
+                icono decorativo se veía SIEMPRE igual, con o sin tiro puesto. En
+                modo clásico se dibuja el pin de verdad en su coordenada real, y
+                `centerOn` mantiene la vista sobre él (sin esto podría caer fuera
+                de los 128px): la miniatura ENSEÑA que ya apuntaste (y dónde), no
+                solo lo dice el rótulo. */}
             <PlayMap
               guess={guess}
               answer={null}
@@ -299,7 +307,7 @@ export function GameScene({
               meAvatar={meAvatar}
               meUserId={meUserId}
               preset="jugar"
-              fixedCenterPin
+              centerOn={guess}
             />
           </div>
           {/* Etiqueta con diana: indica "toca para apuntar". */}
@@ -310,9 +318,14 @@ export function GameScene({
         </button>
       )}
 
-      {/* Estado EXPANDIDO: mapa a pantalla parcial + botón "Clavar tiro".
-          Montado como overlay absoluto (no hoja): el SV sigue visible arriba.
-          El botón de confirmar DENTRO del mapa (como GeoGuessr). */}
+      {/* Estado EXPANDIDO: el mapa DOMINA la pantalla (issue #789 — antes se
+          quedaba corto y no invitaba al ida-y-vuelta explorar↔posicionar).
+          Montado como overlay absoluto que deja SOLO la cabecera (con el
+          contador) visible arriba; el resto es lienzo de mapa. Debajo, DOS
+          acciones de primera clase, igual de visibles: volver a explorar
+          (el pin se queda puesto, se puede reajustar) y confirmar el tiro.
+          Antes "volver" era un icono suelto en la esquina del mapa — un
+          gesto escondido, no una acción obvia. */}
       {expanded.mounted && (
         <div
           className={[styles.mapaExpandido, expanded.exiting ? styles.mapaExpandidoExit : '']
@@ -337,22 +350,18 @@ export function GameScene({
             <span className={styles.dianaFija} aria-hidden="true">
               <IconDiana size={30} />
             </span>
-            {/* Botón de cerrar: vuelve al SV sin clavarlo. */}
-            <button
-              type="button"
-              className={styles.mapaExpandidoCerrar}
-              onClick={onCloseMap}
-              aria-label={`Volver a ${hasStreetView ? 'Street View' : 'la imagen'}`}
-            >
-              <Icon icon={Expand} size={16} />
-            </button>
           </div>
-          <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
-            <span className={styles.btnIcon}>
-              <IconDiana size={18} />
-              Clavar tiro
-            </span>
-          </Button>
+          <div className={styles.mapaExpandidoActions}>
+            <Button variant="secondary" size="lg" fullWidth onClick={onCloseMap}>
+              Volver {hasStreetView ? 'al panorama' : 'a la foto'}
+            </Button>
+            <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
+              <span className={styles.btnIcon}>
+                <IconDiana size={18} />
+                Clavar tiro
+              </span>
+            </Button>
+          </div>
         </div>
       )}
 

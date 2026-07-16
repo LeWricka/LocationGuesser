@@ -1108,9 +1108,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               <>
                 <IconDiana size={64} className={styles.introIcon} />
                 <p className={styles.introLine}>
-                  {hasStreetView
-                    ? 'Mira el panorama y clava tu pin'
-                    : 'Mira la foto y clava tu pin'}
+                  {/* Caso foto+SV (issue #789): solo cuando la foto es PISTA visible
+                      durante la ronda (`hintPhotoUrl`) — la foto "sorpresa" (revelado)
+                      no se ve hasta el final, así que no tiene sentido anunciarla aquí.
+                      "dónde es" (no "dónde están", pese a la petición literal del
+                      dueño): singular, coherente con el resto del copy de la app
+                      ("adivina dónde es", "¿dónde es?"). */}
+                  {hasStreetView && hintPhotoUrl
+                    ? 'Mira la foto y el Street View para intentar adivinar dónde es'
+                    : hasStreetView
+                      ? 'Mira el panorama y clava tu pin'
+                      : 'Mira la foto y clava tu pin'}
                 </p>
                 {challenge.guess_seconds != null && (
                   <span className={styles.introTimeChip}>

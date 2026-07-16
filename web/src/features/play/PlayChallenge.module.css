@@ -286,9 +286,17 @@
   box-shadow: var(--shadow-xs);
 }
 
-/* --- Mini-mapa EXPANDIDO (clavar el tiro) --- */
+/* --- Mini-mapa EXPANDIDO (clavar el tiro) ---
+   Domina la pantalla (issue #789): el dueño reportó que se quedaba corto y no
+   invitaba al ida-y-vuelta explorar↔posicionar. `top` deja SOLO la cabecera
+   flotante (con el contador, `--z-header`) visible arriba — el resto del alto
+   es lienzo de mapa + las dos acciones. `--z-sheet` > `--z-header` a propósito
+   (los sheets van por encima de la cabecera, ver tokens.css), así que el hueco
+   de `top` es lo único que evita taparla; tap-target + space-5 despeja de sobra
+   la altura real de la cabecera flotante (~60px con safe-area). */
 .mapaExpandido {
   position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--tap-target) + var(--space-5));
   left: var(--space-4);
   right: var(--space-4);
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
@@ -334,10 +342,15 @@
   }
 }
 
-/* Lienzo del mapa grande. */
+/* Lienzo del mapa grande: llena TODO el alto disponible del panel (issue #789
+   — antes 300px fijos lo dejaban corto); `flex: 1` se reparte el espacio que
+   sobra tras las acciones de abajo. `min-height: 0` es necesario para que un
+   hijo flex con contenido (el mapa) pueda encogerse por debajo de su tamaño
+   intrínseco dentro de la columna. */
 .mapaExpandidoScene {
   position: relative;
-  height: 300px;
+  flex: 1;
+  min-height: 0;
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: var(--shadow-chrome);
@@ -361,27 +374,16 @@
   pointer-events: none;
 }
 
-/* Botón de colapsar (volver al SV): esquina superior derecha del mapa expandido. */
-.mapaExpandidoCerrar {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  width: var(--tap-target);
-  height: var(--tap-target);
-  display: grid;
-  place-items: center;
-  border: none;
-  border-radius: var(--radius-full);
-  background: var(--scene-surface);
-  color: var(--scene-ink);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition: transform var(--transition-fast);
-}
-.mapaExpandidoCerrar:active {
-  transform: scale(0.92);
+/* Dos acciones de primera clase bajo el mapa (issue #789): "Volver a…" (sigue
+   explorando; el pin se queda puesto, se reajusta cuantas veces haga falta) y
+   "Clavar tiro" (confirma el voto), apiladas — la de confirmar al fondo, más
+   cerca del pulgar, coherente con el resto de la app. Antes "volver" era un
+   icono suelto en la esquina del mapa (`.mapaExpandidoCerrar`, retirado): un
+   gesto escondido en vez de un botón que invite a usarlo. */
+.mapaExpandidoActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 /* ==========================================================================
