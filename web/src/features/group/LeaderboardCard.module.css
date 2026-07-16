@@ -206,8 +206,9 @@
   height: 1em;
 }
 
-/* Disco con el avatar del jugador: el fondo lo inyecta el componente (gradiente
-   del avatar). Anillo claro de la medalla (oro/plata/bronce) alrededor para no
+/* Disco con el avatar del jugador: tint de acento + el dibujo de línea del
+   animal (issue #801, mismo lenguaje que `Avatar.tsx`/`.line`; nunca el emoji
+   crudo). Anillo claro de la medalla (oro/plata/bronce) alrededor para no
    perder la jerarquía de puesto. La 1ª plaza es mayor para marcarla. */
 .podiumDisc {
   flex: 0 0 auto;
@@ -219,6 +220,8 @@
   height: 132px;
   overflow: hidden;
   line-height: 1;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
 }
 
 /* Anillo de puesto sobre el disco del avatar (en vez de tintar todo el disco). */
@@ -232,10 +235,10 @@
   box-shadow: inset 0 0 0 6px var(--medal-bronze);
 }
 
-/* Emoji del avatar dentro del disco (o imagen de avatares antiguos). */
+/* SVG del animal de línea dentro del disco (o imagen, para avatares-foto). */
 .podiumAvatar {
-  font-size: 76px;
-  line-height: 1;
+  width: 62%;
+  height: 62%;
 }
 img.podiumAvatar {
   width: 100%;
@@ -246,10 +249,6 @@ img.podiumAvatar {
 .placeFirst .podiumDisc {
   width: 164px;
   height: 164px;
-}
-
-.placeFirst .podiumAvatar {
-  font-size: 96px;
 }
 
 .podiumName {
