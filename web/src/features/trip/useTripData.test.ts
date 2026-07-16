@@ -301,6 +301,69 @@ describe('useTripData — pastChallenges (issue #608)', () => {
   })
 })
 
+// Issue #800: "Retos anteriores" pasa a incluir los retos EN JUEGO (no solo los
+// cerrados) para que el detalle nuevo (`ChallengeDetail`) sea alcanzable desde
+// ahí también — sin ganador (el resultado no es definitivo) y ordenados los EN
+// JUEGO primero (el que cierra antes, primero).
+describe('useTripData — pastChallenges incluye los EN JUEGO (issue #800)', () => {
+  test('un reto EN JUEGO entra con status "active" y sin ganador, aunque ya tenga votos', async () => {
+    getGroupChallengesMock.mockResolvedValue([activeChallenge({ id: 'c1', title: 'Torre Eiffel' })])
+    getGroupVotesMock.mockResolvedValue([
+      makeVote({ id: 'v1', challenge_id: 'c1', user_id: 'u-me', points: 3100 }),
+    ])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.pastChallenges).toHaveLength(1))
+
+    const [summary] = result.current.pastChallenges
+    expect(summary.status).toBe('active')
+    // El resultado no es definitivo EN JUEGO: nunca se promete un "ganador".
+    expect(summary.winner).toBeNull()
+    // Pero MI resultado sí se conoce (ya jugué) — es la señal anti-spoiler que
+    // decide si la fila va a jugar o al detalle (ver MarcadorTab.test.tsx).
+    expect(summary.myResult).toEqual({ points: 3100, distanceKm: null, leftApp: false })
+  })
+
+  test('un reto CERRADO tiene status "closed" y SÍ lleva ganador', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1' })])
+    getGroupVotesMock.mockResolvedValue([
+      makeVote({ id: 'v1', challenge_id: 'c1', user_id: 'u-otro', points: 4880 }),
+    ])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.pastChallenges).toHaveLength(1))
+
+    expect(result.current.pastChallenges[0].status).toBe('closed')
+    expect(result.current.pastChallenges[0].winner?.points).toBe(4880)
+  })
+
+  test('orden: los EN JUEGO primero (el que cierra antes, primero), luego los CERRADOS (más reciente primero)', async () => {
+    getGroupChallengesMock.mockResolvedValue([
+      activeChallenge({
+        id: 'c-activo-lejos',
+        title: 'Activo (cierra en 5h)',
+        deadline_at: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
+      }),
+      activeChallenge({
+        id: 'c-activo-cerca',
+        title: 'Activo (cierra en 1h)',
+        deadline_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }),
+      closedChallenge({ id: 'c-cerrado', title: 'Cerrado' }),
+    ])
+    getGroupVotesMock.mockResolvedValue([])
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.pastChallenges).toHaveLength(3))
+
+    expect(result.current.pastChallenges.map((c) => c.title)).toEqual([
+      'Activo (cierra en 1h)',
+      'Activo (cierra en 5h)',
+      'Cerrado',
+    ])
+  })
+})
+
 // Issue #566 / migración 0037: el diario ordena por `happened_on` (fecha
 // ELEGIDA) con fallback a `created_at` para momentos legado sin fecha propia —
 // ya no basta con invertir el orden de subida (`getGroupChallenges`, DESC).

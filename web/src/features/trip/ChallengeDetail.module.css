@@ -1,0 +1,271 @@
+/*
+ * Detalle de UN reto (issue #800): a pantalla completa, mismo patrón que
+ * TripWrap (overlay fijo + scroll propio + X flotante) — visual-first, mapa y
+ * foto protagonistas, la clasificación es dato de apoyo compacto debajo.
+ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: var(--color-bg);
+  overflow: hidden;
+  animation: cd-fade var(--motion-duration-base) var(--motion-ease-standard) both;
+}
+@keyframes cd-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.close {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + var(--space-3));
+  right: var(--space-3);
+  /* design-lint-allow: capa local del detalle (X flotante sobre el scroll) */
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  appearance: none;
+  cursor: pointer;
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  transition: background-color var(--motion-transition-fast);
+}
+.close:hover {
+  background: var(--color-surface-hover);
+}
+.close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.scroll {
+  height: 100svh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(env(safe-area-inset-top) + var(--space-6)) var(--space-4)
+    calc(env(safe-area-inset-bottom) + var(--space-6));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.loading,
+.state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50svh;
+}
+
+/* ── Cabecera: estado + título + creador/cierre ─────────────────────────── */
+
+.head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-snug);
+  color: var(--color-text);
+}
+
+.meta {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+.metaIcon {
+  margin: 0 2px;
+  color: var(--color-text-faint);
+}
+
+/* ── Foto protagonista ───────────────────────────────────────────────────── */
+
+.photo {
+  width: 100%;
+}
+
+/* ── Mapa ────────────────────────────────────────────────────────────────── */
+
+.mapWrap {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--hairline-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+.mapPending {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.numberAnswer {
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline-soft);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}
+.numberAnswer strong {
+  color: var(--color-text);
+}
+.numberAnswer p {
+  margin: 0;
+}
+
+/* ── Clasificación (tabla compacta) ─────────────────────────────────────── */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.boardTitle {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.boardCount {
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
+}
+
+.boardEmpty {
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--hairline-soft);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+}
+
+.boardList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.boardRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+.boardRowMine {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.boardRank {
+  flex-shrink: 0;
+  width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+.boardRankNum {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.boardName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.boardMeTag {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent);
+}
+
+.boardPoints {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.boardDetail {
+  flex-shrink: 0;
+  width: 64px;
+  text-align: right;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Aviso anti-trampa (issue #200), mismo criterio que MarcadorTab: icono discreto
+ * con title+aria-label, nunca solo color. */
+.leftAppFlag {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-danger);
+  cursor: help;
+}

@@ -13,6 +13,7 @@ import { Landing } from '../features/auth/Landing'
 import { LoginFlow } from '../features/auth/LoginFlow'
 import { HomePage } from '../features/home/HomePage'
 import { TripPage } from '../features/trip/TripPage'
+import { ChallengeDetail } from '../features/trip/ChallengeDetail'
 import { PlayChallenge } from '../features/play/PlayChallenge'
 import { PlayNumberChallenge } from '../features/play/PlayNumberChallenge'
 import { CreateGroup } from '../features/create/CreateGroup'
@@ -504,6 +505,17 @@ export const cases: GalleryCase[] = [
         onBack={noop}
       />
     ),
+  },
+  {
+    // Issue #800: detalle de UN reto abierto desde "Retos anteriores" del
+    // Marcador — clasificación (jugador → puntos → distancia, el propio
+    // destacado), el mapa con las jugadas de TODOS (`AllGuessesMap`, #797) y la
+    // foto ampliable + título/creador/cierre. CH_CLOSED_OTHER: cerrado, AJENO
+    // (creado por Marta) y con TU voto — el recap real, no la guarda "es tuyo".
+    id: 'detalle-reto-marcador',
+    title: 'Marcador · Detalle de un reto (clasificación + mapa + foto)',
+    section: 'Viaje',
+    render: () => <ChallengeDetail challengeId={CH_CLOSED_OTHER} myUserId={ME_ID} onClose={noop} />,
   },
   {
     // Issue #607: el pie (Copiar enlace / Compartir) desbordaba el panel a

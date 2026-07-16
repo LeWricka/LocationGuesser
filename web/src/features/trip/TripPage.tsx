@@ -31,6 +31,7 @@ import { useTripData } from './useTripData'
 import { TripDiario } from './TripDiario'
 import { BitacoraTab } from './BitacoraTab'
 import { MarcadorTab } from './MarcadorTab'
+import { ChallengeDetail } from './ChallengeDetail'
 import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import { ShareChallengeModal } from './ShareChallengeModal'
@@ -134,6 +135,12 @@ export function TripPage({
   const [section, setSection] = useState<Section>(initialSection)
   // Momento abierto en la hoja de detalle (null = cerrada).
   const [openMoment, setOpenMoment] = useState<Moment | null>(null)
+  // Detalle de UN reto abierto desde "Retos anteriores" del Marcador (issue
+  // #800): clasificación + mapa de jugadas + foto. Null = cerrado. Solo se
+  // abre para un CERRADO o un EN JUEGO ya jugado — el anti-spoiler (un EN
+  // JUEGO sin jugar) lo decide `MarcadorTab` llamando a `onPlayChallenge` en
+  // su lugar, nunca a este estado.
+  const [viewingChallengeId, setViewingChallengeId] = useState<string | null>(null)
   // "Compartir reto" (issue #739): reto suelto a compartir desde su detalle
   // (null = modal cerrado). El imagePath ya viene filtrado por el anti-spoiler
   // de `isMomentPhotoVisible` (ver el botón en MomentSheet más abajo): una foto
@@ -665,10 +672,13 @@ export function TripPage({
               groupId={groupId}
               prizes={group?.prizes ?? null}
               pastChallenges={pastChallenges}
-              // Mismo hash `#g=…&c=…` que "Adivina"/"Ya jugaste" (issue #608): un
-              // reto cerrado con voto propio reabre su revelado; sin voto, entra
-              // al reto (que ya rechaza jugar fuera de plazo).
-              onOpenChallenge={onPlayChallenge}
+              // Anti-spoiler (issue #800): un EN JUEGO sin jugar va al mismo flujo
+              // de jugar que "Adivina" del Diario (nunca al detalle, que
+              // revelaría el mapa antes de tiempo).
+              onPlayChallenge={onPlayChallenge}
+              // Cualquier otro (cerrado, o EN JUEGO ya jugado) abre el detalle
+              // nuevo (clasificación + mapa de jugadas + foto) por encima del viaje.
+              onViewChallenge={(challengeId) => setViewingChallengeId(challengeId)}
               onPrizesSaved={() => void refresh()}
             />
           </section>
@@ -1071,6 +1081,18 @@ export function TripPage({
           prizes={group?.prizes ?? null}
           winnersByChallenge={winnersByChallenge}
           onClose={() => setWrapOpen(false)}
+        />
+      )}
+
+      {/* Detalle de un reto (issue #800), abierto desde "Retos anteriores" del
+          Marcador: clasificación, mapa de jugadas y foto — a pantalla completa,
+          por encima del viaje. Se basta a sí mismo (pide sus propios datos por
+          `challengeId`), así que solo hace falta montarlo/desmontarlo aquí. */}
+      {viewingChallengeId && (
+        <ChallengeDetail
+          challengeId={viewingChallengeId}
+          myUserId={user?.id ?? null}
+          onClose={() => setViewingChallengeId(null)}
         />
       )}
 

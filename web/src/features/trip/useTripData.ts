@@ -12,7 +12,7 @@ import { signedImageUrl } from '../../lib/storage'
 import { supabase } from '../../lib/supabase'
 import { countryFromCoords, type CountryInfo } from '../../lib/countryFlag'
 import type { LatLng } from '../../lib/geo'
-import type { Moment, MomentStatus, RoutePoint } from '../../lib/trip'
+import { resolveMomentPhoto, type Moment, type MomentStatus, type RoutePoint } from '../../lib/trip'
 import { useVisibilityReload } from '../../lib/useVisibilityReload'
 
 // Espera entre peticiones a coords NO cacheadas. Nominatim limita a ~1 req/s;
@@ -57,26 +57,36 @@ export interface PastChallengeResult {
 }
 
 /**
- * Resumen de un reto CERRADO para la sección "Retos anteriores" del Marcador
- * (issue #608, rescatado de `GroupPage`/PastSection): quién ganó y cómo me fue A
- * MÍ, sin arrastrar el detalle completo (foto, mapa, listado de votos) — eso vive
- * en el detalle del reto, al que se llega tocando la fila.
+ * Resumen de un reto para la sección "Retos anteriores" del Marcador (issue #608,
+ * rescatado de `GroupPage`/PastSection; ampliado en el issue #800 a los retos EN
+ * JUEGO): quién ganó (si ya cerró) y cómo me fue A MÍ, sin arrastrar el detalle
+ * completo (foto grande, mapa, listado de votos) — eso vive en el detalle del
+ * reto (`ChallengeDetail`), al que se llega tocando la fila.
  */
 export interface PastChallengeSummary {
   challengeId: string
   title: string
-  /** Fecha de cierre (deadline) para la fila; cae a la de creación si faltara. */
+  /** EN JUEGO (aún no venció el plazo) o CERRADO. Issue #800: separa visualmente
+   * la fila (chip "EN JUEGO" + cuenta atrás) y gobierna el anti-spoiler al tocarla
+   * — un EN JUEGO sin `myResult` va a JUGAR, nunca al detalle. */
+  status: 'active' | 'closed'
+  /** Plazo del reto (`deadline_at`): FUTURO si está `active` (cuenta atrás),
+   * PASADO si `closed` (cuándo cerró). Cae a la fecha de creación si faltara. */
   closedAt: string
   /** Reto CREADO por el usuario en sesión: nunca tiene `myResult` (no se vota lo propio). */
   isOwn: boolean
-  /** Quien más puntos sacó, o null si el reto se cerró sin ningún voto. */
+  /** Quien más puntos sacó, o null si el reto se cerró sin ningún voto. Solo se
+   * calcula para `status: 'closed'` — mientras está EN JUEGO el resultado no es
+   * definitivo, así que la fila no promete un "ganador" todavía. */
   winner: (PastChallengeResult & { name: string }) | null
-  /** Mi resultado en este reto, o null si no jugué (o es mío). */
+  /** Mi resultado en este reto, o null si no jugué (o es mío). En un reto EN
+   * JUEGO, que exista es la señal de que YA lo jugué (anti-spoiler: sin esto,
+   * tocar la fila lleva a jugar, no al detalle). */
   myResult: PastChallengeResult | null
-  /** Foto del reto ya firmada (issue #753, thumbnail de "Retos anteriores"). El
-   * reto ya está CERRADO (ver el filtro de `pastChallenges` abajo), así que su
-   * foto siempre está revelada — nunca hace falta el anti-spoiler de
-   * `resolveMomentPhoto`. Null si no tiene foto (la fila cae al placeholder). */
+  /** Foto del reto ya firmada (issue #753, thumbnail de "Retos anteriores"), con
+   * el mismo anti-spoiler que el resto de la app (`resolveMomentPhoto`): en un
+   * reto CERRADO siempre visible; en uno EN JUEGO, solo si es pista o es mío.
+   * Null si no tiene foto o si toca ocultarla (la fila cae al placeholder). */
   imageUrl: string | null
 }
 
@@ -453,26 +463,39 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
 
   const recentTitle = lastClosed?.title ?? null
 
-  // Retos CERRADOS para "Retos anteriores" del Marcador (issue #608): nombre,
-  // ganador (más puntos, empate roto por nombre asc, mismo criterio estable que
-  // `winnersByChallenge`/`aggregateLeaderboard`) y mi resultado breve. Orden del
-  // más reciente al más antiguo (moments viene ASC, invertimos aquí).
+  // "Retos anteriores" del Marcador (issue #608, ampliado en el #800 a los retos
+  // EN JUEGO): nombre, ganador (solo si ya cerró — más puntos, empate roto por
+  // nombre asc, mismo criterio estable que `winnersByChallenge`/`aggregateLeaderboard`)
+  // y mi resultado breve. Orden: primero los EN JUEGO (el que cierra antes,
+  // primero — más urgente), luego los CERRADOS del más reciente al más antiguo
+  // (moments viene ASC, invertimos ese tramo). Los de PRÁCTICA no entran: son un
+  // reto permanente de prueba, no parte del recorrido del viaje.
   const pastChallenges = useMemo<PastChallengeSummary[]>(() => {
-    const closed = moments.filter((m) => m.status === 'closed')
-    return [...closed].reverse().map((m) => {
+    const active = moments
+      .filter((m) => m.status === 'active' && m.isChallenge)
+      .sort((a, b) => new Date(a.deadlineAt ?? 0).getTime() - new Date(b.deadlineAt ?? 0).getTime())
+    const closed = [...moments.filter((m) => m.status === 'closed')].reverse()
+
+    return [...active, ...closed].map((m) => {
+      const status: 'active' | 'closed' = m.status === 'active' ? 'active' : 'closed'
       const challengeVotes = (votes ?? []).filter((v) => v.challenge_id === m.challengeId)
+      // El "ganador" solo tiene sentido con el reto ya decidido: EN JUEGO el
+      // resultado no es definitivo (issue #800 — la fila no debe insinuar un
+      // veredicto que aún puede cambiar).
       let winner: (PastChallengeResult & { name: string }) | null = null
-      for (const v of challengeVotes) {
-        if (
-          !winner ||
-          v.points > winner.points ||
-          (v.points === winner.points && v.display_name.localeCompare(winner.name) < 0)
-        ) {
-          winner = {
-            name: v.display_name,
-            points: v.points,
-            distanceKm: v.distance_km,
-            leftApp: v.left_app,
+      if (status === 'closed') {
+        for (const v of challengeVotes) {
+          if (
+            !winner ||
+            v.points > winner.points ||
+            (v.points === winner.points && v.display_name.localeCompare(winner.name) < 0)
+          ) {
+            winner = {
+              name: v.display_name,
+              points: v.points,
+              distanceKm: v.distance_km,
+              leftApp: v.left_app,
+            }
           }
         }
       }
@@ -483,11 +506,16 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
       return {
         challengeId: m.challengeId,
         title: m.title,
+        status,
         closedAt: m.deadlineAt ?? m.date,
         isOwn: m.isOwn,
         winner,
         myResult,
-        imageUrl: m.imageUrl,
+        // Mismo anti-spoiler que cualquier otra superficie (Bitácora, Diario): un
+        // reto EN JUEGO con foto SORPRESA no la enseña aquí tampoco, ni siquiera
+        // si ya lo jugué — es la MISMA regla que gobierna el resto de la app, no
+        // una nueva (issue #800, "no reinventar el anti-spoiler").
+        imageUrl: resolveMomentPhoto(m).src,
       }
     })
   }, [moments, votes, myUserId])
