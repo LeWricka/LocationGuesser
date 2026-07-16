@@ -329,15 +329,15 @@
   align-items: center;
   justify-content: center;
   font-size: var(--font-size-xl);
-  color: var(--color-on-accent);
-  /* Vidrio con tinte de acento (petición del dueño, estilo macOS): deja ver la
-     foto/mapa de detrás sin perder la identidad teal del CTA. El blur lleva el
-     grueso de la legibilidad; el borde de contacto define el disco sobre fotos
-     claras. Fallback: sin soporte de backdrop-filter, acento sólido (abajo). */
-  background: color-mix(in srgb, var(--color-accent) 45%, transparent);
-  border: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  /* Vidrio de ESCENA (2ª iteración del feedback del dueño): la misma receta que
+     el chrome del header (botón ⋯, volver) — grafito translúcido + blur sobre el
+     mapa, papel opaco en el Marcador (regla #537: sobre papel el vidrio es ruido).
+     El tinte teal translúcido anterior leía como sólido sobre escena oscura. */
+  color: var(--scene-ink, var(--color-text));
+  background: var(--scene-surface);
+  border: 1px solid var(--scene-hairline);
+  -webkit-backdrop-filter: var(--scene-blur, none);
+  backdrop-filter: var(--scene-blur, none);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
   cursor: pointer;
@@ -346,22 +346,12 @@
     transform var(--transition-fast) var(--ease-emphasized);
 }
 .fab:hover {
-  /* Hover: el vidrio se densifica (más tinte), no se vuelve opaco. */
-  background: color-mix(in srgb, var(--color-accent-hover) 62%, transparent);
+  /* Mismo hover que el chrome del header: el vidrio aclara, no se vuelve opaco. */
+  background: color-mix(in srgb, var(--scene-surface) 70%, white);
   transform: translateY(-2px);
 }
 .fab:active {
   transform: scale(0.94);
-}
-/* Sin backdrop-filter (navegadores viejos): un tinte translúcido SIN esmerilado no
-   garantiza la legibilidad del icono sobre fotos — vuelta al acento sólido. */
-@supports not (backdrop-filter: blur(1px)) {
-  .fab {
-    background: var(--color-accent);
-  }
-  .fab:hover {
-    background: var(--color-accent-hover);
-  }
 }
 .fabActive {
   transform: rotate(45deg);
@@ -389,12 +379,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-on-accent);
-  /* Mismo vidrio de acento que `.fab` (gramática: los dos flotantes son gemelos). */
-  background: color-mix(in srgb, var(--color-accent) 45%, transparent);
-  border: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
+  /* Mismo vidrio de escena que `.fab` (gramática: los dos flotantes son gemelos). */
+  color: var(--scene-ink, var(--color-text));
+  background: var(--scene-surface);
+  border: 1px solid var(--scene-hairline);
+  -webkit-backdrop-filter: var(--scene-blur, none);
+  backdrop-filter: var(--scene-blur, none);
   border-radius: var(--radius-full);
   box-shadow: var(--shadow-lg);
   cursor: pointer;
@@ -403,19 +393,11 @@
     transform var(--transition-fast) var(--ease-emphasized);
 }
 .shareFab:hover {
-  background: color-mix(in srgb, var(--color-accent-hover) 62%, transparent);
+  background: color-mix(in srgb, var(--scene-surface) 70%, white);
   transform: translateY(-2px);
 }
 .shareFab:active {
   transform: scale(0.94);
-}
-@supports not (backdrop-filter: blur(1px)) {
-  .shareFab {
-    background: var(--color-accent);
-  }
-  .shareFab:hover {
-    background: var(--color-accent-hover);
-  }
 }
 
 /* Hoja "Compartir" (issue #758): vista 'pick' — elegir un reto cuando hay más de
