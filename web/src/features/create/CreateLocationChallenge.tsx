@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { MapPicker } from './MapPicker'
+import { describeDeadlineEcho } from './deadlineEcho'
 import { StreetViewPreview } from './StreetViewPreview'
 import { PhotoDropzone } from './PhotoDropzone'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
@@ -73,11 +74,13 @@ interface Props {
   initialState?: { point: LatLng; pano: PanoramaMatch | 'none'; step?: Step }
 }
 
-// Plazo del reto: duración relativa en minutos.
+// Plazo del reto: duración relativa en minutos. "12 h" se llamó "Hoy" y liaba
+// (¿24 h? ¿fin del día? — era 12 h fijas): la etiqueta dice ahora la duración y
+// el echo de deadlineEcho.ts confirma el cierre absoluto debajo del selector.
 const DEADLINE_OPTIONS: { minutes: number; label: string }[] = [
   { minutes: 60, label: '1 h' },
   { minutes: 240, label: '4 h' },
-  { minutes: 720, label: 'Hoy' },
+  { minutes: 720, label: '12 h' },
   { minutes: 4320, label: '3 días' },
 ]
 const DEFAULT_DEADLINE_INDEX = 1 // 4 h
@@ -771,6 +774,9 @@ export function CreateLocationChallenge({
                   value={String(deadlineIndex)}
                   onChange={(v) => setDeadlineIndex(Number(v))}
                 />
+                <p className={styles.toggleHint}>
+                  {describeDeadlineEcho(DEADLINE_OPTIONS[deadlineIndex].minutes)}
+                </p>
               </div>
               <div className={styles.ruleRow}>
                 <label className={styles.ruleLabel}>Tiempo por jugada</label>
