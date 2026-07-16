@@ -32,11 +32,15 @@ interface Props {
   /** Abre la hoja de invitar (CTA del vacío: sin retos ni marcador, invitar es el
    * siguiente paso obvio, no un texto sin acción — issue #510). */
   onInvite: () => void
-  /** Abre el flujo de crear reto. Solo se ofrece a quien puede crear (dueño). */
+  /** Abre el flujo de crear reto. Se ofrece a cualquier MIEMBRO (issue #783). */
   onAddChallenge: () => void
-  /** ¿Puede el usuario crear retos? (dueño) — también gobierna la edición de
-   * premios (issue #608): es el mismo permiso que en GroupPage/GroupSettings. */
+  /** ¿Puede el usuario crear retos? (issue #783: cualquier MIEMBRO del viaje).
+   * Gobierna SOLO el CTA "Crear un reto" del vacío — los premios ya NO
+   * dependen de este prop, ver `isOwner`. */
   canCreate: boolean
+  /** ¿Es DUEÑO del viaje? (issue #783, separado de `canCreate`) — gobierna la
+   * edición de premios: es el mismo permiso que en GroupPage/GroupSettings. */
+  isOwner: boolean
   /** Código del viaje: guarda los premios (`PrizesEditorModal`). */
   groupId: string
   /** Premios por puesto (`groups.prizes`, issue #123). null = sin premios. */
@@ -150,6 +154,11 @@ function PremioTappable({
  * `PremioTappable` lo convierte en un `<button>` real solo para el dueño, con el
  * mismo aspecto que el texto plano (issue #608: para el resto de miembros nunca
  * debe leerse como un botón).
+ *
+ * v5 (issue #783 — cualquier miembro crea): `canCreate` (CTA "Crear un reto")
+ * pasa a ser "soy miembro del viaje"; los premios (chips tappables, CTA "¿Qué
+ * se juega?" y el editor) siguen siendo cosa del dueño, ahora tras `isOwner`
+ * — un prop nuevo y separado.
  */
 export function MarcadorTab({
   leaderboard,
@@ -157,6 +166,7 @@ export function MarcadorTab({
   onInvite,
   onAddChallenge,
   canCreate,
+  isOwner,
   groupId,
   prizes,
   pastChallenges,
@@ -241,7 +251,7 @@ export function MarcadorTab({
                   {premio ? (
                     <PremioTappable
                       className={styles.podioPremio}
-                      canEdit={canCreate}
+                      canEdit={isOwner}
                       onEdit={openPrizeEditor}
                     >
                       <Icon icon={Gift} size={12} />
@@ -252,7 +262,7 @@ export function MarcadorTab({
                     // única entrada para fijarlos (issue #752): en cuanto exista
                     // uno, la edición pasa a vivir en tocar ese chip.
                     esLider &&
-                    canCreate &&
+                    isOwner &&
                     !hasPrizes && (
                       <button
                         type="button"
@@ -319,7 +329,7 @@ export function MarcadorTab({
                         {premio && (
                           <PremioTappable
                             className={styles.filaPremio}
-                            canEdit={canCreate}
+                            canEdit={isOwner}
                             onEdit={openPrizeEditor}
                           >
                             <Icon icon={Gift} size={12} />
@@ -398,7 +408,7 @@ export function MarcadorTab({
                   {premio ? (
                     <PremioTappable
                       className={styles.podioPremio}
-                      canEdit={canCreate}
+                      canEdit={isOwner}
                       onEdit={openPrizeEditor}
                     >
                       <Icon icon={Gift} size={12} />
@@ -406,7 +416,7 @@ export function MarcadorTab({
                     </PremioTappable>
                   ) : (
                     esLider &&
-                    canCreate &&
+                    isOwner &&
                     !hasPrizes && (
                       <button
                         type="button"
@@ -434,7 +444,7 @@ export function MarcadorTab({
           {prizes?.last?.trim() && (
             <PremioTappable
               className={styles.ultimoPill}
-              canEdit={canCreate}
+              canEdit={isOwner}
               onEdit={openPrizeEditor}
             >
               <Icon icon={Skull} size={14} />
@@ -508,7 +518,7 @@ export function MarcadorTab({
         </section>
       )}
 
-      {canCreate && editingPrizes && (
+      {isOwner && editingPrizes && (
         <PrizesEditorModal
           groupId={groupId}
           prizes={prizes}
