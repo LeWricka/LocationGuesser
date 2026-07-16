@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { Icon } from './Icon'
@@ -36,6 +36,12 @@ interface Props {
    * padre desmonta el Lightbox al cerrar o solo baja `open`.
    */
   onSecondaryAction?: (index: number) => void
+  /**
+   * Contenido flotante en la esquina superior IZQUIERDA (la derecha es del botón
+   * de cerrar) — p.ej. el anillo de cuenta atrás del juego, que debe seguir
+   * visible mientras se mira la foto ampliada. Opcional y retrocompatible.
+   */
+  cornerSlot?: ReactNode
 }
 
 // Visor de imagen a pantalla completa (lightbox). Overlay propio en vez de
@@ -53,6 +59,7 @@ export function Lightbox({
   onClose,
   secondaryActionLabel,
   onSecondaryAction,
+  cornerSlot,
 }: Props) {
   const panelRef = useRef<HTMLDivElement>(null)
   // Zoom como toggle simple: tocar la imagen alterna tamaño completo / acercada.
@@ -194,6 +201,7 @@ export function Lightbox({
         <button type="button" className={styles.close} onClick={close} aria-label="Cerrar">
           <Icon icon={X} />
         </button>
+        {cornerSlot && <div className={styles.cornerSlot}>{cornerSlot}</div>}
         {/* Flechas prev/next: solo con varias imágenes (con una, sin flechas). */}
         {multiple && (
           <>

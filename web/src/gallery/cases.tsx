@@ -977,7 +977,7 @@ export const cases: GalleryCase[] = [
   {
     // Mapa EXPANDIDO de "Adivinar" (issue #789): el mapa domina la pantalla, con
     // el contador siempre visible arriba y las dos acciones de primera clase
-    // debajo — "Volver a la foto" (sigue explorando) y "Clavar tiro" (confirma).
+    // debajo — "Volver a la foto" (sigue explorando) y "Confirmar posición" (confirma).
     // `guess` ya puesto: comprueba que el botón de confirmar se habilita.
     id: 'showcase-jugar-mapa-expandido',
     title: 'Showcase · Jugar (mapa expandido, ida y vuelta)',
