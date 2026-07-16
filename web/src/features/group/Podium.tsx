@@ -1,8 +1,7 @@
-import type { CSSProperties } from 'react'
 import { Crown, Gift } from 'lucide-react'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
-import { parseAvatar } from '../../lib/avatar'
+import { ANIMAL_SVG_VIEWBOX, parseAvatar, svgForEmoji } from '../../lib/avatar'
 import { Icon } from '../../ui'
 import { Medal } from '../../ui/Medal'
 import { prizeForRow } from './prizes'
@@ -66,8 +65,12 @@ function PodiumColumn({
   classes: PodiumClasses
 }) {
   const rankClass = rankClassOf(classes, index)
-  // Avatar del jugador en el disco (en vez de la inicial): emoji de animal sobre
-  // su fondo, derivado del avatar del perfil o del id por defecto.
+  // Avatar del jugador en el disco: el MISMO dibujo de línea que `Avatar.tsx`
+  // (issue #801) — nunca el emoji crudo. Antes se pintaba `{avatar.emoji}` como
+  // texto plano sobre un fondo de color; al rasterizar la tarjeta a PNG
+  // (html-to-image) el glifo depende de la fuente emoji del cliente y puede
+  // salir roto/partido. El SVG es autocontenido: viaja igual en pantalla y en
+  // el póster.
   const avatar = parseAvatar(entry.avatar, entry.userId)
   return (
     <div className={`${classes.podiumCol} ${place}`}>
@@ -76,18 +79,19 @@ function PodiumColumn({
           <Icon icon={Crown} />
         </span>
       )}
-      <span
-        className={`${classes.podiumDisc} ${rankClass}`}
-        style={
-          avatar.kind === 'emoji'
-            ? ({ background: avatar.bg.background } as CSSProperties)
-            : undefined
-        }
-      >
+      <span className={`${classes.podiumDisc} ${rankClass}`}>
         {avatar.kind === 'emoji' ? (
-          <span className={classes.podiumAvatar} aria-hidden="true">
-            {avatar.emoji}
-          </span>
+          <svg
+            className={classes.podiumAvatar}
+            viewBox={ANIMAL_SVG_VIEWBOX}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.4}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: svgForEmoji(avatar.emoji) ?? '' }}
+          />
         ) : (
           <img className={classes.podiumAvatar} src={avatar.src} alt="" aria-hidden="true" />
         )}
