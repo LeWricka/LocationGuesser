@@ -23,6 +23,14 @@
   animation: zoom-in var(--transition-base) var(--ease-emphasized);
 }
 
+.cornerSlot {
+  position: absolute;
+  top: calc(var(--space-3) + env(safe-area-inset-top));
+  left: calc(var(--space-3) + env(safe-area-inset-left));
+  z-index: 1;
+  pointer-events: none; /* informativo (cuenta atrás): no roba el toque de cerrar/zoom */
+}
+
 .close {
   position: absolute;
   top: 0;

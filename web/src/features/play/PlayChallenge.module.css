@@ -117,7 +117,9 @@
  * fija tamaño/forma; la imagen (o su esqueleto) lo llena por dentro. */
 .hintFloat {
   position: absolute;
-  top: calc(var(--space-3) + env(safe-area-inset-top));
+  /* DEBAJO de la fila del header (atrás + cronómetro): a la misma altura tapaba
+     el anillo del tiempo — regla del dueño: el tiempo SIEMPRE visible. */
+  top: calc(env(safe-area-inset-top) + var(--tap-target) + var(--space-4));
   right: calc(var(--space-3) + env(safe-area-inset-right));
   z-index: var(--z-header);
   width: clamp(96px, 28vw, 168px);

@@ -288,7 +288,7 @@ export function GameScene({
           onAnimationEnd={(e) => {
             if (e.target === e.currentTarget) collapsed.onExitAnimationEnd()
           }}
-          aria-label="Abrir el mapa para clavar el tiro"
+          aria-label="Abrir el mapa para elegir tu posición"
         >
           <div className={styles.miniMapaScene} aria-hidden="true">
             {/* SIN `fixedCenterPin` a propósito (issue #789): esta miniatura no es
@@ -313,7 +313,7 @@ export function GameScene({
           {/* Etiqueta con diana: indica "toca para apuntar". */}
           <span className={styles.miniMapaLabel}>
             <IconDiana size={14} />
-            {guess ? 'Ajustar tiro' : 'Adivinar'}
+            {guess ? 'Ajustar posición' : 'Adivinar'}
           </span>
         </button>
       )}
@@ -358,7 +358,7 @@ export function GameScene({
             <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
               <span className={styles.btnIcon}>
                 <IconDiana size={18} />
-                Clavar tiro
+                Confirmar posición
               </span>
             </Button>
           </div>
@@ -372,6 +372,13 @@ export function GameScene({
           src={imageUrl ?? hintPhotoUrl ?? ''}
           alt={title}
           onClose={onClosePhoto}
+          // El tiempo SIEMPRE visible (regla del dueño): también mirando la foto
+          // ampliada con el reloj corriendo.
+          cornerSlot={
+            remaining != null && guessSeconds != null ? (
+              <CountdownRing remaining={remaining} total={guessSeconds} urgent={urgent} />
+            ) : undefined
+          }
         />
       )}
 
