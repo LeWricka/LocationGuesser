@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import { MapPin } from 'lucide-react'
 import type { LatLng } from '../../lib/geo'
-import { avatarPinFromProfile, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
+import { avatarPinFromProfile, targetPinSvg, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
 import type { MapPreset } from '../../lib/mapPresets'
 import { Icon, MapSkeleton } from '../../ui'
 import styles from './PlayMap.module.css'
@@ -12,33 +12,6 @@ import styles from './PlayMap.module.css'
 // jugador va de lejos a cerca directo sin tener que alejar primero.
 const WORLD: google.maps.LatLngLiteral = { lat: 25, lng: 0 }
 const WORLD_ZOOM = 2
-
-// El pin de la respuesta es el icono `Target` de lucide (mismo set que el resto
-// de la app, sin el "tell" de prototipo del emoji). Usamos el Marker clásico (no
-// AdvancedMarker) a propósito: NO requiere `mapId`, así no hace falta crear nada
-// en Google Cloud. El glifo va como `icon.url` (data-URI SVG), igual que el pin
-// del propio jugador (avatarPin): así heredan el mismo enfoque y conservan la
-// animación DROP nativa del Marker.
-const ANSWER_PIN_SIZE = 34
-
-// Target de lucide como data-URI SVG. El color sale del token `--accent` en
-// runtime (Google necesita un literal; no hardcodeamos el color en el repo).
-//
-// Halo blanco por debajo (issue #602): el revelado pasa a satélite siempre, y
-// un trazo fino de acento se funde con tonos oscuros de la tesela (mar,
-// bosque). Se dibuja el mismo trío de aros dos veces — blanco y más grueso
-// debajo, color de acento encima — para que se lea sobre cualquier fondo.
-function answerPinUri(color: string): string {
-  const rings =
-    '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${ANSWER_PIN_SIZE}" height="${ANSWER_PIN_SIZE}" ` +
-    'viewBox="0 0 24 24" fill="none">' +
-    `<g stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round">${rings}</g>` + // design-lint-allow: halo del pin en SVG data-URI, no puede leer var(--)
-    `<g stroke="${color}" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round">${rings}</g>` +
-    '</svg>'
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`
-}
 
 const respectsMotion = () =>
   typeof window !== 'undefined' && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -181,13 +154,16 @@ function CenterOn({ position }: { position: LatLng }) {
   return null
 }
 
-// Icono del pin de la RESPUESTA (lucide Target): centrado en la coordenada exacta
-// del objetivo. El color sale de `--accent` en runtime.
+// Icono del pin de la RESPUESTA: la MISMA fábrica que el resto de pines del mapa
+// (issue #794, "una sola fábrica" — antes este componente dibujaba su propia
+// diana de círculos concéntricos sueltos, la pieza exacta que el dueño señaló
+// como "de la era anterior"). Disco de oro con anillo blanco, mismo tamaño/ancla
+// que el pin de avatar para que ambos encajen en el mismo mapa.
 function answerIcon(): google.maps.Icon {
   return {
-    url: answerPinUri(accentColor()),
-    scaledSize: new google.maps.Size(ANSWER_PIN_SIZE, ANSWER_PIN_SIZE),
-    anchor: new google.maps.Point(ANSWER_PIN_SIZE / 2, ANSWER_PIN_SIZE / 2),
+    url: targetPinSvg(),
+    scaledSize: new google.maps.Size(PIN_SIZE.width, PIN_SIZE.height),
+    anchor: new google.maps.Point(PIN_ANCHOR.x, PIN_ANCHOR.y),
   }
 }
 
