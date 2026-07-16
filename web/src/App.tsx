@@ -302,19 +302,20 @@ function LoggedIn({
 
   // Reto concreto → jugar. Solo grupo → página del grupo. (El auto-join corre en
   // paralelo; la lectura ya exige ser miembro por RLS, por eso unimos primero.)
+  //
+  // SIN ReceptorWelcomeGate aquí (caso real, jugadores del viaje de F1): la
+  // bienvenida resuelve su "¿es receptor nuevo?" en asíncrono y, si confirma
+  // tarde, se plantaba ENCIMA del juego con la cuenta atrás ya corriendo — el
+  // jugador perdía segundos reales leyendo un tutorial. En un enlace directo a
+  // reto la prioridad es jugar (la hoja "¿Listo para jugar?" ya orienta); la
+  // bienvenida le espera en la pantalla del viaje, donde no hay cronómetro.
   if (route.challenge && route.group) {
     return (
-      <ReceptorWelcomeGate
-        groupId={route.group}
-        userId={user?.id}
-        profileOnboarding={profile?.onboarding}
-      >
-        <GoogleMapsProvider>
-          <Suspense fallback={<PlayRouteSkeleton />}>
-            <PlayChallenge challengeId={route.challenge} groupId={route.group} />
-          </Suspense>
-        </GoogleMapsProvider>
-      </ReceptorWelcomeGate>
+      <GoogleMapsProvider>
+        <Suspense fallback={<PlayRouteSkeleton />}>
+          <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+        </Suspense>
+      </GoogleMapsProvider>
     )
   }
   if (route.group) {
