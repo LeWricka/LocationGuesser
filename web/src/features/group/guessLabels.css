@@ -1,0 +1,35 @@
+/*
+ * Etiqueta de NOMBRE bajo cada pin de `AllGuessesMap` (vuelve tras el #811,
+ * que la retiró en favor del badge de puesto): con 8+ jugadores el badge
+ * numérico por sí solo obliga a mirar la tabla para saber quién es cada
+ * disco. Vuelve como `label` NATIVO de `Marker` clásico — Google lo inserta
+ * como DOM FUERA del árbol de React, mismo motivo que `.lg-trip-pin` en
+ * tripPins.css: la clase tiene que ser GLOBAL, no un CSS module.
+ *
+ * Nunca un chip/fondo por defecto (con muchos jugadores amontonaría el mapa):
+ * solo un HALO oscuro (texto claro + varias sombras, reutilizando el MISMO
+ * token que ya lee texto sobre una foto/satélite arbitrarios,
+ * `--photo-text-shadow` — ver `ChallengePhoto.module.css` `.caption`). El
+ * jugador SELECCIONADO (issue #824, "se enfatiza") es el ÚNICO que además
+ * lleva una mini cápsula de vidrio — así no compite visualmente con el resto.
+ */
+.lg-guess-label {
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  text-shadow:
+    0 1px 3px var(--photo-text-shadow),
+    0 0 6px var(--photo-text-shadow);
+  /* El label se posiciona por su cuenta (labelOrigin) y nunca es interactivo;
+     no debe robar el toque al pin de debajo (los Marker ya van `clickable={false}`,
+     esto es un cinturón extra por si el label se solapa con otro elemento). */
+  pointer-events: none;
+}
+
+.lg-guess-label--selected {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}

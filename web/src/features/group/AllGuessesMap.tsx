@@ -8,9 +8,15 @@ import {
   targetPinSvg,
   PIN_SIZE,
   PIN_ANCHOR,
+  PIN_LABEL_ORIGIN,
   SELECTED_PIN_SIZE,
   SELECTED_PIN_ANCHOR,
+  SELECTED_PIN_LABEL_ORIGIN,
 } from '../../lib/avatarPin'
+// Clase global del label de nombre (ver el fichero para el porqué no es un CSS
+// module): Google inserta el `label` de un Marker clásico como DOM fuera del
+// árbol de React, mismo motivo que `tripPins.css` para los pines del globo.
+import './guessLabels.css'
 
 // Vista por defecto (el MUNDO) hasta que fitBounds encuadra los puntos.
 const WORLD: google.maps.LatLngLiteral = { lat: 25, lng: 0 }
@@ -66,9 +72,9 @@ function answerIcon(): google.maps.Icon {
 // Icono del pin de un jugador. `own` resalta el PROPIO pin (anillo teal
 // profundo en vez de blanco) para encontrarse un vistazo más rápido entre los
 // del resto (issue #795). `rank` pinta el badge de puesto en la esquina
-// sup-derecha (issue #811) — sustituye al nombre en texto bajo el pin, que
-// amontonaba el mapa con muchos jugadores (issue #795: `visibleLabelUserIds`
-// y su umbral de "top-3" quedan retirados, ya no hacen falta).
+// sup-derecha (issue #811). El NOMBRE vuelve como `label` del propio Marker
+// (ver `nameLabel` más abajo): con el badge numérico solo, un mapa con 8+
+// jugadores obliga a mirar la tabla para saber quién es cada disco.
 function guessIcon(
   avatar: string | null,
   userId: string,
@@ -79,6 +85,41 @@ function guessIcon(
     url: avatarPinFromProfile(avatar, userId, own, rank),
     scaledSize: new google.maps.Size(PIN_SIZE.width, PIN_SIZE.height),
     anchor: new google.maps.Point(PIN_ANCHOR.x, PIN_ANCHOR.y),
+    labelOrigin: new google.maps.Point(PIN_LABEL_ORIGIN.x, PIN_LABEL_ORIGIN.y),
+  }
+}
+
+// Nombre bajo el pin, truncado (evita que un nombre largo tape a los vecinos
+// en un mapa con muchos jugadores cerca). ~10-12 caracteres es lo que cabe
+// legible al tamaño de fuente del label sin saturar.
+const MAX_LABEL_CHARS = 11
+// Función pura exportada junto al componente para testearla aislada (mismo
+// patrón que `rankByUserId` en `ChallengeBoard.tsx`); un fichero aparte sería
+// ruido para una función de 2 líneas.
+// eslint-disable-next-line react-refresh/only-export-components
+export function truncateGuessName(name: string): string {
+  return name.length > MAX_LABEL_CHARS ? `${name.slice(0, MAX_LABEL_CHARS - 1)}…` : name
+}
+
+// Blanco literal: `MarkerLabel.color` es una propiedad del SDK de Google (no
+// una clase CSS) y exige un string ya resuelto — incluso si tuviéramos su
+// valor de `--scene-ink` a mano, esta API no lee `var(--…)`. El HALO oscuro
+// que garantiza la lectura sobre cualquier terreno del satélite vive en CSS
+// (`.lg-guess-label`, `guessLabels.css`), no aquí.
+const LABEL_TEXT_COLOR = '#ffffff' // design-lint-allow: MarkerLabel.color exige string literal
+
+// Label de NOMBRE de un Marker clásico (vuelve tras el #811). El seleccionado
+// (issue #824, "se enfatiza") lleva más peso + la cápsula de vidrio de
+// `.lg-guess-label--selected`; el resto solo el halo base, legible pero
+// discreto. Decorativo: el nombre real y accesible vive en `ChallengeBoard`
+// (issue #824), así que el mapa entero se marca `aria-hidden` en su llamante.
+function nameLabel(name: string, selected: boolean): google.maps.MarkerLabel {
+  return {
+    text: truncateGuessName(name),
+    fontSize: '11px',
+    fontWeight: selected ? '700' : '600',
+    color: LABEL_TEXT_COLOR,
+    className: selected ? 'lg-guess-label lg-guess-label--selected' : 'lg-guess-label',
   }
 }
 
@@ -101,6 +142,13 @@ function selectedGuessIcon(avatar: string | null, userId: string, rank: number):
     anchor: new google.maps.Point(
       SELECTED_PIN_ANCHOR.x * SELECTED_SCALE,
       SELECTED_PIN_ANCHOR.y * SELECTED_SCALE,
+    ),
+    // Mismo factor que `anchor`: Google exige `labelOrigin` en el espacio de
+    // `scaledSize`, no en el del SVG intrínseco (ver el comentario de `anchor`
+    // arriba, gemelo de este).
+    labelOrigin: new google.maps.Point(
+      SELECTED_PIN_LABEL_ORIGIN.x * SELECTED_SCALE,
+      SELECTED_PIN_LABEL_ORIGIN.y * SELECTED_SCALE,
     ),
   }
 }
@@ -192,11 +240,11 @@ function PanToSelected({ target }: { target: LatLng | null }) {
 
 /**
  * Mapa resumen de un reto cerrado (Google Maps, mismo motor que PlayMap): el
- * disco de CADA jugador que votó con el badge de su PUESTO (issue #811 — ya
- * no el nombre en texto bajo el pin, que amontonaba el mapa con muchos
- * jugadores), una línea fina de cada jugada a la respuesta real (la propia
- * destacada) y la respuesta (diana destacada). Encuadra todos los puntos. Sin
- * AdvancedMarker → sin mapId.
+ * disco de CADA jugador que votó con el badge de su PUESTO (issue #811) y su
+ * NOMBRE truncado debajo (`nameLabel`, vuelve tras el #811 — con 8+ jugadores
+ * el badge numérico solo obliga a mirar la tabla), una línea fina de cada
+ * jugada a la respuesta real (la propia destacada) y la respuesta (diana
+ * destacada). Encuadra todos los puntos. Sin AdvancedMarker → sin mapId.
  */
 export function AllGuessesMap({ answer, guesses, meUserId, selectedUserId }: Props) {
   const selected = selectedUserId != null ? guesses.find((g) => g.userId === selectedUserId) : null
@@ -232,6 +280,7 @@ export function AllGuessesMap({ answer, guesses, meUserId, selectedUserId }: Pro
                 ? selectedGuessIcon(g.avatar, g.userId, g.rank)
                 : guessIcon(g.avatar, g.userId, g.userId === meUserId, g.rank)
             }
+            label={nameLabel(g.name, isSelected)}
             zIndex={isSelected ? SELECTED_Z_INDEX : undefined}
             clickable={false}
             title={g.name}

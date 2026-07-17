@@ -1,14 +1,20 @@
 /*
- * Detalle de UN reto (issue #800): a pantalla completa, mismo patrón que
- * TripWrap (overlay fijo + scroll propio + X flotante) — visual-first, mapa y
- * foto protagonistas, la clasificación es dato de apoyo compacto debajo.
+ * Detalle de UN reto: a pantalla completa, mismo patrón que TripWrap (overlay
+ * fijo + scroll propio + X flotante). Dirección validada (detalle oscuro
+ * inmersivo): escena grafito+teal (tokens `--scene-*`/`--glass-*`), sin papel —
+ * la foto del reto a sangre como hero, con el chip de estado/título/meta
+ * superpuestos y un degradado que la funde con la escena de debajo (mismo
+ * lenguaje que `MomentSheet.module.css` `.hero`). Mapa sticky + clasificación
+ * en vidrio scrolleando debajo: sobre escena oscura el vidrio SÍ es correcto
+ * (la regla del design-lint solo lo prohíbe sobre papel, que aquí no hay).
  */
 
 .screen {
   position: fixed;
   inset: 0;
   z-index: var(--z-overlay);
-  background: var(--color-bg);
+  background: var(--scene-bg);
+  color: var(--scene-ink);
   overflow: hidden;
   animation: cd-fade var(--motion-duration-base) var(--motion-ease-standard) both;
 }
@@ -21,6 +27,8 @@
   }
 }
 
+/* Cerrar: disco de vidrio (flota sobre la foto a sangre, igual que el "atrás"
+   de MomentSheet/GlobeSheet sobre escena). */
 .close {
   position: absolute;
   top: calc(env(safe-area-inset-top) + var(--space-3));
@@ -33,18 +41,19 @@
   height: 40px;
   appearance: none;
   cursor: pointer;
-  border: 1px solid var(--hairline-soft);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
-  background: var(--surface);
-  color: var(--color-text);
-  box-shadow: var(--shadow-md);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  color: var(--scene-ink);
   transition: background-color var(--motion-transition-fast);
 }
 .close:hover {
-  background: var(--color-surface-hover);
+  background: var(--glass-bg-strong);
 }
 .close:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--scene-ink);
   outline-offset: 2px;
 }
 
@@ -52,8 +61,10 @@
   height: 100svh;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: calc(env(safe-area-inset-top) + var(--space-6)) var(--space-4)
-    calc(env(safe-area-inset-bottom) + var(--space-6));
+  /* Sin padding-top: el hero de foto va A SANGRE hasta el borde (incl. bajo el
+     notch, como el resto de heroes de escena de la app); `.close` flota encima
+     con su propio offset de safe-area, independiente de este padding. */
+  padding: 0 var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-6));
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
@@ -74,11 +85,80 @@
   align-items: center;
   justify-content: center;
   min-height: 50svh;
+  /* Sin el hero, `.scroll` ya no aporta aire arriba (padding-top: 0): estos
+     estados necesitan el suyo para no quedar pegados al borde/`.close`. */
+  padding-top: calc(env(safe-area-inset-top) + var(--space-8));
 }
 
-/* ── Cabecera: estado + título + creador/cierre ─────────────────────────── */
+/* `EmptyState` (ui kit) pinta su título/descripción en tinta de PAPEL
+   (`--color-text`/`--color-text-muted`): sobre esta escena oscura serían
+   casi invisibles. Selector con más especificidad que la suya propia (clase +
+   elemento vs. una sola clase) para que gane pase lo que pase el orden de
+   import — ver el mismo truco en `.heroImg` más abajo. */
+.state p {
+  color: var(--scene-ink-soft);
+}
+.state p:first-of-type {
+  color: var(--scene-ink);
+}
 
-.head {
+/* ── Hero: foto A SANGRE con el estado/título/meta superpuestos ──────────── */
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  /* Bleed horizontal: cancela el padding de `.scroll` para llegar a los dos
+     bordes; el resto del contenido (mapa, tabla) sigue respetando el gutter. */
+  margin: 0 calc(-1 * var(--space-4));
+}
+
+.heroPhoto {
+  position: relative;
+  height: min(48svh, 118vw);
+  overflow: hidden;
+  background: var(--scene-bg);
+}
+
+/* Anulamos el marco de `ChallengePhoto` (borde/radio/proporción fija): el hero
+   llena su caja al 100% sin esquinas, a sangre. Mismo patrón que `.heroImg`
+   en `MomentSheet.module.css` — esta regla gana porque `ChallengeDetail`
+   importa `ChallengePhoto` (la CSS del padre se emite después que la del
+   hijo), no por casualidad de orden. */
+.heroImg {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  aspect-ratio: auto;
+}
+
+/* Degradado que funde la foto con la escena: oscurece arriba lo justo para
+   que `.close` se lea, deja ver la foto en medio y funde a `--scene-bg` en la
+   base — así el chip/título/meta se leen y el hero no corta en seco contra
+   el resto de contenido (mapa/tabla), que ya vive sobre esa misma escena. */
+.hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  /* design-lint-allow: capa local del hero (degradado bajo el chrome flotante) */
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    var(--scene-veil) 0%,
+    transparent 24%,
+    transparent 44%,
+    var(--scene-bg) 100%
+  );
+}
+
+.heroCaption {
+  position: absolute;
+  left: var(--space-5);
+  right: var(--space-5);
+  bottom: var(--space-5);
+  /* design-lint-allow: capa local del hero (chip/título/meta sobre el degradado) */
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -86,13 +166,37 @@
   text-align: center;
 }
 
+/* Chip "Cerrado": vidrio sobre escena (correcto aquí, no sobre papel). Mismas
+   proporciones que `Badge` (gap/padding/radio/tipografía) para que ambos
+   estados — Cerrado en vidrio, EN JUEGO en rojo vía `Badge tone="live"` — se
+   lean como la misma familia de chip. */
+.chipClosed {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--scene-ink);
+}
+
 .title {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-snug);
-  color: var(--color-text);
+  color: var(--scene-ink);
+  text-shadow:
+    0 1px 3px var(--photo-text-shadow),
+    0 0 10px var(--photo-text-shadow);
 }
 
 .meta {
@@ -104,17 +208,12 @@
   gap: 2px;
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
+  text-shadow: 0 1px 2px var(--photo-text-shadow);
 }
 .metaIcon {
   margin: 0 2px;
-  color: var(--color-text-faint);
-}
-
-/* ── Foto protagonista ───────────────────────────────────────────────────── */
-
-.photo {
-  width: 100%;
+  color: var(--scene-ink-soft);
 }
 
 /* ── Mapa ────────────────────────────────────────────────────────────────── */
@@ -124,13 +223,13 @@
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--hairline-soft);
-  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--scene-shadow);
   /* MAPA FIJO mientras la lista scrollea (petición del dueño con 7 jugadores):
      tocar una fila resalta su pin (#824) — sin esto, con la lista larga el mapa
      quedaba fuera de vista justo cuando lo estás usando. Sticky dentro de
-     `.scroll` (su contenedor de scroll); el título/foto scrollean fuera y el
-     mapa se ancla arriba. */
+     `.scroll` (su contenedor de scroll); el resto del contenido scrollea fuera
+     y el mapa se ancla arriba. */
   position: sticky;
   top: var(--space-2);
   z-index: 2; /* design-lint-allow: capa local (mapa sticky sobre sus propias filas) */
@@ -142,8 +241,8 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: var(--surface);
-  color: var(--color-text-muted);
+  background: var(--glass-bg);
+  color: var(--scene-ink-soft);
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   text-align: center;
@@ -152,25 +251,25 @@
 .numberAnswer {
   padding: var(--space-4);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--hairline-soft);
-  background: var(--surface);
-  box-shadow: var(--shadow-xs);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   text-align: center;
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
 }
 .numberAnswer strong {
-  color: var(--color-text);
+  color: var(--scene-ink);
 }
 .numberAnswer p {
   margin: 0;
 }
 
 /* ── Clasificación ───────────────────────────────────────────────────────
-   El contenido (tabla, filas, medallas…) vive en `ChallengeBoard` (issue
-   #811, compartida con el revelado de PlayChallenge); aquí solo el hueco en
-   el layout de esta pantalla. */
+   El contenido (tabla, filas, medallas…) vive en `ChallengeBoard` (tone="dark"
+   aquí); esta pantalla solo le da el hueco en el layout. */
 
 .board {
   width: 100%;

@@ -1,7 +1,7 @@
 import { describe, test, expect, vi, beforeAll, afterAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { AllGuessesMap, type GuessMarker } from './AllGuessesMap'
+import { AllGuessesMap, truncateGuessName, type GuessMarker } from './AllGuessesMap'
 import { PIN_SIZE } from '../../lib/avatarPin'
 
 // `answerIcon`/`guessIcon` construyen `google.maps.Size`/`Point` (namespace real
@@ -35,6 +35,7 @@ interface MockMarkerProps {
   icon?: { url: string; scaledSize?: { width: number; height: number } }
   title?: string
   zIndex?: number
+  label?: { text: string; className?: string }
 }
 interface MockPolylineProps {
   strokeColor?: string
@@ -47,13 +48,15 @@ vi.mock('@vis.gl/react-google-maps', () => ({
       {children}
     </div>
   ),
-  Marker: ({ icon, title, zIndex }: MockMarkerProps) => (
+  Marker: ({ icon, title, zIndex, label }: MockMarkerProps) => (
     <div
       data-testid="marker"
       data-title={title}
       data-icon={icon?.url}
       data-icon-width={icon?.scaledSize?.width}
       data-z-index={zIndex}
+      data-label-text={label?.text}
+      data-label-class={label?.className}
     />
   ),
   Polyline: ({ strokeColor, strokeWeight, strokeOpacity }: MockPolylineProps) => (
@@ -89,15 +92,47 @@ describe('AllGuessesMap', () => {
     expect(screen.getAllByTestId('marker')).toHaveLength(3)
   })
 
-  // Issue #811: fuera las etiquetas de texto — el pin lleva un badge de puesto
-  // incrustado en su propio SVG (verificado en avatarPin.test.ts), no un
-  // `label` de Marker aparte.
-  test('los pines de jugador NO llevan `label` (issue #811, fuera el texto del mapa)', () => {
-    const guesses = [guess({ userId: 'a', name: 'Ana', rank: 1 })]
-    render(<AllGuessesMap answer={answer} guesses={guesses} />)
-    const markers = screen.getAllByTestId('marker')
-    const mine = markers.find((m) => m.getAttribute('data-title') === 'Ana')
-    expect(mine).not.toHaveAttribute('data-label')
+  // Vuelve tras el #811 (que la retiró en favor del badge de puesto): con 8+
+  // jugadores el badge numérico solo obliga a mirar la tabla para saber quién
+  // es cada disco. El nombre vuelve como `label` nativo de Marker clásico.
+  describe('nombre bajo el pin', () => {
+    test('cada pin de jugador lleva su nombre como label', () => {
+      const guesses = [guess({ userId: 'a', name: 'Ana', rank: 1 })]
+      render(<AllGuessesMap answer={answer} guesses={guesses} />)
+      const markers = screen.getAllByTestId('marker')
+      const mine = markers.find((m) => m.getAttribute('data-title') === 'Ana')
+      expect(mine).toHaveAttribute('data-label-text', 'Ana')
+      expect(mine).toHaveAttribute('data-label-class', 'lg-guess-label')
+    })
+
+    test('un nombre largo se trunca con elipsis (no tapa a los vecinos)', () => {
+      const guesses = [guess({ userId: 'a', name: 'Maximiliana Fernández', rank: 1 })]
+      render(<AllGuessesMap answer={answer} guesses={guesses} />)
+      const marker = screen
+        .getAllByTestId('marker')
+        .find((m) => m.getAttribute('data-title') === 'Maximiliana Fernández')
+      const label = marker?.getAttribute('data-label-text') ?? ''
+      expect(label.length).toBeLessThanOrEqual(11)
+      expect(label.endsWith('…')).toBe(true)
+    })
+
+    test('truncateGuessName: nombres cortos no se tocan, largos se recortan a 11 con elipsis', () => {
+      expect(truncateGuessName('Ana')).toBe('Ana')
+      expect(truncateGuessName('Maximiliana Fernández')).toBe('Maximilian…')
+    })
+
+    test('el label del pin SELECCIONADO lleva la clase de énfasis (issue #824)', () => {
+      const guesses = [guess({ userId: 'a', name: 'Ana' }), guess({ userId: 'b', name: 'Bea' })]
+      render(<AllGuessesMap answer={answer} guesses={guesses} selectedUserId="a" />)
+      const markers = screen.getAllByTestId('marker')
+      const selected = markers.find((m) => m.getAttribute('data-title') === 'Ana')
+      const other = markers.find((m) => m.getAttribute('data-title') === 'Bea')
+      expect(selected).toHaveAttribute(
+        'data-label-class',
+        'lg-guess-label lg-guess-label--selected',
+      )
+      expect(other).toHaveAttribute('data-label-class', 'lg-guess-label')
+    })
   })
 
   test('el pin del propio jugador lleva el anillo teal resaltado y su puesto en el SVG', () => {

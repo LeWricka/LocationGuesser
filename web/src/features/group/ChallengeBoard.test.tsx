@@ -2,6 +2,7 @@ import { describe, test, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ChallengeBoard } from './ChallengeBoard'
 import type { VoteWithName } from '../../lib/leaderboard'
+import styles from './ChallengeBoard.module.css'
 
 // Mínimo viable de un voto con nombre (los campos que ChallengeBoard NO lee
 // se dejan a null/valores neutros — `rankedRowsOf` solo usa los de abajo).
@@ -69,5 +70,19 @@ describe('ChallengeBoard — selección de fila (issue #824)', () => {
   test('sin onSelectUser, tocar una fila no revienta', () => {
     render(<ChallengeBoard votes={votes} myUserId={null} />)
     expect(() => fireEvent.click(screen.getByRole('button', { name: /Ana/ }))).not.toThrow()
+  })
+})
+
+describe('ChallengeBoard — tono (detalle oscuro vs. revelado sobre papel)', () => {
+  const votes = [vote({ user_id: 'a', display_name: 'Ana', points: 100 })]
+
+  test('por defecto (sin tone), sin la clase oscura', () => {
+    const { container } = render(<ChallengeBoard votes={votes} myUserId={null} />)
+    expect(container.querySelector(`.${styles.dark}`)).not.toBeInTheDocument()
+  })
+
+  test('tone="dark" (ChallengeDetail): aplica la clase de vidrio sobre escena', () => {
+    const { container } = render(<ChallengeBoard votes={votes} myUserId={null} tone="dark" />)
+    expect(container.querySelector(`.${styles.dark}`)).toBeInTheDocument()
   })
 })

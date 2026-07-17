@@ -104,15 +104,22 @@ interface Props {
    * no hace nada — no hace falta en ningún consumidor hoy (ambos, `ChallengeDetail`
    * y `PlayChallenge`, lo pasan). */
   onSelectUser?: (userId: string | null) => void
+  /** 'light' (por defecto): filas de papel/superficie, como en `PlayChallenge`
+   * (revelado sobre `lg-page`, papel claro). 'dark': filas de vidrio sobre
+   * escena oscura (`ChallengeDetail`, detalle inmersivo del reto) — MISMO
+   * componente/datos, solo cambia la superficie para no desentonar con el
+   * fondo que lo rodea. */
+  tone?: 'light' | 'dark'
 }
 
 /**
  * Clasificación DE UN RETO (issue #800, extraída a compartible en el #811):
  * puesto (medalla top-3 / número) + avatar + nombre + puntos + distancia (o
  * cifra, en un reto de número) + TIEMPO de respuesta (`votes.elapsed_seconds`).
- * La usan `ChallengeDetail` (histórico del viaje) y `PlayChallenge` (revelado
- * justo tras jugar) — mismo componente, mismos estilos, para que la
- * clasificación se vea IGUAL pase por donde pase.
+ * La usan `ChallengeDetail` (histórico del viaje, detalle oscuro inmersivo —
+ * `tone="dark"`) y `PlayChallenge` (revelado justo tras jugar, sobre papel —
+ * `tone` por defecto) — mismo componente y mismos DATOS en los dos sitios,
+ * solo cambia la superficie (`tone`) para que encaje con lo que la rodea.
  */
 export function ChallengeBoard({
   votes,
@@ -124,11 +131,14 @@ export function ChallengeBoard({
   className,
   selectedUserId = null,
   onSelectUser,
+  tone = 'light',
 }: Props) {
   const rows = rankedRowsOf(votes, myUserId)
   return (
     <section
-      className={[styles.board, className].filter(Boolean).join(' ')}
+      className={[styles.board, tone === 'dark' ? styles.dark : '', className]
+        .filter(Boolean)
+        .join(' ')}
       aria-label="Clasificación del reto"
     >
       <h2 className={styles.boardTitle}>

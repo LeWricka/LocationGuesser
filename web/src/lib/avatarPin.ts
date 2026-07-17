@@ -33,6 +33,14 @@ export const PIN_SIZE = { width: 46, height: 48 } as const
  * del badge): sigue centrada en el DISCO, no en el icono completo. */
 export const PIN_ANCHOR = { x: 20, y: 46 } as const
 
+/** Origen de la etiqueta de NOMBRE bajo el pin (vuelve tras el #811, que la
+ * retiró en favor del badge de puesto: con 8+ jugadores el badge por sí solo
+ * obliga a mirar la tabla para saber quién es cada disco). Mismo eje X que la
+ * punta; unos px por debajo de `PIN_ANCHOR.y` — Google posiciona el label de
+ * forma independiente del icono, así que puede caer fuera de su lienzo (48px
+ * de alto) sin recortarse. */
+export const PIN_LABEL_ORIGIN = { x: PIN_ANCHOR.x, y: PIN_ANCHOR.y + 12 } as const
+
 // Geometría del disco + rombo, calcada de `.lg-trip-pin`/`.lg-trip-pin__disc` en
 // tripPins.css (disco + puntita que se solapa un poco en su base) pero a la
 // escala de este pin más compacto (40×42 frente a los 48px del pin-foto: aquí no
@@ -214,6 +222,16 @@ export const SELECTED_PIN_SIZE = {
 export const SELECTED_PIN_ANCHOR = {
   x: PIN_ANCHOR.x + HALO_PAD,
   y: PIN_ANCHOR.y + HALO_PAD,
+} as const
+
+/** Origen de la etiqueta de NOMBRE del pin SELECCIONADO: mismo desplazamiento
+ * relativo que `PIN_LABEL_ORIGIN` respecto a su ancla, aplicado sobre
+ * `SELECTED_PIN_ANCHOR` (el lienzo mayor del halo). El llamante multiplica por
+ * `SELECTED_SCALE` igual que ya hace con `SELECTED_PIN_ANCHOR` (Google exige
+ * `anchor`/`labelOrigin` en el mismo espacio que `scaledSize`). */
+export const SELECTED_PIN_LABEL_ORIGIN = {
+  x: SELECTED_PIN_ANCHOR.x,
+  y: SELECTED_PIN_ANCHOR.y + 12,
 } as const
 
 function haloSvg(): string {
