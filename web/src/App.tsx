@@ -55,9 +55,11 @@ import { setNextDestination, takeNextDestination, signInAnonymously } from './li
 import { getGroup } from './lib/groupData'
 import { track } from './lib/analytics'
 import { reportError } from './lib/observability'
+import { prefetchMainRoutes } from './lib/prefetch'
 import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
 import {
   BackHomeButton,
+  Button,
   Card,
   Icon,
   Spinner,
@@ -103,6 +105,15 @@ const ProfileEditScreen = lazy(() =>
 const AdminPage = lazy(() => import('./features/admin').then((m) => ({ default: m.AdminPage })))
 
 function App() {
+  useEffect(() => {
+    // QW3 (prefetch): en cuanto el arranque termina, adelantamos en idle la
+    // descarga de los chunks de las rutas MÁS transitadas desde la home (viaje,
+    // jugar, crear) — así la primera navegación a ellas no paga el fetch entero
+    // a pelo. No compite con el primer render (requestIdleCallback) ni con datos
+    // que sí bloquean contenido.
+    prefetchMainRoutes()
+  }, [])
+
   return (
     <AuthProvider>
       <AppRoutes />
@@ -131,11 +142,16 @@ function AppRoutes() {
   useEffect(() => {
     // Cross-fade nativo (View Transitions API) al cambiar de ruta; respeta
     // prefers-reduced-motion (withViewTransition cae a un setState directo).
-    const onHash = () =>
+    const onHash = () => {
+      // QW1 (volver atrás real): cada cambio de hash es una navegación DENTRO
+      // de la app; contarlas es lo que le permite a `goHome` distinguir "hay
+      // historial propio al que volver" de "entrada directa por deep link".
+      internalHashNavigations += 1
       withViewTransition(() => {
         setRoute(parseHash())
         setAdminRoute(isAdminHash())
       })
+    }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -246,7 +262,11 @@ function LoggedIn({
   adminRoute: boolean
 }) {
   const { user, profile, isAnonymous, refreshProfile } = useSession()
-  const joinIfGroup = useDeepLinkJoin(user?.id, isAnonymous)
+  const {
+    joinIfGroup,
+    error: joinError,
+    clearError: clearJoinError,
+  } = useDeepLinkJoin(user?.id, isAnonymous)
 
   // Al volver del email: si guardamos un destino (#g…), lo restauramos (auto-join
   // + navegación). Lo consumimos una sola vez. Si el destino no era de grupo,
@@ -294,6 +314,23 @@ function LoggedIn({
         // #perfil), nunca como paso obligado del alta.
         onDone={() => {
           refreshProfile()
+          goHome()
+        }}
+      />
+    )
+  }
+
+  // QW2: un fallo del auto-join (FK violada, red, RLS…) ya NO expulsa a la home
+  // en silencio — `useDeepLinkJoin` se queda en la ruta y expone el mensaje. Lo
+  // pintamos aquí, ANTES de intentar montar TripPage/PlayChallenge (que fallarían
+  // igual: la lectura exige ser miembro), con una salida EXPLÍCITA en vez de una
+  // redirección forzada que se siente como un golpe.
+  if (route.group && joinError) {
+    return (
+      <JoinErrorScreen
+        message={joinError}
+        onBack={() => {
+          clearJoinError()
           goHome()
         }}
       />
@@ -525,6 +562,27 @@ function AnonCreateGate({ onBack }: { onBack: () => void }) {
   )
 }
 
+// Aviso inline cuando el auto-join a un grupo/reto falla (QW2): antes esto
+// expulsaba a la home en silencio, sin explicar por qué el viaje que se acaba
+// de abrir desaparece. Ahora se queda en la ruta, muestra el motivo (ya pasado
+// por `describeError` en el hook) y ofrece una salida EXPLÍCITA — el usuario
+// decide, no la app por él.
+function JoinErrorScreen({ message, onBack }: { message: string; onBack: () => void }) {
+  return (
+    <main className="lg-page">
+      <Stack gap={4}>
+        <Card padding="md" raised>
+          <Stack gap={3} align="center">
+            <strong>No se pudo abrir el viaje</strong>
+            <p>{message}</p>
+            <Button onClick={onBack}>Ir al inicio</Button>
+          </Stack>
+        </Card>
+      </Stack>
+    </main>
+  )
+}
+
 // Redirige a la home limpiando el hash (p.ej. un no-admin en `#admin`). El
 // borrado va en un efecto para no mutar location durante el render; mientras,
 // pintamos la home para no dejar la pantalla en blanco.
@@ -539,10 +597,28 @@ function RedirectHome() {
   )
 }
 
-// Navegación por hash: cambiar location.hash dispara el listener de hashchange y
-// repinta. La home es la raíz sin hash. Si ya estamos en raíz, forzamos el repintado
-// con un hashchange manual (cambiar a '' no dispara el evento si ya está vacío).
+// QW1 (volver atrás real): navegaciones internas por hash acumuladas desde que
+// arrancó la app (ver el listener de hashchange en AppRoutes). `goHome` la usa
+// para decidir si hay "atrás" real al que volver dentro de la app.
+let internalHashNavigations = 0
+
+// Navegación "a home": la mayoría de llamantes son botones de "atrás" (viaje,
+// crear, perfil, admin…). Antes SIEMPRE hacían push de un hash vacío, lo que
+// APILA una entrada nueva de historial en vez de consumir la anterior — el
+// botón atrás NATIVO del navegador quedaba roto (un toque más de lo esperado,
+// o aterrizaba en una pantalla intermedia que ya no existía). Con navegación
+// interna previa (`internalHashNavigations > 0`), `history.back()` es un
+// "atrás" real: reutiliza la entrada de historial que ya dejamos al entrar,
+// así que el gesto atrás del sistema operativo sigue funcionando después.
+// Sin ella (entrada DIRECTA por un deep link `#g=`/`#c=`, primera pantalla de
+// la sesión, cero hashchange propios), no hay nada al que volver dentro de la
+// app — `history.back()` sacaría al usuario del sitio (referrer o pestaña en
+// blanco) — así que cae al push de siempre, que sí aterriza en la home.
 function goHome() {
+  if (internalHashNavigations > 0) {
+    window.history.back()
+    return
+  }
   if (window.location.hash) {
     window.location.hash = ''
   } else {

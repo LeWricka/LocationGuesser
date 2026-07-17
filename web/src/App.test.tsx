@@ -58,7 +58,7 @@ vi.mock('./features/auth', () => ({
     <div data-testid="landing">landing{groupName ? `:${groupName}` : ''}</div>
   ),
   ProfileGate: () => null,
-  useDeepLinkJoin: () => vi.fn(),
+  useDeepLinkJoin: () => ({ joinIfGroup: vi.fn(async () => {}), error: null, clearError: vi.fn() }),
   needsProfileStep: () => false,
   AccountUpgradeModal: () => null,
 }))

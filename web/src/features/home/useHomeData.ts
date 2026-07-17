@@ -46,6 +46,22 @@ interface State {
 
 const EMPTY: HomeData = { groups: [], pinned: null }
 
+/** Última respuesta buena de `loadHomeData` para un usuario, y cuándo se resolvió. */
+interface HomeDataCacheEntry {
+  data: HomeData
+  resolvedAt: number
+}
+
+// Caché a nivel de módulo (QW4+QW5): cada vez que se MONTA la home (incluida la
+// vuelta desde el viaje/perfil/crear) este hook arrancaba en loading=true y
+// pintaba su esqueleto, aunque los datos fueran casi con toda seguridad los
+// mismos de hace un segundo — un "doble esqueleto" perceptible en cada ida y
+// vuelta. Con esta caché, si ya hay una respuesta previa para el usuario, el
+// hook arranca YA con esos datos (sin esqueleto) y revalida en background
+// (stale-while-revalidate); el esqueleto queda reservado a la primera carga
+// fría de la sesión (sin nada en caché todavía).
+const homeDataCache = new Map<string, HomeDataCacheEntry>()
+
 // El estado de membresía es 'live' | 'your-turn' | 'idle'; el GroupCard del kit
 // usa 'live' | 'toplay' | 'idle'. Solo cambia el nombre del caso "te toca".
 function toUiStatus(status: MyGroup['status']): HomeGroup['status'] {
@@ -127,12 +143,25 @@ async function loadHomeData(userId: string): Promise<HomeData> {
  * Hook de datos de la home. Recarga al montar y expone `reload` (lo usa el
  * realtime de HomePage). Mientras carga, `loading=true` para que la pantalla
  * muestre skeletons; ante error, `error=true` y un aviso (sin romper la app).
+ *
+ * QW4+QW5: con caché previa para este usuario, arranca directamente con esos
+ * datos (`loading=false`) en vez de con el esqueleto — la recarga al montar
+ * (más abajo) sigue disparándose igual, pero como revalidación en background.
  */
 export function useHomeData(userId: string | undefined) {
-  const [state, setState] = useState<State>({ loading: true, error: false, data: EMPTY })
+  const [state, setState] = useState<State>(() => {
+    const cached = userId ? homeDataCache.get(userId) : undefined
+    return cached
+      ? { loading: false, error: false, data: cached.data }
+      : { loading: true, error: false, data: EMPTY }
+  })
   // Cuándo se resolvió la última carga (issue #638): NO en el render, sino en un
   // ref — así `useVisibilityReload` lo lee sin que este hook tenga que reengancharse.
-  const lastResolvedAtRef = useRef<number | null>(null)
+  // Sembrado desde la caché si ya había una respuesta previa (si no, null: "aún sin
+  // resolución", igual que antes de #638).
+  const lastResolvedAtRef = useRef<number | null>(
+    (userId ? homeDataCache.get(userId)?.resolvedAt : undefined) ?? null,
+  )
 
   const reload = useCallback(async () => {
     if (!userId) {
@@ -141,7 +170,9 @@ export function useHomeData(userId: string | undefined) {
     }
     try {
       const data = await loadHomeData(userId)
-      lastResolvedAtRef.current = Date.now()
+      const resolvedAt = Date.now()
+      homeDataCache.set(userId, { data, resolvedAt })
+      lastResolvedAtRef.current = resolvedAt
       setState({ loading: false, error: false, data })
     } catch {
       setState({ loading: false, error: true, data: EMPTY })

@@ -4,12 +4,12 @@
 // una home genérica (cuentas-y-home.md §2 flujos A y C). El alta es silenciosa e
 // idempotente: reentrar no duplica ni falla.
 
-import { useCallback, useRef } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { isMember, joinGroup } from '../../lib/membership'
 import { parseHash, stripOwnerInviteToken } from '../../lib/route'
 import { track } from '../../lib/analytics'
 import { redeemOwnerInvite } from '../../lib/ownerInvites'
-import { ResourceGoneError } from '../../lib/errors'
+import { ResourceGoneError, describeError } from '../../lib/errors'
 import { addBreadcrumb, reportError } from '../../lib/observability'
 import { useToast } from '../../ui'
 
@@ -17,22 +17,31 @@ import { useToast } from '../../ui'
  * Devuelve `joinIfGroup(hash)`: si el hash apunta a un grupo, hace `joinGroup` y
  * navega a ese hash; si no, navega a la home (hash vacío). Idempotente y a prueba
  * de reentradas (no relanza para el mismo destino mientras una llamada está en
- * curso). Errores de join se devuelven al llamante para que decida (toast, etc.).
+ * curso).
  *
  * `isAnonymous` (issue #751) solo alimenta la prop `is_anonymous` de
  * `group_joined`: sin ella no se distingue un alta de miembro con cuenta
  * permanente de un receptor sin cuenta (#758) que se une al abrir el enlace.
+ *
+ * `error` (QW2): antes, CUALQUIER fallo del join (FK violada, red, RLS…) sacaba
+ * al usuario a la home en silencio — un "golpe" tras haber tocado un enlace que
+ * parecía prometer un viaje. Ahora el hook se queda en la ruta y expone el
+ * mensaje (vía `describeError`) para que el llamante lo pinte inline con una
+ * salida EXPLÍCITA ("Ir al inicio"), en vez de decidir por el usuario.
  */
 export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false) {
   // Evita carreras: si ya estamos uniéndonos a un destino, no lo repetimos.
   const inFlight = useRef<string | null>(null)
   const toast = useToast()
+  const [error, setError] = useState<string | null>(null)
 
   const joinIfGroup = useCallback(
     async (hash: string): Promise<void> => {
       const route = parseHash(hash)
 
       // Sin grupo en el destino → no hay nada que unir; el router decide la home.
+      // (No es un error: es la navegación normal cuando el destino guardado no
+      // era de grupo, así que sí conviene ir a la home aquí.)
       if (!route.group) {
         if (window.location.hash !== '') window.location.hash = ''
         return
@@ -41,6 +50,7 @@ export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false)
       if (!userId) return
       if (inFlight.current === hash) return
       inFlight.current = hash
+      setError(null) // reintento (o navegación nueva): limpiamos el error previo
       try {
         // Enlace de CO-DUEÑO (`#g=…&adm=<token>`, issue #707): en vez del alta
         // normal de miembro, canjeamos el token — asciende directo a co-dueño.
@@ -103,18 +113,20 @@ export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false)
       } catch (err) {
         // Antes esto NO se capturaba: un fallo aquí (p.ej. la FK de group_members
         // violada) viajaba como unhandled rejection (issue #760, LOCATIONGUESSER-5,
-        // 4 usuarios / 22 eventos). Nunca dejamos al receptor en un callejón sin
-        // salida: pase lo que pase, aterriza en la home (hash vacío).
+        // 4 usuarios / 22 eventos), y el manejo posterior mandaba SIEMPRE a la
+        // home (hash vacío) — un "golpe" tras haber tocado un enlace que
+        // prometía un viaje (QW2). Ahora nos quedamos en la ruta: exponemos el
+        // mensaje y es la UI la que ofrece la salida explícita ("Ir al inicio"),
+        // no una redirección forzada.
         if (err instanceof ResourceGoneError) {
           // Esperable: el viaje se borró entre que se compartió el enlace y que
           // se abrió. Breadcrumb, NO excepción — no es un fallo real de la app.
           addBreadcrumb('group_gone_on_join', { groupId: route.group })
-          toast.show(err.message, { tone: 'neutral' })
+          setError(err.message)
         } else {
           reportError(err, { area: 'deep_link_join', groupId: route.group })
-          toast.show('No se pudo unir al viaje.', { tone: 'danger' })
+          setError(describeError(err))
         }
-        if (window.location.hash !== '') window.location.hash = ''
       } finally {
         inFlight.current = null
       }
@@ -122,5 +134,5 @@ export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false)
     [userId, isAnonymous, toast],
   )
 
-  return joinIfGroup
+  return { joinIfGroup, error, clearError: () => setError(null) }
 }
