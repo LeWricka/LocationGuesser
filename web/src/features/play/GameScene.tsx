@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties, type RefObject } from 'react'
-import { Compass as CompassIcon, Expand, House, Maximize2 } from 'lucide-react'
+import { Compass as CompassIcon, Expand, House, Maximize2, X } from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { SceneImage } from './SceneImage'
@@ -350,6 +350,28 @@ export function GameScene({
             if (e.target === e.currentTarget) expanded.onExitAnimationEnd()
           }}
         >
+          {/* Cabecera fina de vidrio: SOLO existe visualmente en el panel de
+              escritorio (issue #812, ≥900px vía CSS — `display:none` por
+              defecto en móvil, así que no ocupa hueco ni entra en el orden de
+              lectura ahí). En el panel, el panorama NUNCA deja de verse detrás
+              (a diferencia de móvil, que tapa la pantalla entera), así que un
+              ✕ para cerrar es más natural que repetir "Volver al panorama" —
+              por eso el ✕ vive aquí y el botón de abajo se oculta en desktop. */}
+          <div className={styles.mapaExpandidoHeader}>
+            <span className={styles.mapaExpandidoHeaderLabel}>
+              <IconDiana size={16} />
+              Adivinar en el mapa
+            </span>
+            <button
+              type="button"
+              className={styles.mapaExpandidoClose}
+              onClick={onCloseMap}
+              aria-label="Cerrar mapa"
+              title="Cerrar mapa"
+            >
+              <Icon icon={X} size={18} />
+            </button>
+          </div>
           <div className={styles.mapaExpandidoScene}>
             <PlayMap
               guess={guess}
@@ -368,13 +390,24 @@ export function GameScene({
                 lastCameraRef.current = camera
               }}
             />
-            {/* Diana central: pin fijo de GeoGuessr. */}
+            {/* Diana central: pin fijo de GeoGuessr, centrada en ESTE lienzo
+                (no en la pantalla) — en el panel de escritorio el lienzo es
+                menor que el viewport, así que basta con que este `span` siga
+                siendo hijo directo de `.mapaExpandidoScene` (posicionado
+                `relative`) para que la diana quede en el centro del panel. */}
             <span className={styles.dianaFija} aria-hidden="true">
               <IconDiana size={30} />
             </span>
           </div>
           <div className={styles.mapaExpandidoActions}>
-            <Button variant="secondary" size="lg" fullWidth onClick={onCloseMap}>
+            {/* Oculto en desktop (≥900px): ahí cierra el ✕ de la cabecera. */}
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
+              onClick={onCloseMap}
+              className={styles.mapaExpandidoVolver}
+            >
               Volver {hasStreetView ? 'al panorama' : 'a la foto'}
             </Button>
             <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
