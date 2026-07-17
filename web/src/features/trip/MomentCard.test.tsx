@@ -140,6 +140,80 @@ describe('MomentCard — foto sorpresa (issue #655, spoiler del carrusel)', () =
   })
 })
 
+describe('MomentCard — asociado a un recuerdo (issue #822)', () => {
+  const ASSOCIATED_LABEL = 'Reto creado a partir de un recuerdo con la misma foto'
+  const FOTO = 'https://example.test/foto.jpg'
+
+  test('reto CERRADO asociado: pinta el disco Link2', () => {
+    render(
+      <MomentCard
+        moment={activeChallenge({ status: 'closed', imageUrl: FOTO })}
+        associatedWithMemory
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('img', { name: ASSOCIATED_LABEL })).toBeInTheDocument()
+  })
+
+  test('reto CERRADO sin asociación: no pinta el disco', () => {
+    render(
+      <MomentCard
+        moment={activeChallenge({ status: 'closed', imageUrl: FOTO })}
+        associatedWithMemory={false}
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(screen.queryByRole('img', { name: ASSOCIATED_LABEL })).not.toBeInTheDocument()
+  })
+
+  test('un RECUERDO nunca pinta el disco, aunque llegue associatedWithMemory=true', () => {
+    render(
+      <MomentCard
+        moment={activeChallenge({ status: 'recuerdo', isChallenge: false, imageUrl: FOTO })}
+        associatedWithMemory
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(screen.queryByRole('img', { name: ASSOCIATED_LABEL })).not.toBeInTheDocument()
+  })
+
+  test('reto EN JUEGO con foto SORPRESA asociado: NO revela el vínculo (sería spoiler)', () => {
+    render(
+      <MomentCard
+        moment={activeChallenge({
+          status: 'active',
+          photoIsHint: false,
+          isOwn: false,
+          imageUrl: FOTO,
+        })}
+        associatedWithMemory
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(screen.queryByRole('img', { name: ASSOCIATED_LABEL })).not.toBeInTheDocument()
+    // El sello "Sorpresa" manda esa esquina mientras la foto siga oculta.
+    expect(
+      screen.getByRole('img', { name: 'Foto sorpresa: se revela al cerrar el reto' }),
+    ).toBeInTheDocument()
+  })
+
+  test('reto EN JUEGO con foto PISTA asociado: SÍ revela el vínculo (ya es visible)', () => {
+    render(
+      <MomentCard
+        moment={activeChallenge({ status: 'active', photoIsHint: true, imageUrl: FOTO })}
+        associatedWithMemory
+        onExpand={() => {}}
+      />,
+    )
+
+    expect(screen.getByRole('img', { name: ASSOCIATED_LABEL })).toBeInTheDocument()
+  })
+})
+
 describe('MomentCard — badge de clip de vídeo (issue #649)', () => {
   test('con videoUrl, pinta el badge ▶ sobre la portada', () => {
     render(

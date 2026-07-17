@@ -93,6 +93,10 @@ describe('BitacoraTab — no parpadea al re-firmar (issue #725)', () => {
         canCreate={false}
         onAddMoment={vi.fn()}
         onOpenMoment={vi.fn()}
+        onOpenChallenge={vi.fn()}
+        leaderboard={[]}
+        prizes={null}
+        onViewMarcador={vi.fn()}
       />,
     )
 
@@ -113,6 +117,10 @@ describe('BitacoraTab — no parpadea al re-firmar (issue #725)', () => {
         canCreate={false}
         onAddMoment={vi.fn()}
         onOpenMoment={vi.fn()}
+        onOpenChallenge={vi.fn()}
+        leaderboard={[]}
+        prizes={null}
+        onViewMarcador={vi.fn()}
       />,
     )
 

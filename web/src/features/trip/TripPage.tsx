@@ -288,6 +288,23 @@ export function TripPage({
   const activeChallenges = useMemo(() => moments.filter((m) => m.status === 'active'), [moments])
   const hasLeaderboard = leaderboard.length > 0
 
+  // Tocar un RETO desde la Bitácora (issue #822): MISMO anti-spoiler que "Retos
+  // anteriores" del Marcador — un EN JUEGO sin jugar va a JUGAR (nunca al
+  // detalle, que revelaría el mapa antes de tiempo); cualquier otro (cerrado, en
+  // juego ya jugado) abre el detalle completo. `pastChallenges` no cubre los de
+  // PRÁCTICA (a propósito, "no son parte del recorrido") — sin resumen, cae al
+  // detalle: `ChallengeDetail` ya se defiende sola si la RLS no sirve la
+  // respuesta (nota, no revienta), así que no hace falta duplicar aquí esa guarda.
+  const openChallengeFromBitacora = useCallback(
+    (challengeId: string) => {
+      const summary = pastChallenges.find((p) => p.challengeId === challengeId)
+      const antiSpoiler = summary?.status === 'active' && summary.myResult == null
+      if (antiSpoiler) onPlayChallenge(challengeId)
+      else setViewingChallengeId(challengeId)
+    },
+    [pastChallenges, onPlayChallenge],
+  )
+
   const subtitle = useMemo(
     () => membersLine(memberNames, profile?.display_name ?? null),
     [memberNames, profile],
@@ -634,8 +651,13 @@ export function TripPage({
           /* BITÁCORA (issue #645; antes "Fotos"): el diario del viaje que se
              hojea, día a día. Reusa los MISMOS `moments` ya cargados por
              useTripData (sin pedir el grupo/los retos de nuevo); "Ver el
-             momento" (título o visor) abre la MISMA hoja de detalle que el
-             Diario (`setOpenMoment`). */
+             momento" (título o visor) de un RECUERDO abre la MISMA hoja de
+             detalle que el Diario (`setOpenMoment`); un RETO abre su detalle de
+             juego o el flujo de jugar (issue #822, `openChallengeFromBitacora`
+             — mismo anti-spoiler que "Retos anteriores" del Marcador). Cierra
+             con la clasificación general (issue #822): mismo leaderboard/prizes
+             que el Marcador, "Ver marcador" salta de sección igual que
+             `onViewMarcador` de `MomentSheet` más abajo. */
           <section
             key="fotos"
             className={`${styles.panel} ${styles.panelFotos} ${reducedMotion ? '' : styles.panelEnter}`}
@@ -648,6 +670,13 @@ export function TripPage({
               canCreate={canCreate}
               onAddMoment={onAddMoment}
               onOpenMoment={(m) => setOpenMoment(m)}
+              onOpenChallenge={openChallengeFromBitacora}
+              leaderboard={leaderboard}
+              prizes={group?.prizes ?? null}
+              onViewMarcador={() => {
+                setSection('marcador')
+                location.hash = marcadorGroupHash(groupId)
+              }}
             />
           </section>
         )}

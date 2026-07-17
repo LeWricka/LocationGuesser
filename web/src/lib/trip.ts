@@ -209,6 +209,38 @@ export function parseLegacyDescription(description: string | null): {
 }
 
 /**
+ * Ids de RETO "asociados" a un recuerdo del mismo viaje porque comparten el
+ * MISMO `image_path` — sin FK entre ambos, es la única señal disponible (issue
+ * #821/#822: un reto creado a partir de la foto de un recuerdo, `fromMomentId`
+ * en `CreateChallengeFlow`, sin sustituir la foto prefijada). Heurística
+ * SEGURA: cada subida genera un path con `crypto.randomUUID()` (`lib/storage.ts`),
+ * así que dos fotos distintas nunca coinciden por casualidad — la única forma
+ * de que dos filas compartan el string exacto es que una copiara literalmente
+ * el `image_path` de la otra, el caso real que describe el dueño.
+ *
+ * Un reto SORPRESA aún sin revelar (`isMomentPhotoVisible` false) NUNCA entra
+ * aquí: enseñar "esto viene de aquel recuerdo" antes de tiempo sería un spoiler
+ * en sí mismo (aunque el marcador no diga CUÁL recuerdo). Se filtra en el
+ * origen (no en la UI) para que ninguna otra pantalla tenga que acordarse de
+ * repetir la guarda.
+ */
+export function associatedChallengeIds(
+  moments: Pick<Moment, 'challengeId' | 'isChallenge' | 'imagePath' | 'status' | 'photoIsHint'>[],
+): Set<string> {
+  const memoryPaths = new Set(
+    moments.filter((m) => !m.isChallenge && m.imagePath != null).map((m) => m.imagePath as string),
+  )
+  const out = new Set<string>()
+  if (memoryPaths.size === 0) return out
+  for (const m of moments) {
+    if (!m.isChallenge || m.imagePath == null) continue
+    if (!isMomentPhotoVisible(m)) continue
+    if (memoryPaths.has(m.imagePath)) out.add(m.challengeId)
+  }
+  return out
+}
+
+/**
  * Punto de la RUTA en el mapa. Solo existen para momentos CERRADOS con lat/lng
  * visible: son los que la polyline "cose" en orden cronológico. Por eso lat/lng
  * aquí son obligatorios (a diferencia de `Moment`, que admite null para activos).

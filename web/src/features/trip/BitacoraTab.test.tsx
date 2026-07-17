@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { MomentImage } from '../../lib/momentImages'
 import type { Moment } from '../../lib/trip'
+import type { LeaderboardEntry } from '../../lib/leaderboard'
 
 // Capa de datos: la pestaña solo orquesta estas dos funciones (galería extra de
 // un recuerdo + firmado); aislamos la BD/Storage igual que MomentGallery.test.tsx.
@@ -36,6 +37,16 @@ function moment(over: Partial<Moment> & Pick<Moment, 'challengeId' | 'title'>): 
   }
 }
 
+function leaderboardEntry(over: Partial<LeaderboardEntry> & Pick<LeaderboardEntry, 'userId'>) {
+  return {
+    name: 'Jugador',
+    avatar: null,
+    points: 100,
+    plays: 1,
+    ...over,
+  }
+}
+
 function renderTab(moments: Moment[], overrides: Partial<Parameters<typeof BitacoraTab>[0]> = {}) {
   return render(
     <BitacoraTab
@@ -44,6 +55,10 @@ function renderTab(moments: Moment[], overrides: Partial<Parameters<typeof Bitac
       canCreate={overrides.canCreate ?? true}
       onAddMoment={overrides.onAddMoment ?? vi.fn()}
       onOpenMoment={overrides.onOpenMoment ?? vi.fn()}
+      onOpenChallenge={overrides.onOpenChallenge ?? vi.fn()}
+      leaderboard={overrides.leaderboard ?? []}
+      prizes={overrides.prizes ?? null}
+      onViewMarcador={overrides.onViewMarcador ?? vi.fn()}
     />,
   )
 }
@@ -362,5 +377,133 @@ describe('BitacoraTab — tocar una foto abre el visor', () => {
 
     expect(onOpenMoment).toHaveBeenCalledWith(expect.objectContaining({ challengeId: 'c-target' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+})
+
+describe('BitacoraTab — marca de reto (issue #821)', () => {
+  test('un reto EN JUEGO lleva el chip diana + "EN JUEGO"', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-en-juego',
+        title: 'Reto compartiendo foto',
+        isChallenge: true,
+        status: 'active',
+        photoIsHint: true,
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Reto compartiendo foto' })
+    expect(screen.getByText('EN JUEGO')).toBeInTheDocument()
+  })
+
+  test('un reto CERRADO lleva el chip diana + "Cerrado"', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-cerrado',
+        title: 'Reto cerrado con la misma foto',
+        isChallenge: true,
+        status: 'closed',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Reto cerrado con la misma foto' })
+    expect(screen.getByText('Cerrado')).toBeInTheDocument()
+  })
+
+  test('un recuerdo NUNCA lleva chip, ni compartiendo foto con un reto', async () => {
+    const moments = [
+      moment({ challengeId: 'c-recuerdo-misma-foto', title: 'El recuerdo original' }),
+      moment({
+        challengeId: 'c-reto-misma-foto',
+        title: 'El reto con la misma foto',
+        isChallenge: true,
+        status: 'closed',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'El recuerdo original' })
+    // Solo UN chip "Cerrado" en toda la pantalla: el del reto, no el recuerdo.
+    expect(screen.getAllByText('Cerrado')).toHaveLength(1)
+  })
+})
+
+describe('BitacoraTab — tocar un RETO abre su detalle (issue #822)', () => {
+  test('el título de un reto llama a onOpenChallenge, no a onOpenMoment', async () => {
+    const user = userEvent.setup()
+    const onOpenChallenge = vi.fn()
+    const onOpenMoment = vi.fn()
+    const target = moment({
+      challengeId: 'c-reto',
+      title: 'El bosque de bambú',
+      isChallenge: true,
+      status: 'closed',
+    })
+    renderTab([target], { onOpenChallenge, onOpenMoment })
+
+    await user.click(await screen.findByRole('heading', { name: 'El bosque de bambú' }))
+
+    expect(onOpenChallenge).toHaveBeenCalledWith('c-reto')
+    expect(onOpenMoment).not.toHaveBeenCalled()
+  })
+
+  test('"Ver el momento" de un reto (desde el visor) también llama a onOpenChallenge', async () => {
+    const user = userEvent.setup()
+    const onOpenChallenge = vi.fn()
+    const onOpenMoment = vi.fn()
+    const target = moment({
+      challengeId: 'c-reto-visor',
+      title: 'Templo dorado',
+      isChallenge: true,
+      status: 'closed',
+    })
+    renderTab([target], { onOpenChallenge, onOpenMoment })
+
+    await user.click(await screen.findByRole('button', { name: 'Ampliar foto: Templo dorado' }))
+    await screen.findByRole('dialog')
+    await user.click(screen.getByRole('button', { name: 'Ver el momento' }))
+
+    expect(onOpenChallenge).toHaveBeenCalledWith('c-reto-visor')
+    expect(onOpenMoment).not.toHaveBeenCalled()
+  })
+})
+
+describe('BitacoraTab — cierre con la clasificación (issue #822)', () => {
+  test('sin clasificación (nadie jugó), no se pinta el cierre', async () => {
+    const moments = [moment({ challengeId: 'c1', title: 'Un recuerdo' })]
+    renderTab(moments, { leaderboard: [] })
+
+    await screen.findByRole('heading', { name: 'Un recuerdo' })
+    expect(screen.queryByRole('heading', { name: 'Clasificación' })).not.toBeInTheDocument()
+  })
+
+  test('con clasificación, remata con el podio/lista y el CTA "Ver marcador"', async () => {
+    const moments = [moment({ challengeId: 'c1', title: 'Un recuerdo' })]
+    const leaderboard = [
+      leaderboardEntry({ userId: 'u1', name: 'Marta', points: 300 }),
+      leaderboardEntry({ userId: 'u2', name: 'Iker', points: 200 }),
+    ]
+    renderTab(moments, { leaderboard })
+
+    await screen.findByRole('heading', { name: 'Clasificación' })
+    expect(screen.getByText('Marta')).toBeInTheDocument()
+    expect(screen.getByText('Iker')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Ver marcador/ })).toBeInTheDocument()
+  })
+
+  test('tocar "Ver marcador" llama a onViewMarcador', async () => {
+    const user = userEvent.setup()
+    const onViewMarcador = vi.fn()
+    const moments = [moment({ challengeId: 'c1', title: 'Un recuerdo' })]
+    const leaderboard = [
+      leaderboardEntry({ userId: 'u1', name: 'Marta', points: 300 }),
+      leaderboardEntry({ userId: 'u2', name: 'Iker', points: 200 }),
+    ]
+    renderTab(moments, { leaderboard, onViewMarcador })
+
+    await user.click(await screen.findByRole('button', { name: /Ver marcador/ }))
+    expect(onViewMarcador).toHaveBeenCalled()
   })
 })

@@ -1,11 +1,11 @@
-import { useEffect, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { Flag, Footprints, Users, X } from 'lucide-react'
-import { Avatar, Icon, IconCamara, IconCandado, IconDiana } from '../../ui'
+import { Icon, IconCamara, IconCandado, IconDiana } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import { resolveMomentPhoto, type Moment, type RoutePoint } from '../../lib/trip'
 import { parseMomentDate } from '../../lib/time'
-import { Podium, type PodiumClasses } from '../group/Podium'
+import { StandingsBoard, type StandingsClasses } from './StandingsBoard'
 import { TripMap } from './TripMap'
 import type { ChallengeWinner } from './useTripData'
 import styles from './TripWrap.module.css'
@@ -27,9 +27,10 @@ interface Props {
   onClose: () => void
 }
 
-// Clases del podio en escala de recap (reusa el markup compartido `Podium`,
-// orden 2-1-3). Inyectamos solo la escala; el visual se comparte con el hub.
-const podiumClasses: PodiumClasses = {
+// Clases del podio en escala de recap (reusa el markup compartido `Podium`/
+// `StandingsBoard`, orden 2-1-3). Inyectamos solo la escala; el visual se
+// comparte con el hub (y, ahora, con el cierre de la Bitácora — issue #822).
+const standingsClasses: StandingsClasses = {
   podium: styles.podium,
   podiumCol: styles.podiumCol,
   placeFirst: styles.placeFirst,
@@ -46,6 +47,14 @@ const podiumClasses: PodiumClasses = {
   gold: styles.gold,
   silver: styles.silver,
   bronze: styles.bronze,
+  board: styles.board,
+  row: styles.row,
+  rank: styles.rank,
+  player: styles.player,
+  playerName: styles.playerName,
+  rowRight: styles.rowRight,
+  bar: styles.bar,
+  rowPoints: styles.rowPoints,
 }
 
 const dayMonthFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short' })
@@ -109,9 +118,6 @@ export function TripWrap({
   const challengesCount = moments.filter((m) => m.isChallenge).length
   const playersCount = leaderboard.length
 
-  const hasPodium = leaderboard.length >= 3
-  const podium = hasPodium ? leaderboard.slice(0, 3) : []
-  const top = leaderboard[0]?.points ?? 0
   const range = dateRange(moments)
 
   // `icon` va ya RENDERIZADO (no el componente): mezcla iconos custom de marca
@@ -184,46 +190,7 @@ export function TripWrap({
               <span className={styles.blockKicker}>La liga del viaje</span>
               <h2 className={styles.blockTitle}>Clasificación final</h2>
             </header>
-            {hasPodium ? (
-              <Podium
-                top3={podium}
-                prizes={prizes}
-                totalEntries={leaderboard.length}
-                classes={podiumClasses}
-              />
-            ) : (
-              <ol className={styles.board}>
-                {leaderboard.map((entry, i) => {
-                  const width = top > 0 ? Math.max(8, Math.round((entry.points / top) * 100)) : 0
-                  return (
-                    <li
-                      key={entry.userId}
-                      className={styles.row}
-                      style={{ '--i': i } as CSSProperties}
-                    >
-                      <span className={styles.rank}>{i + 1}</span>
-                      <div className={styles.player}>
-                        <Avatar
-                          userId={entry.userId}
-                          avatarUrl={entry.avatar}
-                          name={entry.name}
-                          size="sm"
-                        />
-                        <span className={styles.playerName}>{entry.name}</span>
-                      </div>
-                      <div className={styles.rowRight}>
-                        <span className={styles.bar} aria-hidden="true">
-                          <i style={{ width: `${width}%` }} />
-                        </span>
-                        <span className={styles.rowPoints}>
-                          {entry.points.toLocaleString('es-ES')}
-                        </span>
-                      </div>
-                    </li>
-                  )
-                })}
-              </ol>
-            )}
+            <StandingsBoard leaderboard={leaderboard} prizes={prizes} classes={standingsClasses} />
           </section>
         )}
 

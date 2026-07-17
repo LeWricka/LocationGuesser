@@ -438,9 +438,16 @@ export const cases: GalleryCase[] = [
     //    visual permanente de que no vuelva a pintarse el emoji gigante.
     //  - CH_MEMORY_QUIET: recuerdo SIN descripción, una sola foto.
     //  - CH_CLOSED / CH_CLOSED_OTHER: retos SELLADOS (ya revelados), con foto
-    //    y descripción, como cualquier recuerdo.
+    //    y descripción, como cualquier recuerdo — cada uno lleva el chip diana +
+    //    "Cerrado" (issue #821) que los distingue de un recuerdo.
     //  - CH_ACTIVE_SORPRESA: reto EN JUEGO con foto SORPRESA (`photo_is_hint:
     //    false`) que NO debe aparecer — vigilancia visual del anti-spoiler.
+    //  - CH_CLOSED_SAME_PHOTO_AS_MEMORY: reto CERRADO con la MISMA foto que
+    //    CH_MEMORY (issue #821, "un reto y un momento con la misma foto se leen
+    //    como duplicados") — guarda visual permanente de que el chip diana +
+    //    estado los distingue aun compartiendo imagen. La clasificación con
+    //    votos ya sembrados también deja ver el cierre de la Bitácora (podio +
+    //    "Ver marcador", issue #822).
     id: 'viaje-bitacora',
     title: 'Viaje · Bitácora',
     section: 'Viaje',

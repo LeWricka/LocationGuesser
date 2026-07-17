@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
-import { AudioPlayer, EmptyState, IconCamara } from '../../ui'
+import { ListOrdered } from 'lucide-react'
+import { AudioPlayer, Badge, Button, EmptyState, Icon, IconCamara, IconDiana } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
 import { listGroupMomentImages } from '../../lib/momentImages'
 import { signedImageUrl } from '../../lib/storage'
 import { reportError } from '../../lib/observability'
 import { track } from '../../lib/analytics'
 import { isMomentPhotoVisible, parseLegacyDescription, type Moment } from '../../lib/trip'
+import type { LeaderboardEntry } from '../../lib/leaderboard'
+import type { GroupPrizes } from '../../lib/database.types'
 import {
   groupMomentsByDay,
   type BitacoraGrouped,
   type BitacoraMomentInput,
   type BitacoraPhoto,
 } from './bitacoraGallery'
+import { StandingsBoard, type StandingsClasses } from './StandingsBoard'
 import styles from './BitacoraTab.module.css'
 
 interface Props {
@@ -24,10 +28,58 @@ interface Props {
   canCreate: boolean
   /** Abre el flujo de "Añadir recuerdo" (CTA del estado vacío). */
   onAddMoment: () => void
-  /** "Ver el momento" (tocar el título, o "Ver el momento" del visor): abre la
-   * hoja de detalle de ESE momento (la misma mecánica que ya usa TripPage para
-   * el Diario). */
+  /** "Ver el momento" (tocar el título, o "Ver el momento" del visor) de un
+   * RECUERDO: abre la hoja de detalle de ESE momento (la misma mecánica que ya
+   * usa TripPage para el Diario). Un RETO nunca llega aquí — ver `onOpenChallenge`. */
   onOpenMoment: (moment: Moment) => void
+  /**
+   * Tocar el título (o "Ver el momento" del visor) de un RETO (issue #822): a
+   * diferencia de un recuerdo, un reto abre su DETALLE de juego (clasificación,
+   * mapa de jugadas, foto) o el flujo de jugar — la decisión de CUÁL de los dos
+   * (anti-spoiler: un EN JUEGO sin jugar va a jugar, nunca al detalle) vive en
+   * `TripPage`, que ya tiene `pastChallenges` para saberlo; esta pestaña no
+   * duplica esa lógica, solo delega.
+   */
+  onOpenChallenge: (challengeId: string) => void
+  /** Clasificación general del viaje (issue #822): alimenta el cierre de la
+   * Bitácora ("La liga del viaje" + podio/lista). Vacía → no se pinta el cierre. */
+  leaderboard: LeaderboardEntry[]
+  /** Premios por puesto (`groups.prizes`): el podio del cierre los muestra igual
+   * que el Marcador/el recap de cierre. */
+  prizes: GroupPrizes | null
+  /** CTA discreto "Ver marcador" del cierre: salta a la pestaña Marcador. */
+  onViewMarcador: () => void
+}
+
+// Clases del podio/lista del cierre, en la escala de la Bitácora (tarjeta opaca
+// sobre la escena oscura, mismo criterio que `.emptyCard`/`.audioCard`):
+// reutiliza el MARKUP compartido `StandingsBoard` (issue #822 — "no dupliques
+// el markup del Marcador"), su propia escala vive en `BitacoraTab.module.css`.
+const standingsClasses: StandingsClasses = {
+  podium: styles.podium,
+  podiumCol: styles.podiumCol,
+  placeFirst: styles.placeFirst,
+  placeSecond: styles.placeSecond,
+  placeThird: styles.placeThird,
+  crown: styles.crown,
+  podiumDisc: styles.podiumDisc,
+  podiumAvatar: styles.podiumAvatar,
+  podiumName: styles.podiumName,
+  podiumPoints: styles.podiumPoints,
+  podiumPrize: styles.podiumPrize,
+  pedestal: styles.pedestal,
+  pedestalMedal: styles.pedestalMedal,
+  gold: styles.gold,
+  silver: styles.silver,
+  bronze: styles.bronze,
+  board: styles.board,
+  row: styles.row,
+  rank: styles.rank,
+  player: styles.player,
+  playerName: styles.playerName,
+  rowRight: styles.rowRight,
+  bar: styles.bar,
+  rowPoints: styles.rowPoints,
 }
 
 // Candidata a foto a firmar (galería propia de un recuerdo) o ya lista
@@ -56,8 +108,29 @@ type PendingPhoto = { kind: 'ready'; src: string } | { kind: 'sign'; path: strin
  * y `TripPage.tsx`): es un identificador interno, no copy — cambiarlo no
  * aporta nada al usuario y arrastraría enlaces ya compartidos. Solo cambia lo
  * que se VE: la etiqueta del tab y esta pantalla.
+ *
+ * MARCA DE RETO (issue #821): un reto y un recuerdo con la MISMA foto (p.ej. un
+ * reto creado a partir de la foto de un recuerdo, `fromMomentId` en
+ * `CreateChallengeFlow`) se leían como entradas duplicadas — nada los
+ * distinguía. Cada entrada de reto lleva ahora el chip diana + estado ("EN
+ * JUEGO" con punto vivo / "Cerrado"), MISMO lenguaje que `ChallengeDetail`; el
+ * recuerdo se queda limpio (su ausencia de chip ES su marca).
+ *
+ * CIERRE (issue #822): tras el último día, si ya hay clasificación (alguien
+ * jugó algún reto), la Bitácora remata con el mismo podio/lista del Marcador
+ * (`StandingsBoard`, pieza compartida) y un CTA discreto a la pestaña completa.
  */
-export function BitacoraTab({ groupId, moments, canCreate, onAddMoment, onOpenMoment }: Props) {
+export function BitacoraTab({
+  groupId,
+  moments,
+  canCreate,
+  onAddMoment,
+  onOpenMoment,
+  onOpenChallenge,
+  leaderboard,
+  prizes,
+  onViewMarcador,
+}: Props) {
   // null = cargando.
   const [grouped, setGrouped] = useState<BitacoraGrouped | null>(null)
   const [lightboxAt, setLightboxAt] = useState<number | null>(null)
@@ -105,6 +178,8 @@ export function BitacoraTab({ groupId, moments, canCreate, onAddMoment, onOpenMo
           return {
             momentId: m.challengeId,
             momentTitle: m.title,
+            isChallenge: m.isChallenge,
+            status: m.status,
             date: m.date,
             description: text,
             dateLabel,
@@ -135,6 +210,16 @@ export function BitacoraTab({ groupId, moments, canCreate, onAddMoment, onOpenMo
   const days = grouped?.days ?? []
   const flatPhotos = grouped?.flatPhotos ?? []
 
+  // Tocar una entrada (título o "Ver el momento" del visor): un RETO abre su
+  // detalle de juego (`onOpenChallenge`, issue #822 — anti-spoiler decidido en
+  // TripPage), un RECUERDO la hoja de contenido de siempre (`onOpenMoment`).
+  const openEntry = (momentId: string) => {
+    const found = moments.find((m) => m.challengeId === momentId)
+    if (!found) return
+    if (found.isChallenge) onOpenChallenge(found.challengeId)
+    else onOpenMoment(found)
+  }
+
   return (
     <div className={styles.scene}>
       {grouped === null ? (
@@ -156,16 +241,17 @@ export function BitacoraTab({ groupId, moments, canCreate, onAddMoment, onOpenMo
           </div>
         </div>
       ) : (
-        days.map((day) => (
-          <section
-            key={day.key}
-            aria-label={day.placesLabel ? `${day.label} — ${day.placesLabel}` : day.label}
-            className={styles.day}
-          >
-            <h3 className={styles.dayHeader}>
-              <span className={styles.dayDate}>{day.label}</span>
-              <span className={styles.dayThread} aria-hidden="true" />
-              {/* El separador es texto real (no solo hueco visual): sin él, la
+        <>
+          {days.map((day) => (
+            <section
+              key={day.key}
+              aria-label={day.placesLabel ? `${day.label} — ${day.placesLabel}` : day.label}
+              className={styles.day}
+            >
+              <h3 className={styles.dayHeader}>
+                <span className={styles.dayDate}>{day.label}</span>
+                <span className={styles.dayThread} aria-hidden="true" />
+                {/* El separador es texto real (no solo hueco visual): sin él, la
                   fecha y los lugares se leerían pegados ("3 julSALENTO") al
                   usuario de lector de pantalla y en el `textContent` del h3.
                   Un "·" (no "—", issue #686): el hilo punteado YA separa fecha
@@ -173,77 +259,129 @@ export function BitacoraTab({ groupId, moments, canCreate, onAddMoment, onOpenMo
                   marca de separación redundante y recargaba la fila; el punto
                   medio es más ligero y es el MISMO lenguaje de puntuación que
                   ya usa `.kicker` y el propio `dayPlaces` entre lugares. */}
-              {day.placesLabel && <span className={styles.dayPlaces}>· {day.placesLabel}</span>}
-            </h3>
+                {day.placesLabel && <span className={styles.dayPlaces}>· {day.placesLabel}</span>}
+              </h3>
 
-            <div className={`${styles.moments} lg-stagger`}>
-              {day.moments.map((moment) => (
-                <article key={moment.momentId} className={styles.moment}>
-                  {/* El "◦ " es decorativo (CSS `::before`, ver .kicker): así el
+              <div className={`${styles.moments} lg-stagger`}>
+                {day.moments.map((moment) => (
+                  <article key={moment.momentId} className={styles.moment}>
+                    {/* Chip de reto (issue #821): diana + estado, MISMO lenguaje que
+                        `ChallengeDetail` ("EN JUEGO" con punto vivo / "Cerrado") —
+                        sin él, un reto y un recuerdo con la misma foto se leen como
+                        duplicados. `practice` cae en "EN JUEGO" (nunca cierra de
+                        verdad, igual criterio binario que `ChallengeDetail`). Un
+                        recuerdo no lleva chip: su ausencia ES la marca. */}
+                    {moment.isChallenge && (
+                      <span className={styles.retoChip}>
+                        <Badge
+                          tone={moment.status === 'closed' ? 'neutral' : 'live'}
+                          dot={moment.status !== 'closed'}
+                        >
+                          <IconDiana size={13} />
+                          {moment.status === 'closed' ? 'Cerrado' : 'EN JUEGO'}
+                        </Badge>
+                      </span>
+                    )}
+
+                    {/* El "◦ " es decorativo (CSS `::before`, ver .kicker): así el
                       texto accesible/testeable arranca en el lugar (o la fecha, si
                       no hay lugar), sin un nodo partido entre el símbolo y el texto.
                       Lugar y fecha legada (#686) van en el MISMO nodo de texto — un
                       "· " entre ambos, nunca en `<span>` hermanos — para que un
                       lector de pantalla los lea como una sola frase, no pegados. */}
-                  {(moment.placeLabel || moment.dateLabel) && (
-                    <p className={styles.kicker}>
-                      {[moment.placeLabel, moment.dateLabel].filter(Boolean).join(' · ')}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className={styles.titleBtn}
-                    onClick={() => {
-                      const found = moments.find((m) => m.challengeId === moment.momentId)
-                      if (found) onOpenMoment(found)
-                    }}
-                  >
-                    <h4 className={styles.title}>{moment.momentTitle}</h4>
-                  </button>
-
-                  {moment.description && <p className={styles.description}>{moment.description}</p>}
-
-                  {/* Nota de voz (issue #648): reproducible aquí mismo, sin abrir
-                      el momento. Envuelta en tarjeta clara: `AudioPlayer` usa
-                      tokens de PAPEL, ilegible directo sobre la escena oscura
-                      (mismo motivo que `.emptyCard` más abajo). */}
-                  {moment.audioUrl && (
-                    <div className={styles.audioCard}>
-                      <AudioPlayer
-                        src={moment.audioUrl}
-                        onPlay={() => track('voice_note_played', { challenge_id: moment.momentId })}
-                      />
-                    </div>
-                  )}
-
-                  <div className={styles.photos}>
-                    {/* Clip corto (issue #649): la primera "foto" del recuerdo es
-                        el vídeo, con su propia portada como poster (mismo
-                        criterio que "El clip" de MomentSheet). */}
-                    {moment.videoUrl && (
-                      <video
-                        className={styles.media}
-                        controls
-                        playsInline
-                        poster={moment.videoPoster ?? undefined}
-                        src={moment.videoUrl}
-                        data-testid="moment-video-player"
-                      />
+                    {(moment.placeLabel || moment.dateLabel) && (
+                      <p className={styles.kicker}>
+                        {[moment.placeLabel, moment.dateLabel].filter(Boolean).join(' · ')}
+                      </p>
                     )}
-                    {moment.photos.map((photo) => (
-                      <BitacoraPhotoFrame
-                        key={photo.flatIndex}
-                        photo={photo}
-                        alt={moment.momentTitle}
-                        onOpen={() => setLightboxAt(photo.flatIndex)}
-                      />
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        ))
+                    <button
+                      type="button"
+                      className={styles.titleBtn}
+                      onClick={() => openEntry(moment.momentId)}
+                    >
+                      <h4 className={styles.title}>{moment.momentTitle}</h4>
+                    </button>
+
+                    {moment.description && (
+                      <p className={styles.description}>{moment.description}</p>
+                    )}
+
+                    {/* Nota de voz (issue #648): reproducible aquí mismo, sin abrir
+                        el momento. Envuelta en tarjeta clara: `AudioPlayer` usa
+                        tokens de PAPEL, ilegible directo sobre la escena oscura
+                        (mismo motivo que `.emptyCard` más abajo). */}
+                    {moment.audioUrl && (
+                      <div className={styles.audioCard}>
+                        <AudioPlayer
+                          src={moment.audioUrl}
+                          onPlay={() =>
+                            track('voice_note_played', { challenge_id: moment.momentId })
+                          }
+                        />
+                      </div>
+                    )}
+
+                    <div className={styles.photos}>
+                      {/* Clip corto (issue #649): la primera "foto" del recuerdo es
+                          el vídeo, con su propia portada como poster (mismo
+                          criterio que "El clip" de MomentSheet). */}
+                      {moment.videoUrl && (
+                        <video
+                          className={styles.media}
+                          controls
+                          playsInline
+                          poster={moment.videoPoster ?? undefined}
+                          src={moment.videoUrl}
+                          data-testid="moment-video-player"
+                        />
+                      )}
+                      {moment.photos.map((photo) => (
+                        <BitacoraPhotoFrame
+                          key={photo.flatIndex}
+                          photo={photo}
+                          alt={moment.momentTitle}
+                          onOpen={() => setLightboxAt(photo.flatIndex)}
+                        />
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ))}
+
+          {/* Cierre de la Bitácora (issue #822): la clasificación general del
+              viaje, MISMA pieza que el Marcador/el recap de cierre
+              (`StandingsBoard`, `Podium` reutilizado) — la bitácora se lee como
+              la historia del viaje y remata con quién ganó. Solo si ya hay
+              alguna jugada (leaderboard vacío = nadie jugó todavía = no añade
+              ruido). Tarjeta opaca sobre la escena, mismo criterio que
+              `.emptyCard`/`.audioCard`. */}
+          {leaderboard.length > 0 && (
+            <section className={styles.closing} aria-label="Clasificación del viaje">
+              <div className={styles.closingCard}>
+                <header className={styles.closingHead}>
+                  <span className={styles.closingKicker}>La liga del viaje</span>
+                  <h2 className={styles.closingTitle}>Clasificación</h2>
+                </header>
+                <StandingsBoard
+                  leaderboard={leaderboard}
+                  prizes={prizes}
+                  classes={standingsClasses}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  fullWidth
+                  className={styles.closingCta}
+                  onClick={onViewMarcador}
+                >
+                  <Icon icon={ListOrdered} size={16} /> Ver marcador
+                </Button>
+              </div>
+            </section>
+          )}
+        </>
       )}
 
       {lightboxAt !== null && (
@@ -256,8 +394,7 @@ export function BitacoraTab({ groupId, moments, canCreate, onAddMoment, onOpenMo
           onSecondaryAction={(i) => {
             setLightboxAt(null)
             const photo = flatPhotos[i]
-            const moment = photo ? moments.find((m) => m.challengeId === photo.momentId) : undefined
-            if (moment) onOpenMoment(moment)
+            if (photo) openEntry(photo.momentId)
           }}
         />
       )}

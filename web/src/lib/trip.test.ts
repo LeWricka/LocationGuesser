@@ -1,5 +1,10 @@
 import { describe, test, expect } from 'vitest'
-import { isMomentPhotoVisible, parseLegacyDescription, resolveMomentPhoto } from './trip'
+import {
+  associatedChallengeIds,
+  isMomentPhotoVisible,
+  parseLegacyDescription,
+  resolveMomentPhoto,
+} from './trip'
 import type { Moment } from './trip'
 
 type MomentInput = Pick<Moment, 'isChallenge' | 'status' | 'photoIsHint'>
@@ -87,6 +92,83 @@ describe('resolveMomentPhoto (issue #655, spoiler del carrusel/hoja/recap)', () 
         pm({ isChallenge: false, status: 'recuerdo', isOwn: false, imageUrl: src }),
       ),
     ).toEqual({ src, surprise: false })
+  })
+})
+
+type AssocInput = Pick<
+  Moment,
+  'challengeId' | 'isChallenge' | 'imagePath' | 'status' | 'photoIsHint'
+>
+
+function am(over: Partial<AssocInput> & Pick<AssocInput, 'challengeId'>): AssocInput {
+  return {
+    isChallenge: false,
+    status: 'recuerdo',
+    imagePath: null,
+    photoIsHint: true,
+    ...over,
+  }
+}
+
+describe('associatedChallengeIds (issue #822, reto ↔ recuerdo con la misma foto)', () => {
+  test('un reto que comparte image_path con un recuerdo queda marcado', () => {
+    const moments = [
+      am({ challengeId: 'recuerdo-1', imagePath: 'foto.jpg' }),
+      am({ challengeId: 'reto-1', isChallenge: true, status: 'closed', imagePath: 'foto.jpg' }),
+    ]
+    expect(associatedChallengeIds(moments)).toEqual(new Set(['reto-1']))
+  })
+
+  test('sin ningún recuerdo con esa foto, el reto no queda marcado', () => {
+    const moments = [
+      am({ challengeId: 'recuerdo-1', imagePath: 'otra-foto.jpg' }),
+      am({ challengeId: 'reto-1', isChallenge: true, status: 'closed', imagePath: 'foto.jpg' }),
+    ]
+    expect(associatedChallengeIds(moments)).toEqual(new Set())
+  })
+
+  test('dos momentos SIN foto (imagePath null) nunca se marcan como asociados', () => {
+    const moments = [
+      am({ challengeId: 'recuerdo-1', imagePath: null }),
+      am({ challengeId: 'reto-1', isChallenge: true, status: 'closed', imagePath: null }),
+    ]
+    expect(associatedChallengeIds(moments)).toEqual(new Set())
+  })
+
+  test('un reto EN JUEGO con foto SORPRESA nunca se marca (sería un spoiler)', () => {
+    const moments = [
+      am({ challengeId: 'recuerdo-1', imagePath: 'foto.jpg' }),
+      am({
+        challengeId: 'reto-1',
+        isChallenge: true,
+        status: 'active',
+        photoIsHint: false,
+        imagePath: 'foto.jpg',
+      }),
+    ]
+    expect(associatedChallengeIds(moments)).toEqual(new Set())
+  })
+
+  test('un reto EN JUEGO con foto PISTA sí se marca (ya es visible)', () => {
+    const moments = [
+      am({ challengeId: 'recuerdo-1', imagePath: 'foto.jpg' }),
+      am({
+        challengeId: 'reto-1',
+        isChallenge: true,
+        status: 'active',
+        photoIsHint: true,
+        imagePath: 'foto.jpg',
+      }),
+    ]
+    expect(associatedChallengeIds(moments)).toEqual(new Set(['reto-1']))
+  })
+
+  test('dos retos que comparten foto entre sí (sin ningún recuerdo) no se marcan', () => {
+    const moments = [
+      am({ challengeId: 'reto-1', isChallenge: true, status: 'closed', imagePath: 'foto.jpg' }),
+      am({ challengeId: 'reto-2', isChallenge: true, status: 'closed', imagePath: 'foto.jpg' }),
+    ]
+    expect(associatedChallengeIds(moments)).toEqual(new Set())
   })
 })
 

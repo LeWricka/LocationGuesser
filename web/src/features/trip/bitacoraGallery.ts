@@ -9,6 +9,8 @@
  * `pinMarkers.ts`/`routeDraw.ts` en esta carpeta.
  */
 
+import type { MomentStatus } from '../../lib/trip'
+
 /** Una foto ABRIBLE en el visor compartido de la Bitácora. */
 export interface BitacoraPhoto {
   src: string
@@ -27,6 +29,15 @@ export interface BitacoraPhoto {
 export interface BitacoraMoment {
   momentId: string
   momentTitle: string
+  /**
+   * ¿Lleva capa de RETO (`is_challenge = true`)? Issue #821: un reto y un
+   * recuerdo con la MISMA foto se leían como entradas duplicadas — sin este
+   * dato, la pantalla no puede pintar el chip diana que los distingue.
+   */
+  isChallenge: boolean
+  /** Estado del momento (ver `lib/trip.ts`): junto a `isChallenge` decide el
+   * texto del chip de reto ("EN JUEGO" con punto vivo / "Cerrado"). */
+  status: MomentStatus
   date: string
   description: string | null
   /**
@@ -73,6 +84,10 @@ export interface BitacoraDay {
 export interface BitacoraMomentInput {
   momentId: string
   momentTitle: string
+  /** Ver `BitacoraMoment.isChallenge`. */
+  isChallenge: boolean
+  /** Ver `BitacoraMoment.status`. */
+  status: MomentStatus
   date: string
   description: string | null
   /** Ver `BitacoraMoment.dateLabel` — ya resuelto por quien construye el input. */
@@ -157,6 +172,8 @@ export function groupMomentsByDay(moments: BitacoraMomentInput[]): BitacoraGroup
     day.moments.push({
       momentId: m.momentId,
       momentTitle: m.momentTitle,
+      isChallenge: m.isChallenge,
+      status: m.status,
       date: m.date,
       description: m.description,
       dateLabel: m.dateLabel,
