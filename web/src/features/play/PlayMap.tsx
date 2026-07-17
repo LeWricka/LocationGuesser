@@ -57,6 +57,16 @@ interface Props {
    */
   fixedCenterPin?: boolean
   /**
+   * Cámara con la que ARRANCA el mapa (centro + zoom). Sin ella, vista mundo.
+   * Nace del bucle explorar↔posicionar (feedback del dueño jugando): al reabrir
+   * el mapa expandido se perdía el zoom del viaje anterior — el llamador guarda
+   * la última cámara (`onCameraChange`) y la restaura aquí al remontar.
+   */
+  initialCamera?: { center: LatLng; zoom: number }
+  /** Última cámara conocida (centro + zoom) en cada movimiento; para restaurarla
+   * en el siguiente montaje vía `initialCamera`. */
+  onCameraChange?: (camera: { center: LatLng; zoom: number }) => void
+  /**
    * Mantiene la vista CENTRADA en esta coordenada mientras cambie (issue #789).
    * Para lienzos no interactivos que deben ENSEÑAR un punto — el thumbnail
    * colapsado de "Adivinar" (GameScene) centra aquí el pin provisional: si el
@@ -296,6 +306,8 @@ export function PlayMap({
   preset: _preset = 'jugar',
   fixedCenterPin = false,
   centerOn = null,
+  initialCamera,
+  onCameraChange,
 }: Props) {
   // En modo pin de centro fijo no se ve el pin-avatar (lo sustituye el pin clavado
   // al centro de la pantalla); tampoco se marca tocando, sino moviendo el mapa.
@@ -322,8 +334,12 @@ export function PlayMap({
     <div className={styles.wrap}>
       <Map
         className="lg-map"
-        defaultCenter={WORLD}
-        defaultZoom={WORLD_ZOOM}
+        defaultCenter={initialCamera?.center ?? WORLD}
+        defaultZoom={initialCamera?.zoom ?? WORLD_ZOOM}
+        // El llamador guarda la última cámara para restaurarla al remontar (el
+        // mapa expandido se desmonta al volver al panorama; sin esto, cada
+        // reapertura vuelve a la vista mundo y el jugador pierde su zoom).
+        onCameraChanged={(e) => onCameraChange?.({ center: e.detail.center, zoom: e.detail.zoom })}
         minZoom={2}
         // `onTilesLoaded` = teselas visibles cargadas → ocultar el skeleton.
         onTilesLoaded={() => setMapReady(true)}
