@@ -41,6 +41,7 @@ function pastChallenge(overrides: Partial<PastChallengeSummary>): PastChallengeS
     isOwn: false,
     winner: null,
     myResult: null,
+    myRank: null,
     imageUrl: null,
     ...overrides,
   }
@@ -303,28 +304,22 @@ describe('MarcadorTab', () => {
     expect(screen.getByDisplayValue('Invita a las cañas')).toBeInTheDocument()
   })
 
-  test('retos anteriores: no se muestra la sección sin retos cerrados', () => {
+  // --- "El camino" (issue #831): cobertura detallada de sus hitos vive en
+  // Camino.test.tsx (el componente ya no renderiza aquí mismo, ver Camino.tsx).
+  // Aquí solo se comprueba el WIRING: MarcadorTab pasa `pastChallenges` y los
+  // handlers de navegación al hijo correctamente.
+
+  test('el camino: sin retos, no se muestra ("El camino" no aparece)', () => {
     renderMarcador({ leaderboard: [], canCreate: false })
-    expect(screen.queryByText('Retos anteriores')).not.toBeInTheDocument()
+    expect(screen.queryByText('El camino')).not.toBeInTheDocument()
   })
 
-  test('retos anteriores: ganador, mi resultado y el aviso anti-trampa; tocar un CERRADO abre el detalle', async () => {
+  test('el camino: con retos, se muestra y navega según el anti-spoiler (wiring de props)', async () => {
     const user = userEvent.setup()
     const onViewChallenge = vi.fn()
     const onPlayChallenge = vi.fn()
     const pastChallenges: PastChallengeSummary[] = [
-      pastChallenge({
-        challengeId: 'c1',
-        title: 'El bosque de bambú',
-        winner: { name: 'Marta', points: 4880, distanceKm: 1.2, leftApp: true },
-        myResult: { points: 3100, distanceKm: 42, leftApp: false },
-      }),
-      pastChallenge({
-        challengeId: 'c2',
-        title: 'El Pabellón Dorado',
-        closedAt: '2026-06-08T10:00:00.000Z',
-        isOwn: true,
-      }),
+      pastChallenge({ challengeId: 'c1', title: 'El bosque de bambú' }),
     ]
     renderMarcador({
       leaderboard: [],
@@ -333,98 +328,9 @@ describe('MarcadorTab', () => {
       onViewChallenge,
       onPlayChallenge,
     })
-    expect(screen.getByText('Retos anteriores')).toBeInTheDocument()
-    expect(screen.getByText(/Marta · 4.?880 pts/)).toBeInTheDocument()
-    expect(screen.getByText(/^3.?100 pts$/)).toBeInTheDocument()
-    expect(screen.getAllByLabelText('Salió de la app durante la jugada')).toHaveLength(1)
-    // El segundo reto es mío (sin votos): "Se cerró sin votos" + "Tu reto".
-    expect(screen.getByText('Se cerró sin votos')).toBeInTheDocument()
-    expect(screen.getByText('Tu reto')).toBeInTheDocument()
+    expect(screen.getByText('El camino')).toBeInTheDocument()
 
     await user.click(screen.getByText('El bosque de bambú'))
-    expect(onViewChallenge).toHaveBeenCalledWith('c1')
-    expect(onPlayChallenge).not.toHaveBeenCalled()
-  })
-
-  test('retos anteriores (issue #753): thumbnail con la foto del reto, o placeholder si no tiene', () => {
-    const pastChallenges: PastChallengeSummary[] = [
-      pastChallenge({ challengeId: 'c1', title: 'Con foto', imageUrl: 'https://x/foto.jpg' }),
-      pastChallenge({ challengeId: 'c2', title: 'Sin foto', imageUrl: null }),
-    ]
-    renderMarcador({ leaderboard: [], canCreate: false, pastChallenges })
-    // La fila entera es un botón (abre el detalle); dentro, el marco de la foto de
-    // ChallengePhoto es un <div> (no anida <button>, zoomable=false).
-    const conFoto = screen.getByText('Con foto').closest('button')
-    expect(conFoto?.querySelector('img')).toHaveAttribute('src', 'https://x/foto.jpg')
-    const sinFoto = screen.getByText('Sin foto').closest('button')
-    expect(sinFoto?.querySelector('img')).toBeNull()
-  })
-
-  // --- Retos EN JUEGO en la lista (issue #800) --------------------------------
-
-  test('retos anteriores (issue #800): un EN JUEGO lleva el chip "EN JUEGO" y cuenta atrás, sin ganador', () => {
-    const pastChallenges: PastChallengeSummary[] = [
-      pastChallenge({
-        challengeId: 'c1',
-        title: 'El templo dorado',
-        status: 'active',
-        closedAt: '2026-06-15T13:00:00.000Z', // +3h desde el "ahora" congelado abajo
-      }),
-    ]
-    vi.useFakeTimers().setSystemTime(new Date('2026-06-15T10:00:00.000Z'))
-    renderMarcador({ leaderboard: [], canCreate: false, pastChallenges })
-    expect(screen.getByText('EN JUEGO')).toBeInTheDocument()
-    expect(screen.getByText(/quedan 3 h/)).toBeInTheDocument()
-    expect(screen.queryByText('Se cerró sin votos')).not.toBeInTheDocument()
-    expect(screen.getByText('Aún sin jugar')).toBeInTheDocument()
-    vi.useRealTimers()
-  })
-
-  test('retos anteriores (issue #800, anti-spoiler): un EN JUEGO sin jugar va a JUGAR, no al detalle', async () => {
-    const user = userEvent.setup()
-    const onPlayChallenge = vi.fn()
-    const onViewChallenge = vi.fn()
-    const pastChallenges: PastChallengeSummary[] = [
-      pastChallenge({
-        challengeId: 'c1',
-        title: 'El templo dorado',
-        status: 'active',
-        myResult: null,
-      }),
-    ]
-    renderMarcador({
-      leaderboard: [],
-      canCreate: false,
-      pastChallenges,
-      onPlayChallenge,
-      onViewChallenge,
-    })
-    await user.click(screen.getByText('El templo dorado'))
-    expect(onPlayChallenge).toHaveBeenCalledWith('c1')
-    expect(onViewChallenge).not.toHaveBeenCalled()
-  })
-
-  test('retos anteriores (issue #800, anti-spoiler): un EN JUEGO YA jugado abre el detalle, no a jugar', async () => {
-    const user = userEvent.setup()
-    const onPlayChallenge = vi.fn()
-    const onViewChallenge = vi.fn()
-    const pastChallenges: PastChallengeSummary[] = [
-      pastChallenge({
-        challengeId: 'c1',
-        title: 'El templo dorado',
-        status: 'active',
-        myResult: { points: 2200, distanceKm: 8, leftApp: false },
-      }),
-    ]
-    renderMarcador({
-      leaderboard: [],
-      canCreate: false,
-      pastChallenges,
-      onPlayChallenge,
-      onViewChallenge,
-    })
-    expect(screen.getByText(/^2.?200 pts$/)).toBeInTheDocument()
-    await user.click(screen.getByText('El templo dorado'))
     expect(onViewChallenge).toHaveBeenCalledWith('c1')
     expect(onPlayChallenge).not.toHaveBeenCalled()
   })

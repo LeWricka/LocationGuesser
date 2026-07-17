@@ -535,16 +535,13 @@ export function TripPage({
     )
   }
 
-  // Escena PAPEL solo en Marcador; Diario Y Bitácora son escenas OSCURAS a
-  // sangre (mapa satélite / diario sobre grafito), así que comparten el chrome
-  // de vidrio esmerilado (regla #537: sobre fondo oscuro, vidrio).
-  const isPaperScene = section === 'marcador'
-
+  // Escena OSCURA en las 3 secciones (issue #831, rediseño del Marcador):
+  // Diario/Bitácora ya eran oscuras (mapa satélite / diario sobre grafito);
+  // Marcador (antes papel claro) pasa a la MISMA escena oscura e inmersiva. Las
+  // 3 comparten el mismo chrome de vidrio esmerilado (regla #537: sobre fondo
+  // oscuro, vidrio) — ya no hace falta distinguir la escena por sección.
   return (
-    <div
-      key="trip"
-      className={`${styles.screen} ${isPaperScene ? styles.scenePaper : styles.sceneDiario} lg-content-in`}
-    >
+    <div key="trip" className={`${styles.screen} ${styles.sceneDiario} lg-content-in`}>
       {/* Cabecera ÚNICA del producto (AppHeader floating): atrás · nombre del viaje
           · menú ⋯. Flota SIEMPRE sobre el contenido (overlay absoluto, layout estable
           entre secciones). Sobre el mapa satélite (Diario) lee con tinta clara + velo;

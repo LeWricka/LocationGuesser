@@ -5,10 +5,18 @@
  * El dueño vio la v1 de solo barras (#547) con datos reales (8 jugadores) y la
  * sintió "pocha, poco visual" — la mecánica es un JUEGO con podio, no una tabla.
  *
- * El oro es EXCLUSIVO del líder (anillo, corona, tarjeta, peana) — nunca
- * decoración genérica. Plata/bronce en el 2º/3º con sus propios colores
- * semánticos. La lista compacta (4º+) sigue el lenguaje Grafito+teal de #547:
- * superficie blanca + hairline suave, acento teal solo en la fila propia.
+ * v7 (issue #831 — rediseño OSCURO e inmersivo): escena `--scene-*` (la misma
+ * de Diario/Bitácora, ver `TripPage.module.css`), no papel. El oro sigue siendo
+ * EXCLUSIVO del líder (anillo, corona, tarjeta, peana) — nunca decoración
+ * genérica. Plata/bronce en el 2º/3º con sus propios colores semánticos (los
+ * tokens `--medal-*` no cambian entre escenas, son un matiz propio, no un
+ * neutro). La lista compacta (4º+) usa superficie/hairline DE ESCENA
+ * (`--scene-surface`/`--scene-hairline`, translúcidos sobre el fondo oscuro en
+ * vez de blanco opaco) y acento teal solo en la fila propia. Sin elevación por
+ * `box-shadow` (esas sombras están calibradas para leer sobre PAPEL claro — en
+ * escena oscura una sombra negra es invisible): el borde + la superficie
+ * translúcida ya dan la separación necesaria, mismo criterio que el resto de
+ * chrome de escena de la app (`GlobeSheet`, `ShellInmersivo`).
  *
  * Motion (issues #546/#594): tarjetas y barras entran escalonadas
  * (--motion-stagger-step vía --i inline); el podio entra en el orden 3º→2º→1º
@@ -27,14 +35,22 @@
  * ancho del bloque entero — en un viewport ancho (tablet, o el "ancho" de la
  * galería) la composición podía leerse pegada a un lado. `margin: 0 auto` sobre
  * un `max-width` fijo la deja centrada siempre, igual que el resto de pantallas
- * de lectura del producto. */
+ * de lectura del producto.
+ *
+ * `--accent-on-scene` (issue #831): el teal de fábrica (`--accent`, calibrado
+ * para leer sobre PAPEL) se apaga demasiado sobre la escena oscura — mismo
+ * cálculo (color-mix con blanco) ya usado para acento sobre escena oscura en
+ * Landing/LandingShowcase. Se define una vez aquí y la usa cualquier texto
+ * teal de este fichero (y de `Camino.module.css`, que redefine la misma idea). */
 .marcador {
+  --accent-on-scene: color-mix(in srgb, var(--accent) 55%, white);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
   width: 100%;
   max-width: 480px;
   margin: 0 auto;
+  color: var(--scene-ink);
 }
 
 /* ───────────────────────── Podio (1º-3º) ───────────────────────── */
@@ -120,23 +136,26 @@
   display: inline-flex;
   border-radius: var(--radius-full);
 }
+/* El "hueco" del anillo (0 0 0 2px) usa `--scene-bg`, no blanco (issue #831):
+ * el avatar se recorta directamente sobre el fondo de escena, así que el gap
+ * debe fundirse con él, no dejar un halo blanco fuera de lugar. */
 .anillo1 {
   transform: scale(1.125);
   box-shadow:
-    0 0 0 2px var(--surface),
+    0 0 0 2px var(--scene-bg),
     0 0 0 4px var(--medal-gold),
     0 0 8px 2px color-mix(in srgb, var(--medal-gold) 45%, transparent);
 }
 .anillo2 {
   transform: scale(0.875);
   box-shadow:
-    0 0 0 2px var(--surface),
+    0 0 0 2px var(--scene-bg),
     0 0 0 3px var(--medal-silver);
 }
 .anillo3 {
   transform: scale(0.875);
   box-shadow:
-    0 0 0 2px var(--surface),
+    0 0 0 2px var(--scene-bg),
     0 0 0 3px var(--medal-bronze);
 }
 
@@ -152,11 +171,12 @@
   width: 64px;
   height: 64px;
   border-radius: var(--radius-full);
-  border: 2px dashed var(--color-border-strong);
-  background: var(--surface);
+  border: 2px dashed var(--scene-hairline);
+  background: var(--scene-surface);
 }
 .avatarHuecoIcono {
-  color: var(--color-text-faint);
+  color: var(--scene-ink-soft);
+  opacity: 0.75;
 }
 
 /* Sin nombre/puntos en el podio vacío (esas filas no existen aún): el premio o
@@ -182,7 +202,7 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
+  color: var(--scene-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -196,7 +216,7 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  color: var(--accent);
+  color: var(--accent-on-scene);
 }
 
 .podioPuntos {
@@ -204,13 +224,13 @@
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
 }
 /* Puntos del líder en acento teal, NO oro: el oro es cromo de medalla (anillo,
  * corona, pedestal), nunca texto — mismo criterio que el podio de temporada
  * (GroupPage.module.css, .placeFirst .podiumPoints). */
 .podio1 .podioPuntos {
-  color: var(--accent);
+  color: var(--accent-on-scene);
 }
 
 /* Chip de premio del puesto (issue #123/#608, rescatado de GroupPage): dato
@@ -227,11 +247,11 @@
   gap: 2px;
   max-width: 100%;
   margin-top: var(--space-1);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
 }
 .podioPremio > svg {
   flex-shrink: 0;
-  color: var(--accent);
+  color: var(--accent-on-scene);
 }
 .podioPremioTexto {
   max-width: 100%;
@@ -255,10 +275,10 @@
   gap: 3px;
   margin-top: var(--space-2);
   padding: 2px var(--space-2);
-  border: 1px dashed var(--accent);
+  border: 1px dashed var(--accent-on-scene);
   border-radius: var(--radius-full);
   background: none;
-  color: var(--accent);
+  color: var(--accent-on-scene);
   font-family: var(--font-sans);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
@@ -266,7 +286,7 @@
   transition: background-color var(--motion-transition-fast);
 }
 .podioPremioCta:hover {
-  background: var(--accent-tint);
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
 }
 .podioPremioCta > svg {
   flex-shrink: 0;
@@ -280,6 +300,7 @@
   background: none;
   padding: 0;
   font: inherit;
+  color: inherit;
   text-align: inherit;
   cursor: pointer;
 }
@@ -297,17 +318,17 @@
   max-width: 100%;
   margin-top: calc(-1 * var(--space-2));
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--hairline-soft);
+  border: 1px solid var(--scene-hairline);
   border-radius: var(--radius-full);
-  background: var(--surface);
-  box-shadow: var(--shadow-xs);
-  color: var(--color-text-muted);
+  background: var(--scene-surface);
+  color: var(--scene-ink-soft);
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
 }
 .marcador .ultimoPill > svg {
   flex-shrink: 0;
-  color: var(--color-text-faint);
+  color: var(--scene-ink-soft);
+  opacity: 0.75;
 }
 .ultimoPillTexto {
   min-width: 0;
@@ -320,7 +341,9 @@
  * dígito bare (issue #608): el icono `Medal` que llevaba antes, a este tamaño y
  * solo dentro de una peana de color, se leía como una carita/avatar fantasma
  * (hallazgo del dueño con datos reales); un "1" bare se había leído como una "I"
- * mayúscula (issue #594). El símbolo de grado (º) desambigua ambos casos.
+ * mayúscula (issue #594). El símbolo de grado (º) desambigua ambos casos. Los
+ * tokens `--medal-*` (borde/tinte) no cambian entre escenas — el tinte de color
+ * ya lee bien sobre fondo oscuro sin retocarlo (issue #831).
  */
 .podioPeana {
   display: flex;
@@ -329,7 +352,7 @@
   width: 100%;
   margin-top: var(--space-2);
   border-radius: var(--radius-md);
-  border: 1px solid var(--hairline-soft);
+  border: 1px solid var(--scene-hairline);
 }
 
 .podioPeanaTexto {
@@ -387,17 +410,18 @@
 }
 
 /* Fila de clasificación: parte superior (posición/avatar/info/puntos) + barra
- * de puntuación a todo el ancho debajo. */
+ * de puntuación a todo el ancho debajo. Superficie/hairline DE ESCENA (issue
+ * #831): translúcida sobre el fondo oscuro, no la tarjeta blanca opaca de
+ * antes — sin `box-shadow` (calibrada para leer sobre papel, invisible aquí). */
 .fila {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
-  background: var(--surface);
+  background: var(--scene-surface);
   border-radius: var(--radius-md);
-  border: 1px solid var(--hairline-soft);
-  box-shadow: var(--shadow-xs);
-  transition: box-shadow var(--motion-transition-fast);
+  border: 1px solid var(--scene-hairline);
+  transition: border-color var(--motion-transition-fast);
   animation: mt-fila-entra var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
   animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
 }
@@ -418,10 +442,13 @@
   gap: var(--space-3);
 }
 
-/* Fila del usuario actual: borde teal + fondo teal tenue (acento en detalle). */
+/* Fila del usuario actual: borde teal + fondo teal tenue (acento en detalle).
+ * `color-mix` en vez de `--accent-tint` (issue #831): ese token es un tinte
+ * PAPEL (casi blanco) — sobre escena oscura leería como un bloque claro fuera
+ * de lugar; mezclado con transparente en vez de blanco, el tinte queda oscuro. */
 .fila.miPosicion {
   border-color: var(--accent);
-  background: var(--accent-tint);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
 /* Posición: nº en sans, tinta suave. Ancho fijo para alinear el contenido
@@ -435,7 +462,7 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
   text-align: center;
 }
 
@@ -449,7 +476,7 @@
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-medium);
-  color: var(--color-text);
+  color: var(--scene-ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -458,7 +485,7 @@
 .partidas {
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
 }
 
 /* Chip de premio del puesto (issue #123/#608, rescatado de GroupPage): dato
@@ -472,12 +499,12 @@
   margin-top: 2px;
   font-family: var(--font-sans);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
 }
 .filaPremio > svg {
   flex-shrink: 0;
   align-self: center;
-  color: var(--accent);
+  color: var(--accent-on-scene);
 }
 .filaPremioLabel {
   flex-shrink: 0;
@@ -489,22 +516,22 @@
 .filaPremioTexto {
   min-width: 0;
   font-weight: var(--font-weight-medium);
-  color: var(--color-text);
+  color: var(--scene-ink);
 }
 
-/* Puntos: teal en la fila propia; grafito para el resto. */
+/* Puntos: teal en la fila propia; tinta de escena para el resto. */
 .puntos {
   flex-shrink: 0;
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
 }
 
 .fila.miPosicion .puntos,
 .fila .puntos.destaca {
-  color: var(--accent);
+  color: var(--accent-on-scene);
 }
 
 /* Barra de puntuación: proporcional al líder del viaje (100%), resto relativo.
@@ -513,7 +540,7 @@
 .barraTrack {
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--hairline-soft);
+  background: var(--scene-hairline);
   overflow: hidden;
 }
 
@@ -543,12 +570,15 @@
 .vacio {
   text-align: center;
   padding: var(--space-4) var(--space-4) 0;
-  color: var(--color-text-muted);
+  color: var(--scene-ink-soft);
   font-family: var(--font-sans);
   font-size: var(--font-size-md);
 }
 
-/* Acciones del vacío: invitar (siempre) + crear un reto (solo dueño). */
+/* Acciones del vacío: invitar (siempre) + crear un reto (solo dueño). Los
+ * botones del UI kit (`Button`) no son conscientes de la escena a propósito
+ * (son opacos siempre, no chrome translúcido) — leen bien sobre cualquier
+ * fondo, como el resto de CTAs de la app sobre foto/mapa. */
 .vacioAcciones {
   display: flex;
   justify-content: center;
@@ -565,107 +595,4 @@
   .barraFill {
     animation: none;
   }
-}
-
-/* ───────────────────── Retos anteriores (issue #608) ───────────────────── */
-
-.anteriores {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.anterioresTitulo {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text);
-}
-
-.anterioresLista {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  /* Los otros `<ol>` de este fichero (.podio, .lista) suprimen el marcador porque
-   * ponen `display:flex` en el propio <li>; aquí el flex vive en el <button> de
-   * dentro, así que el <li> se queda en su `display:list-item` por defecto y el
-   * navegador pintaba "1." "2." delante de cada fila. */
-  list-style: none;
-}
-
-/* Fila-botón: pulsable entera (tap abre el detalle del reto por su hash). Foto
- * miniatura + texto en fila (issue #753: la fila era texto plano; el reto
- * "casi siempre" tiene foto real, así que la miniatura la vende de un vistazo).
- * `ChallengePhoto` ya trae su propio placeholder de marca cuando no hay foto —
- * nunca un icono de "imagen rota". */
-.anteriorFila {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-2);
-  background: var(--surface);
-  border: 1px solid var(--hairline-soft);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-xs);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: box-shadow var(--motion-transition-fast);
-}
-.anteriorFila:hover {
-  box-shadow: var(--shadow-sm);
-}
-
-/* Miniatura fija (72px, `ChallengePhoto` size="sm"): no crece con el ancho de
- * la fila, el texto ocupa el resto. */
-.anteriorFoto {
-  flex-shrink: 0;
-}
-
-.anteriorTexto {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-/* Título + chip "EN JUEGO" (issue #800): en fila, el chip se envuelve a su
- * propia línea si el título es largo (`flex-wrap`) — nunca recorta el título. */
-.anteriorTituloFila {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-2);
-}
-
-.anteriorTitulo {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text);
-}
-
-.anteriorBadge {
-  flex-shrink: 0;
-}
-
-.anteriorGanador,
-.anteriorResultado {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-/* Aviso anti-trampa (issue #200, rescatado de GroupPage:965/1230): icono
- * discreto con title+aria-label — nunca solo color (no depende de verlo). */
-.leftAppFlag {
-  display: inline-flex;
-  flex-shrink: 0;
-  color: var(--color-danger);
-  cursor: help;
 }

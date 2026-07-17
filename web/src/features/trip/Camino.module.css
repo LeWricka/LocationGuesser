@@ -1,0 +1,334 @@
+/*
+ * "El camino" (issue #831) — ruta dorada vertical y cronológica de los retos
+ * del viaje, del más nuevo al más viejo. Sustituye a la antigua sección "Retos
+ * anteriores" (issue #608): mismo dato, presentado como un RECORRIDO (línea +
+ * hitos), no una lista administrativa. Vive en la escena OSCURA del Marcador
+ * (tokens `--scene-*`/`--route-gold`, ver MarcadorTab.module.css).
+ *
+ * Motion: cada hito entra al hacerse visible (IntersectionObserver en el TSX,
+ * mismo patrón que `HowItWorksImmersive`) con un stagger corto entre los
+ * primeros (`--i`, capado a 6 — un camino largo no debe tardar segundos en
+ * revelar sus últimos hitos la primera vez que aparecen en pantalla).
+ * `animation-fill-mode: backwards` (nunca `both`): ver el gotcha documentado en
+ * MarcadorTab.module.css (un transform final "pegado" crea un stacking context
+ * que ya tapó un popover en otra pantalla).
+ */
+
+.camino {
+  /* Mismo cálculo que `.marcador` en MarcadorTab.module.css (issue #831): el
+   * teal de fábrica se apaga sobre escena oscura; ambos ficheros lo redefinen
+   * en vez de compartir un import porque son CSS Modules independientes. */
+  --accent-on-scene: color-mix(in srgb, var(--accent) 55%, white);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+}
+
+.cabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--scene-ink);
+}
+
+.linea {
+  flex: 1;
+  height: 1px;
+  background: var(--scene-hairline);
+}
+
+.subtitulo {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--scene-ink-soft);
+}
+
+/* ───────────────────────── La ruta (línea + hitos) ───────────────────────── */
+
+.ruta {
+  position: relative;
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 52px;
+}
+
+/* Trazo dorado del recorrido: se desvanece hacia el hito más antiguo (todavía
+ * "por descubrir" en un viaje que sigue). Glow suave para que lea como un
+ * camino iluminado, no una regla técnica. */
+.ruta::before {
+  content: '';
+  position: absolute;
+  left: 19px;
+  top: 6px;
+  bottom: 26px;
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(
+    to bottom,
+    var(--route-gold) 0%,
+    var(--route-gold) 60%,
+    var(--route-gold-soft) 100%
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--route-gold) 35%, transparent);
+}
+
+.hito {
+  position: relative;
+  margin-bottom: var(--space-4);
+  opacity: 0;
+  transform: translateY(16px);
+}
+.hitoIn {
+  animation: mt-hito-entra var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
+  animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
+}
+@keyframes mt-hito-entra {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Nodo del hito: disco sobre la línea. Cerrado = trofeo dorado (el reto ya se
+ * decidió); EN JUEGO = disco rojo con pulso (issue #611-style: información de
+ * estado, no decoración — mismo criterio que Badge tone="live"). */
+.node {
+  position: absolute;
+  left: -45px;
+  top: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--scene-bg);
+  /* design-lint-allow: capa local del hito (el nodo debe quedar sobre la línea del camino) */
+  z-index: 1;
+}
+.nodeClosed {
+  background: var(--medal-gold);
+  color: var(--medal-on-gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--medal-gold) 45%, transparent);
+}
+.nodeIcon {
+  flex-shrink: 0;
+}
+.nodeLive {
+  background: var(--color-danger);
+  color: var(--color-on-photo);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-danger) 40%, transparent);
+}
+.nodeDot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  animation: mt-node-pulse 1.6s ease-in-out infinite; /* design-lint-allow: pulso de estado "en vivo" (no decorativo), mismo patrón que Badge tone="live" */
+}
+.nodeDot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  animation: mt-node-ping 1.6s var(--motion-ease-emphasized) infinite; /* design-lint-allow: onda "radar" del estado en vivo, mismo patrón que Badge tone="live" */
+}
+@keyframes mt-node-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+}
+@keyframes mt-node-ping {
+  0% {
+    opacity: 0.5;
+    transform: scale(0.6);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+}
+
+.fecha {
+  margin: 0 0 var(--space-1) 2px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+  text-transform: uppercase;
+  color: var(--scene-ink-soft);
+  opacity: 0.75;
+}
+
+/* ───────────────────────── Tarjeta del hito ───────────────────────── */
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2);
+  border: 1px solid var(--scene-hairline);
+  border-radius: var(--radius-md);
+  background: var(--scene-surface);
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color var(--motion-transition-fast);
+}
+.card:hover {
+  border-color: var(--glass-border);
+}
+.card:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Hito EN JUEGO: tinte de "estado vivo" (mismo tono que el nodo/badge). */
+.cardLive {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 9%, transparent);
+}
+
+.foto {
+  flex-shrink: 0;
+}
+
+.cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pregunta {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  color: var(--scene-ink);
+}
+
+.pill {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+}
+
+/* CTA "Adivina"/"Ver mi apuesta": puramente visual (el `<button>` es la
+ * tarjeta entera) — mismo criterio que el resto de chips no-tappables. */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  margin-top: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.cta > svg {
+  flex-shrink: 0;
+}
+
+.winnerRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+.winnerAvatar {
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1px var(--route-gold-soft);
+}
+.winnerTexto {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--scene-ink-soft);
+}
+.winnerTexto b {
+  color: var(--route-gold);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mineTexto {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--scene-ink-soft);
+}
+.mineTexto b {
+  color: var(--accent-on-scene);
+  font-weight: var(--font-weight-semibold);
+}
+.mineGane b {
+  color: var(--route-gold);
+}
+.mineTrofeo {
+  margin-left: 3px;
+  color: var(--route-gold);
+}
+
+.chev {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--scene-ink-soft);
+  opacity: 0.7;
+}
+
+/* Aviso anti-trampa (issue #200): icono discreto con title+aria-label — nunca
+ * solo color. */
+.leftAppFlag {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-danger);
+  cursor: help;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hito {
+    opacity: 1;
+    transform: none;
+  }
+  .hitoIn {
+    animation: none;
+  }
+  .nodeDot,
+  .nodeDot::after {
+    animation: none;
+  }
+  .nodeDot::after {
+    display: none;
+  }
+}
