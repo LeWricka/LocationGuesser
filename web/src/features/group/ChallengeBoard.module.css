@@ -221,3 +221,8 @@
 .dark .boardTime {
   color: var(--scene-ink-soft);
 }
+/* El acento teal profundo no contrasta sobre la escena oscura (axe serious):
+ * se aclara con la misma fórmula que Landing/Marcador usan sobre escena. */
+.dark .boardMeTag {
+  color: color-mix(in srgb, var(--accent) 55%, white);
+}
