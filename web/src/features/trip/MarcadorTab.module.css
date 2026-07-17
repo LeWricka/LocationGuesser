@@ -370,7 +370,9 @@
 }
 .podio3 .podioPeanaTexto {
   font-size: var(--font-size-md);
-  color: var(--medal-bronze);
+  /* El bronce puro no llega al ratio de contraste sobre la escena oscura
+   * (axe serious): se aclara solo el texto; peana y anillo siguen en bronce. */
+  color: color-mix(in srgb, var(--medal-bronze) 60%, white);
 }
 
 .podio1 .podioPeana {
