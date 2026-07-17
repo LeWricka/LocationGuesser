@@ -1,23 +1,17 @@
-// Prueba el flujo de auto-apply del update de PWA (#555 → #633 → #647): el
-// guard de ruta segura (`lib/safeUpdateRoute.ts`) debe cortar el auto-apply por
-// `visibilitychange` cuando el usuario está en una ruta no segura, y el
-// `hashchange` debe aplicarlo en cuanto navega a una ruta segura. El resto del
-// entrypoint (App, UI, analítica…) se mockea: no es lo que este test verifica.
+// Prueba el flujo de auto-apply del update de PWA (#555 → #633 → #647 → #819):
+// el guard de ruta segura (`lib/safeUpdateRoute.ts`) debe cortar el auto-apply
+// por `visibilitychange` cuando el usuario está en una ruta no segura, y solo
+// aplicar tras el retardo de ausencia real en rutas seguras (#819 retiró el
+// banner "Actualizar" y su gate por `hashchange`: sin banner, la actualización
+// pendiente en una ruta no segura solo se aplica cuando el usuario navega a
+// una segura Y oculta la pestaña, no antes). El resto del entrypoint (App, UI,
+// analítica…) se mockea: no es lo que este test verifica.
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { ReactNode } from 'react'
 
 vi.mock('./App.tsx', () => ({ default: () => null }))
-// Capturamos las props del último render (issue #810): los tests del cierre
-// invocan `onDismiss` directamente, igual que `onNeedRefresh` más abajo, sin
-// depender de testing-library sobre un `createRoot` manual.
-type UpdateBannerProps = { onUpdate: () => void; onDismiss: () => void }
-let lastUpdateBannerProps: UpdateBannerProps | null = null
 vi.mock('./ui', () => ({
   ToastProvider: ({ children }: { children: ReactNode }) => children,
-  UpdateBanner: (props: UpdateBannerProps) => {
-    lastUpdateBannerProps = props
-    return null
-  },
 }))
 vi.mock('./lib/RootErrorBoundary', () => ({
   RootErrorBoundary: ({ children }: { children: ReactNode }) => children,
@@ -84,13 +78,16 @@ if (!('serviceWorker' in navigator)) {
 }
 
 // Cada `loadMain()` (uno por test, tras `vi.resetModules()`) vuelve a ejecutar
-// `main.tsx` y por tanto vuelve a registrar los listeners de `visibilitychange`
-// y `hashchange` en el `document`/`window` REALES de jsdom (compartidos entre
-// tests del mismo fichero). Sin limpiarlos, se ACUMULAN: un test posterior
-// dispararía también los listeners de instancias de módulo de tests
-// anteriores (con su propio `updateAvailable` cerrado sobre el mismo
-// `updateSWMock` compartido), contando llamadas de más. Capturamos los
-// handlers añadidos para poder retirarlos en `afterEach`.
+// `main.tsx` y por tanto vuelve a registrar el listener de `visibilitychange`
+// en el `document` REAL de jsdom (compartido entre tests del mismo fichero).
+// Sin limpiarlo, se ACUMULA: un test posterior dispararía también los
+// listeners de instancias de módulo de tests anteriores (con su propio
+// `updateAvailable` cerrado sobre el mismo `updateSWMock` compartido),
+// contando llamadas de más. Capturamos los handlers añadidos para poder
+// retirarlos en `afterEach`. `addedHashHandlers` se mantiene por si acaso
+// (main.tsx no registra hoy ningún `hashchange` — #819 retiró el que existía
+// solo para el gate del banner — pero el spy no molesta si el array queda
+// vacío).
 const originalDocAddEventListener = document.addEventListener.bind(document)
 const originalWinAddEventListener = window.addEventListener.bind(window)
 let addedVisibilityHandlers: EventListenerOrEventListenerObject[] = []
@@ -118,7 +115,6 @@ describe('main: auto-apply del update de PWA en rutas seguras (#647)', () => {
     reportSilentWarningMock.mockClear()
     registerSWOptions = {}
     onNeedRefresh = () => {}
-    lastUpdateBannerProps = null
     sessionStorage.clear() // guard de #761 (shouldReloadOnPreloadError): aislar cada test
 
     addedVisibilityHandlers = []
@@ -185,141 +181,6 @@ describe('main: auto-apply del update de PWA en rutas seguras (#647)', () => {
     vi.advanceTimersByTime(10 * 60_000)
 
     expect(updateSWMock).not.toHaveBeenCalled()
-  })
-
-  test('hashchange a ruta segura NO aplica solo: enseña la pastilla y decide el usuario', async () => {
-    setHash('#nuevo')
-    await loadMain()
-    setHidden(true)
-    onNeedRefresh()
-
-    // Oculta en ruta no segura: ni al instante ni tras el retardo.
-    document.dispatchEvent(new Event('visibilitychange'))
-    vi.advanceTimersByTime(5 * 60_000)
-    expect(updateSWMock).not.toHaveBeenCalled()
-
-    // Navega a una ruta segura: antes (#647) esto recargaba en la cara del
-    // usuario ("volver atrás" = refresco); ahora solo muestra la pastilla.
-    setHash('#g=abc123')
-    window.dispatchEvent(new Event('hashchange'))
-    expect(updateSWMock).not.toHaveBeenCalled()
-    expect(document.getElementById('update-banner-root')).not.toBeNull()
-  })
-
-  test('hashchange a ruta NO segura no aplica', async () => {
-    setHash('#g=abc123')
-    await loadMain()
-    onNeedRefresh()
-
-    setHash('#g=abc123&add=recuerdo')
-    window.dispatchEvent(new Event('hashchange'))
-
-    expect(updateSWMock).not.toHaveBeenCalled()
-  })
-})
-
-describe('main: el banner de actualización no interrumpe un reto en marcha (#810, caso Nerea)', () => {
-  beforeEach(() => {
-    vi.resetModules()
-    vi.useFakeTimers()
-    document.body.innerHTML = ''
-    setHidden(false)
-    window.location.hash = ''
-    updateSWMock.mockClear()
-    onNeedRefresh = () => {}
-    lastUpdateBannerProps = null
-    sessionStorage.clear()
-
-    addedVisibilityHandlers = []
-    addedHashHandlers = []
-    addedPreloadErrorHandlers = []
-    vi.spyOn(document, 'addEventListener').mockImplementation((type, handler, options) => {
-      if (type === 'visibilitychange') addedVisibilityHandlers.push(handler as EventListener)
-      originalDocAddEventListener(type, handler, options)
-    })
-    vi.spyOn(window, 'addEventListener').mockImplementation((type, handler, options) => {
-      if (type === 'hashchange') addedHashHandlers.push(handler as EventListener)
-      if (type === 'vite:preloadError') addedPreloadErrorHandlers.push(handler as EventListener)
-      originalWinAddEventListener(type, handler, options)
-    })
-  })
-
-  afterEach(() => {
-    addedVisibilityHandlers.forEach((h) => document.removeEventListener('visibilitychange', h))
-    addedHashHandlers.forEach((h) => window.removeEventListener('hashchange', h))
-    addedPreloadErrorHandlers.forEach((h) => window.removeEventListener('vite:preloadError', h))
-    vi.restoreAllMocks()
-    vi.useRealTimers()
-  })
-
-  test('con un reto abierto (c= en el hash) el banner NO se pinta al detectar versión nueva', async () => {
-    setHash('#g=abc123&c=reto1')
-    await loadMain()
-
-    onNeedRefresh() // versión pendiente detectada mientras se está JUGANDO
-
-    expect(document.getElementById('update-banner-root')).toBeNull()
-  })
-
-  test('al salir del reto (hashchange a ruta segura) el banner aparece si sigue pendiente', async () => {
-    setHash('#g=abc123&c=reto1')
-    await loadMain()
-    onNeedRefresh()
-    expect(document.getElementById('update-banner-root')).toBeNull()
-
-    // Termina el reto y vuelve al diario del viaje (ruta segura, sin `c=`).
-    setHash('#g=abc123')
-    window.dispatchEvent(new Event('hashchange'))
-
-    expect(document.getElementById('update-banner-root')).not.toBeNull()
-  })
-
-  test('si el banner ya estaba visible y se entra a jugar un reto, se retira', async () => {
-    setHash('#g=abc123')
-    await loadMain()
-    onNeedRefresh() // ruta segura y visible: el banner aparece
-    expect(document.getElementById('update-banner-root')).not.toBeNull()
-
-    // Abre un reto desde el diario: el banner no puede convivir con la partida.
-    setHash('#g=abc123&c=reto1')
-    window.dispatchEvent(new Event('hashchange'))
-
-    expect(document.getElementById('update-banner-root')).toBeNull()
-  })
-
-  test('el botón ✕ descarta la versión pendiente: no reaparece por hashchange, sí con una versión nueva', async () => {
-    setHash('#g=abc123')
-    await loadMain()
-    onNeedRefresh()
-    expect(document.getElementById('update-banner-root')).not.toBeNull()
-
-    // Descarta (equivalente a pulsar ✕ en el banner real).
-    lastUpdateBannerProps?.onDismiss()
-    expect(document.getElementById('update-banner-root')).toBeNull()
-
-    // Navegar entre rutas seguras NO la resucita: fue un descarte explícito.
-    setHash('#g=abc123&v=marcador')
-    window.dispatchEvent(new Event('hashchange'))
-    expect(document.getElementById('update-banner-root')).toBeNull()
-
-    // Pero si el sondeo detecta OTRA versión más nueva, sí puede volver a salir.
-    onNeedRefresh()
-    expect(document.getElementById('update-banner-root')).not.toBeNull()
-  })
-
-  test('descartar el banner no cancela la aplicación silenciosa al ocultar la pestaña', async () => {
-    setHash('#g=abc123')
-    await loadMain()
-    onNeedRefresh()
-    lastUpdateBannerProps?.onDismiss()
-
-    setHidden(true)
-    document.dispatchEvent(new Event('visibilitychange'))
-    vi.advanceTimersByTime(5 * 60_000)
-
-    // El contrato de #549/#647 sigue intacto: descartar el AVISO no descarta la
-    // ACTUALIZACIÓN — se sigue aplicando sola tras el retardo de ausencia real.
-    expect(updateSWMock).toHaveBeenCalledTimes(1)
   })
 })
 
