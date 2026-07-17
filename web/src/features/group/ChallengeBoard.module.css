@@ -45,19 +45,47 @@
   margin: 0;
 }
 
+/* Fila-BOTÓN (issue #824, tocar selecciona su pin en el mapa): reset de los
+   estilos nativos de <button> (appearance/font/texto) para que se vea IGUAL
+   que la fila estática de antes, más el affordance de interactividad. */
 .boardRow {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--surface);
   border: 1px solid var(--hairline-soft);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-xs);
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+.boardRow:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 .boardRowMine {
   border-color: var(--accent);
   background: var(--accent-tint);
+}
+
+/* Fila SELECCIONADA (issue #824): anillo de acento por encima de cualquier
+   otro estado (incluida `.boardRowMine`) para que "seleccionado" se lea
+   siempre, sea o no tu propia fila. */
+.boardRowSelected {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  box-shadow:
+    0 0 0 2px var(--accent),
+    var(--shadow-xs);
 }
 
 .boardRank {

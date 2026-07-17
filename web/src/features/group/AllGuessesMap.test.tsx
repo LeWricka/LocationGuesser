@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeAll, afterAll } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { AllGuessesMap, type GuessMarker } from './AllGuessesMap'
+import { PIN_SIZE } from '../../lib/avatarPin'
 
 // `answerIcon`/`guessIcon` construyen `google.maps.Size`/`Point` (namespace real
 // del SDK, no disponible en jsdom) — mismo motivo que `streetview.test.ts`:
@@ -31,8 +32,9 @@ interface MockMapProps {
   children?: ReactNode
 }
 interface MockMarkerProps {
-  icon?: { url: string }
+  icon?: { url: string; scaledSize?: { width: number; height: number } }
   title?: string
+  zIndex?: number
 }
 interface MockPolylineProps {
   strokeColor?: string
@@ -45,8 +47,14 @@ vi.mock('@vis.gl/react-google-maps', () => ({
       {children}
     </div>
   ),
-  Marker: ({ icon, title }: MockMarkerProps) => (
-    <div data-testid="marker" data-title={title} data-icon={icon?.url} />
+  Marker: ({ icon, title, zIndex }: MockMarkerProps) => (
+    <div
+      data-testid="marker"
+      data-title={title}
+      data-icon={icon?.url}
+      data-icon-width={icon?.scaledSize?.width}
+      data-z-index={zIndex}
+    />
   ),
   Polyline: ({ strokeColor, strokeWeight, strokeOpacity }: MockPolylineProps) => (
     <div
@@ -135,6 +143,47 @@ describe('AllGuessesMap', () => {
         Number(other!.getAttribute('data-weight')),
       )
       expect(Number(other!.getAttribute('data-opacity'))).toBeLessThan(0.5)
+    })
+  })
+
+  // Issue #824: tocar una fila de ChallengeBoard resalta su pin aquí.
+  describe('selectedUserId (issue #824)', () => {
+    test('sin selección, ningún pin lleva zIndex propio', () => {
+      const guesses = [guess({ userId: 'a', name: 'Ana' }), guess({ userId: 'b', name: 'Bea' })]
+      render(<AllGuessesMap answer={answer} guesses={guesses} />)
+      for (const m of screen.getAllByTestId('marker')) {
+        expect(m).not.toHaveAttribute('data-z-index')
+      }
+    })
+
+    test('el pin seleccionado lleva zIndex por encima y un icono más grande', () => {
+      const guesses = [guess({ userId: 'a', name: 'Ana' }), guess({ userId: 'b', name: 'Bea' })]
+      render(<AllGuessesMap answer={answer} guesses={guesses} selectedUserId="a" />)
+      const markers = screen.getAllByTestId('marker')
+      const selected = markers.find((m) => m.getAttribute('data-title') === 'Ana')
+      const other = markers.find((m) => m.getAttribute('data-title') === 'Bea')
+      expect(selected).toHaveAttribute('data-z-index', '1000')
+      expect(other).not.toHaveAttribute('data-z-index')
+      expect(Number(selected!.getAttribute('data-icon-width'))).toBeGreaterThan(PIN_SIZE.width)
+      expect(Number(other!.getAttribute('data-icon-width'))).toBe(PIN_SIZE.width)
+    })
+
+    test('el icono del pin seleccionado lleva el halo de acento', () => {
+      const guesses = [guess({ userId: 'a', name: 'Ana' })]
+      render(<AllGuessesMap answer={answer} guesses={guesses} selectedUserId="a" />)
+      const marker = screen
+        .getAllByTestId('marker')
+        .find((m) => m.getAttribute('data-title') === 'Ana')
+      const icon = decodeURIComponent(marker!.getAttribute('data-icon') ?? '')
+      expect(icon).toContain('#0f766e')
+    })
+
+    test('selectedUserId que no juega: no revienta, ningún pin resaltado', () => {
+      const guesses = [guess({ userId: 'a', name: 'Ana' })]
+      render(<AllGuessesMap answer={answer} guesses={guesses} selectedUserId="fantasma" />)
+      for (const m of screen.getAllByTestId('marker')) {
+        expect(m).not.toHaveAttribute('data-z-index')
+      }
     })
   })
 })

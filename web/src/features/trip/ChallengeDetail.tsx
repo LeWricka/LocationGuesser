@@ -77,6 +77,9 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
   const [numberAnswer, setNumberAnswer] = useState<number | null>(null)
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [creatorName, setCreatorName] = useState<string | null>(null)
+  // Selección fila↔pin (issue #824): vive aquí (el padre de ambas superficies,
+  // tabla y mapa) y baja como `selectedUserId` a las dos.
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -85,6 +88,9 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
     // llega el nuevo fetch. No es un bucle: corre una vez por cambio de id.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setPhase('loading')
+    // La selección fila↔pin (issue #824) es del reto anterior; un userId de
+    // otro reto no significa nada aquí.
+    setSelectedUserId(null)
 
     void (async () => {
       try {
@@ -249,6 +255,7 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
                     answer={answer}
                     guesses={guesses}
                     meUserId={myUserId ?? undefined}
+                    selectedUserId={selectedUserId}
                   />
                 ) : (
                   <div className={styles.mapPending}>
@@ -270,6 +277,8 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
               numberUnit={challenge.number_unit}
               emptyLabel={closed ? 'Se cerró sin votos.' : 'Nadie ha jugado todavía.'}
               className={styles.board}
+              selectedUserId={selectedUserId}
+              onSelectUser={setSelectedUserId}
             />
           </>
         )}

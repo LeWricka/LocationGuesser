@@ -1,5 +1,15 @@
 import { describe, test, expect } from 'vitest'
-import { PIN_ANCHOR, PIN_SIZE, avatarPinFromProfile, avatarPinSvg, targetPinSvg } from './avatarPin'
+import {
+  PIN_ANCHOR,
+  PIN_SIZE,
+  SELECTED_PIN_ANCHOR,
+  SELECTED_PIN_SIZE,
+  avatarPinFromProfile,
+  avatarPinFromProfileSelected,
+  avatarPinSvg,
+  avatarPinSvgSelected,
+  targetPinSvg,
+} from './avatarPin'
 import { avatarToken, canonicalEmoji, svgForEmoji } from './avatar'
 
 function decode(uri: string): string {
@@ -111,6 +121,66 @@ describe('avatarPinFromProfile', () => {
     const own = decode(avatarPinFromProfile(avatarToken('🦊'), 'user-1', true))
     expect(normal).toContain('#ffffff')
     expect(own).toContain('#0f766e')
+  })
+})
+
+// Issue #824: pin SELECCIONADO desde `ChallengeBoard` — halo de acento +
+// lienzo mayor para que quepa sin recortarse.
+describe('avatarPinSvgSelected', () => {
+  test('devuelve un data-URI de SVG en el lienzo SELECTED_PIN_SIZE (mayor que el normal)', () => {
+    const svg = decode(avatarPinSvgSelected('🦊'))
+    expect(svg).toContain(`width="${SELECTED_PIN_SIZE.width}"`)
+    expect(svg).toContain(`height="${SELECTED_PIN_SIZE.height}"`)
+    expect(SELECTED_PIN_SIZE.width).toBeGreaterThan(PIN_SIZE.width)
+    expect(SELECTED_PIN_SIZE.height).toBeGreaterThan(PIN_SIZE.height)
+  })
+
+  test('lleva el anillo acento (mismo que el pin "propio"), no el blanco por defecto', () => {
+    const svg = decode(avatarPinSvgSelected('🦊'))
+    expect(svg).toContain('#0f766e')
+  })
+
+  test('incrusta el dibujo de línea del animal, no el emoji', () => {
+    const svg = decode(avatarPinSvgSelected('🦊'))
+    expect(svg).not.toContain('<text')
+    expect(svg).not.toContain('🦊')
+    expect(svg).toContain('M4 6l5 4 3-1 3 1 5-4-1 7')
+  })
+
+  test('sin rank, no dibuja badge de puesto; con rank, sí', () => {
+    expect(decode(avatarPinSvgSelected('🦊'))).not.toContain('#c9a24b')
+    expect(decode(avatarPinSvgSelected('🦊', 1))).toContain('#c9a24b')
+  })
+
+  test('el data-URI no contiene caracteres que lo rompan sin codificar', () => {
+    const uri = avatarPinSvgSelected('🦊')
+    const sinPrefijo = uri.slice('data:image/svg+xml,'.length)
+    expect(sinPrefijo).not.toMatch(/[#<>]/)
+  })
+
+  test('SELECTED_PIN_ANCHOR es PIN_ANCHOR desplazado por el margen del halo', () => {
+    const pad = SELECTED_PIN_SIZE.width - PIN_SIZE.width
+    expect(SELECTED_PIN_ANCHOR.x).toBe(PIN_ANCHOR.x + pad / 2)
+    expect(SELECTED_PIN_ANCHOR.y).toBe(PIN_ANCHOR.y + pad / 2)
+  })
+})
+
+describe('avatarPinFromProfileSelected', () => {
+  test('token del set → pin seleccionado con ese animal', () => {
+    const uri = avatarPinFromProfileSelected(avatarToken('🦊'), 'user-1')
+    expect(uri).toBe(avatarPinSvgSelected('🦊'))
+  })
+
+  test('null → cae al animal por defecto del id (estable)', () => {
+    const a = avatarPinFromProfileSelected(null, 'user-1')
+    const b = avatarPinFromProfileSelected(null, 'user-1')
+    expect(a).toBe(b)
+    expect(a.startsWith('data:image/svg+xml,')).toBe(true)
+  })
+
+  test('propaga el rank al badge de puesto', () => {
+    const uri = avatarPinFromProfileSelected(avatarToken('🦊'), 'user-1', 2)
+    expect(decode(uri)).toContain('#a9a39a') // plata
   })
 })
 

@@ -141,10 +141,17 @@ function iconGroup(pathMarkup: string, color: string): string {
   )
 }
 
-function wrapSvg(body: string): string {
+// `width`/`height` por defecto = `PIN_SIZE` (el pin normal); el pin SELECCIONADO
+// (issue #824, ver `avatarPinSvgSelected` más abajo) necesita un lienzo mayor
+// para caber el halo de acento sin recortarse, así que los parametrizamos.
+function wrapSvg(
+  body: string,
+  width: number = PIN_SIZE.width,
+  height: number = PIN_SIZE.height,
+): string {
   const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${PIN_SIZE.width}" height="${PIN_SIZE.height}" ` +
-    `viewBox="0 0 ${PIN_SIZE.width} ${PIN_SIZE.height}">${body}</svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" ` +
+    `viewBox="0 0 ${width} ${height}">${body}</svg>`
   return `data:image/svg+xml,${encodeURIComponent(svg)}`
 }
 
@@ -174,6 +181,68 @@ export function avatarPinSvg(
       discSvg(AVATAR_FILL, ringColor) +
       iconGroup(path, AVATAR_ICON) +
       (rank != null ? rankBadgeSvg(rank) : ''),
+  )
+}
+
+// ── Pin SELECCIONADO (issue #824) ──────────────────────────────────────────
+// Al tocar una fila de `ChallengeBoard`, su pin debe "sobresalir" en
+// `AllGuessesMap`: halo de acento alrededor del disco (esta variante) + escala
+// mayor + z-index por encima (eso lo aplica el LLAMANTE vía `scaledSize`/
+// `zIndex` del Marker — Google admite servir un icono a un tamaño distinto del
+// intrínseco, así que no hace falta otra copia del SVG solo para "más grande").
+//
+// `HALO_PAD` amplía el lienzo por los 4 lados para que el halo no se recorte
+// contra el borde (el lienzo normal solo tiene margen de sobra para el badge
+// de puesto, arriba-derecha). Toda la geometría existente (tail/disc/icono/
+// badge) se reutiliza tal cual, solo desplazada `HALO_PAD` px para centrarse
+// en el lienzo más grande — nada de recalcular CX/CY a mano.
+const HALO_PAD = 7
+const HALO_R = DISC_R + RING_W / 2 + 5 // borde del disco + unos px de resplandor
+const HALO_COLOR = RING_ACTIVE // mismo acento que el anillo "propio"/"activo"
+
+/** Tamaño del pin SELECCIONADO (issue #824): mayor que `PIN_SIZE` para caber el
+ * halo de acento. Úsalo en `scaledSize`/`anchor` del Marker en vez de `PIN_SIZE`
+ * cuando el pin esté resaltado — el llamante puede además multiplicarlo por un
+ * factor de escala extra (Google escala el icono al tamaño que se le pida). */
+export const SELECTED_PIN_SIZE = {
+  width: PIN_SIZE.width + HALO_PAD * 2,
+  height: PIN_SIZE.height + HALO_PAD * 2,
+} as const
+
+/** Ancla del pin SELECCIONADO: la misma punta que `PIN_ANCHOR`, desplazada por
+ * el `HALO_PAD` del lienzo mayor. */
+export const SELECTED_PIN_ANCHOR = {
+  x: PIN_ANCHOR.x + HALO_PAD,
+  y: PIN_ANCHOR.y + HALO_PAD,
+} as const
+
+function haloSvg(): string {
+  // Anillo suelto + relleno muy tenue: se lee como un resplandor, no como un
+  // segundo disco sólido compitiendo con el propio pin.
+  return (
+    `<circle cx="${CX}" cy="${CY}" r="${HALO_R}" fill="${HALO_COLOR}" fill-opacity="0.16"/>` +
+    `<circle cx="${CX}" cy="${CY}" r="${HALO_R}" fill="none" stroke="${HALO_COLOR}" stroke-width="2.5" stroke-opacity="0.55"/>`
+  )
+}
+
+/**
+ * SVG del pin SELECCIONADO (issue #824): mismo dibujo que `avatarPinSvg` (anillo
+ * "active", el mismo acento que el pin propio — seleccionar no compite con
+ * "soy yo", ambos leen igual de destacados) más el halo de `haloSvg` detrás,
+ * en un lienzo `SELECTED_PIN_SIZE` para que no se recorte.
+ */
+export function avatarPinSvgSelected(emoji: string, rank?: number | null): string {
+  const path = svgForEmoji(emoji) ?? ''
+  const body =
+    haloSvg() +
+    tailSvg(RING_ACTIVE) +
+    discSvg(AVATAR_FILL, RING_ACTIVE) +
+    iconGroup(path, AVATAR_ICON) +
+    (rank != null ? rankBadgeSvg(rank) : '')
+  return wrapSvg(
+    `<g transform="translate(${HALO_PAD} ${HALO_PAD})">${body}</g>`,
+    SELECTED_PIN_SIZE.width,
+    SELECTED_PIN_SIZE.height,
   )
 }
 
@@ -209,6 +278,18 @@ export function avatarPinFromProfile(
   const resolved = parseAvatar(avatarUrl, userId)
   const emoji = resolved.kind === 'emoji' ? resolved.emoji : defaultEmojiFor(userId)
   return avatarPinSvg(emoji, own ? 'active' : 'default', rank)
+}
+
+/** Resuelve un avatar de perfil al pin SELECCIONADO (issue #824), ver
+ * `avatarPinSvgSelected`. Mismo criterio de resolución que `avatarPinFromProfile`. */
+export function avatarPinFromProfileSelected(
+  avatarUrl: string | null,
+  userId: string,
+  rank?: number | null,
+): string {
+  const resolved = parseAvatar(avatarUrl, userId)
+  const emoji = resolved.kind === 'emoji' ? resolved.emoji : defaultEmojiFor(userId)
+  return avatarPinSvgSelected(emoji, rank)
 }
 
 // Diana (mismo trazo que `IconDiana` del set custom de iconos): dos anillos +

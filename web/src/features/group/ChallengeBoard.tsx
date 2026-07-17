@@ -95,6 +95,15 @@ interface Props {
    * cuando ya sabe que está cerrado. */
   emptyLabel?: string
   className?: string
+  /** userId de la fila seleccionada (issue #824): la fila marca su estado
+   * (tinte + `aria-pressed`) y el padre resalta el pin correspondiente en el
+   * mapa (`AllGuessesMap`). Null/undefined: ninguna fila seleccionada. */
+  selectedUserId?: string | null
+  /** Toca una fila: selecciona ese jugador, o deselecciona si ya lo estaba
+   * (issue #824). Sin este prop, las filas siguen siendo botones pero tocarlas
+   * no hace nada — no hace falta en ningún consumidor hoy (ambos, `ChallengeDetail`
+   * y `PlayChallenge`, lo pasan). */
+  onSelectUser?: (userId: string | null) => void
 }
 
 /**
@@ -113,6 +122,8 @@ export function ChallengeBoard({
   numberUnit,
   emptyLabel = 'Nadie ha jugado todavía.',
   className,
+  selectedUserId = null,
+  onSelectUser,
 }: Props) {
   const rows = rankedRowsOf(votes, myUserId)
   return (
@@ -133,39 +144,52 @@ export function ChallengeBoard({
         <p className={styles.boardEmpty}>{emptyLabel}</p>
       ) : (
         <ol className={styles.boardList}>
-          {rows.map((row) => (
-            <li
-              key={row.userId}
-              className={[styles.boardRow, row.isMe ? styles.boardRowMine : '']
-                .filter(Boolean)
-                .join(' ')}
-            >
-              <span className={styles.boardRank} aria-hidden="true">
-                {row.rank <= 3 ? (
-                  <Medal rank={row.rank as 1 | 2 | 3} size={18} />
-                ) : (
-                  <span className={styles.boardRankNum}>{row.rank}</span>
-                )}
-              </span>
-              <Avatar userId={row.userId} avatarUrl={row.avatar} name={row.name} size="sm" />
-              <span className={styles.boardName}>
-                {row.name}
-                {row.isMe && <span className={styles.boardMeTag}>Tú</span>}
-                {row.leftApp && <LeftAppFlag />}
-              </span>
-              <span className={styles.boardPoints}>{row.points.toLocaleString('es-ES')} pts</span>
-              <span className={styles.boardDetail}>
-                {isNumberChallenge
-                  ? row.guessNumber != null
-                    ? fmtNumber(row.guessNumber, numberDecimals, numberUnit)
-                    : '—'
-                  : row.distanceKm != null
-                    ? fmtDist(row.distanceKm)
-                    : '—'}
-              </span>
-              <span className={styles.boardTime}>{fmtElapsed(row.elapsedSeconds)}</span>
-            </li>
-          ))}
+          {rows.map((row) => {
+            const selected = row.userId === selectedUserId
+            return (
+              <li key={row.userId}>
+                <button
+                  type="button"
+                  className={[
+                    styles.boardRow,
+                    row.isMe ? styles.boardRowMine : '',
+                    selected ? styles.boardRowSelected : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  aria-pressed={selected}
+                  onClick={() => onSelectUser?.(selected ? null : row.userId)}
+                >
+                  <span className={styles.boardRank} aria-hidden="true">
+                    {row.rank <= 3 ? (
+                      <Medal rank={row.rank as 1 | 2 | 3} size={18} />
+                    ) : (
+                      <span className={styles.boardRankNum}>{row.rank}</span>
+                    )}
+                  </span>
+                  <Avatar userId={row.userId} avatarUrl={row.avatar} name={row.name} size="sm" />
+                  <span className={styles.boardName}>
+                    {row.name}
+                    {row.isMe && <span className={styles.boardMeTag}>Tú</span>}
+                    {row.leftApp && <LeftAppFlag />}
+                  </span>
+                  <span className={styles.boardPoints}>
+                    {row.points.toLocaleString('es-ES')} pts
+                  </span>
+                  <span className={styles.boardDetail}>
+                    {isNumberChallenge
+                      ? row.guessNumber != null
+                        ? fmtNumber(row.guessNumber, numberDecimals, numberUnit)
+                        : '—'
+                      : row.distanceKm != null
+                        ? fmtDist(row.distanceKm)
+                        : '—'}
+                  </span>
+                  <span className={styles.boardTime}>{fmtElapsed(row.elapsedSeconds)}</span>
+                </button>
+              </li>
+            )
+          })}
         </ol>
       )}
     </section>
