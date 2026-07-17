@@ -77,12 +77,18 @@ export interface PastChallengeSummary {
   isOwn: boolean
   /** Quien más puntos sacó, o null si el reto se cerró sin ningún voto. Solo se
    * calcula para `status: 'closed'` — mientras está EN JUEGO el resultado no es
-   * definitivo, así que la fila no promete un "ganador" todavía. */
-  winner: (PastChallengeResult & { name: string }) | null
+   * definitivo, así que la fila no promete un "ganador" todavía. `userId`/`avatar`
+   * (issue #841, rediseño oscuro "El camino"): el hito de un reto cerrado muestra
+   * el AVATAR real de quien ganó, no solo el nombre. */
+  winner: (PastChallengeResult & { name: string; userId: string; avatar: string | null }) | null
   /** Mi resultado en este reto, o null si no jugué (o es mío). En un reto EN
    * JUEGO, que exista es la señal de que YA lo jugué (anti-spoiler: sin esto,
    * tocar la fila lleva a jugar, no al detalle). */
   myResult: PastChallengeResult | null
+  /** Mi puesto (1-based) entre TODOS los que jugaron este reto cerrado, o null si
+   * no jugué o el reto sigue EN JUEGO (issue #841): "El camino" anuncia "Tú: Nº"
+   * además de los puntos — el nº de puesto en ESE reto concreto, no el general. */
+  myRank: number | null
   /** Foto del reto ya firmada (issue #753, thumbnail de "Retos anteriores"), con
    * el mismo anti-spoiler que el resto de la app (`resolveMomentPhoto`): en un
    * reto CERRADO siempre visible; en uno EN JUEGO, solo si es pista o es mío.
@@ -481,22 +487,33 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
       const challengeVotes = (votes ?? []).filter((v) => v.challenge_id === m.challengeId)
       // El "ganador" solo tiene sentido con el reto ya decidido: EN JUEGO el
       // resultado no es definitivo (issue #800 — la fila no debe insinuar un
-      // veredicto que aún puede cambiar).
-      let winner: (PastChallengeResult & { name: string }) | null = null
+      // veredicto que aún puede cambiar). Mismo criterio de desempate estable
+      // (más puntos; a igualdad, nombre asc) que `winnersByChallenge`/
+      // `aggregateLeaderboard`, pero aquí ordenamos TODOS los votos (no solo el
+      // primero) para poder derivar también `myRank` (issue #841) sin una
+      // segunda pasada.
+      let winner:
+        | (PastChallengeResult & { name: string; userId: string; avatar: string | null })
+        | null = null
+      let myRank: number | null = null
       if (status === 'closed') {
-        for (const v of challengeVotes) {
-          if (
-            !winner ||
-            v.points > winner.points ||
-            (v.points === winner.points && v.display_name.localeCompare(winner.name) < 0)
-          ) {
-            winner = {
-              name: v.display_name,
-              points: v.points,
-              distanceKm: v.distance_km,
-              leftApp: v.left_app,
+        const ranked = [...challengeVotes].sort(
+          (a, b) => b.points - a.points || a.display_name.localeCompare(b.display_name),
+        )
+        const top = ranked[0]
+        winner = top
+          ? {
+              name: top.display_name,
+              userId: top.user_id,
+              avatar: top.avatar,
+              points: top.points,
+              distanceKm: top.distance_km,
+              leftApp: top.left_app,
             }
-          }
+          : null
+        if (myUserId) {
+          const idx = ranked.findIndex((v) => v.user_id === myUserId)
+          myRank = idx >= 0 ? idx + 1 : null
         }
       }
       const mine = myUserId ? challengeVotes.find((v) => v.user_id === myUserId) : undefined
@@ -511,6 +528,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         isOwn: m.isOwn,
         winner,
         myResult,
+        myRank,
         // Mismo anti-spoiler que cualquier otra superficie (Bitácora, Diario): un
         // reto EN JUEGO con foto SORPRESA no la enseña aquí tampoco, ni siquiera
         // si ya lo jugué — es la MISMA regla que gobierna el resto de la app, no

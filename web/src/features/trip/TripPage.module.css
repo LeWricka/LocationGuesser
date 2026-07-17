@@ -24,14 +24,13 @@
   padding: var(--space-5);
 }
 
-/* ---- Tokens de escena por sección ----
+/* ---- Tokens de escena (issue #831) ----
    La cabecera (AppHeader floating), el botón ⋯ y los tabs usan los tokens
-   `--scene-*`/`--segctl-*` para leer sobre el fondo. En DIARIO (mapa satélite) el
-   chrome flotante es VIDRIO ESMERILADO real (regla dura #537: sobre un MAPA,
-   vidrio) — tinte grafito + blur + borde blanco, en vez del tinte blanco sin blur
-   de los tokens de escena por defecto. En MARCADOR (papel) los reescribimos a
-   papel/tinta oscura y SIN blur: sobre papel el vidrio es ruido, el mismo chrome
-   sigue opaco. */
+   `--scene-*`/`--segctl-*` para leer sobre el fondo. Vidrio esmerilado real
+   (regla dura #537: sobre un fondo oscuro, vidrio) — tinte grafito + blur +
+   borde blanco. Antes Marcador tenía su propia escena PAPEL (`.scenePaper`,
+   retirada): el rediseño oscuro de esa pestaña unificó las 3 secciones bajo la
+   MISMA escena, así que ya no hace falta distinguir por sección. */
 .sceneDiario {
   --scene-surface: var(--glass-bg);
   --scene-hairline: var(--glass-border);
@@ -41,15 +40,6 @@
   --segctl-blur: blur(var(--glass-blur));
   --segctl-ink: var(--scene-ink-soft);
   --segctl-ink-hover: var(--scene-ink);
-}
-.scenePaper {
-  --scene-ink: var(--color-text);
-  --scene-veil: transparent;
-  --scene-surface: var(--color-surface);
-  --scene-hairline: var(--color-border);
-  --scene-blur: none;
-  /* Sin --segctl-*: sobre papel el SegmentedControl usa sus valores de fábrica
-     (opacos, ver SegmentedControl.module.css) — nada de vidrio aquí. */
 }
 
 /* ---- Cabecera FLOTANTE (AppHeader) ----
@@ -257,9 +247,13 @@
 
 /* Panel Marcador (la GroupPage incrustada): la cabecera + los tabs flotan por
    encima, así que su contenido necesita un padding-top que lo deje pasar por debajo
-   sin quedar tapado (cabecera + altura del control segmentado). */
+   sin quedar tapado (cabecera + altura del control segmentado). Fondo oscuro
+   (issue #831, mismo motivo que `.panelFotos` de abajo): el propio `.panel`
+   reserva un padding-bottom que la escena de MarcadorTab no cubre por ser más
+   baja que su contenido — sin esto esa franja se veía en el papel de `.screen`. */
 .panelMarcador {
   padding-top: calc(env(safe-area-inset-top) + var(--tap-target) + var(--space-8));
+  background: var(--scene-bg);
 }
 
 /* Panel Fotos (issue #645): mismo padding-top que Marcador (para pasar por

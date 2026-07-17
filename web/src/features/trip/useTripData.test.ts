@@ -248,12 +248,17 @@ describe('useTripData — pastChallenges (issue #608)', () => {
     expect(summary.title).toBe('Bosque de bambú')
     expect(summary.winner).toEqual({
       name: 'Marta',
+      userId: 'u-otro',
+      avatar: null,
       points: 4880,
       distanceKm: null,
       leftApp: true,
     })
     expect(summary.myResult).toEqual({ points: 3100, distanceKm: null, leftApp: false })
     expect(summary.isOwn).toBe(false)
+    // Marta (4880) queda 1ª, yo (3100) quedo 2º de los 2 que jugaron este reto
+    // (issue #841: "Tú: Nº" de "El camino" es el puesto EN ESE reto, no el general).
+    expect(summary.myRank).toBe(2)
   })
 
   test('reto cerrado sin votos: winner y myResult null', async () => {
@@ -265,6 +270,7 @@ describe('useTripData — pastChallenges (issue #608)', () => {
 
     expect(result.current.pastChallenges[0].winner).toBeNull()
     expect(result.current.pastChallenges[0].myResult).toBeNull()
+    expect(result.current.pastChallenges[0].myRank).toBeNull()
   })
 
   test('reto propio: isOwn = true (nadie vota su propio reto, así que myResult queda null)', async () => {

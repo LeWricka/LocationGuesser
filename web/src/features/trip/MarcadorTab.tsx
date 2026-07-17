@@ -1,16 +1,15 @@
 import { useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
-import { AlertTriangle, Crown, Gift, Share2, Skull, User } from 'lucide-react'
-import { Avatar, Badge, Button, ChallengePhoto, CountUp, Icon, IconDiana } from '../../ui'
+import { Crown, Gift, Share2, Skull, User } from 'lucide-react'
+import { Avatar, Button, CountUp, Icon, IconDiana } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
-import { formatDeadline } from '../../lib/time'
-// `Medal` no está en el barril de `../../ui` — se importa igual que en el podio
-// de temporada de GroupPage/Podium.tsx. Aquí SOLO junto al nombre del ganador en
-// "Retos anteriores" (inline, pequeño): ese contexto no es ambiguo; el que sí lo
-// era es el pedestal del podio de arriba (ver comentario del componente).
-import { Medal } from '../../ui/Medal'
-import type { PastChallengeResult, PastChallengeSummary } from './useTripData'
+import type { PastChallengeSummary } from './useTripData'
+// "El camino" (issue #831): la ruta dorada vertical de los retos del viaje —
+// antes vivía aquí mismo como "Retos anteriores" (issue #608), extraída a su
+// propio fichero por el tamaño de la pieza (thumbnail, nodo, IntersectionObserver
+// de entrada).
+import { Camino } from './Camino'
 // Rescatado de GroupPage (código muerto, issue #608): PREMIOS por puesto
 // existía solo ahí, así que se perdió al pasar el marcador a esta pestaña. Se
 // REUTILIZA tal cual (sin tocarlo): `prizes.ts` es la misma tabla de puestos
@@ -68,22 +67,6 @@ const ORDINAL: Record<1 | 2 | 3, string> = { 1: '1º', 2: '2º', 3: '3º' }
 // Puestos del podio VACÍO (promesa de lo que habrá, issue #753): mismo orden de
 // entrada/pedestal que el podio real, sin datos de jugador todavía.
 const EMPTY_PODIO_RANKS: (1 | 2 | 3)[] = [1, 2, 3]
-
-// Icono discreto "salió de la app durante la jugada" (issue #200, rescatado de
-// GroupPage:965/1230 — vivía solo en el marcador EN VIVO, que ya no se usaba).
-// title + aria-label duplican el aviso para ratón y lector de pantalla, igual
-// criterio que el original.
-function LeftAppFlag() {
-  return (
-    <span
-      className={styles.leftAppFlag}
-      title="Salió de la app durante la jugada"
-      aria-label="Salió de la app durante la jugada"
-    >
-      <Icon icon={AlertTriangle} size={13} />
-    </span>
-  )
-}
 
 // Chip de premio de un puesto (podio o lista): dato descriptivo, no una acción,
 // salvo que el dueño pueda editar premios (issues #752/#753) — en ese caso es un
@@ -171,6 +154,21 @@ function PremioTappable({
  * siempre al mismo sitio: `onPlayChallenge` (anti-spoiler, un EN JUEGO sin
  * jugar) u `onViewChallenge` (el detalle nuevo — clasificación, mapa de
  * jugadas, foto — para cualquier CERRADO o un EN JUEGO ya jugado).
+ *
+ * v7 (issue #831 — rediseño OSCURO e inmersivo, prototipo validado por el PM):
+ * la pestaña deja de vivir sobre PAPEL claro y pasa a la MISMA escena oscura
+ * que Diario/Bitácora (`--scene-*`/`--glass-*`/`--route-gold`/`--medal-*` de
+ * `index.css`/`tokens.css`; ver `TripPage.module.css`, que unifica las 3
+ * secciones bajo `.sceneDiario`). Sin eyebrow/título encima del podio (el PM lo
+ * quitó explícitamente al validar el prototipo: la cumbre ya se lee sola).
+ * "Retos anteriores" se rebautiza **"El camino"**: la MISMA lista
+ * (`pastChallenges`, EN JUEGO primero + cerrados del más reciente al más
+ * antiguo) pero como una ruta dorada vertical y cronológica, extraída a
+ * `Camino.tsx` por tamaño (thumbnail, nodo con pulso, entrada por
+ * IntersectionObserver). El ganador de un hito cerrado ahora lleva su AVATAR
+ * real (no un icono de medalla) y "Tú: Nº · pts" anuncia el PUESTO propio en
+ * ESE reto (antes solo los puntos) — `useTripData` gana `winner.userId`/
+ * `winner.avatar` y `myRank` para esto (issue #841).
  */
 export function MarcadorTab({
   leaderboard,
@@ -482,77 +480,17 @@ export function MarcadorTab({
         </>
       )}
 
-      {/* "Retos anteriores" (issue #608, rescatado de GroupPage/PastSection;
-          ampliado en el #800 a los EN JUEGO): resumen breve — primero los EN
-          JUEGO (chip "EN JUEGO" + cuenta atrás, el que cierra antes primero),
-          luego los CERRADOS del más reciente al más antiguo — con thumbnail de
-          la foto del reto (issue #753 — placeholder de marca si no tiene, o si
-          toca ocultarla por anti-spoiler). Tocar la fila decide DÓNDE entrar
-          (issue #800, anti-spoiler): un EN JUEGO sin jugar va a JUGAR (mismo
-          destino que "Adivina" del Diario — nunca se revela el mapa antes de
-          tiempo); cualquier otro (cerrado, o EN JUEGO ya jugado) abre el
-          detalle completo (clasificación, mapa de jugadas, foto). Solo se
-          muestra si hay algún reto: no añade ruido a un viaje sin ninguno. */}
-      {pastChallenges.length > 0 && (
-        <section className={styles.anteriores}>
-          <h2 className={styles.anterioresTitulo}>Retos anteriores</h2>
-          <ol className={styles.anterioresLista}>
-            {pastChallenges.map((c) => {
-              const antiSpoiler = c.status === 'active' && c.myResult == null
-              return (
-                <li key={c.challengeId}>
-                  <button
-                    type="button"
-                    className={[styles.anteriorFila, 'lg-press'].join(' ')}
-                    onClick={() =>
-                      antiSpoiler ? onPlayChallenge(c.challengeId) : onViewChallenge(c.challengeId)
-                    }
-                  >
-                    <ChallengePhoto
-                      src={c.imageUrl}
-                      alt={c.title}
-                      ratio="square"
-                      size="sm"
-                      zoomable={false}
-                      className={styles.anteriorFoto}
-                    />
-                    <span className={styles.anteriorTexto}>
-                      <span className={styles.anteriorTituloFila}>
-                        <span className={styles.anteriorTitulo}>{c.title}</span>
-                        {c.status === 'active' && (
-                          <Badge tone="live" dot className={styles.anteriorBadge}>
-                            EN JUEGO
-                          </Badge>
-                        )}
-                      </span>
-                      <span className={styles.anteriorGanador}>
-                        {c.status === 'closed' ? (
-                          c.winner ? (
-                            <>
-                              <Medal rank={1} size={14} />
-                              {c.winner.name} · {c.winner.points.toLocaleString('es-ES')} pts
-                              {c.winner.leftApp && <LeftAppFlag />}
-                            </>
-                          ) : (
-                            'Se cerró sin votos'
-                          )
-                        ) : (
-                          // EN JUEGO: cuenta atrás relativa (`formatDeadline`), NUNCA
-                          // un "ganador" — el resultado todavía no es definitivo.
-                          formatDeadline(c.closedAt)
-                        )}
-                      </span>
-                      <span className={styles.anteriorResultado}>
-                        <PastResultLabel isOwn={c.isOwn} status={c.status} result={c.myResult} />
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
-          </ol>
-        </section>
-      )}
+      {/* "El camino" (issue #831, antes "Retos anteriores" — issue #608, ampliado
+          en el #800 a los EN JUEGO): ruta dorada vertical de los retos del
+          viaje. Mismo dato (`pastChallenges`) y mismo anti-spoiler de siempre
+          (`onPlayChallenge` vs `onViewChallenge`); la pieza entera vive en
+          `Camino.tsx` (extraída por tamaño). No renderiza nada si no hay
+          ningún reto: no añade ruido a un viaje recién creado. */}
+      <Camino
+        pastChallenges={pastChallenges}
+        onPlayChallenge={onPlayChallenge}
+        onViewChallenge={onViewChallenge}
+      />
 
       {isOwner && editingPrizes && (
         <PrizesEditorModal
@@ -567,29 +505,5 @@ export function MarcadorTab({
         />
       )}
     </div>
-  )
-}
-
-// "Tu resultado" corto en una fila de "Retos anteriores": puntos (+ el aviso
-// anti-trampa si salió de la app), "Tu reto" si lo creé yo (nadie vota su propio
-// reto, así que "No jugaste" ahí sería confuso), o sin jugar — en presente
-// ("Aún sin jugar", issue #800) si el reto sigue EN JUEGO (todavía se puede),
-// en pasado ("No jugaste") si ya CERRÓ (la ventana ya se cerró).
-function PastResultLabel({
-  isOwn,
-  status,
-  result,
-}: {
-  isOwn: boolean
-  status: 'active' | 'closed'
-  result: PastChallengeResult | null
-}) {
-  if (isOwn) return <>Tu reto</>
-  if (!result) return status === 'active' ? <>Aún sin jugar</> : <>No jugaste</>
-  return (
-    <>
-      {result.points.toLocaleString('es-ES')} pts
-      {result.leftApp && <LeftAppFlag />}
-    </>
   )
 }
