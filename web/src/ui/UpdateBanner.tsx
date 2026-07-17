@@ -1,10 +1,18 @@
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, X } from 'lucide-react'
 import { Icon } from './Icon'
 import styles from './UpdateBanner.module.css'
 
 interface Props {
   /** Aplica la actualización pendiente (llama a `updateSW(true)` de main.tsx). */
   onUpdate: () => void
+  /**
+   * Descarta ESTA versión pendiente (issue #810): oculta el banner sin aplicar
+   * la actualización. Sigue pendiente — se aplicará sola al ocultar la pestaña
+   * (comportamiento intacto) — y si el sondeo detecta OTRA versión más nueva,
+   * el banner puede volver a aparecer (main.tsx resetea el descarte en cada
+   * `onNeedRefresh`).
+   */
+  onDismiss: () => void
 }
 
 // Aviso de "hay versión nueva" tras un deploy (#549). Se monta en su PROPIO root
@@ -18,17 +26,33 @@ interface Props {
 // un aviso flotante. Centrado en vez de anclado a una esquina porque las esquinas
 // ya están ocupadas por FABs distintos según la pantalla (crear viaje, compartir
 // clasificación, "＋" del viaje viven en esquinas opuestas según la vista) — no hay
-// una esquina libre en todas partes, pero el centro nunca choca con ninguna.
-// role=status (no alert): informa sin interrumpir; nunca se auto-descarta porque
-// la actualización sigue pendiente hasta que el usuario la aplica o se oculta la
-// pestaña (ver main.tsx).
-export function UpdateBanner({ onUpdate }: Props) {
+// una esquina libre en todas partes, pero el centro nunca choca con ninguna
+// HORIZONTALMENTE. El choque real (caso Nerea, #810) era VERTICAL: el banner
+// vivía a la MISMA altura que esos FAB (mismo `bottom: var(--space-4) +
+// safe-area`), tapando botones de jugar — el CSS lo levanta ahora por encima de
+// esa fila (ver UpdateBanner.module.css).
+//
+// role=status (no alert): informa sin interrumpir. Ya no es un aviso "atrapa-
+// usuario": el botón ✕ lo descarta (main.tsx marca la versión como vista; si
+// llega OTRA versión nueva puede volver a salir) y, aparte del cierre manual,
+// la actualización pendiente se sigue aplicando sola al ocultar la pestaña.
+// Además (#810) main.tsx ya no lo muestra en absoluto mientras hay un reto
+// abierto (`route.challenge`): reaparece al salir del reto si sigue pendiente.
+export function UpdateBanner({ onUpdate, onDismiss }: Props) {
   return (
     <div className={styles.banner} role="status">
       <Icon icon={RefreshCw} size={18} className={styles.icon} />
       <span className={[styles.text, 't-caption'].join(' ')}>Hay una versión nueva</span>
       <button type="button" className={[styles.action, 'lg-press'].join(' ')} onClick={onUpdate}>
         Actualizar
+      </button>
+      <button
+        type="button"
+        className={[styles.close, 'lg-press'].join(' ')}
+        onClick={onDismiss}
+        aria-label="Descartar aviso de actualización"
+      >
+        <Icon icon={X} size={16} />
       </button>
     </div>
   )

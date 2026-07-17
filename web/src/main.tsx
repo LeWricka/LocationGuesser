@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { flushSync } from 'react-dom'
 import './index.css'
 import App from './App.tsx'
 import { ToastProvider, UpdateBanner } from './ui'
@@ -81,14 +82,55 @@ const SW_UPDATE_INTERVAL_MS = 60_000
 // con soporte de acción persistente) al que engancharlo, y montarlo aquí evita
 // tocar App.tsx/ToastProvider por un aviso que solo aparece tras un deploy. Es
 // idempotente (no se duplica si `onNeedRefresh` se dispara más de una vez).
-let updateBannerMounted = false
+let updateBannerRoot: ReturnType<typeof createRoot> | null = null
 function showUpdateBanner(onUpdate: () => void) {
-  if (updateBannerMounted) return
-  updateBannerMounted = true
+  if (updateBannerRoot) return
   const container = document.createElement('div')
   container.id = 'update-banner-root'
   document.body.appendChild(container)
-  createRoot(container).render(<UpdateBanner onUpdate={onUpdate} />)
+  updateBannerRoot = createRoot(container)
+  // `flushSync`: este montaje es un root React aislado disparado desde fuera de
+  // React (callback de `virtual:pwa-register`, `hashchange`…), no desde un render
+  // en curso — forzar el commit síncrono evita dejar la decisión "¿ya se pintó
+  // el banner?" al scheduler y hace el comportamiento determinista para quien
+  // lea `document.getElementById('update-banner-root')` justo después.
+  flushSync(() => {
+    updateBannerRoot!.render(<UpdateBanner onUpdate={onUpdate} onDismiss={dismissUpdateBanner} />)
+  })
+}
+
+// Quita el banner del DOM (cierre manual o navegación a una ruta no segura).
+// No toca `updateAvailable`: la actualización sigue pendiente, solo se retira
+// el aviso de la vista.
+function hideUpdateBanner() {
+  if (!updateBannerRoot) return
+  const root = updateBannerRoot
+  const container = document.getElementById('update-banner-root')
+  updateBannerRoot = null
+  root.unmount()
+  container?.remove()
+}
+
+// (#810, botón ✕) El usuario descarta ESTA versión pendiente: se oculta el
+// banner sin aplicar nada. La actualización sigue pendiente — se aplicará sola
+// al ocultar la pestaña, como siempre — pero no volvemos a molestar con ella
+// salvo que el sondeo detecte OTRA versión más nueva (`onNeedRefresh` resetea
+// `bannerDismissed` más abajo).
+let bannerDismissed = false
+function dismissUpdateBanner() {
+  bannerDismissed = true
+  hideUpdateBanner()
+}
+
+// (#810, caso Nerea) Punto único que decide si el banner puede pintarse: nunca
+// si el usuario ya lo descartó, y nunca fuera de una ruta segura (`c=` de un
+// reto en marcha incluido — `isSafeUpdateRoute` ya lo trata como no seguro
+// desde #647). Gate por RUTA, no por el estado interno de `PlayChallenge`: leer
+// el hash aquí es lo único que hace falta para saber si hay un reto abierto.
+function maybeShowUpdateBanner() {
+  if (bannerDismissed) return
+  if (!isSafeUpdateRoute(window.location.hash)) return
+  showUpdateBanner(applyUpdate)
 }
 
 // Recarga como mucho una vez, dispare quien dispare (el `controllerchange` real
@@ -162,12 +204,16 @@ const updateSW = registerSW({
   onRegisterError: reportSwNoise,
   onNeedRefresh() {
     updateAvailable = true
+    // Nueva versión detectada: un descarte previo (botón ✕) era para la versión
+    // ANTERIOR, no para esta — #810 pide justo que "si llega OTRA versión nueva,
+    // puede volver a salir".
+    bannerDismissed = false
     // La pestaña ya está oculta (p.ej. el sondeo de 60 s la encontró mientras el
     // usuario estaba en otra app): programamos la aplicación con el MISMO retardo
     // que el listener de visibilidad — aplicar al instante convertía una ausencia
     // de segundos en una recarga (reporte del dueño, 4 jul).
     if (document.hidden) scheduleHiddenApply()
-    else showUpdateBanner(applyUpdate)
+    else maybeShowUpdateBanner()
   },
 })
 
@@ -208,9 +254,17 @@ document.addEventListener('visibilitychange', () => {
 // navegar a una segura NO se aplica sola (#647 lo hacía y esa recarga SÍ era
 // visible: justo al "volver atrás" al viaje te comías el refresco — reporte del
 // dueño, 4 jul). En su lugar enseñamos la pastilla y decide el usuario.
+//
+// (#810) Y al revés: si el banner ya estaba visible (p.ej. en el diario) y el
+// usuario entra a JUGAR un reto (`c=` en el hash), lo retiramos — nunca debe
+// convivir con la pantalla de juego. No se marca como descartado: si vuelve a
+// una ruta segura con la actualización aún pendiente, reaparece solo.
 window.addEventListener('hashchange', () => {
-  if (updateAvailable && isSafeUpdateRoute(window.location.hash)) {
-    showUpdateBanner(applyUpdate)
+  if (!updateAvailable) return
+  if (isSafeUpdateRoute(window.location.hash)) {
+    maybeShowUpdateBanner()
+  } else {
+    hideUpdateBanner()
   }
 })
 
