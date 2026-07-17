@@ -1,0 +1,138 @@
+/*
+ * Clasificación de un reto (issue #800, extraída a compartible en el #811):
+ * tabla compacta — puesto, avatar, nombre, puntos, distancia/cifra y tiempo.
+ * La usan ChallengeDetail (histórico) y PlayChallenge (revelado); mismos
+ * estilos en los dos sitios.
+ */
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.boardTitle {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+.boardCount {
+  font-weight: var(--font-weight-regular);
+  color: var(--color-text-muted);
+}
+
+.boardEmpty {
+  margin: 0;
+  padding: var(--space-4);
+  text-align: center;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--hairline-soft);
+  color: var(--color-text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+}
+
+.boardList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  /* `list-style: none` NO quita la sangría de serie del <ol> (padding-left
+     40px): era el "listado desplazado" que veía el dueño. */
+  padding: 0;
+  margin: 0;
+}
+
+.boardRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--hairline-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+.boardRowMine {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.boardRank {
+  flex-shrink: 0;
+  width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+}
+.boardRankNum {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.boardName {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.boardMeTag {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent);
+}
+
+.boardPoints {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.boardDetail {
+  flex-shrink: 0;
+  width: 60px;
+  text-align: right;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tiempo de respuesta (issue #811, votes.elapsed_seconds): columna final,
+   la más discreta de las tres métricas — dato de apoyo del dato de apoyo. */
+.boardTime {
+  flex-shrink: 0;
+  width: 52px;
+  text-align: right;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Aviso anti-trampa (issue #200), mismo criterio que MarcadorTab: icono discreto
+ * con title+aria-label, nunca solo color. */
+.leftAppFlag {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-danger);
+  cursor: help;
+}

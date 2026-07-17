@@ -1,14 +1,8 @@
 /// <reference types="google.maps" />
 import { useEffect } from 'react'
-import { Map, Marker, useMap } from '@vis.gl/react-google-maps'
+import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
-import {
-  avatarPinFromProfile,
-  targetPinSvg,
-  PIN_SIZE,
-  PIN_ANCHOR,
-  PIN_LABEL_ORIGIN,
-} from '../../lib/avatarPin'
+import { avatarPinFromProfile, targetPinSvg, PIN_SIZE, PIN_ANCHOR } from '../../lib/avatarPin'
 
 // Vista por defecto (el MUNDO) hasta que fitBounds encuadra los puntos.
 const WORLD: google.maps.LatLngLiteral = { lat: 25, lng: 0 }
@@ -19,19 +13,31 @@ export interface GuessMarker extends LatLng {
   name: string
   /** `avatar_url` del perfil (token `emoji:…`, URL o null) para el pin de disco. */
   avatar: string | null
-  /** Puntos obtenidos (issue #795): decide quién entra en el "top-3" cuando hay
-   * demasiados jugadores para etiquetarlos a todos sin amontonarse. */
-  points: number
+  /** Puesto en el reto, 1-based (issue #811): el MISMO orden que la tabla
+   * (`ChallengeBoard`, vía `rankByUserId` — no un criterio propio recalculado
+   * aquí). Pinta el badge del pin (oro/plata/bronce/neutro). */
+  rank: number
 }
 
 interface Props {
   answer: LatLng
   guesses: GuessMarker[]
   /** Id del jugador que está mirando el resultado (issue #795): resalta su
-   * propio pin (anillo teal profundo) y le garantiza el label aunque no esté
-   * entre los primeros. Sin esto (mapa de un histórico ajeno, p.ej.) ningún pin
-   * se resalta y el criterio de labels cae solo al top-3. */
+   * propio pin (anillo teal profundo) y su línea a la respuesta (issue #811:
+   * accent, más gruesa). Sin esto (mapa de un histórico ajeno, p.ej.) ningún
+   * pin ni línea se resalta. */
   meUserId?: string
+}
+
+// Acento Pizarra de los tokens (no hardcodear color): Google Maps necesita un
+// string literal para el trazo de la línea propia, así que leemos `--accent`
+// del :root en runtime — mismo truco que `PlayMap.accentColor` (no exportado
+// desde allí, así que se repite aquí; son 4 líneas, no justifica un módulo
+// compartido solo para esto).
+function accentColor(): string {
+  if (typeof window === 'undefined') return '#34506b' // design-lint-allow: SSR/test, sin window
+  const value = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+  return value || '#34506b' // design-lint-allow: mismo fallback que PlayMap.accentColor
 }
 
 // Icono de la respuesta (diana): mismo tamaño/ancla que los pines de avatar
@@ -46,61 +52,56 @@ function answerIcon(): google.maps.Icon {
 
 // Icono del pin de un jugador. `own` resalta el PROPIO pin (anillo teal
 // profundo en vez de blanco) para encontrarse un vistazo más rápido entre los
-// del resto (issue #795). El nombre va como label bajo la punta (PIN_LABEL_ORIGIN).
-function guessIcon(avatar: string | null, userId: string, own: boolean): google.maps.Icon {
+// del resto (issue #795). `rank` pinta el badge de puesto en la esquina
+// sup-derecha (issue #811) — sustituye al nombre en texto bajo el pin, que
+// amontonaba el mapa con muchos jugadores (issue #795: `visibleLabelUserIds`
+// y su umbral de "top-3" quedan retirados, ya no hacen falta).
+function guessIcon(
+  avatar: string | null,
+  userId: string,
+  own: boolean,
+  rank: number,
+): google.maps.Icon {
   return {
-    url: avatarPinFromProfile(avatar, userId, own),
+    url: avatarPinFromProfile(avatar, userId, own, rank),
     scaledSize: new google.maps.Size(PIN_SIZE.width, PIN_SIZE.height),
     anchor: new google.maps.Point(PIN_ANCHOR.x, PIN_ANCHOR.y),
-    labelOrigin: new google.maps.Point(PIN_LABEL_ORIGIN.x, PIN_LABEL_ORIGIN.y),
   }
 }
 
-function nameLabel(name: string): google.maps.MarkerLabel {
-  return { text: name, fontSize: '12px', fontWeight: '600' }
-}
+// Grosor/opacidad de la línea de cada jugada a la respuesta (issue #811,
+// petición del dueño: "que se vea de dónde venía cada tiro"). Con hasta ~10
+// jugadores un trazo grueso u opaco por cada uno sería una tela de araña, así
+// que las AJENAS van finas y muy translúcidas; la PROPIA se destaca (accent,
+// +1 de grosor, casi opaca) para seguir siendo fácil de distinguir del resto.
+const OTHER_LINE_WEIGHT = 2
+const OWN_LINE_WEIGHT = OTHER_LINE_WEIGHT + 1
+const OTHER_LINE_OPACITY = 0.35
+const OWN_LINE_OPACITY = 0.9
+const OTHER_LINE_COLOR = '#ffffff' // design-lint-allow: la API de Google Maps exige color literal
 
-// Label del pin, o undefined si no le toca (criterio de `visibleLabelUserIds`).
-// El propio jugador lleva el sufijo "(tú)": con el mismo nombre que ve el resto
-// del viaje, es la forma más rápida de encontrarse entre varios pines.
-function labelFor(
-  g: GuessMarker,
-  labeled: Set<string>,
-  meUserId?: string,
-): google.maps.MarkerLabel | undefined {
-  if (!labeled.has(g.userId)) return undefined
-  return nameLabel(g.userId === meUserId ? `${g.name} (tú)` : g.name)
-}
-
-// Con pocos jugadores, un label bajo cada pin se lee bien. A partir de este
-// umbral (issue #795: "legibilidad con muchos pines cercanos") etiquetar a
-// TODOS amontona el mapa —los nombres se solapan y no se entiende nada a un
-// vistazo—, así que el criterio pasa a ser visual-first: solo lo importante.
-const LABEL_CROWD_THRESHOLD = 5
-// Con el mapa lleno, cuántos de los mejores puestos conservan su label (además
-// del propio jugador, que SIEMPRE la lleva: es lo primero que busca).
-const LABEL_TOP_N = 3
-
-/**
- * Decide qué jugadores conservan el nombre bajo el pin (issue #795). Con pocos
- * jugadores (`< LABEL_CROWD_THRESHOLD`) todos llevan label: no hay amontonamiento
- * que evitar. Con más, solo el TOP-3 por puntos + el propio jugador (si no
- * estuviera ya entre ellos) — el resto de pines se ven igual (disco + nombre al
- * tocar/`title`), pero sin el texto fijo que saturaría el mapa.
- */
-// Función pura exportada junto al componente para testearla aislada
-// (AllGuessesMap.test.tsx); no vale la pena un fichero aparte para esta única
-// función de ~10 líneas.
-// eslint-disable-next-line react-refresh/only-export-components
-export function visibleLabelUserIds(guesses: GuessMarker[], meUserId?: string): Set<string> {
-  if (guesses.length < LABEL_CROWD_THRESHOLD) return new Set(guesses.map((g) => g.userId))
-  const top = [...guesses]
-    .sort((a, b) => b.points - a.points)
-    .slice(0, LABEL_TOP_N)
-    .map((g) => g.userId)
-  const ids = new Set(top)
-  if (meUserId) ids.add(meUserId)
-  return ids
+function GuessLines({ answer, guesses, meUserId }: Props) {
+  return (
+    <>
+      {guesses.map((g) => {
+        const own = g.userId === meUserId
+        const path = [
+          { lat: g.lat, lng: g.lng },
+          { lat: answer.lat, lng: answer.lng },
+        ]
+        return (
+          <Polyline
+            key={g.userId}
+            path={path}
+            strokeColor={own ? accentColor() : OTHER_LINE_COLOR}
+            strokeWeight={own ? OWN_LINE_WEIGHT : OTHER_LINE_WEIGHT}
+            strokeOpacity={own ? OWN_LINE_OPACITY : OTHER_LINE_OPACITY}
+            clickable={false}
+          />
+        )
+      })}
+    </>
+  )
 }
 
 // Encuadra la respuesta + todos los votos. El bloque del revelado entra con
@@ -136,12 +137,13 @@ function FitToAll({ answer, guesses }: Props) {
 
 /**
  * Mapa resumen de un reto cerrado (Google Maps, mismo motor que PlayMap): el
- * disco de CADA jugador que votó (con su nombre como label, según
- * `visibleLabelUserIds`) y la respuesta real (diana destacada). Encuadra todos
- * los puntos. Sin AdvancedMarker → sin mapId.
+ * disco de CADA jugador que votó con el badge de su PUESTO (issue #811 — ya
+ * no el nombre en texto bajo el pin, que amontonaba el mapa con muchos
+ * jugadores), una línea fina de cada jugada a la respuesta real (la propia
+ * destacada) y la respuesta (diana destacada). Encuadra todos los puntos. Sin
+ * AdvancedMarker → sin mapId.
  */
 export function AllGuessesMap({ answer, guesses, meUserId }: Props) {
-  const labeled = visibleLabelUserIds(guesses, meUserId)
   return (
     <Map
       className="lg-map"
@@ -162,17 +164,17 @@ export function AllGuessesMap({ answer, guesses, meUserId }: Props) {
       clickableIcons={false}
     >
       <Marker position={answer} icon={answerIcon()} clickable={false} />
+      <GuessLines answer={answer} guesses={guesses} meUserId={meUserId} />
       {guesses.map((g) => (
         <Marker
           key={g.userId}
           position={{ lat: g.lat, lng: g.lng }}
-          icon={guessIcon(g.avatar, g.userId, g.userId === meUserId)}
-          label={labelFor(g, labeled, meUserId)}
+          icon={guessIcon(g.avatar, g.userId, g.userId === meUserId, g.rank)}
           clickable={false}
           title={g.name}
         />
       ))}
-      <FitToAll answer={answer} guesses={guesses} />
+      <FitToAll answer={answer} guesses={guesses} meUserId={meUserId} />
     </Map>
   )
 }

@@ -50,6 +50,22 @@ export function isPast(iso: string): boolean {
   return new Date(iso).getTime() < Date.now()
 }
 
+/**
+ * Tiempo de RESPUESTA de un jugador (`votes.elapsed_seconds`) para la leyenda
+ * del resultado (issue #811): "12 s" bajo el minuto, "1 m 05 s" a partir de un
+ * minuto (segundos con cero a la izquierda — lectura tabular en la columna).
+ * `null` (voto legado sin cronómetro, o reto sin límite de tiempo) → "—",
+ * nunca "0 s": sería un dato inventado que no se midió.
+ */
+export function fmtElapsed(seconds: number | null): string {
+  if (seconds == null) return '—'
+  const total = Math.max(0, Math.round(seconds))
+  if (total < 60) return `${total} s`
+  const minutes = Math.floor(total / 60)
+  const secs = total % 60
+  return `${minutes} m ${secs.toString().padStart(2, '0')} s`
+}
+
 // Fecha+hora ABSOLUTA en español, instanciada una sola vez (mismo patrón que
 // `dateFmt`/`longFmt` en MomentCard/TripWrap): coste de parseo de Intl una vez,
 // no en cada llamada.

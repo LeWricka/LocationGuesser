@@ -1,12 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import {
-  PIN_ANCHOR,
-  PIN_LABEL_ORIGIN,
-  PIN_SIZE,
-  avatarPinFromProfile,
-  avatarPinSvg,
-  targetPinSvg,
-} from './avatarPin'
+import { PIN_ANCHOR, PIN_SIZE, avatarPinFromProfile, avatarPinSvg, targetPinSvg } from './avatarPin'
 import { avatarToken, canonicalEmoji, svgForEmoji } from './avatar'
 
 function decode(uri: string): string {
@@ -49,6 +42,28 @@ describe('avatarPinSvg', () => {
     const sinPrefijo = uri.slice('data:image/svg+xml,'.length)
     expect(sinPrefijo).not.toMatch(/[#<>]/)
   })
+
+  // Issue #811: badge de puesto en la esquina sup-derecha, mismo lenguaje que
+  // ui/Medal (oro/plata/bronce, neutro a partir del 4º). Sin `rank`, ninguno.
+  test('sin rank, no dibuja ningún badge de puesto', () => {
+    const svg = decode(avatarPinSvg('🦊'))
+    expect(svg).not.toContain('#c9a24b') // oro
+    expect(svg).not.toContain('#a9a39a') // plata
+    expect(svg).not.toContain('#b07a4e') // bronce
+    expect(svg).not.toContain('#575f6c') // neutro
+  })
+
+  test('rank 1/2/3 → disco oro/plata/bronce; 4+ → disco neutro', () => {
+    expect(decode(avatarPinSvg('🦊', 'default', 1))).toContain('#c9a24b')
+    expect(decode(avatarPinSvg('🦊', 'default', 2))).toContain('#a9a39a')
+    expect(decode(avatarPinSvg('🦊', 'default', 3))).toContain('#b07a4e')
+    expect(decode(avatarPinSvg('🦊', 'default', 4))).toContain('#575f6c')
+    expect(decode(avatarPinSvg('🦊', 'default', 10))).toContain('#575f6c')
+  })
+
+  test('rank null → igual que sin rank (defensivo: no revienta con votos sin puesto calculable)', () => {
+    expect(avatarPinSvg('🦊', 'default', null)).toBe(avatarPinSvg('🦊'))
+  })
 })
 
 describe('constantes de tamaño', () => {
@@ -57,13 +72,13 @@ describe('constantes de tamaño', () => {
     expect(PIN_SIZE.height).toBeGreaterThan(0)
   })
 
-  test('PIN_ANCHOR es la punta abajo-centro', () => {
-    expect(PIN_ANCHOR.x).toBe(PIN_SIZE.width / 2)
+  // El icono lleva un margen EXTRA (issue #811) a la derecha y arriba para el
+  // badge de puesto: la punta ya NO cae en el centro horizontal del icono
+  // completo (ese margen es asimétrico), pero sigue dentro de sus límites.
+  test('PIN_ANCHOR es la punta abajo, dentro de los límites del icono', () => {
+    expect(PIN_ANCHOR.x).toBeGreaterThan(0)
+    expect(PIN_ANCHOR.x).toBeLessThan(PIN_SIZE.width)
     expect(PIN_ANCHOR.y).toBeLessThanOrEqual(PIN_SIZE.height)
-  })
-
-  test('PIN_LABEL_ORIGIN queda debajo de la punta del pin', () => {
-    expect(PIN_LABEL_ORIGIN.y).toBeGreaterThan(PIN_ANCHOR.y)
   })
 })
 

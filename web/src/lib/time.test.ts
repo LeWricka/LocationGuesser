@@ -2,6 +2,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   deadlineFromMinutes,
   deadlineFromNow,
+  fmtElapsed,
   formatDeadline,
   isPast,
   parseMomentDate,
@@ -119,5 +120,24 @@ describe('parseMomentDate (#566, migración 0037)', () => {
 
   test('valor inválido: Date inválido (NaN), no revienta', () => {
     expect(Number.isNaN(parseMomentDate('no-es-una-fecha').getTime())).toBe(true)
+  })
+})
+
+// Issue #811: tiempo de respuesta en la leyenda del resultado (votes.elapsed_seconds).
+describe('fmtElapsed', () => {
+  test('bajo el minuto: segundos a secas', () => {
+    expect(fmtElapsed(12)).toBe('12 s')
+    expect(fmtElapsed(0)).toBe('0 s')
+    expect(fmtElapsed(59)).toBe('59 s')
+  })
+
+  test('a partir de un minuto: "m" + segundos con cero a la izquierda', () => {
+    expect(fmtElapsed(60)).toBe('1 m 00 s')
+    expect(fmtElapsed(65)).toBe('1 m 05 s')
+    expect(fmtElapsed(125)).toBe('2 m 05 s')
+  })
+
+  test('null (sin cronómetro, voto legado o reto sin límite) → "—"', () => {
+    expect(fmtElapsed(null)).toBe('—')
   })
 })
