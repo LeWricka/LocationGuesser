@@ -344,6 +344,56 @@
   }
 }
 
+/* Cabecera fina de vidrio del panel de escritorio (issue #812): SOLO existe
+   visualmente en el breakpoint ≥900px (ver media query más abajo). En móvil
+   queda en `display: none` — no ocupa hueco en el `flex column` (un hijo
+   `display:none` no reserva `gap`) ni entra en el orden de lectura, así que
+   el mapa expandido de móvil queda BIT A BIT igual que antes de esta issue. */
+.mapaExpandidoHeader {
+  display: none;
+}
+.mapaExpandidoHeaderLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+/* Botón ✕ de cerrar (solo visible cuando su padre, la cabecera, se activa en
+   desktop). Mismo patrón que `.close` de Modal/Lightbox: circular, discreto,
+   se ilumina al pasar el ratón. */
+.mapaExpandidoClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-target-sm);
+  height: var(--tap-target-sm);
+  flex: none;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+.mapaExpandidoClose:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.mapaExpandidoClose:active {
+  transform: scale(var(--motion-press-scale));
+}
+.mapaExpandidoClose:focus-visible {
+  outline: var(--focus-ring-width) solid var(--color-focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+@media (prefers-reduced-motion: reduce) {
+  .mapaExpandidoClose:active {
+    transform: none;
+  }
+}
+
 /* Lienzo del mapa grande: llena TODO el alto disponible del panel (issue #789
    — antes 300px fijos lo dejaban corto); `flex: 1` se reparte el espacio que
    sobra tras las acciones de abajo. `min-height: 0` es necesario para que un
@@ -386,6 +436,95 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* ==========================================================================
+ * Panel flotante de escritorio (issue #812, ≥900px).
+ *
+ * Problema real (replay del dueño a 1900px): el mapa expandido de móvil
+ * (edge-to-edge, insets de `.mapaExpandido` de arriba) ocupaba TODA la
+ * pantalla en desktop — la diana se perdía de vista y los botones se
+ * estiraban de borde a borde. El panorama, en cambio, SIEMPRE debe verse a
+ * pantalla completa (nunca lo tapa el mapa). Solución (maqueta aprobada,
+ * tema1-a-panel.png): el mapa expandido deja de ser overlay a pantalla
+ * completa y pasa a ser un panel flotante ANCLADO a la esquina inferior
+ * derecha (~520×440), con cabecera fina de vidrio + lienzo + acción — la
+ * diana queda centrada en ESE panel, no en la pantalla entera.
+ *
+ * El breakpoint es un valor suelto (900px), no uno de los `--bp-*`
+ * documentados en tokens.css (sm 480 / md 768 / lg 1024): coincide con el
+ * `~900px` que fija la propia issue, el punto en el que un panel de 520px de
+ * ancho + los controles del panorama (esquina inferior izquierda) y la
+ * foto-pista (esquina superior derecha) dejan de sentirse apretados.
+ *
+ * La coreografía esquina↔expandido de #606 (cross-fade entre `.miniMapa` y
+ * `.mapaExpandido`, `useExitPresence` en GameScene) NO se toca: sigue siendo
+ * el mismo cruce de fundidos por transform/opacity, solo que ahora el destino
+ * es un panel en vez de un overlay a pantalla completa — el mini-mapa
+ * colapsado (misma esquina, ver `.miniMapa` arriba) sigue "creciendo hacia"
+ * el panel. */
+@media (min-width: 900px) {
+  .mapaExpandido {
+    /* Sustituye los cuatro insets de móvil (que estiraban el panel a toda la
+       pantalla) por un ancla fija en la esquina inferior derecha. */
+    top: auto;
+    left: auto;
+    right: calc(var(--space-5) + env(safe-area-inset-right));
+    bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+    width: 520px;
+    height: 440px;
+    /* La cabecera y las acciones ya llevan su propio padding; el lienzo del
+       mapa (en medio) debe llenar el resto sin huecos de `gap` añadidos. */
+    gap: 0;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    /* Recorta las esquinas del panel sobre la cabecera/lienzo/acciones: así
+       ninguno de los tres necesita su propio radio para que el conjunto lea
+       como una sola tarjeta. */
+    overflow: hidden;
+  }
+
+  /* La cabecera SOLO aparece en este breakpoint (ver `.mapaExpandidoHeader`
+     base arriba, `display: none`). Vidrio (chrome-bg/chrome-blur) como el
+     resto del chrome flotante de la escena (`.glassBtn`, `.hintFloat`). */
+  .mapaExpandidoHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: none;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    background: var(--chrome-bg);
+    -webkit-backdrop-filter: var(--chrome-blur);
+    backdrop-filter: var(--chrome-blur);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  /* El lienzo ya no necesita marco/sombra propios (issue #789, pensados para
+     flotar directo sobre la escena en móvil): en el panel de escritorio el
+     marco lo pone el panel entero y el lienzo solo debe llenar el hueco
+     entre cabecera y acciones. */
+  .mapaExpandidoScene {
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  .mapaExpandidoActions {
+    flex: none;
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-surface);
+  }
+
+  /* El panorama NUNCA deja de verse detrás del panel (a diferencia de móvil,
+     donde el mapa expandido SÍ tapa la pantalla entera) — así que repetir
+     "Volver al panorama/foto" aquí es redundante. El ✕ de la cabecera cubre
+     ese cierre de forma más directa; este botón se reserva para móvil. */
+  .mapaExpandidoVolver {
+    display: none;
+  }
 }
 
 /* ==========================================================================

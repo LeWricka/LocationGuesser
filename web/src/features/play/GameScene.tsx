@@ -1,5 +1,5 @@
 import { useRef, useState, type CSSProperties, type RefObject } from 'react'
-import { Compass as CompassIcon, Expand, House, Maximize2 } from 'lucide-react'
+import { Compass as CompassIcon, Expand, House, Maximize2, X } from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { SceneImage } from './SceneImage'
@@ -159,8 +159,13 @@ export function GameScene({
   // Última cámara del mapa expandido (centro + zoom): el mapa se DESMONTA al
   // volver al panorama y, sin esto, cada reapertura nacía en la vista mundo —
   // el jugador perdía el zoom que había afinado (feedback del dueño jugando).
-  // Ref (no estado): cambia en cada arrastre y no debe repintar nada.
+  // Ref (no estado) para el goteo de arrastres (no debe repintar nada); se LEE
+  // únicamente en el evento de abrir el mapa (regla react-hooks/refs: nada de
+  // leer refs en render) y ahí se congela en `restoredCamera` para el montaje.
   const lastCameraRef = useRef<{ center: LatLng; zoom: number } | null>(null)
+  const [restoredCamera, setRestoredCamera] = useState<{ center: LatLng; zoom: number } | null>(
+    null,
+  )
   const expanded = useExitPresence(sceneReady && mapOpen, reducedMotion)
   // Modelo de viewport: el contenedor se ata al alto VISIBLE real (px) cuando lo
   // conocemos; si no, el CSS cae a `100dvh`. Evita que el chrome/teclado colapse
@@ -289,7 +294,12 @@ export function GameScene({
           className={[styles.miniMapa, collapsed.exiting ? styles.miniMapaExit : '', 'lg-press']
             .filter(Boolean)
             .join(' ')}
-          onClick={onOpenMap}
+          onClick={() => {
+            // Evento (no render): momento legal para leer el ref. Congela la
+            // cámara del viaje anterior para restaurarla en el montaje del panel.
+            setRestoredCamera(lastCameraRef.current)
+            onOpenMap()
+          }}
           onAnimationEnd={(e) => {
             if (e.target === e.currentTarget) collapsed.onExitAnimationEnd()
           }}
@@ -340,6 +350,28 @@ export function GameScene({
             if (e.target === e.currentTarget) expanded.onExitAnimationEnd()
           }}
         >
+          {/* Cabecera fina de vidrio: SOLO existe visualmente en el panel de
+              escritorio (issue #812, ≥900px vía CSS — `display:none` por
+              defecto en móvil, así que no ocupa hueco ni entra en el orden de
+              lectura ahí). En el panel, el panorama NUNCA deja de verse detrás
+              (a diferencia de móvil, que tapa la pantalla entera), así que un
+              ✕ para cerrar es más natural que repetir "Volver al panorama" —
+              por eso el ✕ vive aquí y el botón de abajo se oculta en desktop. */}
+          <div className={styles.mapaExpandidoHeader}>
+            <span className={styles.mapaExpandidoHeaderLabel}>
+              <IconDiana size={16} />
+              Adivinar en el mapa
+            </span>
+            <button
+              type="button"
+              className={styles.mapaExpandidoClose}
+              onClick={onCloseMap}
+              aria-label="Cerrar mapa"
+              title="Cerrar mapa"
+            >
+              <Icon icon={X} size={18} />
+            </button>
+          </div>
           <div className={styles.mapaExpandidoScene}>
             <PlayMap
               guess={guess}
@@ -353,20 +385,29 @@ export function GameScene({
               // Reapertura: se restaura la cámara del viaje anterior (zoom
               // incluido). Primera vez con pin ya puesto (p.ej. borrador
               // retomado): se arranca sobre el pin a zoom de ciudad.
-              initialCamera={
-                lastCameraRef.current ?? (guess ? { center: guess, zoom: 6 } : undefined)
-              }
+              initialCamera={restoredCamera ?? (guess ? { center: guess, zoom: 6 } : undefined)}
               onCameraChange={(camera) => {
                 lastCameraRef.current = camera
               }}
             />
-            {/* Diana central: pin fijo de GeoGuessr. */}
+            {/* Diana central: pin fijo de GeoGuessr, centrada en ESTE lienzo
+                (no en la pantalla) — en el panel de escritorio el lienzo es
+                menor que el viewport, así que basta con que este `span` siga
+                siendo hijo directo de `.mapaExpandidoScene` (posicionado
+                `relative`) para que la diana quede en el centro del panel. */}
             <span className={styles.dianaFija} aria-hidden="true">
               <IconDiana size={30} />
             </span>
           </div>
           <div className={styles.mapaExpandidoActions}>
-            <Button variant="secondary" size="lg" fullWidth onClick={onCloseMap}>
+            {/* Oculto en desktop (≥900px): ahí cierra el ✕ de la cabecera. */}
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
+              onClick={onCloseMap}
+              className={styles.mapaExpandidoVolver}
+            >
               Volver {hasStreetView ? 'al panorama' : 'a la foto'}
             </Button>
             <Button size="lg" fullWidth disabled={!guess || confirmDisabled} onClick={onConfirm}>
