@@ -189,14 +189,16 @@ que `main.tsx` lo pide explícitamente. Antes (#498, `autoUpdate` +
 pestañas abiertas, incluso con un formulario a medias — con varios deploys en una
 misma noche, se perdían formularios de crear reto/momento.
 
-Comportamiento tras un deploy:
+Comportamiento tras un deploy (issue #819 — se retiró el banner "Hay una
+versión nueva · Actualizar": en el escritorio, único caso donde la pestaña
+podía quedar visible horas, el coste de fricción del aviso superaba su valor):
 
 - **Usuario con la pestaña oculta** (minimizada, cambió de pestaña/app) cuando se
   detecta la versión nueva: se aplica en silencio (`visibilitychange` →
   `updateSW(true)`); al volver, ve la versión nueva sin haber notado nada.
-- **Usuario activo mirando la pantalla**: aparece un banner discreto ("Hay una
-  versión nueva · Actualizar", `web/src/ui/UpdateBanner.tsx`) y espera a que
-  pulse, o a que oculte la pestaña (lo que ocurra antes).
+- **Usuario activo mirando la pantalla**: no ve nada — sigue en la versión
+  vieja hasta que oculte la pestaña (cambia de app, minimiza, la cierra…), momento
+  en el que se aplica en silencio como en el caso anterior.
 
 Nunca hay una recarga sorpresa con el usuario mirando y sin haberla pedido.
 
