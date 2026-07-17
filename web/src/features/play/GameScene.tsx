@@ -159,8 +159,13 @@ export function GameScene({
   // Última cámara del mapa expandido (centro + zoom): el mapa se DESMONTA al
   // volver al panorama y, sin esto, cada reapertura nacía en la vista mundo —
   // el jugador perdía el zoom que había afinado (feedback del dueño jugando).
-  // Ref (no estado): cambia en cada arrastre y no debe repintar nada.
+  // Ref (no estado) para el goteo de arrastres (no debe repintar nada); se LEE
+  // únicamente en el evento de abrir el mapa (regla react-hooks/refs: nada de
+  // leer refs en render) y ahí se congela en `restoredCamera` para el montaje.
   const lastCameraRef = useRef<{ center: LatLng; zoom: number } | null>(null)
+  const [restoredCamera, setRestoredCamera] = useState<{ center: LatLng; zoom: number } | null>(
+    null,
+  )
   const expanded = useExitPresence(sceneReady && mapOpen, reducedMotion)
   // Modelo de viewport: el contenedor se ata al alto VISIBLE real (px) cuando lo
   // conocemos; si no, el CSS cae a `100dvh`. Evita que el chrome/teclado colapse
@@ -289,7 +294,12 @@ export function GameScene({
           className={[styles.miniMapa, collapsed.exiting ? styles.miniMapaExit : '', 'lg-press']
             .filter(Boolean)
             .join(' ')}
-          onClick={onOpenMap}
+          onClick={() => {
+            // Evento (no render): momento legal para leer el ref. Congela la
+            // cámara del viaje anterior para restaurarla en el montaje del panel.
+            setRestoredCamera(lastCameraRef.current)
+            onOpenMap()
+          }}
           onAnimationEnd={(e) => {
             if (e.target === e.currentTarget) collapsed.onExitAnimationEnd()
           }}
@@ -353,9 +363,7 @@ export function GameScene({
               // Reapertura: se restaura la cámara del viaje anterior (zoom
               // incluido). Primera vez con pin ya puesto (p.ej. borrador
               // retomado): se arranca sobre el pin a zoom de ciudad.
-              initialCamera={
-                lastCameraRef.current ?? (guess ? { center: guess, zoom: 6 } : undefined)
-              }
+              initialCamera={restoredCamera ?? (guess ? { center: guess, zoom: 6 } : undefined)}
               onCameraChange={(camera) => {
                 lastCameraRef.current = camera
               }}
