@@ -2,7 +2,15 @@
 import { useEffect } from 'react'
 import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
-import { avatarPinFromProfile, targetPinSvg, PIN_SIZE, PIN_ANCHOR } from '../../lib/avatarPin'
+import {
+  avatarPinFromProfile,
+  avatarPinFromProfileSelected,
+  targetPinSvg,
+  PIN_SIZE,
+  PIN_ANCHOR,
+  SELECTED_PIN_SIZE,
+  SELECTED_PIN_ANCHOR,
+} from '../../lib/avatarPin'
 
 // Vista por defecto (el MUNDO) hasta que fitBounds encuadra los puntos.
 const WORLD: google.maps.LatLngLiteral = { lat: 25, lng: 0 }
@@ -27,6 +35,11 @@ interface Props {
    * accent, más gruesa). Sin esto (mapa de un histórico ajeno, p.ej.) ningún
    * pin ni línea se resalta. */
   meUserId?: string
+  /** userId de la fila seleccionada en `ChallengeBoard` (issue #824): ese pin
+   * sobresale (escala mayor + halo de acento + z-index por encima del resto) y
+   * el mapa hace `panTo` suave hasta él si queda fuera de la vista actual.
+   * Null/undefined: nadie seleccionado, todos los pines a tamaño normal. */
+  selectedUserId?: string | null
 }
 
 // Acento Pizarra de los tokens (no hardcodear color): Google Maps necesita un
@@ -68,6 +81,33 @@ function guessIcon(
     anchor: new google.maps.Point(PIN_ANCHOR.x, PIN_ANCHOR.y),
   }
 }
+
+// Bump de escala EXTRA del pin SELECCIONADO (issue #824), aplicado aquí (no en
+// `avatarPinSvgSelected`): el halo de acento ya lo agranda un poco, pero el
+// dueño pidió "escala mayor" como efecto propio — Google sirve el mismo SVG a
+// cualquier `scaledSize`/`anchor` que se le pida, así que basta con escalar
+// las constantes del pin seleccionado, sin otra copia del dibujo.
+const SELECTED_SCALE = 1.15
+
+// Icono del pin SELECCIONADO en `ChallengeBoard` (issue #824): el dibujo con
+// halo de `avatarPinSvgSelected`, servido más grande que el resto.
+function selectedGuessIcon(avatar: string | null, userId: string, rank: number): google.maps.Icon {
+  return {
+    url: avatarPinFromProfileSelected(avatar, userId, rank),
+    scaledSize: new google.maps.Size(
+      SELECTED_PIN_SIZE.width * SELECTED_SCALE,
+      SELECTED_PIN_SIZE.height * SELECTED_SCALE,
+    ),
+    anchor: new google.maps.Point(
+      SELECTED_PIN_ANCHOR.x * SELECTED_SCALE,
+      SELECTED_PIN_ANCHOR.y * SELECTED_SCALE,
+    ),
+  }
+}
+
+// Por encima de cualquier pin normal (sin zIndex explícito, Google los ordena
+// por latitud) para que el seleccionado NUNCA quede tapado por otro (issue #824).
+const SELECTED_Z_INDEX = 1000
 
 // Grosor/opacidad de la línea de cada jugada a la respuesta (issue #811,
 // petición del dueño: "que se vea de dónde venía cada tiro"). Con hasta ~10
@@ -135,6 +175,21 @@ function FitToAll({ answer, guesses }: Props) {
   return null
 }
 
+// Centra el mapa sobre el pin SELECCIONADO (issue #824) con un `panTo` suave
+// SOLO si queda fuera de la vista actual — nunca re-encuadra ni cambia el zoom
+// (a diferencia de `FitToAll`): el dueño pidió explícitamente que la lista
+// larga no "salte" de zoom al tocar una fila, solo desplazarse lo justo para
+// traer el pin a la vista si hiciera falta.
+function PanToSelected({ target }: { target: LatLng | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!map || !target) return
+    const bounds = map.getBounds()
+    if (bounds && !bounds.contains(target)) map.panTo(target)
+  }, [map, target])
+  return null
+}
+
 /**
  * Mapa resumen de un reto cerrado (Google Maps, mismo motor que PlayMap): el
  * disco de CADA jugador que votó con el badge de su PUESTO (issue #811 — ya
@@ -143,7 +198,8 @@ function FitToAll({ answer, guesses }: Props) {
  * destacada) y la respuesta (diana destacada). Encuadra todos los puntos. Sin
  * AdvancedMarker → sin mapId.
  */
-export function AllGuessesMap({ answer, guesses, meUserId }: Props) {
+export function AllGuessesMap({ answer, guesses, meUserId, selectedUserId }: Props) {
+  const selected = selectedUserId != null ? guesses.find((g) => g.userId === selectedUserId) : null
   return (
     <Map
       className="lg-map"
@@ -165,16 +221,25 @@ export function AllGuessesMap({ answer, guesses, meUserId }: Props) {
     >
       <Marker position={answer} icon={answerIcon()} clickable={false} />
       <GuessLines answer={answer} guesses={guesses} meUserId={meUserId} />
-      {guesses.map((g) => (
-        <Marker
-          key={g.userId}
-          position={{ lat: g.lat, lng: g.lng }}
-          icon={guessIcon(g.avatar, g.userId, g.userId === meUserId, g.rank)}
-          clickable={false}
-          title={g.name}
-        />
-      ))}
+      {guesses.map((g) => {
+        const isSelected = g.userId === selectedUserId
+        return (
+          <Marker
+            key={g.userId}
+            position={{ lat: g.lat, lng: g.lng }}
+            icon={
+              isSelected
+                ? selectedGuessIcon(g.avatar, g.userId, g.rank)
+                : guessIcon(g.avatar, g.userId, g.userId === meUserId, g.rank)
+            }
+            zIndex={isSelected ? SELECTED_Z_INDEX : undefined}
+            clickable={false}
+            title={g.name}
+          />
+        )
+      })}
       <FitToAll answer={answer} guesses={guesses} meUserId={meUserId} />
+      <PanToSelected target={selected ? { lat: selected.lat, lng: selected.lng } : null} />
     </Map>
   )
 }

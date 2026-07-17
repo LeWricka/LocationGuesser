@@ -1,11 +1,10 @@
 /// <reference types="google.maps" />
 import { useEffect, useState } from 'react'
 import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
-import { MapPin } from 'lucide-react'
 import type { LatLng } from '../../lib/geo'
 import { avatarPinFromProfile, targetPinSvg, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
 import type { MapPreset } from '../../lib/mapPresets'
-import { Icon, MapSkeleton } from '../../ui'
+import { MapSkeleton } from '../../ui'
 import styles from './PlayMap.module.css'
 
 // Vista inicial: el MUNDO entero. Empezando alejado, el
@@ -54,6 +53,14 @@ interface Props {
    * pin se queda clavado en el centro de la pantalla y el jugador MUEVE el mapa
    * bajo él; al asentarse el arrastre, el voto = centro del mapa. Más preciso a una
    * mano en móvil. Opt-in; sin esto, el comportamiento clásico (tocar para marcar).
+   *
+   * Este componente SOLO hace el seguimiento (`CenterPinTracker`, más abajo): el
+   * OVERLAY visual del pin lo dibuja el llamante (GameScene dibuja su propia
+   * diana, `.dianaFija` en PlayChallenge.module.css, con el halo blanco de
+   * contraste del issue #823). Antes este componente pintaba SU PROPIO overlay
+   * (`.centerPin`, un `MapPin` suelto) además del de GameScene — dos iconos
+   * apilados en el mismo punto, uno de ellos sin el halo de contraste. Se quitó
+   * de aquí (issue #823/#824) para que exista un solo dibujo, ya arreglado.
    */
   fixedCenterPin?: boolean
   /**
@@ -392,15 +399,6 @@ export function PlayMap({
           dentro de `.miniMapaScene`): ahí no cabe ni hace falta, y ese contenedor
           ya es `pointer-events: none` (solo abre el mapa al tocar). */}
       {!locked && <LayerToggle layer={layer} onChoose={chooseLayer} />}
-
-      {/* Pin de CENTRO FIJO: clavado en el centro de la pantalla mientras el jugador
-          mueve el mapa debajo. Decorativo (pointer-events:none) para no robar el
-          arrastre al mapa; el voto lo calcula `CenterPinTracker` con el centro. */}
-      {centerPinMode && (
-        <div className={styles.centerPin} aria-hidden="true">
-          <Icon icon={MapPin} size={36} />
-        </div>
-      )}
     </div>
   )
 }

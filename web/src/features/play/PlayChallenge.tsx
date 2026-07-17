@@ -173,6 +173,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // ranking (antes `getVotes`, ahora `getVotesWithNames`: una sola llamada para
   // las dos cosas, no dos).
   const [allGuesses, setAllGuesses] = useState<VoteWithName[]>([])
+  // Selección fila↔pin (issue #824): tocar una fila de `ChallengeBoard` resalta
+  // su pin en `AllGuessesMap`, más abajo en el revelado. Vive aquí (el padre de
+  // ambas superficies) y baja a las dos como `selectedUserId`.
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   // Tiempo de respuesta + factor de velocidad para el revelado (issue #628). Solo
   // tiene sentido con límite por jugada (guess_seconds no null): sin límite
   // ("Libre") no hay contra qué medir. `factor` es null cuando no se puede
@@ -1272,7 +1276,12 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
               Sin respuesta todavía (p.ej. un fallo puntual al pedirla) cae al
               PlayMap de siempre — mi pin + el mundo, sin bloquear el resultado. */}
           {answer ? (
-            <AllGuessesMap answer={answer} guesses={resultGuesses} meUserId={user?.id ?? ''} />
+            <AllGuessesMap
+              answer={answer}
+              guesses={resultGuesses}
+              meUserId={user?.id ?? ''}
+              selectedUserId={selectedUserId}
+            />
           ) : (
             <PlayMap
               guess={guess}
@@ -1292,7 +1301,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         {/* Leyenda bajo el mapa (issue #811): puesto + avatar + nombre + puntos +
             distancia + tiempo de respuesta — mismo componente/estilos que el
             detalle de un reto en el histórico del viaje (`ChallengeDetail`). */}
-        <ChallengeBoard votes={allGuesses} myUserId={user?.id ?? null} className="lg-rise" />
+        <ChallengeBoard
+          votes={allGuesses}
+          myUserId={user?.id ?? null}
+          className="lg-rise"
+          selectedUserId={selectedUserId}
+          onSelectUser={setSelectedUserId}
+        />
 
         <Card padding="md" raised>
           <Stack gap={4}>

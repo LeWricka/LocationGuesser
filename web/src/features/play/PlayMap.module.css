@@ -1,8 +1,14 @@
 /*
- * Lienzo de PlayMap. El `.wrap` envuelve el mapa de Google para poder superponer el
- * pin de centro fijo (overlay) sin afectar al arrastre. Hereda el tamaño del
- * contenedor (la hoja de jugar fija el alto del `.lg-map` interior); por eso el wrap
- * se estira al 100% y el mapa de dentro sigue mandando en su propio alto.
+ * Lienzo de PlayMap. El `.wrap` envuelve el mapa de Google para poder superponer
+ * el toggle de capa (`.layerToggle`) sin afectar al arrastre. Hereda el tamaño
+ * del contenedor (la hoja de jugar fija el alto del `.lg-map` interior); por eso
+ * el wrap se estira al 100% y el mapa de dentro sigue mandando en su propio alto.
+ *
+ * (issue #823/#824: el overlay del pin de CENTRO FIJO vivía aquí en `.centerPin`
+ * — un `MapPin` suelto, duplicado con la diana propia que ya dibuja el llamante
+ * (GameScene, `.dianaFija` en PlayChallenge.module.css). Se retiró: un solo
+ * dibujo, ya con el halo blanco de contraste del #823. Este componente solo
+ * hace el SEGUIMIENTO del centro fijo — ver `CenterPinTracker` en PlayMap.tsx.)
  */
 .wrap {
   position: relative;
@@ -15,26 +21,6 @@
      `@container` cuando este `.wrap` es diminuto (el thumbnail colapsado de
      128px de GameScene), en vez de necesitar un prop nuevo para distinguirlo. */
   container-type: inline-size;
-}
-
-/*
- * Pin de CENTRO FIJO: clavado en el centro del lienzo mientras el jugador mueve el
- * mapa debajo. Decorativo — no captura el puntero para no robar el arrastre. El
- * color es el acento de marca (token); la sombra lo despega del mapa. Anclado por la
- * PUNTA al centro exacto (translate de medio ancho y alto completo del icono).
- */
-.centerPin {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  /* MapPin de 36px: la punta queda en el centro del mapa = el voto real. */
-  transform: translate(-50%, -100%);
-  color: var(--color-accent);
-  pointer-events: none;
-  z-index: var(--z-sticky);
-  /* drop-shadow admite una sola sombra (no el box-shadow de dos capas de --shadow-pin):
-     usamos el color de velo (token) para que el pin se despegue del mapa. */
-  filter: drop-shadow(0 4px 8px var(--color-scrim));
 }
 
 /*

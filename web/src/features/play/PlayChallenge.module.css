@@ -415,14 +415,27 @@
 }
 
 /* Diana de centro fijo: pin clavado al centro del mapa expandido.
-   pointer-events:none para no robar el arrastre al mapa. */
+   pointer-events:none para no robar el arrastre al mapa.
+   Contraste garantizado (issue #823, feedback del dueño jugando): en satélite
+   el terreno suele ser VERDE o AZUL, así que el teal a pelo (solo con un
+   drop-shadow, como estaba antes) se perdía. Disco BLANCO de respaldo + sombra
+   `--shadow-pin` — el MISMO truco que el resto de pines de la app (anillo/disco
+   blanco, ver `avatarPin.ts`/`tripPins.css`): el blanco es el portador del
+   contraste, el teal encima siempre se lee. */
 .dianaFija {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-pin);
   color: var(--color-accent);
-  filter: drop-shadow(0 2px 4px var(--photo-text-shadow));
   pointer-events: none;
 }
 
