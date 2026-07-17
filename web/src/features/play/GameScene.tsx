@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type RefObject } from 'react'
+import { useRef, useState, type CSSProperties, type RefObject } from 'react'
 import { Compass as CompassIcon, Expand, House, Maximize2 } from 'lucide-react'
 import { PlayMap } from './PlayMap'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
@@ -156,6 +156,11 @@ export function GameScene({
   // Cruce esquina↔expandido del mini-mapa (issue #606): ver `useExitPresence`.
   const reducedMotion = useReducedMotion()
   const collapsed = useExitPresence(!mapOpen, reducedMotion)
+  // Última cámara del mapa expandido (centro + zoom): el mapa se DESMONTA al
+  // volver al panorama y, sin esto, cada reapertura nacía en la vista mundo —
+  // el jugador perdía el zoom que había afinado (feedback del dueño jugando).
+  // Ref (no estado): cambia en cada arrastre y no debe repintar nada.
+  const lastCameraRef = useRef<{ center: LatLng; zoom: number } | null>(null)
   const expanded = useExitPresence(sceneReady && mapOpen, reducedMotion)
   // Modelo de viewport: el contenedor se ata al alto VISIBLE real (px) cuando lo
   // conocemos; si no, el CSS cae a `100dvh`. Evita que el chrome/teclado colapse
@@ -345,6 +350,15 @@ export function GameScene({
               meUserId={meUserId}
               preset="jugar"
               fixedCenterPin
+              // Reapertura: se restaura la cámara del viaje anterior (zoom
+              // incluido). Primera vez con pin ya puesto (p.ej. borrador
+              // retomado): se arranca sobre el pin a zoom de ciudad.
+              initialCamera={
+                lastCameraRef.current ?? (guess ? { center: guess, zoom: 6 } : undefined)
+              }
+              onCameraChange={(camera) => {
+                lastCameraRef.current = camera
+              }}
             />
             {/* Diana central: pin fijo de GeoGuessr. */}
             <span className={styles.dianaFija} aria-hidden="true">
