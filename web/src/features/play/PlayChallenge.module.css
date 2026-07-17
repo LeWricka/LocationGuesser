@@ -671,6 +671,12 @@
 .resultMap {
   height: 62svh;
   min-height: 320px;
+  /* Fijo mientras la tarjeta del resultado y la clasificación scrollean debajo
+     (mismo criterio que el detalle del reto): la selección fila↔pin (#824) se
+     usa MIRANDO el mapa. */
+  position: sticky;
+  top: calc(env(safe-area-inset-top) + var(--space-2));
+  z-index: 2; /* design-lint-allow: capa local (mapa sticky sobre sus propias filas) */
 }
 
 .resultMap :global(.lg-map) {

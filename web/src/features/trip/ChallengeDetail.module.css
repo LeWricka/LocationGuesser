@@ -126,6 +126,14 @@
   overflow: hidden;
   border: 1px solid var(--hairline-soft);
   box-shadow: var(--shadow-sm);
+  /* MAPA FIJO mientras la lista scrollea (petición del dueño con 7 jugadores):
+     tocar una fila resalta su pin (#824) — sin esto, con la lista larga el mapa
+     quedaba fuera de vista justo cuando lo estás usando. Sticky dentro de
+     `.scroll` (su contenedor de scroll); el título/foto scrollean fuera y el
+     mapa se ancla arriba. */
+  position: sticky;
+  top: var(--space-2);
+  z-index: 2; /* design-lint-allow: capa local (mapa sticky sobre sus propias filas) */
 }
 
 .mapPending {
