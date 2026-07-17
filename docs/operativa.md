@@ -553,3 +553,42 @@ Variables por plantilla anotadas en la cabecera de cada fichero (`{{ .Token }}`,
   duplicados desaparecen, el culpable era el SMTP compartido) y no cae en spam.
 - El evento `login_email_solicitado` (Mixpanel, #679) sigue contando los envíos
   pedidos desde el cliente para contrastar.
+
+## 9. Coste y eficiencia de GitHub Actions — issue #817
+
+El repo está hoy en **público** (Actions gratis e ilimitado) como parche mientras
+se prepara la vuelta a **privado** (donde cada job factura redondeando AL MINUTO
+hacia arriba). Auditoría con datos de los últimos ~100 runs por workflow:
+
+- **El fallo masivo de `CI` (33/100 runs) NO es de código**: 25 de esos 33 son
+  jobs que "The job was not started because recent account payments have failed
+  or your spending limit needs to be increased" (billing de la cuenta, no del
+  workflow) — se ven como fallos casi instantáneos (2-5 s) con `runner_id: 0` y
+  sin steps. Solo quedan 8 fallos reales (~8 % del total), todos catches
+  legítimos de lint/tipos/tests. **Antes de volver a privado, resolver "Billing
+  & plans" en la cuenta de GitHub** (pago fallido o límite de gasto) o los jobs
+  no arrancan nunca, factura o no.
+- **`Smoke logueado (post-deploy)` ya no falla**: los 18 fallos del histórico
+  son todos anteriores al fix de #674 (04 jul, el guard de secrets corría en
+  `web/` antes del checkout). Desde entonces: 0 fallos. Además, como
+  `E2E_USER_EMAIL`/`E2E_USER_PASSWORD` aún no están configurados (ver §7), el
+  job hace *skip limpio* en ~8s en cada disparo — coste hoy irrelevante.
+- **`DB migrate`**: sano (1 fallo/23, no relacionado con billing).
+
+Cambios de #817 en los workflows (`.github/workflows/*.yml`):
+
+- `timeout-minutes` en todos los jobs (10 min los herméticos, 15 el smoke
+  logueado contra prod, 10 en `db-migrate`) — tope de coste ante un cuelgue.
+- `paths-ignore` (`docs/**`, `.claude/**`, `**/*.md`) en `ci.yml`: un cambio
+  solo de documentación ya no dispara un run completo (y, en cascada, tampoco
+  el `workflow_run` de `prod-smoke`, que depende de que `CI` corra).
+- Los 3 jobs herméticos de E2E (`smoke`, `create`, `a11y`) se fusionaron en un
+  solo job `e2e` (checkout + `npm ci` + instalación de Playwright una vez en
+  lugar de 3) — menos minutos facturables por redondeo, a cambio de ~1 min más
+  de wall time (siguen en paralelo con `quality`, y cada spec conserva su
+  propio step con nombre para que un fallo se vea claro en el log).
+- Caché de navegadores Playwright añadida también a `prod-smoke.yml` (ya
+  existía en `ci.yml`; le faltaba aquí).
+- Todas las actions a su major vigente (`checkout@v7`, `setup-node@v7`,
+  `cache@v6`, `upload-artifact@v7`, `supabase/setup-cli@v3`) — quita el aviso
+  de "Node.js 20 is deprecated" que salía en cada run.

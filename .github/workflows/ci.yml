@@ -3,8 +3,18 @@ name: CI
 on:
   push:
     branches: [main]
+    # No merece la pena facturar un run completo por un cambio que no toca código
+    # ejecutable (docs de producto, reglas de Claude, o el propio README).
+    paths-ignore:
+      - 'docs/**'
+      - '.claude/**'
+      - '**/*.md'
   pull_request:
     branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '.claude/**'
+      - '**/*.md'
 
 # Dieta de minutos (#657): un push nuevo a la misma rama/PR cancela el run de CI
 # anterior, que ya quedó obsoleto. No toca otros workflows (DB migrate, Smoke
@@ -17,15 +27,17 @@ jobs:
   quality:
     name: Lint, types, test y build
     runs-on: ubuntu-latest
+    # Hermético y sin red: ~3 min de sobra hoy. Tope de coste ante un cuelgue.
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: web
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -49,18 +61,29 @@ jobs:
       - name: Build
         run: npm run build
 
-  smoke:
-    name: Smoke E2E (hermético)
+  # Un solo job para los 3 specs de Playwright (antes: smoke/create/a11y en jobs
+  # separados). GitHub Actions factura por JOB redondeado al minuto hacia arriba;
+  # 3 jobs de ~1-3 min cada uno facturaban ~7 min por su cuenta (más el checkout +
+  # npm ci + instalación de Playwright repetidos 3 veces). Fusionados en un job
+  # secuencial, esa instalación se paga una vez y el redondeo se aplica una sola
+  # vez (#817). Coste: el job más lento del push pasa de ~4 min a ~5 min de wall
+  # time (los specs ya no corren en paralelo entre sí) — perceptible pero menor,
+  # y sigue en paralelo con `quality`. Cada spec mantiene su propio step con
+  # nombre, así que un fallo se identifica igual de rápido en el log.
+  e2e:
+    name: E2E hermético (smoke + crear reto + a11y)
     runs-on: ubuntu-latest
+    # Los 3 specs hoy suman ~4 min; deja margen sin regalar minutos a un cuelgue.
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: web
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -79,7 +102,7 @@ jobs:
       # entre runs, así que siempre hace falta `install-deps`.
       - name: Caché de navegadores Playwright
         id: pw-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
@@ -96,51 +119,13 @@ jobs:
       # la SPA monta y muestra el login. El cliente de Supabase se construye al
       # arrancar y exige las dos VITE_*, pero NO valida que sean reales: sirven
       # placeholders públicos. La pantalla de login no hace red. Sin secretos.
+      # Va primero por ser el más rápido (~5s): falla antes si algo básico rompe.
       - name: Smoke (solo el spec hermético)
         run: npx playwright test smoke
         env:
           VITE_SUPABASE_URL: https://placeholder.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_placeholder
           VITE_ANALYTICS_DISABLED: 'true'
-
-  create:
-    name: Crear reto E2E (hermético)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Resolver versión de Playwright (clave de caché)
-        id: pw-version
-        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
-
-      - name: Caché de navegadores Playwright
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-
-      - name: Install Playwright Chromium (+ deps del SO)
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Instalar solo deps del SO (navegador en caché)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
 
       # E2E HERMÉTICO del bucle de crear reto (#443/#456). Su config propia
       # (playwright.hermetic.config.ts) corre contra el BUILD de prod servido por
@@ -157,45 +142,6 @@ jobs:
           VITE_GOOGLE_MAPS_API_KEY: placeholder-maps-key
           VITE_ANALYTICS_DISABLED: 'true'
 
-  a11y:
-    name: Accesibilidad + viewports + integridad de esquina (hermético)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Resolver versión de Playwright (clave de caché)
-        id: pw-version
-        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
-
-      - name: Caché de navegadores Playwright
-        id: pw-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
-
-      - name: Install Playwright Chromium (+ deps del SO)
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Instalar solo deps del SO (navegador en caché)
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
-
       # Guardarraíles HERMÉTICOS de la galería (GALLERY=1: fixtures, sin login ni red;
       # cada spec bloquea toda red externa). `npm run a11y` corre dos specs:
       #  - #396 accesibilidad: axe-core por pantalla a 390×844 (falla solo con violaciones
@@ -203,6 +149,7 @@ jobs:
       #  - #415 integridad de esquina: la hoja (GlobeSheet) no deja asomar la escena oscura
       #    por sus esquinas redondeadas (muestreo de píxel en los triángulos de esquina a
       #    un viewport alto). Los placeholders VITE_* bastan (cliente Supabase falso).
+      # Va al final por ser el más lento (~3 min).
       - name: Accesibilidad (axe) + overflow a 320px + integridad de esquina
         run: npm run a11y
         env:

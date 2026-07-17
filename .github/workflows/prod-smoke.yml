@@ -30,6 +30,9 @@ jobs:
   smoke-logueado:
     name: Smoke logueado en prod
     runs-on: ubuntu-latest
+    # Pega a la app real (Maps, Supabase, Vercel): algo más de margen que los
+    # jobs herméticos, incluida la espera de 90s al deploy de Vercel.
+    timeout-minutes: 15
     # En el disparo post-deploy, solo si la CI que lo disparó fue verde (no tiene
     # sentido probar prod si el build/test falló). El disparo manual no trae este
     # contexto, así que se permite siempre.
@@ -61,11 +64,11 @@ jobs:
 
       - name: Checkout
         if: steps.guard.outputs.run == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
         if: steps.guard.outputs.run == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
@@ -76,10 +79,31 @@ jobs:
         working-directory: web
         run: npm ci
 
-      - name: Install Playwright Chromium
+      # Mismo patrón de caché que ci.yml (#817): sin esto, cada disparo (manual o
+      # post-deploy) reinstalaba Chromium + deps del SO desde cero (~1 min).
+      - name: Resolver versión de Playwright (clave de caché)
         if: steps.guard.outputs.run == 'true'
+        id: pw-version
+        working-directory: web
+        run: echo "version=$(node -e "console.log(require('@playwright/test/package.json').version)")" >> "$GITHUB_OUTPUT"
+
+      - name: Caché de navegadores Playwright
+        if: steps.guard.outputs.run == 'true'
+        id: pw-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright Chromium (+ deps del SO)
+        if: steps.guard.outputs.run == 'true' && steps.pw-cache.outputs.cache-hit != 'true'
         working-directory: web
         run: npx playwright install --with-deps chromium
+
+      - name: Instalar solo deps del SO (navegador en caché)
+        if: steps.guard.outputs.run == 'true' && steps.pw-cache.outputs.cache-hit == 'true'
+        working-directory: web
+        run: npx playwright install-deps chromium
 
       # Espera prudente a que Vercel termine de redesplegar tras el merge a main. Solo
       # en el disparo post-deploy; en el manual el deploy ya está en su sitio.
@@ -94,7 +118,7 @@ jobs:
 
       - name: Subir artefactos de Playwright si falla
         if: ${{ failure() && steps.guard.outputs.run == 'true' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-prod-smoke
           path: |
