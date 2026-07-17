@@ -12,7 +12,15 @@ vi.mock('./useTripData', () => ({ useTripData: vi.fn() }))
 
 vi.mock('./TripDiario', () => ({ TripDiario: () => <div data-testid="diario" /> }))
 vi.mock('./TripWrap', () => ({ TripWrap: () => <div data-testid="wrap" /> }))
-vi.mock('./MomentSheet', () => ({ MomentSheet: () => null }))
+vi.mock('./MomentSheet', () => ({
+  MomentSheet: ({ moment }: { moment: Moment | null }) =>
+    moment ? <div data-testid="moment-sheet">{moment.challengeId}</div> : null,
+}))
+vi.mock('./ChallengeDetail', () => ({
+  ChallengeDetail: ({ challengeId }: { challengeId: string }) => (
+    <div data-testid="challenge-detail">{challengeId}</div>
+  ),
+}))
 vi.mock('../group/EditChallenge', () => ({ EditChallenge: () => null }))
 vi.mock('../group/GroupSettingsModal', () => ({ GroupSettingsModal: () => null }))
 
@@ -231,5 +239,50 @@ describe('TripPage — la sección se refleja en la URL', () => {
 
     await userEvent.click(screen.getByRole('radio', { name: 'Marcador' }))
     expect(window.location.hash).toBe('#g=g1&add=recuerdo&v=marcador')
+  })
+})
+
+describe('TripPage — restaura ver=/m= de la URL al montar (F5 no cierra lo abierto)', () => {
+  type Past = ReturnType<typeof useTripData>['pastChallenges']
+
+  test('con ver=<reto cerrado> reabre el detalle del reto', async () => {
+    window.location.hash = '#g=g1&ver=c9'
+    mockTripData({
+      pastChallenges: [{ challengeId: 'c9', status: 'closed', myResult: null }] as Past,
+    })
+    renderTrip()
+    expect(await screen.findByTestId('challenge-detail')).toHaveTextContent('c9')
+  })
+
+  test('con ver=<EN JUEGO sin jugar> aplica el anti-spoiler: manda a jugar, no al detalle', async () => {
+    window.location.hash = '#g=g1&ver=c9'
+    mockTripData({
+      pastChallenges: [{ challengeId: 'c9', status: 'active', myResult: null }] as Past,
+    })
+    const onPlay = vi.fn()
+    render(
+      <SessionContext.Provider value={session}>
+        <ToastProvider>
+          <TripPage
+            groupId="g1"
+            onPlayChallenge={onPlay}
+            onAddMoment={vi.fn()}
+            onAddChallenge={vi.fn()}
+            onBack={vi.fn()}
+          />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+    await vi.waitFor(() => expect(onPlay).toHaveBeenCalledWith('c9'))
+    expect(screen.queryByTestId('challenge-detail')).not.toBeInTheDocument()
+  })
+
+  test('con m=<momento> reabre la hoja del momento cuando llegan los datos', async () => {
+    window.location.hash = '#g=g1&m=m1'
+    mockTripData({
+      moments: [activeChallenge({ challengeId: 'm1', isChallenge: false, status: 'closed' })],
+    })
+    renderTrip()
+    expect(await screen.findByTestId('moment-sheet')).toHaveTextContent('m1')
   })
 })
