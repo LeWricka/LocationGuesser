@@ -210,3 +210,26 @@ describe('TripPage — FAB "Compartir" (#758)', () => {
     expect(modal).toHaveTextContent('share_fab')
   })
 })
+
+describe('TripPage — la sección se refleja en la URL', () => {
+  test('cambiar a Marcador escribe v=marcador en el hash y volver a Diario lo quita (refrescar conserva la pestaña)', async () => {
+    window.location.hash = '#g=g1'
+    mockTripData()
+    renderTrip()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Marcador' }))
+    expect(window.location.hash).toBe('#g=g1&v=marcador')
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Diario' }))
+    expect(window.location.hash).toBe('#g=g1')
+  })
+
+  test('no pisa parámetros ajenos del hash (flujos vivos como add=recuerdo)', async () => {
+    window.location.hash = '#g=g1&add=recuerdo'
+    mockTripData()
+    renderTrip()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Marcador' }))
+    expect(window.location.hash).toBe('#g=g1&add=recuerdo&v=marcador')
+  })
+})
