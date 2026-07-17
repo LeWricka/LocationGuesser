@@ -1,7 +1,7 @@
-import { forwardRef } from 'react'
+import { forwardRef, useMemo } from 'react'
 import { Map as MapIcon, Share2 } from 'lucide-react'
 import { Button, EmptyState, Icon } from '../../ui'
-import type { Moment, RoutePoint } from '../../lib/trip'
+import { associatedChallengeIds, type Moment, type RoutePoint } from '../../lib/trip'
 import { TripMap } from './TripMap'
 import { MomentCard } from './MomentCard'
 import { MomentTimeline } from './MomentTimeline'
@@ -67,6 +67,10 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
   carouselRef,
 ) {
   const hasMoments = moments.length > 0
+  // Retos "asociados" a un recuerdo del viaje por compartir la MISMA foto
+  // (issue #822, `associatedChallengeIds`): calculado UNA vez para todo el
+  // carrusel, no por tarjeta — `MomentCard` solo pinta el marcador sutil.
+  const associatedIds = useMemo(() => associatedChallengeIds(moments), [moments])
 
   return (
     <div className={styles.diario}>
@@ -106,6 +110,7 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
               <div key={m.challengeId} className={styles.slide} data-cid={m.challengeId}>
                 <MomentCard
                   moment={m}
+                  associatedWithMemory={associatedIds.has(m.challengeId)}
                   selected={m.challengeId === selectedId}
                   // Tocar una tarjeta que NO es la activa: solo SELECCIONA — mismo
                   // camino que un pin del mapa o un punto del timeline

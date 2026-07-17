@@ -5,6 +5,8 @@ function momentInput(over: Partial<BitacoraMomentInput> = {}): BitacoraMomentInp
   return {
     momentId: 'c1',
     momentTitle: 'Un momento',
+    isChallenge: false,
+    status: 'recuerdo',
     date: '2026-06-15T10:00:00.000Z',
     description: null,
     dateLabel: null,
@@ -88,6 +90,19 @@ describe('groupMomentsByDay — fotos abribles y flatIndex', () => {
     expect(days[0].moments[0].photos).toEqual([])
     expect(days[0].moments[0].videoPoster).toBe('portada.jpg')
     expect(flatPhotos).toEqual([])
+  })
+})
+
+describe('groupMomentsByDay — marca de reto (issue #821)', () => {
+  test('conserva isChallenge/status de cada entrada, sin mezclarlos entre momentos', () => {
+    const moments = [
+      momentInput({ momentId: 'c-recuerdo', isChallenge: false, status: 'recuerdo' }),
+      momentInput({ momentId: 'c-cerrado', isChallenge: true, status: 'closed' }),
+    ]
+    const { days } = groupMomentsByDay(moments)
+    const [recuerdo, cerrado] = days[0].moments
+    expect(recuerdo).toMatchObject({ isChallenge: false, status: 'recuerdo' })
+    expect(cerrado).toMatchObject({ isChallenge: true, status: 'closed' })
   })
 })
 

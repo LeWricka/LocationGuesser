@@ -249,6 +249,13 @@ export const CH_NUMBER = 'ch-number-shinkansen'
 // en juego — caso de vigilancia visual del filtro anti-spoiler
 // (`isMomentPhotoVisible`).
 export const CH_ACTIVE_SORPRESA = 'ch-active-sorpresa-dotombori'
+// Reto CERRADO creado a partir de la foto de CH_MEMORY (`fromMomentId` en
+// `CreateChallengeFlow`, sin sustituir la foto prefijada): comparte el MISMO
+// `image_path` ('photo-ramen.jpg') que un recuerdo real del viaje — el caso
+// exacto que reportó el dueño (issue #821, "un reto y un momento con la misma
+// foto se leen como duplicados"). Guarda visual permanente de que el chip
+// diana + estado distingue el reto del recuerdo aun compartiendo foto.
+export const CH_CLOSED_SAME_PHOTO_AS_MEMORY = 'ch-closed-ramen-reto'
 
 export const CHALLENGES: ChallengeRow[] = [
   baseChallenge({
@@ -362,6 +369,24 @@ export const CHALLENGES: ChallengeRow[] = [
     created_by: ME_ID,
     created_at: isoFromNow(-2 * HOUR),
   }),
+  // Reto CERRADO con la MISMA foto que CH_MEMORY (issue #821, ver la constante
+  // más arriba): distinto id, misma `image_path` — sin el chip diana + estado,
+  // esta entrada y "El mejor ramen del viaje" se leerían como duplicadas en la
+  // Bitácora. Creado por otro miembro y con votos propios, para que también
+  // aparezca con normalidad en "Retos anteriores"/Marcador.
+  baseChallenge({
+    id: CH_CLOSED_SAME_PHOTO_AS_MEMORY,
+    title: '¿Dónde estaba este ramen?',
+    description: 'El mismo callejón, ahora convertido en reto.',
+    image_path: 'photo-ramen.jpg',
+    place_lat: 35.0036,
+    place_lng: 135.7788,
+    lat: 35.0036,
+    lng: 135.7788,
+    deadline_at: isoFromNow(-3 * DAY),
+    created_by: 'user-iker-0002',
+    created_at: isoFromNow(-4 * DAY - HOUR),
+  }),
   // Recuerdos situados de los OTROS viajes (#700): un pin suelto por viaje en el
   // globo de `home-con-datos`. Recuerdos (sin plazo) a propósito: no alteran el
   // estado del viaje (idle) ni el chip "Te toca jugar" del protagonista.
@@ -400,6 +425,7 @@ export const CHALLENGES: ChallengeRow[] = [
 export const ANSWERS: Record<string, { lat: number; lng: number }> = {
   [CH_CLOSED]: { lat: 35.0095, lng: 135.6716 },
   [CH_CLOSED_OTHER]: { lat: 35.0394, lng: 135.7292 },
+  [CH_CLOSED_SAME_PHOTO_AS_MEMORY]: { lat: 35.0036, lng: 135.7788 },
 }
 export const NUMBER_ANSWERS: Record<string, number> = {
   [CH_NUMBER]: 285,
@@ -485,6 +511,26 @@ export const VOTES: Vote[] = [
     distance_km: 42,
     guess_lat: 34.9,
     guess_lng: 135.9,
+  }),
+  // Reto cerrado con la MISMA foto que CH_MEMORY (issue #821): un par de votos
+  // para que también aparezca con normalidad en la clasificación/"Retos anteriores".
+  vote({
+    id: 'v10',
+    challenge_id: CH_CLOSED_SAME_PHOTO_AS_MEMORY,
+    user_id: ME_ID,
+    points: 4400,
+    distance_km: 5,
+    guess_lat: 35.01,
+    guess_lng: 135.78,
+  }),
+  vote({
+    id: 'v11',
+    challenge_id: CH_CLOSED_SAME_PHOTO_AS_MEMORY,
+    user_id: 'user-marta-0001',
+    points: 3600,
+    distance_km: 20,
+    guess_lat: 34.9,
+    guess_lng: 135.6,
   }),
   // Reto de número cerrado.
   vote({
