@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Clock, X } from 'lucide-react'
-import { Avatar, Badge, ChallengePhoto, EmptyState, Icon, Spinner } from '../../ui'
-import { Medal } from '../../ui/Medal'
+import { Clock, X } from 'lucide-react'
+import { Badge, ChallengePhoto, EmptyState, Icon, Spinner } from '../../ui'
 import { AllGuessesMap, type GuessMarker } from '../group/AllGuessesMap'
+import { ChallengeBoard, rankByUserId } from '../group/ChallengeBoard'
 import {
   getAnswer,
   getChallengeOrNull,
@@ -16,7 +16,7 @@ import { signedImageUrl } from '../../lib/storage'
 import { isLive } from '../../lib/groupData'
 import { resolveMomentPhoto } from '../../lib/trip'
 import { formatDeadlineDateTime } from '../../lib/time'
-import { fmtDist, fmtNumber, type LatLng } from '../../lib/geo'
+import { fmtNumber, type LatLng } from '../../lib/geo'
 import styles from './ChallengeDetail.module.css'
 
 interface Props {
@@ -29,62 +29,11 @@ interface Props {
 
 type Phase = 'loading' | 'gone' | 'error' | 'ready'
 
-interface ClassificationRow {
-  userId: string
-  name: string
-  avatar: string | null
-  points: number
-  distanceKm: number | null
-  guessNumber: number | null
-  absError: number | null
-  leftApp: boolean
-  isMe: boolean
-}
-
-// Icono discreto "salió de la app durante la jugada" (issue #200) — mismo criterio
-// que MarcadorTab (title + aria-label duplican el aviso para ratón y lector de
-// pantalla). Se duplica aquí en vez de exportarlo: es un fragmento de ~10 líneas
-// ya repetido en un par de sitios de la app (admin, marcador), no justifica un
-// componente compartido propio.
-function LeftAppFlag() {
-  return (
-    <span
-      className={styles.leftAppFlag}
-      title="Salió de la app durante la jugada"
-      aria-label="Salió de la app durante la jugada"
-    >
-      <Icon icon={AlertTriangle} size={13} />
-    </span>
-  )
-}
-
-function classificationOf(votes: VoteWithName[], myUserId: string | null): ClassificationRow[] {
-  return votes
-    .map((v) => ({
-      userId: v.user_id,
-      name: v.display_name,
-      avatar: v.avatar,
-      points: v.points,
-      distanceKm: v.distance_km,
-      guessNumber: v.guess_number,
-      absError: v.abs_error,
-      leftApp: v.left_app,
-      isMe: v.user_id === myUserId,
-    }))
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points
-      // Empate a puntos: desempata quien cayó más cerca (distancia o error
-      // absoluto, según el tipo de reto) — más informativo que el nombre.
-      const aTie = a.distanceKm ?? a.absError
-      const bTie = b.distanceKm ?? b.absError
-      if (aTie != null && bTie != null && aTie !== bTie) return aTie - bTie
-      if (aTie == null && bTie != null) return 1
-      if (aTie != null && bTie == null) return -1
-      return a.name.localeCompare(b.name)
-    })
-}
-
-function guessMarkersOf(votes: VoteWithName[]): GuessMarker[] {
+// Pines de los votos con jugada plotable (issue #800), con el PUESTO de cada
+// uno (issue #811, badge del pin) — el MISMO orden que `ChallengeBoard`, vía
+// `rankByUserId` (no un criterio propio recalculado aquí).
+function guessMarkersOf(votes: VoteWithName[], myUserId: string | null): GuessMarker[] {
+  const rankOf = rankByUserId(votes, myUserId)
   return votes
     .filter(
       (v): v is VoteWithName & { guess_lat: number; guess_lng: number } =>
@@ -96,7 +45,10 @@ function guessMarkersOf(votes: VoteWithName[]): GuessMarker[] {
       avatar: v.avatar,
       lat: v.guess_lat,
       lng: v.guess_lng,
-      points: v.points,
+      // `rankOf` sale de la MISMA lista de votos: siempre tiene entrada para
+      // cada user_id presente aquí. El `?? 0` es puramente defensivo (nunca
+      // debería alcanzarse) para no arrastrar `undefined` al tipo del marker.
+      rank: rankOf.get(v.user_id) ?? 0,
     }))
 }
 
@@ -190,8 +142,7 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
       })
     : { src: null, surprise: false }
 
-  const classification = classificationOf(votes, myUserId)
-  const guesses = guessMarkersOf(votes)
+  const guesses = guessMarkersOf(votes, myUserId)
 
   const heading = challenge
     ? isNumberChallenge
@@ -307,71 +258,19 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
               </div>
             )}
 
-            {/* Clasificación DEL RETO (issue #800): jugador → puntos → distancia,
-                ordenado, el propio destacado. Tabla compacta: el mapa y la foto son
-                los protagonistas, esto es dato de apoyo. */}
-            <section className={styles.board} aria-label="Clasificación del reto">
-              <h2 className={styles.boardTitle}>
-                Clasificación
-                {classification.length > 0 && (
-                  <span className={styles.boardCount}>
-                    {' · '}
-                    {classification.length} {classification.length === 1 ? 'jugador' : 'jugadores'}
-                  </span>
-                )}
-              </h2>
-              {classification.length === 0 ? (
-                <p className={styles.boardEmpty}>
-                  {closed ? 'Se cerró sin votos.' : 'Nadie ha jugado todavía.'}
-                </p>
-              ) : (
-                <ol className={styles.boardList}>
-                  {classification.map((row, i) => (
-                    <li
-                      key={row.userId}
-                      className={[styles.boardRow, row.isMe ? styles.boardRowMine : '']
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
-                      <span className={styles.boardRank} aria-hidden="true">
-                        {i < 3 ? (
-                          <Medal rank={(i + 1) as 1 | 2 | 3} size={18} />
-                        ) : (
-                          <span className={styles.boardRankNum}>{i + 1}</span>
-                        )}
-                      </span>
-                      <Avatar
-                        userId={row.userId}
-                        avatarUrl={row.avatar}
-                        name={row.name}
-                        size="sm"
-                      />
-                      <span className={styles.boardName}>
-                        {row.name}
-                        {row.isMe && <span className={styles.boardMeTag}>Tú</span>}
-                        {row.leftApp && <LeftAppFlag />}
-                      </span>
-                      <span className={styles.boardPoints}>
-                        {row.points.toLocaleString('es-ES')} pts
-                      </span>
-                      <span className={styles.boardDetail}>
-                        {isNumberChallenge
-                          ? row.guessNumber != null
-                            ? fmtNumber(
-                                row.guessNumber,
-                                challenge.number_decimals,
-                                challenge.number_unit,
-                              )
-                            : '—'
-                          : row.distanceKm != null
-                            ? fmtDist(row.distanceKm)
-                            : '—'}
-                      </span>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
+            {/* Clasificación DEL RETO (issue #800; extraída a compartible con
+                PlayChallenge en el #811, columna de tiempo incluida): jugador →
+                puntos → distancia/cifra → tiempo, ordenado, el propio destacado.
+                Tabla compacta: el mapa y la foto son los protagonistas. */}
+            <ChallengeBoard
+              votes={votes}
+              myUserId={myUserId}
+              isNumberChallenge={isNumberChallenge}
+              numberDecimals={challenge.number_decimals}
+              numberUnit={challenge.number_unit}
+              emptyLabel={closed ? 'Se cerró sin votos.' : 'Nadie ha jugado todavía.'}
+              className={styles.board}
+            />
           </>
         )}
       </div>

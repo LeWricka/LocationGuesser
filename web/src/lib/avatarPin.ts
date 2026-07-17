@@ -21,22 +21,26 @@
 
 import { parseAvatar, svgForEmoji } from './avatar'
 
-/** Tamaño del icono del pin en px (el componente lo pasa a `google.maps.Size`). */
-export const PIN_SIZE = { width: 40, height: 42 } as const
+/** Tamaño del icono del pin en px (el componente lo pasa a `google.maps.Size`).
+ * Lleva un margen EXTRA arriba y a la derecha (issue #811, +6px cada uno) que
+ * no pertenece al disco: es el hueco del badge de PUESTO (esquina sup-derecha)
+ * — sin él, el badge se recortaría contra el borde del icono. */
+export const PIN_SIZE = { width: 46, height: 48 } as const
 
 /** Punta del pin (abajo-centro, la puntita del rombo): ancla que se clava en la
- * coordenada exacta — mismo criterio que el pin-foto del globo/viaje. */
-export const PIN_ANCHOR = { x: 20, y: 40 } as const
-
-/** Origen de la etiqueta (debajo de la punta), para pintar el nombre bajo el pin. */
-export const PIN_LABEL_ORIGIN = { x: 20, y: 50 } as const
+ * coordenada exacta — mismo criterio que el pin-foto del globo/viaje. NO es el
+ * centro horizontal de `PIN_SIZE.width` (ese margen extra es asimétrico, solo
+ * del badge): sigue centrada en el DISCO, no en el icono completo. */
+export const PIN_ANCHOR = { x: 20, y: 46 } as const
 
 // Geometría del disco + rombo, calcada de `.lg-trip-pin`/`.lg-trip-pin__disc` en
 // tripPins.css (disco + puntita que se solapa un poco en su base) pero a la
 // escala de este pin más compacto (40×42 frente a los 48px del pin-foto: aquí no
-// hay foto, así que no hace falta el mismo margen para miniatura/sombra).
+// hay foto, así que no hace falta el mismo margen para miniatura/sombra). CY
+// lleva el margen superior del badge de puesto (issue #811: +6, ver PIN_SIZE);
+// CX no cambia (el margen extra de PIN_SIZE es solo a la derecha).
 const CX = 20
-const CY = 19
+const CY = 25
 const DISC_R = 15 // radio de RELLENO del disco (el trazo del anillo añade RING_W/2 más)
 const RING_W = 3 // = --pin-ring-width
 const TAIL_SIDE = 9 // lado del rombo (rect rotado 45°) que hace de puntita
@@ -50,6 +54,48 @@ const AVATAR_FILL = '#e6f2f1' // --accent-tint // design-lint-allow: SVG data-UR
 const AVATAR_ICON = '#0f766e' // --color-accent // design-lint-allow: SVG data-URI, no lee var(--)
 const ANSWER_FILL = '#c9a24b' // --medal-gold // design-lint-allow: SVG data-URI, no lee var(--)
 const ANSWER_ICON = '#ffffff' // design-lint-allow: SVG data-URI, no lee var(--)
+
+// Colores del badge de PUESTO (issue #811): mismo lenguaje que `ui/Medal` (oro/
+// plata/bronce sobre su tinte "on-*" oscuro) más un neutro propio para 4º y
+// siguientes (no existe medalla más allá del podio). Literales por el mismo
+// motivo que el resto de esta tabla: un data-URI no lee `var(--token)`.
+const RANK_GOLD_FILL = '#c9a24b' // --medal-gold // design-lint-allow: SVG data-URI, no lee var(--)
+const RANK_GOLD_TEXT = '#2a2110' // --medal-on-gold // design-lint-allow: SVG data-URI, no lee var(--)
+const RANK_SILVER_FILL = '#a9a39a' // --medal-silver // design-lint-allow: SVG data-URI, no lee var(--)
+const RANK_SILVER_TEXT = '#20211f' // --medal-on-silver // design-lint-allow: SVG data-URI, no lee var(--)
+const RANK_BRONZE_FILL = '#b07a4e' // --medal-bronze // design-lint-allow: SVG data-URI, no lee var(--)
+const RANK_BRONZE_TEXT = '#2a1b0f' // --medal-on-bronze // design-lint-allow: SVG data-URI, no lee var(--)
+const RANK_NEUTRAL_FILL = '#575f6c' // --ink-600 // design-lint-allow: SVG data-URI, no lee var(--)
+const RANK_NEUTRAL_TEXT = '#ffffff' // design-lint-allow: SVG data-URI, no lee var(--)
+
+function rankColorOf(rank: number): { fill: string; text: string } {
+  if (rank === 1) return { fill: RANK_GOLD_FILL, text: RANK_GOLD_TEXT }
+  if (rank === 2) return { fill: RANK_SILVER_FILL, text: RANK_SILVER_TEXT }
+  if (rank === 3) return { fill: RANK_BRONZE_FILL, text: RANK_BRONZE_TEXT }
+  return { fill: RANK_NEUTRAL_FILL, text: RANK_NEUTRAL_TEXT }
+}
+
+// Badge de PUESTO (issue #811): mini-disco de ~18px en la esquina sup-derecha
+// del pin, ligeramente montado sobre el propio disco (mismo patrón que un
+// badge de notificación sobre un avatar). Un anillo blanco lo separa del
+// terreno satélite de debajo, igual que el resto de los trazos del pin.
+const BADGE_R = 9
+const BADGE_RING_W = 1.5
+const BADGE_CX = CX + 12
+const BADGE_CY = CY - 12
+
+function rankBadgeSvg(rank: number): string {
+  const { fill, text } = rankColorOf(rank)
+  // Con 10 jugadores el peor puesto es "10": dos cifras no caben legibles a
+  // font-size 10 en un disco de 18px, así que se encoge un punto.
+  const fontSize = rank >= 10 ? 8 : 10
+  return (
+    `<circle cx="${BADGE_CX}" cy="${BADGE_CY}" r="${BADGE_R}" fill="${fill}" ` +
+    `stroke="${RING_WHITE}" stroke-width="${BADGE_RING_W}"/>` +
+    `<text x="${BADGE_CX}" y="${BADGE_CY}" text-anchor="middle" dominant-baseline="central" ` +
+    `font-family="sans-serif" font-weight="700" font-size="${fontSize}" fill="${text}">${rank}</text>`
+  )
+}
 
 // Escala del glifo (viewBox 24×24, el de ANIMAL_SVGS/IconDiana) dentro del disco:
 // ~66% de su diámetro, mismo criterio proporcional que `Avatar.module.css` (.svg
@@ -109,12 +155,25 @@ function wrapSvg(body: string): string {
  * PROPIO pin entre los del resto, issue #795) + puntita corta.
  * `emoji` debe ser una clave de `ANIMAL_SVGS` (ver `svgForEmoji`); las llamadas
  * de la app siempre pasan por `parseAvatar`/`canonicalEmoji`, que lo garantizan.
+ *
+ * `rank` (issue #811): puesto del jugador en el reto (1-based, mismo orden que
+ * `ChallengeBoard`). Si llega informado, dibuja el badge de puesto en la
+ * esquina sup-derecha (oro/plata/bronce/neutro); sin él (null/undefined,
+ * p.ej. el pin propio mientras se juega, antes de revelar) no se dibuja nada
+ * ahí — el hueco extra de `PIN_SIZE` queda vacío.
  */
-export function avatarPinSvg(emoji: string, ring: 'default' | 'active' = 'default'): string {
+export function avatarPinSvg(
+  emoji: string,
+  ring: 'default' | 'active' = 'default',
+  rank?: number | null,
+): string {
   const ringColor = ring === 'active' ? RING_ACTIVE : RING_WHITE
   const path = svgForEmoji(emoji) ?? ''
   return wrapSvg(
-    tailSvg(ringColor) + discSvg(AVATAR_FILL, ringColor) + iconGroup(path, AVATAR_ICON),
+    tailSvg(ringColor) +
+      discSvg(AVATAR_FILL, ringColor) +
+      iconGroup(path, AVATAR_ICON) +
+      (rank != null ? rankBadgeSvg(rank) : ''),
   )
 }
 
@@ -138,15 +197,18 @@ function defaultEmojiFor(userId: string): string {
  * `own` (issue #795): true para el pin del PROPIO jugador en un mapa con varios
  * jugadores (el resultado post-partida) — anillo teal profundo en vez de blanco,
  * para encontrarse un vistazo más rápido entre los pines del resto.
+ *
+ * `rank` (issue #811): puesto del jugador en el reto, ver `avatarPinSvg`.
  */
 export function avatarPinFromProfile(
   avatarUrl: string | null,
   userId: string,
   own = false,
+  rank?: number | null,
 ): string {
   const resolved = parseAvatar(avatarUrl, userId)
   const emoji = resolved.kind === 'emoji' ? resolved.emoji : defaultEmojiFor(userId)
-  return avatarPinSvg(emoji, own ? 'active' : 'default')
+  return avatarPinSvg(emoji, own ? 'active' : 'default', rank)
 }
 
 // Diana (mismo trazo que `IconDiana` del set custom de iconos): dos anillos +

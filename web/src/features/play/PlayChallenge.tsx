@@ -16,6 +16,11 @@ import { PlayMap } from './PlayMap'
 // nombre — no solo el propio + la respuesta. Reutiliza la fábrica de pines
 // (issue #794) y el criterio de labels ya resueltos en `AllGuessesMap`.
 import { AllGuessesMap, type GuessMarker } from '../group/AllGuessesMap'
+// Leyenda del resultado (issue #811): mismo componente/estilos que el detalle
+// de un reto en el histórico del viaje (`ChallengeDetail`) — puesto, avatar,
+// nombre, puntos, distancia y tiempo de respuesta. `rankByUserId` alimenta
+// también el badge de puesto de los pines del mapa de arriba (mismo orden).
+import { ChallengeBoard, rankByUserId } from '../group/ChallengeBoard'
 import { StreetViewPano, type StreetViewPanoHandle } from './StreetViewPano'
 import { GameScene, type GameSceneData } from './GameScene'
 import { CountdownOverlay } from './CountdownOverlay'
@@ -1085,14 +1090,19 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // no hay dónde clavarlos. Con MI timeout, `resultGuesses` simplemente no
   // lleva mi pin (correcto: no marqué) — el mapa se pinta igual con quien sí
   // marcó, siempre que la respuesta llegara a resolverse (ver el render de
-  // abajo: sin `answer` cae al PlayMap de siempre).
+  // abajo: sin `answer` cae al PlayMap de siempre). El PUESTO de cada pin
+  // (issue #811, badge del pin) sale del MISMO orden que `ChallengeBoard` de
+  // abajo (`rankByUserId`, no un criterio propio recalculado aquí).
+  const rankOfGuess = rankByUserId(allGuesses, user?.id ?? null)
   const resultGuesses: GuessMarker[] = allGuesses.filter(hasGuessLocation).map((v) => ({
     userId: v.user_id,
     name: v.display_name,
     avatar: v.avatar,
     lat: v.guess_lat,
     lng: v.guess_lng,
-    points: v.points,
+    // Ver el comentario del `?? 0` gemelo en `ChallengeDetail.guessMarkersOf`:
+    // `rankOfGuess` sale de la MISMA lista de votos, siempre tiene entrada.
+    rank: rankOfGuess.get(v.user_id) ?? 0,
   }))
   // Reto de práctica: plazo lejano (>1 año). Solo en estos mostramos "volver a
   // jugar" tras revelar; en un reto real rejugar tras ver la respuesta sería trampa.
@@ -1278,6 +1288,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             />
           )}
         </div>
+
+        {/* Leyenda bajo el mapa (issue #811): puesto + avatar + nombre + puntos +
+            distancia + tiempo de respuesta — mismo componente/estilos que el
+            detalle de un reto en el histórico del viaje (`ChallengeDetail`). */}
+        <ChallengeBoard votes={allGuesses} myUserId={user?.id ?? null} className="lg-rise" />
 
         <Card padding="md" raised>
           <Stack gap={4}>
