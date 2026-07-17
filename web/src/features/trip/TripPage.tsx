@@ -133,6 +133,23 @@ export function TripPage({
 
   // Sección activa (diario|marcador). Gobierna el desplazamiento de la pista.
   const [section, setSection] = useState<Section>(initialSection)
+  // La sección se refleja en la URL (`&v=marcador`/`&v=fotos`) para que
+  // REFRESCAR conserve la pestaña: sin esto, F5 en Marcador te devolvía a
+  // Diario porque el estado solo vivía en React. `replaceState` a propósito:
+  // no crea entradas de historial (atrás sigue saliendo del viaje, no
+  // recorriendo pestañas) ni emite `hashchange` (no re-dispara el router).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    // Solo se toca `v`: pisar el hash entero borraría parámetros de flujos
+    // vivos (`add=…`, `adm=…`) o de otra ruta si el viaje está de salida.
+    if (params.get('g') !== groupId) return
+    if (section === 'diario') params.delete('v')
+    else params.set('v', section)
+    const hash = `#${params.toString()}`
+    if (window.location.hash !== hash) {
+      window.history.replaceState(window.history.state, '', hash)
+    }
+  }, [section, groupId])
   // Momento abierto en la hoja de detalle (null = cerrada).
   const [openMoment, setOpenMoment] = useState<Moment | null>(null)
   // Detalle de UN reto abierto desde "Retos anteriores" del Marcador (issue
