@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Clock, X } from 'lucide-react'
+import { Check, Clock, X } from 'lucide-react'
 import { Badge, ChallengePhoto, EmptyState, Icon, Spinner } from '../../ui'
 import { AllGuessesMap, type GuessMarker } from '../group/AllGuessesMap'
 import { ChallengeBoard, rankByUserId } from '../group/ChallengeBoard'
@@ -54,10 +54,12 @@ function guessMarkersOf(votes: VoteWithName[], myUserId: string | null): GuessMa
 
 /**
  * Detalle completo de UN reto (issue #800), abierto desde "Retos anteriores" del
- * Marcador: clasificación DEL RETO (jugador → puntos → distancia, el propio
- * destacado), el mapa con las jugadas de TODOS (reusa `AllGuessesMap` del
- * revelado, #797) y la foto ampliable — título, quién lo creó y cuándo cierra/
- * cerró. Visual-first: mapa y foto protagonistas, la tabla compacta.
+ * Marcador: escena OSCURA e inmersiva (grafito+teal, sin papel) — la foto a
+ * sangre como hero con el chip de estado/título/meta superpuestos, el mapa con
+ * las jugadas de TODOS (reusa `AllGuessesMap` del revelado, #797, ahora con el
+ * NOMBRE bajo cada pin) y la clasificación DEL RETO en vidrio sobre la escena
+ * (`ChallengeBoard` `tone="dark"`). Visual-first: mapa y foto protagonistas,
+ * la tabla compacta.
  *
  * Se basta a sí mismo (no depende de `useTripData`): pide sus propios datos por
  * `challengeId` — `getChallengeOrNull` (reto), `getVotesWithNames` (clasificación
@@ -199,38 +201,48 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
 
         {phase === 'ready' && challenge && (
           <>
-            <header className={styles.head}>
-              {closed ? (
-                <Badge tone="neutral">Cerrado</Badge>
-              ) : (
-                <Badge tone="live" dot>
-                  EN JUEGO
-                </Badge>
-              )}
-              <h1 className={styles.title}>{heading}</h1>
-              <p className={styles.meta}>
-                Creado por <strong>{isOwn ? 'ti' : (creatorName ?? '—')}</strong>
-                {challenge.deadline_at && (
-                  <>
-                    {' · '}
-                    <Icon icon={Clock} size={13} className={styles.metaIcon} />
-                    {closed ? 'Cerró' : 'Cierra'} el {formatDeadlineDateTime(challenge.deadline_at)}
-                  </>
-                )}
-              </p>
-            </header>
-
-            {/* Foto protagonista (issue #800, visual-first): ampliable — ChallengePhoto
-                ya integra `Lightbox` (zoomable por defecto), no hace falta cablearlo
-                aparte. Mismo anti-spoiler que el resto de la app: si sigue oculta cae
+            {/* Hero a sangre (dirección validada, detalle oscuro inmersivo): la
+                foto manda, con el chip/título/meta superpuestos sobre un
+                degradado que funde la foto con la escena de debajo (mismo
+                patrón que `MomentSheet` `.hero`, ver ese módulo). Ampliable:
+                `ChallengePhoto` ya integra `Lightbox` (zoomable por defecto).
+                Mismo anti-spoiler que el resto de la app: si sigue oculta cae
                 al placeholder de marca, nunca revienta la sorpresa. */}
-            <ChallengePhoto
-              src={photoDisplay.src}
-              alt={challenge.title}
-              ratio="wide"
-              size="lg"
-              className={styles.photo}
-            />
+            <div className={styles.hero}>
+              <div className={styles.heroPhoto}>
+                <ChallengePhoto
+                  src={photoDisplay.src}
+                  alt={challenge.title}
+                  ratio="wide"
+                  size="lg"
+                  className={styles.heroImg}
+                />
+              </div>
+              <div className={styles.heroCaption}>
+                {closed ? (
+                  <span className={styles.chipClosed}>
+                    <Icon icon={Check} size={12} />
+                    Cerrado
+                  </span>
+                ) : (
+                  <Badge tone="live" dot>
+                    EN JUEGO
+                  </Badge>
+                )}
+                <h1 className={styles.title}>{heading}</h1>
+                <p className={styles.meta}>
+                  Creado por <strong>{isOwn ? 'ti' : (creatorName ?? '—')}</strong>
+                  {challenge.deadline_at && (
+                    <>
+                      {' · '}
+                      <Icon icon={Clock} size={13} className={styles.metaIcon} />
+                      {closed ? 'Cerró' : 'Cierra'} el{' '}
+                      {formatDeadlineDateTime(challenge.deadline_at)}
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
 
             {isNumberChallenge ? (
               <section className={styles.numberAnswer} aria-label="Respuesta correcta">
@@ -248,8 +260,12 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
             ) : (
               // Mapa con las jugadas de TODOS (issue #800: reusa `AllGuessesMap` del
               // revelado, #797 — solo import). Sin respuesta (RLS: reto propio EN
-              // JUEGO) no hay mapa que pintar; nota en su lugar.
-              <div className={styles.mapWrap}>
+              // JUEGO) no hay mapa que pintar; nota en su lugar. `aria-hidden` SOLO
+              // con mapa real (no en la nota "se revela al cerrar", que sí es
+              // contenido): los pines/nombres del mapa son decorativos — el dato
+              // accesible real (nombre, puntos, distancia) vive en `ChallengeBoard`
+              // de abajo, con su propia fila-botón enfocable.
+              <div className={styles.mapWrap} aria-hidden={answer ? true : undefined}>
                 {answer ? (
                   <AllGuessesMap
                     answer={answer}
@@ -279,6 +295,7 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
               className={styles.board}
               selectedUserId={selectedUserId}
               onSelectUser={setSelectedUserId}
+              tone="dark"
             />
           </>
         )}
