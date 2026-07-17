@@ -54,6 +54,11 @@ async function loadSentry(): Promise<void> {
     sendDefaultPii: false,
     // No activamos Session Replay de Sentry: ya tenemos el de Mixpanel. Con la
     // captura de errores basta para el dashboard.
+    // Ruido conocido del navegador, jamás accionable (LOCATIONGUESSER-12): el
+    // navegador salta una View Transition si la pestaña pasa a segundo plano en
+    // pleno cruce. No es un fallo nuestro y le pasará a cualquier usuario que
+    // minimice a mitad de animación — fuera del dashboard.
+    ignoreErrors: ['View transition was skipped because document visibility state is hidden'],
   })
   sentry = Sentry
   for (const op of queue.splice(0)) op(Sentry)
