@@ -158,6 +158,30 @@ export function TripPage({
   // JUEGO sin jugar) lo decide `MarcadorTab` llamando a `onPlayChallenge` en
   // su lugar, nunca a este estado.
   const [viewingChallengeId, setViewingChallengeId] = useState<string | null>(null)
+  // Mismo patrón que la sección (#835): detalle de reto (`ver=`) y hoja de
+  // momento (`m=`) se reflejan en el hash para que F5 no cierre lo que estabas
+  // mirando. Los ids pedidos por la URL al montar se guardan aparte y se
+  // CONSUMEN una sola vez cuando llegan los datos — no antes, porque restaurar
+  // el detalle exige pasar por la guarda anti-spoiler (que necesita
+  // `pastChallenges`) y la hoja necesita el `Moment` completo.
+  const pendingFromUrl = useRef(
+    (() => {
+      const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      return { ver: params.get('ver'), m: params.get('m') }
+    })(),
+  )
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    if (params.get('g') !== groupId) return
+    if (viewingChallengeId) params.set('ver', viewingChallengeId)
+    else if (!pendingFromUrl.current.ver) params.delete('ver')
+    if (openMoment) params.set('m', openMoment.challengeId)
+    else if (!pendingFromUrl.current.m) params.delete('m')
+    const hash = `#${params.toString()}`
+    if (window.location.hash !== hash) {
+      window.history.replaceState(window.history.state, '', hash)
+    }
+  }, [viewingChallengeId, openMoment, groupId])
   // "Compartir reto" (issue #739): reto suelto a compartir desde su detalle
   // (null = modal cerrado). El imagePath ya viene filtrado por el anti-spoiler
   // de `isMomentPhotoVisible` (ver el botón en MomentSheet más abajo): una foto
@@ -321,6 +345,25 @@ export function TripPage({
     },
     [pastChallenges, onPlayChallenge],
   )
+
+  // Restaura lo que la URL pedía al montar (`ver=`/`m=`, F5 con algo abierto),
+  // una sola vez y SOLO cuando hay datos: el detalle pasa por la misma guarda
+  // anti-spoiler que un click (un EN JUEGO sin jugar manda a jugar, no al
+  // detalle) y la hoja necesita encontrar su `Moment` completo.
+  useEffect(() => {
+    if (loading) return
+    const pending = pendingFromUrl.current
+    if (pending.m) {
+      const momento = moments.find((x) => x.challengeId === pending.m)
+      pending.m = null
+      if (momento) setOpenMoment(momento)
+    }
+    if (pending.ver) {
+      const id = pending.ver
+      pending.ver = null
+      openChallengeFromBitacora(id)
+    }
+  }, [loading, moments, openChallengeFromBitacora])
 
   const subtitle = useMemo(
     () => membersLine(memberNames, profile?.display_name ?? null),
