@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { ChevronRight, ListOrdered } from 'lucide-react'
-import { AudioPlayer, Badge, Button, EmptyState, Icon, IconCamara, IconDiana } from '../../ui'
+import { ChevronRight } from 'lucide-react'
+import { AudioPlayer, Badge, EmptyState, Icon, IconCamara, IconDiana } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
 import { listGroupMomentImages } from '../../lib/momentImages'
 import { signedImageUrl } from '../../lib/storage'
@@ -22,7 +22,7 @@ import {
   type BitacoraPhoto,
   type BitacoraReto,
 } from './bitacoraGallery'
-import { StandingsBoard, type StandingsClasses } from './StandingsBoard'
+import { StandingsBoard } from './StandingsBoard'
 import type { PastChallengeSummary } from './useTripData'
 import styles from './BitacoraTab.module.css'
 
@@ -83,37 +83,6 @@ function retoInfoFor(challenge: Moment, pastChallenges: PastChallengeSummary[]):
   }
 }
 
-// Clases del podio/lista del cierre, en la escala de la Bitácora (tarjeta opaca
-// sobre la escena oscura, mismo criterio que `.emptyCard`/`.audioCard`):
-// reutiliza el MARKUP compartido `StandingsBoard` (issue #822 — "no dupliques
-// el markup del Marcador"), su propia escala vive en `BitacoraTab.module.css`.
-const standingsClasses: StandingsClasses = {
-  podium: styles.podium,
-  podiumCol: styles.podiumCol,
-  placeFirst: styles.placeFirst,
-  placeSecond: styles.placeSecond,
-  placeThird: styles.placeThird,
-  crown: styles.crown,
-  podiumDisc: styles.podiumDisc,
-  podiumAvatar: styles.podiumAvatar,
-  podiumName: styles.podiumName,
-  podiumPoints: styles.podiumPoints,
-  podiumPrize: styles.podiumPrize,
-  pedestal: styles.pedestal,
-  pedestalMedal: styles.pedestalMedal,
-  gold: styles.gold,
-  silver: styles.silver,
-  bronze: styles.bronze,
-  board: styles.board,
-  row: styles.row,
-  rank: styles.rank,
-  player: styles.player,
-  playerName: styles.playerName,
-  rowRight: styles.rowRight,
-  bar: styles.bar,
-  rowPoints: styles.rowPoints,
-}
-
 // Candidata a foto a firmar (galería propia de un recuerdo) o ya lista
 // (portada, que `useTripData` ya firmó en lote). Mantener el orden original
 // importa: por eso cada momento resuelve TODA su tanda en un único hueco del
@@ -153,9 +122,13 @@ type PendingPhoto = { kind: 'ready'; src: string } | { kind: 'sign'; path: strin
  * navegación (`onOpenChallenge`) que ya tenía el reto suelto. Un reto SIN
  * recuerdo asociado sigue con el chip suelto de siempre ("EN JUEGO"/"Cerrado").
  *
- * CIERRE (issue #822): tras el último día, si ya hay clasificación (alguien
- * jugó algún reto), la Bitácora remata con el mismo podio/lista del Marcador
- * (`StandingsBoard`, pieza compartida) y un CTA discreto a la pestaña completa.
+ * CIERRE (issue #822, rediseño oscuro issue #849): tras el último día, si ya
+ * hay clasificación (alguien jugó algún reto), la Bitácora remata con
+ * `StandingsBoard` en su modo INMERSIVO (sin `classes`): se pinta ENTERO
+ * (cabecera, podio/lista con el lenguaje de la cumbre del Marcador, resumen y
+ * el CTA "Ver marcador") directamente sobre la escena oscura — ya no una
+ * tarjeta de papel encima de ella (issue #849: el diseño anterior "chirriaba"
+ * contra la Bitácora oscura).
  */
 export function BitacoraTab({
   groupId,
@@ -172,6 +145,11 @@ export function BitacoraTab({
   // null = cargando.
   const [grouped, setGrouped] = useState<BitacoraGrouped | null>(null)
   const [lightboxAt, setLightboxAt] = useState<number | null>(null)
+  // Resumen de la liga (issue #849, punto 3): cerrados = con resultado ya
+  // resuelto (los EN JUEGO todavía no cuentan como "jugados" del todo). Se
+  // deriva de un prop que la pestaña YA recibe (`pastChallenges`) — sin fetch
+  // nuevo.
+  const challengesPlayed = pastChallenges.filter((c) => c.status === 'closed').length
 
   useEffect(() => {
     let cancelled = false
@@ -430,36 +408,20 @@ export function BitacoraTab({
             </section>
           ))}
 
-          {/* Cierre de la Bitácora (issue #822): la clasificación general del
-              viaje, MISMA pieza que el Marcador/el recap de cierre
-              (`StandingsBoard`, `Podium` reutilizado) — la bitácora se lee como
-              la historia del viaje y remata con quién ganó. Solo si ya hay
-              alguna jugada (leaderboard vacío = nadie jugó todavía = no añade
-              ruido). Tarjeta opaca sobre la escena, mismo criterio que
-              `.emptyCard`/`.audioCard`. */}
+          {/* Cierre de la Bitácora (issue #822, rediseño oscuro #849): el
+              remate visual del diario, modo INMERSIVO de `StandingsBoard`
+              (sin `classes` — se pinta entero: cabecera, podio/lista con el
+              lenguaje de la cumbre del Marcador, resumen y el CTA "Ver
+              marcador") directamente sobre la escena, sin tarjeta de papel.
+              Solo si ya hay alguna jugada (leaderboard vacío = nadie jugó
+              todavía = no añade ruido). */}
           {leaderboard.length > 0 && (
-            <section className={styles.closing} aria-label="Clasificación del viaje">
-              <div className={styles.closingCard}>
-                <header className={styles.closingHead}>
-                  <span className={styles.closingKicker}>La liga del viaje</span>
-                  <h2 className={styles.closingTitle}>Clasificación</h2>
-                </header>
-                <StandingsBoard
-                  leaderboard={leaderboard}
-                  prizes={prizes}
-                  classes={standingsClasses}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  fullWidth
-                  className={styles.closingCta}
-                  onClick={onViewMarcador}
-                >
-                  <Icon icon={ListOrdered} size={16} /> Ver marcador
-                </Button>
-              </div>
-            </section>
+            <StandingsBoard
+              leaderboard={leaderboard}
+              prizes={prizes}
+              challengesPlayed={challengesPlayed}
+              onViewMarcador={onViewMarcador}
+            />
           )}
         </>
       )}
