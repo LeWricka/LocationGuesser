@@ -918,3 +918,27 @@ describe('HomeGlobe — keep-alive: el globo sobrevive a ocultarse/mostrarse (#8
     expect(map.fitBoundsCalls).toHaveLength(1)
   })
 })
+
+// Guarda del keep-alive (#847) + #763: al revelarse la home oculta, el fit puede
+// llegar con el lienzo aún a tamaño 0 (display:none) — MapLibre reventaba dentro
+// de cameraForBoxAndBearing (Sentry LOCATIONGUESSER-9). Con el canvas degenerado
+// el encuadre se salta y la cámara se queda como está.
+test('con el lienzo a tamaño 0 (oculto/recién revelado) NO se llama a fitBounds', async () => {
+  const iberia: GlobePin[] = [
+    { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+    { id: 'roma', lat: 41.8902, lng: 12.4922, title: 'Roma', imageUrl: null, targetId: 't2' },
+  ]
+  render(<HomeGlobe pins={iberia} />)
+
+  await waitFor(() => expect(mapInstances).toHaveLength(1))
+  mapInstances[0].canvas = {
+    tabIndex: 0,
+    width: 0,
+    height: 0,
+  } as (typeof mapInstances)[number]['canvas']
+  bootMap(mapInstances[0])
+  // Da tiempo a que el efecto de pines corra: el fit debe haberse saltado.
+  await new Promise((r) => setTimeout(r, 20))
+  expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
+  expect(mapInstances[0].easeToCalls).toHaveLength(0)
+})
