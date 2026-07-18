@@ -31,19 +31,15 @@ describe('Camino', () => {
       <Camino pastChallenges={[]} onPlayChallenge={noop} onViewChallenge={noop} />,
     )
     expect(container).toBeEmptyDOMElement()
-    expect(screen.queryByText('El camino')).not.toBeInTheDocument()
+    expect(screen.queryByText('Retos')).not.toBeInTheDocument()
   })
 
   test('con retos, muestra el título "El camino" y la ruta como lista accesible', () => {
     render(
-      <Camino
-        pastChallenges={[pastChallenge({})]}
-        onPlayChallenge={noop}
-        onViewChallenge={noop}
-      />,
+      <Camino pastChallenges={[pastChallenge({})]} onPlayChallenge={noop} onViewChallenge={noop} />,
     )
-    expect(screen.getByText('El camino')).toBeInTheDocument()
-    expect(screen.getByRole('list', { name: 'El camino del viaje' })).toBeInTheDocument()
+    expect(screen.getByText('Retos')).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Retos del viaje' })).toBeInTheDocument()
   })
 
   test('hito CERRADO con ganador: avatar + "Ganó X", "Tú: Nº · pts" y el aviso anti-trampa', async () => {
@@ -53,13 +49,24 @@ describe('Camino', () => {
       pastChallenge({
         challengeId: 'c1',
         title: 'El bosque de bambú',
-        winner: { name: 'Marta', userId: 'u-marta', avatar: null, points: 4880, distanceKm: 1.2, leftApp: true },
+        winner: {
+          name: 'Marta',
+          userId: 'u-marta',
+          avatar: null,
+          points: 4880,
+          distanceKm: 1.2,
+          leftApp: true,
+        },
         myResult: { points: 3100, distanceKm: 42, leftApp: false },
         myRank: 2,
       }),
     ]
     render(
-      <Camino pastChallenges={pastChallenges} onPlayChallenge={noop} onViewChallenge={onViewChallenge} />,
+      <Camino
+        pastChallenges={pastChallenges}
+        onPlayChallenge={noop}
+        onViewChallenge={onViewChallenge}
+      />,
     )
     expect(screen.getByText(/Ganó/)).toBeInTheDocument()
     expect(screen.getByText('Marta')).toBeInTheDocument()
@@ -100,7 +107,11 @@ describe('Camino', () => {
     ]
     vi.useFakeTimers().setSystemTime(new Date('2026-06-15T10:00:00.000Z'))
     render(
-      <Camino pastChallenges={pastChallenges} onPlayChallenge={onPlayChallenge} onViewChallenge={onViewChallenge} />,
+      <Camino
+        pastChallenges={pastChallenges}
+        onPlayChallenge={onPlayChallenge}
+        onViewChallenge={onViewChallenge}
+      />,
     )
     expect(screen.getByText('EN JUEGO')).toBeInTheDocument()
     expect(screen.getByText(/quedan 3 h/)).toBeInTheDocument()
@@ -125,7 +136,11 @@ describe('Camino', () => {
       }),
     ]
     render(
-      <Camino pastChallenges={pastChallenges} onPlayChallenge={onPlayChallenge} onViewChallenge={onViewChallenge} />,
+      <Camino
+        pastChallenges={pastChallenges}
+        onPlayChallenge={onPlayChallenge}
+        onViewChallenge={onViewChallenge}
+      />,
     )
     expect(screen.getByText('Ver mi apuesta')).toBeInTheDocument()
 

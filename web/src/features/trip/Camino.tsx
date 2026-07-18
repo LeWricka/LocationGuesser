@@ -204,11 +204,11 @@ export function Camino({ pastChallenges, onPlayChallenge, onViewChallenge }: Pro
   return (
     <section className={styles.camino}>
       <div className={styles.cabecera}>
-        <h2 className={styles.titulo}>El camino</h2>
+        <h2 className={styles.titulo}>Retos</h2>
         <span className={styles.linea} aria-hidden="true" />
       </div>
       <p className={styles.subtitulo}>Toca un reto para ver dónde acertó cada uno.</p>
-      <ol className={styles.ruta} aria-label="El camino del viaje" ref={rootRef}>
+      <ol className={styles.ruta} aria-label="Retos del viaje" ref={rootRef}>
         {pastChallenges.map((c, i) => (
           <Hito
             key={c.challengeId}
