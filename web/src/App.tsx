@@ -142,11 +142,16 @@ function AppRoutes() {
   useEffect(() => {
     // Cross-fade nativo (View Transitions API) al cambiar de ruta; respeta
     // prefers-reduced-motion (withViewTransition cae a un setState directo).
-    const onHash = () => {
+    const onHash = (e: HashChangeEvent) => {
       // QW1 (volver atrás real): cada cambio de hash es una navegación DENTRO
       // de la app; contarlas es lo que le permite a `goHome` distinguir "hay
       // historial propio al que volver" de "entrada directa por deep link".
       internalHashNavigations += 1
+      // Y recordamos QUÉ hash queda en la entrada anterior del historial:
+      // `goHome` solo puede usar history.back() si esa entrada ES la home.
+      // (Los replaceState no emiten hashchange y no tocan la entrada anterior,
+      // así que este valor sigue siendo fiel aunque el hash se reescriba.)
+      previousEntryHash = new URL(e.oldURL).hash
       withViewTransition(() => {
         setRoute(parseHash())
         setAdminRoute(isAdminHash())
@@ -302,7 +307,10 @@ function LoggedIn({
   // refreshProfile actualiza el contexto y este bloque deja de ejecutarse.
   // EXCEPCIÓN: rutas #g= y #g=&c= (ver/jugar) NO requieren nombre para acceder.
   // El usuario puede ver y jugar sin nombre; solo la home y crear lo requieren.
-  if (needsProfileStep(profile) && !route.group && !adminRoute) {
+  // EXCEPCIÓN 2 (18-jul): las sesiones ANÓNIMAS tampoco — su identidad se pide
+  // dentro del flujo de jugar ("identidad al final", #748/#757); un receptor que
+  // vuelve a la home desde un viaje se topaba con la pantalla de nombre otra vez.
+  if (needsProfileStep(profile) && !route.group && !adminRoute && !isAnonymous) {
     return (
       <ProfileGate
         userId={user!.id}
@@ -601,6 +609,11 @@ function RedirectHome() {
 // arrancó la app (ver el listener de hashchange en AppRoutes). `goHome` la usa
 // para decidir si hay "atrás" real al que volver dentro de la app.
 let internalHashNavigations = 0
+// Hash de la ENTRADA ANTERIOR del historial (oldURL del último hashchange).
+// Sin esto, `history.back()` es una lotería: tras un deep link, "atrás" podía
+// aterrizar en el reto recién jugado o en una pantalla intermedia en vez de
+// la home (bug reportado por el dueño el 18-jul).
+let previousEntryHash: string | null = null
 
 // Navegación "a home": la mayoría de llamantes son botones de "atrás" (viaje,
 // crear, perfil, admin…). Antes SIEMPRE hacían push de un hash vacío, lo que
@@ -615,7 +628,13 @@ let internalHashNavigations = 0
 // app — `history.back()` sacaría al usuario del sitio (referrer o pestaña en
 // blanco) — así que cae al push de siempre, que sí aterriza en la home.
 function goHome() {
-  if (internalHashNavigations > 0) {
+  // history.back() SOLO cuando la entrada anterior es la home: es el caso
+  // home→pantalla→atrás, donde consumir la entrada mantiene sano el gesto
+  // atrás nativo. En cualquier otro caso (deep link, cadenas viaje→jugar→
+  // viaje…) "atrás" debe ATERRIZAR en la home sí o sí, así que se empuja.
+  const previousIsHome =
+    previousEntryHash === '' || previousEntryHash === '#' || previousEntryHash === '#/'
+  if (internalHashNavigations > 0 && previousIsHome) {
     window.history.back()
     return
   }
