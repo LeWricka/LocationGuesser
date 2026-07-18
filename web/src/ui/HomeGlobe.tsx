@@ -95,6 +95,17 @@ interface Props {
    * y la cámara compensa esa franja invisible igual que hace con el dock.
    */
   topObscuredPx?: number
+  /**
+   * ¿La home está VISIBLE en pantalla? (issue #847, keep-alive). Por defecto `true`.
+   * El router (App.tsx) mantiene la home MONTADA pero OCULTA (`display:none`) mientras
+   * navega al viaje/jugar, para que el globo MapLibre no se destruya y volver sea
+   * instantáneo. Con `active={false}` el globo entra en reposo TOTAL: pausa la deriva,
+   * detiene cualquier animación de cámara (`map.stop()`) y NO reencuadra ni repinta —
+   * cero trabajo con el lienzo oculto (batería/memoria en móvil). Al volver a
+   * `active={true}` hace `map.resize()` (el lienzo pudo cambiar de tamaño mientras
+   * estaba `display:none`) SIN mover la cámara: reaparece exactamente donde quedó.
+   */
+  active?: boolean
   className?: string
 }
 
@@ -385,6 +396,7 @@ export function HomeGlobe({
   activeTargetId = null,
   bottomObscuredPx = 0,
   topObscuredPx = 0,
+  active = true,
   className,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -413,6 +425,16 @@ export function HomeGlobe({
   const entranceDoneRef = useRef(false)
   // Timer de la red de seguridad del revelado (REVEAL_FALLBACK_MS).
   const revealFallbackRef = useRef<number | null>(null)
+  // Keep-alive (issue #847): valor de `active` en ref para que los efectos que mueven
+  // cámara/repintan (async, o disparados por props) lean la visibilidad al día sin
+  // meter `active` en sus deps ni recrear nada.
+  const activeRef = useRef(active)
+  // ¿Cambiaron los datos (pins/rutas) mientras la home estaba OCULTA? Si es así, al
+  // volver a mostrarla repintamos los markers UNA vez (sin mover cámara) para reflejar
+  // el estado actual; mientras está oculta no tocamos el lienzo (requisito de cero
+  // trabajo). Sin este flag, un realtime que llegue con la home oculta o no se vería al
+  // volver, o nos obligaría a repintar en background (justo lo que evitamos).
+  const needsSyncRef = useRef(false)
 
   // Props en refs: el handler `load` (async) lee siempre el último valor sin recrear.
   const pinsRef = useRef(pins)
@@ -440,6 +462,7 @@ export function HomeGlobe({
     activeTargetIdRef.current = activeTargetId
     bottomObscuredRef.current = bottomObscuredPx
     topObscuredRef.current = topObscuredPx
+    activeRef.current = active
   })
 
   // Gesto del usuario (arrastre) en curso: si `activeTargetId` cambia mientras el
@@ -951,7 +974,13 @@ export function HomeGlobe({
   // Repinta + reencuadra cuando cambian los pines O las rutas (no recrea el mapa).
   // `routes` en las deps (issue #702): `repaint` lee de la ref, pero el EFECTO
   // necesita saber que el valor de la prop cambió para volver a dispararse.
+  // Keep-alive (issue #847): con la home OCULTA no tocamos el lienzo (cero trabajo);
+  // apuntamos que hay datos pendientes y el efecto de `active` los sincroniza al volver.
   useEffect(() => {
+    if (!activeRef.current) {
+      needsSyncRef.current = true
+      return
+    }
     repaint()
     if (readyRef.current) fitToPins()
   }, [pins, routes, repaint, fitToPins])
@@ -963,7 +992,10 @@ export function HomeGlobe({
   // (issue #702) recolorea las rutas sin reconstruirlas — el "recoloreo barato" al
   // cambiar de protagonista (p.ej. al deslizar el carrusel de viajes).
   useEffect(() => {
-    if (readyRef.current) {
+    // Keep-alive (issue #847): sin vuelo/recoloreo con la home oculta. En la práctica
+    // `activeTargetId` solo cambia por gesto del carrusel (que exige la home visible),
+    // así que este guard es defensivo más que necesario.
+    if (readyRef.current && activeRef.current) {
       flyToTarget()
       applyRouteEmphasis()
     }
@@ -975,7 +1007,8 @@ export function HomeGlobe({
   // la banda que acaba de crecer o encogerse. Basta `fitToPins`: desde #700 ya encuadra
   // el recorrido del viaje activo (antes hacía falta `flyToTarget` aparte).
   useEffect(() => {
-    if (!readyRef.current) return
+    // Keep-alive (issue #847): el dock no cambia de alto con la home oculta; guard defensivo.
+    if (!readyRef.current || !activeRef.current) return
     fitToPins()
   }, [bottomObscuredPx, fitToPins])
 
@@ -994,6 +1027,46 @@ export function HomeGlobe({
       startSpin()
     }
   }, [relaxed, startSpin, stopSpin])
+
+  // KEEP-ALIVE (issue #847): la home no se desmonta al navegar; se OCULTA
+  // (`display:none`, ver App.tsx). Este efecto es el ciclo de vida del globo en ese
+  // estado, e impone dos invariantes:
+  //  - OCULTA (`active=false`) → REPOSO TOTAL: pausa la deriva, cancela su rAF y
+  //    detiene cualquier animación de cámara en vuelo (`map.stop()`). Con el lienzo en
+  //    `display:none` MapLibre ya no pinta (canvas de tamaño 0, sin rAF propio); esto
+  //    remata el único trabajo que podía seguir vivo (la deriva). Cero rAF, cero
+  //    render, cero animación mientras la home no se ve (batería/memoria en móvil).
+  //  - VISIBLE de nuevo (`active=true`) → `map.resize()` (el lienzo pudo cambiar de
+  //    tamaño mientras estaba oculto: rotación, cambio de viewport) SIN reencuadrar, así
+  //    reaparece EN LA MISMA cámara que dejó (nada de "renacer"). Si llegaron datos
+  //    nuevos mientras estaba oculta (realtime), repintamos los markers UNA vez —también
+  //    sin mover cámara— para no dejar el globo desincronizado. La deriva se reanuda solo
+  //    donde procede (landing decorativa `world`, hoja recogida).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !readyRef.current) return
+    if (!active) {
+      spinPausedRef.current = true
+      stopSpin()
+      // `stop` es opcional en la API real y ausente en algún doble de test: guard.
+      if (typeof map.stop === 'function') map.stop()
+      return
+    }
+    // `resize` recalcula las dimensiones del canvas tras el `display:none`; opcional en
+    // algún doble de test, por eso el guard.
+    if (typeof map.resize === 'function') map.resize()
+    if (needsSyncRef.current) {
+      needsSyncRef.current = false
+      // Solo markers/rutas (repaint), NUNCA fit: preservar la cámara donde quedó manda
+      // sobre reencuadrar por datos nuevos — un salto de cámara al volver sería el
+      // "golpe visual" que este keep-alive existe para eliminar.
+      repaint()
+    }
+    if (framingRef.current === 'world' && !relaxedRef.current) {
+      spinPausedRef.current = false
+      startSpin()
+    }
+  }, [active, repaint, startSpin, stopSpin])
 
   const evoked = !webgl || failed
 

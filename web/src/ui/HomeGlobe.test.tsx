@@ -40,6 +40,11 @@ class MockMap {
   setPaintPropertyCalls: SetPaintPropertyCall[] = []
   removeLayerCalls: string[] = []
   removeSourceCalls: string[] = []
+  // Keep-alive (issue #847): contadores para verificar el reposo (stop) y el reajuste
+  // del lienzo (resize) al ocultar/mostrar, y que el mapa NO se recrea/destruye.
+  stopCalls = 0
+  resizeCalls = 0
+  removeCalls = 0
   private sourcesById = new Map<string, unknown>()
   opts: Record<string, unknown>
   constructor(opts: Record<string, unknown>) {
@@ -114,8 +119,15 @@ class MockMap {
     return { lng: 0, lat: 0 }
   }
   setCenter() {}
-  stop() {}
-  remove() {}
+  stop() {
+    this.stopCalls += 1
+  }
+  resize() {
+    this.resizeCalls += 1
+  }
+  remove() {
+    this.removeCalls += 1
+  }
   getContainer(): HTMLElement | undefined {
     return this.opts.container as HTMLElement | undefined
   }
@@ -860,5 +872,49 @@ describe('HomeGlobe — revelado del lienzo y entrada de pines (perf: cargas sin
     for (const marker of markerInstances.slice(2)) {
       expect(marker.getElement().classList.contains('lg-pin-enter')).toBe(false)
     }
+  })
+})
+
+// Keep-alive (issue #847): la home no se desmonta al navegar; App.tsx la OCULTA
+// (display:none) y le pasa `active={false}` al globo. El mapa MapLibre debe SOBREVIVIR
+// (no se recrea ni se destruye) y quedar en reposo total; al volver (`active={true}`) se
+// reusa el mismo mapa y solo se hace `resize()` (el lienzo pudo cambiar de tamaño con
+// display:none), SIN reencuadrar — la cámara reaparece donde quedó.
+describe('HomeGlobe — keep-alive: el globo sobrevive a ocultarse/mostrarse (#847)', () => {
+  test('ocultar (active=false) NO recrea ni destruye el mapa, y lo pone en reposo', async () => {
+    const pins = clusteredPins()
+    const { rerender } = render(<HomeGlobe pins={pins} />)
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    const map = mapInstances[0]
+    bootMap(map)
+    const stopBefore = map.stopCalls
+
+    rerender(<HomeGlobe pins={pins} active={false} />)
+
+    // Un solo globo vivo: ni se instancia otro ni se destruye el actual al ocultar.
+    expect(mapInstances).toHaveLength(1)
+    expect(map.removeCalls).toBe(0)
+    // Reposo total: se detiene cualquier animación de cámara/deriva en vuelo (loop pausado).
+    expect(map.stopCalls).toBeGreaterThan(stopBefore)
+  })
+
+  test('volver a mostrar (active=true) reusa el MISMO mapa y hace resize (no lo recrea)', async () => {
+    const pins = clusteredPins()
+    const { rerender } = render(<HomeGlobe pins={pins} />)
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    const map = mapInstances[0]
+    bootMap(map)
+
+    rerender(<HomeGlobe pins={pins} active={false} />)
+    const resizeBefore = map.resizeCalls
+    rerender(<HomeGlobe pins={pins} active={true} />)
+
+    // No se instancia un globo nuevo al volver: es EL MISMO (vuelta instantánea).
+    expect(mapInstances).toHaveLength(1)
+    expect(map.removeCalls).toBe(0)
+    // Recalcula el lienzo tras el display:none, pero NO reencuadra (sin fitBounds extra):
+    // la cámara se queda donde estaba. Solo el fit inicial (1) quedó registrado.
+    expect(map.resizeCalls).toBeGreaterThan(resizeBefore)
+    expect(map.fitBoundsCalls).toHaveLength(1)
   })
 })

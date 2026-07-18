@@ -37,6 +37,7 @@
 // gracia al flujo de hoy (Landing + código OTP): nunca pantalla en blanco.
 
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { isAdminEmail } from './lib/admin'
 import {
@@ -56,6 +57,7 @@ import { getGroup } from './lib/groupData'
 import { track } from './lib/analytics'
 import { reportError } from './lib/observability'
 import { prefetchMainRoutes } from './lib/prefetch'
+import { KeepAliveHome } from './features/home/KeepAliveHome'
 import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
 import {
   BackHomeButton,
@@ -273,6 +275,22 @@ function LoggedIn({
     clearError: clearJoinError,
   } = useDeepLinkJoin(user?.id, isAnonymous)
 
+  // KEEP-ALIVE (issue #847): ¿la ruta ACTUAL es la home (raíz, sin viaje/crear/perfil/
+  // admin)? Cuando lo es, la home se pinta; cuando no, se queda montada y OCULTA detrás.
+  const homeIsActiveRoute =
+    !route.group && route.view !== 'new' && route.view !== 'profile' && !adminRoute
+  // "Cerrojo" de una sola escritura: ¿la home ha sido la ruta activa alguna vez en esta
+  // sesión? Solo entonces la mantenemos montada (oculta) al navegar a otras rutas. Evita
+  // instanciar el globo de la home para quien entra por un DEEP LINK directo a un viaje/
+  // reto y quizá nunca la visita (ese viaje ya tiene su propio mapa; dos contextos WebGL
+  // vivos a la vez sería derroche de memoria en móvil). En cuanto pisa la home una vez, el
+  // keep-alive queda activo y las vueltas siguientes son instantáneas. Cerrojo derivado
+  // en el cuerpo del render (patrón oficial "ajustar estado según props", react.dev): en
+  // cuanto la home es la ruta activa se marca montada; condicional → sin bucle de renders.
+  // En estado (no ref) para no leer refs en render (regla react-hooks/refs).
+  const [homeMounted, setHomeMounted] = useState(false)
+  if (homeIsActiveRoute && !homeMounted) setHomeMounted(true)
+
   // Al volver del email: si guardamos un destino (#g…), lo restauramos (auto-join
   // + navegación). Lo consumimos una sola vez. Si el destino no era de grupo,
   // takeNextDestination devuelve algo no-grupo y joinIfGroup nos manda a la home.
@@ -345,127 +363,9 @@ function LoggedIn({
     )
   }
 
-  // Reto concreto → jugar. Solo grupo → página del grupo. (El auto-join corre en
-  // paralelo; la lectura ya exige ser miembro por RLS, por eso unimos primero.)
-  //
-  // SIN ReceptorWelcomeGate aquí (caso real, jugadores del viaje de F1): la
-  // bienvenida resuelve su "¿es receptor nuevo?" en asíncrono y, si confirma
-  // tarde, se plantaba ENCIMA del juego con la cuenta atrás ya corriendo — el
-  // jugador perdía segundos reales leyendo un tutorial. En un enlace directo a
-  // reto la prioridad es jugar (la hoja "¿Listo para jugar?" ya orienta); la
-  // bienvenida le espera en la pantalla del viaje, donde no hay cronómetro.
-  if (route.challenge && route.group) {
-    return (
-      <GoogleMapsProvider>
-        <Suspense fallback={<PlayRouteSkeleton />}>
-          <PlayChallenge challengeId={route.challenge} groupId={route.group} />
-        </Suspense>
-      </GoogleMapsProvider>
-    )
-  }
-  if (route.group) {
-    const groupId = route.group
-    // FAB "＋" del viaje → flujo ligero "Añadir recuerdo" (separación contenido/reto):
-    // un momento (foto/lugar/texto) sin reto por defecto, con el reto como capa
-    // opcional. Al terminar (o cancelar) volvemos al viaje. Reemplaza el salto
-    // directo al asistente de reto clásico.
-    if (route.groupAddMoment) {
-      return (
-        <GoogleMapsProvider>
-          <Suspense fallback={<UtilityRouteSkeleton />}>
-            <AddMoment
-              groupId={groupId}
-              onBack={() => {
-                location.hash = groupHash(groupId)
-              }}
-              onCreated={() => {
-                location.hash = groupHash(groupId)
-              }}
-              // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
-              // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
-              onAddChallenge={(momentId) => {
-                location.hash = addChallengeHash(groupId, momentId)
-              }}
-            />
-          </Suspense>
-        </GoogleMapsProvider>
-      )
-    }
-    // FAB "Reto" del viaje → flujo INMERSIVO de crear reto (mapa satélite a sangre
-    // + hoja que crece por etapas). Reemplaza al asistente clásico de 3 pasos. Al
-    // crear, volvemos al viaje (diario): el creador no debe acabar jugando su
-    // propio reto (#509); el enlace para compartir se ofrece desde el viaje.
-    if (route.groupAddChallenge) {
-      return (
-        <GoogleMapsProvider>
-          <Suspense fallback={<UtilityRouteSkeleton />}>
-            <CreateChallengeFlow
-              groupId={groupId}
-              // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
-              fromMomentId={route.groupChallengeFrom}
-              // Promoción de un recuerdo YA guardado (`&promote=<id>`, issue #723):
-              // mismo asistente prefijado, pero el recuerdo SE CONVIERTE (no se duplica).
-              promoteMomentId={route.groupChallengePromote}
-              onBack={() => {
-                location.hash = groupHash(groupId)
-              }}
-              // El creador NO debe acabar jugando su propio reto (#509): tras crear,
-              // volvemos al viaje (diario), no al reto recién creado.
-              onCreated={() => {
-                location.hash = groupHash(groupId)
-              }}
-            />
-          </Suspense>
-        </GoogleMapsProvider>
-      )
-    }
-    // UNA vista por viaje: el grupo SIEMPRE abre la pantalla "Viaje", que tiene TRES
-    // secciones con un tab (Diario · Fotos · Marcador, issue #645). El marcador
-    // completo + gestión ya no es una pantalla suelta: es una pestaña del propio
-    // viaje (GroupPage incrustada). Los enlaces viejos `#g=…&v=clasico` aterrizan
-    // en esa pestaña (`groupView === 'marcador'`), así que no se rompe nada.
-    return (
-      <ReceptorWelcomeGate
-        groupId={groupId}
-        userId={user?.id}
-        profileOnboarding={profile?.onboarding}
-      >
-        {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos
-            con Google Maps) y EditChallenge (preview Street View); por eso el
-            viaje necesita el provider de Maps. */}
-        <GoogleMapsProvider>
-          <Suspense fallback={<TripRouteSkeleton />}>
-            <TripPage
-              groupId={groupId}
-              // Sección inicial: "Marcador" o "Fotos" si el enlace lo pide (legado
-              // v=clasico / v=marcador, o v=fotos), si no "Diario".
-              initialSection={
-                route.groupView === 'marcador'
-                  ? 'marcador'
-                  : route.groupView === 'fotos'
-                    ? 'fotos'
-                    : 'diario'
-              }
-              // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
-              onPlayChallenge={(challengeId) => {
-                location.hash = groupHash(groupId, challengeId)
-              }}
-              // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
-              // un momento sin reto por defecto (el reto es una capa opcional con toggle).
-              onAddMoment={() => {
-                location.hash = addMomentHash(groupId)
-              }}
-              // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
-              onAddChallenge={() => {
-                location.hash = addChallengeHash(groupId)
-              }}
-              onBack={() => goHome()}
-            />
-          </Suspense>
-        </GoogleMapsProvider>
-      </ReceptorWelcomeGate>
-    )
-  }
+  // #nuevo (crear viaje) FUERA del keep-alive (issue #847): crear un viaje MUTA la lista,
+  // así que al volver la home debe reflejarlo; y un receptor ANÓNIMO ve aquí el CTA
+  // "guárdate", no la home. Se resuelve como pantalla completa, igual que antes.
   if (route.view === 'new') {
     // Crear viaje: con el modelo email-first (issue #506), cualquier usuario con
     // sesión OTP verificada puede crear. La RLS `groups_insert_owner` es el candado
@@ -488,8 +388,132 @@ function LoggedIn({
       </Suspense>
     )
   }
-  if (route.view === 'profile') {
-    return (
+
+  // Ruta activa DISTINTA de la home (jugar/viaje/perfil), o `null` si la ruta ACTUAL es
+  // la home. Estas rutas SÍ participan del keep-alive (issue #847): al navegar a ellas la
+  // home no se desmonta, se queda montada y OCULTA detrás (el globo MapLibre sobrevive).
+  let activeRoute: ReactNode = null
+  if (route.challenge && route.group) {
+    // Reto concreto → jugar. (El auto-join corre en paralelo; la lectura ya exige ser
+    // miembro por RLS, por eso unimos primero.)
+    //
+    // SIN ReceptorWelcomeGate aquí (caso real, jugadores del viaje de F1): la
+    // bienvenida resuelve su "¿es receptor nuevo?" en asíncrono y, si confirma
+    // tarde, se plantaba ENCIMA del juego con la cuenta atrás ya corriendo — el
+    // jugador perdía segundos reales leyendo un tutorial. En un enlace directo a
+    // reto la prioridad es jugar (la hoja "¿Listo para jugar?" ya orienta); la
+    // bienvenida le espera en la pantalla del viaje, donde no hay cronómetro.
+    activeRoute = (
+      <GoogleMapsProvider>
+        <Suspense fallback={<PlayRouteSkeleton />}>
+          <PlayChallenge challengeId={route.challenge} groupId={route.group} />
+        </Suspense>
+      </GoogleMapsProvider>
+    )
+  } else if (route.group) {
+    const groupId = route.group
+    if (route.groupAddMoment) {
+      // FAB "＋" del viaje → flujo ligero "Añadir recuerdo" (separación contenido/reto):
+      // un momento (foto/lugar/texto) sin reto por defecto, con el reto como capa
+      // opcional. Al terminar (o cancelar) volvemos al viaje. Reemplaza el salto
+      // directo al asistente de reto clásico.
+      activeRoute = (
+        <GoogleMapsProvider>
+          <Suspense fallback={<UtilityRouteSkeleton />}>
+            <AddMoment
+              groupId={groupId}
+              onBack={() => {
+                location.hash = groupHash(groupId)
+              }}
+              onCreated={() => {
+                location.hash = groupHash(groupId)
+              }}
+              // "Añadir reto" desde el recuerdo guardado: al formulario de reto con la
+              // foto y el lugar del recuerdo pre-rellenados (`&from=<momentId>`).
+              onAddChallenge={(momentId) => {
+                location.hash = addChallengeHash(groupId, momentId)
+              }}
+            />
+          </Suspense>
+        </GoogleMapsProvider>
+      )
+    } else if (route.groupAddChallenge) {
+      // FAB "Reto" del viaje → flujo INMERSIVO de crear reto (mapa satélite a sangre
+      // + hoja que crece por etapas). Reemplaza al asistente clásico de 3 pasos. Al
+      // crear, volvemos al viaje (diario): el creador no debe acabar jugando su
+      // propio reto (#509); el enlace para compartir se ofrece desde el viaje.
+      activeRoute = (
+        <GoogleMapsProvider>
+          <Suspense fallback={<UtilityRouteSkeleton />}>
+            <CreateChallengeFlow
+              groupId={groupId}
+              // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
+              fromMomentId={route.groupChallengeFrom}
+              // Promoción de un recuerdo YA guardado (`&promote=<id>`, issue #723):
+              // mismo asistente prefijado, pero el recuerdo SE CONVIERTE (no se duplica).
+              promoteMomentId={route.groupChallengePromote}
+              onBack={() => {
+                location.hash = groupHash(groupId)
+              }}
+              // El creador NO debe acabar jugando su propio reto (#509): tras crear,
+              // volvemos al viaje (diario), no al reto recién creado.
+              onCreated={() => {
+                location.hash = groupHash(groupId)
+              }}
+            />
+          </Suspense>
+        </GoogleMapsProvider>
+      )
+    } else {
+      // UNA vista por viaje: el grupo SIEMPRE abre la pantalla "Viaje", que tiene TRES
+      // secciones con un tab (Diario · Fotos · Marcador, issue #645). El marcador
+      // completo + gestión ya no es una pantalla suelta: es una pestaña del propio
+      // viaje (GroupPage incrustada). Los enlaces viejos `#g=…&v=clasico` aterrizan
+      // en esa pestaña (`groupView === 'marcador'`), así que no se rompe nada.
+      activeRoute = (
+        <ReceptorWelcomeGate
+          groupId={groupId}
+          userId={user?.id}
+          profileOnboarding={profile?.onboarding}
+        >
+          {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos
+              con Google Maps) y EditChallenge (preview Street View); por eso el
+              viaje necesita el provider de Maps. */}
+          <GoogleMapsProvider>
+            <Suspense fallback={<TripRouteSkeleton />}>
+              <TripPage
+                groupId={groupId}
+                // Sección inicial: "Marcador" o "Fotos" si el enlace lo pide (legado
+                // v=clasico / v=marcador, o v=fotos), si no "Diario".
+                initialSection={
+                  route.groupView === 'marcador'
+                    ? 'marcador'
+                    : route.groupView === 'fotos'
+                      ? 'fotos'
+                      : 'diario'
+                }
+                // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
+                onPlayChallenge={(challengeId) => {
+                  location.hash = groupHash(groupId, challengeId)
+                }}
+                // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
+                // un momento sin reto por defecto (el reto es una capa opcional con toggle).
+                onAddMoment={() => {
+                  location.hash = addMomentHash(groupId)
+                }}
+                // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
+                onAddChallenge={() => {
+                  location.hash = addChallengeHash(groupId)
+                }}
+                onBack={() => goHome()}
+              />
+            </Suspense>
+          </GoogleMapsProvider>
+        </ReceptorWelcomeGate>
+      )
+    }
+  } else if (route.view === 'profile') {
+    activeRoute = (
       <Suspense fallback={<UtilityRouteSkeleton />}>
         <ProfileEditScreen
           userId={user!.id}
@@ -508,21 +532,37 @@ function LoggedIn({
     )
   }
 
-  // Raíz sin hash → home/dashboard (centro de gravedad con sesión, §3). Para el
-  // admin añadimos un acceso DISCRETO a `#admin` (un enlace flotante), invisible
-  // para el resto. Solo en la home para no estorbar en grupo/jugar/perfil.
-  // Fallback `HomeRouteSkeleton` (issue "perf(cargas): entrada sin saltos"): antes
-  // este `<Suspense>` usaba el `UtilityRouteSkeleton` genérico (forma de
-  // FORMULARIO) mientras llegaba el chunk, y en cuanto `HomePage` montaba pintaba
-  // su PROPIO esqueleto (forma de globo+feed) mientras `useHomeData` resolvía —
-  // dos esqueletos de forma distinta en la misma carga es un doble-swap visible
-  // (form → globo → contenido). Con el mismo `HomeRouteSkeleton` en ambos sitios,
-  // el arranque logueado pinta un único layout de espera hasta el contenido real.
+  // KEEP-ALIVE (issue #847, estrategia A): la home queda MONTADA y solo se OCULTA cuando
+  // hay una ruta activa encima (`KeepAliveHome`, `display:none` + `inert`); así su globo
+  // MapLibre no se destruye y volver a la home es instantáneo —misma cámara, sin recarga
+  // de tiles—. La prop `active` propaga la visibilidad hasta HomeGlobe, que con la home
+  // oculta entra en reposo total (deriva pausada, `map.stop()`, sin renders).
+  //
+  // La home solo se monta una vez que ha sido ruta activa alguna vez en la sesión (el
+  // cerrojo `homeMounted`): así, quien entra por deep link a un viaje/reto no paga la
+  // instanciación de un segundo globo mientras ve el viaje (que ya tiene su mapa). Se
+  // pinta si es la ruta actual O si ya se armó el cerrojo (para poder ocultarla, no
+  // desmontarla, al navegar fuera).
+  //
+  // Raíz sin hash → home/dashboard (centro de gravedad con sesión, §3). Para el admin
+  // añadimos un acceso DISCRETO a `#admin` (un enlace flotante), invisible para el resto;
+  // solo en la home (no estorba en viaje/jugar/perfil).
+  const homeHidden = !homeIsActiveRoute
   return (
-    <Suspense fallback={<HomeRouteSkeleton />}>
-      <HomePage />
-      {isAdminEmail(user?.email) && <AdminLink />}
-    </Suspense>
+    <>
+      {(homeIsActiveRoute || homeMounted) && (
+        <KeepAliveHome hidden={homeHidden}>
+          {/* Fallback `HomeRouteSkeleton` (perf "entrada sin saltos"): un único layout de
+              espera (globo+feed) mientras llega el chunk y `useHomeData` resuelve, en vez
+              del esqueleto genérico de formulario seguido del de la home (doble-swap). */}
+          <Suspense fallback={<HomeRouteSkeleton />}>
+            <HomePage active={!homeHidden} />
+            {isAdminEmail(user?.email) && <AdminLink />}
+          </Suspense>
+        </KeepAliveHome>
+      )}
+      {activeRoute}
+    </>
   )
 }
 
