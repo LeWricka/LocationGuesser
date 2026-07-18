@@ -311,7 +311,7 @@ describe('MarcadorTab', () => {
 
   test('el camino: sin retos, no se muestra ("El camino" no aparece)', () => {
     renderMarcador({ leaderboard: [], canCreate: false })
-    expect(screen.queryByText('El camino')).not.toBeInTheDocument()
+    expect(screen.queryByText('Retos')).not.toBeInTheDocument()
   })
 
   test('el camino: con retos, se muestra y navega según el anti-spoiler (wiring de props)', async () => {
@@ -328,7 +328,7 @@ describe('MarcadorTab', () => {
       onViewChallenge,
       onPlayChallenge,
     })
-    expect(screen.getByText('El camino')).toBeInTheDocument()
+    expect(screen.getByText('Retos')).toBeInTheDocument()
 
     await user.click(screen.getByText('El bosque de bambú'))
     expect(onViewChallenge).toHaveBeenCalledWith('c1')

@@ -88,6 +88,12 @@
   transform: translateY(16px);
 }
 .hitoIn {
+  /* El estado de REPOSO visible vive en la clase, no en los keyframes: con la
+   * base en opacity 0, `backwards` solo cubre la espera del stagger — al
+   * terminar la animación el hito caía de vuelta a opacity 0 y el camino se
+   * quedaba vacío (bug del 18-jul, visto en el viaje real). */
+  opacity: 1;
+  transform: none;
   animation: mt-hito-entra var(--motion-duration-slow) var(--motion-ease-emphasized) backwards;
   animation-delay: calc(var(--motion-stagger-step) * var(--i, 0));
 }
