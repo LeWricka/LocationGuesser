@@ -241,6 +241,59 @@ export function associatedChallengeIds(
 }
 
 /**
+ * Para cada recuerdo, el reto ASOCIADO del que nace (mismo `image_path`, ver
+ * `associatedChallengeIds`) — la relación INVERTIDA (de challengeId → memoryId
+ * a memoryId → challenge completo), para que Bitácora y Diario puedan
+ * FUSIONAR el par en una sola entrada (issue #839: dos entradas con la MISMA
+ * foto se leían como contenido duplicado, no como "el juego de aquel
+ * momento"). Un recuerdo con más de un reto asociado (raro: promocionado dos
+ * veces) se queda con el PRIMERO en el orden de `moments` — desempate estable,
+ * no hay forma fiable de saber cuál "es el bueno".
+ */
+export function pairedChallengeByMemoryId(moments: Moment[]): Map<string, Moment> {
+  const associatedIds = associatedChallengeIds(moments)
+  const out = new Map<string, Moment>()
+  if (associatedIds.size === 0) return out
+  const memoryIdByPath = new Map<string, string>()
+  for (const m of moments) {
+    if (!m.isChallenge && m.imagePath != null) memoryIdByPath.set(m.imagePath, m.challengeId)
+  }
+  for (const m of moments) {
+    if (!associatedIds.has(m.challengeId) || m.imagePath == null) continue
+    const memoryId = memoryIdByPath.get(m.imagePath)
+    if (memoryId != null && !out.has(memoryId)) out.set(memoryId, m)
+  }
+  return out
+}
+
+/**
+ * Fusiona un recuerdo con su reto ASOCIADO (`pairedChallengeByMemoryId`) en UNA
+ * sola entrada de PRESENTACIÓN para el Diario (issue #839): conserva la
+ * IDENTIDAD y el contenido del recuerdo (id de pin/selección en el mapa, foto,
+ * lugar, fecha — su foto es SIEMPRE visible, nunca spoiler) pero adopta el
+ * ESTADO DE JUEGO del reto (chip "EN JUEGO"/reto, cuenta de jugadas, plazo,
+ * guarda "no puedo jugar lo mío"). Así `MomentCard` pinta una única tarjeta
+ * con la cara del recuerdo y el pulso del reto, sin repetir la foto.
+ *
+ * El `challengeId` del resultado es el del RECUERDO a propósito: quien llama
+ * (`TripDiario`) lo sigue usando para el pin del mapa y la selección — el id
+ * REAL del reto (para lanzar "Adivina") vive aparte, en `challenge.challengeId`.
+ */
+export function fuseMemoryWithChallenge(memory: Moment, challenge: Moment): Moment {
+  return {
+    ...memory,
+    isChallenge: true,
+    status: challenge.status,
+    deadlineAt: challenge.deadlineAt,
+    isOwn: challenge.isOwn,
+    guessedCount: challenge.guessedCount,
+    guessSeconds: challenge.guessSeconds,
+    svPanoId: challenge.svPanoId,
+    photoIsHint: challenge.photoIsHint,
+  }
+}
+
+/**
  * Punto de la RUTA en el mapa. Solo existen para momentos CERRADOS con lat/lng
  * visible: son los que la polyline "cose" en orden cronológico. Por eso lat/lng
  * aquí son obligatorios (a diferencia de `Moment`, que admite null para activos).

@@ -90,6 +90,54 @@
   margin-bottom: var(--space-1);
 }
 
+/* Franja de reto FUSIONADO (issue #839): mismo `Badge` que `.retoChip` + el
+ * estado ("quedan X h" / "Ganó X") + una flecha que anuncia la acción. Fondo
+ * de vidrio (mismas variables `--glass-*` que las tarjetas del Diario,
+ * `MomentCard.module.css`) para que se lea como un CONTROL tappable, no como
+ * más texto de la entrada — a diferencia de `.retoChip` (solo informa), esta
+ * franja SÍ navega (`onOpenChallenge`, reutilizando la navegación existente). */
+.retoStrip {
+  appearance: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  color: var(--scene-ink);
+  font: inherit;
+  text-align: left;
+}
+.retoStrip:hover,
+.retoStrip:focus-visible {
+  background: var(--glass-bg-strong);
+}
+.retoStrip:focus-visible {
+  outline: 2px solid var(--route-gold);
+  outline-offset: 2px;
+}
+
+.retoStripMeta {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.retoStripChevron {
+  flex: none;
+  color: var(--scene-ink-soft);
+}
+
 /* Kicker de lugar: dorado, versalitas — mismo tratamiento que un eyebrow
  * editorial, con el acento de "camino" (`--route-gold`) en vez de tinta neutra. */
 .kicker {

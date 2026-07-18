@@ -1,7 +1,9 @@
 import { describe, test, expect } from 'vitest'
 import {
   associatedChallengeIds,
+  fuseMemoryWithChallenge,
   isMomentPhotoVisible,
+  pairedChallengeByMemoryId,
   parseLegacyDescription,
   resolveMomentPhoto,
 } from './trip'
@@ -169,6 +171,134 @@ describe('associatedChallengeIds (issue #822, reto ↔ recuerdo con la misma fot
       am({ challengeId: 'reto-2', isChallenge: true, status: 'closed', imagePath: 'foto.jpg' }),
     ]
     expect(associatedChallengeIds(moments)).toEqual(new Set())
+  })
+})
+
+// Factory de un Moment COMPLETO (a diferencia de `am`, que solo lleva los
+// campos que mira `associatedChallengeIds`): `pairedChallengeByMemoryId`/
+// `fuseMemoryWithChallenge` necesitan el resto (status de juego, isOwn,
+// guessedCount…) para construir la fusión.
+function fullMoment(over: Partial<Moment> & Pick<Moment, 'challengeId' | 'title'>): Moment {
+  return {
+    description: null,
+    status: 'recuerdo',
+    isChallenge: false,
+    date: '2026-06-15T10:00:00.000Z',
+    deadlineAt: null,
+    imageUrl: 'https://cdn.test/portada.jpg',
+    imagePath: 'portada.jpg',
+    lat: null,
+    lng: null,
+    guessedCount: 0,
+    isOwn: false,
+    guessSeconds: null,
+    svPanoId: null,
+    photoIsHint: true,
+    ...over,
+  }
+}
+
+describe('pairedChallengeByMemoryId (issue #839, fusión momento↔reto)', () => {
+  test('empareja el recuerdo con el reto que nace de su misma foto', () => {
+    const memory = fullMoment({ challengeId: 'recuerdo-1', title: 'Llegada al campamento' })
+    const challenge = fullMoment({
+      challengeId: 'reto-1',
+      title: 'Llegada al campamento',
+      isChallenge: true,
+      status: 'active',
+      photoIsHint: true,
+    })
+    const paired = pairedChallengeByMemoryId([memory, challenge])
+    expect(paired.get('recuerdo-1')).toBe(challenge)
+    expect(paired.size).toBe(1)
+  })
+
+  test('un reto SIN recuerdo asociado no aparece en el mapa', () => {
+    const challenge = fullMoment({
+      challengeId: 'reto-suelto',
+      title: 'Reto suelto',
+      isChallenge: true,
+      status: 'closed',
+    })
+    expect(pairedChallengeByMemoryId([challenge]).size).toBe(0)
+  })
+
+  test('un reto EN JUEGO con foto SORPRESA no se empareja (sería spoiler)', () => {
+    const memory = fullMoment({ challengeId: 'recuerdo-1', title: 'Recuerdo' })
+    const challenge = fullMoment({
+      challengeId: 'reto-1',
+      title: 'Reto',
+      isChallenge: true,
+      status: 'active',
+      photoIsHint: false,
+    })
+    expect(pairedChallengeByMemoryId([memory, challenge]).size).toBe(0)
+  })
+
+  test('con dos retos asociados al MISMO recuerdo, se queda con el primero en orden', () => {
+    const memory = fullMoment({ challengeId: 'recuerdo-1', title: 'Recuerdo' })
+    const challengeA = fullMoment({
+      challengeId: 'reto-a',
+      title: 'Reto A',
+      isChallenge: true,
+      status: 'closed',
+    })
+    const challengeB = fullMoment({
+      challengeId: 'reto-b',
+      title: 'Reto B',
+      isChallenge: true,
+      status: 'closed',
+    })
+    const paired = pairedChallengeByMemoryId([memory, challengeA, challengeB])
+    expect(paired.get('recuerdo-1')).toBe(challengeA)
+    expect(paired.size).toBe(1)
+  })
+})
+
+describe('fuseMemoryWithChallenge (issue #839, la tarjeta fusionada)', () => {
+  test('conserva la identidad/contenido del recuerdo y adopta el estado de juego del reto', () => {
+    const memory = fullMoment({
+      challengeId: 'recuerdo-1',
+      title: 'Llegada al campamento',
+      description: 'Primer día',
+      imageUrl: 'https://cdn.test/foto.jpg',
+      imagePath: 'foto.jpg',
+      lat: 40.1,
+      lng: -3.2,
+      isOwn: false,
+      guessedCount: 0,
+    })
+    const challenge = fullMoment({
+      challengeId: 'reto-1',
+      title: 'Llegada al campamento',
+      isChallenge: true,
+      status: 'active',
+      deadlineAt: '2026-06-16T10:00:00.000Z',
+      isOwn: true,
+      guessedCount: 3,
+      guessSeconds: 60,
+      svPanoId: 'pano-1',
+      photoIsHint: true,
+    })
+
+    const fused = fuseMemoryWithChallenge(memory, challenge)
+
+    // Identidad/contenido: del RECUERDO (id de pin/selección en el mapa, foto, lugar).
+    expect(fused.challengeId).toBe('recuerdo-1')
+    expect(fused.title).toBe('Llegada al campamento')
+    expect(fused.description).toBe('Primer día')
+    expect(fused.imageUrl).toBe('https://cdn.test/foto.jpg')
+    expect(fused.lat).toBe(40.1)
+    expect(fused.lng).toBe(-3.2)
+
+    // Estado de juego: del RETO (chip/CTA/cuenta de jugadas/guarda de dueño).
+    expect(fused.isChallenge).toBe(true)
+    expect(fused.status).toBe('active')
+    expect(fused.deadlineAt).toBe('2026-06-16T10:00:00.000Z')
+    expect(fused.isOwn).toBe(true)
+    expect(fused.guessedCount).toBe(3)
+    expect(fused.guessSeconds).toBe(60)
+    expect(fused.svPanoId).toBe('pano-1')
   })
 })
 

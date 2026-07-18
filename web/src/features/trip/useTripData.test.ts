@@ -221,6 +221,78 @@ describe('useTripData — visibilidad de pines por estado (issue #593)', () => {
   })
 })
 
+// Issue #839: Bitácora/Diario fusionan un recuerdo con su reto ASOCIADO (misma
+// foto) en una sola entrada — pero si el mapa siguiera pintando el pin de AMBOS
+// (el lugar visible del recuerdo Y la respuesta revelada del reto), el par
+// tendría dos pines pegados en vez de uno. `route` debe quedarse con uno solo.
+describe('useTripData — pin único para el par momento↔reto fusionado (issue #839)', () => {
+  test('el reto CERRADO asociado a un recuerdo con lugar visible no repite el pin', async () => {
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({
+        id: 'reto-1',
+        title: 'Llegada al campamento',
+        image_path: 'foto.jpg',
+      }),
+      activeChallenge({
+        id: 'recuerdo-1',
+        title: 'Llegada al campamento',
+        is_challenge: false,
+        image_path: 'foto.jpg',
+        place_lat: 40.1,
+        place_lng: -3.2,
+        deadline_at: null,
+      }),
+    ])
+    getAnswersMock.mockResolvedValue(new Map([['reto-1', { lat: 41.0, lng: -4.0 }]]))
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(2))
+
+    // Ambos momentos siguen existiendo (la fusión VISUAL vive en TripDiario/
+    // BitacoraTab, no aquí) pero la RUTA del mapa solo lleva el pin del
+    // RECUERDO — el del reto asociado se descarta para no duplicarlo.
+    expect(result.current.route).toHaveLength(1)
+    expect(result.current.route[0].challengeId).toBe('recuerdo-1')
+  })
+
+  test('si el recuerdo NO tiene lugar visible propio, se deja el pin del reto (mejor uno que ninguno)', async () => {
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({
+        id: 'reto-1',
+        title: 'Llegada al campamento',
+        image_path: 'foto.jpg',
+      }),
+      activeChallenge({
+        id: 'recuerdo-1',
+        title: 'Llegada al campamento',
+        is_challenge: false,
+        image_path: 'foto.jpg',
+        place_lat: null,
+        place_lng: null,
+        deadline_at: null,
+      }),
+    ])
+    getAnswersMock.mockResolvedValue(new Map([['reto-1', { lat: 41.0, lng: -4.0 }]]))
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(2))
+
+    expect(result.current.route).toHaveLength(1)
+    expect(result.current.route[0].challengeId).toBe('reto-1')
+  })
+
+  test('un reto CERRADO SIN recuerdo asociado sigue con su pin de siempre (no regresión)', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'reto-suelto' })])
+    getAnswersMock.mockResolvedValue(new Map([['reto-suelto', { lat: 41.0, lng: -4.0 }]]))
+
+    const { result } = renderHook(() => useTripData('g1', 'u-me'))
+    await waitFor(() => expect(result.current.moments).toHaveLength(1))
+
+    expect(result.current.route).toHaveLength(1)
+    expect(result.current.route[0].challengeId).toBe('reto-suelto')
+  })
+})
+
 // Issue #608: "Retos anteriores" del Marcador (rescatado de GroupPage/PastSection)
 // necesita, por reto CERRADO, quién ganó y cómo me fue A MÍ — derivado de los
 // votos reales, sin volver a pedir nada a Supabase.

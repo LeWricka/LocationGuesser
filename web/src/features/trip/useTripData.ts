@@ -12,7 +12,13 @@ import { signedImageUrl } from '../../lib/storage'
 import { supabase } from '../../lib/supabase'
 import { countryFromCoords, type CountryInfo } from '../../lib/countryFlag'
 import type { LatLng } from '../../lib/geo'
-import { resolveMomentPhoto, type Moment, type MomentStatus, type RoutePoint } from '../../lib/trip'
+import {
+  pairedChallengeByMemoryId,
+  resolveMomentPhoto,
+  type Moment,
+  type MomentStatus,
+  type RoutePoint,
+} from '../../lib/trip'
 import { useVisibilityReload } from '../../lib/useVisibilityReload'
 
 // Espera entre peticiones a coords NO cacheadas. Nominatim limita a ~1 req/s;
@@ -415,6 +421,22 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
     myUserId,
   ])
 
+  // Ids de reto FUSIONADOS en su recuerdo (issue #839: Bitácora/Diario ya no
+  // los pintan como entrada propia, ver `fuseMemoryWithChallenge`): su pin en
+  // el mapa tampoco debe repetirse si el recuerdo YA tiene uno visible propio
+  // (serían dos pines pegados del mismo par, uno con el lugar del recuerdo y
+  // otro con la respuesta del reto). Si el recuerdo NO tiene lugar visible,
+  // dejamos el pin del reto tal cual — mejor un pin que ninguno.
+  const mergedAwayChallengeIds = useMemo(() => {
+    const paired = pairedChallengeByMemoryId(moments)
+    const out = new Set<string>()
+    for (const [memoryId, challenge] of paired) {
+      const memory = moments.find((m) => m.challengeId === memoryId)
+      if (memory && memory.lat != null && memory.lng != null) out.add(challenge.challengeId)
+    }
+    return out
+  }, [moments])
+
   // Ruta: los momentos con un lugar VISIBLE en el mapa, en orden cronológico ASC.
   // Entran los RECUERDOS con lugar (place_*) y los RETOS CERRADOS con respuesta
   // revelada; los retos ACTIVOS no (su coord es spoiler → llevan lat/lng null).
@@ -423,7 +445,10 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
       moments
         .filter(
           (m): m is Moment & { lat: number; lng: number } =>
-            (m.status === 'closed' || m.status === 'recuerdo') && m.lat != null && m.lng != null,
+            (m.status === 'closed' || m.status === 'recuerdo') &&
+            m.lat != null &&
+            m.lng != null &&
+            !mergedAwayChallengeIds.has(m.challengeId),
         )
         .map((m) => ({
           challengeId: m.challengeId,
@@ -433,7 +458,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
           imageUrl: m.imageUrl,
           date: m.date,
         })),
-    [moments],
+    [moments, mergedAwayChallengeIds],
   )
 
   // Clasificación general del grupo: misma agregación que GroupPage (suma de

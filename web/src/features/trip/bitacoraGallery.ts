@@ -23,6 +23,23 @@ export interface BitacoraPhoto {
 }
 
 /**
+ * Reto ASOCIADO a un recuerdo (misma foto, issue #839, `pairedChallengeByMemoryId`
+ * en `lib/trip.ts`) — fusionado en la franja de esa MISMA entrada en vez de
+ * pintarse como una segunda entrada con la foto repetida (issue #831). `null`
+ * si el momento no tiene ningún reto emparejado.
+ */
+export interface BitacoraReto {
+  challengeId: string
+  /** `practice` cae en 'active' (nunca cierra de verdad, igual criterio binario
+   * que el chip suelto de un reto sin recuerdo asociado). */
+  status: 'active' | 'closed'
+  /** `deadline_at` del reto: alimenta "quedan X h" (`formatDeadline`) mientras EN JUEGO. */
+  deadlineAt: string | null
+  /** Nombre del ganador si ya CERRÓ y alguien votó; null si nadie votó o sigue en juego. */
+  winnerName: string | null
+}
+
+/**
  * Un recuerdo (o reto ya revelado) con TODA su galería resuelta: kicker de
  * lugar, título, descripción, nota de voz y fotos a ancho completo.
  */
@@ -38,6 +55,9 @@ export interface BitacoraMoment {
   /** Estado del momento (ver `lib/trip.ts`): junto a `isChallenge` decide el
    * texto del chip de reto ("EN JUEGO" con punto vivo / "Cerrado"). */
   status: MomentStatus
+  /** Reto ASOCIADO a este recuerdo (issue #839): ver `BitacoraReto`. Siempre
+   * `null` en un reto suelto — solo un recuerdo puede llevarlo. */
+  reto: BitacoraReto | null
   date: string
   description: string | null
   /**
@@ -88,6 +108,8 @@ export interface BitacoraMomentInput {
   isChallenge: boolean
   /** Ver `BitacoraMoment.status`. */
   status: MomentStatus
+  /** Ver `BitacoraMoment.reto`. */
+  reto: BitacoraReto | null
   date: string
   description: string | null
   /** Ver `BitacoraMoment.dateLabel` — ya resuelto por quien construye el input. */
@@ -174,6 +196,7 @@ export function groupMomentsByDay(moments: BitacoraMomentInput[]): BitacoraGroup
       momentTitle: m.momentTitle,
       isChallenge: m.isChallenge,
       status: m.status,
+      reto: m.reto,
       date: m.date,
       description: m.description,
       dateLabel: m.dateLabel,
