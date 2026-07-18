@@ -227,6 +227,12 @@ interface Props {
    * con el tinte/placeholder sin intentar refrescar nada.
    */
   onCoverError?: () => void
+  /**
+   * ¿La home está VISIBLE? (issue #847, keep-alive). Se pasa tal cual a HomeGlobe: con
+   * `false` el globo entra en reposo total (la home sigue montada pero oculta). Por
+   * defecto `true`.
+   */
+  active?: boolean
   className?: string
 }
 
@@ -255,6 +261,7 @@ export function HomeDashboard({
   onOpenGroup,
   onPlayPinned,
   onCoverError,
+  active = true,
   className,
 }: Props) {
   const feed = sortTrips(groups)
@@ -399,6 +406,7 @@ export function HomeDashboard({
           activeTargetId={activeId || null}
           bottomObscuredPx={bottomObscuredPx}
           topObscuredPx={2 * GLOBE_LIFT_PX}
+          active={active}
         />
       </div>
 

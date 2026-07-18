@@ -27,6 +27,12 @@ interface Props {
   fab?: ReactNode
   /** Etiqueta accesible de la hoja. */
   sheetLabel?: string
+  /**
+   * ¿La home está VISIBLE? (issue #847, keep-alive). Se pasa tal cual a HomeGlobe: con
+   * `false` el globo entra en reposo total (deriva pausada, sin renders) mientras la
+   * home sigue montada pero oculta. Por defecto `true`.
+   */
+  active?: boolean
 }
 
 // Dos posiciones de reposo de la hoja, como fracción del alto del visor que ocupa el
@@ -58,6 +64,7 @@ export function GlobeSheet({
   children,
   fab,
   sheetLabel,
+  active = true,
 }: Props) {
   // El scroll interno de la hoja: el hook engancha aquí los gestos (touch/wheel) para que
   // dirijan la expansión de la hoja mientras el contenido está en el tope.
@@ -73,7 +80,13 @@ export function GlobeSheet({
       {/* Zona del GLOBO: gestiona sus propios gestos (paneo/zoom). Ocupa el alto hasta
           donde llega la hoja, así sus pines no quedan bajo ella cuando está recogida. */}
       <div className={styles.globeZone} style={{ height: `${topFrac * 100}dvh` }}>
-        <HomeGlobe pins={pins} onOpenPin={onOpenPin} framing={framing} relaxed={raised} />
+        <HomeGlobe
+          pins={pins}
+          onOpenPin={onOpenPin}
+          framing={framing}
+          relaxed={raised}
+          active={active}
+        />
       </div>
 
       {/* Overlay (marca + ajustes): hermano del shell (NO dentro de la zona del globo)

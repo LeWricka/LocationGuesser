@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import {
   Avatar,
@@ -31,7 +31,18 @@ import styles from './HomePage.module.css'
 // Lee la sesión (useSession), la membresía (useHomeData) y las coordenadas de tus viajes
 // (useWorldTrips) para alimentar el globo. La navegación se hace por hash (la home no
 // posee el router; ver ./navigation.ts): #g=<id>, #g=<id>&c=<cId>, #nuevo, #perfil.
-export function HomePage() {
+interface Props {
+  /**
+   * ¿La home está VISIBLE? (issue #847, keep-alive). App.tsx mantiene la home MONTADA
+   * pero OCULTA (`display:none` + `inert`) mientras se navega al viaje/jugar, para que
+   * el globo MapLibre sobreviva y volver sea instantáneo. Se pasa al globo (reposo total
+   * con `false`) y gobierna el conteo de `home_viewed` (una vista por visita visible, no
+   * por montaje — que ahora ocurre una sola vez). Por defecto `true`.
+   */
+  active?: boolean
+}
+
+export function HomePage({ active = true }: Props = {}) {
   const { user, profile, loading: sessionLoading } = useSession()
   const { loading: dataLoading, error, data, reload } = useHomeData(user?.id)
 
@@ -89,10 +100,16 @@ export function HomePage() {
     }
   }, [data.groups])
 
-  // Analítica: una vista de home por montaje (cuenta la llegada, no la carga).
+  // Analítica: una vista de home por VISITA visible (cuenta la llegada, no la carga).
+  // Keep-alive (issue #847): la home ya no se desmonta al navegar —se oculta— así que
+  // un `useEffect([])` "por montaje" solo contaría la PRIMERA visita. Contamos cada
+  // transición oculta→visible (incluido el montaje inicial), preservando el conteo
+  // por-visita de antes del keep-alive.
+  const wasActiveRef = useRef(false)
   useEffect(() => {
-    track('home_viewed')
-  }, [])
+    if (active && !wasActiveRef.current) track('home_viewed')
+    wasActiveRef.current = active
+  }, [active])
 
   // Realtime "ligero": cualquier voto o reto nuevo en los grupos del usuario puede cambiar
   // sus estados ("te toca", "en vivo"), sus números o el reto fijado, así que recargamos
@@ -240,6 +257,7 @@ export function HomePage() {
     <main className="lg-page lg-content-in">
       {hasGroups ? (
         <HomeDashboard
+          active={active}
           userId={userId}
           displayName={displayName}
           avatarUrl={profile?.avatar_url}
@@ -276,6 +294,7 @@ export function HomePage() {
         // mismos pines: aquí faltaba pasarlo explícitamente y por eso cayó al 'pins' por
         // defecto (la causa real de los pines en sitios imposibles del reporte).
         <GlobeSheet
+          active={active}
           pins={HOME_DEMO_PINS}
           onOpenPin={onCreateGroup}
           framing="world"
