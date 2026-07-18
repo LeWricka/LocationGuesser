@@ -1,0 +1,370 @@
+/*
+ * StandingsBoard — modo INMERSIVO (issue #849): el cierre de la Bitácora,
+ * pintado DIRECTAMENTE sobre la escena oscura (`--scene-*`) en vez de una
+ * tarjeta de papel encima de ella (el diseño anterior, que "chirriaba" contra
+ * la Bitácora oscura — feedback de producto). Sin fondo opaco propio: el filo
+ * dorado superior (`.cierre::before`) es el único separador, mismo lenguaje
+ * "camino" que el resto de la Bitácora (`--route-gold`, `BitacoraTab.module.css
+ * .kicker/.dayThread`).
+ *
+ * El podio/pedestal/anillo de medalla DUPLICA a propósito las reglas de
+ * `MarcadorTab.module.css` (mismo criterio que `Podium.tsx`: el lenguaje
+ * visual se comparte de un vistazo, la hoja de estilos no — evita un import
+ * cruzado entre pestañas solo para no repetir un puñado de reglas). El modo
+ * LEGACY de `StandingsBoard.tsx` (recap `TripWrap`) no usa nada de este
+ * fichero: sigue con el podio de papel compartido y su propia escala.
+ */
+
+.cierre {
+  --accent-on-scene: color-mix(in srgb, var(--accent) 55%, white);
+  position: relative;
+  max-width: 480px;
+  margin: var(--space-6) auto var(--space-2);
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  color: var(--scene-ink);
+  text-align: center;
+  /* Entrada por scroll (issue #849, punto 5): oculto en la regla base,
+   * revelado por `.in` (ver `ImmersiveClose`, IntersectionObserver +
+   * fallback de `prefers-reduced-motion`/sin observer). Una TRANSICIÓN, no
+   * una animación por keyframes: con la entrada gateada por clase, un
+   * `animation-fill-mode: backwards` revertiría a este estado oculto al
+   * terminar la animación (el gotcha de MarcadorTab.module.css solo evita
+   * esto cuando la regla base YA es el estado final, que aquí no lo es). */
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity var(--motion-duration-slower) var(--motion-ease-standard),
+    transform var(--motion-duration-slower) var(--motion-ease-standard);
+}
+.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Filo dorado superior (issue #849, punto 1): "ya hay un borde dorado
+ * arriba, intégralo mejor" — un trazo corto y centrado, mismo oro
+ * (`--route-gold`) que cose el resto de la Bitácora, en vez de una barra a
+ * todo el ancho de un ::before de tarjeta (el diseño de papel anterior). */
+.cierre::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, transparent, var(--route-gold), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cierre {
+    transition: none;
+  }
+}
+
+/* ───────────────────────── Cabecera ───────────────────────── */
+.head {
+  margin-bottom: var(--space-5);
+}
+.kicker {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--letter-spacing-eyebrow);
+  text-transform: uppercase;
+  color: var(--route-gold);
+}
+.title {
+  margin: 2px 0 0;
+  font-family: var(--font-serif);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--scene-ink);
+}
+
+/* ───────────────────────── Podio (1º-3º) ─────────────────────────
+ * Mismo lenguaje que la cumbre del Marcador (MarcadorTab.module.css): oro
+ * exclusivo del líder (anillo, corona, peana), plata/bronce con sus tokens
+ * `--medal-*`, peanas escalonadas por altura. */
+.podio {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.podioItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 120px;
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity var(--motion-duration-slow) var(--motion-ease-emphasized),
+    transform var(--motion-duration-slow) var(--motion-ease-emphasized);
+  transition-delay: calc(var(--motion-stagger-step) * var(--i, 0));
+}
+.in .podioItem {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .podioItem {
+    transition: none;
+  }
+}
+
+.podio1 {
+  order: 2;
+}
+.podio2 {
+  order: 1;
+}
+.podio3 {
+  order: 3;
+}
+
+.corona {
+  display: inline-flex;
+  margin-bottom: calc(-1 * var(--space-1));
+  color: var(--medal-gold);
+  filter: drop-shadow(0 1px 2px color-mix(in srgb, var(--medal-gold) 55%, transparent));
+}
+
+/* Avatar con anillo de medalla: mismo `Avatar` del UI kit (`lg`) escalado por
+ * transform, sin tocar Avatar.tsx — el líder ~72px, 2º/3º ~56px. */
+.avatarRing {
+  display: inline-flex;
+  border-radius: var(--radius-full);
+}
+.anillo1 {
+  transform: scale(1.125);
+  box-shadow:
+    0 0 0 2px var(--scene-bg),
+    0 0 0 4px var(--medal-gold),
+    0 0 8px 2px color-mix(in srgb, var(--medal-gold) 45%, transparent);
+}
+.anillo2 {
+  transform: scale(0.875);
+  box-shadow:
+    0 0 0 2px var(--scene-bg),
+    0 0 0 3px var(--medal-silver);
+}
+.anillo3 {
+  transform: scale(0.875);
+  box-shadow:
+    0 0 0 2px var(--scene-bg),
+    0 0 0 3px var(--medal-bronze);
+}
+
+.podioNombre {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--scene-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.podioPuntos {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--scene-ink-soft);
+}
+.podio1 .podioPuntos {
+  color: var(--accent-on-scene);
+}
+
+.podioPremio {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  margin-top: var(--space-1);
+  color: var(--scene-ink-soft);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-xs);
+}
+.podioPremio > svg {
+  flex-shrink: 0;
+  color: var(--accent-on-scene);
+}
+.podioPremioTexto {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Peana: cerrada y teñida por puesto, altura escalonada — ordinal de texto
+ * ("1º"/"2º"/"3º"), nunca un icono ni un dígito bare (mismo hallazgo que
+ * MarcadorTab). El bronce se aclara para AA sobre la escena oscura (axe
+ * serious) — mismo `color-mix` ya establecido en MarcadorTab/ChallengeBoard. */
+.podioPeana {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: var(--space-2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--scene-hairline);
+}
+.podioPeanaTexto {
+  font-family: var(--font-sans);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.podio1 .podioPeanaTexto {
+  font-size: var(--font-size-lg);
+  color: var(--medal-gold);
+}
+.podio2 .podioPeanaTexto {
+  font-size: var(--font-size-md);
+  color: var(--medal-silver);
+}
+.podio3 .podioPeanaTexto {
+  font-size: var(--font-size-md);
+  /* El bronce puro no llega al ratio de contraste sobre la escena oscura
+   * (axe serious): se aclara solo el texto; peana/anillo siguen en bronce. */
+  color: color-mix(in srgb, var(--medal-bronze) 60%, white);
+}
+.podio1 .podioPeana {
+  height: 56px;
+  background: color-mix(in srgb, var(--medal-gold) 16%, transparent);
+  border-color: var(--medal-gold);
+}
+.podio2 .podioPeana {
+  height: 44px;
+  background: color-mix(in srgb, var(--medal-silver) 16%, transparent);
+  border-color: var(--medal-silver);
+}
+.podio3 .podioPeana {
+  height: 36px;
+  background: color-mix(in srgb, var(--medal-bronze) 16%, transparent);
+  border-color: var(--medal-bronze);
+}
+
+/* ───────────────────────── Lista (con menos de 3 jugadores) ───────────────────────── */
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+}
+.fila {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--scene-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--scene-hairline);
+  opacity: 0;
+  transform: translateY(10px);
+  transition:
+    opacity var(--motion-duration-slow) var(--motion-ease-emphasized),
+    transform var(--motion-duration-slow) var(--motion-ease-emphasized);
+  transition-delay: calc(var(--motion-stagger-step) * var(--i, 0));
+}
+.in .fila {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fila {
+    transition: none;
+  }
+}
+.filaTop {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.posicion {
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--scene-ink-soft);
+}
+.nombre {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  color: var(--scene-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.puntos {
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--scene-ink-soft);
+}
+.barraTrack {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--scene-hairline);
+  overflow: hidden;
+}
+.barraFill {
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transform: scaleX(var(--bar-pct, 0));
+  transform-origin: left;
+}
+
+/* ───────────────────────── Resumen + CTA ───────────────────────── */
+/* Resumen de la liga (issue #849, punto 3): "N retos jugados · M jugadores" —
+ * el dato que cierra el diario con perspectiva de viaje entero. */
+.resumen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  margin: var(--space-5) 0 0;
+  color: var(--scene-ink-soft);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+}
+.resumenItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.resumenItem > svg {
+  flex-shrink: 0;
+  color: var(--accent-on-scene);
+}
+
+.cta {
+  margin-top: var(--space-4);
+}
