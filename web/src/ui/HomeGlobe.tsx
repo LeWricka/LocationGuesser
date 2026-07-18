@@ -4,6 +4,7 @@ import { Info } from 'lucide-react'
 // import() dinámico dentro del efecto, para que quede en su propio chunk WebGL.
 import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
 import { MAP_PRESETS, SCENE_GLOBE } from '../lib/mapPresets'
+import { reportSilentWarning } from '../lib/observability'
 import { hasWebGL } from '../lib/webglSupport'
 import { Icon } from './Icon'
 import { buildHomePinElement } from '../features/trip/pinMarkers'
@@ -658,6 +659,14 @@ export function HomeGlobe({
     const map = mapRef.current
     const gl = glRef.current
     if (!map || !gl || route.length === 0) return
+    // Keep-alive (issue #847) + guarda del #763: al REVELARSE la home oculta,
+    // React re-ejecuta los efectos y este fit puede llegar ANTES del map.resize()
+    // del efecto de `active` — con el lienzo aún en tamaño 0 (display:none), el
+    // helper de cámara del globo de MapLibre revienta (cameraForBoxAndBearing →
+    // undefined.center, Sentry LOCATIONGUESSER-9). Saltárselo es correcto: la
+    // cámara preservada manda, y los datos ocultos ya se sincronizan sin fit.
+    const canvas = typeof map.getCanvas === 'function' ? map.getCanvas() : null
+    if (!activeRef.current || (canvas && (canvas.width === 0 || canvas.height === 0))) return
     // Antes del REVELADO del lienzo, toda cámara es instantánea ("perf(cargas):
     // entrada sin saltos"): el encuadre inicial (#700) aterriza con el globo aún
     // oculto y el usuario nunca ve un paneo de 700ms nada más entrar. La animación
@@ -667,18 +676,32 @@ export function HomeGlobe({
     // abajo para el dock de HomeDashboard — sin el contenedor montado (aún no debería
     // pasar aquí, pero por robustez) cae a 0 y el padding/offset quedan en su mínimo.
     const containerHeight = containerRef.current?.clientHeight ?? 0
+    // Guarda #763: ninguna llamada de cámara puede tumbar la Home entera — si
+    // MapLibre no puede computar el encuadre (transform sin medidas, bounds
+    // raros), se queda la cámara como está y se anota en silencio.
+    const conCamaraProtegida = (mover: () => void) => {
+      try {
+        mover()
+      } catch (err) {
+        reportSilentWarning('frameRoute: MapLibre no pudo encuadrar; cámara intacta', {
+          error: String(err),
+        })
+      }
+    }
     if (route.length === 1) {
       const offsetY = verticalFrameOffset(
         containerHeight,
         bottomObscuredRef.current,
         topObscuredRef.current,
       )
-      map.easeTo({
-        center: [route[0].lng, route[0].lat],
-        zoom: SINGLE_ZOOM,
-        duration,
-        offset: [0, offsetY],
-      })
+      conCamaraProtegida(() =>
+        map.easeTo({
+          center: [route[0].lng, route[0].lat],
+          zoom: SINGLE_ZOOM,
+          duration,
+          offset: [0, offsetY],
+        }),
+      )
       return
     }
     // Extensión real de los pines del recorrido.
@@ -704,12 +727,14 @@ export function HomeGlobe({
         bottomObscuredRef.current,
         topObscuredRef.current,
       )
-      map.easeTo({
-        center: [lead.lng, lead.lat],
-        zoom: SINGLE_ZOOM,
-        duration,
-        offset: [0, offsetY],
-      })
+      conCamaraProtegida(() =>
+        map.easeTo({
+          center: [lead.lng, lead.lat],
+          zoom: SINGLE_ZOOM,
+          duration,
+          offset: [0, offsetY],
+        }),
+      )
       return
     }
     // Ensancha los bounds hasta un span mínimo alrededor de su centro: si todos los pines
@@ -734,7 +759,7 @@ export function HomeGlobe({
     )
     const padding = { top, bottom, left: FIT_PADDING_SIDE, right: FIT_PADDING_SIDE }
 
-    map.fitBounds(bounds, { padding, maxZoom: FIT_MAX_ZOOM, duration })
+    conCamaraProtegida(() => map.fitBounds(bounds, { padding, maxZoom: FIT_MAX_ZOOM, duration }))
   }, [])
 
   // Encuadre por defecto (#700, "globo poblado"): el RECORRIDO del viaje activo —
