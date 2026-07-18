@@ -1,4 +1,4 @@
-import { Link2, Play, User } from 'lucide-react'
+import { Play, User } from 'lucide-react'
 import { Badge, Button, ChallengePhoto, Icon, IconCandado, IconDiana } from '../../ui'
 import { resolveMomentPhoto, type Moment } from '../../lib/trip'
 import { parseMomentDate } from '../../lib/time'
@@ -6,13 +6,6 @@ import styles from './MomentCard.module.css'
 
 interface Props {
   moment: Moment
-  /**
-   * ¿Este reto comparte la MISMA foto que un recuerdo del viaje (issue #822,
-   * `associatedChallengeIds` en `lib/trip.ts`)? Calculado por `TripDiario` para
-   * TODO el carrusel a la vez — esta tarjeta solo decide si pintar el
-   * marcador. Irrelevante en un recuerdo (nunca lleva la marca).
-   */
-  associatedWithMemory?: boolean
   /** ¿Es la tarjeta seleccionada (centrada)? Resalta su marco. */
   selected?: boolean
   /** Tocar la foto: centra su pin en el mapa Y abre la hoja de detalle (foto grande). */
@@ -64,16 +57,17 @@ function formatMomentDate(value: string): string | null {
  * ve su propia foto en preview, con el mismo sello para que sepa que el resto
  * del grupo aún no la ve.
  *
- * ASOCIADO A UN RECUERDO (issue #822): un reto creado a partir de la foto de un
- * recuerdo (`fromMomentId`, sin sustituir la foto prefijada) comparte el MISMO
- * `image_path` — sin la marca, foto repetida se lee como duplicado, no como "el
- * juego de aquel momento". `associatedWithMemory` (calculado por `TripDiario`,
- * `associatedChallengeIds` en `lib/trip.ts`) enciende un disco de vidrio con
- * `Link2` en la esquina sup-der — MISMA esquina que el sello "Sorpresa", nunca a
- * la vez: mientras la foto sigue oculta (`surprise`) no se revela el vínculo,
- * sería un spoiler adicional aunque el disco no diga con QUÉ recuerdo.
+ * ASOCIADO A UN RECUERDO (issue #822 → #839): un reto creado a partir de la
+ * foto de un recuerdo (`fromMomentId`, sin sustituir la foto prefijada)
+ * comparte el MISMO `image_path`. El #822 marcaba el reto con un disco de
+ * vínculo pero seguía pintando DOS tarjetas con la misma foto (duplicado); el
+ * #839 lo sustituye por una FUSIÓN real (`fuseMemoryWithChallenge` en
+ * `lib/trip.ts`, orquestada por `TripDiario`): el par ya no llega aquí como
+ * dos momentos — llega como UNO solo, con la foto/lugar del recuerdo y el
+ * chip/CTA de estado del reto, así que esta tarjeta no necesita saber de la
+ * asociación en absoluto.
  */
-export function MomentCard({ moment, associatedWithMemory, selected, onExpand, onPlay }: Props) {
+export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
   const isActive = moment.status === 'active'
   // Lleva capa de reto (en juego, cerrado o práctica) → chip "🎯 Reto". Un recuerdo
   // puro no lo lleva: la tarjeta lee como contenido, no como juego.
@@ -87,7 +81,6 @@ export function MomentCard({ moment, associatedWithMemory, selected, onExpand, o
   // del lugar y la pregunta jamás se solapan (bug nº1 del test de diseño).
   const placeName = moment.country?.name ?? null
   const { src: photoSrc, surprise } = resolveMomentPhoto(moment)
-  const showAssociated = isReto && associatedWithMemory === true && !surprise
 
   return (
     <article
@@ -146,19 +139,6 @@ export function MomentCard({ moment, associatedWithMemory, selected, onExpand, o
           aria-label="Foto sorpresa: se revela al cerrar el reto"
         >
           <IconCandado size={14} />
-        </div>
-      )}
-
-      {/* Vínculo con un recuerdo (issue #822): MISMA esquina que "Sorpresa", nunca
-          las dos a la vez (ver comentario del componente) — no hace falta
-          comprobar `!surprise` aquí de nuevo, ya lo decide `showAssociated`. */}
-      {showAssociated && (
-        <div
-          className={styles.associated}
-          role="img"
-          aria-label="Reto creado a partir de un recuerdo con la misma foto"
-        >
-          <Icon icon={Link2} size={14} />
         </div>
       )}
 

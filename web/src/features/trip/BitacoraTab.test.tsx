@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { MomentImage } from '../../lib/momentImages'
 import type { Moment } from '../../lib/trip'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
+import type { PastChallengeSummary } from './useTripData'
 
 // Capa de datos: la pestaña solo orquesta estas dos funciones (galería extra de
 // un recuerdo + firmado); aislamos la BD/Storage igual que MomentGallery.test.tsx.
@@ -47,6 +48,22 @@ function leaderboardEntry(over: Partial<LeaderboardEntry> & Pick<LeaderboardEntr
   }
 }
 
+function pastChallengeSummary(
+  over: Partial<PastChallengeSummary> & Pick<PastChallengeSummary, 'challengeId'>,
+): PastChallengeSummary {
+  return {
+    title: 'Reto',
+    status: 'closed',
+    closedAt: '2026-06-15T12:00:00.000Z',
+    isOwn: false,
+    winner: null,
+    myResult: null,
+    myRank: null,
+    imageUrl: null,
+    ...over,
+  }
+}
+
 function renderTab(moments: Moment[], overrides: Partial<Parameters<typeof BitacoraTab>[0]> = {}) {
   return render(
     <BitacoraTab
@@ -56,6 +73,7 @@ function renderTab(moments: Moment[], overrides: Partial<Parameters<typeof Bitac
       onAddMoment={overrides.onAddMoment ?? vi.fn()}
       onOpenMoment={overrides.onOpenMoment ?? vi.fn()}
       onOpenChallenge={overrides.onOpenChallenge ?? vi.fn()}
+      pastChallenges={overrides.pastChallenges ?? []}
       leaderboard={overrides.leaderboard ?? []}
       prizes={overrides.prizes ?? null}
       onViewMarcador={overrides.onViewMarcador ?? vi.fn()}
@@ -412,14 +430,22 @@ describe('BitacoraTab — marca de reto (issue #821)', () => {
     expect(screen.getByText('Cerrado')).toBeInTheDocument()
   })
 
-  test('un recuerdo NUNCA lleva chip, ni compartiendo foto con un reto', async () => {
+  test('un recuerdo NUNCA lleva el chip suelto, tenga o no un reto asociado', async () => {
     const moments = [
-      moment({ challengeId: 'c-recuerdo-misma-foto', title: 'El recuerdo original' }),
+      // Distinto `imagePath` que el reto: NO se asocian, siguen siendo dos
+      // entradas independientes (este test cubre el chip SUELTO, no la fusión
+      // — ver el describe "fusión momento↔reto" más abajo).
+      moment({
+        challengeId: 'c-recuerdo-misma-foto',
+        title: 'El recuerdo original',
+        imagePath: 'otra-foto.jpg',
+      }),
       moment({
         challengeId: 'c-reto-misma-foto',
         title: 'El reto con la misma foto',
         isChallenge: true,
         status: 'closed',
+        imagePath: 'foto-reto.jpg',
       }),
     ]
     renderTab(moments)
@@ -427,6 +453,176 @@ describe('BitacoraTab — marca de reto (issue #821)', () => {
     await screen.findByRole('heading', { name: 'El recuerdo original' })
     // Solo UN chip "Cerrado" en toda la pantalla: el del reto, no el recuerdo.
     expect(screen.getAllByText('Cerrado')).toHaveLength(1)
+  })
+})
+
+describe('BitacoraTab — fusión momento↔reto (issue #839)', () => {
+  test('un recuerdo con un reto ASOCIADO (misma foto) pinta UNA sola entrada', async () => {
+    const moments = [
+      moment({ challengeId: 'c-recuerdo', title: 'Llegada al campamento' }),
+      moment({
+        challengeId: 'c-reto',
+        title: 'Llegada al campamento',
+        isChallenge: true,
+        status: 'active',
+        photoIsHint: true,
+      }),
+    ]
+    renderTab(moments)
+
+    // Una única entrada (el reto ya NO pinta su propia entrada): un único
+    // heading con ese título, no dos.
+    expect(await screen.findAllByRole('heading', { name: 'Llegada al campamento' })).toHaveLength(1)
+  })
+
+  test('la franja de reto EN JUEGO muestra la cuenta atrás, no un ganador', async () => {
+    // Sin mockear el reloj (evita la pesadilla de fake timers + `findBy*`
+    // colgándose entre tests): un plazo muy lejano en el futuro basta para
+    // afirmar el patrón "quedan N d" sin fijar un valor exacto.
+    const farDeadline = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString()
+    const moments = [
+      moment({ challengeId: 'c-recuerdo', title: 'Llegada al campamento' }),
+      moment({
+        challengeId: 'c-reto',
+        title: 'Llegada al campamento',
+        isChallenge: true,
+        status: 'active',
+        photoIsHint: true,
+        deadlineAt: farDeadline,
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Llegada al campamento' })
+    expect(screen.getByText('EN JUEGO')).toBeInTheDocument()
+    expect(screen.getByText(/quedan \d+ d/)).toBeInTheDocument()
+  })
+
+  test('la franja de reto CERRADO con ganador muestra "Ganó <nombre>"', async () => {
+    const moments = [
+      moment({ challengeId: 'c-recuerdo', title: 'Llegada al campamento' }),
+      moment({
+        challengeId: 'c-reto',
+        title: 'Llegada al campamento',
+        isChallenge: true,
+        status: 'closed',
+      }),
+    ]
+    const pastChallenges = [
+      pastChallengeSummary({
+        challengeId: 'c-reto',
+        status: 'closed',
+        winner: {
+          name: 'Amaia',
+          userId: 'u-amaia',
+          avatar: null,
+          points: 4200,
+          distanceKm: 3,
+          leftApp: false,
+        },
+      }),
+    ]
+    renderTab(moments, { pastChallenges })
+
+    await screen.findByRole('heading', { name: 'Llegada al campamento' })
+    expect(screen.getByText('Reto cerrado')).toBeInTheDocument()
+    expect(screen.getByText('Ganó Amaia')).toBeInTheDocument()
+  })
+
+  test('la franja de reto CERRADO sin ganador (nadie votó) dice "Se cerró sin votos"', async () => {
+    const moments = [
+      moment({ challengeId: 'c-recuerdo', title: 'Llegada al campamento' }),
+      moment({
+        challengeId: 'c-reto',
+        title: 'Llegada al campamento',
+        isChallenge: true,
+        status: 'closed',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Llegada al campamento' })
+    expect(screen.getByText('Se cerró sin votos')).toBeInTheDocument()
+  })
+
+  test('tocar la franja de reto llama a onOpenChallenge con el id REAL del reto', async () => {
+    const user = userEvent.setup()
+    const onOpenChallenge = vi.fn()
+    const moments = [
+      moment({ challengeId: 'c-recuerdo', title: 'Llegada al campamento' }),
+      moment({
+        challengeId: 'c-reto',
+        title: 'Llegada al campamento',
+        isChallenge: true,
+        status: 'closed',
+      }),
+    ]
+    renderTab(moments, { onOpenChallenge })
+
+    await screen.findByRole('heading', { name: 'Llegada al campamento' })
+    await user.click(screen.getByText('Se cerró sin votos'))
+
+    expect(onOpenChallenge).toHaveBeenCalledWith('c-reto')
+  })
+
+  test('tocar el título de la entrada fusionada abre el MOMENTO (onOpenMoment), no el reto', async () => {
+    const user = userEvent.setup()
+    const onOpenMoment = vi.fn()
+    const onOpenChallenge = vi.fn()
+    const moments = [
+      moment({ challengeId: 'c-recuerdo', title: 'Llegada al campamento' }),
+      moment({
+        challengeId: 'c-reto',
+        title: 'Llegada al campamento',
+        isChallenge: true,
+        status: 'closed',
+      }),
+    ]
+    renderTab(moments, { onOpenMoment, onOpenChallenge })
+
+    await user.click(await screen.findByRole('heading', { name: 'Llegada al campamento' }))
+
+    expect(onOpenMoment).toHaveBeenCalledWith(
+      expect.objectContaining({ challengeId: 'c-recuerdo' }),
+    )
+    expect(onOpenChallenge).not.toHaveBeenCalled()
+  })
+
+  test('un reto EN JUEGO con foto SORPRESA no se fusiona (no se asocia, sería spoiler)', async () => {
+    const moments = [
+      moment({ challengeId: 'c-recuerdo', title: 'Llegada al campamento' }),
+      moment({
+        challengeId: 'c-reto',
+        title: 'Reto sorpresa',
+        isChallenge: true,
+        status: 'active',
+        photoIsHint: false,
+      }),
+    ]
+    renderTab(moments)
+
+    // El recuerdo se pinta (su foto nunca es spoiler); el reto sorpresa, no
+    // (anti-spoiler existente, sin tocar) — por tanto tampoco hay franja.
+    await screen.findByRole('heading', { name: 'Llegada al campamento' })
+    expect(screen.queryByText('EN JUEGO')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Reto sorpresa' })).not.toBeInTheDocument()
+  })
+
+  test('un reto SIN recuerdo asociado sigue con su chip suelto de siempre', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-reto-suelto',
+        title: 'Reto suelto',
+        isChallenge: true,
+        status: 'active',
+        photoIsHint: true,
+        imagePath: 'reto-suelto.jpg',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Reto suelto' })
+    expect(screen.getByText('EN JUEGO')).toBeInTheDocument()
   })
 })
 

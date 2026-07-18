@@ -21,7 +21,7 @@ import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { marcadorGroupHash, promoteChallengeHash } from '../../lib/route'
-import { isMomentPhotoVisible, type Moment } from '../../lib/trip'
+import { isMomentPhotoVisible, pairedChallengeByMemoryId, type Moment } from '../../lib/trip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
 import { MembersModal } from '../group/MembersModal'
@@ -319,6 +319,18 @@ export function TripPage({
   }, [reloadMembership])
 
   const activeMoment = useMemo(() => moments.find((m) => m.status === 'active') ?? null, [moments])
+  // Id a AUTO-SELECCIONAR al abrir el viaje (issue #839): si el reto EN JUEGO
+  // está FUSIONADO en su recuerdo (`TripDiario`, `fuseMemoryWithChallenge`), el
+  // carrusel/timeline ya no pintan SU id — pintan el del recuerdo. Sin esto,
+  // `selectFromMap`/`scrollCardIntoView` de abajo apuntarían a un `data-cid`
+  // que ya no existe (el reto asociado no se pinta suelto).
+  const activeSelectId = useMemo(() => {
+    if (!activeMoment) return null
+    for (const [memoryId, challenge] of pairedChallengeByMemoryId(moments)) {
+      if (challenge.challengeId === activeMoment.challengeId) return memoryId
+    }
+    return activeMoment.challengeId
+  }, [activeMoment, moments])
   // Nº de RETOS (no recuerdos) para el preview de la hoja de invitar.
   const challengeCount = useMemo(() => moments.filter((m) => m.isChallenge).length, [moments])
   // Retos EN JUEGO (issue #758): gobierna el item "Compartir un reto" de la hoja
@@ -415,13 +427,13 @@ export function TripPage({
 
   // Al abrir el viaje, si hay un momento en juego lo seleccionamos solo (una vez).
   useEffect(() => {
-    if (didAutoSelect.current || selectedId || !activeMoment) return
+    if (didAutoSelect.current || selectedId || !activeSelectId) return
     didAutoSelect.current = true
-    selectFromMap(activeMoment.challengeId)
-    scrollCardIntoView(activeMoment.challengeId)
+    selectFromMap(activeSelectId)
+    scrollCardIntoView(activeSelectId)
     // selectFromMap es estable; no lo listamos para no re-disparar la auto-selección.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMoment, selectedId])
+  }, [activeSelectId, selectedId])
 
   // Stepper de reproducción del recorrido (igual que antes).
   useEffect(() => {
@@ -728,6 +740,7 @@ export function TripPage({
               onAddMoment={onAddMoment}
               onOpenMoment={(m) => setOpenMoment(m)}
               onOpenChallenge={openChallengeFromBitacora}
+              pastChallenges={pastChallenges}
               leaderboard={leaderboard}
               prizes={group?.prizes ?? null}
               onViewMarcador={() => {

@@ -1,7 +1,12 @@
 import { forwardRef, useMemo } from 'react'
 import { Map as MapIcon, Share2 } from 'lucide-react'
 import { Button, EmptyState, Icon } from '../../ui'
-import { associatedChallengeIds, type Moment, type RoutePoint } from '../../lib/trip'
+import {
+  fuseMemoryWithChallenge,
+  pairedChallengeByMemoryId,
+  type Moment,
+  type RoutePoint,
+} from '../../lib/trip'
 import { TripMap } from './TripMap'
 import { MomentCard } from './MomentCard'
 import { MomentTimeline } from './MomentTimeline'
@@ -66,11 +71,34 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
   },
   carouselRef,
 ) {
-  const hasMoments = moments.length > 0
-  // Retos "asociados" a un recuerdo del viaje por compartir la MISMA foto
-  // (issue #822, `associatedChallengeIds`): calculado UNA vez para todo el
-  // carrusel, no por tarjeta — `MomentCard` solo pinta el marcador sutil.
-  const associatedIds = useMemo(() => associatedChallengeIds(moments), [moments])
+  // Reto ASOCIADO a un recuerdo del viaje por compartir la MISMA foto (issue
+  // #839, `pairedChallengeByMemoryId`): calculado UNA vez para todo el Diario.
+  const pairedByMemoryId = useMemo(() => pairedChallengeByMemoryId(moments), [moments])
+
+  // Fusión momento↔reto (issue #839): un reto asociado ya NO se pinta como
+  // entrada propia — antes timeline y carrusel repetían la MISMA foto en dos
+  // paradas/tarjetas (un punto teal del momento + uno rojo "En juego" del
+  // reto). Aquí se funde en la tarjeta del recuerdo (`fuseMemoryWithChallenge`,
+  // que hereda su chip/CTA/cuenta de jugadas): timeline y carrusel comparten
+  // esta MISMA lista, así nunca hay dos paradas para el mismo par. Un reto SIN
+  // recuerdo asociado sigue pintándose suelto, como hasta ahora.
+  const displayMoments = useMemo<Moment[]>(() => {
+    const mergedAwayIds = new Set(Array.from(pairedByMemoryId.values(), (c) => c.challengeId))
+    return moments
+      .filter((m) => !mergedAwayIds.has(m.challengeId))
+      .map((m) => {
+        const challenge = pairedByMemoryId.get(m.challengeId)
+        return challenge ? fuseMemoryWithChallenge(m, challenge) : m
+      })
+  }, [moments, pairedByMemoryId])
+
+  // Momento ORIGINAL (sin fusionar) por id: `onExpand` debe abrir siempre el
+  // recuerdo REAL (`MomentSheet` no sabe de tarjetas fusionadas ni debe recibir
+  // un id de reto disfrazado de recuerdo), nunca la versión de PRESENTACIÓN con
+  // el estado de juego superpuesto por `fuseMemoryWithChallenge`.
+  const originalById = useMemo(() => new Map(moments.map((m) => [m.challengeId, m])), [moments])
+
+  const hasMoments = displayMoments.length > 0
 
   return (
     <div className={styles.diario}>
@@ -98,7 +126,7 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
            mapa. El velo funde el dock con el mapa para que el contenido respire. */
         <div className={styles.dock}>
           <MomentTimeline
-            moments={moments}
+            moments={displayMoments}
             selectedId={selectedId}
             onSelect={onSelectFromMap}
             playing={playing}
@@ -106,11 +134,10 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
           />
 
           <div className={styles.carousel} ref={carouselRef}>
-            {moments.map((m) => (
+            {displayMoments.map((m) => (
               <div key={m.challengeId} className={styles.slide} data-cid={m.challengeId}>
                 <MomentCard
                   moment={m}
-                  associatedWithMemory={associatedIds.has(m.challengeId)}
                   selected={m.challengeId === selectedId}
                   // Tocar una tarjeta que NO es la activa: solo SELECCIONA — mismo
                   // camino que un pin del mapa o un punto del timeline
@@ -121,19 +148,26 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
                   // (`programmaticScroll`) para que el scroll programático no se pelee
                   // con el scroll-snap nativo. Tocar la YA activa abre el detalle
                   // (issue #605, punto 2 — antes un solo toque hacía las dos cosas a
-                  // la vez y "abrir el detalle" tapaba el vuelo del mapa).
+                  // la vez y "abrir el detalle" tapaba el vuelo del mapa). Pasa el
+                  // momento ORIGINAL (`originalById`), nunca la versión fusionada de
+                  // presentación (issue #839): `MomentSheet` no sabe de fusión.
                   onExpand={() => {
                     if (m.challengeId === selectedId) {
-                      onExpand(m)
+                      onExpand(originalById.get(m.challengeId) ?? m)
                     } else {
                       onSelectFromMap(m.challengeId)
                     }
                   }}
                   // El propio reto activo no ofrece "Adivina →" (el creador no puede
                   // jugar su reto, guarda #513): MomentCard pinta el recuento de
-                  // jugadas en su lugar cuando `moment.isOwn` (#578).
+                  // jugadas en su lugar cuando `moment.isOwn` (#578). En una tarjeta
+                  // FUSIONADA, "Adivina" debe lanzar el id REAL del reto asociado
+                  // (`pairedByMemoryId`), no el del recuerdo (no es jugable) — issue #839.
                   onPlay={
-                    m.status === 'active' && !m.isOwn ? () => onPlay(m.challengeId) : undefined
+                    m.status === 'active' && !m.isOwn
+                      ? () =>
+                          onPlay(pairedByMemoryId.get(m.challengeId)?.challengeId ?? m.challengeId)
+                      : undefined
                   }
                 />
               </div>

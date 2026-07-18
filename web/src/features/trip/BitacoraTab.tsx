@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
-import { ListOrdered } from 'lucide-react'
+import { ChevronRight, ListOrdered } from 'lucide-react'
 import { AudioPlayer, Badge, Button, EmptyState, Icon, IconCamara, IconDiana } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
 import { listGroupMomentImages } from '../../lib/momentImages'
 import { signedImageUrl } from '../../lib/storage'
 import { reportError } from '../../lib/observability'
 import { track } from '../../lib/analytics'
-import { isMomentPhotoVisible, parseLegacyDescription, type Moment } from '../../lib/trip'
+import { formatDeadline } from '../../lib/time'
+import {
+  isMomentPhotoVisible,
+  pairedChallengeByMemoryId,
+  parseLegacyDescription,
+  type Moment,
+} from '../../lib/trip'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
 import type { GroupPrizes } from '../../lib/database.types'
 import {
@@ -14,8 +20,10 @@ import {
   type BitacoraGrouped,
   type BitacoraMomentInput,
   type BitacoraPhoto,
+  type BitacoraReto,
 } from './bitacoraGallery'
 import { StandingsBoard, type StandingsClasses } from './StandingsBoard'
+import type { PastChallengeSummary } from './useTripData'
 import styles from './BitacoraTab.module.css'
 
 interface Props {
@@ -33,7 +41,8 @@ interface Props {
    * usa TripPage para el Diario). Un RETO nunca llega aquí — ver `onOpenChallenge`. */
   onOpenMoment: (moment: Moment) => void
   /**
-   * Tocar el título (o "Ver el momento" del visor) de un RETO (issue #822): a
+   * Tocar el título (o "Ver el momento" del visor) de un RETO SUELTO (issue
+   * #822), o la franja de reto de un momento FUSIONADO (issue #839): a
    * diferencia de un recuerdo, un reto abre su DETALLE de juego (clasificación,
    * mapa de jugadas, foto) o el flujo de jugar — la decisión de CUÁL de los dos
    * (anti-spoiler: un EN JUEGO sin jugar va a jugar, nunca al detalle) vive en
@@ -41,6 +50,12 @@ interface Props {
    * duplica esa lógica, solo delega.
    */
   onOpenChallenge: (challengeId: string) => void
+  /** Retos del viaje con su GANADOR ya resuelto (issue #839, mismo dato que
+   * "Retos anteriores" del Marcador): la única fuente del nombre para "Reto
+   * cerrado · ganó X" en la franja de un momento FUSIONADO — no se recalcula
+   * aquí, se REUTILIZA. Los de PRÁCTICA no entran (no son parte del recorrido,
+   * ver `useTripData`); su franja fusionada cae a "EN JUEGO" sin ganador. */
+  pastChallenges: PastChallengeSummary[]
   /** Clasificación general del viaje (issue #822): alimenta el cierre de la
    * Bitácora ("La liga del viaje" + podio/lista). Vacía → no se pinta el cierre. */
   leaderboard: LeaderboardEntry[]
@@ -49,6 +64,23 @@ interface Props {
   prizes: GroupPrizes | null
   /** CTA discreto "Ver marcador" del cierre: salta a la pestaña Marcador. */
   onViewMarcador: () => void
+}
+
+// Info de la franja de reto de un momento FUSIONADO (issue #839): status del
+// reto asociado (closed cae en 'closed', practice/active en 'active' — mismo
+// binario que el chip suelto de abajo) y el ganador si ya cerró, buscado en
+// `pastChallenges` (única fuente del nombre, no se recalcula desde los votos).
+function retoInfoFor(challenge: Moment, pastChallenges: PastChallengeSummary[]): BitacoraReto {
+  const closed = challenge.status === 'closed'
+  const summary = closed
+    ? pastChallenges.find((p) => p.challengeId === challenge.challengeId)
+    : undefined
+  return {
+    challengeId: challenge.challengeId,
+    status: closed ? 'closed' : 'active',
+    deadlineAt: challenge.deadlineAt,
+    winnerName: summary?.winner?.name ?? null,
+  }
 }
 
 // Clases del podio/lista del cierre, en la escala de la Bitácora (tarjeta opaca
@@ -109,12 +141,17 @@ type PendingPhoto = { kind: 'ready'; src: string } | { kind: 'sign'; path: strin
  * aporta nada al usuario y arrastraría enlaces ya compartidos. Solo cambia lo
  * que se VE: la etiqueta del tab y esta pantalla.
  *
- * MARCA DE RETO (issue #821): un reto y un recuerdo con la MISMA foto (p.ej. un
- * reto creado a partir de la foto de un recuerdo, `fromMomentId` en
- * `CreateChallengeFlow`) se leían como entradas duplicadas — nada los
- * distinguía. Cada entrada de reto lleva ahora el chip diana + estado ("EN
- * JUEGO" con punto vivo / "Cerrado"), MISMO lenguaje que `ChallengeDetail`; el
- * recuerdo se queda limpio (su ausencia de chip ES su marca).
+ * MARCA DE RETO (issue #821) → FUSIÓN (issue #839): un reto y un recuerdo con
+ * la MISMA foto (p.ej. un reto creado a partir de la foto de un recuerdo,
+ * `fromMomentId` en `CreateChallengeFlow`) se leían como DOS entradas
+ * duplicadas — el #821 solo los distinguía con un chip, sin dejar de
+ * repetirlos. El #839 los FUSIONA de verdad (`pairedChallengeByMemoryId` en
+ * `lib/trip.ts`): el reto asociado no pinta su propia entrada — se filtra
+ * antes de agrupar por día, y su estado ("EN JUEGO" con punto vivo / "Reto
+ * cerrado · ganó X") se pinta como una franja tappable dentro de la entrada
+ * del recuerdo (`moment.reto`, `retoInfoFor`), reutilizando la MISMA
+ * navegación (`onOpenChallenge`) que ya tenía el reto suelto. Un reto SIN
+ * recuerdo asociado sigue con el chip suelto de siempre ("EN JUEGO"/"Cerrado").
  *
  * CIERRE (issue #822): tras el último día, si ya hay clasificación (alguien
  * jugó algún reto), la Bitácora remata con el mismo podio/lista del Marcador
@@ -127,6 +164,7 @@ export function BitacoraTab({
   onAddMoment,
   onOpenMoment,
   onOpenChallenge,
+  pastChallenges,
   leaderboard,
   prizes,
   onViewMarcador,
@@ -140,7 +178,16 @@ export function BitacoraTab({
 
     async function load() {
       try {
-        const visible = moments.filter(isMomentPhotoVisible)
+        // Fusión momento↔reto (issue #839): un reto ASOCIADO a un recuerdo
+        // (misma foto, `pairedChallengeByMemoryId`) no se pinta como entrada
+        // propia — se funde en la franja de esa MISMA entrada más abajo
+        // (`retoInfoFor`). Antes esto pintaba dos entradas con la MISMA foto
+        // (el recuerdo y el reto), leídas como contenido duplicado.
+        const pairedByMemoryId = pairedChallengeByMemoryId(moments)
+        const mergedAwayIds = new Set(Array.from(pairedByMemoryId.values(), (c) => c.challengeId))
+        const visible = moments
+          .filter(isMomentPhotoVisible)
+          .filter((m) => !mergedAwayIds.has(m.challengeId))
         const recuerdoIds = visible.filter((m) => !m.isChallenge).map((m) => m.challengeId)
         const galleryByMoment = await listGroupMomentImages(recuerdoIds)
 
@@ -175,11 +222,13 @@ export function BitacoraTab({
           // GIGANTE bajo la letra capitular de `.description` (issue #686). El
           // cuerpo limpio va al párrafo de siempre; la fecha, junto al kicker.
           const { dateLabel, text } = parseLegacyDescription(m.description)
+          const pairedChallenge = pairedByMemoryId.get(m.challengeId)
           return {
             momentId: m.challengeId,
             momentTitle: m.title,
             isChallenge: m.isChallenge,
             status: m.status,
+            reto: pairedChallenge ? retoInfoFor(pairedChallenge, pastChallenges) : null,
             date: m.date,
             description: text,
             dateLabel,
@@ -205,7 +254,7 @@ export function BitacoraTab({
     return () => {
       cancelled = true
     }
-  }, [groupId, moments])
+  }, [groupId, moments, pastChallenges])
 
   const days = grouped?.days ?? []
   const flatPhotos = grouped?.flatPhotos ?? []
@@ -344,6 +393,37 @@ export function BitacoraTab({
                         />
                       ))}
                     </div>
+
+                    {/* Franja de reto FUSIONADO (issue #839): un reto asociado a
+                        este recuerdo (misma foto) ya no pinta su propia entrada
+                        duplicada — vive integrado aquí, con el mismo lenguaje de
+                        estado que el chip suelto de arriba (diana + "EN JUEGO"/
+                        "Reto cerrado") más la acción que ya tenía el reto suelto
+                        (tocar → `onOpenChallenge`, que en `TripPage` decide jugar
+                        o ver el detalle, mismo anti-spoiler de siempre). */}
+                    {moment.reto && (
+                      <button
+                        type="button"
+                        className={[styles.retoStrip, 'lg-press'].join(' ')}
+                        onClick={() => onOpenChallenge(moment.reto!.challengeId)}
+                      >
+                        <Badge
+                          tone={moment.reto.status === 'closed' ? 'neutral' : 'live'}
+                          dot={moment.reto.status !== 'closed'}
+                        >
+                          <IconDiana size={13} />
+                          {moment.reto.status === 'closed' ? 'Reto cerrado' : 'EN JUEGO'}
+                        </Badge>
+                        <span className={styles.retoStripMeta}>
+                          {moment.reto.status === 'closed'
+                            ? moment.reto.winnerName
+                              ? `Ganó ${moment.reto.winnerName}`
+                              : 'Se cerró sin votos'
+                            : formatDeadline(moment.reto.deadlineAt)}
+                        </span>
+                        <Icon icon={ChevronRight} size={16} className={styles.retoStripChevron} />
+                      </button>
+                    )}
                   </article>
                 ))}
               </div>

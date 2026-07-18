@@ -7,6 +7,7 @@ function momentInput(over: Partial<BitacoraMomentInput> = {}): BitacoraMomentInp
     momentTitle: 'Un momento',
     isChallenge: false,
     status: 'recuerdo',
+    reto: null,
     date: '2026-06-15T10:00:00.000Z',
     description: null,
     dateLabel: null,
@@ -103,6 +104,32 @@ describe('groupMomentsByDay — marca de reto (issue #821)', () => {
     const [recuerdo, cerrado] = days[0].moments
     expect(recuerdo).toMatchObject({ isChallenge: false, status: 'recuerdo' })
     expect(cerrado).toMatchObject({ isChallenge: true, status: 'closed' })
+  })
+})
+
+describe('groupMomentsByDay — reto asociado fusionado (issue #839)', () => {
+  test('conserva el `reto` de la entrada tal cual, sin mezclarlo con otras', () => {
+    const moments = [
+      momentInput({
+        momentId: 'c-fusionado',
+        reto: {
+          challengeId: 'reto-1',
+          status: 'active',
+          deadlineAt: '2026-06-20T10:00:00.000Z',
+          winnerName: null,
+        },
+      }),
+      momentInput({ momentId: 'c-suelto', reto: null }),
+    ]
+    const { days } = groupMomentsByDay(moments)
+    const [fusionado, suelto] = days[0].moments
+    expect(fusionado.reto).toEqual({
+      challengeId: 'reto-1',
+      status: 'active',
+      deadlineAt: '2026-06-20T10:00:00.000Z',
+      winnerName: null,
+    })
+    expect(suelto.reto).toBeNull()
   })
 })
 
