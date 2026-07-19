@@ -153,6 +153,10 @@ describe('main: auto-apply del update de PWA en rutas seguras (#647)', () => {
   test('visibilidad en ruta segura: aplica tras el retardo, no al instante', async () => {
     setHash('#g=abc123')
     await loadMain()
+    // Sesión ya AVANZADA (fuera de la ventana de arranque del 19-jul, donde
+    // aplicar al instante sí es lo correcto): los timers falsos también mueven
+    // Date.now(), así que esto simula que la página lleva rato viva.
+    vi.advanceTimersByTime(11_000)
     onNeedRefresh()
 
     setHidden(true)
@@ -169,6 +173,8 @@ describe('main: auto-apply del update de PWA en rutas seguras (#647)', () => {
   test('salto corto: volver antes del retardo cancela la recarga', async () => {
     setHash('#g=abc123')
     await loadMain()
+    // Fuera de la ventana de arranque (ver test anterior).
+    vi.advanceTimersByTime(11_000)
     onNeedRefresh()
 
     setHidden(true)
@@ -181,6 +187,37 @@ describe('main: auto-apply del update de PWA en rutas seguras (#647)', () => {
     vi.advanceTimersByTime(10 * 60_000)
 
     expect(updateSWMock).not.toHaveBeenCalled()
+  })
+
+  // Ventana de ARRANQUE (19-jul): abrir la app con una versión nueva esperando
+  // debe aplicarla YA (recarga única al abrir, sin scroll/estado que perder) —
+  // sin esto el usuario iba siempre una versión por detrás (el retardo de 5 min
+  // solo cubre sesiones vivas).
+  test('arranque en ruta segura: una actualización detectada al abrir se aplica al instante', async () => {
+    setHash('#g=abc123')
+    await loadMain()
+    onNeedRefresh() // el sondeo inicial la encuentra a los pocos segundos
+
+    expect(updateSWMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('arranque en ruta NO segura (jugar/crear): no se aplica al abrir', async () => {
+    setHash('#nuevo')
+    await loadMain()
+    onNeedRefresh()
+
+    expect(updateSWMock).not.toHaveBeenCalled()
+  })
+
+  test('arranque con un SW ya EN ESPERA de la sesión anterior: se aplica al registrar', async () => {
+    setHash('#g=abc123')
+    await loadMain()
+    registerSWOptions.onRegisteredSW?.('sw.js', {
+      waiting: {},
+      update: () => Promise.resolve(),
+    } as unknown as ServiceWorkerRegistration)
+
+    expect(updateSWMock).toHaveBeenCalledTimes(1)
   })
 })
 
