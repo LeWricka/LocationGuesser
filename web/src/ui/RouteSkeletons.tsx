@@ -15,14 +15,25 @@ import styles from './RouteSkeletons.module.css'
 // hueco que va a ocupar la pantalla real. `role="status"` + `aria-label` los
 // anuncia como región de carga; los bloques individuales son `aria-hidden`
 // (los pone <Skeleton/>), así un lector de pantalla no lee "cargando" N veces.
+//
+// Issue "entrada al viaje sin flashazo": Viaje/Jugar/Home son ESCENAS OSCURAS a
+// sangre (mapa/globo/foto, tokens `--scene-*`) — sus esqueletos deben arrancar
+// YA en ese tono (`tone="scene"` de `<Skeleton/>`, fondo `--scene-bg`), nunca en
+// el papel claro por defecto. Solo el utilitario (formularios: crear/perfil/
+// admin) sigue siendo papel — es fiel a `ShellUtilitario`, que es papel de verdad.
 
 // ── Viaje (TripPage): cabecera + mapa/globo + tira de recuerdos ──────────────
-export function TripRouteSkeleton() {
+// También sirve como esqueleto de DATOS de TripPage (mientras `useTripData`
+// resuelve, ver TripPage.tsx): antes tenía su propio esqueleto inline, en tonos
+// de papel — dos esqueletos distintos (y de dos colores distintos) para la
+// MISMA espera. Reusar este componente en los dos momentos (chunk cargando +
+// datos cargando) los hace coherentes por construcción.
+export function TripRouteSkeleton({ ariaLabel = 'Cargando…' }: { ariaLabel?: string } = {}) {
   return (
-    <main className={styles.page} role="status" aria-label="Cargando…">
+    <main className={`${styles.page} ${styles.pageDark}`} role="status" aria-label={ariaLabel}>
       <div className={styles.header}>
-        <Skeleton width={40} height={40} radius="full" />
-        <Skeleton className={styles.headerTitle} width={140} height={18} />
+        <Skeleton tone="scene" width={40} height={40} radius="full" />
+        <Skeleton tone="scene" className={styles.headerTitle} width={140} height={18} />
         <div className={styles.headerSpacer} aria-hidden="true" />
       </div>
 
@@ -32,7 +43,7 @@ export function TripRouteSkeleton() {
 
       <div className={styles.strip}>
         {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className={styles.stripCard} height={72} radius="lg" />
+          <Skeleton key={i} tone="scene" className={styles.stripCard} height={72} radius="lg" />
         ))}
       </div>
     </main>
@@ -74,39 +85,47 @@ export function UtilityRouteSkeleton() {
   )
 }
 
-// ── Home (HomePage): globo + banner del reto + feed de portadas ─────────────
+// ── Home (HomeDashboard): escena de globo a sangre + dock de viajes ─────────
 //
 // Issue "perf(cargas): entrada sin saltos": la home logueada es la ÚNICA ruta
 // lazy de App.tsx sin familia de skeleton propia — antes caía al
 // `UtilityRouteSkeleton` genérico (cabecera + 4 campos, forma de FORMULARIO)
 // mientras se descargaba el chunk de `HomePage`, y en cuanto montaba pintaba
-// SU PROPIO esqueleto (globo + banner + tarjetas) mientras `useHomeData`
-// resolvía. Dos formas de esqueleto DISTINTAS en la misma carga son un
-// doble-swap visible (form → globo → contenido) — exactamente la clase de
-// "salto" que reporta el dueño. Sacamos el esqueleto de la home a esta familia
-// compartida para que el fallback de `<Suspense>` (mientras llega el chunk) y
-// el esqueleto por datos (mientras `useHomeData`/`useSession` resuelven, ver
-// `HomePage.tsx`) sean el MISMO layout: un solo paso visual hasta el contenido
-// real, no dos.
+// SU PROPIO esqueleto mientras `useHomeData` resolvía. Sacamos el esqueleto de
+// la home a esta familia compartida para que el fallback de `<Suspense>`
+// (mientras llega el chunk) y el esqueleto por datos (mientras `useHomeData`/
+// `useSession` resuelven, ver `HomePage.tsx`) sean el MISMO layout.
+//
+// Issue "entrada al viaje sin flashazo": la forma de arriba (globo claro +
+// banner + feed de tarjetas blancas) quedó desfasada del rediseño #568 ("sin
+// hoja blanca": la home pasó a ser una escena INMERSIVA a sangre — globo +
+// TODO el chrome flotando encima, ver `HomeDashboard.module.css`). El esqueleto
+// seguía pintando tarjetas de tono 'surface' (claro) sobre `.lg-page` (que
+// hereda el papel del body) y "brillaba" en blanco un instante contra el fondo
+// oscuro real. Ahora anticipa la MISMA escena a sangre: fondo `--scene-bg`,
+// marca+avatar arriba (`.homeOverlay`, espejo de `HomeDashboard` `.overlay`) y
+// el dock inferior (etiqueta + carrusel de viajes) en placeholders
+// `tone="scene"`.
 export function HomeRouteSkeleton() {
   return (
-    <main className="lg-page" role="status" aria-label="Cargando tu inicio">
-      <Stack gap={6}>
-        {/* Globo héroe (placeholder alto). */}
-        <Skeleton width="100%" height={260} radius="lg" />
+    <div className={styles.homeScene} role="status" aria-label="Cargando tu inicio">
+      <Row className={styles.homeOverlay} justify="between" gap={3}>
+        <Skeleton tone="scene" width={112} height={22} radius="sm" />
+        <Skeleton tone="scene" width={36} height={36} radius="full" />
+      </Row>
 
-        {/* Banner del reto + feed de portadas. */}
-        <Row justify="between" align="center" gap={3}>
-          <Skeleton width={120} height={28} radius="md" />
-          <Skeleton width={64} height={16} />
-        </Row>
-        <Skeleton width="100%" height={88} radius="lg" />
-        <Stack gap={3}>
+      {/* Globo a sangre: mismo bloque estático (sin shimmer) que `.scene` del
+          viaje — el globo real siempre parte de oscuro. */}
+      <div className={styles.homeSpacer} aria-hidden="true" />
+
+      <Stack gap={2} className={styles.homeDock}>
+        <Skeleton tone="scene" width={140} height={14} />
+        <Row gap={3} align="stretch">
           {[0, 1].map((i) => (
-            <Skeleton key={i} width="100%" height={240} radius="lg" />
+            <Skeleton key={i} tone="scene" className={styles.homeCard} height={200} radius="lg" />
           ))}
-        </Stack>
+        </Row>
       </Stack>
-    </main>
+    </div>
   )
 }

@@ -13,6 +13,15 @@ describe('RouteSkeletons', () => {
     expect(screen.getByRole('status', { name: 'Cargando…' })).toBeInTheDocument()
   })
 
+  test('TripRouteSkeleton acepta un aria-label propio (TripPage lo reusa como esqueleto de datos)', () => {
+    // Issue "entrada al viaje sin flashazo": TripPage ya no pinta su propio
+    // esqueleto inline mientras `useTripData` resuelve — reusa este componente,
+    // con una etiqueta más específica que el "Cargando…" genérico del fallback
+    // de <Suspense>.
+    render(<TripRouteSkeleton ariaLabel="Cargando el viaje" />)
+    expect(screen.getByRole('status', { name: 'Cargando el viaje' })).toBeInTheDocument()
+  })
+
   test('PlayRouteSkeleton se anuncia como región de carga', () => {
     render(<PlayRouteSkeleton />)
     expect(screen.getByRole('status', { name: 'Cargando…' })).toBeInTheDocument()

@@ -12,7 +12,15 @@ import {
   Trash2,
   Users,
 } from 'lucide-react'
-import { ChallengePhoto, EmptyState, Icon, IconDiana, useReducedMotion, useToast } from '../../ui'
+import {
+  ChallengePhoto,
+  EmptyState,
+  Icon,
+  IconDiana,
+  TripRouteSkeleton,
+  useReducedMotion,
+  useToast,
+} from '../../ui'
 import { AppHeader } from '../../ui/AppHeader'
 import { BottomSheet } from '../../ui/BottomSheet'
 import { SegmentedControl } from '../../ui/SegmentedControl'
@@ -573,25 +581,21 @@ export function TripPage({
   }
 
   if (loading) {
-    // `key="loading"` (issue #623): sin él, React reconcilia este `<div>` contra el
-    // de la carga siguiente (mismo tipo host en la misma posición) y REUTILIZA el
-    // nodo `.panel.panelMarcador` de abajo para pintar `.tabs` encima —de una
-    // superficie a pantalla completa a una píldora flotante en el mismo frame, el
-    // salto de layout más grande medido en esta pantalla (CLS ~0.066, ver PR). La
-    // key fuerza un desmontaje/montaje limpio entre esqueleto y contenido real.
-    return (
-      <div key="loading" className={styles.screen} role="status" aria-label="Cargando el viaje">
-        <header className={`${styles.overlay} ${styles.overlayLight}`} aria-hidden="true">
-          <span className={`${styles.skelPill} ${styles.skelIcon} lg-shimmer-surface`} />
-          <span className={`${styles.skelPill} ${styles.skelTitle} lg-shimmer-surface`} />
-          <span className={`${styles.skelPill} ${styles.skelIcon} lg-shimmer-surface`} />
-        </header>
-        <div className={`${styles.panel} ${styles.panelMarcador}`}>
-          <span className={`${styles.skelHero} lg-shimmer-surface`} />
-          <span className={`${styles.skelCard} lg-shimmer-surface`} />
-        </div>
-      </div>
-    )
+    // Esqueleto compartido con el fallback de `<Suspense>` de App.tsx
+    // (`TripRouteSkeleton`, issue "entrada al viaje sin flashazo"): antes este
+    // `if` pintaba su PROPIO esqueleto inline, en tonos de papel — un segundo
+    // esqueleto, de otro color, para la MISMA espera (el "doble esqueleto" que
+    // reportó el dueño: tarjetas blancas sobre la escena oscura del viaje).
+    // Reusar el mismo componente aquí y en App.tsx los hace coherentes por
+    // construcción, no por mantenimiento manual en paralelo.
+    //
+    // `key="loading"` (issue #623): sin él, React puede reconciliar el árbol de
+    // esta rama contra el del contenido real en la misma posición y reutilizar
+    // nodos entre dos formas MUY distintas de layout (el bug de CLS ~0.066 que
+    // motivó la key). El tipo de elemento raíz ya cambia (`main` aquí vs `div`
+    // del contenido, ver más abajo), pero se deja explícita por claridad y como
+    // red de seguridad si el contenido cambia de raíz en el futuro.
+    return <TripRouteSkeleton key="loading" ariaLabel="Cargando el viaje" />
   }
 
   if (error) {
