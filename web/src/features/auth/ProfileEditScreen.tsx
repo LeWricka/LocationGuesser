@@ -208,9 +208,10 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
             </div>
           </fieldset>
 
-          {/* Avisos del grupo (PWA): control aparte del guardado del perfil. Solo
-              se renderiza si el navegador soporta push y hay VAPID configurada. */}
-          <PushNotificationsControl userId={userId} />
+          {/* Avisos y preferencias de notificaciones (PWA): control aparte del
+              guardado del perfil — persiste solo/directamente, sin pasar por
+              "Guardar". */}
+          <PushNotificationsControl userId={userId} profile={profile} />
         </Stack>
 
         {/* Acciones secundarias, separadas del formulario y del "atrás" (que ya

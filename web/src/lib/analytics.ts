@@ -221,6 +221,10 @@ export type AnalyticsEvent =
   | 'push_prompt_shown'
   | 'push_prompt_accepted'
   | 'push_prompt_dismissed'
+  // Sección "Notificaciones" del perfil: el usuario activa/desactiva un tipo de
+  // aviso concreto (Reto nuevo / Momento nuevo / Fin de reto / Fin de viaje).
+  // Props: kind ('created'|'memory'|'closed'|'trip_closed'), enabled (boolean).
+  | 'push_pref_changed'
 
 // Identidad del usuario para `identifyUser`. id = uuid de Supabase Auth (estable).
 export interface AnalyticsIdentity {
