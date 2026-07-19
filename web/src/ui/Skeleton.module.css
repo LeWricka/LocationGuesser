@@ -2,18 +2,35 @@
   display: block;
   position: relative;
   overflow: hidden;
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Tono 'surface' (por defecto): papel/tarjeta clara — el de siempre. Banda de
+ * brillo que recorre el bloque (shimmer); el gradiente se mueve con
+ * background-position para no forzar layout. */
+.tone-surface {
   background-color: var(--color-surface-raised);
-  /* Banda de brillo que recorre el bloque (shimmer). El gradiente se mueve con
-   * background-position para no forzar layout. */
   background-image: linear-gradient(
     100deg,
     transparent 30%,
     var(--color-surface-hover) 50%,
     transparent 70%
   );
-  background-size: 200% 100%;
-  background-repeat: no-repeat;
-  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+/* Tono 'scene': chrome sobre una escena OSCURA (mapa/globo/foto a sangre). Mismos
+ * tokens `--scene-*` que el resto del chrome flotante — nunca el blanco de
+ * 'surface', que "brillaba" como un parche roto sobre el fondo oscuro real. */
+.tone-scene {
+  background-color: var(--scene-surface);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    var(--scene-hairline) 50%,
+    transparent 70%
+  );
 }
 
 .radius-sm {

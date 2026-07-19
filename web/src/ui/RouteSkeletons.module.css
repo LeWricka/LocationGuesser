@@ -11,6 +11,17 @@
   background-color: var(--paper);
 }
 
+/* Fondo de escena OSCURA (issue "entrada al viaje sin flashazo"): Viaje/Jugar
+ * viven sobre `--scene-bg` (mapa/dock a sangre, issue #831) — el esqueleto debe
+ * arrancar YA en ese tono, nunca en el papel claro de las rutas utilitarias.
+ * Modificador aparte (no se toca `.page`) porque Jugar/Utilitario siguen en
+ * papel: el propio `PlayRouteSkeleton` es papel + escena+hoja, fiel a
+ * `PlayChallenge.module.css` (`--color-bg` con una escena y una hoja clara
+ * encima); solo Viaje pasa la PÁGINA entera a oscuro. */
+.pageDark {
+  background-color: var(--scene-bg);
+}
+
 /* Cabecera: botón redondo a la izquierda, título centrado. El spacer de la
  * derecha iguala el ancho del botón para que el título quede centrado de
  * verdad (mismo truco de 3 columnas que AppHeader). */
@@ -32,13 +43,17 @@
   flex-shrink: 0;
 }
 
-/* Bloque de mapa/globo del viaje: tono de escena oscuro y ESTÁTICO (el mapa
- * real siempre arranca oscuro; no hace falta shimmer sobre este bloque). */
+/* Bloque de mapa/globo del viaje: ESTÁTICO, sin shimmer (el mapa real siempre
+ * arranca oscuro, no hay nada que "cargar" visualmente aquí). Con `.pageDark`
+ * ya oscureciendo la página entera, este bloque usa `--scene-surface` (no
+ * `--scene-bg`, igual que el fondo) + un hairline tenue para seguir
+ * leyéndose como un hueco propio, no fundirse con la página. */
 .scene {
   flex: 1;
   min-height: 220px;
   margin: 0 var(--space-gutter);
-  background-color: var(--scene-bg);
+  background-color: var(--scene-surface);
+  border: 1px solid var(--scene-hairline);
   border-radius: var(--radius-lg);
 }
 
@@ -81,4 +96,43 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+}
+
+/* ── Home: escena a sangre (issue "entrada al viaje sin flashazo" / #568) ────
+ * `position: fixed` a propósito: espejo exacto del `.scene` real de
+ * `HomeDashboard.module.css` (escena inmersiva, sin hoja blanca) — así el
+ * esqueleto ocupa el mismo hueco de viewport que el contenido que lo releva,
+ * sin depender del flujo/`max-width` de `.lg-page`. */
+.homeScene {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--scene-bg);
+}
+
+/* Chrome superior (marca + avatar), espejo de `.overlay`/`.brand`/`.avatarButton`
+ * de HomeDashboard. */
+.homeOverlay {
+  flex: none;
+  padding: max(env(safe-area-inset-top), var(--space-4)) var(--space-4) var(--space-4);
+}
+
+/* El globo llena el resto de la escena: bloque vacío (el fondo `--scene-bg` de
+ * `.homeScene` ya "es" el globo en reposo, igual que `.scene` del viaje). */
+.homeSpacer {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Dock inferior: etiqueta + carrusel de tarjetas-viaje, espejo de `.dock` de
+ * HomeDashboard. */
+.homeDock {
+  flex: none;
+  padding: 0 var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-8));
+}
+
+.homeCard {
+  flex: 1;
 }

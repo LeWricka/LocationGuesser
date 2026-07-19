@@ -147,6 +147,61 @@ function statusOf(challenge: ChallengeForPlay, now: Date): MomentStatus {
 }
 
 /**
+ * Última respuesta buena de `refresh` para UN viaje+usuario, y cuándo se
+ * resolvió. Solo lo que sale directo de red (grupo, retos, votos, respuestas y
+ * URLs firmadas): lo derivado (`moments`/`route`/`leaderboard`/…) son `useMemo`
+ * puros sobre esto, así que no hace falta cachearlo aparte. `countryById` TAMPOCO
+ * entra: se resuelve aparte, de forma escalonada y no bloqueante (no gobierna
+ * `loading`, así que no forma parte del "esqueleto o no").
+ */
+interface TripDataSnapshot {
+  group: GroupInfo | null
+  challenges: ChallengeForPlay[]
+  votes: VoteWithName[]
+  answersById: Map<string, LatLng>
+  imageUrlById: Record<string, string>
+  audioUrlById: Record<string, string>
+  videoUrlById: Record<string, string>
+}
+
+interface TripDataCacheEntry {
+  snapshot: TripDataSnapshot
+  resolvedAt: number
+}
+
+// Caché a nivel de módulo (issue "entrada al viaje sin flashazo", mismo patrón
+// que `homeDataCache` en `features/home/useHomeData.ts`, issue #830): sin ella,
+// CADA entrada a un viaje —incluida la vuelta desde Marcador/Bitácora, o desde
+// la home tras haber estado ya dentro— arrancaba en loading=true y pintaba el
+// esqueleto, aunque los datos fueran con toda seguridad los mismos de hace un
+// instante. Con la caché, si ya hay una respuesta previa para ESTE viaje y ESTE
+// usuario, el hook arranca YA con esos datos (loading=false, sin esqueleto) y
+// revalida en segundo plano (stale-while-revalidate, el `refresh()` del efecto
+// de montaje de más abajo); el esqueleto queda reservado a la primera carga fría.
+//
+// Clave POR USUARIO además de por viaje: un logout o un cambio de cuenta en el
+// mismo navegador no debe servir de caché la respuesta de OTRA identidad para
+// el mismo viaje (defensivo — hoy el fetch no filtra por `myUserId`, la RLS
+// decide visibilidad por membresía, pero la clave por usuario es la misma
+// invalidación "gratis" que ya usa `homeDataCache`: cambiar de usuario siempre
+// da un cache-miss y una carga fría, nunca datos ajenos servidos por caché).
+const tripDataCache = new Map<string, TripDataCacheEntry>()
+
+function tripCacheKey(groupId: string, myUserId: string | null): string {
+  return `${groupId}:${myUserId ?? 'anon'}`
+}
+
+/**
+ * SOLO para tests: vacía la caché de módulo entre casos que reutilizan el mismo
+ * groupId/usuario con mocks distintos (`useTripData.test.ts`, que no puede
+ * inyectar un mock del propio módulo sin perder la implementación real). Nunca
+ * se llama desde código de producción.
+ */
+export function __resetTripDataCacheForTests(): void {
+  tripDataCache.clear()
+}
+
+/**
  * Orquesta los datos del viaje (grupo + momentos + ruta) reusando la misma capa
  * de datos que `GroupPage`: una sola carga conjunta y una derivación pura encima.
  *
@@ -162,18 +217,31 @@ function statusOf(challenge: ChallengeForPlay, now: Date): MomentStatus {
  *    no ofrece un "Adivina →" que aterriza en la guarda "Este reto es tuyo" (#578).
  *  - Realtime: nos resuscribimos a los votos del grupo (igual patrón que
  *    GroupPage) para que likes/contadores y nuevos momentos se refresquen solos.
+ *  - Caché por viaje+usuario (ver `tripDataCache` arriba): la revisita a un viaje
+ *    ya visto arranca con los datos de la última carga buena, sin esqueleto.
  */
 export function useTripData(groupId: string, myUserId: string | null): TripData {
-  const [group, setGroup] = useState<GroupInfo | null>(null)
-  const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(null)
-  const [votes, setVotes] = useState<VoteWithName[] | null>(null)
+  const cacheKey = tripCacheKey(groupId, myUserId)
+  const cached = tripDataCache.get(cacheKey)
+
+  const [group, setGroup] = useState<GroupInfo | null>(() => cached?.snapshot.group ?? null)
+  const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(
+    () => cached?.snapshot.challenges ?? null,
+  )
+  const [votes, setVotes] = useState<VoteWithName[] | null>(() => cached?.snapshot.votes ?? null)
   // Respuestas (lat/lng) de los CERRADOS; los activos no entran aquí a propósito.
-  const [answersById, setAnswersById] = useState<Map<string, LatLng>>(new Map())
+  const [answersById, setAnswersById] = useState<Map<string, LatLng>>(
+    () => cached?.snapshot.answersById ?? new Map(),
+  )
   // URL firmada de cada foto, indexada por challenge_id (bucket privado).
-  const [imageUrlById, setImageUrlById] = useState<Record<string, string>>({})
+  const [imageUrlById, setImageUrlById] = useState<Record<string, string>>(
+    () => cached?.snapshot.imageUrlById ?? {},
+  )
   // URL firmada de cada nota de voz, indexada por challenge_id (mismo bucket
   // privado, prefijo `audio/`, #648). Mismo patrón que `imageUrlById`.
-  const [audioUrlById, setAudioUrlById] = useState<Record<string, string>>({})
+  const [audioUrlById, setAudioUrlById] = useState<Record<string, string>>(
+    () => cached?.snapshot.audioUrlById ?? {},
+  )
   // URL firmada de cada clip de vídeo corto, indexada por challenge_id (mismo
   // bucket privado, prefijo `video/`, issue #649). A diferencia de
   // `imageUrlById`/`audioUrlById` (que solo firman lo que YA viene en `c`,
@@ -184,13 +252,19 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   // que alimenta JUGAR un reto. Por eso aquí hace falta una consulta APARTE,
   // solo sobre los RECUERDOS del lote (`is_challenge = false`) — un reto no
   // puede tener vídeo (`promoteToChallenge` lo vacía), así que ni se pregunta.
-  const [videoUrlById, setVideoUrlById] = useState<Record<string, string>>({})
+  const [videoUrlById, setVideoUrlById] = useState<Record<string, string>>(
+    () => cached?.snapshot.videoUrlById ?? {},
+  )
   // País por challenge_id, resuelto de forma escalonada y no bloqueante (abajo).
   // Solo se rellena para CERRADOS con coord; va apareciendo según se resuelve.
+  // Fuera de la caché (ver comentario de `TripDataSnapshot`): se resuelve de
+  // nuevo en cada montaje, barato porque `countryFromCoords` ya cachea por coord.
   const [countryById, setCountryById] = useState<Record<string, CountryInfo | null>>({})
   const [error, setError] = useState<string | null>(null)
   // Cuándo se resolvió la última carga (issue #638): alimenta `useVisibilityReload`.
-  const lastResolvedAtRef = useRef<number | null>(null)
+  // Sembrado desde la caché si ya había una respuesta previa (si no, null —
+  // "aún sin resolución", igual que antes de la caché).
+  const lastResolvedAtRef = useRef<number | null>(cached?.resolvedAt ?? null)
 
   // Carga conjunta (grupo + retos + votos), reutilizable en el montaje y en cada
   // evento de Realtime. Tras tenerlos, resuelve respuestas e imágenes (asíncrono,
@@ -220,7 +294,10 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
           async (ch) => [ch.id, await signedImageUrl(ch.image_path as string)] as const,
         ),
       )
-      setImageUrlById(Object.fromEntries(pairs.filter((p): p is [string, string] => p[1] != null)))
+      const imageUrlByIdNext = Object.fromEntries(
+        pairs.filter((p): p is [string, string] => p[1] != null),
+      )
+      setImageUrlById(imageUrlByIdNext)
 
       // Firmar las notas de voz en lote, mismo patrón que las fotos (#648).
       const withAudio = c.filter((ch) => ch.audio_path)
@@ -229,9 +306,10 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
           async (ch) => [ch.id, await signedImageUrl(ch.audio_path as string)] as const,
         ),
       )
-      setAudioUrlById(
-        Object.fromEntries(audioPairs.filter((p): p is [string, string] => p[1] != null)),
+      const audioUrlByIdNext = Object.fromEntries(
+        audioPairs.filter((p): p is [string, string] => p[1] != null),
       )
+      setAudioUrlById(audioUrlByIdNext)
 
       // Vídeo (#649): consulta APARTE, solo sobre los ids de RECUERDO del lote
       // (nunca un reto — ver el comentario de `videoUrlById` de arriba). Patrón
@@ -239,6 +317,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
       // puede filtrar por columna revocada/excluida en el mismo select que ya
       // trajo `c`, así que se pide de nuevo, mínima (dos columnas).
       const recuerdoIds = c.filter((ch) => !ch.is_challenge).map((ch) => ch.id)
+      let videoUrlByIdNext: Record<string, string> = {}
       if (recuerdoIds.length > 0) {
         const { data: videoRows, error: videoError } = await supabase
           .from('challenges')
@@ -251,17 +330,33 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
             async (row) => [row.id, await signedImageUrl(row.video_path as string)] as const,
           ),
         )
-        setVideoUrlById(
-          Object.fromEntries(videoPairs.filter((p): p is [string, string] => p[1] != null)),
+        videoUrlByIdNext = Object.fromEntries(
+          videoPairs.filter((p): p is [string, string] => p[1] != null),
         )
-      } else {
-        setVideoUrlById({})
       }
-      lastResolvedAtRef.current = Date.now()
+      setVideoUrlById(videoUrlByIdNext)
+
+      // Última respuesta buena → caché del módulo (stale-while-revalidate, ver
+      // `tripDataCache` arriba): la próxima vez que se monte este viaje para
+      // este mismo usuario, arranca con esto en vez de con el esqueleto.
+      const resolvedAt = Date.now()
+      lastResolvedAtRef.current = resolvedAt
+      tripDataCache.set(cacheKey, {
+        snapshot: {
+          group: g,
+          challenges: c,
+          votes: v,
+          answersById: answers,
+          imageUrlById: imageUrlByIdNext,
+          audioUrlById: audioUrlByIdNext,
+          videoUrlById: videoUrlByIdNext,
+        },
+        resolvedAt,
+      })
     } catch {
       setError('No hemos podido cargar el viaje. Reintenta en un momento.')
     }
-  }, [groupId])
+  }, [groupId, cacheKey])
 
   // Re-firma defensiva (issue #638): mismo margen que la home — si la pestaña
   // vuelve tras estar de fondo con el dato viejo, las fotos del viaje (héroes,

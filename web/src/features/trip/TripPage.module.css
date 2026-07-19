@@ -173,30 +173,6 @@
   color: var(--color-danger);
 }
 
-/* ---- Esqueleto de carga: overlay simple (no es el AppHeader) ----
-   Solo lo usa el estado de carga para insinuar la cabecera con tres pastillas. */
-.overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  /* design-lint-allow: capa local de la página (esqueleto de cabecera) */
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: calc(env(safe-area-inset-top) + var(--space-3)) var(--space-4) var(--space-5);
-}
-.overlayLight::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  /* design-lint-allow: capa local (velo detrás del esqueleto) */
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(to bottom, var(--color-bg) 38%, transparent);
-}
-
 /* ---- Viewport de UN SOLO panel ----
    Solo la sección activa se monta (la inactiva NO está en el DOM). Se acabó la pista
    al 200% con dos paneles hermanos y translateX: ya no hay un panel inactivo pegado al
@@ -268,36 +244,6 @@
   padding-left: 0;
   padding-right: 0;
   background: var(--scene-bg);
-}
-
-/* ---- Esqueleto de carga ---- */
-.skelPill {
-  border-radius: var(--radius-full);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-}
-.skelIcon {
-  flex: 0 0 auto;
-  width: 42px;
-  height: 42px;
-}
-.skelTitle {
-  flex: 1;
-  height: 30px;
-  border-radius: var(--radius-sm);
-}
-.skelHero {
-  display: block;
-  width: 100%;
-  height: 240px;
-  border-radius: var(--radius-lg);
-  margin-bottom: var(--space-4);
-}
-.skelCard {
-  display: block;
-  width: 86%;
-  aspect-ratio: 16 / 9;
-  border-radius: var(--radius-lg);
 }
 
 /* FAB "＋" con menú: contenedor flotando abajo-derecha; ancla el popover de acciones. */

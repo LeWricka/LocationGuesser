@@ -75,7 +75,7 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-import { useTripData } from './useTripData'
+import { useTripData, __resetTripDataCacheForTests } from './useTripData'
 
 function activeChallenge(overrides: Partial<ChallengeForPlay>): ChallengeForPlay {
   return {
@@ -119,6 +119,13 @@ function closedChallenge(overrides: Partial<ChallengeForPlay>): ChallengeForPlay
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // La caché es a nivel de MÓDULO (issue "entrada al viaje sin flashazo"): sin
+  // vaciarla, un test que reutilice el mismo groupId/usuario que uno anterior
+  // (la mayoría usa 'g1'/'u-me') arrancaría con los datos del test previo en vez
+  // de con loading=true, y `waitFor` daría un falso verde antes de que el nuevo
+  // mock resuelva. El describe de caché de más abajo usa groupIds PROPIOS a
+  // propósito para poder ejercer el cache-HIT entre dos renders del mismo test.
+  __resetTripDataCacheForTests()
   getGroupMock.mockResolvedValue({
     id: 'g1',
     name: 'Viaje',
@@ -517,5 +524,67 @@ describe('useTripData — orden por happened_on con fallback a created_at (issue
     await waitFor(() => expect(result.current.moments).toHaveLength(2))
 
     expect(result.current.moments.map((m) => m.title)).toEqual(['Subido temprano', 'Subido tarde'])
+  })
+})
+
+// Issue "entrada al viaje sin flashazo": caché a nivel de módulo (mismo patrón
+// que `homeDataCache`, issue #830). Cada test de este bloque usa un groupId
+// PROPIO (nunca reutilizado en otro describe de este fichero) para que la caché
+// de un test no contamine a otro — es a nivel de módulo, no se resetea entre tests.
+describe('useTripData — caché por viaje+usuario (issue "entrada al viaje sin flashazo")', () => {
+  test('revisitar el MISMO viaje+usuario arranca sin esqueleto (loading=false) con los últimos datos, y revalida en segundo plano', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1', title: 'Primera vez' })])
+
+    const first = renderHook(() => useTripData('g-cache-hit', 'u-cache'))
+    await waitFor(() => expect(first.result.current.moments).toHaveLength(1))
+    expect(first.result.current.loading).toBe(false)
+    first.unmount()
+
+    // El servidor cambió entre visitas (nuevo título) — la revalidación en
+    // segundo plano debe reflejarlo, pero el PRIMER render debe ir directo con
+    // lo cacheado, sin pasar por loading=true.
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1', title: 'Revalidado' })])
+
+    const second = renderHook(() => useTripData('g-cache-hit', 'u-cache'))
+    // Sincrónico, ANTES de que la revalidación en segundo plano resuelva: ya
+    // arranca sin esqueleto, con los datos de la visita anterior.
+    expect(second.result.current.loading).toBe(false)
+    expect(second.result.current.moments.map((m) => m.title)).toEqual(['Primera vez'])
+
+    // Stale-while-revalidate: el refresh de fondo trae el dato fresco.
+    await waitFor(() =>
+      expect(second.result.current.moments.map((m) => m.title)).toEqual(['Revalidado']),
+    )
+  })
+
+  test('viaje nunca visitado: sin caché, arranca con el esqueleto (loading=true)', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1' })])
+
+    const { result } = renderHook(() => useTripData('g-cache-cold', 'u-cache'))
+
+    expect(result.current.loading).toBe(true)
+
+    // Dejamos que la carga (real, sin caché) resuelva antes de acabar el test:
+    // si no, el `act()` de React se queja de un setState tras el test.
+    await waitFor(() => expect(result.current.loading).toBe(false))
+  })
+
+  test('cambio de usuario (logout/otra cuenta) en el MISMO viaje: cache-miss, nunca sirve datos de otra identidad', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1', title: 'De u-a' })])
+
+    const asUserA = renderHook(() => useTripData('g-cache-user-switch', 'u-a'))
+    await waitFor(() => expect(asUserA.result.current.moments).toHaveLength(1))
+    asUserA.unmount()
+
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1', title: 'De u-b' })])
+
+    // Mismo viaje, usuario DISTINTO: no debe arrancar con los datos de u-a.
+    const asUserB = renderHook(() => useTripData('g-cache-user-switch', 'u-b'))
+    expect(asUserB.result.current.loading).toBe(true)
+    expect(asUserB.result.current.moments).toHaveLength(0)
+
+    await waitFor(() =>
+      expect(asUserB.result.current.moments.map((m) => m.title)).toEqual(['De u-b']),
+    )
   })
 })
