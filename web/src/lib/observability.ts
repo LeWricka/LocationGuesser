@@ -59,6 +59,19 @@ async function loadSentry(): Promise<void> {
     // pleno cruce. No es un fallo nuestro y le pasará a cualquier usuario que
     // minimice a mitad de animación — fuera del dashboard.
     ignoreErrors: ['View transition was skipped because document visibility state is hidden'],
+    // Ruido ambiental de Safari/iOS (LOCATIONGUESSER-4): "NotReadableError: The
+    // I/O read operation failed" como REJECTION sin capturar y sin stack — el
+    // almacenamiento del navegador (Cache API/IndexedDB del SW) falla al leer
+    // tras una expulsión de iOS. No accionable. Se filtra SOLO el caso sin
+    // capturar: los fallos de lectura de fotos del pipeline de subida se
+    // reportan aparte con contexto propio (reportAndThrow) y siguen entrando.
+    beforeSend(event, hint) {
+      const original = hint?.originalException
+      const esNotReadable = original instanceof DOMException && original.name === 'NotReadableError'
+      const sinCapturar = event.exception?.values?.[0]?.mechanism?.handled === false
+      if (esNotReadable && sinCapturar) return null
+      return event
+    },
   })
   sentry = Sentry
   for (const op of queue.splice(0)) op(Sentry)
