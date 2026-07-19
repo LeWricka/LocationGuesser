@@ -1,5 +1,10 @@
 import { assertEquals, assertNotEquals } from 'jsr:@std/assert@1'
-import { buildPushPayload, shouldNotifyCreator } from './payload.ts'
+import {
+  buildPushPayload,
+  buildTripClosedPayload,
+  isPushEnabled,
+  shouldNotifyCreator,
+} from './payload.ts'
 
 Deno.test('reto creado: copy y tag intactos (regresión issue #775)', () => {
   const p = buildPushPayload('created', 'abc123', 'challenge-uuid', 'Dónde estoy', null)
@@ -52,8 +57,61 @@ Deno.test('retos con el mismo id pero distinto kind NO comparten tag (created vs
   assertNotEquals(created.tag, closing.tag)
 })
 
-Deno.test('shouldNotifyCreator: solo "closing" avisa al propio creador', () => {
+Deno.test('shouldNotifyCreator: "closing" y "closed" avisan al propio creador', () => {
   assertEquals(shouldNotifyCreator('created'), false)
   assertEquals(shouldNotifyCreator('memory'), false)
   assertEquals(shouldNotifyCreator('closing'), true)
+  assertEquals(shouldNotifyCreator('closed'), true)
+})
+
+Deno.test('fin de reto (closed): copy con resultado, url al DETALLE (ver=), tag por reto (issue #857)', () => {
+  const p = buildPushPayload('closed', 'abc123', 'challenge-uuid', 'Dónde estoy', null)
+  assertEquals(p.title, 'Se acabó: Dónde estoy')
+  assertEquals(p.body, 'Mira los resultados y quién ha ganado.')
+  assertEquals(p.url, 'https://www.momentu.art/#g=abc123&ver=challenge-uuid')
+  assertEquals(p.tag, 'closed-challenge-uuid')
+})
+
+Deno.test('fin de reto (closed) sin título (defensivo): cae a "un reto"', () => {
+  const p = buildPushPayload('closed', 'abc123', 'challenge-uuid', '   ', null)
+  assertEquals(p.title, 'Se acabó: un reto')
+})
+
+Deno.test('retos con el mismo id pero distinto kind NO comparten tag (closing vs closed)', () => {
+  const closing = buildPushPayload('closing', 'abc123', 'challenge-uuid', 'T', null)
+  const closed = buildPushPayload('closed', 'abc123', 'challenge-uuid', 'T', null)
+  assertNotEquals(closing.tag, closed.tag)
+})
+
+Deno.test('fin de viaje (trip_closed): copy con nombre del viaje, url al marcador, tag por viaje (issue #857)', () => {
+  const p = buildTripClosedPayload('abc123', 'Fiordos 2026')
+  assertEquals(p.title, 'Fin del viaje: Fiordos 2026')
+  assertEquals(p.body, 'Mira la clasificación final y el resumen.')
+  assertEquals(p.url, 'https://www.momentu.art/#g=abc123&v=marcador')
+  assertEquals(p.tag, 'trip-closed-abc123')
+})
+
+Deno.test('fin de viaje (trip_closed) sin nombre: cae a "tu viaje"', () => {
+  const p = buildTripClosedPayload('abc123', null)
+  assertEquals(p.title, 'Fin del viaje: tu viaje')
+})
+
+Deno.test('fin de viaje (trip_closed): tags de viajes distintos no colisionan', () => {
+  const a = buildTripClosedPayload('abc123', 'Viaje A')
+  const b = buildTripClosedPayload('xyz789', 'Viaje B')
+  assertNotEquals(a.tag, b.tag)
+})
+
+Deno.test('isPushEnabled: clave ausente o perfil sin prefs = activado (issue #857)', () => {
+  assertEquals(isPushEnabled('created', null), true)
+  assertEquals(isPushEnabled('created', undefined), true)
+  assertEquals(isPushEnabled('created', {}), true)
+  assertEquals(isPushEnabled('memory', { created: false }), true)
+})
+
+Deno.test('isPushEnabled: solo false explícito desactiva ese kind', () => {
+  assertEquals(isPushEnabled('created', { created: false }), false)
+  assertEquals(isPushEnabled('closed', { created: false, closed: false }), false)
+  assertEquals(isPushEnabled('closed', { created: false }), true)
+  assertEquals(isPushEnabled('trip_closed', { trip_closed: false }), false)
 })
