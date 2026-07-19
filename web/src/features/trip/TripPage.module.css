@@ -12,8 +12,18 @@
   width: 100%;
   height: 100svh;
   overflow: hidden;
-  background: var(--color-bg);
-  background-image: var(--paper-halo-cool), var(--paper-halo-warm), var(--paper-grain);
+  /* Fondo de ESCENA oscura (issue #831 unificó las 3 secciones), no el papel
+   * claro de página (`--color-bg`/`--paper-halo-*`/`--paper-grain`) que llevaba
+   * este contenedor desde antes del rediseño oscuro. En régimen normal nunca se
+   * ve (los 3 paneles pintan su propio `--scene-bg` de borde a borde encima),
+   * pero SÍ asomaba durante el fundido de entrada de la pantalla entera
+   * (`lg-content-in`, opacity 0→1 en `.screen`): con el papel claro detrás, ese
+   * fundido teñía el Diario YA cargado (fotos, timeline, carrusel) de un velo
+   * grisáceo con textura de puntos (el grano SVG del papel) y una banda clara
+   * arriba (el halo cálido) — el "flashazo" al entrar a un viaje mientras el
+   * mapa satélite aún cargaba. Mismo tono que el contenido: el fundido pasa a
+   * ser solo de opacidad, sin cambiar de color. */
+  background: var(--scene-bg);
 }
 
 .center {
