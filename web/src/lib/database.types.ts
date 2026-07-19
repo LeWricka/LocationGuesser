@@ -28,6 +28,26 @@ export interface ProfileOnboarding {
   [context: string]: string
 }
 
+/**
+ * Preferencias de notificaciones push POR TIPO (sección "Notificaciones" del
+ * perfil). Se persiste como jsonb en `profiles.push_prefs` (migración en un PR
+ * en paralelo — `supabase/**` es área de otro agente). Cada clave es opcional:
+ * **la clave AUSENTE significa activada** (`true`), así que la fila por
+ * defecto (sin escribir nunca esta columna) ya manda todo — solo se escribe
+ * cuando el usuario DESACTIVA o vuelve a activar un tipo. Ver
+ * `lib/pushPrefs.ts` (`isPushKindEnabled`/`setPushPref`).
+ */
+export interface PushPrefs {
+  /** Aviso al lanzar un reto nuevo. */
+  created?: boolean
+  /** Aviso al compartir un momento nuevo. */
+  memory?: boolean
+  /** Aviso al cerrarse un reto (resultados y ganador). */
+  closed?: boolean
+  /** Aviso al cerrarse un viaje (clasificación final y resumen). */
+  trip_closed?: boolean
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -38,6 +58,12 @@ export interface Database {
           avatar_url: string | null
           created_at: string
           onboarding: ProfileOnboarding
+          // Opcional en el Row (no solo en Insert/Update) A PROPÓSITO: la
+          // migración que añade esta columna vive en un PR en paralelo, así
+          // que hasta que se aplique en prod, las filas reales no la traen
+          // (`undefined`, no `null`). Toda la app debe tolerarlo (ver
+          // lib/pushPrefs.ts, `isPushKindEnabled`).
+          push_prefs?: PushPrefs | null
         }
         Insert: {
           id: string
@@ -45,6 +71,7 @@ export interface Database {
           avatar_url?: string | null
           created_at?: string
           onboarding?: ProfileOnboarding
+          push_prefs?: PushPrefs | null
         }
         Update: {
           id?: string
@@ -52,6 +79,7 @@ export interface Database {
           avatar_url?: string | null
           created_at?: string
           onboarding?: ProfileOnboarding
+          push_prefs?: PushPrefs | null
         }
         Relationships: []
       }
