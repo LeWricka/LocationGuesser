@@ -137,14 +137,36 @@ function reportSwNoise(error: unknown): void {
   })
 }
 
+// Aplicación EN EL ARRANQUE (19-jul): el retardo de 5 min al ocultar protege el
+// scroll/estado de una sesión viva, pero convertía cada apertura en "voy una
+// versión por detrás" (con la cadencia real de deploys, el dueño nunca veía lo
+// último sin borrar datos). El arranque es el único momento GRATIS para
+// recargar: aún no hay scroll, ni partida, ni formulario que perder. Si hay una
+// actualización esperando (de la sesión anterior) o se detecta en los primeros
+// segundos de vida de la página, se aplica YA — una recarga única e invisible al
+// abrir. Solo en rutas seguras (jugar/crear siguen intocables) y sin riesgo de
+// bucle: tras recargar, el SW nuevo controla y no queda nada en espera.
+const BOOT_APPLY_WINDOW_MS = 10_000
+const bootedAt = Date.now()
+function bootApplyIfFresh(): boolean {
+  if (Date.now() - bootedAt > BOOT_APPLY_WINDOW_MS) return false
+  if (!isSafeUpdateRoute(window.location.hash)) return false
+  applyUpdate()
+  return true
+}
+
 const updateSW = registerSW({
   immediate: true,
   onRegisteredSW(_swUrl, registration) {
     if (!registration) return
+    // Un SW ya EN ESPERA de la sesión anterior no siempre re-dispara
+    // onNeedRefresh: se comprueba aquí explícitamente al registrar.
+    if (registration.waiting) bootApplyIfFresh()
     setInterval(() => void registration.update().catch(reportSwNoise), SW_UPDATE_INTERVAL_MS)
   },
   onRegisterError: reportSwNoise,
   onNeedRefresh() {
+    if (bootApplyIfFresh()) return
     updateAvailable = true
     // La pestaña ya está oculta (p.ej. el sondeo de 60 s la encontró mientras el
     // usuario estaba en otra app): programamos la aplicación con el MISMO retardo
