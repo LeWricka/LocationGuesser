@@ -425,9 +425,7 @@ export function HomeDashboard({
           patrón universal, el avatar basta. */}
       <div className={styles.overlay}>
         <span className={styles.brand}>
-          {/* Variante `oscuro`: el símbolo lleva su paleta propia (papel + oro + teal)
-              sobre la escena oscura del globo, en vez de aplanarse a un solo tono. */}
-          <LogoMomentu variant="oscuro" size={22} />
+          <LogoMomentu size={22} />
           <WordmarkMomentu size={18} />
         </span>
         <button

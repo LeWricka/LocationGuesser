@@ -54,9 +54,7 @@ export function LoginScreen({
   return (
     <AuthScreen
       className={className}
-      /* Variante `claro`: pin grafito sobre el disco cálido de --color-accent-soft
-         (fondo papel/claro de esta pantalla), no la escena oscura del globo (#557). */
-      icon={<LogoMomentu variant="claro" size={40} />}
+      icon={<LogoMomentu size={40} />}
       title={joining ? 'Únete para jugar este reto' : 'Entra a Momentu'}
       header={onBack ? <BackHomeButton onClick={onBack} label="Atrás" /> : undefined}
       subtitle={

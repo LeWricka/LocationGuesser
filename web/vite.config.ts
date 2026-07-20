@@ -6,7 +6,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Paleta de marca (sistema "Atelier" de src/ui/tokens.css) para el manifest:
 // el navegador la usa para la barra de estado y la pantalla de carga al instalar.
 const PAPER = '#f6f7f9' // background_color (papel claro de la app)
-const ACCENT = '#34506b' // theme_color (azul pizarra de marca)
+// theme_color: mismo tono que --scene-bg (tokens.css) — el fondo de escena oscuro
+// a sangre del nuevo icono "Cometa" (issue #865, rebrand obturador de luz).
+// Antes era el azul pizarra plano (#34506b); ahora el icono ES ese tile, así que
+// la barra de estado/UI del navegador coincide con el propio icono instalado.
+const ACCENT = '#0b1016'
 
 // GALERÍA (issue #364): entry de DESARROLLO para revisar visualmente cada pantalla
 // con fixtures deterministas (sin login ni red). Se activa SOLO con GALLERY=1 (lo

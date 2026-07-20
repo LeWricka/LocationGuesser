@@ -1,20 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Momentu">
-  <!--
-    Marca "Momentu": el símbolo "el camino dentro del pin" (issue #538, geometría
-    máster del dueño) — variante FAVICON, con trazos engordados para legibilidad
-    a 16-32px. Pin grafito, ruta punteada en oro hasta un destino teal.
-  -->
-  <path
-    d="M32 3C18.7 3 8 13.6 8 26.7 8 42.8 32 61 32 61s24-18.2 24-34.3C56 13.6 45.3 3 32 3Z"
-    fill="#1F2A30"
-  />
-  <path
-    d="M20 41 C20 30, 30 34, 32 26 C34 18.5, 40 20, 42.5 14.5"
-    fill="none"
-    stroke="#D9B96A"
-    stroke-width="5"
-    stroke-linecap="round"
-    stroke-dasharray="0.5 9"
-  />
-  <circle cx="44" cy="13.5" r="6.2" fill="#0F766E" stroke="#FBFBF9" stroke-width="2.4" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Momentu" fill="none">
+  <!-- ICON P1 FAVICON · COMETA — 16px, solido, sin filtros. Sin aro oscuro
+       (mataba el caracter): estela de luz oro casi completa con CABEZA brillante
+       + 3 palas oro gruesas + nucleo teal. Duotono oro/teal a cualquier fondo. -->
+  <!-- 3 palas del iris (oro), gruesas para leer a 16px -->
+  <g stroke="#e6c46e" stroke-width="8.5" stroke-linecap="round">
+    <line x1="61" y1="22" x2="45.5" y2="45"/>
+    <line x1="61" y1="22" x2="45.5" y2="45" transform="rotate(120 50 50)"/>
+    <line x1="61" y1="22" x2="45.5" y2="45" transform="rotate(240 50 50)"/>
+  </g>
+  <!-- estela de luz (oro) casi completa, cabeza en arriba-izq -->
+  <path d="M66.9 18.2 A36 36 0 1 1 33.1 18.2" stroke="#d9b25a" stroke-width="8.5" stroke-linecap="round"/>
+  <!-- CABEZA de luz: brillante y mas ancha que el trazo = sentido de captura -->
+  <circle cx="33.1" cy="18.2" r="8.5" fill="#eafffb"/>
+  <circle cx="33.1" cy="18.2" r="5" fill="#7fe6da"/>
+  <!-- nucleo teal: el momento -->
+  <circle cx="50" cy="50" r="13.5" fill="#0f766e"/>
+  <circle cx="50" cy="50" r="5.5" fill="#aef5ec"/>
 </svg>

@@ -1,20 +1,60 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Momentu">
-  <!-- Icono PWA estándar: símbolo "el camino dentro del pin" (issue #538) centrado
-       sobre papel, con esquinas suaves. Variante claro: pin grafito. -->
-  <rect width="512" height="512" rx="112" fill="#f6f7f9"/>
-  <g transform="translate(256 256) scale(5.4) translate(-32 -32)">
-    <path
-      d="M32 4C19.3 4 9 14.1 9 26.6 9 42 32 60 32 60s23-18 23-33.4C55 14.1 44.7 4 32 4Z"
-      fill="#1F2A30"
-    />
-    <path
-      d="M20 40 C20 30, 30 34, 32 26 C34 19, 40 20, 42 15"
-      fill="none"
-      stroke="#D9B96A"
-      stroke-width="3.4"
-      stroke-linecap="round"
-      stroke-dasharray="0.5 7.5"
-    />
-    <circle cx="43" cy="14" r="4.6" fill="#0F766E" stroke="#FBFBF9" stroke-width="2"/>
+  <!-- ICON P1 · COMETA — app icon (512). Trail protagonista, fiel a Final 1:
+       tile de escena a sangre + estela de luz con glow real + iris de 4 palas +
+       nucleo teal. Menos palas y mas gruesas que el maestro para leer como tile. -->
+  <defs>
+    <radialGradient id="p1a-bg" cx="0.5" cy="0.42" r="0.75">
+      <stop offset="0" stop-color="#16232c"/>
+      <stop offset="1" stop-color="#0b1016"/>
+    </radialGradient>
+    <radialGradient id="p1a-vane" gradientUnits="userSpaceOnUse" cx="50" cy="50" r="40">
+      <stop offset="0" stop-color="#3fd0c1"/>
+      <stop offset="0.32" stop-color="#0f766e"/>
+      <stop offset="0.64" stop-color="#c79a45"/>
+      <stop offset="1" stop-color="#e6c46e"/>
+    </radialGradient>
+    <radialGradient id="p1a-core" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#aef5ec"/>
+      <stop offset="0.5" stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </radialGradient>
+    <linearGradient id="p1a-trail" gradientUnits="userSpaceOnUse" x1="30" y1="19" x2="82" y2="86">
+      <stop offset="0" stop-color="#c8fff5"/>
+      <stop offset="0.28" stop-color="#2dd4bf"/>
+      <stop offset="0.62" stop-color="#7fe6da"/>
+      <stop offset="0.82" stop-color="#e9c877"/>
+      <stop offset="1" stop-color="#d9b25a"/>
+    </linearGradient>
+    <filter id="p1a-glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="1.7"/>
+    </filter>
+    <filter id="p1a-head" x="-400%" y="-400%" width="900%" height="900%">
+      <feGaussianBlur stdDeviation="2.4"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="url(#p1a-bg)"/>
+
+  <g transform="translate(96 96) scale(3.2)">
+    <!-- aro de dashes: eco de ruta -->
+    <circle cx="50" cy="50" r="44" fill="none" stroke="#d9b25a" stroke-width="1.2" stroke-dasharray="1.1 7" stroke-linecap="round" opacity="0.55"/>
+    <!-- halo del nucleo -->
+    <circle cx="50" cy="50" r="13" fill="#0f766e" opacity="0.28" filter="url(#p1a-glow)"/>
+    <!-- 4 palas del iris (gradiente oro->teal), base estable atenuada -->
+    <g stroke="url(#p1a-vane)" stroke-width="4.6" stroke-linecap="round" opacity="0.82" fill="none">
+      <line x1="59" y1="18.5" x2="44" y2="41"/>
+      <line x1="59" y1="18.5" x2="44" y2="41" transform="rotate(90 50 50)"/>
+      <line x1="59" y1="18.5" x2="44" y2="41" transform="rotate(180 50 50)"/>
+      <line x1="59" y1="18.5" x2="44" y2="41" transform="rotate(270 50 50)"/>
+    </g>
+    <!-- ESTELA DE LUZ (protagonista): glow + trazo nitido, ~300 grados -->
+    <path d="M66.80 17.03 A37 37 0 1 1 29.85 18.97" fill="none" stroke="url(#p1a-trail)" stroke-width="4.2" stroke-linecap="round" filter="url(#p1a-glow)" opacity="0.85"/>
+    <path d="M66.80 17.03 A37 37 0 1 1 29.85 18.97" fill="none" stroke="url(#p1a-trail)" stroke-width="2.8" stroke-linecap="round"/>
+    <!-- CABEZA de luz -->
+    <circle cx="29.85" cy="18.97" r="5" fill="#c8fff5" filter="url(#p1a-head)" opacity="0.95"/>
+    <circle cx="29.85" cy="18.97" r="2.1" fill="#eafffb"/>
+    <!-- nucleo teal: el momento -->
+    <circle cx="50" cy="50" r="6.4" fill="url(#p1a-core)"/>
+    <circle cx="50" cy="50" r="2.5" fill="#eafffb"/>
   </g>
 </svg>
