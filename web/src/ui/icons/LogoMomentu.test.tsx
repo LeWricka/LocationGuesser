@@ -8,27 +8,22 @@ describe('LogoMomentu', () => {
     expect(screen.getByRole('img', { name: 'Momentu' })).toBeInTheDocument()
   })
 
-  test('variante claro pinta el pin en grafito', () => {
-    render(<LogoMomentu variant="claro" />)
+  test('por defecto (variant "color") pinta el gradiente de marca oro→teal', () => {
+    render(<LogoMomentu />)
     const svg = screen.getByRole('img', { name: 'Momentu' })
-    const pin = svg.querySelector('path')
-    expect(pin).toHaveAttribute('fill', '#1F2A30')
-  })
-
-  test('variante oscuro pinta el pin en papel', () => {
-    render(<LogoMomentu variant="oscuro" />)
-    const svg = screen.getByRole('img', { name: 'Momentu' })
-    const pin = svg.querySelector('path')
-    expect(pin).toHaveAttribute('fill', '#FBFBF9')
+    // El núcleo teal y la estela de luz se pintan con gradientes propios (no
+    // `currentColor`): confirma que no cayó al modo mono por defecto.
+    expect(svg.querySelector('radialGradient')).toBeInTheDocument()
+    expect(svg.querySelector('linearGradient')).toBeInTheDocument()
   })
 
   test('variante mono hereda currentColor en todas las piezas', () => {
     render(<LogoMomentu variant="mono" />)
     const svg = screen.getByRole('img', { name: 'Momentu' })
-    const pin = svg.querySelector('path')
-    const dest = svg.querySelector('circle')
-    expect(pin).toHaveAttribute('fill', 'currentColor')
-    expect(dest).toHaveAttribute('fill', 'currentColor')
+    const group = svg.querySelector('g')
+    expect(group).toHaveAttribute('fill', 'currentColor')
+    expect(group).toHaveAttribute('stroke', 'currentColor')
+    expect(svg.querySelector('radialGradient')).not.toBeInTheDocument()
   })
 
   test('title personaliza la etiqueta accesible', () => {

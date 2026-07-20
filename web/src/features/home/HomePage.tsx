@@ -302,7 +302,7 @@ export function HomePage({ active = true }: Props = {}) {
           overlay={
             <>
               <span className={styles.brand}>
-                <LogoMomentu variant="oscuro" size={22} />
+                <LogoMomentu size={22} />
                 <WordmarkMomentu size={18} />
               </span>
               {/* Un solo acceso al perfil (issue #616): antes el engranaje duplicaba el

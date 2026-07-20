@@ -96,9 +96,7 @@ export function Landing({ groupName, redirectTo }: Props) {
         {/* Marca sobre el globo: mismo velo/tinta de escena que la home logueada. */}
         <div className={styles.heroChrome}>
           <span className={styles.brand}>
-            {/* Variante `oscuro`: paleta propia (papel + oro + teal) sobre la escena
-                oscura del globo héroe, en vez de aplanarse a un solo tono (#557). */}
-            <LogoMomentu variant="oscuro" size={22} />
+            <LogoMomentu size={22} />
             <WordmarkMomentu size={18} />
           </span>
         </div>
