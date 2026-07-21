@@ -20,38 +20,11 @@ describe('getSlides', () => {
     }
   })
 
-  test('welcome personaliza el titular con el nombre del viaje', () => {
-    const slides = getSlides('welcome', { tripName: 'Japón 2026' })
-    expect(slides[0].title).toContain('Japón 2026')
-  })
-
-  test('welcome cae a copy genérico sin nombre de viaje', () => {
-    const slides = getSlides('welcome')
-    expect(slides.length).toBeGreaterThan(0)
-    // Sin nombre, el titular no debe quedar con un hueco vacío.
-    expect(slides[0].title).not.toContain('undefined')
-    expect(slides[0].title.trim().length).toBeGreaterThan(0)
-  })
-
-  test('welcome ignora un nombre en blanco (cae a genérico)', () => {
-    const generic = getSlides('welcome').at(0)?.title
-    const blank = getSlides('welcome', { tripName: '   ' }).at(0)?.title
-    expect(blank).toBe(generic)
-  })
-
-  // Issue #752: si el dueño ya definió qué se juega, el receptor lo ve desde el
-  // primer paso de su bienvenida — el gancho de motivación no puede esperar a
-  // que entre al viaje.
-  test('welcome añade los premios al cuerpo del primer paso si los hay', () => {
-    const slides = getSlides('welcome', {
-      tripName: 'Japón 2026',
-      prizesSummary: '1º manda  ·  Último invita',
-    })
-    expect(slides[0].body).toContain('En juego: 1º manda  ·  Último invita')
-  })
-
-  test('welcome sin premios no menciona "En juego"', () => {
-    const slides = getSlides('welcome', { tripName: 'Japón 2026' })
-    expect(slides[0].body).not.toContain('En juego')
+  // Onboarding nuevo (pieza 1/4): `welcome` ya no usa slides — pinta el marco de
+  // una pantalla `GuestWelcomeFrame` (ver OnboardingGate). `guest-register`
+  // (registro post-valor) tampoco. Ambos devuelven vacío a propósito.
+  test('welcome y guest-register no traen slides (contenido propio, no slideshow)', () => {
+    expect(getSlides('welcome')).toEqual([])
+    expect(getSlides('guest-register')).toEqual([])
   })
 })

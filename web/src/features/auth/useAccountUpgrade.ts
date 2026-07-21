@@ -24,10 +24,12 @@ export type AccountUpgradeStep = 'email' | 'code'
  * no se puede cruzar con el resto del funnel (qué superficie convierte más).
  * `groupId`/`challengeId` solo tienen sentido con origin 'play_result' (se
  * jugó un reto concreto); en 'anon_create_gate' (intento de crear un viaje sin
- * cuenta) no hay grupo/reto todavía.
+ * cuenta) no hay grupo/reto todavía. `guest_register` (onboarding nuevo, pieza
+ * 1/4): el registro post-valor del INVITADO del enlace, tras jugar su primer
+ * reto — ver `GuestRegisterPrompt`/`useGuestRegisterPrompt`.
  */
 export interface AccountUpgradeContext {
-  origin: 'play_result' | 'anon_create_gate'
+  origin: 'play_result' | 'anon_create_gate' | 'guest_register'
   groupId?: string
   challengeId?: string
 }

@@ -1,0 +1,146 @@
+/*
+ * Marco de bienvenida del invitado: overlay a pantalla completa, escena
+ * oscura (tokens `--scene-*`), foto de portada a sangre si el viaje tiene una
+ * (si no, degradado de escena — nunca lienzo vacío). Mismo patrón que
+ * `ChallengeDetail.module.css` (.hero/.hero::after) para el degradado que
+ * funde la foto con el pie de texto, y que `OnboardingSlideshow.module.css`
+ * para el overlay fijo + animación de entrada.
+ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  overflow: hidden;
+  background: var(--scene-bg);
+  color: var(--scene-ink);
+  animation: guest-welcome-in var(--motion-duration-base) var(--motion-ease-standard) both;
+}
+@keyframes guest-welcome-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen {
+    animation: none;
+  }
+}
+
+.backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Sin portada: degradado de escena (mismo lenguaje que el globo/satélite de
+   otras pantallas), nunca un fondo liso o vacío. Reutiliza los tokens de
+   destello ya existentes (`--color-accent-glow-soft`/`--route-gold-soft`) en
+   vez de inventar opacidades nuevas. */
+.photoFallback {
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--color-accent-glow-soft), transparent 60%),
+    radial-gradient(100% 70% at 85% 100%, var(--route-gold-soft), transparent 60%), var(--scene-bg);
+}
+
+/* Degradado que funde la foto/fallback con el marco de texto de abajo; usa
+   `--scene-veil` (el mismo velo de legibilidad del resto del kit). */
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--scene-bg) 20%, var(--scene-veil) 55%, transparent 100%);
+}
+
+.frame {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* design-lint-allow: capa local del marco (texto sobre el degradado, no una escala global) */
+  z-index: 1;
+  padding: var(--space-6) var(--space-gutter) calc(env(safe-area-inset-bottom) + var(--space-6));
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.avatarline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.avatarText {
+  color: var(--scene-ink-soft);
+}
+
+.eyebrow {
+  color: var(--route-gold);
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  color: var(--scene-ink);
+  text-wrap: balance;
+}
+
+.body {
+  margin: 0 0 var(--space-4);
+  max-width: 34ch;
+  color: var(--scene-ink-soft);
+}
+
+.turnRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+}
+
+.turnIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--route-gold);
+}
+
+.turnText {
+  margin: 0;
+  color: var(--scene-ink-soft);
+}
+.turnText strong {
+  color: var(--scene-ink);
+}
+
+.cta {
+  margin-bottom: var(--space-4);
+}
+
+.ctaLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.remate {
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--scene-ink-soft);
+}

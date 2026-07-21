@@ -2,6 +2,10 @@
 // llega a ese contexto (grupo o reto), muestra el tutorial como overlay encima.
 // Engancha la persistencia (useOnboarding) y la analítica (track). App.tsx la usa
 // como wrapper sin tocar la lógica de routing ni las pantallas envueltas.
+//
+// Contexto `welcome` (onboarding nuevo, pieza 1/4): en vez del slideshow de 3
+// pasos, pinta el marco de UNA pantalla `GuestWelcomeFrame` — el motor (visto/
+// analítica) es EXACTAMENTE el mismo, solo cambia el CONTENIDO que gatea.
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import { track } from '../../lib/analytics'
@@ -9,7 +13,8 @@ import type { OnboardingContext } from '../../lib/onboardingFlags'
 import type { ProfileOnboarding } from '../../lib/database.types'
 import { useOnboarding } from './useOnboarding'
 import { OnboardingSlideshow } from './OnboardingSlideshow'
-import { getSlides, type SlideParams } from './slides'
+import { GuestWelcomeFrame, type Props as GuestWelcomeFrameProps } from './GuestWelcomeFrame'
+import { getSlides } from './slides'
 
 interface Props {
   context: OnboardingContext
@@ -22,8 +27,13 @@ interface Props {
    * vacío. Ver lib/onboardingFlags.ts para el diagnóstico completo.
    */
   profileOnboarding?: ProfileOnboarding | null
-  /** Datos para personalizar las slides (p.ej. el nombre del viaje en el welcome). */
-  slideParams?: SlideParams
+  /**
+   * Datos reales del viaje para `GuestWelcomeFrame` (SOLO contexto `welcome`):
+   * nombre, quién invita, avatares de quién ya está dentro, portada y si hay un
+   * reto en juego. Sin esto, el contexto `welcome` no pinta nada aunque
+   * `shouldShow` sea true (evita un marco a medias mientras se resuelve).
+   */
+  welcomeData?: Omit<GuestWelcomeFrameProps, 'onEnter'>
   /**
    * Id del viaje (solo lo pasa el contexto `welcome` del receptor). Sirve para el
    * evento de embudo `receptor_welcome_shown` (#330); no afecta al render.
@@ -36,7 +46,7 @@ export function OnboardingGate({
   context,
   userId,
   profileOnboarding,
-  slideParams,
+  welcomeData,
   groupId,
   children,
 }: Props) {
@@ -71,13 +81,16 @@ export function OnboardingGate({
   return (
     <>
       {children}
-      {shouldShow && (
-        <OnboardingSlideshow
-          slides={getSlides(context, slideParams)}
-          onComplete={handleComplete}
-          onSkip={handleSkip}
-        />
-      )}
+      {shouldShow &&
+        (context === 'welcome' ? (
+          welcomeData && <GuestWelcomeFrame {...welcomeData} onEnter={handleComplete} />
+        ) : (
+          <OnboardingSlideshow
+            slides={getSlides(context)}
+            onComplete={handleComplete}
+            onSkip={handleSkip}
+          />
+        ))}
     </>
   )
 }

@@ -38,18 +38,26 @@
 //    reto y compartirlo) y se muestra una sola vez al aterrizar en la home vacía;
 //    reabrible con "Ver tutorial". Sustituye a los tutoriales por-pantalla que
 //    saltaban de más al crear viaje/reto (gates retirados de App.tsx).
-//  - welcome: bienvenida del RECEPTOR que llega por un enlace compartido la
-//    primera vez (lo más importante: entender en 3 s qué es y por qué unirse).
+//  - welcome: marco de UNA pantalla del RECEPTOR que llega por un enlace
+//    compartido la primera vez (lo más importante: entender en 3 s qué es y por
+//    qué unirse). Onboarding nuevo (pieza 1/4): sustituye al slideshow de 3
+//    pasos por un único marco (ver GuestWelcomeFrame); el flag "visto" es el
+//    mismo de siempre, solo cambia el CONTENIDO que gatea.
+//  - guest-register: momento de registro TRAS jugar (post-valor, nunca antes)
+//    para el receptor anónimo del enlace — ver GuestRegisterPrompt/
+//    useGuestRegisterPrompt. Independiente de `welcome`: se ve una segunda vez,
+//    ya con una jugada real detrás.
 //  - group / challenge / create-trip / add-moment / create-challenge: contextos
 //    de los tutoriales por-pantalla ANTIGUOS (issue #742: ya no se disparan desde
 //    App.tsx). Se conservan para el flag "visto" del receptor (ReceptorWelcomeGate
 //    marca `group`) y para no romper histórico; el único tutorial en vivo es
-//    `entry` (+ `welcome` para el invitado).
+//    `entry` (+ `welcome`/`guest-register` para el invitado).
 export type OnboardingContext =
   | 'entry'
   | 'group'
   | 'challenge'
   | 'welcome'
+  | 'guest-register'
   | 'create-trip'
   | 'add-moment'
   | 'create-challenge'

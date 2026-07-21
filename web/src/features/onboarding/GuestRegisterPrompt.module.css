@@ -1,0 +1,79 @@
+/*
+ * Registro post-valor del invitado: overlay a pantalla completa, escena
+ * oscura sólida (sin foto — es un cierre discreto, no un hero), mismo
+ * lenguaje que `GuestWelcomeFrame`/`ChallengeDetail` (tokens `--scene-*`).
+ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--scene-bg);
+  color: var(--scene-ink);
+  padding: var(--space-gutter) var(--space-gutter)
+    calc(env(safe-area-inset-bottom) + var(--space-6));
+  animation: guest-register-in var(--motion-duration-base) var(--motion-ease-standard) both;
+}
+@keyframes guest-register-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen {
+    animation: none;
+  }
+}
+
+.badge {
+  width: 62px;
+  height: 62px;
+  margin-bottom: var(--space-5);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  /* Tinte suave del token (no una rgba nueva) — mismo recurso que Camino.module.css. */
+  background: color-mix(in srgb, var(--route-gold) 12%, transparent);
+  border: 1px solid var(--route-gold-soft);
+  color: var(--route-gold);
+}
+
+.eyebrow {
+  color: var(--route-gold);
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  color: var(--scene-ink);
+}
+
+.body {
+  margin: 0 0 var(--space-6);
+  max-width: 34ch;
+  color: var(--scene-ink-soft);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* El `ghost` del kit usa `--color-text` (pensado para PAPEL): sobre esta
+   escena oscura casi no se lee (axe: color-contrast serio). Reescribe solo el
+   color al tono de escena — misma técnica que `.heroImg` en
+   ChallengeDetail.module.css (gana por orden de import, ver ese fichero). */
+.ghostOnScene {
+  color: var(--scene-ink-soft);
+}
+.ghostOnScene:hover:not(:disabled) {
+  background: var(--glass-bg);
+  color: var(--scene-ink);
+}

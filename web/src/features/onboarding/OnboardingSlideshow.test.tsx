@@ -50,13 +50,6 @@ describe('OnboardingSlideshow — render de pasos (#625)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Saltar' }))
     expect(onSkip).toHaveBeenCalledTimes(1)
   })
-
-  test('la bienvenida del receptor adapta el primer paso al viaje', () => {
-    const slides = getSlides('welcome', { tripName: 'Japón 2026' })
-    render(<OnboardingSlideshow slides={slides} onSkip={vi.fn()} onComplete={vi.fn()} />)
-
-    expect(screen.getByRole('heading', { name: /Japón 2026/ })).toBeInTheDocument()
-  })
 })
 
 // Swipe entre slides (issue #717, "más dinámicos"): además del botón.
