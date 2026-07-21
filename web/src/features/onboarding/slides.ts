@@ -59,16 +59,6 @@ export interface OnboardingSlide {
   image: string
 }
 
-/** Parámetros opcionales para personalizar slides (p.ej. la bienvenida del receptor). */
-export interface SlideParams {
-  /** Nombre del viaje, para personalizar la bienvenida del receptor. */
-  tripName?: string
-  /** Premios "en juego" ya resumidos en texto (issue #752, `prizesLine`), o
-   * undefined si el dueño no definió ninguno — solo lo usa la bienvenida del
-   * receptor (`welcome`). */
-  prizesSummary?: string
-}
-
 // Tutorial del viaje (issue #625): los 3 GESTOS clave de Momentu, ni uno más.
 // Sustituye a la versión de 4 slides (más genérica); el dueño pidió recortar al
 // hueso: compartir un momento, invitar al grupo, jugar un reto.
@@ -221,57 +211,23 @@ const ENTRY_SLIDES: OnboardingSlide[] = [
   CREATE_CHALLENGE_SLIDES[2], // Comparte el enlace del reto
 ]
 
-const SLIDES: Record<OnboardingContext, OnboardingSlide[]> = {
+// Contextos que YA NO usan slides: `welcome` pinta el marco de una pantalla
+// `GuestWelcomeFrame` (onboarding nuevo, pieza 1/4; ver `OnboardingGate`), y
+// `guest-register` es el registro post-valor del invitado (`GuestRegisterPrompt`),
+// que ni siquiera pasa por `OnboardingGate`. Se excluyen del mapa de slides para
+// no arrastrar copy muerto — `getSlides` los cubre con un array vacío.
+type SlideContext = Exclude<OnboardingContext, 'welcome' | 'guest-register'>
+
+const SLIDES: Record<SlideContext, OnboardingSlide[]> = {
   entry: ENTRY_SLIDES,
   group: GROUP_SLIDES,
   challenge: CHALLENGE_SLIDES,
   'create-trip': CREATE_TRIP_SLIDES,
   'add-moment': ADD_MOMENT_SLIDES,
   'create-challenge': CREATE_CHALLENGE_SLIDES,
-  // El welcome es dinámico (lleva el nombre del viaje); se construye en getSlides.
-  welcome: [],
 }
 
-// Bienvenida del RECEPTOR (lo clave): el recién llegado por un enlace debe pillar
-// en 3 segundos qué es y por qué unirse. Si sabemos el nombre del viaje, lo usamos
-// para que el saludo sea suyo ("Estás invitado a <viaje>"). Solo el PRIMER paso se
-// adapta al contexto de invitación; los otros dos son el mismo cierre "mira y
-// juega" que el resto de tutoriales (issue #625).
-//
-// Premios (issue #752): si el dueño ya definió qué se juega, se añade al cuerpo
-// del primer paso ("En juego: …") — es el gancho de motivación, tiene que verse
-// desde el primer segundo del receptor, no solo tras entrar al viaje.
-function welcomeSlides(tripName?: string, prizesSummary?: string): OnboardingSlide[] {
-  const trip = tripName?.trim()
-  const baseBody = 'Te comparten dónde estuvieron para que lo vivas con ellos.'
-  return [
-    {
-      icon: Sparkles,
-      visual: 'spark',
-      title: trip ? `Te invitan a vivir ${trip}` : 'Te invitan a un viaje',
-      body: prizesSummary ? `${baseBody} En juego: ${prizesSummary}.` : baseBody,
-      // Captura REAL de la home: literalmente lo que se van a encontrar al entrar.
-      image: homeShot,
-    },
-    {
-      icon: Camera,
-      visual: 'card',
-      title: 'Mira cada parada',
-      body: 'Una foto de cada sitio. Tú adivinas en el mapa dónde es.',
-      image: tokioPhoto,
-    },
-    {
-      icon: MapPin,
-      visual: 'pin',
-      title: 'Únete y juega',
-      body: 'Ya estás dentro. Abre el viaje y empieza a adivinar.',
-      // Captura REAL de la pantalla de resultado: es, literalmente, jugar.
-      image: resultadoShot,
-    },
-  ]
-}
-
-export function getSlides(context: OnboardingContext, params?: SlideParams): OnboardingSlide[] {
-  if (context === 'welcome') return welcomeSlides(params?.tripName, params?.prizesSummary)
+export function getSlides(context: OnboardingContext): OnboardingSlide[] {
+  if (context === 'welcome' || context === 'guest-register') return []
   return SLIDES[context]
 }

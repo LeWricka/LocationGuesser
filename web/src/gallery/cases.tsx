@@ -31,7 +31,12 @@ import { ResultCard } from '../features/play/ResultCard'
 import { LeaderboardCard } from '../features/group/LeaderboardCard'
 import { GameScene } from '../features/play/GameScene'
 import { TripDiario } from '../features/trip/TripDiario'
-import { OnboardingSlideshow, getSlides } from '../features/onboarding'
+import {
+  OnboardingSlideshow,
+  getSlides,
+  GuestWelcomeFrame,
+  GuestRegisterPrompt,
+} from '../features/onboarding'
 import {
   BackHomeButton,
   Card,
@@ -920,17 +925,33 @@ export const cases: GalleryCase[] = [
       <OnboardingSlideshow slides={[getSlides('group')[2]]} onSkip={noop} onComplete={noop} />
     ),
   },
+  // Marco de bienvenida del invitado (onboarding nuevo, pieza 1/4): UNA sola
+  // pantalla —no slides— con los datos reales del viaje. Sustituye a la
+  // bienvenida-slideshow de arriba.
   {
-    id: 'onboarding-bienvenida-receptor',
-    title: 'Onboarding · bienvenida del receptor (adaptada al viaje)',
+    id: 'onboarding-marco-invitado',
+    title: 'Onboarding · marco de bienvenida del invitado (una pantalla)',
     section: 'Onboarding',
     render: () => (
-      <OnboardingSlideshow
-        slides={getSlides('welcome', { tripName: 'Japón 2026' })}
-        onSkip={noop}
-        onComplete={noop}
+      <GuestWelcomeFrame
+        tripName="Ruta por Portugal"
+        ownerName="Lucía"
+        othersCount={3}
+        avatarMembers={[
+          { userId: 'owner-1', name: 'Lucía', avatarUrl: null },
+          { userId: 'member-2', name: 'Ana', avatarUrl: null },
+        ]}
+        coverImageUrl={null}
+        hasActiveChallenge
+        onEnter={noop}
       />
     ),
+  },
+  {
+    id: 'onboarding-registro-invitado',
+    title: 'Onboarding · registro post-valor del invitado (tras jugar)',
+    section: 'Onboarding',
+    render: () => <GuestRegisterPrompt onCreateAccount={noop} onDismiss={noop} />,
   },
   // ── Showcase de la landing (issue #652) ──────────────────────────────────
   // Las 4 pantallas que alimentan LandingShowcase (features/auth/LandingShowcase)

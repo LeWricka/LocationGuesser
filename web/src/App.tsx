@@ -474,6 +474,7 @@ function LoggedIn({
         <ReceptorWelcomeGate
           groupId={groupId}
           userId={user?.id}
+          isAnonymous={isAnonymous}
           profileOnboarding={profile?.onboarding}
         >
           {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos
