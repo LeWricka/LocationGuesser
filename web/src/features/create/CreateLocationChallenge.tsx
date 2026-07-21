@@ -835,7 +835,7 @@ export function CreateLocationChallenge({
               className={styles.launchBtn}
               disabled={!canLaunch}
               onClick={() => void save()}
-              aria-label="Este es mi sitio: lanzar el reto al grupo"
+              aria-label="Este es mi sitio: lanzar el reto a tu gente"
             >
               {busy ? <Spinner size={18} /> : <RocketIcon />}
               Lanzar el reto
@@ -852,7 +852,7 @@ export function CreateLocationChallenge({
               <CheckIcon />
             </span>
             <h3 className={styles.celebrateH}>¡Reto lanzado!</h3>
-            <p className={styles.celebrateSub}>Tu grupo ya puede intentar adivinarlo.</p>
+            <p className={styles.celebrateSub}>Tu gente ya puede intentar adivinarlo.</p>
           </div>
         </div>
       )}

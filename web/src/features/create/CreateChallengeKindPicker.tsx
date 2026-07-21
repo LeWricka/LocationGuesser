@@ -45,7 +45,7 @@ export function CreateChallengeKindPicker({ groupName, onBack, onPick }: Props) 
               {groupName ? `Nuevo reto · ${groupName}` : 'Nuevo reto'}
             </span>
             <h1 className={styles.h}>¿A qué jugamos?</h1>
-            <p className={styles.sub}>Dos formas de retar al grupo. Eliges una y a por ello.</p>
+            <p className={styles.sub}>Dos formas de retar a tu gente. Eliges una y a por ello.</p>
           </header>
 
           <div className={styles.options}>

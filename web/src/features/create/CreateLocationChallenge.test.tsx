@@ -218,7 +218,7 @@ describe('CreateLocationChallenge — ¿Dónde estamos? v3 (#592)', () => {
     expect(screen.queryByTestId('sv-preview')).not.toBeInTheDocument()
     expect(screen.getByText('Plazo')).toBeInTheDocument()
     expect(screen.getByText('Tiempo por jugada')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /lanzar el reto al grupo/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /lanzar el reto a tu gente/i })).toBeInTheDocument()
   })
 
   test('paso 2 → flecha "Atrás" de la cabecera vuelve al paso 1 CONSERVANDO el pin (sin repetir la búsqueda)', async () => {
@@ -292,7 +292,7 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
     renderScreen()
     await advanceToRules(user)
 
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     expect(uploadImageMock).not.toHaveBeenCalled()
@@ -318,7 +318,7 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
     const file = new File(['foto'], 'sitio.jpg', { type: 'image/jpeg' })
     await user.upload(screen.getByLabelText('Añadir foto del sitio'), file)
 
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     // NO es el mismo `File` (#642, `PhotoDropzone` copia los bytes al
@@ -355,7 +355,7 @@ describe('CreateLocationChallenge — foto opcional del reto (#595)', () => {
 
     const file = new File(['heic-bytes'], 'IMG_6756.HEIC', { type: 'image/heic' })
     await user.upload(screen.getByLabelText('Añadir foto del sitio'), file)
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     expect(
       await screen.findByText(/no se pudo leer la imagen «img_6756\.heic»/i),
@@ -383,7 +383,7 @@ describe('CreateLocationChallenge — fecha del reto creado desde cero', () => {
     // `beforeEach`), la cascada cae en "hoy" (regla 3 de `computeDefaultDate`).
     await screen.findByLabelText('Fecha')
 
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     expect(createChallengeMock).toHaveBeenCalledWith(
@@ -449,7 +449,7 @@ describe('CreateLocationChallenge — "La velocidad puntúa" (#628)', () => {
     renderScreen()
     await advanceToRules(user)
 
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     expect(createChallengeMock).toHaveBeenCalledWith(expect.objectContaining({ timeScoring: true }))
@@ -466,7 +466,7 @@ describe('CreateLocationChallenge — "La velocidad puntúa" (#628)', () => {
     await advanceToRules(user)
 
     await user.click(screen.getByRole('switch', { name: 'La velocidad puntúa' }))
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     expect(createChallengeMock).toHaveBeenCalledWith(
@@ -517,7 +517,7 @@ describe('CreateLocationChallenge — borrador persistente (#718)', () => {
     const user = userEvent.setup()
     renderScreen(groupId)
     await advanceToRules(user)
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     expect(await loadDraft(`locationChallenge:${groupId}`)).toBeNull()
@@ -569,7 +569,7 @@ describe('CreateLocationChallenge — prefill desde un recuerdo (unificación)',
     await screen.findByTestId('sv-preview')
     await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
 
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     expect(uploadImageMock).not.toHaveBeenCalled()
@@ -593,7 +593,7 @@ describe('CreateLocationChallenge — prefill desde un recuerdo (unificación)',
     await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
 
     await user.click(screen.getByRole('button', { name: 'Quitar foto' }))
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
     expect(uploadImageMock).not.toHaveBeenCalled()
@@ -646,7 +646,7 @@ describe('CreateLocationChallenge — modo promoción (promoteMomentId)', () => 
     renderScreen('g-1', prefill, 'm-9')
     await screen.findByTestId('sv-preview')
     await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(promoteToChallengeMock).toHaveBeenCalledTimes(1))
     // Identidad conservada: se promociona la fila del momento, no se crea otra.
@@ -686,7 +686,7 @@ describe('CreateLocationChallenge — modo promoción (promoteMomentId)', () => 
 
     expect(screen.queryByLabelText('Fecha')).not.toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
     await waitFor(() => expect(promoteToChallengeMock).toHaveBeenCalledTimes(1))
     expect(promoteToChallengeMock.mock.calls[0][1]).not.toHaveProperty('happenedOn')
   })
@@ -703,7 +703,7 @@ describe('CreateLocationChallenge — modo promoción (promoteMomentId)', () => 
     await user.click(await screen.findByRole('button', { name: /continuar a las reglas/i }))
 
     await user.click(screen.getByRole('button', { name: 'Quitar foto' }))
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(promoteToChallengeMock).toHaveBeenCalledTimes(1))
     expect(promoteToChallengeMock.mock.calls[0][1]).toMatchObject({ imagePath: null })
@@ -719,7 +719,7 @@ describe('CreateLocationChallenge — modo promoción (promoteMomentId)', () => 
 
     const file = new File(['foto'], 'nueva.jpg', { type: 'image/jpeg' })
     await user.upload(screen.getByLabelText('Cambiar foto del reto'), file)
-    await user.click(screen.getByRole('button', { name: /lanzar el reto al grupo/i }))
+    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(promoteToChallengeMock).toHaveBeenCalledTimes(1))
     expect(uploadImageMock).toHaveBeenCalledTimes(1)

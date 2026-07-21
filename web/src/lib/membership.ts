@@ -214,7 +214,7 @@ export async function leaveGroup(groupId: string, userId: string): Promise<void>
     .maybeSingle()
   if (groupError) throw groupError
   if (group?.created_by === userId) {
-    throw new Error('El dueño no puede salir del grupo: transfiere antes la propiedad.')
+    throw new Error('El dueño no puede salir del viaje: transfiere antes la propiedad.')
   }
 
   const { error } = await supabase

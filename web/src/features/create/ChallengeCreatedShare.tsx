@@ -70,9 +70,9 @@ export function ChallengeCreatedShare({
   const caption = buildShareCaption(authorName, link)
   const domain = shareDomain(link)
 
-  // A quién llega el reto: el viaje. Con nombre, "Tu grupo de Lisboa"; sin él, genérico.
+  // A quién llega el reto: el viaje. Con nombre, "Tu gente de Lisboa"; sin él, genérico.
   const trip = groupName?.trim()
-  const audience = trip ? `Tu grupo de ${trip} ya puede jugar` : 'Tu grupo ya puede jugar'
+  const audience = trip ? `Tu gente de ${trip} ya puede jugar` : 'Tu gente ya puede jugar'
 
   // Resuelve la portada de fondo al montar (una vez: la hoja vive un único reto
   // recién creado, no hay props que cambien a lo largo de su vida).

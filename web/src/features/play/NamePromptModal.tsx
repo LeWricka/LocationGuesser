@@ -103,7 +103,7 @@ export function NamePromptModal({
     >
       <form onSubmit={handleSubmit} noValidate>
         <Stack gap={3}>
-          <p>Así te reconoce el resto del grupo en el marcador.</p>
+          <p>Así te reconoce tu gente en el marcador.</p>
           <Field label="Tu nombre" error={error}>
             {(fieldProps) => (
               <Input

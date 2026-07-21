@@ -226,7 +226,7 @@ export function ShareChallengeModal({
       </div>
 
       <p className={styles.hint}>
-        Comparte la tarjeta en el chat del grupo. Quien la abra entra directo a jugar ESTE reto.
+        Comparte la tarjeta en el chat de tu gente. Quien la abra entra directo a jugar ESTE reto.
       </p>
 
       {/* La tarjeta real, a tamaño completo, montada fuera del viewport para que

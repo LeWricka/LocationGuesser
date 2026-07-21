@@ -496,7 +496,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
               <i className={styles.dot} /> Paso 1 de 2 · La pregunta
             </div>
             <h1 className={styles.h}>¿Qué adivinan?</h1>
-            <p className={styles.sub}>Ponle nombre y lanza la pregunta de cifra a tu grupo.</p>
+            <p className={styles.sub}>Ponle nombre y lanza la pregunta de cifra a tu gente.</p>
 
             <div className={styles.field}>
               <label className={styles.label} htmlFor="cn-title">
@@ -520,7 +520,7 @@ export function CreateNumberChallenge({ groupId, groupName, onBack, onCreated }:
                 id="cn-question"
                 className={styles.input}
                 type="text"
-                placeholder="p. ej. ¿Cuánto costó la cena del grupo?"
+                placeholder="p. ej. ¿Cuánto costó la cena con tu gente?"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
               />

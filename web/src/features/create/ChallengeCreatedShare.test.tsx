@@ -77,7 +77,7 @@ describe('ChallengeCreatedShare — tarjeta-imagen, sin link crudo (#595)', () =
   test('dice qué se comparte (nombre del reto) y a quién (el grupo del viaje); sin link crudo visible', async () => {
     renderShare()
     expect(screen.getByText('¡Reto creado!')).toBeInTheDocument()
-    expect(screen.getByText(/tu grupo de lisboa ya puede jugar/i)).toBeInTheDocument()
+    expect(screen.getByText(/tu gente de lisboa ya puede jugar/i)).toBeInTheDocument()
     // El enlace NUNCA se pinta en la hoja (solo viaja en el caption al compartir).
     expect(screen.queryByText(/\/j\/reto-1/)).not.toBeInTheDocument()
     // Deja asentar los efectos async (resolución de portada + rasterizado) para
