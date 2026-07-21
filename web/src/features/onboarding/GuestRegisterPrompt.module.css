@@ -65,3 +65,15 @@
   flex-direction: column;
   gap: var(--space-3);
 }
+
+/* El `ghost` del kit usa `--color-text` (pensado para PAPEL): sobre esta
+   escena oscura casi no se lee (axe: color-contrast serio). Reescribe solo el
+   color al tono de escena — misma técnica que `.heroImg` en
+   ChallengeDetail.module.css (gana por orden de import, ver ese fichero). */
+.ghostOnScene {
+  color: var(--scene-ink-soft);
+}
+.ghostOnScene:hover:not(:disabled) {
+  background: var(--glass-bg);
+  color: var(--scene-ink);
+}

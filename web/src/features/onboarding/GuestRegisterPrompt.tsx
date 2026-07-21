@@ -35,7 +35,7 @@ export function GuestRegisterPrompt({ onCreateAccount, onDismiss }: Props) {
         <Button fullWidth onClick={onCreateAccount}>
           Crear cuenta
         </Button>
-        <Button variant="ghost" fullWidth onClick={onDismiss}>
+        <Button variant="ghost" fullWidth onClick={onDismiss} className={styles.ghostOnScene}>
           Ahora no
         </Button>
       </div>
