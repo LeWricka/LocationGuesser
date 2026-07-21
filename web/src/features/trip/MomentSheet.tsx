@@ -503,7 +503,7 @@ export function MomentSheet({
     ? `${(moment.lat as number).toFixed(4)}°, ${(moment.lng as number).toFixed(4)}°`
     : null
   // Eyebrow editorial sobre la foto: el tipo de momento (en juego / reto / recuerdo).
-  const eyebrow = isActive ? 'En juego' : isReto ? 'Un reto para el grupo' : 'Recuerdo'
+  const eyebrow = isActive ? 'En juego' : isReto ? 'Un reto para tu gente' : 'Recuerdo'
   // Foto del héroe (issue #655): un reto en juego con foto-sorpresa no se pinta a
   // pelo aquí (destriparía la respuesta antes de votar) — `resolveMomentPhoto`
   // aplica la misma regla que la pestaña Fotos, con la excepción del creador.

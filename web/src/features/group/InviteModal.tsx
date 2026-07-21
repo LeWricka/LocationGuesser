@@ -277,7 +277,7 @@ export function InviteModal({
       </div>
 
       <p className={styles.hint}>
-        Comparte la tarjeta en el chat del grupo. Quien la abra entra directo al viaje.
+        Comparte la tarjeta en el chat de tu gente. Quien la abra entra directo al viaje.
       </p>
 
       {/* Enlace de co-dueño (issue #707): sección discreta, SOLO para dueños —
