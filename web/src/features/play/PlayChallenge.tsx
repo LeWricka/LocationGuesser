@@ -1306,7 +1306,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           <h1 className={styles.title}>{challenge.title}</h1>
         </Stack>
 
-        <div className={`${styles.resultMap} lg-rise`}>
+        {/* Mapa del resultado: DÓNDE apostaste vs el objetivo. Es el "resultado
+            que obtuviste" real (no solo la cifra de puntos), así que es lo que
+            resalta el primer coach-mark del reto compartido (RetoShareGuide) —
+            para que el receptor VEA su tiro, no solo lea los puntos. */}
+        <div ref={revealResultRef} className={`${styles.resultMap} lg-rise`}>
           {/* Issue #795: con respuesta conocida, el mapa de resultado enseña el
               pin de TODOS los que ya jugaron (con su nombre), no solo el mío.
               Sin respuesta todavía (p.ej. un fallo puntual al pedirla) cae al
@@ -1345,11 +1349,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           onSelectUser={setSelectedUserId}
         />
 
-        {/* Tarjeta del resultado, envuelta para anclar el coach-mark "tu
-            resultado" de la guía del reto compartido (RetoShareGuide). El div
-            existe siempre en el reveal (también en timeout), así el coach-mark
-            nunca se queda sin objetivo. */}
-        <div ref={revealResultRef}>
+        {/* Tarjeta de puntos (cifra + distancia + anillo). El coach-mark del reto
+            ya no la ancla: resalta el MAPA de arriba (el tiro real); los puntos
+            quedan a la vista debajo del mapa resaltado. */}
+        <div>
           <Card padding="md" raised>
             <Stack gap={4}>
               {timedOut ? (
