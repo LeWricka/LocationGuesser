@@ -135,6 +135,9 @@ const coachMarkTabBarRef: { current: HTMLDivElement | null } = { current: null }
 // #886/#891) SIN taparlo: una caja visible que simula la tarjeta de puntos.
 // Demuestra que el resultado se ve DEBAJO del scrim.
 const retoResultRef: { current: HTMLElement | null } = { current: null }
+// Ídem, para el 2º paso (issue #899): simula la lista de clasificación +
+// puntuación, objetivo del coach-mark "Cómo vais".
+const retoListRef: { current: HTMLElement | null } = { current: null }
 
 // Foto stub para `MomentSheet` (issue #571): mismo estilo que el SVG data-URI que
 // firma el Storage falso (`fakeSupabase.photoDataUri`, no exportado), duplicado
@@ -1063,7 +1066,7 @@ export const cases: GalleryCase[] = [
           }}
           style={{
             // Simula el MAPA del resultado (issue #897): el coach ancla al mapa
-            // (el tiro real), no a la cifra de puntos. Caja alta tipo mapa.
+            // (tu posición), no a la cifra de puntos. Caja alta tipo mapa.
             height: 280,
             display: 'flex',
             alignItems: 'center',
@@ -1079,9 +1082,35 @@ export const cases: GalleryCase[] = [
             textAlign: 'center',
           }}
         >
-          Mapa del resultado · tu tiro vs el objetivo
+          Mapa del resultado · tu posición vs el objetivo
         </div>
-        <RetoShareGuide resultRef={retoResultRef} onNext={noop} onSkip={noop} />
+        {/* Simula la lista + tarjeta de puntos (issue #899): objetivo del 2º
+            paso ("Cómo vais"). Misma superficie de escena oscura que el mapa
+            de arriba, para el mismo motivo de contraste. */}
+        <div
+          ref={(el) => {
+            retoListRef.current = el
+          }}
+          style={{
+            minHeight: 160,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: 16,
+            background: 'var(--scene-surface)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--scene-ink)',
+            textAlign: 'center',
+          }}
+        >
+          Clasificación · lista + tu puntuación
+        </div>
+        <RetoShareGuide
+          resultRef={retoResultRef}
+          listRef={retoListRef}
+          onNext={noop}
+          onSkip={noop}
+        />
       </div>
     ),
   },
