@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ChevronLeft,
+  CircleUser,
   Flag,
   Globe,
   ImagePlus,
@@ -30,6 +31,7 @@ import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { marcadorGroupHash, promoteChallengeHash } from '../../lib/route'
+import { gotoProfile } from '../home/navigation'
 import { isMomentPhotoVisible, pairedChallengeByMemoryId, type Moment } from '../../lib/trip'
 import { EXAMPLE_TRIP_GROUP_ID, EXAMPLE_TRIP_SUBTITLE } from '../../lib/exampleTrip'
 import { EditChallenge } from '../group/EditChallenge'
@@ -1396,6 +1398,23 @@ export function TripPage({
         ariaLabel="Opciones del viaje"
       >
         <nav className={styles.menu} aria-label="Opciones del viaje">
+          {/* Tu perfil (#892): dentro del viaje la cabecera muestra el ⋯, no el
+              avatar de la home — sin este item el usuario perdía la puerta al
+              perfil al entrar a un viaje. Mismo destino que el avatar de la home
+              (`gotoProfile` → #perfil), aquí como primera opción. */}
+          <button
+            type="button"
+            className={[styles.menuItem, 'lg-press'].join(' ')}
+            onClick={() => {
+              setMenuOpen(false)
+              gotoProfile()
+            }}
+          >
+            <span className={styles.menuItemIcon}>
+              <Icon icon={CircleUser} size={18} />
+            </span>
+            Tu perfil
+          </button>
           {/* Miembros (#616): quién está en el viaje y su gestión (co-dueños,
               expulsar, salir, transferir). Visible para cualquier miembro. */}
           <button
