@@ -274,6 +274,25 @@ export function TripPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Coach-mark de ENTRADA al Marcador (issue #886): quien aterriza aquí desde la
+  // guía del reto compartido (`&guide=marcador`, ver `RetoShareGuide`) recibe UN
+  // coach-mark que señala la clasificación real (el podio). Se CONSUME una sola
+  // vez del hash al montar (mismo criterio que `tourActive`): una recarga no lo
+  // relanza. No es una guía conducida cruzando de ruta —eso sería frágil—, solo
+  // un remate independiente en el destino.
+  const [marcadorGuideActive, setMarcadorGuideActive] = useState(() => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    return params.get('g') === groupId && params.get('guide') === 'marcador'
+  })
+  useEffect(() => {
+    if (!marcadorGuideActive) return
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    if (params.get('g') !== groupId || !params.has('guide')) return
+    params.delete('guide')
+    window.history.replaceState(window.history.state, '', `#${params.toString()}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const carouselRef = useRef<HTMLDivElement>(null)
   const selectionFromCarousel = useRef(false)
   const programmaticScroll = useRef(false)
@@ -1139,6 +1158,22 @@ export function TripPage({
           }
           dismissLabel="Entendido"
           onDismiss={creador.dismissRemate}
+        />
+      )}
+
+      {/* Coach-mark de entrada al Marcador (issue #886): remate de la guía del
+          reto compartido. Señala el podio real (la clasificación) al aterrizar.
+          Solo en el Marcador y solo si el podio existe (CoachMark no pinta nada
+          sin objetivo medible). Un único paso, se cierra con "Entendido". */}
+      {marcadorGuideActive && section === 'marcador' && (
+        <CoachMark
+          targetRef={podioRef}
+          step="El Marcador"
+          title="Aquí va la clasificación"
+          ariaLabel="Aquí va la clasificación"
+          body="Quién va ganando en el viaje, reto tras reto. Debajo tienes los retos pasados y los premios."
+          dismissLabel="Entendido"
+          onDismiss={() => setMarcadorGuideActive(false)}
         />
       )}
 

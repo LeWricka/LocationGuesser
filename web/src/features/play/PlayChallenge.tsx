@@ -5,6 +5,7 @@ import {
   Eye,
   EyeOff,
   Ghost,
+  HelpCircle,
   Lock,
   RotateCcw,
   Share2,
@@ -51,7 +52,7 @@ import { getGroup } from '../../lib/groupData'
 import { getGroupMembers } from '../../lib/membership'
 import { aggregateLeaderboard, getGroupVotes, type VoteWithName } from '../../lib/leaderboard'
 import { upsertProfile } from '../../lib/profile'
-import { groupHash, marcadorGroupHash } from '../../lib/route'
+import { marcadorGroupHash, marcadorGuideGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
@@ -77,10 +78,10 @@ import { AccountUpgradeModal, RecoverIdentityModal } from '../auth'
 import { PushOptInPrompt } from '../trip/PushOptInPrompt'
 // Entrada por RETO COMPARTIDO (onboarding nuevo, pieza 2/4): quien abre un
 // deep link de UN reto suelto sin cuenta y por primera vez ve una intro mínima
-// ANTES de jugar (RetoShareIntro) y, tras el resultado, la explicación de
-// Momentu + puente al viaje + registro (RetoShareExplainSequence). El motor de
-// detección/persistencia vive en `useRetoShareOnboarding`; aquí solo se engancha.
-import { RetoShareIntro, RetoShareExplainSequence, useRetoShareOnboarding } from '../onboarding'
+// ANTES de jugar (RetoShareIntro) y, tras el resultado y a PETICIÓN, la guía
+// que señala el resultado real y explica el Marcador (RetoShareGuide). El motor
+// de detección/persistencia vive en `useRetoShareOnboarding`; aquí solo se engancha.
+import { RetoShareIntro, RetoShareGuide, useRetoShareOnboarding } from '../onboarding'
 import {
   BackHomeButton,
   Button,
@@ -263,9 +264,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // con nombre y seguir sin cuenta permanente indefinidamente.
   const [upgradeOpen, setUpgradeOpen] = useState(false)
   // De qué superficie se abrió el alta (issue #751/onboarding pieza 2/4): el CTA
-  // normal de "no pierdas tus puntos" y el registro al final de
-  // RetoShareExplainSequence comparten el MISMO modal (nunca se apilan dos), pero
-  // viajan con un origin distinto para poder cruzar el funnel por superficie.
+  // normal de "no pierdas tus puntos" y el registro al final de la guía del reto
+  // compartido comparten el MISMO modal (nunca se apilan dos), pero viajan con un
+  // origin distinto para poder cruzar el funnel por superficie.
   const [upgradeOrigin, setUpgradeOrigin] = useState<'play_result' | 'reto_share_register'>(
     'play_result',
   )
@@ -274,7 +275,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // deep link de reto sin cuenta y por primera vez (ver useRetoShareOnboarding).
   const retoShare = useRetoShareOnboarding(groupId, user?.id, isAnonymous, profile?.onboarding)
   const [retoIntroDismissed, setRetoIntroDismissed] = useState(false)
+  // ¿Ya lanzó el usuario la explicación desde el reveal? Empieza en false a
+  // propósito: el resultado (puntos, mapa de los demás) se ve ENTERO primero;
+  // la guía solo se monta cuando se pulsa "¿Qué es esto?" (nunca de golpe
+  // encima del reveal, que era el bug que tapaba los puntos).
+  const [retoExplainStarted, setRetoExplainStarted] = useState(false)
   const [retoExplainDone, setRetoExplainDone] = useState(false)
+  // Anclas REALES del reveal para los coach-marks de la guía (RetoShareGuide):
+  // la tarjeta de puntuación ("tu resultado") y el mapa con los pines de todos
+  // ("lo que marcaron los demás"). Baratas: refs vacías salvo en el reveal.
+  const revealResultRef = useRef<HTMLDivElement>(null)
+  const revealOthersRef = useRef<HTMLDivElement>(null)
   // Nombre de quien creó el viaje (solo hace falta para el copy de la
   // explicación de arriba: "el viaje de {ownerName}"). Cosmético: sin
   // resolverlo, el copy cae al genérico ("un viaje", "Ver el viaje").
@@ -1324,7 +1335,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           <h1 className={styles.title}>{challenge.title}</h1>
         </Stack>
 
-        <div className={`${styles.resultMap} lg-rise`}>
+        <div ref={revealOthersRef} className={`${styles.resultMap} lg-rise`}>
           {/* Issue #795: con respuesta conocida, el mapa de resultado enseña el
               pin de TODOS los que ya jugaron (con su nombre), no solo el mío.
               Sin respuesta todavía (p.ej. un fallo puntual al pedirla) cae al
@@ -1363,259 +1374,282 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           onSelectUser={setSelectedUserId}
         />
 
-        <Card padding="md" raised>
-          <Stack gap={4}>
-            {timedOut ? (
-              <Stack gap={2}>
-                <strong className={styles.inlineIcon}>
-                  <Icon icon={TimerOff} size={18} /> No diste a tiempo
-                </strong>
-                <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
-              </Stack>
-            ) : result ? (
-              <Stack gap={4} align="center" className={styles.scoreReveal}>
-                {/* Celebración de gran tiro: destello + confeti sobrio + háptico.
+        {/* Tarjeta del resultado, envuelta para anclar el coach-mark "tu
+            resultado" de la guía del reto compartido (RetoShareGuide). El div
+            existe siempre en el reveal (también en timeout), así el coach-mark
+            nunca se queda sin objetivo. */}
+        <div ref={revealResultRef}>
+          <Card padding="md" raised>
+            <Stack gap={4}>
+              {timedOut ? (
+                <Stack gap={2}>
+                  <strong className={styles.inlineIcon}>
+                    <Icon icon={TimerOff} size={18} /> No diste a tiempo
+                  </strong>
+                  <span className={styles.status}>Se acabó el tiempo antes de colocar tu pin.</span>
+                </Stack>
+              ) : result ? (
+                <Stack gap={4} align="center" className={styles.scoreReveal}>
+                  {/* Celebración de gran tiro: destello + confeti sobrio + háptico.
                     Solo se monta si fue gran tiro; respeta reduced-motion (no pinta
                     ni vibra). Va absoluto sobre el bloque, sin capturar toques. */}
-                <RevealBurst active={result.points >= GREAT_SHOT} />
-                {/* Titular de celebración: icono custom + texto cálido si fue gran
+                  <RevealBurst active={result.points >= GREAT_SHOT} />
+                  {/* Titular de celebración: icono custom + texto cálido si fue gran
                     tiro; diana neutra si fue un resultado normal. Entra el primero. */}
-                <span
-                  className={`${styles.scoreEyebrow} ${styles.eyebrowIn} ${
-                    result.points >= GREAT_SHOT ? styles.scoreEyebrowWin : ''
-                  }`}
-                >
-                  {result.points >= GREAT_SHOT ? (
-                    <span className={styles.inlineIcon}>
-                      <IconTrofeo size={16} />
-                      ¡Gran tiro!
-                    </span>
-                  ) : (
-                    <span className={styles.inlineIcon}>
-                      <IconDiana size={16} />
-                      Resultado
-                    </span>
-                  )}
-                </span>
-                {/* Anillo de acierto protagonista: % de la puntuación máxima, con
+                  <span
+                    className={`${styles.scoreEyebrow} ${styles.eyebrowIn} ${
+                      result.points >= GREAT_SHOT ? styles.scoreEyebrowWin : ''
+                    }`}
+                  >
+                    {result.points >= GREAT_SHOT ? (
+                      <span className={styles.inlineIcon}>
+                        <IconTrofeo size={16} />
+                        ¡Gran tiro!
+                      </span>
+                    ) : (
+                      <span className={styles.inlineIcon}>
+                        <IconDiana size={16} />
+                        Resultado
+                      </span>
+                    )}
+                  </span>
+                  {/* Anillo de acierto protagonista: % de la puntuación máxima, con
                     los puntos (count-up) gigantes en el centro. Coreografía del
                     revelado (#545): el anillo entra con un muelle y luego DIBUJA su
                     trazo solo (ScoreRing anima ~900ms al montar); el resto del bloque
                     (veredicto, distancia, acciones) entra EN ORDEN tras él, no de
                     golpe — ver los delays de .verdictIn/.distIn/.actionsIn más abajo. */}
-                {/* El anillo entra envuelto (no vía su propio `className`): ScoreRing
+                  {/* El anillo entra envuelto (no vía su propio `className`): ScoreRing
                     ya usa esa prop para `.high` (pulso infinito de gran tiro), que
                     competiría por la propiedad `animation` con la entrada. */}
-                <div className={styles.ringIn}>
-                  <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
-                    <CountUp className={styles.ringPoints} value={result.points} duration={1200} />
-                    <span className={styles.ringUnit}>puntos</span>
-                  </ScoreRing>
-                </div>
-                <div className={styles.scoreText}>
-                  <span className={`${styles.scoreLabel} ${styles.verdictIn}`}>
-                    {distanceLabel(result.km)}
-                  </span>
-                  <span className={`${styles.resultDist} ${styles.distIn}`}>
-                    a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del objetivo
-                  </span>
-                  {/* Tu puesto en el reto: pica a mejorar ("3º de 6"). Solo si se
-                      pudo calcular con los votos del reto. */}
-                  {rank && (
-                    <span className={`${styles.rank} ${styles.distIn}`}>
-                      <IconMedalla size={14} />
-                      {rank.position}º de {rank.total}
+                  <div className={styles.ringIn}>
+                    <ScoreRing value={result.points} max={MAX_POINTS} size={168}>
+                      <CountUp
+                        className={styles.ringPoints}
+                        value={result.points}
+                        duration={1200}
+                      />
+                      <span className={styles.ringUnit}>puntos</span>
+                    </ScoreRing>
+                  </div>
+                  <div className={styles.scoreText}>
+                    <span className={`${styles.scoreLabel} ${styles.verdictIn}`}>
+                      {distanceLabel(result.km)}
                     </span>
-                  )}
-                  {/* Tiempo de respuesta + nota del factor de velocidad (issue
+                    <span className={`${styles.resultDist} ${styles.distIn}`}>
+                      a <strong className={styles.resultKm}>{fmtDist(result.km)}</strong> del
+                      objetivo
+                    </span>
+                    {/* Tu puesto en el reto: pica a mejorar ("3º de 6"). Solo si se
+                      pudo calcular con los votos del reto. */}
+                    {rank && (
+                      <span className={`${styles.rank} ${styles.distIn}`}>
+                        <IconMedalla size={14} />
+                        {rank.position}º de {rank.total}
+                      </span>
+                    )}
+                    {/* Tiempo de respuesta + nota del factor de velocidad (issue
                       #628). La nota solo aparece cuando el factor confirmadamente
                       aplicó (nunca es una estimación del reloj local) y se aleja
                       de ×1,0 (sin desviación, no aporta nada nuevo que decir). */}
-                  {speedInfo && (
-                    <span className={`${styles.rank} ${styles.distIn}`}>
-                      <Icon icon={Timer} size={14} />
-                      Respondiste en {speedInfo.seconds}s
-                      {speedInfo.factor != null && Math.round(speedInfo.factor * 10) !== 10 && (
-                        <>
-                          {' · ×'}
-                          {speedInfo.factor.toLocaleString('es-ES', {
-                            minimumFractionDigits: 1,
-                            maximumFractionDigits: 1,
-                          })}{' '}
-                          por rapidez
-                        </>
-                      )}
-                    </span>
+                    {speedInfo && (
+                      <span className={`${styles.rank} ${styles.distIn}`}>
+                        <Icon icon={Timer} size={14} />
+                        Respondiste en {speedInfo.seconds}s
+                        {speedInfo.factor != null && Math.round(speedInfo.factor * 10) !== 10 && (
+                          <>
+                            {' · ×'}
+                            {speedInfo.factor.toLocaleString('es-ES', {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 1,
+                            })}{' '}
+                            por rapidez
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  {saving && (
+                    <Row gap={2} justify="center" className={styles.actionsIn}>
+                      <Spinner size={16} />
+                      <span className={styles.status}>Guardando tu voto…</span>
+                    </Row>
                   )}
-                </div>
-                {saving && (
-                  <Row gap={2} justify="center" className={styles.actionsIn}>
-                    <Spinner size={16} />
-                    <span className={styles.status}>Guardando tu voto…</span>
-                  </Row>
-                )}
-              </Stack>
-            ) : (
-              <span className={styles.status}>Revelado.</span>
-            )}
+                </Stack>
+              ) : (
+                <span className={styles.status}>Revelado.</span>
+              )}
 
-            {/* Anti-trampa (issue #200): si mi voto salió de la app durante la
+              {/* Anti-trampa (issue #200): si mi voto salió de la app durante la
                 jugada, aviso informativo (no penaliza puntos, solo deja constancia;
                 en el marcador se ve junto a mi nombre). */}
-            {iLeftApp && (
-              <p className={styles.leftAppNotice} role="note">
-                <Icon icon={AlertTriangle} size={16} /> Saliste de la app durante la jugada
-              </p>
-            )}
+              {iLeftApp && (
+                <p className={styles.leftAppNotice} role="note">
+                  <Icon icon={AlertTriangle} size={16} /> Saliste de la app durante la jugada
+                </p>
+              )}
 
-            {/* "Guárdate / entra del todo" (issue #758): CTA OPCIONAL solo para el
+              {/* "¿Qué es esto?" (issue #886): lanza la explicación del reto
+                compartido A PETICIÓN, nunca de golpe encima del reveal (el bug
+                era un overlay opaco que tapaba los puntos desde el primer
+                frame). Solo el receptor ANÓNIMO que aún no la ha visto: primero
+                ve su resultado entero y, si quiere, la abre. */}
+              {isAnonymous && retoShare.active && !retoExplainStarted && !retoExplainDone && (
+                <Button
+                  variant="secondary"
+                  fullWidth
+                  onClick={() => setRetoExplainStarted(true)}
+                  className={styles.actionsIn}
+                >
+                  <span className={styles.inlineIcon}>
+                    <Icon icon={HelpCircle} size={18} /> ¿Qué es esto?
+                  </span>
+                </Button>
+              )}
+
+              {/* "Guárdate / entra del todo" (issue #758): CTA OPCIONAL solo para el
                 receptor ANÓNIMO — vincula su sesión a un email sin perder su voto
                 ni su puesto (mismo uid). Saltable: no vincular no le quita nada de
                 lo que ya jugó. No se ofrece a quien ya tiene cuenta permanente.
                 Reencuadrado al beneficio + intensidad progresiva (issue #756):
                 variant primaria a partir de la 2ª partida como anónimo. */}
-            {isAnonymous ? (
-              <Button
-                variant={intensifiedUpgrade ? 'primary' : 'secondary'}
-                fullWidth
-                onClick={() => {
-                  // Numerador del clic (issue #751): `upgrade_cta_shown` (la
-                  // impresión del modal) lo emite AccountUpgradeModal al abrir.
-                  track('upgrade_cta_clicked', {
-                    origin: 'play_result',
-                    group_id: groupId,
-                    challenge_id: challenge.id,
-                  })
-                  setUpgradeOrigin('play_result')
-                  setUpgradeOpen(true)
-                }}
-                className={styles.actionsIn}
-              >
-                {upgradeCtaLabel}
-              </Button>
-            ) : (
-              // Pre-prompt de push (issue #769): SOLO cuentas (el anónimo ve el
-              // CTA de arriba) y solo con viaje (el aviso es "reto nuevo en tu
-              // viaje" — un reto de práctica suelto, sin groupId, no aplica).
-              groupId && (
-                <PushOptInPrompt
-                  surface="post_play"
-                  groupId={groupId}
+              {isAnonymous ? (
+                <Button
+                  variant={intensifiedUpgrade ? 'primary' : 'secondary'}
+                  fullWidth
+                  onClick={() => {
+                    // Numerador del clic (issue #751): `upgrade_cta_shown` (la
+                    // impresión del modal) lo emite AccountUpgradeModal al abrir.
+                    track('upgrade_cta_clicked', {
+                      origin: 'play_result',
+                      group_id: groupId,
+                      challenge_id: challenge.id,
+                    })
+                    setUpgradeOrigin('play_result')
+                    setUpgradeOpen(true)
+                  }}
                   className={styles.actionsIn}
-                />
-              )
-            )}
+                >
+                  {upgradeCtaLabel}
+                </Button>
+              ) : (
+                // Pre-prompt de push (issue #769): SOLO cuentas (el anónimo ve el
+                // CTA de arriba) y solo con viaje (el aviso es "reto nuevo en tu
+                // viaje" — un reto de práctica suelto, sin groupId, no aplica).
+                groupId && <PushOptInPrompt surface="post_play" groupId={groupId} />
+              )}
 
-            {/* Compartir MI resultado (apuesta viral): pica al resto a jugar con la
+              {/* Compartir MI resultado (apuesta viral): pica al resto a jugar con la
                 tarjeta de mi rendimiento, SIN revelar la ubicación. Solo si jugué
                 (hay resultado, no timeout) y vengo de un grupo (para el enlace al
                 reto). No se muestra en timeout: no hay puntos que presumir. */}
-            {result && groupId && (
-              <Button
-                fullWidth
-                size="lg"
-                onClick={() => void onShareResult()}
-                loading={sharingResult}
-                className={styles.actionsIn}
-              >
-                <span className={styles.inlineIcon}>
-                  <Icon icon={Share2} size={18} /> Compartir mi resultado
-                </span>
-              </Button>
-            )}
-
-            {/* Foto sorpresa: estaba oculta al jugar; se revela aquí, al votar. */}
-            {surprisePhotoUrl && (
-              <ChallengePhoto
-                src={surprisePhotoUrl}
-                alt="Foto del reto"
-                caption="La foto del reto"
-              />
-            )}
-
-            {/* Street View secundario: oculto tras un botón. Solo si el reto lo
-              tiene; los legacy con foto la muestran directa, también plegada. */}
-            {(hasStreetView || imageUrl) && (
-              <Stack gap={2} className={`${styles.secondary} ${styles.actionsIn}`}>
+              {result && groupId && (
                 <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowStreetView((v) => !v)}
-                  aria-expanded={showStreetView}
+                  fullWidth
+                  size="lg"
+                  onClick={() => void onShareResult()}
+                  loading={sharingResult}
+                  className={styles.actionsIn}
                 >
                   <span className={styles.inlineIcon}>
-                    {showStreetView ? (
-                      <>
-                        <Icon icon={EyeOff} size={16} /> Ocultar
-                      </>
-                    ) : (
-                      <>
-                        <Icon icon={Eye} size={16} />{' '}
-                        {hasStreetView ? 'Ver Street View' : 'Ver la foto'}
-                      </>
-                    )}
+                    <Icon icon={Share2} size={18} /> Compartir mi resultado
                   </span>
                 </Button>
-                {showStreetView && (
-                  <div className={styles.secondaryScene}>
-                    {hasStreetView ? (
-                      <StreetViewPano
-                        panoId={challenge.sv_pano_id}
-                        position={panoFallback}
-                        heading={challenge.sv_heading}
-                        pitch={challenge.sv_pitch}
-                      />
-                    ) : imageUrl ? (
-                      <SceneImage
-                        key={imageUrl}
-                        src={imageUrl}
-                        alt={challenge.title}
-                        className={styles.photo}
-                        skeletonRadius="lg"
-                      />
-                    ) : null}
-                  </div>
-                )}
-              </Stack>
-            )}
+              )}
 
-            {/* Volver a jugar: SOLO en retos de práctica (plazo lejano). Reinicia
+              {/* Foto sorpresa: estaba oculta al jugar; se revela aquí, al votar. */}
+              {surprisePhotoUrl && (
+                <ChallengePhoto
+                  src={surprisePhotoUrl}
+                  alt="Foto del reto"
+                  caption="La foto del reto"
+                />
+              )}
+
+              {/* Street View secundario: oculto tras un botón. Solo si el reto lo
+              tiene; los legacy con foto la muestran directa, también plegada. */}
+              {(hasStreetView || imageUrl) && (
+                <Stack gap={2} className={`${styles.secondary} ${styles.actionsIn}`}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowStreetView((v) => !v)}
+                    aria-expanded={showStreetView}
+                  >
+                    <span className={styles.inlineIcon}>
+                      {showStreetView ? (
+                        <>
+                          <Icon icon={EyeOff} size={16} /> Ocultar
+                        </>
+                      ) : (
+                        <>
+                          <Icon icon={Eye} size={16} />{' '}
+                          {hasStreetView ? 'Ver Street View' : 'Ver la foto'}
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                  {showStreetView && (
+                    <div className={styles.secondaryScene}>
+                      {hasStreetView ? (
+                        <StreetViewPano
+                          panoId={challenge.sv_pano_id}
+                          position={panoFallback}
+                          heading={challenge.sv_heading}
+                          pitch={challenge.sv_pitch}
+                        />
+                      ) : imageUrl ? (
+                        <SceneImage
+                          key={imageUrl}
+                          src={imageUrl}
+                          alt={challenge.title}
+                          className={styles.photo}
+                          skeletonRadius="lg"
+                        />
+                      ) : null}
+                    </div>
+                  )}
+                </Stack>
+              )}
+
+              {/* Volver a jugar: SOLO en retos de práctica (plazo lejano). Reinicia
                 el juego para retrastear sin SQL; en retos reales NO se monta (rejugar
                 tras ver la respuesta sería trampa). */}
-            {isPractice && (
-              <Button
-                variant="secondary"
-                fullWidth
-                onClick={() => void replay()}
-                className={styles.actionsIn}
-              >
-                <span className={styles.inlineIcon}>
-                  <Icon icon={RotateCcw} size={16} /> Volver a jugar
-                </span>
-              </Button>
-            )}
-
-            {groupId && (
-              <Row gap={2} justify="end" className={styles.actionsIn}>
+              {isPractice && (
                 <Button
                   variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    // Al Marcador (no al Diario): venimos de jugar, lo esperable es
-                    // ver la clasificación (#509).
-                    location.hash = marcadorGroupHash(groupId)
-                  }}
+                  fullWidth
+                  onClick={() => void replay()}
+                  className={styles.actionsIn}
                 >
                   <span className={styles.inlineIcon}>
-                    <IconTrofeo size={16} />
-                    Ver clasificación
-                    <Icon icon={ArrowRight} size={16} />
+                    <Icon icon={RotateCcw} size={16} /> Volver a jugar
                   </span>
                 </Button>
-              </Row>
-            )}
-          </Stack>
-        </Card>
+              )}
+
+              {groupId && (
+                <Row gap={2} justify="end" className={styles.actionsIn}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      // Al Marcador (no al Diario): venimos de jugar, lo esperable es
+                      // ver la clasificación (#509).
+                      location.hash = marcadorGroupHash(groupId)
+                    }}
+                  >
+                    <span className={styles.inlineIcon}>
+                      <IconTrofeo size={16} />
+                      Ver clasificación
+                      <Icon icon={ArrowRight} size={16} />
+                    </span>
+                  </Button>
+                </Row>
+              )}
+            </Stack>
+          </Card>
+        </div>
       </Stack>
 
       {/* Lienzo de captura: la tarjeta de MI resultado vive a tamaño real (1080px)
@@ -1637,32 +1671,45 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         </div>
       )}
 
-      {/* Entrada por reto compartido (onboarding pieza 2/4): tras el resultado,
-          la explicación de Momentu → los retos → puente al viaje → registro.
-          `!upgradeOpen` evita apilarla encima del alta real (mismo criterio
-          que ReceptorWelcomeGate con GuestRegisterPrompt: nunca dos prompts a
-          la vez). "Ver el viaje" navega de verdad (no pasa por el registro). */}
-      {isAnonymous && retoShare.active && !retoExplainDone && !upgradeOpen && (
-        <RetoShareExplainSequence
-          ownerName={ownerName}
-          onViewTrip={() => {
-            setRetoExplainDone(true)
-            if (groupId) location.hash = groupHash(groupId)
-          }}
-          onCreateAccount={() => {
-            setRetoExplainDone(true)
-            setUpgradeOrigin('reto_share_register')
-            setUpgradeOpen(true)
-          }}
-          onDismiss={() => setRetoExplainDone(true)}
-        />
-      )}
+      {/* Guía del reto compartido (onboarding pieza 2/4, issue #886): se monta
+          SOLO tras pulsar "¿Qué es esto?" (`retoExplainStarted`), nunca de
+          golpe encima del reveal. Coach-marks sobre el resultado real + las
+          tarjetas de explicación + aterrizaje en el Marcador. `!upgradeOpen`
+          evita apilarla encima del alta real (nunca dos prompts a la vez). */}
+      {isAnonymous &&
+        retoShare.active &&
+        retoExplainStarted &&
+        !retoExplainDone &&
+        !upgradeOpen && (
+          <RetoShareGuide
+            ownerName={ownerName}
+            resultRef={revealResultRef}
+            othersRef={revealOthersRef}
+            onCreateAccount={() => {
+              setRetoExplainDone(true)
+              setUpgradeOrigin('reto_share_register')
+              setUpgradeOpen(true)
+            }}
+            onFinish={() => {
+              setRetoExplainDone(true)
+              // El recorrido acaba en el MARCADOR (no en el Diario), con el
+              // coach-mark de entrada que señala la clasificación real.
+              if (groupId) location.hash = marcadorGuideGroupHash(groupId)
+            }}
+          />
+        )}
 
       {isAnonymous && (
         <AccountUpgradeModal
           open={upgradeOpen}
           onClose={() => {
             setUpgradeOpen(false)
+            // Si venía del registro del reto compartido, el recorrido termina
+            // en el Marcador aunque no llegue a crear la cuenta (mismo destino
+            // que "Ahora no"): nunca se queda varado en el reveal.
+            if (upgradeOrigin === 'reto_share_register' && groupId) {
+              location.hash = marcadorGuideGroupHash(groupId)
+            }
             setUpgradeOrigin('play_result')
           }}
           origin={upgradeOrigin}
@@ -1672,10 +1719,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           points={upgradePoints}
           onUpgraded={() => {
             setUpgradeOpen(false)
+            const fromRetoShare = upgradeOrigin === 'reto_share_register'
             setUpgradeOrigin('play_result')
             toast.show(`Guardado. Tus puntos de ${groupLabel} siguen siendo tuyos.`, {
               tone: 'success',
             })
+            // Recién registrado desde el reto compartido: aterriza en el
+            // Marcador con el coach-mark de entrada (igual que el camino anónimo).
+            if (fromRetoShare && groupId) location.hash = marcadorGuideGroupHash(groupId)
           }}
         />
       )}

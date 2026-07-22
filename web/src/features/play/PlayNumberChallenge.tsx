@@ -760,9 +760,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
                 CTA de "guárdate" para el anónimo (a diferencia de
                 PlayChallenge); el guard evita mostrárselo a quien aún no
                 tiene identidad guardada. */}
-            {!isAnonymous && groupId && (
-              <PushOptInPrompt surface="post_play" groupId={groupId} className={styles.actionsIn} />
-            )}
+            {!isAnonymous && groupId && <PushOptInPrompt surface="post_play" groupId={groupId} />}
 
             {/* Marcador del reto: cada jugador con su número y su error relativo. */}
             {ranked.length > 0 && answer != null && (
