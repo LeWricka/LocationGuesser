@@ -7,11 +7,11 @@ describe('CreadorNudge', () => {
   test('pinta el mensaje', () => {
     render(
       <CreadorNudge icon={Share2} onDismiss={vi.fn()}>
-        Pásale el enlace a tu gente. Entran sin instalar nada.
+        Pásale el enlace a tu gente. Ven y juegan de forma directa.
       </CreadorNudge>,
     )
     expect(
-      screen.getByText('Pásale el enlace a tu gente. Entran sin instalar nada.'),
+      screen.getByText('Pásale el enlace a tu gente. Ven y juegan de forma directa.'),
     ).toBeInTheDocument()
   })
 

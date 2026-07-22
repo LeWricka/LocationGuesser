@@ -2,7 +2,8 @@
 // 3/4): quien acaba de crear un viaje y cae en su Diario vacío se guía de UNA
 // acción cada vez, contextual, en vez de una pantalla-lista de pasos. Los 5
 // avisos (intro → coach-mark en el "+" → sugerencia de reto tras el primer
-// momento → aviso de compartir tras lanzarlo → remate discreto) se derivan de
+// momento, TAMBIÉN anclada al "+" → aviso de compartir tras lanzarlo → remate
+// anclado a la barra de pestañas) se derivan de
 // datos REALES del viaje (nº de momentos, si ya existe un reto) más un puñado
 // de banderas locales para "¿ya vi este paso?" — no hace falta una máquina de
 // estados persistida: el propio viaje ES el estado.

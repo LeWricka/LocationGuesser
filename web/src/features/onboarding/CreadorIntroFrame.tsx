@@ -3,7 +3,7 @@
 // su Diario vacío. A propósito no explica nada más que el "porqué" del
 // producto — el "cómo" (guardar un momento, lanzar un reto) se aprende
 // HACIENDO, con el coach-mark sobre el "+" real y la sugerencia contextual que
-// vienen después (ver CoachMark/MomentChallengeSuggestion). Copy y jerarquía
+// vienen después (ambos son `CoachMark`, ver ese fichero). Copy y jerarquía
 // del prototipo (`#cintro`), mismo lenguaje visual que GuestWelcomeFrame/
 // RetoShareIntro (escena oscura a pantalla completa, marco de texto, un único
 // CTA) pero SIN foto de fondo: aquí no hay recuerdo real todavía que enseñar,
@@ -34,8 +34,8 @@ export function CreadorIntroFrame({ onStart }: Props) {
         <span className={`t-label ${styles.eyebrow}`}>Momentu</span>
         <h1 className={`t-display ${styles.title}`}>Tu viaje, compartido con tu gente.</h1>
         <p className={`t-body ${styles.body}`}>
-          Un diario para tus viajes: guardas cada momento, lo compartes con tu gente y les lanzas
-          retos para que disfruten del viaje.
+          Un diario para tus viajes: guardas cada momento, lo compartes con tu gente y les retas
+          para que viajen contigo.
         </p>
 
         <Button fullWidth onClick={onStart} className={styles.cta}>

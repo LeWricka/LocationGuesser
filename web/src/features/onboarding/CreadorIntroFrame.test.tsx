@@ -8,6 +8,7 @@ describe('CreadorIntroFrame', () => {
     expect(screen.getByText('Momentu')).toBeInTheDocument()
     expect(screen.getByText('Tu viaje, compartido con tu gente.')).toBeInTheDocument()
     expect(screen.getByText(/Un diario para tus viajes: guardas cada momento/)).toBeInTheDocument()
+    expect(screen.getByText(/les retas para que viajen contigo\.$/)).toBeInTheDocument()
   })
 
   test('"Empezar" llama a onStart', () => {

@@ -217,8 +217,8 @@ const ENTRY_SLIDES: OnboardingSlide[] = [
 // `reto_share` es la entrada por reto suelto (onboarding nuevo, pieza 2/4:
 // RetoShareIntro/RetoShareExplainSequence), y `creador` es el aprender-haciendo
 // del creador (onboarding nuevo, pieza 3/4: CreadorIntroFrame/CoachMark/
-// MomentChallengeSuggestion/CreadorNudge, ver useCreadorOnboarding) — ninguno
-// de los cuatro pasa por `OnboardingGate`. Se excluyen del mapa de slides para
+// CreadorNudge, ver useCreadorOnboarding) — ninguno de los cuatro pasa por
+// `OnboardingGate`. Se excluyen del mapa de slides para
 // no arrastrar copy muerto — `getSlides` los cubre con un array vacío.
 type SlideContext = Exclude<
   OnboardingContext,
