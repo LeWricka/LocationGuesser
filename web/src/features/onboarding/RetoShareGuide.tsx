@@ -1,8 +1,10 @@
 // Guía del RETO COMPARTIDO tras el resultado (onboarding nuevo, pieza 2/4).
 //
 // Rediseño (issue #891): en el revelado ya NO se explica todo aquí. Es UN solo
-// paso — un coach-mark BLOQUEANTE que señala el RESULTADO real (la tarjeta de
-// puntos, `resultRef`) sin taparlo. Desde él:
+// paso — un coach-mark BLOQUEANTE que señala el RESULTADO real. Issue #897: el
+// objetivo es el MAPA del resultado (el tiro: dónde apostaste vs el objetivo),
+// no la cifra de puntos — que la cifra sola ya se veía y no bastaba; el receptor
+// tiene que VER su tiro. Los puntos quedan a la vista bajo el mapa. Desde él:
 //   - "Siguiente" → el llamador (PlayChallenge) navega al VIAJE REAL y arranca
 //     allí el tour conducido (Diario → Bitácora → Marcador, ver `GuidedTour` en
 //     TripPage). PlayChallenge se desmonta; el resto de la explicación vive en
@@ -21,7 +23,8 @@ import { useReducedMotion } from '../../ui'
 import { CoachMark } from './CoachMark'
 
 export interface Props {
-  /** Tarjeta de puntuación del reveal, a resaltar en el coach-mark. */
+  /** Mapa del resultado del reveal (dónde apostaste vs el objetivo), a resaltar
+   * en el coach-mark: el "resultado" que el receptor debe VER, no solo la cifra. */
   resultRef: RefObject<HTMLElement | null>
   /**
    * "Siguiente": el llamador navega al viaje real y arranca el tour conducido.
@@ -34,7 +37,7 @@ export interface Props {
 export function RetoShareGuide({ resultRef, onNext, onSkip }: Props) {
   const reducedMotion = useReducedMotion()
 
-  // Lleva la tarjeta de puntos a la vista: el reveal scrollea y puede quedar
+  // Lleva el mapa del resultado a la vista: el reveal scrollea y puede quedar
   // fuera de pantalla. `CoachMark` remide sola cada 400ms, así que el aro encaja
   // aunque el scroll no sea instantáneo (mismo criterio que `GuidedTour`).
   useEffect(() => {
@@ -51,7 +54,7 @@ export function RetoShareGuide({ resultRef, onNext, onSkip }: Props) {
       targetRef={resultRef}
       step="Tu resultado"
       title="Este es tu resultado"
-      body="Míralo con calma: tus puntos y a qué distancia quedaste del objetivo (cuanto más cerca, más puntos). Cuando quieras, sigue."
+      body="Aquí ves tu tiro: dónde apostaste y lo cerca que quedaste del objetivo. Tus puntos, justo debajo (cuanto más cerca, más puntos). Míralo con calma; cuando quieras, sigue."
       ariaLabel="Este es tu resultado"
       dismissLabel="Saltar"
       primaryAction={{ label: 'Siguiente', onClick: onNext }}

@@ -1062,7 +1062,12 @@ export const cases: GalleryCase[] = [
             retoResultRef.current = el
           }}
           style={{
-            padding: 24,
+            // Simula el MAPA del resultado (issue #897): el coach ancla al mapa
+            // (el tiro real), no a la cifra de puntos. Caja alta tipo mapa.
+            height: 280,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             borderRadius: 16,
             // Superficie de ESCENA (oscura), como el reveal real: la burbuja
             // glass translúcida se compone sobre oscuro (texto legible), no
@@ -1074,7 +1079,7 @@ export const cases: GalleryCase[] = [
             textAlign: 'center',
           }}
         >
-          Tu resultado: 4.200 puntos · a 8 km
+          Mapa del resultado · tu tiro vs el objetivo
         </div>
         <RetoShareGuide resultRef={retoResultRef} onNext={noop} onSkip={noop} />
       </div>
