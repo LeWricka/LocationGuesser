@@ -104,6 +104,25 @@ describe('AccountUpgradeModal — copy reencuadrado al beneficio (issue #756)', 
     expect(screen.getByRole('heading', { name: 'Guarda tu cuenta' })).toBeInTheDocument()
     expect(screen.getByText(/Guarda tu progreso con tu correo/)).toBeInTheDocument()
   })
+
+  // Título/intro a medida (issue #891): el gate del "+" anónimo pide cuenta con
+  // su propio encuadre de "crear", sin tocar el copy de beneficio por defecto.
+  test('title/intro a medida ganan al copy por defecto', () => {
+    render(
+      <AccountUpgradeModal
+        open
+        onClose={vi.fn()}
+        origin="anon_create_gate"
+        title="Regístrate para crear tus viajes"
+        intro="Estás como invitado."
+      />,
+    )
+    expect(
+      screen.getByRole('heading', { name: 'Regístrate para crear tus viajes' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Estás como invitado.')).toBeInTheDocument()
+    expect(screen.queryByText(/Guarda tu progreso con tu correo/)).not.toBeInTheDocument()
+  })
 })
 
 // Issue #751: funnel del CTA — antes solo existía `account_upgraded` (el

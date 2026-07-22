@@ -2,6 +2,7 @@ import { useRef, type RefObject } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { GuidedTour, type TourStep } from './GuidedTour'
+import coachStyles from './CoachMark.module.css'
 
 // jsdom no implementa scrollIntoView; GuidedTour lo usa para llevar el
 // objetivo de cada paso a pantalla si vive dentro de algo que scrollea.
@@ -93,5 +94,57 @@ describe('GuidedTour', () => {
     render(<Harness onFinish={vi.fn()} onSkip={onSkip} onNavigate={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: 'Saltar' }))
     expect(onSkip).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Sin pantalla de cierre + paso bloqueante (issue #891): el tour del reto
+// compartido no tiene cierre genérico (remata con un registro que monta el
+// padre) y su primer paso ancla al mapa/globo vivo, así que va `blocking`.
+describe('GuidedTour — sin cierre y con pasos bloqueantes (#891)', () => {
+  function HarnessNoClosing({ onFinish, onSkip }: { onFinish: () => void; onSkip: () => void }) {
+    const diarioRef = useRef<HTMLDivElement>(null)
+    const marcadorRef = useRef<HTMLDivElement>(null)
+    const steps: TourStep[] = [
+      {
+        targetRef: diarioRef as RefObject<HTMLElement | null>,
+        step: 'El Diario',
+        title: 'El viaje entero',
+        body: 'Cada parada queda aquí.',
+        ariaLabel: 'El viaje entero',
+        blocking: true,
+      },
+      {
+        targetRef: marcadorRef as RefObject<HTMLElement | null>,
+        step: 'El Marcador',
+        title: 'Aquí se juega',
+        body: 'Quién va ganando.',
+        ariaLabel: 'Aquí se juega',
+      },
+    ]
+    return (
+      <div>
+        <div ref={diarioRef}>Globo del diario</div>
+        <div ref={marcadorRef}>Camino de retos</div>
+        <GuidedTour steps={steps} lastStepLabel="Listo" onFinish={onFinish} onSkip={onSkip} />
+      </div>
+    )
+  }
+
+  test('el primer paso (mapa) se pinta como bloqueante', () => {
+    const { container } = render(<HarnessNoClosing onFinish={vi.fn()} onSkip={vi.fn()} />)
+    const layerClass = coachStyles.layerBlocking as string
+    expect(container.getElementsByClassName(layerClass).length).toBe(1)
+  })
+
+  test('sin cierre: el último paso remata con onFinish (no hay pantalla de cierre)', () => {
+    const onFinish = vi.fn()
+    render(<HarnessNoClosing onFinish={onFinish} onSkip={vi.fn()} />)
+    // Avanza al último paso.
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    // En el último paso el CTA es el `lastStepLabel` (no "Ver cierre") y remata ya.
+    fireEvent.click(screen.getByRole('button', { name: 'Listo' }))
+    expect(onFinish).toHaveBeenCalledTimes(1)
+    // No hay pantalla de cierre genérica.
+    expect(screen.queryByText('Ya conoces el viaje')).not.toBeInTheDocument()
   })
 })

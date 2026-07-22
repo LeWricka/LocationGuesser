@@ -41,7 +41,6 @@ import {
   GuestWelcomeFrame,
   GuestRegisterPrompt,
   RetoShareIntro,
-  RetoShareExplainSequence,
   RetoShareGuide,
   CreadorIntroFrame,
   CoachMark,
@@ -132,11 +131,10 @@ const noop = () => {}
 const coachMarkFabRef: { current: HTMLButtonElement | null } = { current: null }
 // Ídem, para el remate anclado a la barra Diario·Bitácora·Marcador.
 const coachMarkTabBarRef: { current: HTMLDivElement | null } = { current: null }
-// Anclas falsas del reveal para capturar el coach-mark de RetoShareGuide (issue
-// #886) SIN taparlo: dos cajas visibles que simulan la tarjeta de puntos y el
-// mapa con los pines de todos. Demuestra que el resultado se ve DEBAJO.
+// Ancla falsa del reveal para capturar el coach-mark de RetoShareGuide (issue
+// #886/#891) SIN taparlo: una caja visible que simula la tarjeta de puntos.
+// Demuestra que el resultado se ve DEBAJO del scrim.
 const retoResultRef: { current: HTMLElement | null } = { current: null }
-const retoOthersRef: { current: HTMLElement | null } = { current: null }
 
 // Foto stub para `MomentSheet` (issue #571): mismo estilo que el SVG data-URI que
 // firma el Storage falso (`fakeSupabase.photoDataUri`, no exportado), duplicado
@@ -1038,43 +1036,10 @@ export const cases: GalleryCase[] = [
     render: () => <RetoShareIntro photoUrl={null} onPlay={noop} />,
   },
   {
-    id: 'onboarding-reto-retos',
-    title: 'Onboarding · reto compartido — la sección de retos (Marcador)',
-    section: 'Onboarding',
-    render: () => (
-      <RetoShareExplainSequence ownerName="Lucía" onCreateAccount={noop} onDismiss={noop} />
-    ),
-  },
-  {
-    id: 'onboarding-reto-puente',
-    title: 'Onboarding · reto compartido — puente al viaje entero',
-    section: 'Onboarding',
-    render: () => (
-      <RetoShareExplainSequence
-        ownerName="Lucía"
-        initialStep="puente"
-        onCreateAccount={noop}
-        onDismiss={noop}
-      />
-    ),
-  },
-  {
-    id: 'onboarding-reto-quees',
-    title: 'Onboarding · reto compartido — qué es Momentu',
-    section: 'Onboarding',
-    render: () => (
-      <RetoShareExplainSequence
-        ownerName="Lucía"
-        initialStep="quees"
-        onCreateAccount={noop}
-        onDismiss={noop}
-      />
-    ),
-  },
-  {
-    // El coach-mark SEÑALA el resultado real sin taparlo (issue #886): las dos
-    // cajas de abajo son el reveal (tarjeta de puntos + mapa de los demás),
-    // visibles bajo el scrim. Antes había un overlay opaco que las tapaba.
+    // El coach-mark SEÑALA el resultado real sin taparlo (issue #886/#891): la
+    // caja de abajo es el reveal (tarjeta de puntos), visible bajo el scrim.
+    // Rediseño #891: UN solo paso — "Siguiente" llevaría al viaje real (aquí
+    // stub), "Saltar" al Marcador.
     id: 'onboarding-reto-guide-coach',
     title: 'Onboarding · reto compartido — coach-mark sobre el resultado (no lo tapa)',
     section: 'Onboarding',
@@ -1111,29 +1076,7 @@ export const cases: GalleryCase[] = [
         >
           Tu resultado: 4.200 puntos · a 8 km
         </div>
-        <div
-          ref={(el) => {
-            retoOthersRef.current = el
-          }}
-          style={{
-            height: 180,
-            borderRadius: 16,
-            background: 'var(--scene-surface)',
-            border: '1px solid var(--glass-border)',
-            color: 'var(--scene-ink)',
-            display: 'grid',
-            placeItems: 'center',
-          }}
-        >
-          Mapa con los pines de todos
-        </div>
-        <RetoShareGuide
-          ownerName="Lucía"
-          resultRef={retoResultRef}
-          othersRef={retoOthersRef}
-          onCreateAccount={noop}
-          onFinish={noop}
-        />
+        <RetoShareGuide resultRef={retoResultRef} onNext={noop} onSkip={noop} />
       </div>
     ),
   },

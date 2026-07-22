@@ -7,6 +7,14 @@ export interface ToastOptions {
   /** Milisegundos antes de auto-cerrar. 0 = persistente. */
   duration?: number
   /**
+   * Dónde ancla el aviso. Por defecto 'bottom' (el sitio de siempre). 'top'
+   * (issue #891) lo saca ARRIBA con una entrada deslizante — pensado para las
+   * confirmaciones que, abajo, chocarían con la burbuja de un coach-mark del
+   * tutorial (p.ej. "¡Voto guardado!" tras revelar un reto). Solo cambia la
+   * posición del aviso que lo pide; el resto sigue abajo.
+   */
+  position?: 'top' | 'bottom'
+  /**
    * Acción secundaria del aviso (issue #718: el toast "Recuperado tu
    * borrador" ofrece "Descartar" sin abrir un modal que interrumpa). Un solo
    * botón, discreto, junto al de cerrar — no una fila de acciones.

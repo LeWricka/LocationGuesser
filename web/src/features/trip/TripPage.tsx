@@ -50,10 +50,14 @@ import {
   CoachMark,
   CreadorIntroFrame,
   CreadorNudge,
+  GuestRegisterPrompt,
   GuidedTour,
   useCreadorOnboarding,
   type TourStep,
 } from '../onboarding'
+// Alta real reutilizable (issue #891): la usa el cierre del tour del reto
+// compartido (registro opcional) y el gate del "+" para anónimos.
+import { AccountUpgradeModal } from '../auth'
 import styles from './TripPage.module.css'
 
 /**
@@ -295,6 +299,32 @@ export function TripPage({
     window.history.replaceState(window.history.state, '', `#${params.toString()}`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Tour del RETO COMPARTIDO en el viaje REAL (issue #891): quien acaba de jugar
+  // su primer reto suelto como anónimo pulsa "Siguiente" en el revelado y aterriza
+  // aquí con `#g=…&tour=reto`. Recorre Diario → Bitácora → Marcador sobre las
+  // pantallas de verdad y remata con un registro opcional. Distinto del `tour=1`
+  // del viaje de EJEMPLO (que sigue igual): este es para un viaje real.
+  //
+  // A DIFERENCIA de `tourActive`/`marcadorGuideActive`, NO consumimos el flag del
+  // hash al montar: la pantalla del viaje puede remontarse una vez (la bienvenida
+  // del receptor resuelve async si envolver en OnboardingGate), y si ya lo
+  // hubiéramos borrado el tour se perdería. Lo dejamos en el hash MIENTRAS corre y
+  // lo limpiamos al terminar/saltar; un remonte temprano solo reinicia el tour en
+  // su primer paso (invisible), y tras terminar una recarga ya no lo relanza.
+  const [retoTourActive, setRetoTourActive] = useState(() => {
+    if (isExampleTrip) return false
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    return params.get('g') === groupId && params.get('tour') === 'reto'
+  })
+  // Cierre del tour del reto: registro opcional (`GuestRegisterPrompt`) y, tras
+  // "Crear cuenta", el alta real (`AccountUpgradeModal`). Ambos dejan al usuario
+  // en el Marcador (donde acaba el tour).
+  const [retoRegisterOpen, setRetoRegisterOpen] = useState(false)
+  const [retoUpgradeOpen, setRetoUpgradeOpen] = useState(false)
+  // Gate del "+" para anónimos (issue #891): el FAB vuelve a verse, pero al
+  // tocarlo pedimos cuenta (no el menú Momento/Reto, que no puede completar).
+  const [anonCreateOpen, setAnonCreateOpen] = useState(false)
 
   const carouselRef = useRef<HTMLDivElement>(null)
   const selectionFromCarousel = useRef(false)
@@ -767,6 +797,67 @@ export function TripPage({
     [],
   )
 
+  // Pasos del tour del RETO COMPARTIDO (issue #891): TRES pantallas reales del
+  // viaje, una por pestaña — Diario → Bitácora → Marcador. Más corto que el del
+  // ejemplo (aquí quien lo ve acaba de jugar un reto, no necesita el recorrido
+  // completo). El paso del Diario es `blocking`: su objetivo es el mapa/globo
+  // vivo (Leaflet), donde dejar pasar el toque lo arrastraría en vez de avanzar.
+  const retoTourSteps: TourStep[] = useMemo(
+    () => [
+      {
+        targetRef: diarioMapRef,
+        step: 'El Diario',
+        title: 'El viaje entero',
+        ariaLabel: 'El viaje entero',
+        body: 'Este reto es una parada de un viaje. Cada parada queda aquí, en el Diario.',
+        onBeforeShow: () => setSection('diario'),
+        blocking: true,
+      },
+      {
+        targetRef: bitacoraFirstDayRef,
+        step: 'La Bitácora',
+        title: 'Todo el viaje, en orden',
+        ariaLabel: 'Todo el viaje, en orden',
+        body: 'En la Bitácora lo hojeas entero, día a día.',
+        onBeforeShow: () => setSection('fotos'),
+      },
+      {
+        targetRef: podioRef,
+        step: 'El Marcador',
+        title: 'Aquí se juega',
+        ariaLabel: 'Aquí se juega',
+        body: 'Los retos del viaje y quién va ganando, reto tras reto.',
+        onBeforeShow: () => setSection('marcador'),
+      },
+    ],
+    [],
+  )
+
+  // Limpia `tour=reto` del hash (preservando el resto): tras terminar/saltar, una
+  // recarga no debe relanzar el tour. Igual criterio que `tourActive`, pero
+  // aplazado al final (ver el comentario de `retoTourActive`).
+  const clearRetoTourHash = useCallback(() => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    if (params.get('tour') !== 'reto') return
+    params.delete('tour')
+    window.history.replaceState(window.history.state, '', `#${params.toString()}`)
+  }, [])
+
+  // Fin del tour: queda en el Marcador y se le ofrece el registro (saltable).
+  const handleRetoTourFinish = useCallback(() => {
+    setRetoTourActive(false)
+    setSection('marcador')
+    clearRetoTourHash()
+    setRetoRegisterOpen(true)
+  }, [clearRetoTourHash])
+
+  // "Saltar" en cualquier paso: directo al Marcador, SIN registro.
+  const handleRetoTourSkip = useCallback(() => {
+    setRetoTourActive(false)
+    setSection('marcador')
+    clearRetoTourHash()
+  }, [clearRetoTourHash])
+
   // Editor de reto a pantalla completa: toma la pantalla mientras está abierto.
   // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa
   // reflejan los cambios). Reutiliza el editor completo de la GroupPage clásica.
@@ -1016,13 +1107,13 @@ export function TripPage({
       {/* FAB "＋" flotante con menú de dos acciones: Momento (recuerdo) o Reto (a
           adivinar). ÚNICO punto de crear del viaje. Issue #783: CUALQUIER miembro
           (ya no solo el dueño) y siempre disponible (fijo abajo), salvo con el
-          recap abierto (es una pantalla de cierre). `!isAnonymous` (issue #888):
-          un receptor anónimo que juega un reto se hace miembro y `canCreate`
-          pasaba a true, pero RLS/AnonCreateGate igualmente le bloquean crear —
-          no se le enseña un botón que no puede completar. */}
-      {canCreate && !wrapOpen && !isAnonymous && (
+          recap abierto (es una pantalla de cierre). Issue #891: el "+" vuelve a
+          verse también a un ANÓNIMO (antes se ocultaba, #888) — pero al tocarlo
+          NO abre el menú Momento/Reto (que RLS le bloquea): abre el alta real
+          ("Regístrate para crear tus viajes"). Con cuenta, comportamiento de siempre. */}
+      {canCreate && !wrapOpen && (
         <div className={styles.fabWrap} ref={fabWrapRef}>
-          {fabOpen && (
+          {fabOpen && !isAnonymous && (
             <div className={styles.fabMenu} role="menu" aria-label="Crear">
               <button
                 type="button"
@@ -1058,10 +1149,14 @@ export function TripPage({
             type="button"
             ref={fabButtonRef}
             className={`${styles.fab} ${fabOpen ? styles.fabActive : ''}`}
-            onClick={() => setFabOpen((o) => !o)}
-            aria-label="Crear momento o reto"
-            aria-haspopup="menu"
-            aria-expanded={fabOpen}
+            onClick={() => {
+              // Anónimo: pedir cuenta en vez de abrir el menú (no puede crear).
+              if (isAnonymous) setAnonCreateOpen(true)
+              else setFabOpen((o) => !o)
+            }}
+            aria-label={isAnonymous ? 'Regístrate para crear tus viajes' : 'Crear momento o reto'}
+            aria-haspopup={isAnonymous ? 'dialog' : 'menu'}
+            aria-expanded={isAnonymous ? undefined : fabOpen}
           >
             <Icon icon={Plus} size={26} />
           </button>
@@ -1552,6 +1647,62 @@ export function TripPage({
           closingCta="Entendido"
           onFinish={() => setTourActive(false)}
           onSkip={() => setTourActive(false)}
+        />
+      )}
+
+      {/* Tour del RETO COMPARTIDO en el viaje REAL (issue #891): Diario →
+          Bitácora → Marcador, sin pantalla de cierre genérica — el remate es el
+          registro opcional de abajo. "Saltar" cae directo en el Marcador. */}
+      {retoTourActive && !isExampleTrip && (
+        <GuidedTour
+          steps={retoTourSteps}
+          lastStepLabel="Listo"
+          onFinish={handleRetoTourFinish}
+          onSkip={handleRetoTourSkip}
+        />
+      )}
+
+      {/* Cierre del tour del reto: registro opcional (issue #891). Se salta con
+          "Ahora no" y en cualquier caso el usuario QUEDA en el Marcador (donde
+          terminó el tour). `!retoUpgradeOpen` evita apilar dos diálogos. */}
+      {retoRegisterOpen && !retoUpgradeOpen && (
+        <GuestRegisterPrompt
+          title="No pierdas tus retos"
+          onCreateAccount={() => setRetoUpgradeOpen(true)}
+          onDismiss={() => setRetoRegisterOpen(false)}
+        />
+      )}
+      {retoUpgradeOpen && (
+        <AccountUpgradeModal
+          open
+          onClose={() => {
+            setRetoUpgradeOpen(false)
+            setRetoRegisterOpen(false)
+          }}
+          origin="reto_share_register"
+          groupId={groupId}
+          onUpgraded={() => {
+            setRetoUpgradeOpen(false)
+            setRetoRegisterOpen(false)
+            toast.show('Guardado. Tus retos siguen siendo tuyos.', { tone: 'success' })
+          }}
+        />
+      )}
+
+      {/* Gate del "+" para anónimos (issue #891): el alta real con encuadre de
+          "crear". Al guardar la cuenta, ya puede crear (el FAB pasa a menú). */}
+      {anonCreateOpen && (
+        <AccountUpgradeModal
+          open
+          onClose={() => setAnonCreateOpen(false)}
+          origin="anon_create_gate"
+          groupId={groupId}
+          title="Regístrate para crear tus viajes"
+          intro="Estás como invitado. Crea tu cuenta con tu correo para guardar tus propios momentos y lanzar retos — no pierdes nada de lo que ya jugaste."
+          onUpgraded={() => {
+            setAnonCreateOpen(false)
+            toast.show('Cuenta guardada. Ya puedes crear.', { tone: 'success' })
+          }}
         />
       )}
     </div>

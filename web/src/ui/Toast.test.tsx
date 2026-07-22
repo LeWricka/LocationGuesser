@@ -5,20 +5,26 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { ToastProvider } from './ToastProvider'
 import { useToast } from './toast-context'
+import type { ToastOptions } from './toast-context'
+import styles from './Toast.module.css'
 
 // Botón de prueba que dispara un toast con las opciones que le pasemos.
 function Trigger({
   message,
   duration,
   action,
+  tone,
+  position,
 }: {
   message: string
   duration?: number
   action?: { label: string; onClick: () => void }
+  tone?: ToastOptions['tone']
+  position?: ToastOptions['position']
 }) {
   const toast = useToast()
   return (
-    <button type="button" onClick={() => toast.show(message, { duration, action })}>
+    <button type="button" onClick={() => toast.show(message, { duration, action, tone, position })}>
       mostrar
     </button>
   )
@@ -76,6 +82,39 @@ describe('Toast', () => {
     await user.click(screen.getByRole('button', { name: 'Descartar' }))
     expect(onClick).toHaveBeenCalledOnce()
     expect(screen.queryByText('Recuperado tu borrador')).not.toBeInTheDocument()
+  })
+
+  // Issue #891: las confirmaciones que abajo chocarían con la burbuja de un
+  // coach-mark del tutorial (p.ej. "¡Voto guardado!") se sacan ARRIBA, con un
+  // check de éxito. El resto de avisos sigue abajo.
+  test('position: "top" pinta el aviso en la región de arriba con un check de éxito', async () => {
+    const user = userEvent.setup()
+    render(
+      <ToastProvider>
+        <Trigger message="¡Voto guardado!" tone="success" position="top" />
+      </ToastProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'mostrar' }))
+    const toast = screen.getByText('¡Voto guardado!').closest('[role="status"]') as HTMLElement
+    const region = toast.parentElement as HTMLElement
+    expect(region.className).toContain(styles.regionTop as string)
+    // El icono de confirmación (leadIcon) solo aparece en éxito+arriba.
+    expect(toast.getElementsByClassName(styles.leadIcon as string)).toHaveLength(1)
+  })
+
+  test('por defecto (sin position) el aviso NO va arriba', async () => {
+    const user = userEvent.setup()
+    render(
+      <ToastProvider>
+        <Trigger message="Abajo" tone="success" />
+      </ToastProvider>,
+    )
+    await user.click(screen.getByRole('button', { name: 'mostrar' }))
+    const toast = screen.getByText('Abajo').closest('[role="status"]') as HTMLElement
+    const region = toast.parentElement as HTMLElement
+    expect(region.className).not.toContain(styles.regionTop as string)
+    // Sin check: el leadIcon es solo para éxito ARRIBA.
+    expect(toast.getElementsByClassName(styles.leadIcon as string)).toHaveLength(0)
   })
 
   test('sin action no se pinta ningún botón extra (solo cerrar)', async () => {

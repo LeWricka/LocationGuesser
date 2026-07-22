@@ -1,6 +1,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { RefObject } from 'react'
 import type { User } from '@supabase/supabase-js'
 import type { Moment } from '../../lib/trip'
 
@@ -10,7 +11,45 @@ import type { Moment } from '../../lib/trip'
 // nueva (issue #758) decide qué items ofrece según esos datos.
 vi.mock('./useTripData', () => ({ useTripData: vi.fn() }))
 
-vi.mock('./TripDiario', () => ({ TripDiario: () => <div data-testid="diario" /> }))
+// TripDiario/BitacoraTab/MarcadorTab van por stub: pesados y no es lo que se
+// prueba aquí. REENVÍAN los refs del tour (issue #891) a un nodo real para que
+// los coach-marks del `GuidedTour` tengan objetivo medible en jsdom (si el ref
+// queda sin nodo, `CoachMark` no pinta y el tour no avanzaría en el test).
+vi.mock('./TripDiario', () => ({
+  TripDiario: ({ mapRef }: { mapRef?: RefObject<HTMLDivElement | null> }) => (
+    <div data-testid="diario" ref={mapRef} />
+  ),
+}))
+vi.mock('./BitacoraTab', () => ({
+  // `<section>` usa HTMLElement (no HTMLDivElement), que casa con el tipo de
+  // `firstDayRef` sin castear.
+  BitacoraTab: ({ firstDayRef }: { firstDayRef?: RefObject<HTMLElement | null> }) => (
+    <section data-testid="bitacora" ref={firstDayRef} />
+  ),
+}))
+vi.mock('./MarcadorTab', () => ({
+  MarcadorTab: ({ podioRef }: { podioRef?: RefObject<HTMLOListElement | null> }) => (
+    <ol data-testid="marcador" ref={podioRef} />
+  ),
+}))
+// Solo se sustituye AccountUpgradeModal (el resto del barril —p.ej.
+// usePushAvailability, que usa PushOptInPrompt— se conserva con importOriginal).
+vi.mock('../auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../auth')>()
+  return {
+    ...actual,
+    AccountUpgradeModal: ({
+      open,
+      origin,
+      title,
+    }: {
+      open: boolean
+      origin: string
+      title?: string
+    }) =>
+      open ? <div data-testid="account-upgrade-modal">{`${origin}|${title ?? ''}`}</div> : null,
+  }
+})
 vi.mock('./TripWrap', () => ({ TripWrap: () => <div data-testid="wrap" /> }))
 vi.mock('./MomentSheet', () => ({
   MomentSheet: ({ moment }: { moment: Moment | null }) =>
@@ -58,6 +97,10 @@ import { TripPage } from './TripPage'
 import { useTripData } from './useTripData'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
+
+// jsdom no implementa scrollIntoView; el GuidedTour del tour del reto (#891) lo
+// usa para llevar cada paso a la vista.
+Element.prototype.scrollIntoView = vi.fn()
 
 const session: SessionState = {
   session: null,
@@ -219,16 +262,15 @@ describe('TripPage — FAB "Compartir" (#758)', () => {
   })
 })
 
-// Gating de FABs a ANÓNIMOS (issue #888): un receptor anónimo que juega un
-// reto suelto se hace miembro (RLS) y `canCreate` pasaba a true, así que veía
-// el "+" aunque crear de verdad siga bloqueado; el "Compartir" tampoco tenía
-// gate alguno. Ninguno de los dos debe salir a un anónimo — sí a un miembro
-// con cuenta (el `session` de arriba) y al dueño (ya cubierto por el resto de
-// tests de este fichero).
-describe('TripPage — FABs no salen a usuarios ANÓNIMOS (#888)', () => {
+// Gating de FABs a ANÓNIMOS: el "Compartir" sigue oculto (issue #888 — jugar un
+// reto no convierte al receptor en quien re-comparte). El "+" VUELVE a verse
+// (issue #891) pero, al tocarlo, pide cuenta ("Regístrate para crear tus
+// viajes") en vez de abrir el menú Momento/Reto que no puede completar.
+describe('TripPage — FABs para usuarios ANÓNIMOS (#888/#891)', () => {
   const anonSession: SessionState = { ...session, isAnonymous: true }
 
   function renderTripAnon() {
+    window.location.hash = '#g=g1'
     render(
       <SessionContext.Provider value={anonSession}>
         <ToastProvider>
@@ -244,16 +286,29 @@ describe('TripPage — FABs no salen a usuarios ANÓNIMOS (#888)', () => {
     )
   }
 
-  test('anónimo: ni el FAB "+" ni el FAB "Compartir" se muestran', async () => {
+  test('anónimo: el "Compartir" sigue oculto, pero el "+" SÍ se ve (#891)', async () => {
     mockTripData()
     renderTripAnon()
-    // `canCreate` se confirma async (isMember/myGroups mockeados a true/owner
-    // arriba): esperamos a que el resto de la pantalla asiente antes de
-    // afirmar la AUSENCIA de los FABs (si no, el test pasaría "por no haber
-    // llegado a tiempo", no porque el gate funcione).
+    // `canCreate` se confirma async (isMember/myGroups mockeados): esperamos a
+    // que la pantalla asiente antes de afirmar presencia/ausencia.
     expect(await screen.findByRole('radio', { name: 'Marcador' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Crear momento o reto' })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Regístrate para crear tus viajes' }),
+    ).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^compartir$/i })).not.toBeInTheDocument()
+  })
+
+  test('anónimo: tocar el "+" abre el alta (no el menú Momento/Reto)', async () => {
+    mockTripData()
+    renderTripAnon()
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Regístrate para crear tus viajes' }),
+    )
+    const modal = await screen.findByTestId('account-upgrade-modal')
+    expect(modal).toHaveTextContent('anon_create_gate|Regístrate para crear tus viajes')
+    // No abre el menú de crear: sus items no aparecen.
+    expect(screen.queryByRole('menuitem', { name: /momento/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /reto/i })).not.toBeInTheDocument()
   })
 
   test('miembro con cuenta (no anónimo): SÍ ve los dos FABs', async () => {
@@ -261,6 +316,67 @@ describe('TripPage — FABs no salen a usuarios ANÓNIMOS (#888)', () => {
     renderTrip()
     expect(await screen.findByRole('button', { name: 'Crear momento o reto' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^compartir$/i })).toBeInTheDocument()
+  })
+})
+
+// Tour del RETO COMPARTIDO en el viaje REAL (issue #891): quien acaba de jugar
+// su primer reto suelto pulsa "Siguiente" en el revelado y aterriza aquí con
+// `#g=…&tour=reto`. Recorre Diario → Bitácora → Marcador y remata con un
+// registro opcional. (Los mapas reales se stubean; el recorrido de pestañas y el
+// cierre —lo que orquesta TripPage— sí se ejercitan aquí.)
+describe('TripPage — tour del reto compartido (#891)', () => {
+  const anonSession: SessionState = { ...session, isAnonymous: true }
+
+  function renderRetoTour() {
+    window.location.hash = '#g=g1&tour=reto'
+    render(
+      <SessionContext.Provider value={anonSession}>
+        <ToastProvider>
+          <TripPage
+            groupId="g1"
+            onPlayChallenge={vi.fn()}
+            onAddMoment={vi.fn()}
+            onAddChallenge={vi.fn()}
+            onBack={vi.fn()}
+          />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+  }
+
+  test('arranca en el Diario y navega Diario → Bitácora → Marcador y remata con el registro', async () => {
+    mockTripData()
+    renderRetoTour()
+
+    // Paso 1 — Diario (mapa/globo): el tour arranca aquí.
+    expect(await screen.findByText('El viaje entero')).toBeInTheDocument()
+    expect(screen.getByTestId('diario')).toBeInTheDocument()
+
+    // Paso 2 — Bitácora: "Siguiente" cambia de pestaña (onBeforeShow).
+    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByText('Todo el viaje, en orden')).toBeInTheDocument()
+    expect(screen.getByTestId('bitacora')).toBeInTheDocument()
+
+    // Paso 3 — Marcador (último): CTA "Listo", no "Ver cierre".
+    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(await screen.findByText('Aquí se juega')).toBeInTheDocument()
+    expect(screen.getByTestId('marcador')).toBeInTheDocument()
+
+    // "Listo" remata con el registro opcional y limpia el tour del hash.
+    await userEvent.click(screen.getByRole('button', { name: 'Listo' }))
+    expect(await screen.findByText('No pierdas tus retos')).toBeInTheDocument()
+    expect(window.location.hash).not.toContain('tour=reto')
+  })
+
+  test('"Saltar" lleva al Marcador sin tarjeta de registro', async () => {
+    mockTripData()
+    renderRetoTour()
+    await screen.findByText('El viaje entero')
+    await userEvent.click(screen.getByRole('button', { name: 'Saltar' }))
+    // Queda en el Marcador (su pestaña), sin registro, y el tour sale del hash.
+    expect(await screen.findByTestId('marcador')).toBeInTheDocument()
+    expect(screen.queryByText('No pierdas tus retos')).not.toBeInTheDocument()
+    expect(window.location.hash).not.toContain('tour=reto')
   })
 })
 
