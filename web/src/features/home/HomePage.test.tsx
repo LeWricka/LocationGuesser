@@ -123,13 +123,18 @@ describe('HomePage', () => {
     expect(screen.queryByRole('button', { name: 'Abrir tus ajustes' })).not.toBeInTheDocument()
   })
 
-  test('sin grupos y tutorial no visto → auto-muestra el tutorial único de entrada (#742)', async () => {
-    // Perfil con onboarding vacío = tutorial de entrada aún no visto.
+  test('sin grupos y tutorial no visto → YA NO se auto-muestra (onboarding nuevo, pieza 3/4)', async () => {
+    // Perfil con onboarding vacío = tutorial de entrada aún no visto. Antes
+    // (#742) esto auto-mostraba el slideshow sobre la home vacía; ahora quien
+    // de verdad crea un viaje aprende HACIENDO dentro del propio viaje (ver
+    // useCreadorOnboarding en TripPage) — auto-mostrar aquí ADEMÁS repetiría el
+    // mismo bucle dos veces. El slideshow queda solo tras "Ver tutorial".
     sessionState.profile = { display_name: 'Lewis', avatar_url: null, onboarding: {} }
     render(<HomePage />)
-    // El slideshow es un diálogo modal; arranca en su primer paso (5 en total).
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument())
-    expect(screen.getByText(/1 de 5/)).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Crear viaje' })).toBeInTheDocument(),
+    )
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   test('"Ver tutorial" reabre el tutorial aunque ya se haya visto (#742)', async () => {

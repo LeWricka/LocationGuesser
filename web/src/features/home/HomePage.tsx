@@ -180,11 +180,15 @@ export function HomePage({ active = true }: Props = {}) {
   const userId = user?.id ?? ''
   const hasGroups = data.groups.length > 0
 
-  // Tutorial ÚNICO de entrada (issue #742): auto-show una sola vez para el recién
-  // llegado (home vacía, aún sin viajes); para quien ya tiene viajes NO se
-  // interpone (solo lo reabre a mano). `tutorialForced` cubre la reapertura desde
-  // "Ver tutorial", ignore el flag de "ya visto".
-  const showEntryTutorial = (!hasGroups && entryTutorial.shouldShow) || tutorialForced
+  // Tutorial de entrada (issue #742): YA NO se auto-muestra (onboarding nuevo,
+  // pieza 3/4) — quien de verdad crea un viaje ahora aprende HACIENDO, dentro
+  // del propio viaje vacío (intro de una pantalla → coach-mark sobre el "+" →
+  // sugerencia de reto → aviso de compartir, ver useCreadorOnboarding en
+  // TripPage). Auto-mostrar este slideshow ADEMÁS de esa guía sería explicar el
+  // mismo bucle dos veces seguidas. Se queda solo como repaso MANUAL desde "Ver
+  // tutorial" (`tutorialForced`); `entryTutorial` se conserva únicamente para
+  // marcar "visto" al cerrarlo (compatibilidad con el flag histórico).
+  const showEntryTutorial = tutorialForced
 
   // Cascada de portada por viaje: (1) portada propia firmada; (2) foto del recuerdo más
   // reciente (ya resuelta por useWorldTrips para el pin del globo, ver arriba); (3) null →

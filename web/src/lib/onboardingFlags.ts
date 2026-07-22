@@ -35,9 +35,18 @@
 // Contextos de onboarding. Cada uno tiene su tutorial y su flag "ya visto":
 //  - entry: tutorial ÚNICO de entrada (issue #742). Cubre el bucle completo
 //    (guardar un momento → verlo en la bitácora → compartir el viaje → crear un
-//    reto y compartirlo) y se muestra una sola vez al aterrizar en la home vacía;
-//    reabrible con "Ver tutorial". Sustituye a los tutoriales por-pantalla que
-//    saltaban de más al crear viaje/reto (gates retirados de App.tsx).
+//    reto y compartirlo) en un slideshow. Onboarding nuevo (pieza 3/4): YA NO se
+//    auto-muestra en la home vacía —el recorrido `creador` (aprender-haciendo,
+//    dentro del propio viaje) le tomó el relevo para quien de verdad va a crear
+//    uno—; el slideshow queda solo reabrible a mano con "Ver tutorial" (repaso
+//    rápido para quien lo pida antes de decidirse).
+//  - creador: onboarding del CREADOR — aprender-haciendo (onboarding nuevo,
+//    pieza 3/4): quien acaba de crear un viaje y cae en su Diario vacío se guía
+//    de UNA acción cada vez (intro de una pantalla → coach-mark sobre el "+" real
+//    → sugerencia de reto tras el primer momento → aviso de compartir → remate),
+//    NUNCA una pantalla-lista de pasos — ver useCreadorOnboarding/CoachMark/
+//    MomentChallengeSuggestion/CreadorNudge, enganchado en TripPage. Sustituye a
+//    `entry` para quien de verdad crea un viaje (ver arriba).
 //  - welcome: marco de UNA pantalla del RECEPTOR que llega por un enlace
 //    compartido la primera vez (lo más importante: entender en 3 s qué es y por
 //    qué unirse). Onboarding nuevo (pieza 1/4): sustituye al slideshow de 3
@@ -56,9 +65,10 @@
 //  - group / challenge / create-trip / add-moment / create-challenge: contextos
 //    de los tutoriales por-pantalla ANTIGUOS (issue #742: ya no se disparan desde
 //    App.tsx). Se conservan para el flag "visto" del receptor (ReceptorWelcomeGate
-//    marca `group`) y para no romper histórico; el único tutorial en vivo es
-//    `entry` (+ `welcome`/`guest-register` para el invitado, `reto_share` para
-//    quien llega por un reto suelto).
+//    marca `group`) y para no romper histórico; los recorridos en vivo son
+//    `creador` (quien crea) + `welcome`/`guest-register` (quien es invitado al
+//    viaje) + `reto_share` (quien llega por un reto suelto); `entry` queda como
+//    repaso manual desde "Ver tutorial".
 export type OnboardingContext =
   | 'entry'
   | 'group'
@@ -66,6 +76,7 @@ export type OnboardingContext =
   | 'welcome'
   | 'guest-register'
   | 'reto_share'
+  | 'creador'
   | 'create-trip'
   | 'add-moment'
   | 'create-challenge'

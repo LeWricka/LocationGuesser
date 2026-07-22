@@ -9,6 +9,7 @@
 // caso aquí; el script de Playwright los recorre solo (vía window.__galleryCases).
 
 import type { ReactNode } from 'react'
+import { BookOpen, Share2 } from 'lucide-react'
 import { Landing } from '../features/auth/Landing'
 import { LoginFlow } from '../features/auth/LoginFlow'
 import { HomePage } from '../features/home/HomePage'
@@ -38,6 +39,10 @@ import {
   GuestRegisterPrompt,
   RetoShareIntro,
   RetoShareExplainSequence,
+  CreadorIntroFrame,
+  CoachMark,
+  MomentChallengeSuggestion,
+  CreadorNudge,
 } from '../features/onboarding'
 import {
   BackHomeButton,
@@ -114,6 +119,14 @@ function challengeForPlay(id: string): ChallengeForPlay {
 }
 
 const noop = () => {}
+
+// Coach-mark del onboarding del creador (pieza 3/4): ancla a un elemento REAL
+// vía `targetRef` (ver CoachMark.tsx), así que la captura necesita un objetivo
+// de verdad montado — un mock del FAB "+" en la misma esquina que TripPage. Un
+// objeto mutable de módulo basta (sin `useRef`): ningún caso necesita que el
+// propio ref sea reactivo, y así el caso se queda como JSX plano (sin definir
+// un componente nuevo aquí, que dispararía el guardarraíl de fast-refresh).
+const coachMarkFabRef: { current: HTMLButtonElement | null } = { current: null }
 
 // Foto stub para `MomentSheet` (issue #571): mismo estilo que el SVG data-URI que
 // firma el Storage falso (`fakeSupabase.photoDataUri`, no exportado), duplicado
@@ -1002,6 +1015,97 @@ export const cases: GalleryCase[] = [
         onCreateAccount={noop}
         onDismiss={noop}
       />
+    ),
+  },
+  // Onboarding del CREADOR — aprender-haciendo (onboarding nuevo, pieza 3/4):
+  // intro de una pantalla → coach-mark real sobre el "+" → sugerencia de reto
+  // tras el primer momento → aviso de compartir → remate discreto. Ninguno es
+  // una pantalla-lista de pasos (ver useCreadorOnboarding, enganchado en TripPage).
+  {
+    id: 'onboarding-creador-intro',
+    title: 'Onboarding · creador — intro (una pantalla)',
+    section: 'Onboarding',
+    render: () => <CreadorIntroFrame onStart={noop} />,
+  },
+  {
+    id: 'onboarding-creador-coach',
+    title: 'Onboarding · creador — coach-mark sobre el "+" real',
+    section: 'Onboarding',
+    render: () => (
+      <div
+        style={{
+          position: 'relative',
+          height: '100dvh',
+          overflow: 'hidden',
+          background: '#0b1016',
+        }}
+      >
+        <button
+          type="button"
+          ref={(el) => {
+            coachMarkFabRef.current = el
+          }}
+          aria-label="Crear momento o reto"
+          style={{
+            position: 'absolute',
+            right: 20,
+            bottom: 30,
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            border: 'none',
+            background: '#fff',
+          }}
+        />
+        <CoachMark
+          targetRef={coachMarkFabRef}
+          step="Empieza aquí"
+          title="Guarda tu primer momento"
+          ariaLabel="Guarda tu primer momento"
+          body={
+            <>
+              Toca <strong>+</strong> y guarda dónde estás: una foto, un vídeo o una nota de voz.
+              Aparecerá aquí, en tu Diario.
+            </>
+          }
+          onDismiss={noop}
+        />
+      </div>
+    ),
+  },
+  {
+    id: 'onboarding-creador-sugerencia',
+    title: 'Onboarding · creador — sugerencia de reto (tras el primer momento)',
+    section: 'Onboarding',
+    render: () => (
+      <div style={{ position: 'relative', height: '100dvh', background: '#0b1016' }}>
+        <MomentChallengeSuggestion photoUrl={null} onCreateChallenge={noop} onDismiss={noop} />
+      </div>
+    ),
+  },
+  {
+    id: 'onboarding-creador-compartir',
+    title: 'Onboarding · creador — aviso de compartir tras lanzar el reto',
+    section: 'Onboarding',
+    render: () => (
+      <div style={{ position: 'relative', height: '100dvh', background: '#0b1016', padding: 16 }}>
+        <CreadorNudge icon={Share2} onDismiss={noop}>
+          Pásale el enlace a tu gente. Entran sin instalar nada.
+        </CreadorNudge>
+      </div>
+    ),
+  },
+  {
+    id: 'onboarding-creador-remate',
+    title: 'Onboarding · creador — remate (Bitácora/Marcador)',
+    section: 'Onboarding',
+    render: () => (
+      <div style={{ position: 'relative', height: '100dvh', background: '#0b1016', padding: 16 }}>
+        <CreadorNudge icon={BookOpen} onDismiss={noop}>
+          Todo esto se guarda en tu <strong>Bitácora</strong>; en el <strong>Marcador</strong> ves
+          quién va ganando.
+        </CreadorNudge>
+      </div>
     ),
   },
   // ── Showcase de la landing (issue #652) ──────────────────────────────────

@@ -1,0 +1,77 @@
+/*
+ * Marco de intro del creador: overlay a pantalla completa, escena oscura
+ * (tokens `--scene-*`), degradado ambiental en vez de foto (issue del
+ * prototipo #cintro no tiene recuerdo real que mostrar todavía). Mismo patrón
+ * de overlay + animación de entrada que GuestWelcomeFrame/RetoShareIntro.
+ */
+
+.screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  overflow: hidden;
+  background: var(--scene-bg);
+  color: var(--scene-ink);
+  display: flex;
+  flex-direction: column;
+  animation: creador-intro-in var(--motion-duration-base) var(--motion-ease-standard) both;
+}
+@keyframes creador-intro-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen {
+    animation: none;
+  }
+}
+
+/* Degradado de escena (mismo lenguaje que el fallback sin portada de
+   GuestWelcomeFrame): nunca un fondo liso. */
+.backdrop {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 70% at 50% -10%, var(--color-accent-glow-soft), transparent 60%),
+    radial-gradient(100% 80% at 85% 100%, var(--route-gold-soft), transparent 60%);
+}
+
+.frame {
+  position: relative;
+  margin-top: auto;
+  padding: var(--space-6) var(--space-gutter) calc(env(safe-area-inset-bottom) + var(--space-6));
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.eyebrow {
+  color: var(--route-gold);
+  margin-bottom: var(--space-3);
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  color: var(--scene-ink);
+  text-wrap: balance;
+}
+
+.body {
+  margin: 0 0 var(--space-5);
+  max-width: 34ch;
+  color: var(--scene-ink-soft);
+}
+
+.cta {
+  margin-bottom: 0;
+}
+
+.ctaLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
