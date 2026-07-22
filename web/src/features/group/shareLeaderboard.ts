@@ -3,7 +3,7 @@
 // enlace clicable (la imagen no lo es) y una línea de gancho. Repetir la tabla
 // en texto sería ruido y desincentivaría abrir la imagen. Función pura.
 export function buildShareText(groupName: string, link: string): string {
-  return `📍 Los viajes de ${groupName} 👉 ${link}` // design-lint-allow: caption de WhatsApp, no UI de la app
+  return `🏆 Así va la liga de «${groupName}» 👉 ${link}` // design-lint-allow: caption de WhatsApp, no UI de la app
 }
 
 // Dominio "bonito" para el pie de la tarjeta: el host del enlace sin "www.".

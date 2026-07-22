@@ -37,14 +37,18 @@ describe('copy cálido por tipo', () => {
   })
 
   test('reto: reta a clavar el punto antes de la cuenta atrás', () => {
-    expect(challengeShareText('Iker')).toBe(
-      'Iker te reta 🎯 — ¿adivinas dónde está esta foto? Clava el punto antes de que acabe la cuenta atrás.',
-    )
+    expect(challengeShareText('Iker')).toBe('Iker te reta — ¡Adivina dónde está!')
   })
 
-  test('los emojis (contenido) se mantienen', () => {
+  test('el texto del viaje mantiene su emoji de contenido', () => {
     expect(tripShareText('A', 'B')).toContain('🌍')
-    expect(challengeShareText('A')).toContain('🎯')
+  })
+
+  test('el reto es corto y con gancho, sin emoji ni cuenta atrás', () => {
+    const text = challengeShareText('A')
+    expect(text).toContain('te reta')
+    expect(text).toContain('¡Adivina dónde está!')
+    expect(text).not.toContain('🎯')
   })
 })
 

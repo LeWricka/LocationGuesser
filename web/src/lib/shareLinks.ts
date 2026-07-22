@@ -64,9 +64,9 @@ export function tripShareText(authorName: string, tripTitle: string): string {
   return `${authorName} te invita a vivir su viaje «${tripTitle}» 🌍 — mira cada parada en el mapa y adivina dónde estaba.`
 }
 
-/** Texto de reto: «{quién} te reta 🎯 — ¿adivinas dónde está esta foto?…». */
+/** Texto de reto: «{quién} te reta — ¡Adivina dónde está!». Corto y con gancho. */
 export function challengeShareText(authorName: string): string {
-  return `${authorName} te reta 🎯 — ¿adivinas dónde está esta foto? Clava el punto antes de que acabe la cuenta atrás.`
+  return `${authorName} te reta — ¡Adivina dónde está!`
 }
 
 /**
