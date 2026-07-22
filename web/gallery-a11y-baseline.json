@@ -3,5 +3,12 @@
     "landing-generica :: aria-hidden-focus :: ._globe_1fgps_5",
     "landing-por-invitacion :: aria-hidden-focus :: ._globe_1fgps_5"
   ],
-  "overflow": ["editar-reto", "tarjeta-clasificacion", "tarjeta-resultado"]
+  "overflow": [
+    "editar-reto",
+    "tarjeta-clasificacion",
+    "tarjeta-invitar-sin-portada",
+    "tarjeta-resultado",
+    "tarjeta-reto-sin-foto-numero",
+    "tarjeta-reto-sin-foto-ubicacion"
+  ]
 }

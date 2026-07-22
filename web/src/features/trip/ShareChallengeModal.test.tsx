@@ -48,6 +48,7 @@ function renderModal(onClose = vi.fn(), imagePath: string | null = null, origin?
           groupName="Japón en primavera"
           challengeId="reto-9"
           challengeTitle="¿Dónde comimos ramen?"
+          challengeKind="location"
           imagePath={imagePath}
           origin={origin}
           onClose={onClose}

@@ -52,6 +52,7 @@ function renderShare(onPlay = vi.fn(), imagePath: string | null = null) {
           groupName="Lisboa"
           challengeId="reto-1"
           challengeTitle="¿Dónde desayuné?"
+          challengeKind="location"
           imagePath={imagePath}
           onPlay={onPlay}
         />

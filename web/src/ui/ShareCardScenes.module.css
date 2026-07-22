@@ -1,0 +1,94 @@
+/*
+ * Fondos de marca del placeholder "sin foto" de las tarjetas-compartir (issue
+ * #880): ver el comentario de cabecera de `ShareCardScenes.tsx` para la
+ * restricción dura (sin `filter`, sin `<canvas>` — html-to-image no los
+ * rasteriza bien). Todo aquí es `background`/gradient sólido, igual criterio
+ * que `ChallengeShareCard.module.css`.
+ *
+ * Tamaño fijo (tarjeta rasterizada a 1080×1350, patrón ya aceptado en
+ * LeaderboardCard/ChallengeShareCard): los px crudos de `.globeGlow`/
+ * `.heroMark` son a propósito (no hay regla de design-lint sobre width/height,
+ * solo sobre radius/font-size/z-index crudos).
+ */
+
+.layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* ── GLOBO (reto de ubicación) ────────────────────────────────────────────── */
+
+.globeScene {
+  position: absolute;
+  inset: 0;
+}
+
+.globeBg {
+  position: absolute;
+  inset: 0;
+  /* Esfera nocturna bespoke (dirección "Globo" aprobada, issue #880): no hay
+     token de tema para este triple de azules, es geometría/color de escena
+     fijo, igual criterio que la paleta de LogoMomentu. */
+  background:
+    radial-gradient(58% 46% at 50% 40%, #2d4a5e 0%, #233c4d 52%, #16242f 100%), var(--scene-bg); /* design-lint-allow: esfera nocturna bespoke (issue #880), no es color de tema */
+}
+
+/* Viñeta de integración: la esfera no llena el rectángulo, funde a cielo oscuro. */
+.globeBg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(78% 62% at 50% 40%, transparent 52%, var(--scene-bg) 100%);
+}
+
+/* Halo del destino: radial-gradient que ya se apaga a transparente (sin blur). */
+.globeGlow {
+  position: absolute;
+  left: 62%;
+  top: 34%;
+  width: 360px;
+  height: 360px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 55%, transparent) 0%,
+    transparent 62%
+  );
+}
+
+/* ── OBTURADOR (reto de número + invitación al viaje) ────────────────────── */
+
+.obturadorScene {
+  position: absolute;
+  inset: 0;
+}
+
+.obturadorBg {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      70% 55% at 50% 40%,
+      color-mix(in srgb, var(--accent) 30%, transparent) 0%,
+      transparent 62%
+    ),
+    radial-gradient(
+      120% 90% at 82% 12%,
+      color-mix(in srgb, var(--route-gold) 12%, transparent) 0%,
+      transparent 55%
+    ),
+    linear-gradient(160deg, var(--accent-deep) 0%, var(--scene-bg) 74%);
+}
+
+/* Mark héroe: mismo obturador de marca, escalado grande, centrado en el tercio
+   superior (mismo encuadre que el prototipo aprobado). */
+.heroMark {
+  position: absolute;
+  top: 300px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 520px;
+  height: 520px;
+}

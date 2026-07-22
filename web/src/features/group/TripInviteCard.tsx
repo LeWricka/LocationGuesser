@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
 import { ArrowRight, Users } from 'lucide-react'
-import { Icon, IconPin, WordmarkMomentu } from '../../ui'
+import { Icon, LogoMomentu, ShareCardObturadorScene, WordmarkMomentu } from '../../ui'
 import styles from './TripInviteCard.module.css'
 
 interface Props {
@@ -21,8 +21,8 @@ interface Props {
  * Tarjeta-IMAGEN de "Invitar al viaje" (issue #617), poster vertical 1080×1350
  * — mismo formato que `ChallengeShareCard`/`LeaderboardCard`: sustituye al link
  * crudo al compartir por una imagen de marca con la portada del viaje (o el
- * mapa nocturno de marca si no hay ninguna) y, encima, el nombre del viaje, la
- * línea de viajeros/retos, el wordmark y una llamada a unirse.
+ * fondo OBTURADOR de marca si no hay ninguna, issue #880) y, encima, el nombre
+ * del viaje, la línea de viajeros/retos, el lockup y una llamada a unirse.
  *
  * Pensada para snapshot con html-to-image: como `ChallengeShareCard`, solo usa
  * colores/gradientes/bordes sólidos (sin `backdrop-filter`/`filter`/sombras de
@@ -43,18 +43,16 @@ export const TripInviteCard = forwardRef<HTMLDivElement, Props>(function TripInv
         style={hasCover ? { backgroundImage: `url('${coverDataUrl}')` } : undefined}
         aria-hidden="true"
       >
-        {/* Sin portada resuelta: mapa nocturno de marca (mismo gradiente
-            grafito/teal + pin que el placeholder de la home, HomeDashboard). */}
-        {!hasCover && (
-          <span className={styles.nightMap} aria-hidden="true">
-            <IconPin size={240} className={styles.nightMapPin} />
-          </span>
-        )}
+        {/* Sin portada resuelta: fondo OBTURADOR de marca (issue #880) — el
+            globo del reto de ubicación no aplica aquí, esto invita al viaje. */}
+        {!hasCover && <ShareCardObturadorScene />}
       </div>
       {/* Velo de lectura al pie: el fondo manda, el texto blanco se lee AA encima. */}
       <div className={styles.scrim} aria-hidden="true" />
 
+      {/* Lockup de marca: obturador (LogoMomentu) + wordmark, como HomeDashboard. */}
       <div className={styles.top}>
+        <LogoMomentu size={48} />
         <WordmarkMomentu size={40} className={styles.wordmark} />
       </div>
 
