@@ -1,0 +1,104 @@
+/*
+ * Capa de coach-mark: spotlight + halo sobre un elemento REAL (posición
+ * calculada en JS desde su `getBoundingClientRect`, ver CoachMark.tsx) y una
+ * burbuja de texto ancoada junto a él. TODA la capa es `pointer-events: none`
+ * salvo el botón "Saltar guía": nunca atrapa un toque sobre el objetivo real
+ * (que sigue siendo el mismo nodo del DOM, debajo) ni sobre el resto de la
+ * pantalla.
+ */
+
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  pointer-events: none;
+}
+
+/* Aro que oscurece todo salvo el hueco recortado sobre el objetivo (mismo
+   truco que el resto del sistema: una caja con box-shadow enorme). */
+.spotlight {
+  position: fixed;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 0 0 9999px var(--scene-scrim-strong);
+}
+
+/* Halo dorado pulsante: dirige el ojo al objetivo mientras la guía sigue
+   activa. */
+.pulse {
+  position: fixed;
+  border-radius: var(--radius-lg);
+  border: 2px solid var(--route-gold);
+  box-shadow: 0 0 24px var(--route-gold-soft);
+  animation: coach-mark-pulse 2s var(--motion-ease-standard) infinite; /* design-lint-allow: bucle acotado — vive solo mientras el coach-mark está montado (cesa al primer toque/skip), mismo precedente que recordPulse/homePulse */
+}
+@keyframes coach-mark-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pulse {
+    animation: none;
+  }
+}
+
+.card {
+  position: fixed;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--scene-shadow);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  color: var(--scene-ink);
+}
+
+.step {
+  display: block;
+  color: var(--route-gold);
+  margin-bottom: var(--space-2);
+}
+
+.title {
+  margin: 0 0 var(--space-2);
+  color: var(--scene-ink);
+}
+
+.body {
+  margin: 0;
+  color: var(--scene-ink-soft);
+}
+
+/* Sin z-index propio: en `.layer` (fixed, sin hijos con z-index) el orden del
+   DOM ya basta — pintado el último, siempre queda encima del aro/burbuja. */
+.dismiss {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + var(--space-3));
+  right: var(--space-4);
+  pointer-events: auto;
+  appearance: none;
+  cursor: pointer;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  color: var(--scene-ink-soft);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  transition: background-color var(--motion-transition-fast);
+}
+.dismiss:hover {
+  background: var(--glass-bg-strong);
+}
+.dismiss:focus-visible {
+  outline: 2px solid var(--scene-ink);
+  outline-offset: 2px;
+}

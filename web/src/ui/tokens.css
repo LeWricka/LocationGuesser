@@ -249,6 +249,10 @@
   --scene-ink: rgba(255, 255, 255, 0.96); /* texto/icono principal sobre escena */
   --scene-ink-soft: rgba(255, 255, 255, 0.72); /* secundario / meta sobre escena */
   --scene-veil: rgba(11, 16, 22, 0.55); /* velo de legibilidad bajo texto sobre foto */
+  /* Scrim OPACO para el spotlight del coach-mark (onboarding pieza 3/4): oscurece
+     todo salvo el hueco recortado sobre el elemento real resaltado — necesita más
+     opacidad que `--scene-veil` (pensado para leer texto, no para apagar UI). */
+  --scene-scrim-strong: rgba(9, 13, 18, 0.82);
   --scene-surface: rgba(255, 255, 255, 0.12); /* pastilla/chrome translúcido sobre escena */
   --scene-hairline: rgba(255, 255, 255, 0.16); /* hairline/borde de contacto en escena */
   --scene-shadow: 0 8px 28px -8px rgba(0, 0, 0, 0.55), 0 2px 8px -3px rgba(0, 0, 0, 0.4);

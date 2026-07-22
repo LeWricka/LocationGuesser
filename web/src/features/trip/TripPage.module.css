@@ -506,6 +506,17 @@
   z-index: 3;
 }
 
+/* Avisos suaves del onboarding del creador (pieza 3/4: compartir el enlace /
+   remate "Bitácora-Marcador"): encima del FAB "+" real (56px), nunca lo tapa. */
+.creadorNudgeWrap {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-5) + 56px + var(--space-4));
+  /* design-lint-allow: capa local de la página (misma franja que .pushBannerWrap/.wrapBanner) */
+  z-index: 3;
+}
+
 @keyframes lg-fab-menu-in {
   from {
     opacity: 0;

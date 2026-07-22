@@ -41,6 +41,13 @@ async function seedOnboardingFlags(page: Page, userId: string): Promise<void> {
   await page.addInitScript((id: string) => {
     window.localStorage.setItem(`lg:onboarding:group:seen:${id}`, '1')
     window.localStorage.setItem(`lg:onboarding:challenge:seen:${id}`, '1')
+    // Onboarding del CREADOR — aprender-haciendo (pieza 3/4): esta cuenta puede
+    // crear un viaje nuevo (create-full.spec.ts) y caer en un Diario vacío, lo
+    // que dispara la intro de pantalla completa de `useCreadorOnboarding` (un
+    // gate legítimo, mismo patrón que GuestWelcomeFrame — no un bug). Esta suite
+    // prueba el flujo de crear, no ese onboarding, así que se marca visto de
+    // antemano, igual que las dos líneas de arriba.
+    window.localStorage.setItem(`lg:onboarding:creador:seen:${id}`, '1')
   }, userId)
 }
 

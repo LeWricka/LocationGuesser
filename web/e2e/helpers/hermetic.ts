@@ -371,6 +371,17 @@ export async function primeHermeticCreate(page: Page, opts: HermeticOptions): Pr
       window.localStorage.setItem(`lg:onboarding:group:seen:${userId}`, '1')
       window.localStorage.setItem(`lg:onboarding:challenge:seen:${userId}`, '1')
       window.localStorage.setItem(`lg:onboarding:create-challenge:seen:${userId}`, '1')
+      // Onboarding del CREADOR — aprender-haciendo (pieza 3/4): el usuario hermético
+      // ES el dueño de HERMETIC_GROUP_ID y el mock de challenges arranca sin retos
+      // (ver mockSupabase), así que sin este flag `useCreadorOnboarding` mostraría la
+      // intro de pantalla completa (#cintro) ANTES de dejar tocar el FAB — un gate
+      // legítimo (mismo patrón que GuestWelcomeFrame/RetoShareIntro: un modal a
+      // pantalla completa que debe descartarse a propósito, ver CreadorIntroFrame),
+      // no un bug. Este spec no prueba ESE onboarding (lo cubren
+      // useCreadorOnboarding.test.ts/CreadorIntroFrame.test.tsx/CoachMark.test.tsx);
+      // prueba el bucle de crear reto, así que lo marcamos visto de antemano —
+      // exactamente el mismo criterio que las 3 líneas de arriba.
+      window.localStorage.setItem(`lg:onboarding:creador:seen:${userId}`, '1')
     },
     [storageKey, sessionValue, FAKE_USER_ID] as const,
   )

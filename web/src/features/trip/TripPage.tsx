@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  BookOpen,
   ChevronLeft,
   Flag,
   Globe,
@@ -44,6 +45,13 @@ import { TripWrap } from './TripWrap'
 import { MomentSheet } from './MomentSheet'
 import { ShareChallengeModal } from './ShareChallengeModal'
 import { PushOptInPrompt } from './PushOptInPrompt'
+import {
+  CoachMark,
+  CreadorIntroFrame,
+  CreadorNudge,
+  MomentChallengeSuggestion,
+  useCreadorOnboarding,
+} from '../onboarding'
 import styles from './TripPage.module.css'
 
 /**
@@ -233,6 +241,9 @@ export function TripPage({
   // Menú del FAB "＋": elegir entre crear un Momento o un Reto.
   const [fabOpen, setFabOpen] = useState(false)
   const fabWrapRef = useRef<HTMLDivElement>(null)
+  // Nodo REAL del botón "+" (no el wrap): el coach-mark del onboarding del
+  // creador (pieza 3/4) lo resalta anclándose a este mismo elemento.
+  const fabButtonRef = useRef<HTMLButtonElement>(null)
 
   // Menú ⋯ de la cabecera (hoja inferior con acciones fijas del viaje).
   const [menuOpen, setMenuOpen] = useState(false)
@@ -348,6 +359,18 @@ export function TripPage({
   // `ShareChallengeModal`, que solo tiene sentido con el reto en juego).
   const activeChallenges = useMemo(() => moments.filter((m) => m.status === 'active'), [moments])
   const hasLeaderboard = leaderboard.length > 0
+
+  // Onboarding del CREADOR — aprender-haciendo (pieza 3/4): solo aplica al
+  // DUEÑO de un viaje que aún no completó (ni saltó) esta guía en su cuenta;
+  // el paso a mostrar se deriva de los datos reales del viaje (nº de momentos,
+  // si ya hay un reto), no de una pantalla-lista aparte — ver useCreadorOnboarding.
+  const creador = useCreadorOnboarding(
+    user?.id,
+    profile?.onboarding,
+    isOwner,
+    moments.length,
+    challengeCount > 0,
+  )
 
   // Tocar un RETO desde la Bitácora (issue #822): MISMO anti-spoiler que "Retos
   // anteriores" del Marcador — un EN JUEGO sin jugar va a JUGAR (nunca al
@@ -828,6 +851,7 @@ export function TripPage({
           )}
           <button
             type="button"
+            ref={fabButtonRef}
             className={`${styles.fab} ${fabOpen ? styles.fabActive : ''}`}
             onClick={() => setFabOpen((o) => !o)}
             aria-label="Crear momento o reto"
@@ -860,6 +884,56 @@ export function TripPage({
           >
             <Icon icon={Share2} size={24} />
           </button>
+        </div>
+      )}
+
+      {/* Onboarding del CREADOR — aprender-haciendo (pieza 3/4): UN aviso cada
+          vez, pegado a lo que el usuario acaba de hacer, nunca una pantalla-
+          lista de pasos. `creador.stage` deriva de datos reales (moments.length,
+          si ya hay un reto) — ver useCreadorOnboarding. */}
+      {creador.stage === 'intro' && <CreadorIntroFrame onStart={creador.dismissIntro} />}
+
+      {creador.stage === 'coach' && (
+        <CoachMark
+          targetRef={fabButtonRef}
+          step="Empieza aquí"
+          title="Guarda tu primer momento"
+          ariaLabel="Guarda tu primer momento"
+          body={
+            <>
+              Toca <strong>+</strong> y guarda dónde estás: una foto, un vídeo o una nota de voz.
+              Aparecerá aquí, en tu Diario.
+            </>
+          }
+          onDismiss={creador.skipGuide}
+        />
+      )}
+
+      {creador.stage === 'suggest' && section === 'diario' && moments[0] && (
+        <MomentChallengeSuggestion
+          photoUrl={moments[0].imageUrl}
+          onCreateChallenge={() => {
+            creador.dismissSuggest()
+            location.hash = promoteChallengeHash(groupId, moments[0].challengeId)
+          }}
+          onDismiss={creador.dismissSuggest}
+        />
+      )}
+
+      {creador.stage === 'share' && section === 'diario' && (
+        <div className={styles.creadorNudgeWrap}>
+          <CreadorNudge icon={Share2} onDismiss={creador.dismissShare}>
+            Pásale el enlace a tu gente. Entran sin instalar nada.
+          </CreadorNudge>
+        </div>
+      )}
+
+      {creador.stage === 'remate' && section === 'diario' && (
+        <div className={styles.creadorNudgeWrap}>
+          <CreadorNudge icon={BookOpen} onDismiss={creador.dismissRemate}>
+            Todo esto se guarda en tu <strong>Bitácora</strong>; en el <strong>Marcador</strong> ves
+            quién va ganando.
+          </CreadorNudge>
         </div>
       )}
 
