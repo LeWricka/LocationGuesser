@@ -286,3 +286,94 @@ describe('TripPage — restaura ver=/m= de la URL al montar (F5 no cierra lo abi
     expect(await screen.findByTestId('moment-sheet')).toHaveTextContent('m1')
   })
 })
+
+// Onboarding del CREADOR (pieza 3/4), pulido tras feedback del fundador: la
+// sugerencia y el remate DEJAN de ser tarjetas/banners flotantes (el fundador
+// reportó la sugerencia ilegible sobre el mapa) y pasan a reutilizar el MISMO
+// `CoachMark` que ya usa el paso "coach" — scrim sólido + burbuja legible,
+// anclado a un elemento REAL (`fabButtonRef`/`tabBarRef`, ver TripPage). Las
+// banderas de paso viven en localStorage (`lg:onboarding:creador:<paso>:<uid>`,
+// ver useCreadorOnboarding) — las precargamos para caer directo en el paso que
+// se prueba, sin tener que simular todo el recorrido.
+describe('TripPage — onboarding creador: sugerencia y remate anclados a un elemento real', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    window.location.hash = '#g=g1'
+  })
+
+  function seenSteps(...steps: Array<'intro' | 'suggest' | 'share'>) {
+    for (const step of steps) localStorage.setItem(`lg:onboarding:creador:${step}:u-me`, '1')
+  }
+
+  test('sugerencia: CoachMark legible (no la tarjeta translúcida vieja) anclado al "+"', async () => {
+    seenSteps('intro')
+    mockTripData({
+      moments: [
+        activeChallenge({
+          challengeId: 'm1',
+          isChallenge: false,
+          status: 'closed',
+          imageUrl: null,
+        }),
+      ],
+    })
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    renderTrip()
+
+    const bubble = await screen.findByRole('note', {
+      name: '¿Y si les lanzas un reto para que viajen contigo?',
+    })
+    expect(bubble).toHaveTextContent('Tu gente adivina dónde es. Gana quien más se acerca.')
+
+    // La tarjeta flotante translúcida de antes ya no existe (su × tenía este label).
+    expect(screen.queryByLabelText('Cerrar sugerencia')).not.toBeInTheDocument()
+
+    // Anclado al "+" real (mismo nodo que mide CoachMark), no un elemento cualquiera.
+    const fab = screen.getByRole('button', { name: 'Crear momento o reto' })
+    await vi.waitFor(() => expect(rectSpy.mock.instances).toContain(fab))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear un reto' }))
+    expect(window.location.hash).toBe('#g=g1&add=reto&promote=m1')
+
+    rectSpy.mockRestore()
+  })
+
+  test('sugerencia: "Saltar" descarta el paso sin crear el reto', async () => {
+    seenSteps('intro')
+    mockTripData({ moments: [activeChallenge({ challengeId: 'm1', isChallenge: false })] })
+    renderTrip()
+
+    await screen.findByRole('note', { name: '¿Y si les lanzas un reto para que viajen contigo?' })
+    await userEvent.click(screen.getByRole('button', { name: 'Saltar' }))
+
+    expect(
+      screen.queryByRole('note', { name: '¿Y si les lanzas un reto para que viajen contigo?' }),
+    ).not.toBeInTheDocument()
+    expect(window.location.hash).toBe('#g=g1')
+    expect(localStorage.getItem('lg:onboarding:creador:suggest:u-me')).toBe('1')
+  })
+
+  test('remate: CoachMark anclado a la barra de pestañas, nombra Diario/Bitácora/Marcador', async () => {
+    seenSteps('intro', 'suggest', 'share')
+    // `activeChallenge` deja isChallenge:true por defecto → challengeCount > 0.
+    mockTripData({ moments: [activeChallenge({ challengeId: 'c1' })] })
+    const rectSpy = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    renderTrip()
+
+    const bubble = await screen.findByRole('note', { name: 'Así queda todo' })
+    expect(bubble).toHaveTextContent(
+      'Todo queda en tu Diario y tu Bitácora; en el Marcador ves quién va ganando.',
+    )
+
+    // Anclado a la barra Diario·Bitácora·Marcador (su wrapper, `tabBarRef`), no
+    // un banner suelto abajo.
+    const tabBar = screen.getByRole('radiogroup', { name: 'Secciones del viaje' }).parentElement
+    await vi.waitFor(() => expect(rectSpy.mock.instances).toContain(tabBar))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }))
+    expect(screen.queryByRole('note', { name: 'Así queda todo' })).not.toBeInTheDocument()
+    expect(localStorage.getItem('lg:onboarding:creador:remate:u-me')).toBe('1')
+
+    rectSpy.mockRestore()
+  })
+})

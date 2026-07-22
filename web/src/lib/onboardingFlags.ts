@@ -43,9 +43,9 @@
 //  - creador: onboarding del CREADOR — aprender-haciendo (onboarding nuevo,
 //    pieza 3/4): quien acaba de crear un viaje y cae en su Diario vacío se guía
 //    de UNA acción cada vez (intro de una pantalla → coach-mark sobre el "+" real
-//    → sugerencia de reto tras el primer momento → aviso de compartir → remate),
-//    NUNCA una pantalla-lista de pasos — ver useCreadorOnboarding/CoachMark/
-//    MomentChallengeSuggestion/CreadorNudge, enganchado en TripPage. Sustituye a
+//    → sugerencia de reto (también anclada al "+") → aviso de compartir → remate
+//    anclado a la barra de pestañas), NUNCA una pantalla-lista de pasos — ver
+//    useCreadorOnboarding/CoachMark/CreadorNudge, enganchado en TripPage. Sustituye a
 //    `entry` para quien de verdad crea un viaje (ver arriba).
 //  - welcome: marco de UNA pantalla del RECEPTOR que llega por un enlace
 //    compartido la primera vez (lo más importante: entender en 3 s qué es y por

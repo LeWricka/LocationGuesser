@@ -9,7 +9,7 @@
 // caso aquí; el script de Playwright los recorre solo (vía window.__galleryCases).
 
 import type { ReactNode } from 'react'
-import { BookOpen, Share2 } from 'lucide-react'
+import { Share2 } from 'lucide-react'
 import { Landing } from '../features/auth/Landing'
 import { LoginFlow } from '../features/auth/LoginFlow'
 import { HomePage } from '../features/home/HomePage'
@@ -43,7 +43,6 @@ import {
   RetoShareExplainSequence,
   CreadorIntroFrame,
   CoachMark,
-  MomentChallengeSuggestion,
   CreadorNudge,
 } from '../features/onboarding'
 import {
@@ -129,6 +128,8 @@ const noop = () => {}
 // propio ref sea reactivo, y así el caso se queda como JSX plano (sin definir
 // un componente nuevo aquí, que dispararía el guardarraíl de fast-refresh).
 const coachMarkFabRef: { current: HTMLButtonElement | null } = { current: null }
+// Ídem, para el remate anclado a la barra Diario·Bitácora·Marcador.
+const coachMarkTabBarRef: { current: HTMLDivElement | null } = { current: null }
 
 // Foto stub para `MomentSheet` (issue #571): mismo estilo que el SVG data-URI que
 // firma el Storage falso (`fakeSupabase.photoDataUri`, no exportado), duplicado
@@ -1127,12 +1128,49 @@ export const cases: GalleryCase[] = [
     ),
   },
   {
+    // Antes una tarjeta flotante translúcida (el texto se pisaba con el mapa,
+    // reportado en vivo): ahora es el MISMO CoachMark que el paso anterior,
+    // anclado al mismo "+" — scrim sólido + burbuja legible, con la acción
+    // primaria "Crear un reto" conviviendo con "Saltar" (ver `.actions` de
+    // CoachMark, el mismo patrón que GuidedTour).
     id: 'onboarding-creador-sugerencia',
-    title: 'Onboarding · creador — sugerencia de reto (tras el primer momento)',
+    title: 'Onboarding · creador — sugerencia de reto, anclada al "+"',
     section: 'Onboarding',
     render: () => (
-      <div style={{ position: 'relative', height: '100dvh', background: '#0b1016' }}>
-        <MomentChallengeSuggestion photoUrl={null} onCreateChallenge={noop} onDismiss={noop} />
+      <div
+        style={{
+          position: 'relative',
+          height: '100dvh',
+          overflow: 'hidden',
+          background: '#0b1016',
+        }}
+      >
+        <button
+          type="button"
+          ref={(el) => {
+            coachMarkFabRef.current = el
+          }}
+          aria-label="Crear momento o reto"
+          style={{
+            position: 'absolute',
+            right: 20,
+            bottom: 30,
+            width: 56,
+            height: 56,
+            borderRadius: '50%',
+            border: 'none',
+            background: '#fff',
+          }}
+        />
+        <CoachMark
+          targetRef={coachMarkFabRef}
+          title="¿Y si les lanzas un reto para que viajen contigo?"
+          ariaLabel="¿Y si les lanzas un reto para que viajen contigo?"
+          body="Tu gente adivina dónde es. Gana quien más se acerca."
+          dismissLabel="Saltar"
+          primaryAction={{ label: 'Crear un reto', onClick: noop }}
+          onDismiss={noop}
+        />
       </div>
     ),
   },
@@ -1143,21 +1181,54 @@ export const cases: GalleryCase[] = [
     render: () => (
       <div style={{ position: 'relative', height: '100dvh', background: '#0b1016', padding: 16 }}>
         <CreadorNudge icon={Share2} onDismiss={noop}>
-          Pásale el enlace a tu gente. Entran sin instalar nada.
+          Pásale el enlace a tu gente. Ven y juegan de forma directa.
         </CreadorNudge>
       </div>
     ),
   },
   {
+    // Antes un banner suelto abajo que nombraba Bitácora/Marcador sin
+    // señalarlos: ahora también nombra el Diario y se ancla a la barra de
+    // pestañas real (mismo motor de spotlight que el resto de la guía).
     id: 'onboarding-creador-remate',
-    title: 'Onboarding · creador — remate (Bitácora/Marcador)',
+    title: 'Onboarding · creador — remate, anclado a la barra de pestañas',
     section: 'Onboarding',
     render: () => (
-      <div style={{ position: 'relative', height: '100dvh', background: '#0b1016', padding: 16 }}>
-        <CreadorNudge icon={BookOpen} onDismiss={noop}>
-          Todo esto se guarda en tu <strong>Bitácora</strong>; en el <strong>Marcador</strong> ves
-          quién va ganando.
-        </CreadorNudge>
+      <div
+        style={{
+          position: 'relative',
+          height: '100dvh',
+          overflow: 'hidden',
+          background: '#0b1016',
+        }}
+      >
+        <div
+          ref={(el) => {
+            coachMarkTabBarRef.current = el
+          }}
+          style={{
+            position: 'absolute',
+            top: 70,
+            left: 16,
+            right: 16,
+            height: 44,
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.12)',
+          }}
+        />
+        <CoachMark
+          targetRef={coachMarkTabBarRef}
+          title="Así queda todo"
+          ariaLabel="Así queda todo"
+          body={
+            <>
+              Todo queda en tu <strong>Diario</strong> y tu <strong>Bitácora</strong>; en el{' '}
+              <strong>Marcador</strong> ves quién va ganando.
+            </>
+          }
+          dismissLabel="Entendido"
+          onDismiss={noop}
+        />
       </div>
     ),
   },

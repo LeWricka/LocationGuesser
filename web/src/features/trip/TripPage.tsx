@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  BookOpen,
   ChevronLeft,
   Flag,
   Globe,
@@ -52,7 +51,6 @@ import {
   CreadorIntroFrame,
   CreadorNudge,
   GuidedTour,
-  MomentChallengeSuggestion,
   useCreadorOnboarding,
   type TourStep,
 } from '../onboarding'
@@ -292,6 +290,10 @@ export function TripPage({
   // Nodo REAL del botón "+" (no el wrap): el coach-mark del onboarding del
   // creador (pieza 3/4) lo resalta anclándose a este mismo elemento.
   const fabButtonRef = useRef<HTMLButtonElement>(null)
+  // Nodo REAL de la barra Diario·Bitácora·Marcador: el remate del onboarding
+  // del creador (pieza 3/4) se ancla aquí en vez de flotar como un banner
+  // suelto — señala las 3 pestañas que acaba de nombrar en su copy.
+  const tabBarRef = useRef<HTMLDivElement>(null)
 
   // Menú ⋯ de la cabecera (hoja inferior con acciones fijas del viaje).
   const [menuOpen, setMenuOpen] = useState(false)
@@ -845,7 +847,7 @@ export function TripPage({
       {/* Tab Diario · Bitácora · Marcador (issue #645): el control segmentado
           conmuta de sección. Flota bajo la cabecera, centrado, sobre cada fondo
           (mapa, bitácora o papel). */}
-      <div className={styles.tabs}>
+      <div className={styles.tabs} ref={tabBarRef}>
         <SegmentedControl
           options={SECTION_OPTIONS}
           value={section}
@@ -1088,12 +1090,24 @@ export function TripPage({
         />
       )}
 
+      {/* Antes era una tarjeta flotante translúcida: sobre el mapa satélite el
+          texto se pisaba con él y no se leía (reportado en vivo). El coach-mark
+          trae el mismo scrim sólido + burbuja legible que ya resuelve el paso
+          "coach" de arriba, y de paso señala el "+" real — el mismo flujo de
+          siempre (promoteChallengeHash) cuelga ahora de `primaryAction`. */}
       {creador.stage === 'suggest' && section === 'diario' && moments[0] && (
-        <MomentChallengeSuggestion
-          photoUrl={moments[0].imageUrl}
-          onCreateChallenge={() => {
-            creador.dismissSuggest()
-            location.hash = promoteChallengeHash(groupId, moments[0].challengeId)
+        <CoachMark
+          targetRef={fabButtonRef}
+          title="¿Y si les lanzas un reto para que viajen contigo?"
+          ariaLabel="¿Y si les lanzas un reto para que viajen contigo?"
+          body="Tu gente adivina dónde es. Gana quien más se acerca."
+          dismissLabel="Saltar"
+          primaryAction={{
+            label: 'Crear un reto',
+            onClick: () => {
+              creador.dismissSuggest()
+              location.hash = promoteChallengeHash(groupId, moments[0].challengeId)
+            },
           }}
           onDismiss={creador.dismissSuggest}
         />
@@ -1102,18 +1116,30 @@ export function TripPage({
       {creador.stage === 'share' && section === 'diario' && (
         <div className={styles.creadorNudgeWrap}>
           <CreadorNudge icon={Share2} onDismiss={creador.dismissShare}>
-            Pásale el enlace a tu gente. Entran sin instalar nada.
+            Pásale el enlace a tu gente. Ven y juegan de forma directa.
           </CreadorNudge>
         </div>
       )}
 
+      {/* Remate (último paso): antes un banner suelto abajo que nombraba
+          Bitácora/Marcador sin señalarlos. Ahora nombra también el Diario y se
+          ancla a la barra de pestañas real (`tabBarRef`) — el mismo motor de
+          spotlight que el resto de la guía, coherente con "señala lo que
+          nombra" en vez de flotar aparte. */}
       {creador.stage === 'remate' && section === 'diario' && (
-        <div className={styles.creadorNudgeWrap}>
-          <CreadorNudge icon={BookOpen} onDismiss={creador.dismissRemate}>
-            Todo esto se guarda en tu <strong>Bitácora</strong>; en el <strong>Marcador</strong> ves
-            quién va ganando.
-          </CreadorNudge>
-        </div>
+        <CoachMark
+          targetRef={tabBarRef}
+          title="Así queda todo"
+          ariaLabel="Así queda todo"
+          body={
+            <>
+              Todo queda en tu <strong>Diario</strong> y tu <strong>Bitácora</strong>; en el{' '}
+              <strong>Marcador</strong> ves quién va ganando.
+            </>
+          }
+          dismissLabel="Entendido"
+          onDismiss={creador.dismissRemate}
+        />
       )}
 
       {/* Hoja "Compartir" del viaje (issue #758): mismo componente que el menú ⋯
