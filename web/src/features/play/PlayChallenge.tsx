@@ -1635,8 +1635,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             setRetoExplainDone(true)
             // Al viaje real con el tour del reto: `tour=reto` lo lee TripPage
             // (como el `tour=1` del ejemplo) y lo limpia del hash al terminar.
-            // PlayChallenge se desmonta al cambiar el hash.
-            if (groupId) location.hash = `#g=${encodeURIComponent(groupId)}&tour=reto`
+            // PlayChallenge se desmonta al cambiar el hash. `rc` (issue #895)
+            // lleva el id de ESTE reto para que TripPage pueda volver al revelado
+            // al terminar el tour; se usa `rc` (no `c`) para NO reabrir aquí
+            // PlayChallenge y cortar el tour.
+            if (groupId) {
+              location.hash = `#g=${encodeURIComponent(groupId)}&tour=reto&rc=${encodeURIComponent(challenge.id)}`
+            }
           }}
           onSkip={() => {
             setRetoExplainDone(true)

@@ -50,9 +50,9 @@ export function RetoShareGuide({ resultRef, onNext, onSkip }: Props) {
     <CoachMark
       targetRef={resultRef}
       step="Tu resultado"
-      title="Esto es tu resultado"
-      body="Tus puntos y a qué distancia quedaste del objetivo: cuanto más cerca, más puntos."
-      ariaLabel="Esto es tu resultado"
+      title="Este es tu resultado"
+      body="Míralo con calma: tus puntos y a qué distancia quedaste del objetivo (cuanto más cerca, más puntos). Cuando quieras, sigue."
+      ariaLabel="Este es tu resultado"
       dismissLabel="Saltar"
       primaryAction={{ label: 'Siguiente', onClick: onNext }}
       onDismiss={onSkip}

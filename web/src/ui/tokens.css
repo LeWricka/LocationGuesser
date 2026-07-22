@@ -253,6 +253,12 @@
      todo salvo el hueco recortado sobre el elemento real resaltado — necesita más
      opacidad que `--scene-veil` (pensado para leer texto, no para apagar UI). */
   --scene-scrim-strong: rgba(9, 13, 18, 0.82);
+  /* Superficie SÓLIDA sobre escena (coach-mark, issue #895): la burbuja del
+     coach-mark se pinta sobre fondos arbitrarios (foto/globo/satélite a sangre),
+     donde el vidrio translúcido (`--glass-bg`, ~38%) dejaba el texto ilegible.
+     Casi opaca (0.96) para que la legibilidad NO dependa de la translucidez —
+     el blur del `.card` queda solo como acabado, no como recurso de contraste. */
+  --scene-surface-solid: rgba(11, 16, 22, 0.96);
   --scene-surface: rgba(255, 255, 255, 0.12); /* pastilla/chrome translúcido sobre escena */
   --scene-hairline: rgba(255, 255, 255, 0.16); /* hairline/borde de contacto en escena */
   --scene-shadow: 0 8px 28px -8px rgba(0, 0, 0, 0.55), 0 2px 8px -3px rgba(0, 0, 0, 0.4);
