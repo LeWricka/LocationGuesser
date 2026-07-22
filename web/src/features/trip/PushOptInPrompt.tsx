@@ -98,7 +98,7 @@ export function PushOptInPrompt({ surface, groupId }: Props) {
           <span className={styles.titleIcon}>
             <Icon icon={Bell} size={20} />
           </span>
-          No te pierdas ningún reto
+          Activa las notificaciones
         </span>
       }
       footer={

@@ -26,7 +26,7 @@ import { snoozePushPrompt } from '../../lib/pushPrompt'
 
 // El pop-up (issue #886) se identifica por su titular; el copy de valor
 // (avisos + gestión desde el perfil) se comprueba aparte más abajo.
-const PROMPT_TEXT = 'No te pierdas ningún reto'
+const PROMPT_TEXT = 'Activa las notificaciones'
 
 function fakeSession(overrides: Partial<SessionState> = {}): SessionState {
   return {
