@@ -694,6 +694,16 @@
   }
 }
 
+/* Envoltorio de la lista (ChallengeBoard) + la tarjeta de puntos (issue #899):
+ * un único contenedor para que el 2º paso de la guía del reto (RetoShareGuide)
+ * ancle a AMBOS con un solo `targetRef`, preservando el mismo espaciado que
+ * tenían como hermanos sueltos del `Stack gap={4}` del reveal. */
+.revealList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 /* Contenedor del bloque de puntuación. `relative` para contener el
  * destello/confeti de la celebración (RevealBurst, posicionado absoluto). El
  * bloque YA NO aparece de golpe (issue #545): cada hijo tiene su propio tiempo
