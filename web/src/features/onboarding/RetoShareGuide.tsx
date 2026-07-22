@@ -1,16 +1,20 @@
 // Guía del RETO COMPARTIDO tras el resultado (onboarding nuevo, pieza 2/4).
 //
 // Orquesta, SIN taparlo, la explicación de quien juega su primer reto suelto
-// como anónimo: PlayChallenge la monta solo cuando el usuario pulsa un CTA
-// explícito en el reveal ("¿Qué es esto?"), nunca de golpe encima del
-// resultado (ese era el bug: la vieja secuencia era un overlay opaco que
-// tapaba los puntos desde el primer frame).
+// como anónimo: PlayChallenge la monta AUTOMÁTICAMENTE la 1ª vez, en cuanto
+// se revela el resultado (issue #888 — antes había un botón "¿Qué es esto?"
+// que casi nadie pulsaba, paso ciego del funnel). "Sin taparlo" se sostiene
+// igual: los dos primeros pasos son coach-marks a prueba de balas (`blocking`
+// en `CoachMark`) que SEÑALAN el resultado/mapa reales (siguen visibles,
+// atenuados alrededor) en vez de sustituirlos por un overlay opaco.
 //
 // Dos fases, cada una robusta por sí sola (nada depende de que una ref
 // sobreviva a un cambio de ruta):
-//   1. Coach-marks sobre elementos REALES del reveal (refs que le pasa
-//      PlayChallenge): "tu resultado" (la tarjeta de puntos) y "lo que marcaron
-//      los demás" (el mapa con todos los pines). Reutiliza `CoachMark`.
+//   1. Coach-marks BLOQUEANTES sobre elementos REALES del reveal (refs que le
+//      pasa PlayChallenge): "tu resultado" (la tarjeta de puntos) y "lo que
+//      marcaron los demás" (el mapa con todos los pines, Leaflet vivo — de
+//      ahí `blocking`: sin capar el mapa, arrastrarlo se cuela por debajo).
+//      Reutiliza `CoachMark`.
 //   2. Las tarjetas de `RetoShareExplainSequence` (la sección de retos, el
 //      puente al viaje y qué es Momentu) + el registro opcional.
 //
@@ -87,6 +91,10 @@ export function RetoShareGuide({
           setCardsStart('registro')
           setPhase('cards')
         }}
+        // A prueba de balas (issue #888): el segundo paso ancla al mapa de
+        // resultado (Leaflet vivo) — sin `blocking` el pass-through de
+        // siempre arrastraba el mapa y "Siguiente" no recibía el toque.
+        blocking
       />
     )
   }
@@ -111,6 +119,9 @@ export function RetoShareGuide({
           setCardsStart('registro')
           setPhase('cards')
         }}
+        // Mismo motivo que arriba: este paso ancla justo al mapa con los
+        // pines de todos.
+        blocking
       />
     )
   }

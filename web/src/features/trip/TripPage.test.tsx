@@ -219,6 +219,51 @@ describe('TripPage — FAB "Compartir" (#758)', () => {
   })
 })
 
+// Gating de FABs a ANÓNIMOS (issue #888): un receptor anónimo que juega un
+// reto suelto se hace miembro (RLS) y `canCreate` pasaba a true, así que veía
+// el "+" aunque crear de verdad siga bloqueado; el "Compartir" tampoco tenía
+// gate alguno. Ninguno de los dos debe salir a un anónimo — sí a un miembro
+// con cuenta (el `session` de arriba) y al dueño (ya cubierto por el resto de
+// tests de este fichero).
+describe('TripPage — FABs no salen a usuarios ANÓNIMOS (#888)', () => {
+  const anonSession: SessionState = { ...session, isAnonymous: true }
+
+  function renderTripAnon() {
+    render(
+      <SessionContext.Provider value={anonSession}>
+        <ToastProvider>
+          <TripPage
+            groupId="g1"
+            onPlayChallenge={vi.fn()}
+            onAddMoment={vi.fn()}
+            onAddChallenge={vi.fn()}
+            onBack={vi.fn()}
+          />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+  }
+
+  test('anónimo: ni el FAB "+" ni el FAB "Compartir" se muestran', async () => {
+    mockTripData()
+    renderTripAnon()
+    // `canCreate` se confirma async (isMember/myGroups mockeados a true/owner
+    // arriba): esperamos a que el resto de la pantalla asiente antes de
+    // afirmar la AUSENCIA de los FABs (si no, el test pasaría "por no haber
+    // llegado a tiempo", no porque el gate funcione).
+    expect(await screen.findByRole('radio', { name: 'Marcador' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crear momento o reto' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^compartir$/i })).not.toBeInTheDocument()
+  })
+
+  test('miembro con cuenta (no anónimo): SÍ ve los dos FABs', async () => {
+    mockTripData()
+    renderTrip()
+    expect(await screen.findByRole('button', { name: 'Crear momento o reto' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^compartir$/i })).toBeInTheDocument()
+  })
+})
+
 describe('TripPage — la sección se refleja en la URL', () => {
   test('cambiar a Marcador escribe v=marcador en el hash y volver a Diario lo quita (refrescar conserva la pestaña)', async () => {
     window.location.hash = '#g=g1'

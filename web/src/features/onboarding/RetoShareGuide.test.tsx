@@ -2,6 +2,7 @@ import { useRef, type RefObject } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { RetoShareGuide } from './RetoShareGuide'
+import coachStyles from './CoachMark.module.css'
 
 // jsdom no implementa scrollIntoView; RetoShareGuide lo usa para llevar a la
 // vista el objetivo del coach-mark activo (la tarjeta de puntos / el mapa).
@@ -75,5 +76,20 @@ describe('RetoShareGuide', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Saltar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }))
     expect(onCreateAccount).toHaveBeenCalledTimes(1)
+  })
+
+  // A prueba de balas (issue #888): los dos coach-marks que anclan a elementos
+  // vivos/interactivos del reveal (la tarjeta de puntos, el mapa con los pines
+  // de todos) DEBEN pasar `blocking` — si alguien lo quita sin querer al tocar
+  // este fichero, este test lo detecta (aunque jsdom no pueda cazar el bug de
+  // pass-through en sí, ver CoachMark.test.tsx y el spec de Playwright real).
+  test('los dos primeros coach-marks (resultado y mapa) son bloqueantes', () => {
+    const { container } = render(<Harness />)
+    const layerClass = coachStyles.layerBlocking as string
+    expect(container.getElementsByClassName(layerClass).length).toBe(1)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(screen.getByText('Esto marcaron los demás')).toBeInTheDocument()
+    expect(container.getElementsByClassName(layerClass).length).toBe(1)
   })
 })

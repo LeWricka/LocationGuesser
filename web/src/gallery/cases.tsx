@@ -34,6 +34,7 @@ import { ChallengeShareCard } from '../features/create/ChallengeShareCard'
 import { TripInviteCard } from '../features/group/TripInviteCard'
 import { GameScene } from '../features/play/GameScene'
 import { TripDiario } from '../features/trip/TripDiario'
+import { CoachMarkBlockingHarness } from './CoachMarkBlockingHarness'
 import {
   OnboardingSlideshow,
   getSlides,
@@ -1135,6 +1136,16 @@ export const cases: GalleryCase[] = [
         />
       </div>
     ),
+  },
+  {
+    // Issue #888: el modo `blocking` sobre un objetivo REALMENTE interactivo (un
+    // `<button>` a pantalla completa que reacciona al toque, no el stub plano de
+    // siempre) — ver `e2e/gallery-coachmark-blocking.spec.ts`, que cierra el
+    // agujero de test (galería/a11y con mapas stubeados nunca ejercitaba esto).
+    id: 'onboarding-coachmark-blocking',
+    title: 'Onboarding · coach-mark BLOQUEANTE sobre un objetivo interactivo (#888)',
+    section: 'Onboarding',
+    render: () => <CoachMarkBlockingHarness />,
   },
   // Onboarding del CREADOR — aprender-haciendo (onboarding nuevo, pieza 3/4):
   // intro de una pantalla → coach-mark real sobre el "+" → sugerencia de reto

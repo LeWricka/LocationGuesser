@@ -13,6 +13,10 @@ import { defineConfig, devices } from '@playwright/test'
 //    sus esquinas redondeadas (muestreo de píxel en los triángulos de esquina).
 //  - gallery-sheet-scroll-expand: el gesto de scroll sobre la hoja dirige su expansión
 //    (scroll arriba la agranda, scroll abajo la recoge) — cableado del nested scroll.
+//  - gallery-coachmark-blocking: el modo `blocking` de CoachMark (issue #888) sobre un
+//    objetivo REALMENTE interactivo — el scrim bloquea el toque de debajo y "Siguiente"
+//    sigue siendo clicable. Necesita un navegador REAL (jsdom ignora `pointer-events`
+//    al hacer hit-testing), por eso vive aquí y no en un test de Vitest.
 //
 // El viewport de cada comprobación lo fija el propio spec, por eso aquí solo dejamos la
 // base de Desktop Chrome.
@@ -22,7 +26,7 @@ const baseURL = `http://localhost:${PORT}`
 
 export default defineConfig({
   testDir: 'e2e',
-  testMatch: /gallery-(a11y|corner-integrity|sheet-scroll-expand)\.spec\.ts/,
+  testMatch: /gallery-(a11y|corner-integrity|sheet-scroll-expand|coachmark-blocking)\.spec\.ts/,
   fullyParallel: false,
   reporter: 'list',
   // Un único spec recorre todos los casos × comprobaciones; subimos el límite por

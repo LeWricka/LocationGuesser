@@ -134,7 +134,10 @@ export function TripPage({
   onAddChallenge,
   onBack,
 }: Props) {
-  const { user, profile } = useSession()
+  // `isAnonymous` (issue #888): gatea los dos FABs flotantes (crear/compartir)
+  // más abajo — un receptor anónimo que juega un reto se hace miembro (RLS) y
+  // veía el "+" aunque crear/compartir de verdad sigan bloqueados/no le tocan.
+  const { user, profile, isAnonymous } = useSession()
   const {
     group,
     moments,
@@ -1013,8 +1016,11 @@ export function TripPage({
       {/* FAB "＋" flotante con menú de dos acciones: Momento (recuerdo) o Reto (a
           adivinar). ÚNICO punto de crear del viaje. Issue #783: CUALQUIER miembro
           (ya no solo el dueño) y siempre disponible (fijo abajo), salvo con el
-          recap abierto (es una pantalla de cierre). */}
-      {canCreate && !wrapOpen && (
+          recap abierto (es una pantalla de cierre). `!isAnonymous` (issue #888):
+          un receptor anónimo que juega un reto se hace miembro y `canCreate`
+          pasaba a true, pero RLS/AnonCreateGate igualmente le bloquean crear —
+          no se le enseña un botón que no puede completar. */}
+      {canCreate && !wrapOpen && !isAnonymous && (
         <div className={styles.fabWrap} ref={fabWrapRef}>
           {fabOpen && (
             <div className={styles.fabMenu} role="menu" aria-label="Crear">
@@ -1069,8 +1075,11 @@ export function TripPage({
           Compartir clasificación). Nunca dos flotantes a la vez en el mismo tab:
           sustituye al FAB de clasificación que vivía solo en Marcador (issue
           #608) y al item "Invitar" del menú ⋯. Nunca en el viaje de ejemplo
-          (solo lectura): no hay nada real que invitar/compartir. */}
-      {!wrapOpen && !isExampleTrip && (
+          (solo lectura): no hay nada real que invitar/compartir. Tampoco a un
+          receptor ANÓNIMO (issue #888): jugar un reto suelto no debe
+          convertirle en quien re-comparte el viaje/reto — ese gesto es de
+          quien ya se identifica (miembro con cuenta o dueño). */}
+      {!wrapOpen && !isExampleTrip && !isAnonymous && (
         <div className={styles.shareFabWrap}>
           <button
             type="button"

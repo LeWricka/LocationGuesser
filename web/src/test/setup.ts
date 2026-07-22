@@ -34,3 +34,14 @@ if (typeof Blob !== 'undefined' && !Blob.prototype.text) {
     })
   }
 }
+
+// jsdom no implementa `Element.prototype.scrollIntoView` (issue #888): antes
+// solo lo mockeaba localmente `RetoShareGuide.test.tsx` (el único sitio que lo
+// montaba a propósito). Desde que la guía del reto compartido arranca SOLA al
+// revelar (ya no hace falta pulsar "¿Qué es esto?"), cualquier test de
+// `PlayChallenge` con un receptor anónimo + `retoShare.active` la monta de
+// rebote y revienta con "scrollIntoView is not a function" si no está aquí. Un
+// no-op basta: ningún test aserta SOBRE el scroll en sí.
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function scrollIntoView() {}
+}
