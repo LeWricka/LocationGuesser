@@ -24,7 +24,9 @@ describe('GuestWelcomeFrame', () => {
     expect(screen.getByText('Estás dentro del viaje de Lucía')).toBeInTheDocument()
     expect(screen.getByText('Lucía y 1 más ya están dentro')).toBeInTheDocument()
     expect(
-      screen.getByText(/Momentu es su diario de viaje\. Lo sigues por el Diario y la Bitácora/),
+      screen.getByText(
+        /Momentu es la forma de guardar tus viajes y compartirlos con quien más quieres/,
+      ),
     ).toBeInTheDocument()
     expect(screen.getByText('Comparte tus momentos de una forma diferente.')).toBeInTheDocument()
   })
@@ -68,7 +70,7 @@ describe('GuestWelcomeFrame', () => {
     expect(screen.getByText(/Ahora te toca un reto/)).toBeInTheDocument()
   })
 
-  test('"Entrar a jugar" llama a onEnter', () => {
+  test('"Ver el viaje" llama a onEnter', () => {
     const onEnter = vi.fn()
     render(
       <GuestWelcomeFrame
@@ -79,7 +81,7 @@ describe('GuestWelcomeFrame', () => {
         onEnter={onEnter}
       />,
     )
-    fireEvent.click(screen.getByRole('button', { name: /Entrar a jugar/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Ver el viaje/ }))
     expect(onEnter).toHaveBeenCalledTimes(1)
   })
 })

@@ -26,7 +26,9 @@ export interface Props {
   coverImageUrl: string | null
   /** Hay un reto EN JUEGO ahora mismo: muestra el aviso "te toca jugar". */
   hasActiveChallenge: boolean
-  /** CTA "Entrar a jugar": completa el onboarding (revela el viaje debajo). */
+  /** CTA "Ver el viaje": completa la intro y ARRANCA el recorrido guiado del
+   * viaje (Diario → Bitácora → retos). No dice "jugar": la identidad es
+   * compartir el viaje, la mecánica de adivinar baja al recorrido. */
   onEnter: () => void
 }
 
@@ -76,8 +78,8 @@ export function GuestWelcomeFrame({
         <span className={`t-label ${styles.eyebrow}`}>{eyebrow}</span>
         <h1 className={`t-display ${styles.title}`}>{title}</h1>
         <p className={`t-body ${styles.body}`}>
-          Momentu es su diario de viaje. Lo sigues por el Diario y la Bitácora —y eres parte
-          mediante los retos que te comparte.
+          Momentu es la forma de guardar tus viajes y compartirlos con quien más quieres. Sigue este
+          viaje por el Diario y la Bitácora —y eres parte con los retos que os lanzáis.
         </p>
 
         {hasActiveChallenge && (
@@ -92,7 +94,7 @@ export function GuestWelcomeFrame({
 
         <Button fullWidth onClick={onEnter} className={styles.cta}>
           <span className={styles.ctaLabel}>
-            Entrar a jugar
+            Ver el viaje
             <Icon icon={ArrowRight} size={18} />
           </span>
         </Button>

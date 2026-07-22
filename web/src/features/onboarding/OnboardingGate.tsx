@@ -39,6 +39,13 @@ interface Props {
    * evento de embudo `receptor_welcome_shown` (#330); no afecta al render.
    */
   groupId?: string
+  /**
+   * Se llama al COMPLETAR la intro de bienvenida (solo contexto `welcome`): el
+   * receptor pulsó "Ver el viaje" (issue #901). `ReceptorWelcomeGate` lo usa para
+   * ARRANCAR el tour de bienvenida en `TripPage`. Separado de `markSeen`:
+   * OnboardingGate no sabe de tours, solo avisa de que se entró al viaje.
+   */
+  onWelcomeEntered?: () => void
   children: ReactNode
 }
 
@@ -48,6 +55,7 @@ export function OnboardingGate({
   profileOnboarding,
   welcomeData,
   groupId,
+  onWelcomeEntered,
   children,
 }: Props) {
   const { shouldShow, markSeen, skip } = useOnboarding(context, userId, profileOnboarding)
@@ -71,6 +79,10 @@ export function OnboardingGate({
   const handleComplete = () => {
     track('onboarding_completed', { context })
     markSeen()
+    // Solo la bienvenida del receptor encadena el tour del viaje (issue #901):
+    // avisar tras marcar visto, para que el disparo del tour ocurra una vez la
+    // intro ya está resuelta.
+    if (context === 'welcome') onWelcomeEntered?.()
   }
 
   const handleSkip = () => {

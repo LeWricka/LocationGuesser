@@ -70,6 +70,21 @@ export function ReceptorWelcomeGate({
     if (show) void persistOnboardingSeen('group', userId, profileOnboarding)
   }, [show, userId, profileOnboarding])
 
+  // Al COMPLETAR la intro (issue #901): en vez de solo revelar el viaje, fijamos
+  // `tour=bienvenida` en el hash para ARRANCAR allí el tour de bienvenida
+  // (Diario → Bitácora → retos). Mismo mecanismo que `tour=reto`, pero disparado
+  // desde aquí: esta pantalla YA está montada cuando se pulsa "Ver el viaje", así
+  // que `TripPage` lo recoge por `hashchange`. Preservamos el resto de params
+  // (`g`, `v`…) y usamos `location.hash =` (no replaceState) a propósito, para
+  // que el evento `hashchange` se emita. Solo aquí, un receptor real (no dueño,
+  // no ejemplo): quien entra por un reto ya tiene `welcome` visto y nunca pasa
+  // por esta intro, así que no colisiona con `tour=reto`.
+  const startBienvenidaTour = () => {
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    params.set('tour', 'bienvenida')
+    window.location.hash = `#${params.toString()}`
+  }
+
   // Hasta confirmar que es un receptor (no el dueño), el marco de bienvenida no
   // envuelve nada; el registro post-valor (más abajo) es independiente de esto.
   const content = show ? (
@@ -86,6 +101,7 @@ export function ReceptorWelcomeGate({
         hasActiveChallenge,
       }}
       groupId={groupId}
+      onWelcomeEntered={startBienvenidaTour}
     >
       {children}
     </OnboardingGate>
