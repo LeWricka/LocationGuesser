@@ -31,16 +31,34 @@ export interface TourStep {
    * quien define el paso no tiene que ocuparse de eso.
    */
   onBeforeShow?: () => void
+  /**
+   * Modo bloqueante del `CoachMark` de este paso (issue #891): captura la
+   * interacción por debajo en vez del pass-through de siempre. Pensado para
+   * objetivos vivos (un mapa/globo Leaflet del Diario) donde dejar pasar el
+   * toque arrastra el mapa en vez de avanzar. Default: comportamiento intacto.
+   */
+  blocking?: boolean
 }
 
 interface Props {
   steps: TourStep[]
-  /** Título/cuerpo de la pantalla de CIERRE (sin objetivo, centrada) tras el
-   * último paso. */
-  closingTitle: string
-  closingBody: ReactNode
+  /**
+   * Título/cuerpo de la pantalla de CIERRE (sin objetivo, centrada) tras el
+   * último paso. OPCIONAL (issue #891): sin `closingTitle`, la guía NO tiene
+   * pantalla de cierre — el último paso llama a `onFinish` directamente, y quien
+   * monta la guía decide qué mostrar después (p.ej. el tour del reto compartido
+   * remata con la tarjeta de registro, no con un cierre genérico).
+   */
+  closingTitle?: string
+  closingBody?: ReactNode
   closingCta?: string
-  /** Se completó la guía entera (cierre → CTA final). */
+  /**
+   * Etiqueta del botón primario en el ÚLTIMO paso. Por defecto 'Ver cierre'
+   * cuando hay pantalla de cierre; conviene otra ('Listo'/'Terminar') cuando no
+   * la hay (issue #891) — "ver cierre" implicaría una pantalla que no existe.
+   */
+  lastStepLabel?: string
+  /** Se completó la guía entera (cierre → CTA final, o último paso sin cierre). */
   onFinish: () => void
   /** "Saltar" en cualquier paso: sale de la guía sin pasar por el cierre. */
   onSkip: () => void
@@ -62,6 +80,7 @@ export function GuidedTour({
   closingTitle,
   closingBody,
   closingCta = 'Terminar',
+  lastStepLabel,
   onFinish,
   onSkip,
 }: Props) {
@@ -69,6 +88,9 @@ export function GuidedTour({
   const reducedMotion = useReducedMotion()
   const total = steps.length
   const current = index < total ? steps[index] : null
+  // Sin `closingTitle` no hay pantalla de cierre (issue #891): el último paso
+  // remata la guía llamando a `onFinish` directamente.
+  const hasClosing = closingTitle != null
 
   // Al cambiar de paso: aplica la navegación del paso (si la trae) y, con un
   // pequeño margen, hace visible su objetivo si vivía fuera de pantalla (un
@@ -92,6 +114,12 @@ export function GuidedTour({
 
   if (current) {
     const isLast = index === total - 1
+    // Último paso: si hay cierre, avanza al índice de cierre; si no, remata ya
+    // (onFinish) — no hay pantalla de cierre que pintar.
+    const primaryLabel = isLast
+      ? (lastStepLabel ?? (hasClosing ? 'Ver cierre' : 'Terminar'))
+      : 'Siguiente'
+    const primaryOnClick = isLast && !hasClosing ? onFinish : () => setIndex((i) => i + 1)
     return (
       <CoachMark
         targetRef={current.targetRef}
@@ -100,14 +128,16 @@ export function GuidedTour({
         body={current.body}
         ariaLabel={current.ariaLabel}
         dismissLabel="Saltar"
-        primaryAction={{
-          label: isLast ? 'Ver cierre' : 'Siguiente',
-          onClick: () => setIndex((i) => i + 1),
-        }}
+        primaryAction={{ label: primaryLabel, onClick: primaryOnClick }}
         onDismiss={onSkip}
+        blocking={current.blocking}
       />
     )
   }
+
+  // Sin pantalla de cierre (issue #891): el último paso ya llamó a `onFinish`;
+  // aquí no hay nada que pintar (el padre desmonta la guía).
+  if (!hasClosing) return null
 
   // Cierre: sin objetivo que resaltar (remata la guía a pantalla completa,
   // como el "tour-closing" del prototipo validado) — el usuario ya recorrió

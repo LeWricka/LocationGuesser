@@ -18,6 +18,27 @@
   pointer-events: none;
 }
 
+/* Región ARRIBA (issue #891): misma caja centrada que la de abajo, pero anclada
+ * al borde superior (con su safe-area). Se usa para confirmaciones que abajo
+ * chocarían con la burbuja de un coach-mark del tutorial. */
+.regionTop {
+  top: calc(var(--space-4) + env(safe-area-inset-top, 0px));
+  bottom: auto;
+}
+.regionTop .toast {
+  /* Entrada deslizante DESDE ARRIBA (la de abajo entra desde abajo): que la
+   * confirmación se sienta más viva, no un aviso plano. */
+  animation: toast-in-top var(--motion-transition-base);
+}
+
+.leadIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: var(--color-success);
+}
+
 .toast {
   display: flex;
   align-items: center;
@@ -106,6 +127,17 @@
 @keyframes toast-in {
   from {
     transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toast-in-top {
+  from {
+    transform: translateY(-8px);
     opacity: 0;
   }
   to {

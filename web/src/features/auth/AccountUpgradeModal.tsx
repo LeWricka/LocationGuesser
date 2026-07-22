@@ -17,7 +17,7 @@
 // props (p.ej. origin 'anon_create_gate', sin reto jugado) cae al copy
 // genérico de progreso.
 
-import { useEffect, useRef, type FormEvent } from 'react'
+import { useEffect, useRef, type FormEvent, type ReactNode } from 'react'
 import { Modal, Button, Field, Input, Row, Stack } from '../../ui'
 import { track } from '../../lib/analytics'
 import { useAccountUpgrade, type AccountUpgradeContext } from './useAccountUpgrade'
@@ -48,6 +48,18 @@ interface Props {
    */
   groupName?: string
   points?: number
+  /**
+   * Titular a medida (issue #891). Por defecto se deriva de `groupName`
+   * ("Guarda tus puntos de {viaje}") o cae a "Guarda tu cuenta"; el gate del
+   * "+" anónimo lo usa para pedir cuenta con su propio encuadre ("Regístrate
+   * para crear tus viajes").
+   */
+  title?: string
+  /**
+   * Texto introductorio a medida del paso de email (issue #891). Sin él, cae al
+   * copy de beneficio de siempre (puntos del viaje o progreso genérico).
+   */
+  intro?: ReactNode
 }
 
 export function AccountUpgradeModal({
@@ -59,6 +71,8 @@ export function AccountUpgradeModal({
   challengeId,
   groupName,
   points,
+  title,
+  intro,
 }: Props) {
   const {
     step,
@@ -125,7 +139,7 @@ export function AccountUpgradeModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title={groupName ? `Guarda tus puntos de ${groupName}` : 'Guarda tu cuenta'}
+      title={title ?? (groupName ? `Guarda tus puntos de ${groupName}` : 'Guarda tu cuenta')}
       footer={
         step === 'email' ? (
           <Row gap={2} justify="end">
@@ -151,7 +165,9 @@ export function AccountUpgradeModal({
       {step === 'email' ? (
         <form onSubmit={handleSubmitEmail} noValidate>
           <Stack gap={3}>
-            {groupName && points != null ? (
+            {intro ? (
+              <p>{intro}</p>
+            ) : groupName && points != null ? (
               <p>
                 No pierdas tus <strong>{points} puntos</strong> de {groupName}: con tu correo, tu
                 voto y tu puesto siguen siendo tuyos aunque cambies de móvil. Es opcional — si

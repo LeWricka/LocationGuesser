@@ -14,11 +14,11 @@ export type { Props as GuestWelcomeFrameProps } from './GuestWelcomeFrame'
 export { GuestRegisterPrompt } from './GuestRegisterPrompt'
 export { useGuestRegisterPrompt } from './useGuestRegisterPrompt'
 // Entrada por RETO COMPARTIDO (onboarding nuevo, pieza 2/4): intro mínima antes
-// de jugar + explicación de Momentu/puente al viaje/registro tras el resultado.
+// de jugar.
 export { RetoShareIntro } from './RetoShareIntro'
-export { RetoShareExplainSequence } from './RetoShareExplainSequence'
-// Guía tras el resultado del reto compartido: coach-marks sobre el reveal REAL
-// (sin taparlo) + las tarjetas de explicación + aterrizaje en el Marcador.
+// Guía tras el resultado del reto compartido (rediseño #891): UN coach-mark que
+// señala el resultado real; "Siguiente" lleva al viaje real y arranca allí el
+// tour (Diario → Bitácora → Marcador), "Saltar" cae en el Marcador.
 export { RetoShareGuide } from './RetoShareGuide'
 export { useRetoShareOnboarding } from './useRetoShareOnboarding'
 // Onboarding del CREADOR — aprender-haciendo (onboarding nuevo, pieza 3/4):

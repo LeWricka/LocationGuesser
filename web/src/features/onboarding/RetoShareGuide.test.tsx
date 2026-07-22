@@ -5,91 +5,59 @@ import { RetoShareGuide } from './RetoShareGuide'
 import coachStyles from './CoachMark.module.css'
 
 // jsdom no implementa scrollIntoView; RetoShareGuide lo usa para llevar a la
-// vista el objetivo del coach-mark activo (la tarjeta de puntos / el mapa).
+// vista la tarjeta de puntos que resalta el coach-mark.
 Element.prototype.scrollIntoView = vi.fn()
 
-// Arnés con dos objetivos reales (como el reveal tendría la tarjeta de puntos y
-// el mapa con los pines de todos): cada coach-mark ancla a uno de ellos.
+// Arnés con un objetivo real (la tarjeta de puntos del reveal): el coach-mark
+// ancla a él y sigue visible DEBAJO (no hay overlay opaco que lo sustituya).
 function Harness({
-  onCreateAccount = vi.fn(),
-  onFinish = vi.fn(),
-  initialPhase,
+  onNext = vi.fn(),
+  onSkip = vi.fn(),
 }: {
-  onCreateAccount?: () => void
-  onFinish?: () => void
-  initialPhase?: 'result' | 'others' | 'cards'
+  onNext?: () => void
+  onSkip?: () => void
 }) {
   const resultRef = useRef<HTMLDivElement>(null)
-  const othersRef = useRef<HTMLDivElement>(null)
   return (
     <>
       <div ref={resultRef}>tarjeta de resultado</div>
-      <div ref={othersRef}>mapa de los demás</div>
       <RetoShareGuide
-        ownerName="Lucía"
         resultRef={resultRef as RefObject<HTMLElement | null>}
-        othersRef={othersRef as RefObject<HTMLElement | null>}
-        onCreateAccount={onCreateAccount}
-        onFinish={onFinish}
-        initialPhase={initialPhase}
+        onNext={onNext}
+        onSkip={onSkip}
       />
     </>
   )
 }
 
-describe('RetoShareGuide', () => {
-  test('arranca señalando el resultado (no tapa el reveal: es un coach-mark)', () => {
+describe('RetoShareGuide (rediseño #891)', () => {
+  test('señala el resultado sin taparlo (es un coach-mark, no un overlay)', () => {
     render(<Harness />)
     expect(screen.getByText('Esto es tu resultado')).toBeInTheDocument()
-    // El reveal sigue en el DOM debajo (no hay overlay opaco que lo sustituya).
+    // El reveal sigue en el DOM debajo.
     expect(screen.getByText('tarjeta de resultado')).toBeInTheDocument()
   })
 
-  test('"Siguiente" pasa del resultado al mapa de los demás y luego a las tarjetas', () => {
-    render(<Harness />)
+  test('"Siguiente" llama a onNext (el llamador navega al viaje real)', () => {
+    const onNext = vi.fn()
+    render(<Harness onNext={onNext} />)
     fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
-    expect(screen.getByText('Esto marcaron los demás')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
-    // Entra a las tarjetas por el principio (la sección de retos / el Marcador).
-    expect(screen.getByText('Aquí se sigue la partida')).toBeInTheDocument()
+    expect(onNext).toHaveBeenCalledTimes(1)
   })
 
-  test('"Saltar" en un coach-mark entra a las tarjetas directo por el registro', () => {
-    render(<Harness />)
+  test('"Saltar" llama a onSkip (directo al Marcador, sin registro)', () => {
+    const onSkip = vi.fn()
+    render(<Harness onSkip={onSkip} />)
     fireEvent.click(screen.getByRole('button', { name: 'Saltar' }))
-    expect(screen.getByText('No pierdas tus retos')).toBeInTheDocument()
+    expect(onSkip).toHaveBeenCalledTimes(1)
   })
 
-  test('al terminar (registro → "Ahora no") llama a onFinish para aterrizar en el Marcador', () => {
-    const onFinish = vi.fn()
-    render(<Harness onFinish={onFinish} initialPhase="cards" />)
-    // Salta las tarjetas hasta el registro y cierra con "Ahora no".
-    fireEvent.click(screen.getByRole('button', { name: 'Saltar' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Ahora no' }))
-    expect(onFinish).toHaveBeenCalledTimes(1)
-  })
-
-  test('"Crear cuenta" en el registro llama a onCreateAccount', () => {
-    const onCreateAccount = vi.fn()
-    render(<Harness onCreateAccount={onCreateAccount} initialPhase="cards" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Saltar' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }))
-    expect(onCreateAccount).toHaveBeenCalledTimes(1)
-  })
-
-  // A prueba de balas (issue #888): los dos coach-marks que anclan a elementos
-  // vivos/interactivos del reveal (la tarjeta de puntos, el mapa con los pines
-  // de todos) DEBEN pasar `blocking` — si alguien lo quita sin querer al tocar
-  // este fichero, este test lo detecta (aunque jsdom no pueda cazar el bug de
-  // pass-through en sí, ver CoachMark.test.tsx y el spec de Playwright real).
-  test('los dos primeros coach-marks (resultado y mapa) son bloqueantes', () => {
+  // A prueba de balas (issue #888): el único coach-mark ancla a la zona del
+  // reveal, así que DEBE ser `blocking`. Si alguien lo quita sin querer, este
+  // test lo detecta (jsdom no caza el pass-through en sí, ver CoachMark.test).
+  test('el coach-mark es bloqueante', () => {
     const { container } = render(<Harness />)
     const layerClass = coachStyles.layerBlocking as string
-    expect(container.getElementsByClassName(layerClass).length).toBe(1)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
-    expect(screen.getByText('Esto marcaron los demás')).toBeInTheDocument()
     expect(container.getElementsByClassName(layerClass).length).toBe(1)
   })
 })

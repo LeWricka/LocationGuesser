@@ -51,7 +51,7 @@ import { getGroup } from '../../lib/groupData'
 import { getGroupMembers } from '../../lib/membership'
 import { aggregateLeaderboard, getGroupVotes, type VoteWithName } from '../../lib/leaderboard'
 import { upsertProfile } from '../../lib/profile'
-import { marcadorGroupHash, marcadorGuideGroupHash } from '../../lib/route'
+import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
@@ -262,13 +262,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // el receptor anónimo. Sin relación con el nombre de arriba: se puede jugar
   // con nombre y seguir sin cuenta permanente indefinidamente.
   const [upgradeOpen, setUpgradeOpen] = useState(false)
-  // De qué superficie se abrió el alta (issue #751/onboarding pieza 2/4): el CTA
-  // normal de "no pierdas tus puntos" y el registro al final de la guía del reto
-  // compartido comparten el MISMO modal (nunca se apilan dos), pero viajan con un
-  // origin distinto para poder cruzar el funnel por superficie.
-  const [upgradeOrigin, setUpgradeOrigin] = useState<'play_result' | 'reto_share_register'>(
-    'play_result',
-  )
   // Entrada por RETO COMPARTIDO (onboarding nuevo, pieza 2/4): intro mínima
   // antes de jugar + explicación tras el resultado, solo para quien abre un
   // deep link de reto sin cuenta y por primera vez (ver useRetoShareOnboarding).
@@ -283,15 +276,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // dispararía sin aportar nada (antes existía para gatear el botón "¿Qué es
   // esto?", que ya no existe).
   const [retoExplainDone, setRetoExplainDone] = useState(false)
-  // Anclas REALES del reveal para los coach-marks de la guía (RetoShareGuide):
-  // la tarjeta de puntuación ("tu resultado") y el mapa con los pines de todos
-  // ("lo que marcaron los demás"). Baratas: refs vacías salvo en el reveal.
+  // Ancla REAL del reveal para el coach-mark de la guía (RetoShareGuide,
+  // rediseño #891): la tarjeta de puntuación ("tu resultado"). Barata: ref
+  // vacía salvo en el reveal. El resto de la explicación ya no vive aquí —
+  // se recorre en el viaje real (tour de TripPage).
   const revealResultRef = useRef<HTMLDivElement>(null)
-  const revealOthersRef = useRef<HTMLDivElement>(null)
-  // Nombre de quien creó el viaje (solo hace falta para el copy de la
-  // explicación de arriba: "el viaje de {ownerName}"). Cosmético: sin
-  // resolverlo, el copy cae al genérico ("un viaje", "Ver el viaje").
-  const [ownerName, setOwnerName] = useState<string | undefined>(undefined)
   // Intensidad del CTA a partir de la 2ª partida (issue #756): recuento del
   // receptor anónimo EN ESTE VIAJE (no solo este reto). Se resuelve reusando
   // `getGroupVotes`/`aggregateLeaderboard` (ya existen para el marcador, sin
@@ -424,7 +413,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           // Solo si se pudo calcular (no rompemos el evento si falla la consulta).
           ...(rankPosition != null && { rank_in_challenge: rankPosition }),
         })
-        toast.show('¡Voto guardado!', { tone: 'success' })
+        // Arriba, no abajo (issue #891): tras revelar, el tutorial del reto
+        // compartido monta un coach-mark cuya burbuja + "Siguiente" viven en la
+        // mitad inferior — un toast abajo lo tapaba. Arriba nunca lo pisa.
+        toast.show('¡Voto guardado!', { tone: 'success', position: 'top' })
       } catch (err) {
         if (err instanceof ResourceGoneError) {
           // Esperable (issue #760, LOCATIONGUESSER-10): el reto se borró con la
@@ -718,29 +710,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       cancelled = true
     }
   }, [groupId])
-
-  // Nombre de quien creó el viaje, SOLO para la entrada por reto compartido
-  // (onboarding pieza 2/4): el resto de jugadas no lo necesita, así que no
-  // pagamos esta consulta extra fuera de `retoShare.active`. Reutiliza
-  // `getGroupMembers` (ya importado para el choque de nombres de `submitName`)
-  // en vez de una consulta nueva. Falla en silencio: sin nombre, el copy de la
-  // explicación cae a la versión genérica ("un viaje", "Ver el viaje").
-  useEffect(() => {
-    if (!retoShare.active || !groupId) return
-    let cancelled = false
-    void getGroupMembers(groupId)
-      .then((members) => {
-        if (cancelled) return
-        const owner = members.find((m) => m.isCreator)
-        if (owner) setOwnerName(owner.name)
-      })
-      .catch(() => {
-        // Sin nombre: el copy usa el fallback genérico.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [retoShare.active, groupId])
 
   // Recuento del receptor anónimo EN EL VIAJE, para intensificar el CTA de
   // guardar cuenta a partir de la 2ª partida (issue #756). Solo tras revelar
@@ -1337,7 +1306,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           <h1 className={styles.title}>{challenge.title}</h1>
         </Stack>
 
-        <div ref={revealOthersRef} className={`${styles.resultMap} lg-rise`}>
+        <div className={`${styles.resultMap} lg-rise`}>
           {/* Issue #795: con respuesta conocida, el mapa de resultado enseña el
               pin de TODOS los que ya jugaron (con su nombre), no solo el mío.
               Sin respuesta todavía (p.ej. un fallo puntual al pedirla) cae al
@@ -1509,7 +1478,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                       group_id: groupId,
                       challenge_id: challenge.id,
                     })
-                    setUpgradeOrigin('play_result')
                     setUpgradeOpen(true)
                   }}
                   className={styles.actionsIn}
@@ -1655,59 +1623,43 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         </div>
       )}
 
-      {/* Guía del reto compartido (onboarding pieza 2/4, issue #888): se monta
-          SOLA en cuanto se revela (este bloque YA vive dentro de la rama
-          `revealed`, ver el `if (!revealed) return …` de arriba), nunca de
-          golpe encima del reveal — los coach-marks son BLOQUEANTES pero
-          SEÑALAN el resultado/mapa reales sin taparlos. `!upgradeOpen` evita
-          apilarla encima del alta real (nunca dos prompts a la vez). */}
+      {/* Guía del reto compartido (onboarding pieza 2/4, rediseño #891): UN
+          coach-mark que señala el resultado real (sin taparlo) en cuanto se
+          revela. "Siguiente" navega al VIAJE REAL y arranca allí el tour
+          (Diario → Bitácora → Marcador); "Saltar" cae directo en el Marcador,
+          sin registro. `!upgradeOpen` evita apilarla sobre el alta real. */}
       {isAnonymous && retoShare.active && !retoExplainDone && !upgradeOpen && (
-          <RetoShareGuide
-            ownerName={ownerName}
-            resultRef={revealResultRef}
-            othersRef={revealOthersRef}
-            onCreateAccount={() => {
-              setRetoExplainDone(true)
-              setUpgradeOrigin('reto_share_register')
-              setUpgradeOpen(true)
-            }}
-            onFinish={() => {
-              setRetoExplainDone(true)
-              // El recorrido acaba en el MARCADOR (no en el Diario), con el
-              // coach-mark de entrada que señala la clasificación real.
-              if (groupId) location.hash = marcadorGuideGroupHash(groupId)
-            }}
-          />
-        )}
+        <RetoShareGuide
+          resultRef={revealResultRef}
+          onNext={() => {
+            setRetoExplainDone(true)
+            // Al viaje real con el tour del reto: `tour=reto` lo lee TripPage
+            // (como el `tour=1` del ejemplo) y lo limpia del hash al terminar.
+            // PlayChallenge se desmonta al cambiar el hash.
+            if (groupId) location.hash = `#g=${encodeURIComponent(groupId)}&tour=reto`
+          }}
+          onSkip={() => {
+            setRetoExplainDone(true)
+            // Saltar: directo al Marcador, sin tarjeta de registro.
+            if (groupId) location.hash = marcadorGroupHash(groupId)
+          }}
+        />
+      )}
 
       {isAnonymous && (
         <AccountUpgradeModal
           open={upgradeOpen}
-          onClose={() => {
-            setUpgradeOpen(false)
-            // Si venía del registro del reto compartido, el recorrido termina
-            // en el Marcador aunque no llegue a crear la cuenta (mismo destino
-            // que "Ahora no"): nunca se queda varado en el reveal.
-            if (upgradeOrigin === 'reto_share_register' && groupId) {
-              location.hash = marcadorGuideGroupHash(groupId)
-            }
-            setUpgradeOrigin('play_result')
-          }}
-          origin={upgradeOrigin}
+          onClose={() => setUpgradeOpen(false)}
+          origin="play_result"
           groupId={groupId}
           challengeId={challenge.id}
           groupName={groupLabel}
           points={upgradePoints}
           onUpgraded={() => {
             setUpgradeOpen(false)
-            const fromRetoShare = upgradeOrigin === 'reto_share_register'
-            setUpgradeOrigin('play_result')
             toast.show(`Guardado. Tus puntos de ${groupLabel} siguen siendo tuyos.`, {
               tone: 'success',
             })
-            // Recién registrado desde el reto compartido: aterriza en el
-            // Marcador con el coach-mark de entrada (igual que el camino anónimo).
-            if (fromRetoShare && groupId) location.hash = marcadorGuideGroupHash(groupId)
           }}
         />
       )}
