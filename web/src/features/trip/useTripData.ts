@@ -13,6 +13,11 @@ import { supabase } from '../../lib/supabase'
 import { countryFromCoords, type CountryInfo } from '../../lib/countryFlag'
 import type { LatLng } from '../../lib/geo'
 import {
+  EXAMPLE_TRIP_GROUP_ID,
+  getExampleTripCountryById,
+  getExampleTripSnapshot,
+} from '../../lib/exampleTrip'
+import {
   pairedChallengeByMemoryId,
   resolveMomentPhoto,
   type Moment,
@@ -221,26 +226,44 @@ export function __resetTripDataCacheForTests(): void {
  *    ya visto arranca con los datos de la última carga buena, sin esqueleto.
  */
 export function useTripData(groupId: string, myUserId: string | null): TripData {
+  // Viaje de EJEMPLO (onboarding nuevo, pieza 4/4): `groupId` centinela que NUNCA
+  // existe como fila real en `groups` (ver `lib/exampleTrip.ts`). Es el ÚNICO punto
+  // de intercepción: por debajo de aquí, `refresh`/el efecto de montaje/la
+  // resolución de país comprueban `isExampleTrip` y se cortan ANTES de tocar
+  // Supabase (REST, Realtime o Storage) — el resto del hook (las derivaciones
+  // `useMemo` de moments/route/leaderboard/pastChallenges) es el MISMO camino que
+  // un viaje real, así que la guía conducida ve datos con las mismas reglas
+  // (anti-spoiler incluido) sin duplicar lógica.
+  const isExampleTrip = groupId === EXAMPLE_TRIP_GROUP_ID
+  // Snapshot puro (sin red): se reconstruye barato en cada render, pero solo lo
+  // LEEN los inicializadores perezosos de abajo, que React solo invoca una vez
+  // (al montar) — nunca sustituye un estado ya en marcha.
+  const exampleSnapshot = isExampleTrip ? getExampleTripSnapshot() : null
+
   const cacheKey = tripCacheKey(groupId, myUserId)
   const cached = tripDataCache.get(cacheKey)
 
-  const [group, setGroup] = useState<GroupInfo | null>(() => cached?.snapshot.group ?? null)
-  const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(
-    () => cached?.snapshot.challenges ?? null,
+  const [group, setGroup] = useState<GroupInfo | null>(
+    () => exampleSnapshot?.group ?? cached?.snapshot.group ?? null,
   )
-  const [votes, setVotes] = useState<VoteWithName[] | null>(() => cached?.snapshot.votes ?? null)
+  const [challenges, setChallenges] = useState<ChallengeForPlay[] | null>(
+    () => exampleSnapshot?.challenges ?? cached?.snapshot.challenges ?? null,
+  )
+  const [votes, setVotes] = useState<VoteWithName[] | null>(
+    () => exampleSnapshot?.votes ?? cached?.snapshot.votes ?? null,
+  )
   // Respuestas (lat/lng) de los CERRADOS; los activos no entran aquí a propósito.
   const [answersById, setAnswersById] = useState<Map<string, LatLng>>(
-    () => cached?.snapshot.answersById ?? new Map(),
+    () => exampleSnapshot?.answersById ?? cached?.snapshot.answersById ?? new Map(),
   )
   // URL firmada de cada foto, indexada por challenge_id (bucket privado).
   const [imageUrlById, setImageUrlById] = useState<Record<string, string>>(
-    () => cached?.snapshot.imageUrlById ?? {},
+    () => exampleSnapshot?.imageUrlById ?? cached?.snapshot.imageUrlById ?? {},
   )
   // URL firmada de cada nota de voz, indexada por challenge_id (mismo bucket
   // privado, prefijo `audio/`, #648). Mismo patrón que `imageUrlById`.
   const [audioUrlById, setAudioUrlById] = useState<Record<string, string>>(
-    () => cached?.snapshot.audioUrlById ?? {},
+    () => exampleSnapshot?.audioUrlById ?? cached?.snapshot.audioUrlById ?? {},
   )
   // URL firmada de cada clip de vídeo corto, indexada por challenge_id (mismo
   // bucket privado, prefijo `video/`, issue #649). A diferencia de
@@ -253,13 +276,17 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   // solo sobre los RECUERDOS del lote (`is_challenge = false`) — un reto no
   // puede tener vídeo (`promoteToChallenge` lo vacía), así que ni se pregunta.
   const [videoUrlById, setVideoUrlById] = useState<Record<string, string>>(
-    () => cached?.snapshot.videoUrlById ?? {},
+    () => exampleSnapshot?.videoUrlById ?? cached?.snapshot.videoUrlById ?? {},
   )
   // País por challenge_id, resuelto de forma escalonada y no bloqueante (abajo).
   // Solo se rellena para CERRADOS con coord; va apareciendo según se resuelve.
   // Fuera de la caché (ver comentario de `TripDataSnapshot`): se resuelve de
   // nuevo en cada montaje, barato porque `countryFromCoords` ya cachea por coord.
-  const [countryById, setCountryById] = useState<Record<string, CountryInfo | null>>({})
+  // El viaje de ejemplo trae el suyo YA fijado (`getExampleTripCountryById`):
+  // nunca pasa por Nominatim (ver el efecto de resolución más abajo).
+  const [countryById, setCountryById] = useState<Record<string, CountryInfo | null>>(() =>
+    isExampleTrip ? getExampleTripCountryById() : {},
+  )
   const [error, setError] = useState<string | null>(null)
   // Cuándo se resolvió la última carga (issue #638): alimenta `useVisibilityReload`.
   // Sembrado desde la caché si ya había una respuesta previa (si no, null —
@@ -270,6 +297,11 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   // evento de Realtime. Tras tenerlos, resuelve respuestas e imágenes (asíncrono,
   // así que el setState nunca corre síncrono en el cuerpo de un efecto).
   const refresh = useCallback(async () => {
+    // Viaje de ejemplo: los 7 datos ya están sembrados en memoria (ver los
+    // `useState` de arriba) — solo lectura, nunca pega a Supabase. Este `return`
+    // temprano es el punto de intercepción real: nada por debajo de aquí
+    // (REST, RPC, Storage) llega a ejecutarse para el groupId centinela.
+    if (isExampleTrip) return
     try {
       const [g, c, v] = await Promise.all([
         getGroup(groupId),
@@ -356,7 +388,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
     } catch {
       setError('No hemos podido cargar el viaje. Reintenta en un momento.')
     }
-  }, [groupId, cacheKey])
+  }, [groupId, cacheKey, isExampleTrip])
 
   // Re-firma defensiva (issue #638): mismo margen que la home — si la pestaña
   // vuelve tras estar de fondo con el dato viejo, las fotos del viaje (héroes,
@@ -369,6 +401,10 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- refresh es async: el setState corre tras el fetch, no síncrono
     void refresh()
+    // Viaje de ejemplo: sin Realtime — no hay votos/retos reales que escuchar
+    // (y suscribirse igualmente abriría un canal contra un `group_id` que no
+    // existe en la base de datos, ruido sin ningún evento que recibir nunca).
+    if (isExampleTrip) return
     // Realtime opcional: refrescamos al entrar/cambiar cualquier voto del grupo
     // (contadores de "adivinaron") sin romper si el canal falla.
     const channel = supabase
@@ -384,7 +420,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [groupId, refresh])
+  }, [groupId, refresh, isExampleTrip])
 
   // Coordenadas candidatas a bandera: momentos con un lugar VISIBLE en el mapa.
   //  - RECUERDO: su lugar (`place_lat`/`place_lng`), siempre visible.
@@ -415,6 +451,9 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   // cachea por coord redondeada, así que solo espaciamos las peticiones REALES a
   // Nominatim; las cacheadas resuelven al instante sin gastar el presupuesto de 1 req/s.
   useEffect(() => {
+    // Viaje de ejemplo: el país de cada momento ya viene FIJADO (semilla de
+    // `countryById`, arriba) — nunca pasa por Nominatim.
+    if (isExampleTrip) return
     if (flagTargets.length === 0) return
     // `cancelled` corta el bucle si cambia el groupId/targets o se desmonta: así
     // nunca hacemos setState tras unmount ni mezclamos datos de otro viaje.
@@ -436,7 +475,7 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
     return () => {
       cancelled = true
     }
-  }, [flagTargets])
+  }, [flagTargets, isExampleTrip])
 
   // Nº de votantes distintos por reto: el contador REAL de "quién ha adivinado".
   const guessedCountById = useMemo(() => {

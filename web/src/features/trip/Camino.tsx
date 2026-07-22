@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, RefObject } from 'react'
 import { AlertTriangle, ChevronRight, Compass, Trophy } from 'lucide-react'
 import { Avatar, Badge, ChallengePhoto, Icon, useReducedMotion } from '../../ui'
 import { formatDeadline } from '../../lib/time'
@@ -13,6 +13,11 @@ interface Props {
   onPlayChallenge: (challengeId: string) => void
   /** Cualquier CERRADO, o un EN JUEGO ya jugado: abre el detalle completo. */
   onViewChallenge: (challengeId: string) => void
+  /**
+   * Ancla del PRIMER hito para `GuidedTour` (viaje de ejemplo, onboarding nuevo
+   * pieza 4/4): "Así se juega uno." Opcional y sin efecto fuera de la guía.
+   */
+  firstHitoRef?: RefObject<HTMLLIElement | null>
 }
 
 // El stagger de entrada se capa a los primeros hitos (issue #831, rescatado del
@@ -68,9 +73,11 @@ interface HitoProps {
   index: number
   onPlayChallenge: (challengeId: string) => void
   onViewChallenge: (challengeId: string) => void
+  /** Solo el PRIMER hito lo recibe (ver `Camino`, más abajo). */
+  hitoRef?: RefObject<HTMLLIElement | null>
 }
 
-function Hito({ challenge: c, index, onPlayChallenge, onViewChallenge }: HitoProps) {
+function Hito({ challenge: c, index, onPlayChallenge, onViewChallenge, hitoRef }: HitoProps) {
   const isLive = c.status === 'active'
   // Anti-spoiler (issue #800, idéntico al Marcador de antes): un EN JUEGO sin
   // jugar va a JUGAR (nunca al detalle, que revelaría el mapa); cualquier otro
@@ -83,6 +90,7 @@ function Hito({ challenge: c, index, onPlayChallenge, onViewChallenge }: HitoPro
       className={styles.hito}
       style={{ '--i': Math.min(index, STAGGER_CAP) } as CSSProperties}
       data-camino-hito
+      ref={hitoRef}
     >
       <span
         className={[styles.node, isLive ? styles.nodeLive : styles.nodeClosed].join(' ')}
@@ -170,7 +178,7 @@ function Hito({ challenge: c, index, onPlayChallenge, onViewChallenge }: HitoPro
  * `IntersectionObserver` (jsdom/navegadores viejos), se muestran todos ya
  * revelados en vez de quedar invisibles a la espera de un scroll que no llega.
  */
-export function Camino({ pastChallenges, onPlayChallenge, onViewChallenge }: Props) {
+export function Camino({ pastChallenges, onPlayChallenge, onViewChallenge, firstHitoRef }: Props) {
   const rootRef = useRef<HTMLOListElement>(null)
   const reduced = useReducedMotion()
 
@@ -216,6 +224,7 @@ export function Camino({ pastChallenges, onPlayChallenge, onViewChallenge }: Pro
             index={i}
             onPlayChallenge={onPlayChallenge}
             onViewChallenge={onViewChallenge}
+            hitoRef={i === 0 ? firstHitoRef : undefined}
           />
         ))}
       </ol>

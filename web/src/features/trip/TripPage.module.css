@@ -78,6 +78,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Marco "Ejemplo" (onboarding nuevo, pieza 4/4): pegado al nombre del viaje,
+   nunca en su propia línea (el título ya es corto, "Vuelta al mundo"). */
+.exampleBadge {
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
 .tripMeta {
   display: block;
   max-width: 100%;

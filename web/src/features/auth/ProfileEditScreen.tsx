@@ -10,18 +10,31 @@
 // contenido (NO pegada al atrás). La lógica de guardado/avatar no cambia.
 
 import { useState } from 'react'
-import { Check, Wrench } from 'lucide-react'
+import { Check, ChevronRight, Compass, MapPinned, Plus, UserPlus, Wrench } from 'lucide-react'
 import { AppHeader, Avatar, Button, Field, Icon, Input, Stack, useToast } from '../../ui'
 import { ShellUtilitario } from '../../ui/shells'
 import { upsertProfile } from '../../lib/profile'
 import { signOut } from '../../lib/auth'
+import { exampleTripHash } from '../../lib/route'
 import { PushNotificationsControl } from './PushNotificationsControl'
 import { uploadAvatar } from '../../lib/storage'
 import { ANIMAL_EMOJIS, avatarToken, parseAvatar } from '../../lib/avatar'
 import { track } from '../../lib/analytics'
 import type { Profile } from '../../lib/database.types'
 import { AvatarPhotoPicker } from './AvatarPhotoPicker'
+import { getSlides, OnboardingSlideshow, useOnboarding } from '../onboarding'
+import type { OnboardingContext } from '../../lib/onboardingFlags'
 import styles from './ProfileEditScreen.module.css'
+
+// Contextos de los TRES tutoriales-slideshow reabribles desde "Tutoriales"
+// (onboarding nuevo, pieza 4/4): "Empezar un viaje" es el MISMO recorrido que
+// "Ver tutorial" de la home (`entry`, ver `HomePage.tsx`); "Jugar un reto" y
+// "Te han invitado" reutilizan el contenido de los tutoriales por-pantalla
+// LEGADO (`challenge`/`group`, `lib/onboardingFlags.ts`) — ya no se auto-
+// muestran en ningún sitio, así que revivirlos aquí como repaso manual no
+// choca con nada. "Ver un viaje de ejemplo" no es un slideshow: abre el viaje
+// de ejemplo con la guía conducida (`GuidedTour`, ver `TripPage`/`exampleTripHash`).
+type TutorialSlideContext = Extract<OnboardingContext, 'entry' | 'challenge' | 'group'>
 
 interface Props {
   userId: string
@@ -45,6 +58,24 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+
+  // Sección "Tutoriales" (onboarding nuevo, pieza 4/4): "Repasa cómo funciona
+  // Momentu cuando quieras." Reutiliza el MISMO gate que "Ver tutorial" de la
+  // home (`useOnboarding` + un forzado local) para cada uno de los tres
+  // recorridos-slideshow — solo cambia CUÁL se fuerza.
+  const [openTutorial, setOpenTutorial] = useState<TutorialSlideContext | null>(null)
+  const entryTutorial = useOnboarding('entry', userId, profile?.onboarding)
+  const challengeTutorial = useOnboarding('challenge', userId, profile?.onboarding)
+  const groupTutorial = useOnboarding('group', userId, profile?.onboarding)
+  const TUTORIAL_GATE: Record<TutorialSlideContext, { markSeen: () => void }> = {
+    entry: entryTutorial,
+    challenge: challengeTutorial,
+    group: groupTutorial,
+  }
+  function closeTutorial() {
+    if (openTutorial) TUTORIAL_GATE[openTutorial].markSeen()
+    setOpenTutorial(null)
+  }
 
   // Emoji actualmente seleccionado (para marcarlo en el grid). Si el perfil aún
   // no tiene animal explícito, se resalta el animal por defecto del id.
@@ -214,6 +245,87 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
           <PushNotificationsControl userId={userId} profile={profile} />
         </Stack>
 
+        {/* Tutoriales (onboarding nuevo, pieza 4/4): repasa cualquier recorrido
+            cuando quieras, sin esperar a que la app decida mostrarlo. Cada fila
+            relanza su propio gate (mismo mecanismo que "Ver tutorial" de la
+            home); "Ver un viaje de ejemplo" es la única que no es un slideshow:
+            abre el viaje de ejemplo con la guía conducida. */}
+        <div className={styles.tutorials}>
+          <span className={styles.sectionLabel}>Tutoriales</span>
+          <p className={styles.tutorialsIntro}>Repasa cómo funciona Momentu cuando quieras.</p>
+          <div className={styles.tutorialList}>
+            <button
+              type="button"
+              className={styles.tutorialRow}
+              onClick={() => setOpenTutorial('entry')}
+            >
+              <span className={styles.tutorialIcon}>
+                <Icon icon={Plus} size={18} />
+              </span>
+              <span className={styles.tutorialText}>
+                <b>Empezar un viaje</b>
+                <span>Crear, subir momentos, invitar y lanzar retos.</span>
+              </span>
+              <span className={styles.tutorialGo}>
+                Ver <Icon icon={ChevronRight} size={16} />
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={styles.tutorialRow}
+              onClick={() => setOpenTutorial('challenge')}
+            >
+              <span className={styles.tutorialIcon}>
+                <Icon icon={Compass} size={18} />
+              </span>
+              <span className={styles.tutorialText}>
+                <b>Jugar un reto</b>
+                <span>Adivinar en el mapa a contrarreloj.</span>
+              </span>
+              <span className={styles.tutorialGo}>
+                Ver <Icon icon={ChevronRight} size={16} />
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={styles.tutorialRow}
+              onClick={() => setOpenTutorial('group')}
+            >
+              <span className={styles.tutorialIcon}>
+                <Icon icon={UserPlus} size={18} />
+              </span>
+              <span className={styles.tutorialText}>
+                <b>Te han invitado</b>
+                <span>Qué pasa cuando entras al viaje de tu gente.</span>
+              </span>
+              <span className={styles.tutorialGo}>
+                Ver <Icon icon={ChevronRight} size={16} />
+              </span>
+            </button>
+
+            <button
+              type="button"
+              className={styles.tutorialRow}
+              onClick={() => {
+                location.hash = exampleTripHash(true)
+              }}
+            >
+              <span className={styles.tutorialIcon}>
+                <Icon icon={MapPinned} size={18} />
+              </span>
+              <span className={styles.tutorialText}>
+                <b>Ver un viaje de ejemplo</b>
+                <span>Explora un viaje de muestra a tu aire.</span>
+              </span>
+              <span className={styles.tutorialGo}>
+                Ver <Icon icon={ChevronRight} size={16} />
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* Acciones secundarias, separadas del formulario y del "atrás" (que ya
             vive en la cabecera): vista de administración (si aplica) y cerrar
             sesión, al pie del contenido. */}
@@ -228,6 +340,17 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
           </Button>
         </div>
       </ShellUtilitario>
+
+      {/* Slideshow forzado (onboarding nuevo, pieza 4/4): mismo componente que
+          gatea `OnboardingGate` en el resto de la app, aquí montado a mano sin
+          pasar por el gate de "primera vez" — es un repaso deliberado. */}
+      {openTutorial && (
+        <OnboardingSlideshow
+          slides={getSlides(openTutorial)}
+          onComplete={closeTutorial}
+          onSkip={closeTutorial}
+        />
+      )}
     </div>
   )
 }

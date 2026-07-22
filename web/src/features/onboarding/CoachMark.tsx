@@ -6,13 +6,16 @@
 // FAB "+" del Diario vacío (ver TripPage), pero deliberadamente genérico
 // (recibe un `targetRef`, no sabe nada de FABs ni de viajes) para que la
 // pieza 4 (revivir tutoriales desde el perfil) pueda reanclarlo a otros
-// elementos reales sin duplicar el motor de spotlight/medición.
+// elementos reales sin duplicar el motor de spotlight/medición. `GuidedTour`
+// (pieza 4/4, viaje de ejemplo) encadena varios de estos pasos añadiendo
+// `primaryAction` ("Siguiente"): el resto de usos (creador) no lo pasan y
+// se quedan con el único botón de cierre de siempre.
 //
 // Nunca atrapa toques fuera del objetivo: el spotlight/halo son decoración
 // `pointer-events: none` — el elemento resaltado sigue siendo el MISMO nodo
 // del DOM real, así que tocarlo (a través del hueco visual) dispara su propio
-// handler sin que esta capa se interponga. Solo el botón "Saltar guía" captura
-// toques.
+// handler sin que esta capa se interponga. Solo los botones de acción (cierre
+// y, si lo hay, "Siguiente") capturan toques.
 
 import { useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react'
 import { useReducedMotion } from '../../ui'
@@ -27,6 +30,12 @@ export interface CoachMarkProps {
   body: ReactNode
   /** Copy del cierre. Por defecto "Saltar guía"; la pieza 4 puede pasar otro. */
   dismissLabel?: string
+  /**
+   * Acción PRIMARIA opcional junto al cierre (p.ej. "Siguiente" de `GuidedTour`,
+   * pieza 4/4). Sin ella, el coach-mark se queda con el único botón de cierre
+   * de siempre (creador, pieza 3/4) — puramente aditivo.
+   */
+  primaryAction?: { label: string; onClick: () => void }
   /** Etiqueta accesible de la burbuja para el lector de pantalla. */
   ariaLabel: string
   onDismiss: () => void
@@ -49,6 +58,7 @@ export function CoachMark({
   title,
   body,
   dismissLabel = 'Saltar guía',
+  primaryAction,
   ariaLabel,
   onDismiss,
 }: CoachMarkProps) {
@@ -104,11 +114,28 @@ export function CoachMark({
         {step && <span className={`t-label ${styles.step}`}>{step}</span>}
         <h3 className={`t-title ${styles.title}`}>{title}</h3>
         <p className={`t-body ${styles.body}`}>{body}</p>
+
+        {/* Fila de acciones DENTRO de la burbuja (hereda su posición, sin cálculo
+            propio): con `primaryAction` (GuidedTour, pieza 4/4), "Saltar" convive
+            con "Siguiente"; el botón de cierre en solitario del creador (pieza
+            3/4) se queda flotando arriba-derecha, fuera de la burbuja (`.dismiss`). */}
+        {primaryAction && (
+          <div className={styles.actions}>
+            <button type="button" className={styles.dismissInline} onClick={onDismiss}>
+              {dismissLabel}
+            </button>
+            <button type="button" className={styles.primary} onClick={primaryAction.onClick}>
+              {primaryAction.label}
+            </button>
+          </div>
+        )}
       </div>
 
-      <button type="button" className={styles.dismiss} onClick={onDismiss}>
-        {dismissLabel}
-      </button>
+      {!primaryAction && (
+        <button type="button" className={styles.dismiss} onClick={onDismiss}>
+          {dismissLabel}
+        </button>
+      )}
     </div>
   )
 }

@@ -1,0 +1,66 @@
+/* Pantalla de CIERRE de GuidedTour: sin objetivo que resaltar, centrada, con
+ * el mismo scrim/vidrio que el resto del onboarding oscuro (CoachMark). */
+.closing {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  background: var(--scene-scrim-strong);
+}
+
+.card {
+  max-width: 360px;
+  width: 100%;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--scene-shadow);
+  padding: var(--space-6) var(--space-5) var(--space-5);
+  text-align: center;
+  color: var(--scene-ink);
+}
+
+.title {
+  margin: 0 0 var(--space-2);
+  color: var(--scene-ink);
+}
+
+.body {
+  margin: 0 0 var(--space-5);
+  color: var(--scene-ink-soft);
+}
+
+.cta {
+  appearance: none;
+  cursor: pointer;
+  width: 100%;
+  background: var(--scene-ink);
+  color: var(--scene-bg);
+  border: none;
+  border-radius: var(--radius-full);
+  padding: var(--space-3) var(--space-5);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  transition: transform var(--motion-transition-fast);
+}
+.cta:hover {
+  transform: translateY(-1px);
+}
+.cta:focus-visible {
+  outline: 2px solid var(--scene-ink);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta {
+    transition: none;
+  }
+  .cta:hover {
+    transform: none;
+  }
+}

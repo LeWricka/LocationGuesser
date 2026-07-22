@@ -8,6 +8,8 @@
 // Se modelan como vistas atómicas: si el hash es exactamente esa palabra, manda;
 // el deep link `#g`/`#c` sigue funcionando igual que antes.
 
+import { EXAMPLE_TRIP_GROUP_ID } from './exampleTrip'
+
 export type View = 'home' | 'new' | 'profile'
 
 export interface Route {
@@ -229,5 +231,18 @@ export function stripOwnerInviteToken(hash: string): string {
   if (!raw.includes('adm=')) return hash.startsWith('#') ? hash : `#${hash}`
   const params = new URLSearchParams(raw)
   params.delete('adm')
+  return `#${params.toString()}`
+}
+
+/**
+ * Hash del viaje de EJEMPLO (onboarding nuevo, pieza 4/4, `lib/exampleTrip.ts`):
+ * `#g=ejemplo` abre el mismo viaje que "Ver un viaje de ejemplo" del perfil,
+ * `withTour` añade `&tour=1` para arrancar además la guía conducida
+ * (`GuidedTour`) — `TripPage` la consume una sola vez al montar y la retira
+ * del hash, igual criterio que `ownerInviteToken`/`stripOwnerInviteToken`.
+ */
+export function exampleTripHash(withTour = false): string {
+  const params = new URLSearchParams({ g: EXAMPLE_TRIP_GROUP_ID })
+  if (withTour) params.set('tour', '1')
   return `#${params.toString()}`
 }

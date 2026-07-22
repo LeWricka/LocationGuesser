@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, ReactNode, RefObject } from 'react'
 import { Crown, Gift, Share2, Skull, User } from 'lucide-react'
 import { Avatar, Button, CountUp, Icon, IconDiana } from '../../ui'
 import type { LeaderboardEntry } from '../../lib/leaderboard'
@@ -56,6 +56,16 @@ interface Props {
   onViewChallenge: (challengeId: string) => void
   /** Tras guardar los premios: refresca el viaje para que los chips reflejen el cambio. */
   onPrizesSaved: () => void
+  /**
+   * Anclas de `GuidedTour` (viaje de ejemplo, onboarding nuevo pieza 4/4), todas
+   * opcionales y sin efecto fuera de la guía: el podio ("Y quién va ganando."),
+   * el envoltorio de "El camino" ("Los retos del viaje: aquí se juega.") y el
+   * PRIMER hito de la ruta ("Así se juega uno.") — este último se reenvía a
+   * `Camino`, que lo ata a su primer `<li>`.
+   */
+  podioRef?: RefObject<HTMLOListElement | null>
+  caminoWrapRef?: RefObject<HTMLDivElement | null>
+  firstHitoRef?: RefObject<HTMLLIElement | null>
 }
 
 // Orden de ENTRADA del podio: 3º → 2º → 1º (el ganador remata la coreografía).
@@ -183,6 +193,9 @@ export function MarcadorTab({
   onPlayChallenge,
   onViewChallenge,
   onPrizesSaved,
+  podioRef,
+  caminoWrapRef,
+  firstHitoRef,
 }: Props) {
   const [editingPrizes, setEditingPrizes] = useState(false)
   const hasEntries = leaderboard.length > 0
@@ -210,7 +223,7 @@ export function MarcadorTab({
     <div className={styles.marcador}>
       {hasEntries ? (
         <>
-          <ol className={styles.podio} aria-label="Podio">
+          <ol className={styles.podio} aria-label="Podio" ref={podioRef}>
             {podio.map((entry, i) => {
               const rank = (i + 1) as 1 | 2 | 3
               const esMio = entry.userId === myUserId
@@ -486,11 +499,14 @@ export function MarcadorTab({
           (`onPlayChallenge` vs `onViewChallenge`); la pieza entera vive en
           `Camino.tsx` (extraída por tamaño). No renderiza nada si no hay
           ningún reto: no añade ruido a un viaje recién creado. */}
-      <Camino
-        pastChallenges={pastChallenges}
-        onPlayChallenge={onPlayChallenge}
-        onViewChallenge={onViewChallenge}
-      />
+      <div ref={caminoWrapRef}>
+        <Camino
+          pastChallenges={pastChallenges}
+          onPlayChallenge={onPlayChallenge}
+          onViewChallenge={onViewChallenge}
+          firstHitoRef={firstHitoRef}
+        />
+      </div>
 
       {isOwner && editingPrizes && (
         <PrizesEditorModal

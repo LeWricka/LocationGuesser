@@ -11,6 +11,7 @@ import { track } from '../../lib/analytics'
 import { redeemOwnerInvite } from '../../lib/ownerInvites'
 import { ResourceGoneError, describeError } from '../../lib/errors'
 import { addBreadcrumb, reportError } from '../../lib/observability'
+import { EXAMPLE_TRIP_GROUP_ID } from '../../lib/exampleTrip'
 import { useToast } from '../../ui'
 
 /**
@@ -38,6 +39,21 @@ export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false)
   const joinIfGroup = useCallback(
     async (hash: string): Promise<void> => {
       const route = parseHash(hash)
+
+      // Viaje de EJEMPLO (onboarding nuevo, pieza 4/4): id CENTINELA puro, NUNCA
+      // existe como fila real en `groups` (ver `lib/exampleTrip.ts`) — a
+      // propósito, para no depender de ninguna migración. Sin este corte,
+      // `joinGroup` violaría la FK hacia `groups` (23503), `ResourceGoneError`
+      // dejaría al usuario en `JoinErrorScreen` ("Este viaje ya no existe") y el
+      // viaje de ejemplo sería IRRECUPERABLE para cualquier sesión (logueada o
+      // anónima). Mismo patrón de intercepción que `useTripData`/`BitacoraTab`:
+      // cortar ANTES de tocar Supabase, ni join ni analítica. Restauramos el
+      // destino tal cual (sin `stripOwnerInviteToken`: el ejemplo nunca lleva
+      // `adm=`) para que `#g=ejemplo`/`&tour=1` aterricen en TripPage sin trámite.
+      if (route.group === EXAMPLE_TRIP_GROUP_ID) {
+        if (window.location.hash !== hash) window.location.hash = hash
+        return
+      }
 
       // Sin grupo en el destino → no hay nada que unir; el router decide la home.
       // (No es un error: es la navegación normal cuando el destino guardado no
