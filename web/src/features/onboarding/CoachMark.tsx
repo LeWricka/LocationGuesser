@@ -66,6 +66,15 @@ export interface CoachMarkProps {
 const RECHECK_MS = 400
 const MARGIN_PX = 16
 const RING_PADDING_PX = 10
+// Margen interior del aro respecto al viewport cuando el objetivo se SALE de la
+// pantalla (issue #895): recortarlo a `[0, vw/vh]` dejaba el aro pegado al borde
+// y el `.pulse` (glow box-shadow 24px + pulsación `scale(1.06)`, que en un aro a
+// pantalla completa desborda ~24px por lado) se salía. 48px = glow (24) + la
+// holgura de la pulsación, así el aro Y su glow quedan SIEMPRE dentro. Solo se
+// aplica a los lados que DESBORDAN (objetivo gigante, el Diario a pantalla
+// completa); un objetivo pequeño pegado a un borde se sigue ciñendo sin
+// despegarse (su glow puede rozar el borde, igual que antes).
+const RING_VIEWPORT_MARGIN_PX = 48
 // Hueco mínimo (px) para que la burbuja quepa cómoda a un lado del objetivo.
 // Con un objetivo ENORME (el mapa a pantalla completa, modo `blocking`) ni
 // arriba ni abajo hay tanto hueco: en ese caso la clavamos al borde inferior
@@ -100,18 +109,26 @@ export function CoachMark({
     }
   }, [targetRef])
 
-  // Aro CONTENIDO (issue #888): con un objetivo enorme (el mapa a pantalla
-  // completa) el rect + el padding se salía del viewport ("cuadrado dorado
-  // que se sale del mapa"). Recortamos a [0, innerWidth/Height] tras aplicar
-  // el padding, así el aro nunca se desborda.
+  // Aro CONTENIDO (issue #888/#895): con un objetivo enorme (el mapa a pantalla
+  // completa) el rect + el padding se salía del viewport. Antes recortábamos a
+  // [0, vw/vh], pero eso pegaba el aro AL BORDE y su glow (el `.pulse`: box-shadow
+  // 24px + `scale(1.06)`) seguía saliéndose. Ahora, SOLO en los lados donde el aro
+  // se saldría (objetivo gigante), lo metemos hasta `margin` (deja dentro glow +
+  // pulso). A un objetivo pequeño pegado a un borde NO lo despegamos: se sigue
+  // ciñendo (su glow puede rozar el borde, como hasta ahora).
   const ringStyle = useMemo(() => {
     if (!rect) return null
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const left = Math.max(0, rect.left - RING_PADDING_PX)
-    const top = Math.max(0, rect.top - RING_PADDING_PX)
-    const right = Math.min(vw, rect.right + RING_PADDING_PX)
-    const bottom = Math.min(vh, rect.bottom + RING_PADDING_PX)
+    const m = RING_VIEWPORT_MARGIN_PX
+    let left = rect.left - RING_PADDING_PX
+    let top = rect.top - RING_PADDING_PX
+    let right = rect.right + RING_PADDING_PX
+    let bottom = rect.bottom + RING_PADDING_PX
+    if (left < 0) left = m
+    if (top < 0) top = m
+    if (right > vw) right = vw - m
+    if (bottom > vh) bottom = vh - m
     return { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) }
   }, [rect])
 

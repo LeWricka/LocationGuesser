@@ -68,7 +68,11 @@
      el toque aunque `.layer` sea pass-through — nunca deja pasar nada A TRAVÉS
      de la burbuja, solo por el hueco del spotlight. */
   pointer-events: auto;
-  background: var(--glass-bg);
+  /* Fondo SÓLIDO (issue #895): la burbuja se pinta sobre escenas arbitrarias
+     (foto/globo/satélite) y con `--glass-bg` (~38%) el texto quedaba ilegible.
+     `--scene-surface-solid` es casi opaco: la legibilidad ya no depende de la
+     translucidez. El borde y el blur se conservan solo como ACABADO. */
+  background: var(--scene-surface-solid);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   backdrop-filter: blur(var(--glass-blur));

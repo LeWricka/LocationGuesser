@@ -33,7 +33,7 @@ function Harness({
 describe('RetoShareGuide (rediseño #891)', () => {
   test('señala el resultado sin taparlo (es un coach-mark, no un overlay)', () => {
     render(<Harness />)
-    expect(screen.getByText('Esto es tu resultado')).toBeInTheDocument()
+    expect(screen.getByText('Este es tu resultado')).toBeInTheDocument()
     // El reveal sigue en el DOM debajo.
     expect(screen.getByText('tarjeta de resultado')).toBeInTheDocument()
   })

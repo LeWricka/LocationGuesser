@@ -327,8 +327,8 @@ describe('TripPage — FABs para usuarios ANÓNIMOS (#888/#891)', () => {
 describe('TripPage — tour del reto compartido (#891)', () => {
   const anonSession: SessionState = { ...session, isAnonymous: true }
 
-  function renderRetoTour() {
-    window.location.hash = '#g=g1&tour=reto'
+  function renderRetoTour(hash = '#g=g1&tour=reto') {
+    window.location.hash = hash
     render(
       <SessionContext.Provider value={anonSession}>
         <ToastProvider>
@@ -377,6 +377,49 @@ describe('TripPage — tour del reto compartido (#891)', () => {
     expect(await screen.findByTestId('marcador')).toBeInTheDocument()
     expect(screen.queryByText('No pierdas tus retos')).not.toBeInTheDocument()
     expect(window.location.hash).not.toContain('tour=reto')
+  })
+
+  // Cambio #895: durante el tour NO se ven los FABs (el "+" del anónimo ni el
+  // "Compartir") — se colaban por encima del coach-mark.
+  test('durante el tour no se ven los FABs', async () => {
+    mockTripData()
+    renderRetoTour()
+    await screen.findByText('El viaje entero')
+    expect(
+      screen.queryByRole('button', { name: 'Regístrate para crear tus viajes' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^compartir$/i })).not.toBeInTheDocument()
+  })
+
+  // Cambio #895: con `rc` (reto de retorno), al terminar el tour se ofrece el
+  // registro y, al CERRARLO ("Ahora no"), se vuelve al REVELADO del reto
+  // (`#g=…&c=<rc>`), no al Marcador — el usuario recupera su resultado.
+  test('con rc: "Listo" → registro → "Ahora no" vuelve al revelado del reto', async () => {
+    mockTripData()
+    renderRetoTour('#g=g1&tour=reto&rc=cRETO')
+
+    await screen.findByText('El viaje entero')
+    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await screen.findByText('Todo el viaje, en orden')
+    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    await screen.findByText('Aquí se juega')
+    await userEvent.click(screen.getByRole('button', { name: 'Listo' }))
+
+    // Remata con el registro (saltable).
+    expect(await screen.findByText('No pierdas tus retos')).toBeInTheDocument()
+    // "Ahora no" cierra y vuelve al revelado del reto de retorno.
+    await userEvent.click(screen.getByRole('button', { name: 'Ahora no' }))
+    expect(window.location.hash).toBe('#g=g1&c=cRETO')
+  })
+
+  // Cambio #895: con `rc`, "Saltar" va DIRECTO al revelado del reto, sin registro.
+  test('con rc: "Saltar" va directo al revelado del reto, sin registro', async () => {
+    mockTripData()
+    renderRetoTour('#g=g1&tour=reto&rc=cRETO')
+    await screen.findByText('El viaje entero')
+    await userEvent.click(screen.getByRole('button', { name: 'Saltar' }))
+    expect(screen.queryByText('No pierdas tus retos')).not.toBeInTheDocument()
+    expect(window.location.hash).toBe('#g=g1&c=cRETO')
   })
 })
 

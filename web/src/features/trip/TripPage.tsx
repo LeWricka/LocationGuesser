@@ -319,6 +319,19 @@ export function TripPage({
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     return params.get('g') === groupId && params.get('tour') === 'reto'
   })
+  // Reto de RETORNO (issue #895): el revelado del reto pasa su id en `rc` al
+  // arrancar el tour (`#g=…&tour=reto&rc=<challengeId>`). Al terminar/saltar
+  // volvemos a ESE revelado (`#g=…&c=<challengeId>`), no al Marcador — así el
+  // usuario recupera su resultado. `rc` (no `c`) a propósito: `c` abriría
+  // PlayChallenge de inmediato y cortaría el tour. Se lee UNA vez al montar y se
+  // conserva mientras corre el tour; sin `rc` (p.ej. el tour del ejemplo) el
+  // cierre mantiene el comportamiento de siempre (queda en el Marcador).
+  const [retoReturnChallengeId] = useState(() => {
+    if (isExampleTrip) return null
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    if (params.get('g') !== groupId || params.get('tour') !== 'reto') return null
+    return params.get('rc')
+  })
   // Cierre del tour del reto: registro opcional (`GuestRegisterPrompt`) y, tras
   // "Crear cuenta", el alta real (`AccountUpgradeModal`). Ambos dejan al usuario
   // en el Marcador (donde acaba el tour).
@@ -802,8 +815,9 @@ export function TripPage({
   // Pasos del tour del RETO COMPARTIDO (issue #891): TRES pantallas reales del
   // viaje, una por pestaña — Diario → Bitácora → Marcador. Más corto que el del
   // ejemplo (aquí quien lo ve acaba de jugar un reto, no necesita el recorrido
-  // completo). El paso del Diario es `blocking`: su objetivo es el mapa/globo
-  // vivo (Leaflet), donde dejar pasar el toque lo arrastraría en vez de avanzar.
+  // completo). LOS TRES pasos son `blocking` (issue #895): además de evitar que
+  // el toque se cuele al mapa/globo vivo (Leaflet), el scrim bloqueante atenúa el
+  // fondo con textura para que la burbuja del coach-mark se lea sobre él.
   const retoTourSteps: TourStep[] = useMemo(
     () => [
       {
@@ -822,6 +836,7 @@ export function TripPage({
         ariaLabel: 'Todo el viaje, en orden',
         body: 'En la Bitácora lo hojeas entero, día a día.',
         onBeforeShow: () => setSection('fotos'),
+        blocking: true,
       },
       {
         targetRef: podioRef,
@@ -830,6 +845,7 @@ export function TripPage({
         ariaLabel: 'Aquí se juega',
         body: 'Los retos del viaje y quién va ganando, reto tras reto.',
         onBeforeShow: () => setSection('marcador'),
+        blocking: true,
       },
     ],
     [],
@@ -845,20 +861,41 @@ export function TripPage({
     window.history.replaceState(window.history.state, '', `#${params.toString()}`)
   }, [])
 
-  // Fin del tour: queda en el Marcador y se le ofrece el registro (saltable).
+  // Vuelve al REVELADO del reto de retorno (issue #895): `#g=…&c=<challengeId>`.
+  // Para un reto ya votado, PlayChallenge muestra directamente el resultado — el
+  // usuario recupera su jugada de donde salió, en vez de quedar en el Marcador.
+  const goToRetoReveal = useCallback(() => {
+    if (!retoReturnChallengeId) return false
+    location.hash = `#g=${encodeURIComponent(groupId)}&c=${encodeURIComponent(retoReturnChallengeId)}`
+    return true
+  }, [retoReturnChallengeId, groupId])
+
+  // Fin del tour: ofrece el registro (saltable). Con `rc` (reto de retorno) NO
+  // dejamos en el Marcador: al CERRAR el registro volvemos al revelado (ver
+  // `closeRetoRegister`). Sin `rc` (tour del ejemplo u origen sin reto), queda en
+  // el Marcador como siempre.
   const handleRetoTourFinish = useCallback(() => {
     setRetoTourActive(false)
-    setSection('marcador')
     clearRetoTourHash()
+    if (!retoReturnChallengeId) setSection('marcador')
     setRetoRegisterOpen(true)
-  }, [clearRetoTourHash])
+  }, [clearRetoTourHash, retoReturnChallengeId])
 
-  // "Saltar" en cualquier paso: directo al Marcador, SIN registro.
+  // "Saltar" en cualquier paso: SIN registro. Con `rc`, directo al revelado del
+  // reto; sin `rc`, al Marcador (comportamiento de siempre).
   const handleRetoTourSkip = useCallback(() => {
     setRetoTourActive(false)
-    setSection('marcador')
     clearRetoTourHash()
-  }, [clearRetoTourHash])
+    if (!goToRetoReveal()) setSection('marcador')
+  }, [clearRetoTourHash, goToRetoReveal])
+
+  // Cierre del registro del tour (issue #895): tanto "Ahora no" como completar el
+  // alta cierran los diálogos y, si hay reto de retorno, vuelven a su revelado.
+  const closeRetoRegister = useCallback(() => {
+    setRetoUpgradeOpen(false)
+    setRetoRegisterOpen(false)
+    goToRetoReveal()
+  }, [goToRetoReveal])
 
   // Editor de reto a pantalla completa: toma la pantalla mientras está abierto.
   // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa
@@ -994,7 +1031,10 @@ export function TripPage({
           cerrado ya tiene su propio aviso ahí) así que nunca compiten por el
           hueco. `PushOptInPrompt` decide en solitario si renderiza algo
           (returns null sin condición); este wrapper solo fija la posición. */}
-      {!isClosed && !isExampleTrip && (
+      {/* Issue #895: NO durante un tour (el pop-up de notis se colaba encima del
+          coach-mark) ni para un ANÓNIMO (no gestiona notis en este flujo: primero
+          se registra — el tour del reto remata con el alta). */}
+      {!isClosed && !isExampleTrip && !isAnonymous && !retoTourActive && !tourActive && (
         <div className={styles.pushBannerWrap}>
           <PushOptInPrompt surface="trip_banner" groupId={groupId} />
         </div>
@@ -1113,7 +1153,7 @@ export function TripPage({
           verse también a un ANÓNIMO (antes se ocultaba, #888) — pero al tocarlo
           NO abre el menú Momento/Reto (que RLS le bloquea): abre el alta real
           ("Regístrate para crear tus viajes"). Con cuenta, comportamiento de siempre. */}
-      {canCreate && !wrapOpen && (
+      {canCreate && !wrapOpen && !retoTourActive && !tourActive && (
         <div className={styles.fabWrap} ref={fabWrapRef}>
           {fabOpen && !isAnonymous && (
             <div className={styles.fabMenu} role="menu" aria-label="Crear">
@@ -1176,7 +1216,7 @@ export function TripPage({
           receptor ANÓNIMO (issue #888): jugar un reto suelto no debe
           convertirle en quien re-comparte el viaje/reto — ese gesto es de
           quien ya se identifica (miembro con cuenta o dueño). */}
-      {!wrapOpen && !isExampleTrip && !isAnonymous && (
+      {!wrapOpen && !isExampleTrip && !isAnonymous && !retoTourActive && !tourActive && (
         <div className={styles.shareFabWrap}>
           <button
             type="button"
@@ -1688,21 +1728,17 @@ export function TripPage({
         <GuestRegisterPrompt
           title="No pierdas tus retos"
           onCreateAccount={() => setRetoUpgradeOpen(true)}
-          onDismiss={() => setRetoRegisterOpen(false)}
+          onDismiss={closeRetoRegister}
         />
       )}
       {retoUpgradeOpen && (
         <AccountUpgradeModal
           open
-          onClose={() => {
-            setRetoUpgradeOpen(false)
-            setRetoRegisterOpen(false)
-          }}
+          onClose={closeRetoRegister}
           origin="reto_share_register"
           groupId={groupId}
           onUpgraded={() => {
-            setRetoUpgradeOpen(false)
-            setRetoRegisterOpen(false)
+            closeRetoRegister()
             toast.show('Guardado. Tus retos siguen siendo tuyos.', { tone: 'success' })
           }}
         />
