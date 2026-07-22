@@ -63,9 +63,13 @@ vi.mock('../../lib/leaderboard', async (importActual) => {
 
 // Nombre antes de revelar (issue #758): `upsertProfile` real toca Supabase (lanza
 // sin env vars en test); lo aislamos igual que el resto de la capa de datos.
+// `persistOnboardingSeen` (onboarding pieza 2/4, `useRetoShareOnboarding`) igual:
+// sin behavior real, solo para que el import no reviente al faltar el export.
 const upsertProfileMock = vi.fn<(...args: unknown[]) => Promise<unknown>>()
+const persistOnboardingSeenMock = vi.fn<(...args: unknown[]) => Promise<void>>()
 vi.mock('../../lib/profile', () => ({
   upsertProfile: (...args: unknown[]) => upsertProfileMock(...args),
+  persistOnboardingSeen: (...args: unknown[]) => persistOnboardingSeenMock(...args),
 }))
 
 // "Guárdate" (issue #758): stub sin comportamiento — el flujo de vincular email

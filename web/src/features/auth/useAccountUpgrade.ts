@@ -26,10 +26,12 @@ export type AccountUpgradeStep = 'email' | 'code'
  * jugó un reto concreto); en 'anon_create_gate' (intento de crear un viaje sin
  * cuenta) no hay grupo/reto todavía. `guest_register` (onboarding nuevo, pieza
  * 1/4): el registro post-valor del INVITADO del enlace, tras jugar su primer
- * reto — ver `GuestRegisterPrompt`/`useGuestRegisterPrompt`.
+ * reto — ver `GuestRegisterPrompt`/`useGuestRegisterPrompt`. `reto_share_register`
+ * (onboarding nuevo, pieza 2/4): el registro al final de la secuencia de
+ * explicación de quien llegó por un RETO SUELTO — ver `RetoShareExplainSequence`.
  */
 export interface AccountUpgradeContext {
-  origin: 'play_result' | 'anon_create_gate' | 'guest_register'
+  origin: 'play_result' | 'anon_create_gate' | 'guest_register' | 'reto_share_register'
   groupId?: string
   challengeId?: string
 }

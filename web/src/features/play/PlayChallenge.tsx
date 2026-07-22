@@ -51,7 +51,7 @@ import { getGroup } from '../../lib/groupData'
 import { getGroupMembers } from '../../lib/membership'
 import { aggregateLeaderboard, getGroupVotes, type VoteWithName } from '../../lib/leaderboard'
 import { upsertProfile } from '../../lib/profile'
-import { marcadorGroupHash } from '../../lib/route'
+import { groupHash, marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
 import { track } from '../../lib/analytics'
@@ -75,6 +75,12 @@ import { AccountUpgradeModal, RecoverIdentityModal } from '../auth'
 // anónimo ya tiene aquí mismo el CTA "no pierdas tus puntos" de arriba —
 // AccountUpgradeModal/RecoverIdentityModal — y nunca se apilan dos prompts).
 import { PushOptInPrompt } from '../trip/PushOptInPrompt'
+// Entrada por RETO COMPARTIDO (onboarding nuevo, pieza 2/4): quien abre un
+// deep link de UN reto suelto sin cuenta y por primera vez ve una intro mínima
+// ANTES de jugar (RetoShareIntro) y, tras el resultado, la explicación de
+// Momentu + puente al viaje + registro (RetoShareExplainSequence). El motor de
+// detección/persistencia vive en `useRetoShareOnboarding`; aquí solo se engancha.
+import { RetoShareIntro, RetoShareExplainSequence, useRetoShareOnboarding } from '../onboarding'
 import {
   BackHomeButton,
   Button,
@@ -256,6 +262,23 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // el receptor anónimo. Sin relación con el nombre de arriba: se puede jugar
   // con nombre y seguir sin cuenta permanente indefinidamente.
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  // De qué superficie se abrió el alta (issue #751/onboarding pieza 2/4): el CTA
+  // normal de "no pierdas tus puntos" y el registro al final de
+  // RetoShareExplainSequence comparten el MISMO modal (nunca se apilan dos), pero
+  // viajan con un origin distinto para poder cruzar el funnel por superficie.
+  const [upgradeOrigin, setUpgradeOrigin] = useState<'play_result' | 'reto_share_register'>(
+    'play_result',
+  )
+  // Entrada por RETO COMPARTIDO (onboarding nuevo, pieza 2/4): intro mínima
+  // antes de jugar + explicación tras el resultado, solo para quien abre un
+  // deep link de reto sin cuenta y por primera vez (ver useRetoShareOnboarding).
+  const retoShare = useRetoShareOnboarding(groupId, user?.id, isAnonymous, profile?.onboarding)
+  const [retoIntroDismissed, setRetoIntroDismissed] = useState(false)
+  const [retoExplainDone, setRetoExplainDone] = useState(false)
+  // Nombre de quien creó el viaje (solo hace falta para el copy de la
+  // explicación de arriba: "el viaje de {ownerName}"). Cosmético: sin
+  // resolverlo, el copy cae al genérico ("un viaje", "Ver el viaje").
+  const [ownerName, setOwnerName] = useState<string | undefined>(undefined)
   // Intensidad del CTA a partir de la 2ª partida (issue #756): recuento del
   // receptor anónimo EN ESTE VIAJE (no solo este reto). Se resuelve reusando
   // `getGroupVotes`/`aggregateLeaderboard` (ya existen para el marcador, sin
@@ -682,6 +705,29 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
       cancelled = true
     }
   }, [groupId])
+
+  // Nombre de quien creó el viaje, SOLO para la entrada por reto compartido
+  // (onboarding pieza 2/4): el resto de jugadas no lo necesita, así que no
+  // pagamos esta consulta extra fuera de `retoShare.active`. Reutiliza
+  // `getGroupMembers` (ya importado para el choque de nombres de `submitName`)
+  // en vez de una consulta nueva. Falla en silencio: sin nombre, el copy de la
+  // explicación cae a la versión genérica ("un viaje", "Ver el viaje").
+  useEffect(() => {
+    if (!retoShare.active || !groupId) return
+    let cancelled = false
+    void getGroupMembers(groupId)
+      .then((members) => {
+        if (cancelled) return
+        const owner = members.find((m) => m.isCreator)
+        if (owner) setOwnerName(owner.name)
+      })
+      .catch(() => {
+        // Sin nombre: el copy usa el fallback genérico.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [retoShare.active, groupId])
 
   // Recuento del receptor anónimo EN EL VIAJE, para intensificar el CTA de
   // guardar cuenta a partir de la 2ª partida (issue #756). Solo tras revelar
@@ -1254,6 +1300,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           onClose={cancelRecover}
           onRecovered={handleRecovered}
         />
+
+        {/* Entrada por reto compartido (onboarding pieza 2/4): intro mínima
+            ANTES de jugar — solo en `idle` (aún no se pulsó "Empezar"), solo
+            la primera vez. "Jugar" solo la cierra; el flujo de jugar de
+            siempre (overlay "Empezar" → cuenta atrás) sigue igual detrás. */}
+        {retoShare.active && phase === 'idle' && !retoIntroDismissed && (
+          <RetoShareIntro photoUrl={photoUrl} onPlay={() => setRetoIntroDismissed(true)} />
+        )}
       </>
     )
   }
@@ -1432,6 +1486,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                     group_id: groupId,
                     challenge_id: challenge.id,
                   })
+                  setUpgradeOrigin('play_result')
                   setUpgradeOpen(true)
                 }}
                 className={styles.actionsIn}
@@ -1582,17 +1637,42 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         </div>
       )}
 
+      {/* Entrada por reto compartido (onboarding pieza 2/4): tras el resultado,
+          la explicación de Momentu → los retos → puente al viaje → registro.
+          `!upgradeOpen` evita apilarla encima del alta real (mismo criterio
+          que ReceptorWelcomeGate con GuestRegisterPrompt: nunca dos prompts a
+          la vez). "Ver el viaje" navega de verdad (no pasa por el registro). */}
+      {isAnonymous && retoShare.active && !retoExplainDone && !upgradeOpen && (
+        <RetoShareExplainSequence
+          ownerName={ownerName}
+          onViewTrip={() => {
+            setRetoExplainDone(true)
+            if (groupId) location.hash = groupHash(groupId)
+          }}
+          onCreateAccount={() => {
+            setRetoExplainDone(true)
+            setUpgradeOrigin('reto_share_register')
+            setUpgradeOpen(true)
+          }}
+          onDismiss={() => setRetoExplainDone(true)}
+        />
+      )}
+
       {isAnonymous && (
         <AccountUpgradeModal
           open={upgradeOpen}
-          onClose={() => setUpgradeOpen(false)}
-          origin="play_result"
+          onClose={() => {
+            setUpgradeOpen(false)
+            setUpgradeOrigin('play_result')
+          }}
+          origin={upgradeOrigin}
           groupId={groupId}
           challengeId={challenge.id}
           groupName={groupLabel}
           points={upgradePoints}
           onUpgraded={() => {
             setUpgradeOpen(false)
+            setUpgradeOrigin('play_result')
             toast.show(`Guardado. Tus puntos de ${groupLabel} siguen siendo tuyos.`, {
               tone: 'success',
             })

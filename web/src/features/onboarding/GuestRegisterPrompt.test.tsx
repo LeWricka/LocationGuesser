@@ -23,4 +23,20 @@ describe('GuestRegisterPrompt', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Ahora no' }))
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
+
+  // Reuso por el registro de la entrada por reto compartido (onboarding nuevo,
+  // pieza 2/4, RetoShareExplainSequence): mismo eyebrow/cuerpo/CTAs, titular propio.
+  test('con `title`, sustituye el titular por defecto (mismo eyebrow y cuerpo)', () => {
+    render(
+      <GuestRegisterPrompt
+        title="No pierdas tus retos"
+        onCreateAccount={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('No pierdas tus retos')).toBeInTheDocument()
+    expect(screen.getByText('Guárdalo')).toBeInTheDocument()
+    expect(screen.getByText('Crea una cuenta para vivir toda la experiencia.')).toBeInTheDocument()
+    expect(screen.queryByText('Sigue el viaje desde tu cuenta')).not.toBeInTheDocument()
+  })
 })

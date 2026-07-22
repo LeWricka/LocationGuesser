@@ -47,17 +47,25 @@
 //    para el receptor anónimo del enlace — ver GuestRegisterPrompt/
 //    useGuestRegisterPrompt. Independiente de `welcome`: se ve una segunda vez,
 //    ya con una jugada real detrás.
+//  - reto_share: entrada por RETO COMPARTIDO (onboarding nuevo, pieza 2/4): quien
+//    abre un deep link de UN reto suelto (`#g=…&c=…`) sin cuenta y por primera
+//    vez — ver useRetoShareOnboarding/RetoShareIntro/RetoShareExplainSequence.
+//    Cubre DOS momentos del mismo recorrido (intro mínima antes de jugar +
+//    explicación tras el resultado), pero un solo flag: no hace falta
+//    distinguirlos porque los dos se muestran o no se muestran juntos.
 //  - group / challenge / create-trip / add-moment / create-challenge: contextos
 //    de los tutoriales por-pantalla ANTIGUOS (issue #742: ya no se disparan desde
 //    App.tsx). Se conservan para el flag "visto" del receptor (ReceptorWelcomeGate
 //    marca `group`) y para no romper histórico; el único tutorial en vivo es
-//    `entry` (+ `welcome`/`guest-register` para el invitado).
+//    `entry` (+ `welcome`/`guest-register` para el invitado, `reto_share` para
+//    quien llega por un reto suelto).
 export type OnboardingContext =
   | 'entry'
   | 'group'
   | 'challenge'
   | 'welcome'
   | 'guest-register'
+  | 'reto_share'
   | 'create-trip'
   | 'add-moment'
   | 'create-challenge'

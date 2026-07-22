@@ -212,11 +212,13 @@ const ENTRY_SLIDES: OnboardingSlide[] = [
 ]
 
 // Contextos que YA NO usan slides: `welcome` pinta el marco de una pantalla
-// `GuestWelcomeFrame` (onboarding nuevo, pieza 1/4; ver `OnboardingGate`), y
+// `GuestWelcomeFrame` (onboarding nuevo, pieza 1/4; ver `OnboardingGate`),
 // `guest-register` es el registro post-valor del invitado (`GuestRegisterPrompt`),
-// que ni siquiera pasa por `OnboardingGate`. Se excluyen del mapa de slides para
-// no arrastrar copy muerto — `getSlides` los cubre con un array vacío.
-type SlideContext = Exclude<OnboardingContext, 'welcome' | 'guest-register'>
+// y `reto_share` es la entrada por reto suelto (onboarding nuevo, pieza 2/4:
+// RetoShareIntro/RetoShareExplainSequence) — ninguno de los tres pasa por
+// `OnboardingGate`. Se excluyen del mapa de slides para no arrastrar copy
+// muerto — `getSlides` los cubre con un array vacío.
+type SlideContext = Exclude<OnboardingContext, 'welcome' | 'guest-register' | 'reto_share'>
 
 const SLIDES: Record<SlideContext, OnboardingSlide[]> = {
   entry: ENTRY_SLIDES,
@@ -228,6 +230,6 @@ const SLIDES: Record<SlideContext, OnboardingSlide[]> = {
 }
 
 export function getSlides(context: OnboardingContext): OnboardingSlide[] {
-  if (context === 'welcome' || context === 'guest-register') return []
+  if (context === 'welcome' || context === 'guest-register' || context === 'reto_share') return []
   return SLIDES[context]
 }
