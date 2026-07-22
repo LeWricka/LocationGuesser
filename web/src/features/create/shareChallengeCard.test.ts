@@ -6,7 +6,7 @@ import { buildShareCaption } from './shareChallengeCard'
 describe('buildShareCaption', () => {
   test('lleva el gancho del reto + el enlace, en líneas separadas', () => {
     const text = buildShareCaption('Iker', 'https://momentu.art/j/abc123')
-    expect(text).toContain('¿adivinas dónde está esta foto?')
+    expect(text).toContain('¡Adivina dónde está!')
     expect(text).toContain('Iker te reta')
     expect(text.endsWith('https://momentu.art/j/abc123')).toBe(true)
   })
