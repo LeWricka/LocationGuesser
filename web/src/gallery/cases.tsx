@@ -36,6 +36,8 @@ import {
   getSlides,
   GuestWelcomeFrame,
   GuestRegisterPrompt,
+  RetoShareIntro,
+  RetoShareExplainSequence,
 } from '../features/onboarding'
 import {
   BackHomeButton,
@@ -952,6 +954,55 @@ export const cases: GalleryCase[] = [
     title: 'Onboarding · registro post-valor del invitado (tras jugar)',
     section: 'Onboarding',
     render: () => <GuestRegisterPrompt onCreateAccount={noop} onDismiss={noop} />,
+  },
+  // Entrada por RETO COMPARTIDO (onboarding nuevo, pieza 2/4): intro mínima
+  // ANTES de jugar + explicación tras el resultado (qué es/retos/puente/registro).
+  {
+    id: 'onboarding-reto-intro',
+    title: 'Onboarding · reto compartido — intro mínima (antes de jugar)',
+    section: 'Onboarding',
+    render: () => <RetoShareIntro photoUrl={null} onPlay={noop} />,
+  },
+  {
+    id: 'onboarding-reto-quees',
+    title: 'Onboarding · reto compartido — qué es Momentu (tras el resultado)',
+    section: 'Onboarding',
+    render: () => (
+      <RetoShareExplainSequence
+        ownerName="Lucía"
+        onViewTrip={noop}
+        onCreateAccount={noop}
+        onDismiss={noop}
+      />
+    ),
+  },
+  {
+    id: 'onboarding-reto-retos',
+    title: 'Onboarding · reto compartido — cómo son los retos',
+    section: 'Onboarding',
+    render: () => (
+      <RetoShareExplainSequence
+        ownerName="Lucía"
+        initialStep="retos"
+        onViewTrip={noop}
+        onCreateAccount={noop}
+        onDismiss={noop}
+      />
+    ),
+  },
+  {
+    id: 'onboarding-reto-puente',
+    title: 'Onboarding · reto compartido — puente al viaje entero',
+    section: 'Onboarding',
+    render: () => (
+      <RetoShareExplainSequence
+        ownerName="Lucía"
+        initialStep="puente"
+        onViewTrip={noop}
+        onCreateAccount={noop}
+        onDismiss={noop}
+      />
+    ),
   },
   // ── Showcase de la landing (issue #652) ──────────────────────────────────
   // Las 4 pantallas que alimentan LandingShowcase (features/auth/LandingShowcase)

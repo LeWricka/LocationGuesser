@@ -27,4 +27,10 @@ describe('getSlides', () => {
     expect(getSlides('welcome')).toEqual([])
     expect(getSlides('guest-register')).toEqual([])
   })
+
+  // Onboarding nuevo (pieza 2/4): `reto_share` (entrada por reto suelto) tampoco
+  // usa el slideshow genérico — RetoShareIntro/RetoShareExplainSequence.
+  test('reto_share no trae slides (contenido propio, no slideshow)', () => {
+    expect(getSlides('reto_share')).toEqual([])
+  })
 })
