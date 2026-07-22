@@ -1078,7 +1078,19 @@ export const cases: GalleryCase[] = [
     title: 'Onboarding · reto compartido — coach-mark sobre el resultado (no lo tapa)',
     section: 'Onboarding',
     render: () => (
-      <div style={{ position: 'relative', height: '100dvh', padding: 16 }}>
+      // Escena OSCURA detrás (como el coach del creador y como producción: el
+      // coach vive sobre el reveal oscuro + scrim). Sin ella, la burbuja glass
+      // translúcida se pintaría sobre el fondo claro de la galería y axe mediría
+      // contraste insuficiente del texto (pensado para escena oscura).
+      <div
+        style={{
+          position: 'relative',
+          height: '100dvh',
+          padding: 16,
+          background: 'var(--scene-bg)',
+          color: 'var(--scene-ink)',
+        }}
+      >
         <div
           ref={(el) => {
             retoResultRef.current = el
@@ -1086,8 +1098,12 @@ export const cases: GalleryCase[] = [
           style={{
             padding: 24,
             borderRadius: 16,
-            background: 'var(--card-surface)',
-            border: '1px solid var(--card-border)',
+            // Superficie de ESCENA (oscura), como el reveal real: la burbuja
+            // glass translúcida se compone sobre oscuro (texto legible), no
+            // sobre una tarjeta clara (contraste insuficiente para axe).
+            background: 'var(--scene-surface)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--scene-ink)',
             marginBottom: 16,
             textAlign: 'center',
           }}
@@ -1101,8 +1117,9 @@ export const cases: GalleryCase[] = [
           style={{
             height: 180,
             borderRadius: 16,
-            background: 'var(--color-surface-raised)',
-            border: '1px solid var(--color-border)',
+            background: 'var(--scene-surface)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--scene-ink)',
             display: 'grid',
             placeItems: 'center',
           }}
