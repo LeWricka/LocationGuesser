@@ -22,12 +22,14 @@ describe('GuestWelcomeFrame', () => {
     )
     expect(screen.getByText('Te han invitado · Ruta por Portugal')).toBeInTheDocument()
     expect(screen.getByText('Estás dentro del viaje de Lucía')).toBeInTheDocument()
-    expect(screen.getByText('Lucía y 1 más ya están dentro')).toBeInTheDocument()
+    // La línea "N más ya están dentro" se retiró (feedback): no debe aparecer.
+    expect(screen.queryByText(/ya están dentro/)).not.toBeInTheDocument()
     expect(
       screen.getByText(
         /Momentu es la forma de guardar tus viajes y compartirlos con quien más quieres/,
       ),
     ).toBeInTheDocument()
+    expect(screen.getByText(/participa en los retos que te mandan/)).toBeInTheDocument()
     expect(screen.getByText('Comparte tus momentos de una forma diferente.')).toBeInTheDocument()
   })
 
@@ -43,7 +45,6 @@ describe('GuestWelcomeFrame', () => {
     )
     expect(screen.getByText('Te han invitado')).toBeInTheDocument()
     expect(screen.getByText('Estás dentro de este viaje')).toBeInTheDocument()
-    expect(screen.getByText('Tu gente ya está dentro')).toBeInTheDocument()
   })
 
   test('el aviso "te toca un reto" SOLO aparece si hay uno en juego', () => {
