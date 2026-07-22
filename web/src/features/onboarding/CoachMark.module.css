@@ -102,3 +102,62 @@
   outline: 2px solid var(--scene-ink);
   outline-offset: 2px;
 }
+
+/* Fila de acciones de GuidedTour (Saltar + Siguiente): DENTRO de la burbuja
+   (hereda su posición), no flotando arriba-derecha como el cierre en solitario
+   del creador. */
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.dismissInline {
+  appearance: none;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: var(--space-2) var(--space-2);
+  color: var(--scene-ink-soft);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+.dismissInline:hover {
+  color: var(--scene-ink);
+}
+.dismissInline:focus-visible {
+  outline: 2px solid var(--scene-ink);
+  outline-offset: 2px;
+}
+
+.primary {
+  appearance: none;
+  cursor: pointer;
+  background: var(--scene-ink);
+  color: var(--scene-bg);
+  border: none;
+  border-radius: var(--radius-full);
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  transition: transform var(--motion-transition-fast);
+}
+.primary:hover {
+  transform: translateY(-1px);
+}
+.primary:focus-visible {
+  outline: 2px solid var(--scene-ink);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .primary {
+    transition: none;
+  }
+  .primary:hover {
+    transform: none;
+  }
+}

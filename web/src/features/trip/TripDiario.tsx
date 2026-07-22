@@ -1,4 +1,4 @@
-import { forwardRef, useMemo } from 'react'
+import { forwardRef, useMemo, type RefObject } from 'react'
 import { Map as MapIcon, Share2 } from 'lucide-react'
 import { Button, EmptyState, Icon } from '../../ui'
 import {
@@ -42,6 +42,17 @@ interface Props {
   /** Abre la hoja de invitar (CTA secundario del vacío: invitar es tan visible
    * como añadir el primer momento — issue #510, invitar quedaba escondido tras el ···). */
   onInvite: () => void
+  /**
+   * Ancla del mapa a sangre para `GuidedTour` (viaje de ejemplo, onboarding
+   * nuevo pieza 4/4): "Cada parada del viaje queda aquí, en el Diario." Opcional
+   * y sin efecto fuera de la guía — el resto de usos no lo pasan.
+   */
+  mapRef?: RefObject<HTMLDivElement | null>
+  /**
+   * Ancla de la PRIMERA tarjeta del carrusel para `GuidedTour`: "Una foto, un
+   * vídeo o una nota de voz, con su sitio." Igual de opcional que `mapRef`.
+   */
+  firstMomentRef?: RefObject<HTMLDivElement | null>
 }
 
 /**
@@ -68,6 +79,8 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
     onPlay,
     onAddMoment,
     onInvite,
+    mapRef,
+    firstMomentRef,
   },
   carouselRef,
 ) {
@@ -112,7 +125,11 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
           (HomeDashboard.tsx), puesto SIEMPRE mientras el Diario está montado: hace
           de "new" al llegar y de "old" al volver (la Home reclama el nombre de
           vuelta vía sessionStorage, ver `heroReturnId` en HomeDashboard.tsx). */}
-      <div className={styles.map} style={{ viewTransitionName: heroTransitionName(groupId) }}>
+      <div
+        className={styles.map}
+        style={{ viewTransitionName: heroTransitionName(groupId) }}
+        ref={mapRef}
+      >
         <TripMap
           route={route}
           selectedChallengeId={selectedId}
@@ -134,8 +151,13 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
           />
 
           <div className={styles.carousel} ref={carouselRef}>
-            {displayMoments.map((m) => (
-              <div key={m.challengeId} className={styles.slide} data-cid={m.challengeId}>
+            {displayMoments.map((m, i) => (
+              <div
+                key={m.challengeId}
+                className={styles.slide}
+                data-cid={m.challengeId}
+                ref={i === 0 ? firstMomentRef : undefined}
+              >
                 <MomentCard
                   moment={m}
                   selected={m.challengeId === selectedId}

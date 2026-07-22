@@ -19,6 +19,7 @@ import { supabase } from '../../lib/supabase'
 import { getGroup, getGroupChallenges, isLive } from '../../lib/groupData'
 import { groupAvatars, type MemberAvatar } from '../../lib/membership'
 import { signedImageUrl } from '../../lib/storage'
+import { EXAMPLE_TRIP_GROUP_ID } from '../../lib/exampleTrip'
 import { prizesLine } from '../group/prizes'
 
 interface ReceptorWelcome {
@@ -66,6 +67,17 @@ export function useReceptorWelcome(
     void (async () => {
       // Sin grupo o sin usuario aún no hay receptor que saludar.
       if (!groupId || !userId) {
+        if (active) setState(EMPTY_STATE)
+        return
+      }
+      // Viaje de EJEMPLO (onboarding nuevo, pieza 4/4): id CENTINELA — nunca hay
+      // un "dueño" real que saludar como receptor (es solo lectura, para
+      // cualquiera). Cortamos ANTES de `isOwner`/`resolveGuestData`: sin este
+      // guarda, cada visita disparaba dos consultas a `groups` más el resto de
+      // `resolveGuestData` (getGroup/getGroupChallenges/groupAvatars) contra un
+      // groupId que no existe — inofensivo (resuelven vacío/null), pero rompe la
+      // promesa de "viaje de ejemplo 100% offline, sin ni una petición".
+      if (groupId === EXAMPLE_TRIP_GROUP_ID) {
         if (active) setState(EMPTY_STATE)
         return
       }

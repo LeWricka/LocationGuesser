@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
+import type { RefObject } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { AudioPlayer, Badge, EmptyState, Icon, IconCamara, IconDiana } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
-import { listGroupMomentImages } from '../../lib/momentImages'
+import { listGroupMomentImages, type MomentImage } from '../../lib/momentImages'
 import { signedImageUrl } from '../../lib/storage'
 import { reportError } from '../../lib/observability'
 import { track } from '../../lib/analytics'
 import { formatDeadline } from '../../lib/time'
+import { EXAMPLE_TRIP_GROUP_ID } from '../../lib/exampleTrip'
 import {
   isMomentPhotoVisible,
   pairedChallengeByMemoryId,
@@ -64,6 +66,12 @@ interface Props {
   prizes: GroupPrizes | null
   /** CTA discreto "Ver marcador" del cierre: salta a la pestaña Marcador. */
   onViewMarcador: () => void
+  /**
+   * Ancla del PRIMER día para `GuidedTour` (viaje de ejemplo, onboarding nuevo
+   * pieza 4/4): "En la Bitácora lo hojeas entero, en orden." Opcional y sin
+   * efecto fuera de la guía.
+   */
+  firstDayRef?: RefObject<HTMLElement | null>
 }
 
 // Info de la franja de reto de un momento FUSIONADO (issue #839): status del
@@ -141,6 +149,7 @@ export function BitacoraTab({
   leaderboard,
   prizes,
   onViewMarcador,
+  firstDayRef,
 }: Props) {
   // null = cargando.
   const [grouped, setGrouped] = useState<BitacoraGrouped | null>(null)
@@ -167,7 +176,13 @@ export function BitacoraTab({
           .filter(isMomentPhotoVisible)
           .filter((m) => !mergedAwayIds.has(m.challengeId))
         const recuerdoIds = visible.filter((m) => !m.isChallenge).map((m) => m.challengeId)
-        const galleryByMoment = await listGroupMomentImages(recuerdoIds)
+        // Viaje de ejemplo (onboarding nuevo, pieza 4/4): sin galería extra que
+        // pedir a `moment_images` — sus fotos ya vienen en `moment.imageUrl`
+        // (rutas públicas de `/example-trip/*`, ver `lib/exampleTrip.ts`), así
+        // que cada momento cae al fallback de "portada ya firmada" de abajo sin
+        // ninguna llamada de red.
+        const galleryByMoment: Map<string, MomentImage[]> =
+          groupId === EXAMPLE_TRIP_GROUP_ID ? new Map() : await listGroupMomentImages(recuerdoIds)
 
         // Por momento, su tanda de fotos (ready/a firmar) EN ORDEN de galería.
         const perMoment: { moment: Moment; pending: PendingPhoto[] }[] = []
@@ -269,11 +284,12 @@ export function BitacoraTab({
         </div>
       ) : (
         <>
-          {days.map((day) => (
+          {days.map((day, i) => (
             <section
               key={day.key}
               aria-label={day.placesLabel ? `${day.label} — ${day.placesLabel}` : day.label}
               className={styles.day}
+              ref={i === 0 ? firstDayRef : undefined}
             >
               <h3 className={styles.dayHeader}>
                 <span className={styles.dayDate}>{day.label}</span>

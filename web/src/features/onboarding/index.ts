@@ -29,3 +29,8 @@ export { MomentChallengeSuggestion } from './MomentChallengeSuggestion'
 export { CreadorNudge } from './CreadorNudge'
 export { useCreadorOnboarding } from './useCreadorOnboarding'
 export type { CreadorStage, UseCreadorOnboarding } from './useCreadorOnboarding'
+// Guía CONDUCIDA del viaje de ejemplo (onboarding nuevo, pieza 4/4): recorre
+// Diario → un momento → Bitácora → Marcador/Retos → La liga → un reto,
+// encadenando `CoachMark` sobre elementos reales. Enganchada en TripPage.
+export { GuidedTour } from './GuidedTour'
+export type { TourStep } from './GuidedTour'

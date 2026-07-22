@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { getGroupVotes } from '../../lib/leaderboard'
 import type { ProfileOnboarding } from '../../lib/database.types'
+import { EXAMPLE_TRIP_GROUP_ID } from '../../lib/exampleTrip'
 import { useOnboarding } from './useOnboarding'
 
 export interface UseGuestRegisterPrompt {
@@ -32,8 +33,10 @@ export function useGuestRegisterPrompt(
 
     void (async () => {
       // Solo merece la pena mirar votos si, por lo demás, tocaría mostrarlo: un
-      // registrado o quien ya lo vio no necesita esta consulta.
-      if (!groupId || !userId || !isAnonymous || !shouldShow) {
+      // registrado o quien ya lo vio no necesita esta consulta. El viaje de
+      // EJEMPLO (id centinela, onboarding nuevo pieza 4/4) tampoco: es solo
+      // lectura, sin votos reales que consultar — cortamos antes de la red.
+      if (!groupId || !userId || !isAnonymous || !shouldShow || groupId === EXAMPLE_TRIP_GROUP_ID) {
         if (active) setHasPlayed(false)
         return
       }

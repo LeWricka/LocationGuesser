@@ -10,30 +10,37 @@ let avatarsById: Map<string, { userId: string; name: string; avatarUrl: string |
   new Map()
 let challenges: { is_challenge: boolean; deadline_at: string | null }[] = []
 
+// Espías (no solo stubs): el viaje de EJEMPLO (id centinela, onboarding nuevo
+// pieza 4/4) debe cortar ANTES de llamar a NINGUNA de estas — ver el test
+// dedicado más abajo, que comprueba `not.toHaveBeenCalled()` en las cuatro.
+const maybeSingleSpy = vi.fn(async () => ({ data: { created_by: createdBy } }))
 vi.mock('../../lib/supabase', () => ({
   supabase: {
     from: () => ({
       select: () => ({
-        eq: () => ({ maybeSingle: async () => ({ data: { created_by: createdBy } }) }),
+        eq: () => ({ maybeSingle: () => maybeSingleSpy() }),
       }),
     }),
   },
 }))
 
+const getGroupSpy = vi.fn(async () => ({
+  id: 'g1',
+  name: 'Japón 2026',
+  prizes: groupPrizes,
+  cover_image_path: coverImagePath,
+}))
+const getGroupChallengesSpy = vi.fn(async () => challenges)
 vi.mock('../../lib/groupData', () => ({
-  getGroup: async () => ({
-    id: 'g1',
-    name: 'Japón 2026',
-    prizes: groupPrizes,
-    cover_image_path: coverImagePath,
-  }),
-  getGroupChallenges: async () => challenges,
+  getGroup: () => getGroupSpy(),
+  getGroupChallenges: () => getGroupChallengesSpy(),
   isLive: (c: { deadline_at: string | null }, now: Date) =>
     c.deadline_at != null && new Date(c.deadline_at).getTime() > now.getTime(),
 }))
 
+const groupAvatarsSpy = vi.fn(async () => avatarsById)
 vi.mock('../../lib/membership', () => ({
-  groupAvatars: async () => avatarsById,
+  groupAvatars: () => groupAvatarsSpy(),
 }))
 
 vi.mock('../../lib/storage', () => ({
@@ -41,6 +48,7 @@ vi.mock('../../lib/storage', () => ({
 }))
 
 import { useReceptorWelcome } from './useReceptorWelcome'
+import { EXAMPLE_TRIP_GROUP_ID } from '../../lib/exampleTrip'
 
 describe('useReceptorWelcome', () => {
   beforeEach(() => {
@@ -49,6 +57,23 @@ describe('useReceptorWelcome', () => {
     coverImagePath = null
     avatarsById = new Map()
     challenges = []
+    maybeSingleSpy.mockClear()
+    getGroupSpy.mockClear()
+    getGroupChallengesSpy.mockClear()
+    groupAvatarsSpy.mockClear()
+  })
+
+  // Viaje de EJEMPLO (onboarding nuevo, pieza 4/4): id CENTINELA — solo lectura
+  // en memoria, sin fila real en `groups`. Debe cortar ANTES de `isOwner`
+  // (maybeSingle) y de `resolveGuestData` (getGroup/getGroupChallenges/
+  // groupAvatars): ni una petición, en ninguna visita.
+  test('viaje de EJEMPLO (id centinela): nunca pega a Supabase, nunca muestra el marco', async () => {
+    const { result } = renderHook(() => useReceptorWelcome(EXAMPLE_TRIP_GROUP_ID, 'guest-2'))
+    await waitFor(() => expect(result.current.show).toBe(false))
+    expect(maybeSingleSpy).not.toHaveBeenCalled()
+    expect(getGroupSpy).not.toHaveBeenCalled()
+    expect(getGroupChallengesSpy).not.toHaveBeenCalled()
+    expect(groupAvatarsSpy).not.toHaveBeenCalled()
   })
 
   test('no muestra sin grupo o sin usuario', async () => {

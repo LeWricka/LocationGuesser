@@ -14,6 +14,7 @@ import {
   Users,
 } from 'lucide-react'
 import {
+  Badge,
   ChallengePhoto,
   EmptyState,
   Icon,
@@ -31,6 +32,7 @@ import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { marcadorGroupHash, promoteChallengeHash } from '../../lib/route'
 import { isMomentPhotoVisible, pairedChallengeByMemoryId, type Moment } from '../../lib/trip'
+import { EXAMPLE_TRIP_GROUP_ID, EXAMPLE_TRIP_SUBTITLE } from '../../lib/exampleTrip'
 import { EditChallenge } from '../group/EditChallenge'
 import { InviteModal } from '../group/InviteModal'
 import { MembersModal } from '../group/MembersModal'
@@ -49,8 +51,10 @@ import {
   CoachMark,
   CreadorIntroFrame,
   CreadorNudge,
+  GuidedTour,
   MomentChallengeSuggestion,
   useCreadorOnboarding,
+  type TourStep,
 } from '../onboarding'
 import styles from './TripPage.module.css'
 
@@ -147,6 +151,13 @@ export function TripPage({
   const reducedMotion = useReducedMotion()
   const toast = useToast()
 
+  // Viaje de EJEMPLO (onboarding nuevo, pieza 4/4): SOLO LECTURA — sin FAB de
+  // crear/compartir, sin menú de miembros/ajustes, sin jugar de verdad. El
+  // groupId centinela (`lib/exampleTrip.ts`) ya hace que `useTripData` sirva
+  // datos curados sin red; aquí solo gobierna qué acciones de escritura se
+  // capan y el marco "Ejemplo" de la cabecera.
+  const isExampleTrip = groupId === EXAMPLE_TRIP_GROUP_ID
+
   // Sección activa (diario|marcador). Gobierna el desplazamiento de la pista.
   const [section, setSection] = useState<Section>(initialSection)
   // La sección se refleja en la URL (`&v=marcador`/`&v=fotos`) para que
@@ -228,6 +239,39 @@ export function TripPage({
   const [isOwner, setIsOwner] = useState(false)
   const [memberNames, setMemberNames] = useState<string[]>([])
 
+  // Anclas de GuidedTour (viaje de ejemplo, onboarding nuevo pieza 4/4): un
+  // elemento REAL por parada del recorrido — el mapa a sangre del Diario, la
+  // primera tarjeta de momento, el primer día de la Bitácora, el podio, "El
+  // camino" y su primer hito. Existen SIEMPRE (no solo con la guía activa):
+  // son refs vacías y baratas hasta que algo las asigna, y así no hace falta
+  // montar/desmontar el árbol de refs al arrancar/parar el tour.
+  const diarioMapRef = useRef<HTMLDivElement>(null)
+  const firstMomentRef = useRef<HTMLDivElement>(null)
+  const bitacoraFirstDayRef = useRef<HTMLElement>(null)
+  const podioRef = useRef<HTMLOListElement>(null)
+  const caminoWrapRef = useRef<HTMLDivElement>(null)
+  const firstHitoRef = useRef<HTMLLIElement>(null)
+  // Guía activa: solo tiene sentido en el viaje de ejemplo, y solo se arranca
+  // por `#g=ejemplo&tour=1` (ver `lib/route.ts`, `exampleTripHash`) o desde el
+  // botón "Ver un viaje de ejemplo" del perfil, ya dentro del propio viaje. Se
+  // CONSUME una sola vez del hash al montar (mismo criterio que `pendingFromUrl`
+  // de arriba): una recarga posterior no debe relanzar la guía sola.
+  const [tourActive, setTourActive] = useState(() => {
+    if (groupId !== EXAMPLE_TRIP_GROUP_ID) return false
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    return params.get('tour') === '1'
+  })
+  useEffect(() => {
+    if (!tourActive) return
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    if (params.get('g') !== groupId || !params.has('tour')) return
+    params.delete('tour')
+    window.history.replaceState(window.history.state, '', `#${params.toString()}`)
+    // Solo al arrancar la guía (una vez): no queremos re-escribir el hash en
+    // cada render mientras `tourActive` sigue en true.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const carouselRef = useRef<HTMLDivElement>(null)
   const selectionFromCarousel = useRef(false)
   const programmaticScroll = useRef(false)
@@ -255,6 +299,10 @@ export function TripPage({
   const [inviting, setInviting] = useState(false)
   const [inviteOrigin, setInviteOrigin] = useState<string | undefined>(undefined)
   const openInvite = (origin?: string) => {
+    // Viaje de ejemplo: no hay nada real que invitar (el enlace apuntaría a un
+    // groupId centinela). Defensa en profundidad — hoy ningún CTA visible
+    // llama a esto en el viaje de ejemplo (FAB/menú ocultos, ver más abajo).
+    if (isExampleTrip) return
     setInviteOrigin(origin)
     setInviting(true)
   }
@@ -317,6 +365,10 @@ export function TripPage({
   // "Miembros" (#616): expulsar/transferir cambian la línea de gente y mis
   // propios permisos (isOwner) sin cambiar groupId/user.
   const reloadMembership = useCallback(async () => {
+    // Viaje de ejemplo: nunca hay una membresía real que resolver — se queda
+    // con los valores por defecto (canCreate/isOwner en false), que es
+    // exactamente lo que capa el FAB de crear y las acciones de dueño.
+    if (isExampleTrip) return
     if (!user) return
     try {
       const member = await isMember(groupId, user.id)
@@ -330,7 +382,7 @@ export function TripPage({
     } catch {
       // Permisos/miembros no resueltos: tratamos como miembro sin gestión.
     }
-  }, [groupId, user])
+  }, [groupId, user, isExampleTrip])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reloadMembership es async: setState corre tras el fetch, no síncrono
@@ -372,6 +424,33 @@ export function TripPage({
     challengeCount > 0,
   )
 
+  // Solo lectura del viaje de ejemplo (onboarding nuevo, pieza 4/4): jugar de
+  // verdad o abrir el detalle de un reto pegarían a Supabase con un
+  // `challengeId`/`groupId` que no existen — en vez de eso, un aviso discreto.
+  // Envuelven `onPlayChallenge`/`setViewingChallengeId` en el ÚNICO punto que
+  // los dispara (esta función y los usos de más abajo), así que el resto del
+  // viaje sigue siendo un browse normal, solo sin acción real al fondo.
+  const handlePlayChallenge = useCallback(
+    (challengeId: string) => {
+      if (isExampleTrip) {
+        toast.show('Es un viaje de ejemplo: aquí no se juega de verdad.')
+        return
+      }
+      onPlayChallenge(challengeId)
+    },
+    [isExampleTrip, onPlayChallenge, toast],
+  )
+  const handleViewChallenge = useCallback(
+    (challengeId: string) => {
+      if (isExampleTrip) {
+        toast.show('Es un viaje de ejemplo: no hay detalle real que ver.')
+        return
+      }
+      setViewingChallengeId(challengeId)
+    },
+    [isExampleTrip, toast],
+  )
+
   // Tocar un RETO desde la Bitácora (issue #822): MISMO anti-spoiler que "Retos
   // anteriores" del Marcador — un EN JUEGO sin jugar va a JUGAR (nunca al
   // detalle, que revelaría el mapa antes de tiempo); cualquier otro (cerrado, en
@@ -383,10 +462,10 @@ export function TripPage({
     (challengeId: string) => {
       const summary = pastChallenges.find((p) => p.challengeId === challengeId)
       const antiSpoiler = summary?.status === 'active' && summary.myResult == null
-      if (antiSpoiler) onPlayChallenge(challengeId)
-      else setViewingChallengeId(challengeId)
+      if (antiSpoiler) handlePlayChallenge(challengeId)
+      else handleViewChallenge(challengeId)
     },
-    [pastChallenges, onPlayChallenge],
+    [pastChallenges, handlePlayChallenge, handleViewChallenge],
   )
 
   // Restaura lo que la URL pedía al montar (`ver=`/`m=`, F5 con algo abierto),
@@ -408,9 +487,15 @@ export function TripPage({
     }
   }, [loading, moments, openChallengeFromBitacora])
 
+  // Viaje de ejemplo: su "gente" es fija (`EXAMPLE_TRIP_SUBTITLE`), sin "Tú" —
+  // quien lo mira no es miembro de este viaje curado, a diferencia de uno real
+  // (donde `membersLine` SÍ antepone "Tú" porque la sesión ya es miembro).
   const subtitle = useMemo(
-    () => membersLine(memberNames, profile?.display_name ?? null),
-    [memberNames, profile],
+    () =>
+      isExampleTrip
+        ? EXAMPLE_TRIP_SUBTITLE
+        : membersLine(memberNames, profile?.display_name ?? null),
+    [isExampleTrip, memberNames, profile],
   )
   const title = group?.name?.trim() || groupId
 
@@ -556,6 +641,10 @@ export function TripPage({
   // la pide aparte con derecho del dueño) y abrimos el editor a pantalla completa.
   // La hoja se cierra para que el editor sea el foco. Falla en silencio con aviso.
   const openChallengeEditor = async (challengeId: string) => {
+    // Defensa en profundidad: `isOwner` (false en el ejemplo) ya oculta la
+    // acción "Editar" en la hoja del momento, así que esto no debería
+    // disparase nunca desde la UI del viaje de ejemplo.
+    if (isExampleTrip) return
     try {
       const challenge = await getChallenge(challengeId)
       setOpenMoment(null)
@@ -586,6 +675,68 @@ export function TripPage({
       document.removeEventListener('keydown', onKeyDown)
     }
   }, [fabOpen])
+
+  // Guía CONDUCIDA del viaje de ejemplo (onboarding nuevo, pieza 4/4): recorre
+  // Diario (el mapa) → un momento → Bitácora → Marcador/Retos → La liga → un
+  // reto, cambiando de pestaña entre pasos (`onBeforeShow: () => setSection(…)`)
+  // y anclando cada paso a un elemento REAL (ver los refs de arriba). `GuidedTour`
+  // es genérico: esta lista es la ÚNICA pieza que sabe de "viaje"/pestañas.
+  const tourSteps: TourStep[] = useMemo(
+    () => [
+      {
+        targetRef: diarioMapRef,
+        step: 'El Diario',
+        title: 'Cada parada, en su sitio',
+        ariaLabel: 'Cada parada, en su sitio',
+        body: 'Cada parada del viaje queda aquí, en el Diario.',
+        onBeforeShow: () => setSection('diario'),
+      },
+      {
+        targetRef: firstMomentRef,
+        step: 'Un momento',
+        title: 'Guarda cualquier cosa',
+        ariaLabel: 'Guarda cualquier cosa',
+        body: 'Una foto, un vídeo o una nota de voz, con su sitio.',
+        onBeforeShow: () => setSection('diario'),
+      },
+      {
+        targetRef: bitacoraFirstDayRef,
+        step: 'La Bitácora',
+        title: 'Todo el viaje, en orden',
+        ariaLabel: 'Todo el viaje, en orden',
+        body: 'En la Bitácora lo hojeas entero, en orden.',
+        onBeforeShow: () => setSection('fotos'),
+      },
+      {
+        targetRef: caminoWrapRef,
+        step: 'El Marcador',
+        title: 'Aquí se juega',
+        ariaLabel: 'Aquí se juega',
+        body: 'Los retos del viaje: aquí se juega.',
+        onBeforeShow: () => setSection('marcador'),
+      },
+      {
+        targetRef: podioRef,
+        step: 'La liga',
+        title: 'Quién va ganando',
+        ariaLabel: 'Quién va ganando',
+        body: 'Y quién va ganando.',
+        onBeforeShow: () => setSection('marcador'),
+      },
+      {
+        targetRef: firstHitoRef,
+        step: 'Un reto',
+        title: 'Así se juega uno',
+        ariaLabel: 'Así se juega uno',
+        body: 'Así se juega uno.',
+        onBeforeShow: () => setSection('marcador'),
+      },
+    ],
+    // Los refs son estables (useRef); setSection también lo es (setter de
+    // useState) — el linter ya los reconoce como tal, así que no hace falta
+    // recalcular la lista por render.
+    [],
+  )
 
   // Editor de reto a pantalla completa: toma la pantalla mientras está abierto.
   // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa
@@ -654,20 +805,36 @@ export function TripPage({
         onLead={onBack}
         title={
           <span className={styles.headerTitle}>
-            <span className={styles.tripName}>{title}</span>
+            <span className={styles.tripName}>
+              {title}
+              {/* Marco "Ejemplo" (onboarding nuevo, pieza 4/4): entrando desde el
+                  perfil el encuadre es "Ejemplo" — el reto compartido (pieza 2/4)
+                  ya enlaza "Ver el viaje" al viaje REAL de quien lo comparte, así
+                  que nunca coexisten los dos marcos para un mismo viaje. */}
+              {isExampleTrip && (
+                <Badge tone="accent" className={styles.exampleBadge}>
+                  Ejemplo
+                </Badge>
+              )}
+            </span>
             {subtitle && <span className={styles.tripMeta}>{subtitle}</span>}
           </span>
         }
+        // Sin menú ⋯ en el viaje de ejemplo: ni Miembros (no hay membresía real
+        // que gestionar) ni Ajustes/Cerrar/Borrar (isOwner ya en false los
+        // oculta, pero sin dueño tampoco queda nada más que ofrecer aquí).
         action={
-          <button
-            type="button"
-            className={[styles.menuButton, 'lg-press'].join(' ')}
-            onClick={() => setMenuOpen(true)}
-            aria-label="Más opciones del viaje"
-            aria-haspopup="dialog"
-          >
-            <Icon icon={MoreHorizontal} size={22} />
-          </button>
+          isExampleTrip ? undefined : (
+            <button
+              type="button"
+              className={[styles.menuButton, 'lg-press'].join(' ')}
+              onClick={() => setMenuOpen(true)}
+              aria-label="Más opciones del viaje"
+              aria-haspopup="dialog"
+            >
+              <Icon icon={MoreHorizontal} size={22} />
+            </button>
+          )
         }
       />
       {/* Tab Diario · Bitácora · Marcador (issue #645): el control segmentado
@@ -705,7 +872,7 @@ export function TripPage({
           cerrado ya tiene su propio aviso ahí) así que nunca compiten por el
           hueco. `PushOptInPrompt` decide en solitario si renderiza algo
           (returns null sin condición); este wrapper solo fija la posición. */}
-      {!isClosed && (
+      {!isClosed && !isExampleTrip && (
         <div className={styles.pushBannerWrap}>
           <PushOptInPrompt surface="trip_banner" groupId={groupId} />
         </div>
@@ -737,9 +904,11 @@ export function TripPage({
               onTogglePlay={reducedMotion ? undefined : togglePlay}
               onSelectFromMap={selectFromMap}
               onExpand={(m) => setOpenMoment(m)}
-              onPlay={onPlayChallenge}
+              onPlay={handlePlayChallenge}
               onAddMoment={onAddMoment}
               onInvite={() => openInvite()}
+              mapRef={diarioMapRef}
+              firstMomentRef={firstMomentRef}
             />
           </section>
         )}
@@ -774,6 +943,7 @@ export function TripPage({
                 setSection('marcador')
                 location.hash = marcadorGroupHash(groupId)
               }}
+              firstDayRef={bitacoraFirstDayRef}
             />
           </section>
         )}
@@ -801,11 +971,14 @@ export function TripPage({
               // Anti-spoiler (issue #800): un EN JUEGO sin jugar va al mismo flujo
               // de jugar que "Adivina" del Diario (nunca al detalle, que
               // revelaría el mapa antes de tiempo).
-              onPlayChallenge={onPlayChallenge}
+              onPlayChallenge={handlePlayChallenge}
               // Cualquier otro (cerrado, o EN JUEGO ya jugado) abre el detalle
               // nuevo (clasificación + mapa de jugadas + foto) por encima del viaje.
-              onViewChallenge={(challengeId) => setViewingChallengeId(challengeId)}
+              onViewChallenge={handleViewChallenge}
               onPrizesSaved={() => void refresh()}
+              podioRef={podioRef}
+              caminoWrapRef={caminoWrapRef}
+              firstHitoRef={firstHitoRef}
             />
           </section>
         )}
@@ -869,8 +1042,9 @@ export function TripPage({
           Abre la hoja "Compartir" (Invitar al viaje / Compartir un reto /
           Compartir clasificación). Nunca dos flotantes a la vez en el mismo tab:
           sustituye al FAB de clasificación que vivía solo en Marcador (issue
-          #608) y al item "Invitar" del menú ⋯. */}
-      {!wrapOpen && (
+          #608) y al item "Invitar" del menú ⋯. Nunca en el viaje de ejemplo
+          (solo lectura): no hay nada real que invitar/compartir. */}
+      {!wrapOpen && !isExampleTrip && (
         <div className={styles.shareFabWrap}>
           <button
             type="button"
@@ -1137,13 +1311,14 @@ export function TripPage({
         onClose={() => setOpenMoment(null)}
         onPlay={
           openMoment?.status === 'active'
-            ? () => onPlayChallenge(openMoment.challengeId)
+            ? () => handlePlayChallenge(openMoment.challengeId)
             : undefined
         }
         // "Compartir reto" (issue #739): solo con el reto EN JUEGO (un reto
-        // cerrado ya no se juega — para ese caso está "Ver marcador").
+        // cerrado ya no se juega — para ese caso está "Ver marcador"). Nunca en
+        // el viaje de ejemplo: no hay nada real que compartir (solo lectura).
         onShareChallenge={
-          openMoment?.status === 'active'
+          openMoment?.status === 'active' && !isExampleTrip
             ? () => {
                 openShareChallenge(openMoment)
                 setOpenMoment(null)
@@ -1161,8 +1336,10 @@ export function TripPage({
         }}
         // "Convertir en reto" (issue #723): al asistente completo en modo promoción
         // (`&add=reto&promote=<id>`), con el pin/foto/título del recuerdo prefijados.
+        // Nunca en el viaje de ejemplo (solo lectura): `canEdit={isOwner}` ya lo
+        // oculta en la práctica, pero se guarda igual por defensa en profundidad.
         onPromote={
-          openMoment
+          openMoment && !isExampleTrip
             ? () => {
                 setOpenMoment(null)
                 location.hash = promoteChallengeHash(groupId, openMoment.challengeId)
@@ -1286,6 +1463,21 @@ export function TripPage({
         isOwner={isOwner}
         origin={inviteOrigin}
       />
+
+      {/* Guía conducida del viaje de ejemplo (onboarding nuevo, pieza 4/4): solo
+          en el viaje de ejemplo y solo mientras `tourActive` — arrancada por
+          `#g=ejemplo&tour=1` (perfil → "Ver un viaje de ejemplo") o, más
+          adelante, por cualquier otra entrada que quiera recorrerlo. */}
+      {isExampleTrip && tourActive && (
+        <GuidedTour
+          steps={tourSteps}
+          closingTitle="Ya conoces el viaje"
+          closingBody="Así se ve un viaje entero en Momentu: un diario que se comparte, con retos de por medio."
+          closingCta="Entendido"
+          onFinish={() => setTourActive(false)}
+          onSkip={() => setTourActive(false)}
+        />
+      )}
     </div>
   )
 }

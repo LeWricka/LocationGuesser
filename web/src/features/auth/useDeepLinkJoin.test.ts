@@ -41,6 +41,7 @@ vi.mock('../../lib/observability', () => ({
 
 import { useDeepLinkJoin } from './useDeepLinkJoin'
 import { ResourceGoneError } from '../../lib/errors'
+import { EXAMPLE_TRIP_GROUP_ID } from '../../lib/exampleTrip'
 
 beforeEach(() => {
   joinGroup.mockClear()
@@ -259,6 +260,35 @@ describe('useDeepLinkJoin', () => {
       joinGroup.mockResolvedValueOnce(undefined)
       await join(result, '#g=ABC')
       expect(result.current.error).toBeNull()
+    })
+  })
+
+  // Viaje de EJEMPLO (onboarding nuevo, pieza 4/4): id CENTINELA puro, nunca
+  // existe una fila real en `groups` — sin este corte, `joinGroup` violaría la
+  // FK (23503) y dejaría al usuario en JoinErrorScreen. El guarda debe cortar
+  // ANTES de intentar unirse, para cualquier sesión (logueada o anónima).
+  describe('viaje de EJEMPLO (id centinela, onboarding nuevo pieza 4/4)', () => {
+    test('#g=ejemplo: no hace join ni consulta membresía, solo restaura el hash', async () => {
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await join(result, `#g=${EXAMPLE_TRIP_GROUP_ID}&tour=1`)
+      expect(joinGroup).not.toHaveBeenCalled()
+      expect(isMember).not.toHaveBeenCalled()
+      expect(track).not.toHaveBeenCalled()
+      expect(window.location.hash).toBe(`#g=${EXAMPLE_TRIP_GROUP_ID}&tour=1`)
+      expect(result.current.error).toBeNull()
+    })
+
+    test('#g=ejemplo sin sesión (receptor anónimo aún sin userId): tampoco intenta unirse', async () => {
+      const { result } = renderHook(() => useDeepLinkJoin(undefined))
+      await join(result, `#g=${EXAMPLE_TRIP_GROUP_ID}`)
+      expect(joinGroup).not.toHaveBeenCalled()
+    })
+
+    test('#g=ejemplo con sesión ANÓNIMA: tampoco intenta unirse', async () => {
+      const { result } = renderHook(() => useDeepLinkJoin('anon-1', true))
+      await join(result, `#g=${EXAMPLE_TRIP_GROUP_ID}`)
+      expect(joinGroup).not.toHaveBeenCalled()
+      expect(window.location.hash).toBe(`#g=${EXAMPLE_TRIP_GROUP_ID}`)
     })
   })
 })

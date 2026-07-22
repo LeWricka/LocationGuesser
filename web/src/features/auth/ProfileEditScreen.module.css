@@ -31,6 +31,92 @@
   border-top: 1px solid var(--color-border);
 }
 
+/* Tutoriales (onboarding nuevo, pieza 4/4): bloque propio, separado del
+ * formulario (mismo espaciado que `.secondaryActions`, sin el borde superior
+ * — no es una "zona peligrosa", es un repaso). */
+.tutorials {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.tutorialsIntro {
+  margin: var(--space-1) 0 var(--space-3);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.tutorialList {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.tutorialRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+.tutorialRow:last-child {
+  border-bottom: none;
+}
+.tutorialRow:hover {
+  background: var(--color-surface-hover);
+}
+.tutorialRow:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.tutorialIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.tutorialText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.tutorialText b {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+.tutorialText span {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.tutorialGo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+  flex: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+}
+
 /* Sección de foto de perfil: etiqueta, control de subida y nota de ayuda. */
 .photoSection {
   display: flex;
