@@ -292,11 +292,27 @@
      El tinte teal translúcido anterior leía como sólido sobre escena oscura. */
   color: var(--scene-ink, var(--color-text));
   background: var(--scene-surface);
-  border: 1px solid var(--scene-hairline);
+  /* Raya blanca detrás del FAB (issue #888), fuente EXACTA medida en píxel: este
+     bloque vive dentro de `.sceneDiario` (arriba), que redefine
+     `--scene-hairline` a `--glass-border` (25% blanco) — calibrado para leer
+     como "canto de contacto" de un cristal ENCIMA de un mapa/foto con textura.
+     El FAB flota sobre el `--scene-bg` PLANO (sin nada debajo que el blur pueda
+     deshacer), así que ese 25% blanco no se disuelve: compone directo sobre el
+     propio relleno translúcido y pinta un aro nítido y persistente. Atenuado con
+     `color-mix` a un cuarto de esa opacidad — vuelve a leer como hairline, no
+     como aro — sin tocar el token compartido (que sí hace falta al 25% sobre el
+     mapa/foto, sección Diario/Bitácora). */
+  border: 1px solid color-mix(in srgb, var(--scene-hairline) 40%, transparent);
   -webkit-backdrop-filter: var(--scene-blur, none);
   backdrop-filter: var(--scene-blur, none);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-lg);
+  /* `--shadow-lg` es la sombra de PAPEL (rgba casi negro a ~10% de alpha):
+     medido en píxel, con/sin ella el FAB no cambia (diff < 3/255) — invisible
+     sobre escena oscura, mismo criterio ya documentado en MarcadorTab.module.css
+     ("sobre escena oscura una sombra negra es invisible"). `--scene-shadow` SÍ
+     tiene alpha real (.55/.4) y da la separación que `--shadow-lg` prometía y
+     nunca daba aquí. */
+  box-shadow: var(--scene-shadow);
   cursor: pointer;
   transition:
     background-color var(--transition-base),
@@ -336,14 +352,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Mismo vidrio de escena que `.fab` (gramática: los dos flotantes son gemelos). */
+  /* Mismo vidrio de escena que `.fab` (gramática: los dos flotantes son gemelos),
+     con el mismo arreglo de la raya blanca/sombra de papel (issue #888, ver el
+     comentario largo en `.fab`). */
   color: var(--scene-ink, var(--color-text));
   background: var(--scene-surface);
-  border: 1px solid var(--scene-hairline);
+  border: 1px solid color-mix(in srgb, var(--scene-hairline) 40%, transparent);
   -webkit-backdrop-filter: var(--scene-blur, none);
   backdrop-filter: var(--scene-blur, none);
   border-radius: var(--radius-full);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--scene-shadow);
   cursor: pointer;
   transition:
     background-color var(--transition-base),

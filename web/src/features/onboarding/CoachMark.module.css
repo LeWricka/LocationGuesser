@@ -10,8 +10,21 @@
 .layer {
   position: fixed;
   inset: 0;
+  /* Por encima de TODO, incluido Leaflet (contenido a ~1000 dentro de `.lg-map`
+     vía `isolation:isolate`, ver index.css): `--z-toast` es el piso más alto
+     del sistema, a propósito para que esta capa nunca quede tapada por el
+     mapa vivo. */
   z-index: var(--z-toast);
   pointer-events: none;
+}
+
+/* Modo bloqueante (issue #888): la capa entera pasa a capturar el toque —
+   sobre un mapa Leaflet vivo, el pass-through de siempre arrastra el mapa en
+   vez de avanzar de paso. El objetivo no necesita ser interactivo aquí (solo
+   se lee + se pulsa "Siguiente"), así que "tragarse" el toque en toda la capa
+   es correcto y no rompe nada. */
+.layerBlocking {
+  pointer-events: auto;
 }
 
 /* Aro que oscurece todo salvo el hueco recortado sobre el objetivo (mismo
@@ -50,6 +63,11 @@
 
 .card {
   position: fixed;
+  /* Igual que `.actions`: la burbuja en sí (su texto, y sobre todo su propio
+     scroll cuando `maxHeight` recorta un objetivo enorme) necesita capturar
+     el toque aunque `.layer` sea pass-through — nunca deja pasar nada A TRAVÉS
+     de la burbuja, solo por el hueco del spotlight. */
+  pointer-events: auto;
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
@@ -112,6 +130,12 @@
   justify-content: space-between;
   gap: var(--space-3);
   margin-top: var(--space-3);
+  /* `pointer-events` se hereda: `.card` vive dentro de `.layer`, que en modo NO
+     bloqueante es `pointer-events:none` (pass-through al objetivo real). Sin
+     este `auto` explícito los botones de abajo heredaban ese "none" y nunca
+     recibían el toque en un navegador real (los tests con jsdom no lo pillan:
+     no aplican `pointer-events` al hacer hit-testing) — issue #888. */
+  pointer-events: auto;
 }
 
 .dismissInline {

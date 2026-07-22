@@ -16,6 +16,15 @@
 // del DOM real, así que tocarlo (a través del hueco visual) dispara su propio
 // handler sin que esta capa se interponga. Solo los botones de acción (cierre
 // y, si lo hay, "Siguiente") capturan toques.
+//
+// MODO `blocking` (issue #888, aditivo): sobre un objetivo vivo e interactivo
+// por naturaleza —un mapa Leaflet— el pass-through de arriba es un desastre:
+// arrastra el mapa en vez de avanzar de paso, y el "Siguiente" puede acabar
+// recibiendo el toque el propio mapa (capas de Leaflet por debajo). Con
+// `blocking`, la capa entera pasa a `pointer-events:auto`: captura CUALQUIER
+// toque por debajo (el objetivo no necesita ser interactivo, el usuario solo
+// lee + pulsa "Siguiente") y así nunca se cuela al elemento real. Sin esta
+// prop el comportamiento de siempre queda intacto (creador, FAB "+").
 
 import { useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react'
 import { useReducedMotion } from '../../ui'
@@ -39,6 +48,14 @@ export interface CoachMarkProps {
   /** Etiqueta accesible de la burbuja para el lector de pantalla. */
   ariaLabel: string
   onDismiss: () => void
+  /**
+   * Modo bloqueante (issue #888): captura toda interacción por debajo (scrim
+   * `pointer-events:auto`) en vez del pass-through de siempre. Pensado para
+   * objetivos vivos/interactivos (mapa Leaflet) donde dejar pasar el toque
+   * arrastra el mapa en vez de avanzar. Default `false` = comportamiento
+   * intacto (creador, FAB "+").
+   */
+  blocking?: boolean
 }
 
 // Re-medición barata: el objetivo típico (un FAB `position: fixed`) no se
@@ -47,10 +64,13 @@ export interface CoachMarkProps {
 // corto es más robusto que un ResizeObserver atado a un nodo que puede tardar
 // en existir, y es barato (un getBoundingClientRect, nada de layout thrashing).
 const RECHECK_MS = 400
-// Si el objetivo está muy arriba, no cabe una burbuja ENCIMA: la bajamos.
-const FLIP_BELOW_THRESHOLD_PX = 220
 const MARGIN_PX = 16
 const RING_PADDING_PX = 10
+// Hueco mínimo (px) para que la burbuja quepa cómoda a un lado del objetivo.
+// Con un objetivo ENORME (el mapa a pantalla completa, modo `blocking`) ni
+// arriba ni abajo hay tanto hueco: en ese caso la clavamos al borde inferior
+// del viewport con su propio scroll (nunca fuera de pantalla, issue #888).
+const MIN_CARD_SPACE_PX = 180
 
 export function CoachMark({
   targetRef,
@@ -61,6 +81,7 @@ export function CoachMark({
   primaryAction,
   ariaLabel,
   onDismiss,
+  blocking = false,
 }: CoachMarkProps) {
   const reducedMotion = useReducedMotion()
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -79,26 +100,54 @@ export function CoachMark({
     }
   }, [targetRef])
 
+  // Aro CONTENIDO (issue #888): con un objetivo enorme (el mapa a pantalla
+  // completa) el rect + el padding se salía del viewport ("cuadrado dorado
+  // que se sale del mapa"). Recortamos a [0, innerWidth/Height] tras aplicar
+  // el padding, así el aro nunca se desborda.
   const ringStyle = useMemo(() => {
     if (!rect) return null
-    return {
-      left: rect.left - RING_PADDING_PX,
-      top: rect.top - RING_PADDING_PX,
-      width: rect.width + RING_PADDING_PX * 2,
-      height: rect.height + RING_PADDING_PX * 2,
-    }
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const left = Math.max(0, rect.left - RING_PADDING_PX)
+    const top = Math.max(0, rect.top - RING_PADDING_PX)
+    const right = Math.min(vw, rect.right + RING_PADDING_PX)
+    const bottom = Math.min(vh, rect.bottom + RING_PADDING_PX)
+    return { left, top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) }
   }, [rect])
 
+  // Burbuja SIEMPRE dentro del viewport (issue #888): antes se decidía
+  // arriba/abajo con un umbral fijo sobre `rect.top` y sin tope — con un
+  // objetivo alto (el mapa) la burbuja podía acabar fuera de pantalla. Ahora
+  // comparamos el hueco REAL a cada lado y, si ninguno alcanza
+  // `MIN_CARD_SPACE_PX` (objetivo enorme), la clavamos al borde inferior con
+  // su propio scroll. Los dos lados "normales" también llevan `maxHeight` +
+  // scroll propio como red de seguridad (nunca fuera de pantalla, aunque el
+  // contenido crezca).
   const cardStyle = useMemo(() => {
     if (!rect) return null
-    const below = rect.top < FLIP_BELOW_THRESHOLD_PX
-    return {
+    const vw = window.innerWidth
+    const vh = window.innerHeight
+    const spaceAbove = rect.top
+    const spaceBelow = vh - rect.bottom
+    const base = {
       left: MARGIN_PX,
-      right: Math.max(MARGIN_PX, window.innerWidth - rect.right),
-      ...(below
-        ? { top: rect.bottom + MARGIN_PX }
-        : { bottom: Math.max(MARGIN_PX, window.innerHeight - rect.top + MARGIN_PX) }),
+      right: Math.max(MARGIN_PX, vw - rect.right),
+      maxHeight: `calc(100dvh - ${MARGIN_PX * 2}px)`,
+      overflowY: 'auto' as const,
     }
+    if (spaceAbove < MIN_CARD_SPACE_PX && spaceBelow < MIN_CARD_SPACE_PX) {
+      return {
+        ...base,
+        bottom: MARGIN_PX,
+        maxHeight: `min(50dvh, calc(100dvh - ${MARGIN_PX * 2}px))`,
+      }
+    }
+    if (spaceBelow >= spaceAbove) {
+      const top = Math.min(rect.bottom + MARGIN_PX, Math.max(MARGIN_PX, vh - MIN_CARD_SPACE_PX))
+      return { ...base, top, maxHeight: `calc(100dvh - ${top}px - ${MARGIN_PX}px)` }
+    }
+    const bottom = Math.max(MARGIN_PX, vh - rect.top + MARGIN_PX)
+    return { ...base, bottom, maxHeight: `calc(100dvh - ${bottom}px - ${MARGIN_PX}px)` }
   }, [rect])
 
   // Sin objetivo medible todavía (aún no montado, o desapareció): no pintamos
@@ -106,7 +155,7 @@ export function CoachMark({
   if (!rect || !ringStyle || !cardStyle) return null
 
   return (
-    <div className={styles.layer}>
+    <div className={`${styles.layer} ${blocking ? styles.layerBlocking : ''}`}>
       <div className={styles.spotlight} style={ringStyle} />
       {!reducedMotion && <div className={styles.pulse} style={ringStyle} />}
 

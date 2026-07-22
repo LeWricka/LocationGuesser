@@ -62,3 +62,57 @@ describe('CoachMark', () => {
     expect(container).toBeEmptyDOMElement()
   })
 })
+
+// Modo `blocking` (issue #888): a prueba de balas sobre un objetivo vivo (mapa
+// Leaflet/Google). jsdom NO aplica `pointer-events`/z-index al hacer hit-testing
+// (fireEvent dispara directo sobre el nodo, ignorando CSS) — por eso el
+// bloqueo REAL del scrim contra un elemento interactivo de debajo lo cubre un
+// test de Playwright con navegador real (ver
+// e2e/gallery-coachmark-blocking.spec.ts, caso `onboarding-coachmark-blocking`).
+// Aquí verificamos lo que SÍ es observable en jsdom: que `blocking` es aditivo
+// (no rompe el render/las acciones por defecto) y que activa una clase
+// DISTINTA a la del modo normal (el gancho CSS del scrim bloqueante).
+describe('CoachMark — modo blocking (issue #888)', () => {
+  function renderWithBlocking(blocking: boolean) {
+    const targetRef = { current: document.createElement('div') } as RefObject<HTMLElement | null>
+    const onDismiss = vi.fn()
+    const onNext = vi.fn()
+    const utils = render(
+      <CoachMark
+        targetRef={targetRef}
+        title="Esto marcaron los demás"
+        ariaLabel="Esto marcaron los demás"
+        body="Cuerpo"
+        primaryAction={{ label: 'Siguiente', onClick: onNext }}
+        onDismiss={onDismiss}
+        blocking={blocking}
+      />,
+    )
+    return { ...utils, onDismiss, onNext }
+  }
+
+  test('blocking=true sigue pintando título, cuerpo y acciones (aditivo, no rompe el render)', () => {
+    renderWithBlocking(true)
+    expect(screen.getByText('Esto marcaron los demás')).toBeInTheDocument()
+    expect(screen.getByText('Cuerpo')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeInTheDocument()
+  })
+
+  test('blocking=true: "Siguiente" y "Saltar" siguen disparando su handler', () => {
+    const { onNext, onDismiss } = renderWithBlocking(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(onNext).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Saltar guía' }))
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+  })
+
+  test('blocking=true aplica una capa distinta a blocking=false (gancho del scrim bloqueante)', () => {
+    const { container: withBlocking, unmount } = renderWithBlocking(true)
+    const blockingClassName = withBlocking.firstElementChild?.className
+    unmount()
+    const { container: withoutBlocking } = renderWithBlocking(false)
+    const normalClassName = withoutBlocking.firstElementChild?.className
+    expect(blockingClassName).toBeTruthy()
+    expect(blockingClassName).not.toBe(normalClassName)
+  })
+})

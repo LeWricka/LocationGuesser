@@ -5,7 +5,6 @@ import {
   Eye,
   EyeOff,
   Ghost,
-  HelpCircle,
   Lock,
   RotateCcw,
   Share2,
@@ -275,11 +274,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // deep link de reto sin cuenta y por primera vez (ver useRetoShareOnboarding).
   const retoShare = useRetoShareOnboarding(groupId, user?.id, isAnonymous, profile?.onboarding)
   const [retoIntroDismissed, setRetoIntroDismissed] = useState(false)
-  // ¿Ya lanzó el usuario la explicación desde el reveal? Empieza en false a
-  // propósito: el resultado (puntos, mapa de los demás) se ve ENTERO primero;
-  // la guía solo se monta cuando se pulsa "¿Qué es esto?" (nunca de golpe
-  // encima del reveal, que era el bug que tapaba los puntos).
-  const [retoExplainStarted, setRetoExplainStarted] = useState(false)
+  // Fin del recorrido de la guía del reto compartido (issue #888): NO hace
+  // falta un flag "ya empezó" aparte — el render de más abajo YA vive dentro
+  // de la rama `revealed` (todo lo que sigue tras `if (!revealed) return …`),
+  // así que la guía arranca SOLA en cuanto se revela (mientras `retoShare.active`
+  // sea true, "solo la 1ª vez" lo da ese propio flag) sin un efecto que ponga
+  // estado — evita el cascading-render que un `setState` síncrono en un efecto
+  // dispararía sin aportar nada (antes existía para gatear el botón "¿Qué es
+  // esto?", que ya no existe).
   const [retoExplainDone, setRetoExplainDone] = useState(false)
   // Anclas REALES del reveal para los coach-marks de la guía (RetoShareGuide):
   // la tarjeta de puntuación ("tu resultado") y el mapa con los pines de todos
@@ -1489,24 +1491,6 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                 </p>
               )}
 
-              {/* "¿Qué es esto?" (issue #886): lanza la explicación del reto
-                compartido A PETICIÓN, nunca de golpe encima del reveal (el bug
-                era un overlay opaco que tapaba los puntos desde el primer
-                frame). Solo el receptor ANÓNIMO que aún no la ha visto: primero
-                ve su resultado entero y, si quiere, la abre. */}
-              {isAnonymous && retoShare.active && !retoExplainStarted && !retoExplainDone && (
-                <Button
-                  variant="secondary"
-                  fullWidth
-                  onClick={() => setRetoExplainStarted(true)}
-                  className={styles.actionsIn}
-                >
-                  <span className={styles.inlineIcon}>
-                    <Icon icon={HelpCircle} size={18} /> ¿Qué es esto?
-                  </span>
-                </Button>
-              )}
-
               {/* "Guárdate / entra del todo" (issue #758): CTA OPCIONAL solo para el
                 receptor ANÓNIMO — vincula su sesión a un email sin perder su voto
                 ni su puesto (mismo uid). Saltable: no vincular no le quita nada de
@@ -1671,16 +1655,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         </div>
       )}
 
-      {/* Guía del reto compartido (onboarding pieza 2/4, issue #886): se monta
-          SOLO tras pulsar "¿Qué es esto?" (`retoExplainStarted`), nunca de
-          golpe encima del reveal. Coach-marks sobre el resultado real + las
-          tarjetas de explicación + aterrizaje en el Marcador. `!upgradeOpen`
-          evita apilarla encima del alta real (nunca dos prompts a la vez). */}
-      {isAnonymous &&
-        retoShare.active &&
-        retoExplainStarted &&
-        !retoExplainDone &&
-        !upgradeOpen && (
+      {/* Guía del reto compartido (onboarding pieza 2/4, issue #888): se monta
+          SOLA en cuanto se revela (este bloque YA vive dentro de la rama
+          `revealed`, ver el `if (!revealed) return …` de arriba), nunca de
+          golpe encima del reveal — los coach-marks son BLOQUEANTES pero
+          SEÑALAN el resultado/mapa reales sin taparlos. `!upgradeOpen` evita
+          apilarla encima del alta real (nunca dos prompts a la vez). */}
+      {isAnonymous && retoShare.active && !retoExplainDone && !upgradeOpen && (
           <RetoShareGuide
             ownerName={ownerName}
             resultRef={revealResultRef}
