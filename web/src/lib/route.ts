@@ -27,6 +27,16 @@ export interface Route {
    */
   groupView?: 'marcador' | 'fotos'
   /**
+   * Coach-mark de ENTRADA al Marcador (`#g=…&v=marcador&guide=marcador`): quien
+   * acaba de jugar su primer reto compartido como anónimo aterriza en el
+   * Marcador con la guía del reto ya recorrida (ver `RetoShareGuide`); este
+   * flag pide un único coach-mark que señale la clasificación real (el podio)
+   * al entrar. Se CONSUME una sola vez al montar (mismo criterio que `tour=1`):
+   * una recarga posterior no debe relanzarlo. Solo tiene sentido junto a
+   * `v=marcador`.
+   */
+  groupGuide?: 'marcador'
+  /**
    * Intención de abrir directamente "Añadir momento" al entrar al viaje
    * (`#g=…&v=marcador&add=1`). Lo usa el asistente de reto clásico.
    */
@@ -112,6 +122,12 @@ export function parseHash(hash: string = window.location.hash): Route {
   if (v === 'marcador' || v === 'clasico') route.groupView = 'marcador'
   else if (v === 'fotos') route.groupView = 'fotos'
 
+  // Coach-mark de entrada al Marcador (`&guide=marcador`): solo tiene sentido si
+  // se aterriza en el Marcador. TripPage lo consume una vez y lo quita del hash.
+  if (params.get('guide')?.trim() === 'marcador' && route.groupView === 'marcador') {
+    route.groupGuide = 'marcador'
+  }
+
   // Intención de abrir "Añadir momento" directo (solo junto a la vista clásica).
   if (params.get('add')?.trim() === '1') route.groupAdd = true
 
@@ -159,6 +175,18 @@ export function groupHash(groupId: string, challengeId?: string): string {
  */
 export function marcadorGroupHash(groupId: string): string {
   return `#g=${encodeURIComponent(groupId)}&v=marcador`
+}
+
+/**
+ * Como `marcadorGroupHash` pero pidiendo además el coach-mark de ENTRADA que
+ * señala la clasificación (`&guide=marcador`). Lo usa el aterrizaje final de la
+ * guía del reto compartido (`RetoShareGuide`): tras recorrer el resultado y la
+ * explicación, se cae en el Marcador y se resalta el podio real una vez.
+ * `TripPage` consume el flag al montar y lo retira del hash (mismo criterio que
+ * `tour=1`), así una recarga no lo relanza.
+ */
+export function marcadorGuideGroupHash(groupId: string): string {
+  return `#g=${encodeURIComponent(groupId)}&v=marcador&guide=marcador`
 }
 
 /**

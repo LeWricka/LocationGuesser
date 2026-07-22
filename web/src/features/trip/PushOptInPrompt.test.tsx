@@ -24,7 +24,9 @@ import { PushOptInPrompt } from './PushOptInPrompt'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { snoozePushPrompt } from '../../lib/pushPrompt'
 
-const PROMPT_TEXT = '¿Te avisamos cuando haya un reto nuevo?'
+// El pop-up (issue #886) se identifica por su titular; el copy de valor
+// (avisos + gestión desde el perfil) se comprueba aparte más abajo.
+const PROMPT_TEXT = 'No te pierdas ningún reto'
 
 function fakeSession(overrides: Partial<SessionState> = {}): SessionState {
   return {
@@ -119,13 +121,26 @@ describe('PushOptInPrompt — render condicional', () => {
     expect(screen.queryByText(PROMPT_TEXT)).not.toBeInTheDocument()
   })
 
-  test('renderiza el banner con el gate ideal y emite push_prompt_shown', () => {
+  test('renderiza el pop-up con el gate ideal y emite push_prompt_shown', () => {
     renderPrompt()
     expect(screen.getByText(PROMPT_TEXT)).toBeInTheDocument()
     expect(trackMock).toHaveBeenCalledWith('push_prompt_shown', {
       surface: 'trip_banner',
       group_id: 'g1',
     })
+  })
+
+  test('el pop-up EXPLICA el valor: los avisos y que se gestionan desde el perfil', () => {
+    renderPrompt()
+    // Los cuatro avisos del diseño (reto nuevo, momento, fin de reto, fin de viaje).
+    expect(screen.getByText('Cuando hay un reto nuevo para jugar')).toBeInTheDocument()
+    expect(screen.getByText('Cuando alguien comparte un momento')).toBeInTheDocument()
+    expect(screen.getByText('Cuando un reto está a punto de cerrar')).toBeInTheDocument()
+    expect(screen.getByText('Cuando el viaje llega a su fin')).toBeInTheDocument()
+    // La gestión real vive en el perfil.
+    expect(
+      screen.getByText('Puedes gestionarlas cuando quieras desde tu perfil.'),
+    ).toBeInTheDocument()
   })
 })
 
@@ -135,7 +150,7 @@ describe('PushOptInPrompt — acciones', () => {
     const user = userEvent.setup()
     renderPrompt()
 
-    await user.click(screen.getByRole('button', { name: 'Sí, avisadme' }))
+    await user.click(screen.getByRole('button', { name: 'Activar avisos' }))
 
     expect(subscribeToPushMock).toHaveBeenCalledWith('u1')
     await waitFor(() =>
@@ -155,7 +170,7 @@ describe('PushOptInPrompt — acciones', () => {
     const user = userEvent.setup()
     renderPrompt()
 
-    await user.click(screen.getByRole('button', { name: 'Sí, avisadme' }))
+    await user.click(screen.getByRole('button', { name: 'Activar avisos' }))
 
     await waitFor(() =>
       expect(trackMock).toHaveBeenCalledWith('push_prompt_accepted', {
@@ -171,7 +186,7 @@ describe('PushOptInPrompt — acciones', () => {
     const user = userEvent.setup()
     renderPrompt()
 
-    await user.click(screen.getByRole('button', { name: 'Sí, avisadme' }))
+    await user.click(screen.getByRole('button', { name: 'Activar avisos' }))
 
     await waitFor(() =>
       expect(trackMock).toHaveBeenCalledWith('push_prompt_accepted', {

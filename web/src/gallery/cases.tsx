@@ -41,6 +41,7 @@ import {
   GuestRegisterPrompt,
   RetoShareIntro,
   RetoShareExplainSequence,
+  RetoShareGuide,
   CreadorIntroFrame,
   CoachMark,
   CreadorNudge,
@@ -130,6 +131,11 @@ const noop = () => {}
 const coachMarkFabRef: { current: HTMLButtonElement | null } = { current: null }
 // Ídem, para el remate anclado a la barra Diario·Bitácora·Marcador.
 const coachMarkTabBarRef: { current: HTMLDivElement | null } = { current: null }
+// Anclas falsas del reveal para capturar el coach-mark de RetoShareGuide (issue
+// #886) SIN taparlo: dos cajas visibles que simulan la tarjeta de puntos y el
+// mapa con los pines de todos. Demuestra que el resultado se ve DEBAJO.
+const retoResultRef: { current: HTMLElement | null } = { current: null }
+const retoOthersRef: { current: HTMLElement | null } = { current: null }
 
 // Foto stub para `MomentSheet` (issue #571): mismo estilo que el SVG data-URI que
 // firma el Storage falso (`fakeSupabase.photoDataUri`, no exportado), duplicado
@@ -1031,30 +1037,11 @@ export const cases: GalleryCase[] = [
     render: () => <RetoShareIntro photoUrl={null} onPlay={noop} />,
   },
   {
-    id: 'onboarding-reto-quees',
-    title: 'Onboarding · reto compartido — qué es Momentu (tras el resultado)',
-    section: 'Onboarding',
-    render: () => (
-      <RetoShareExplainSequence
-        ownerName="Lucía"
-        onViewTrip={noop}
-        onCreateAccount={noop}
-        onDismiss={noop}
-      />
-    ),
-  },
-  {
     id: 'onboarding-reto-retos',
-    title: 'Onboarding · reto compartido — cómo son los retos',
+    title: 'Onboarding · reto compartido — la sección de retos (Marcador)',
     section: 'Onboarding',
     render: () => (
-      <RetoShareExplainSequence
-        ownerName="Lucía"
-        initialStep="retos"
-        onViewTrip={noop}
-        onCreateAccount={noop}
-        onDismiss={noop}
-      />
+      <RetoShareExplainSequence ownerName="Lucía" onCreateAccount={noop} onDismiss={noop} />
     ),
   },
   {
@@ -1065,10 +1052,88 @@ export const cases: GalleryCase[] = [
       <RetoShareExplainSequence
         ownerName="Lucía"
         initialStep="puente"
-        onViewTrip={noop}
         onCreateAccount={noop}
         onDismiss={noop}
       />
+    ),
+  },
+  {
+    id: 'onboarding-reto-quees',
+    title: 'Onboarding · reto compartido — qué es Momentu',
+    section: 'Onboarding',
+    render: () => (
+      <RetoShareExplainSequence
+        ownerName="Lucía"
+        initialStep="quees"
+        onCreateAccount={noop}
+        onDismiss={noop}
+      />
+    ),
+  },
+  {
+    // El coach-mark SEÑALA el resultado real sin taparlo (issue #886): las dos
+    // cajas de abajo son el reveal (tarjeta de puntos + mapa de los demás),
+    // visibles bajo el scrim. Antes había un overlay opaco que las tapaba.
+    id: 'onboarding-reto-guide-coach',
+    title: 'Onboarding · reto compartido — coach-mark sobre el resultado (no lo tapa)',
+    section: 'Onboarding',
+    render: () => (
+      // Escena OSCURA detrás (como el coach del creador y como producción: el
+      // coach vive sobre el reveal oscuro + scrim). Sin ella, la burbuja glass
+      // translúcida se pintaría sobre el fondo claro de la galería y axe mediría
+      // contraste insuficiente del texto (pensado para escena oscura).
+      <div
+        style={{
+          position: 'relative',
+          height: '100dvh',
+          padding: 16,
+          background: 'var(--scene-bg)',
+          color: 'var(--scene-ink)',
+        }}
+      >
+        <div
+          ref={(el) => {
+            retoResultRef.current = el
+          }}
+          style={{
+            padding: 24,
+            borderRadius: 16,
+            // Superficie de ESCENA (oscura), como el reveal real: la burbuja
+            // glass translúcida se compone sobre oscuro (texto legible), no
+            // sobre una tarjeta clara (contraste insuficiente para axe).
+            background: 'var(--scene-surface)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--scene-ink)',
+            marginBottom: 16,
+            textAlign: 'center',
+          }}
+        >
+          Tu resultado: 4.200 puntos · a 8 km
+        </div>
+        <div
+          ref={(el) => {
+            retoOthersRef.current = el
+          }}
+          style={{
+            height: 180,
+            borderRadius: 16,
+            background: 'var(--scene-surface)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--scene-ink)',
+            display: 'grid',
+            placeItems: 'center',
+          }}
+        >
+          Mapa con los pines de todos
+        </div>
+        <RetoShareGuide
+          ownerName="Lucía"
+          resultRef={retoResultRef}
+          othersRef={retoOthersRef}
+          onCreateAccount={noop}
+          onFinish={noop}
+        />
+      </div>
     ),
   },
   // Onboarding del CREADOR — aprender-haciendo (onboarding nuevo, pieza 3/4):

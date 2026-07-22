@@ -4,6 +4,7 @@ import {
   groupHash,
   classicGroupHash,
   marcadorGroupHash,
+  marcadorGuideGroupHash,
   fotosGroupHash,
   addMomentHash,
   addChallengeHash,
@@ -102,6 +103,19 @@ describe('parseHash', () => {
     expect(parseHash('#g=abc123&v=otra')).toEqual({ view: 'home', group: 'abc123' })
   })
 
+  test('guide=marcador junto a v=marcador pide el coach-mark de entrada (issue #886)', () => {
+    expect(parseHash('#g=abc123&v=marcador&guide=marcador')).toEqual({
+      view: 'home',
+      group: 'abc123',
+      groupView: 'marcador',
+      groupGuide: 'marcador',
+    })
+  })
+
+  test('guide=marcador sin v=marcador se ignora (solo tiene sentido en el Marcador)', () => {
+    expect(parseHash('#g=abc123&guide=marcador')).toEqual({ view: 'home', group: 'abc123' })
+  })
+
   test('add=1 marca la intención de añadir momento (asistente clásico)', () => {
     expect(parseHash('#g=abc123&v=marcador&add=1')).toEqual({
       view: 'home',
@@ -164,6 +178,14 @@ describe('marcadorGroupHash / classicGroupHash / addMomentHash', () => {
     expect(marcadorGroupHash('abc123')).toBe('#g=abc123&v=marcador')
     // Y parseHash lo reconoce (ida y vuelta).
     expect(parseHash(marcadorGroupHash('abc123')).groupView).toBe('marcador')
+  })
+
+  test('marcadorGuideGroupHash pide además el coach-mark de entrada (issue #886)', () => {
+    expect(marcadorGuideGroupHash('abc123')).toBe('#g=abc123&v=marcador&guide=marcador')
+    // Ida y vuelta: parseHash reconoce ambos flags.
+    const r = parseHash(marcadorGuideGroupHash('abc123'))
+    expect(r.groupView).toBe('marcador')
+    expect(r.groupGuide).toBe('marcador')
   })
 
   test('classicGroupHash (legado) sigue aterrizando en Marcador', () => {

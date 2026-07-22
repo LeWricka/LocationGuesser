@@ -17,6 +17,9 @@ export { useGuestRegisterPrompt } from './useGuestRegisterPrompt'
 // de jugar + explicación de Momentu/puente al viaje/registro tras el resultado.
 export { RetoShareIntro } from './RetoShareIntro'
 export { RetoShareExplainSequence } from './RetoShareExplainSequence'
+// Guía tras el resultado del reto compartido: coach-marks sobre el reveal REAL
+// (sin taparlo) + las tarjetas de explicación + aterrizaje en el Marcador.
+export { RetoShareGuide } from './RetoShareGuide'
 export { useRetoShareOnboarding } from './useRetoShareOnboarding'
 // Onboarding del CREADOR — aprender-haciendo (onboarding nuevo, pieza 3/4):
 // intro de una pantalla, coach-mark reutilizable anclado a un elemento REAL (lo

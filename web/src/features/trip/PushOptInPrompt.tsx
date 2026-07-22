@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Bell, X } from 'lucide-react'
-import { Banner, Button, Icon } from '../../ui'
+import { Bell, CalendarCheck, Camera, Target, TimerReset } from 'lucide-react'
+import { Button, Icon, Modal, Stack } from '../../ui'
 import { usePushAvailability } from '../auth'
 import { shouldShowPushPrompt, snoozePushPrompt } from '../../lib/pushPrompt'
 import { subscribeToPush } from '../../lib/push'
@@ -14,28 +14,37 @@ export type PushPromptSurface = 'trip_banner' | 'post_play'
 interface Props {
   surface: PushPromptSurface
   groupId: string
-  /** Para insertarlo en el flujo de una tarjeta (post_play) en vez de flotar. */
-  className?: string
 }
 
+// Qué avisos gana el usuario al activar (issue #886): explicarlo es el punto
+// del pop-up — antes era un banner de una línea que no decía para qué sirve.
+const PERKS: { icon: typeof Bell; text: string }[] = [
+  { icon: Target, text: 'Cuando hay un reto nuevo para jugar' },
+  { icon: Camera, text: 'Cuando alguien comparte un momento' },
+  { icon: TimerReset, text: 'Cuando un reto está a punto de cerrar' },
+  { icon: CalendarCheck, text: 'Cuando el viaje llega a su fin' },
+]
+
 /**
- * Pre-prompt visual propio (issue #769): "¿Te avisamos cuando haya un reto
- * nuevo?" ANTES de disparar el prompt NATIVO del navegador — el nativo
- * denegado es irreversible, así que solo se llama a `subscribeToPush` (que lo
- * dispara) tras pulsar "Sí, avisadme" aquí. Mismo componente, mismo copy,
- * misma analítica y el MISMO snooze en las dos superficies del diseño:
- *  - `trip_banner`: banner flotante en TripPage (cubre invitado nuevo y
- *    miembro existente, con o sin cuenta).
+ * Pre-prompt visual propio (issue #769, ampliado en #886): explica el VALOR de
+ * las notificaciones ANTES de disparar el prompt NATIVO del navegador — el
+ * nativo denegado es irreversible, así que solo se llama a `subscribeToPush`
+ * (que lo dispara) tras pulsar "Activar avisos" aquí. Pasó de banner de una
+ * línea a POP-UP centrado (`Modal`) que enumera los avisos: el usuario decide
+ * informado, no a ciegas. Mismo componente, misma analítica y el MISMO snooze
+ * en las dos superficies del diseño:
+ *  - `trip_banner`: en TripPage (cubre invitado nuevo y miembro existente).
  *  - `post_play`: tras revelar un reto, SOLO para cuentas — el receptor
- *    anónimo ya tiene ahí el CTA "no pierdas tus puntos" y nunca se apilan
- *    dos prompts en la misma vista (lo decide el llamador).
+ *    anónimo ya tiene ahí su propio CTA y nunca se apilan dos prompts en la
+ *    misma vista (lo decide el llamador).
  *
  * Visibilidad (`shouldShowPushPrompt`, lib/pushPrompt.ts): configurado +
- * navegador capaz + permiso 'default' + sin suscripción + sin snooze. La X
- * snoozea 7 días en una clave COMPARTIDA: descartarlo en una superficie calla
- * también la otra (no naggear en ninguna).
+ * navegador capaz + permiso 'default' + sin suscripción + sin snooze. Cerrar
+ * ("Ahora no", la X o Escape) snoozea 7 días en una clave COMPARTIDA:
+ * descartarlo en una superficie calla también la otra (no naggear en ninguna).
+ * La gestión REAL vive en el perfil (`PushNotificationsControl`).
  */
-export function PushOptInPrompt({ surface, groupId, className }: Props) {
+export function PushOptInPrompt({ surface, groupId }: Props) {
   const { user } = useSession()
   const availability = usePushAvailability()
   const [dismissed, setDismissed] = useState(false)
@@ -56,8 +65,8 @@ export function PushOptInPrompt({ surface, groupId, className }: Props) {
     setBusy(true)
     try {
       // El permiso nativo es irreversible si se deniega: llegar aquí YA es el
-      // consentimiento informado (el usuario pulsó "Sí" en NUESTRO aviso, no
-      // en el del navegador).
+      // consentimiento informado (el usuario pulsó "Activar" en NUESTRO aviso,
+      // no en el del navegador).
       const status = await subscribeToPush(userId)
       track('push_prompt_accepted', {
         surface,
@@ -81,22 +90,42 @@ export function PushOptInPrompt({ surface, groupId, className }: Props) {
   }
 
   return (
-    <Banner
-      tone="oferta"
-      icon={Bell}
-      className={className}
-      action={
-        <div className={styles.actions}>
-          <Button size="sm" onClick={() => void handleEnable()} loading={busy}>
-            Sí, avisadme
+    <Modal
+      open={visible}
+      onClose={handleDismiss}
+      title={
+        <span className={styles.title}>
+          <span className={styles.titleIcon}>
+            <Icon icon={Bell} size={20} />
+          </span>
+          No te pierdas ningún reto
+        </span>
+      }
+      footer={
+        <div className={styles.footer}>
+          <Button fullWidth onClick={() => void handleEnable()} loading={busy}>
+            Activar avisos
           </Button>
-          <Button variant="ghost" iconButton aria-label="Ahora no" onClick={handleDismiss}>
-            <Icon icon={X} size={18} />
+          <Button variant="ghost" fullWidth onClick={handleDismiss}>
+            Ahora no
           </Button>
         </div>
       }
     >
-      ¿Te avisamos cuando haya un reto nuevo?
-    </Banner>
+      <Stack gap={4}>
+        <p className={styles.lede}>Actívalas y te avisamos de lo que pasa en tu viaje:</p>
+        <ul className={styles.perks}>
+          {PERKS.map((perk) => (
+            <li key={perk.text} className={styles.perk}>
+              <span className={styles.perkIcon}>
+                <Icon icon={perk.icon} size={18} />
+              </span>
+              <span>{perk.text}</span>
+            </li>
+          ))}
+        </ul>
+        <p className={styles.manage}>Puedes gestionarlas cuando quieras desde tu perfil.</p>
+      </Stack>
+    </Modal>
   )
 }
