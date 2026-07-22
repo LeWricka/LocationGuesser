@@ -28,6 +28,11 @@ interface Props {
   /** Nombre del reto, para la tarjeta y el título de la hoja. */
   challengeTitle: string
   /**
+   * Tipo del reto (`challenge_kind`, issue #880): decide el placeholder SIN
+   * FOTO de la tarjeta (globo si es de ubicación, obturador si es de número).
+   */
+  challengeKind: 'location' | 'number'
+  /**
    * Foto del reto para la portada de la tarjeta, YA filtrada por el llamador
    * según el anti-spoiler de `isMomentPhotoVisible` (lib/trip): `null` si la
    * foto sigue siendo SORPRESA (`photo_is_hint = false`) — este componente NUNCA
@@ -61,6 +66,7 @@ export function ShareChallengeModal({
   groupName,
   challengeId,
   challengeTitle,
+  challengeKind,
   imagePath,
   origin,
   onClose,
@@ -236,6 +242,7 @@ export function ShareChallengeModal({
           ref={cardRef}
           challengeTitle={challengeTitle}
           groupName={groupName}
+          kind={challengeKind}
           coverDataUrl={cover ?? null}
           domain={domain}
         />

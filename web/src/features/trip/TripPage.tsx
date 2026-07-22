@@ -220,6 +220,10 @@ export function TripPage({
   const [sharingChallenge, setSharingChallenge] = useState<{
     id: string
     title: string
+    // Tipo del reto (issue #880): decide el placeholder sin foto de la
+    // tarjeta. Fallback a 'location' si el momento no lo trae (recuerdo
+    // legado sin `challengeKind`, no debería llegar aquí en la práctica).
+    kind: 'location' | 'number'
     imagePath: string | null
     origin?: string
   } | null>(null)
@@ -632,6 +636,7 @@ export function TripPage({
     setSharingChallenge({
       id: moment.challengeId,
       title: moment.title,
+      kind: moment.challengeKind ?? 'location',
       imagePath: isMomentPhotoVisible(moment) ? moment.imagePath : null,
       origin,
     })
@@ -1359,6 +1364,7 @@ export function TripPage({
           groupName={group?.name ?? null}
           challengeId={sharingChallenge.id}
           challengeTitle={sharingChallenge.title}
+          challengeKind={sharingChallenge.kind}
           imagePath={sharingChallenge.imagePath}
           origin={sharingChallenge.origin}
           onClose={() => setSharingChallenge(null)}

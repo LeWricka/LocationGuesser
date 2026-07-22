@@ -30,6 +30,8 @@ import { GroupSettingsModal } from '../features/group/GroupSettingsModal'
 import { InviteModal } from '../features/group/InviteModal'
 import { ResultCard } from '../features/play/ResultCard'
 import { LeaderboardCard } from '../features/group/LeaderboardCard'
+import { ChallengeShareCard } from '../features/create/ChallengeShareCard'
+import { TripInviteCard } from '../features/group/TripInviteCard'
 import { GameScene } from '../features/play/GameScene'
 import { TripDiario } from '../features/trip/TripDiario'
 import {
@@ -588,6 +590,7 @@ export const cases: GalleryCase[] = [
           groupName={GROUP.name ?? GROUP_ID}
           challengeId={CH_ACTIVE}
           challengeTitle="¿Dónde tomó Marta esta foto?"
+          challengeKind="location"
           imagePath="photo-fushimi.jpg"
           onClose={noop}
         />
@@ -897,6 +900,56 @@ export const cases: GalleryCase[] = [
         prizes={{ first: 'Elige el próximo reto', last: 'Paga las cervezas' }}
         domain="momentu.art"
         photoDataUrl={null}
+      />
+    ),
+  },
+  {
+    // Issue #880: placeholder SIN FOTO de "Compartir reto" cuando es de
+    // UBICACIÓN — fondo GLOBO (esfera nocturna + ruta dorada + destino teal).
+    // `coverDataUrl={null}` fuerza la cascada (foto del reto → portada del
+    // viaje → fondo de marca) a caer al fondo, igual criterio que
+    // `tarjeta-clasificacion` con `photoDataUrl={null}`.
+    id: 'tarjeta-reto-sin-foto-ubicacion',
+    title: 'Tarjeta de compartir reto sin foto — ubicación (globo)',
+    section: 'Grupo',
+    render: () => (
+      <ChallengeShareCard
+        challengeTitle="¿En qué barrio de Tokio saqué esta foto?"
+        groupName="Ruta por Japón"
+        kind="location"
+        coverDataUrl={null}
+        domain="momentu.art"
+      />
+    ),
+  },
+  {
+    // Issue #880: mismo placeholder sin foto, reto de NÚMERO — fondo OBTURADOR
+    // (el globo no aplica a "¿cuánto?"): el mark de marca, grande, héroe.
+    id: 'tarjeta-reto-sin-foto-numero',
+    title: 'Tarjeta de compartir reto sin foto — número (obturador)',
+    section: 'Grupo',
+    render: () => (
+      <ChallengeShareCard
+        challengeTitle="¿Cuántos escalones tiene este templo?"
+        groupName="Ruta por Japón"
+        kind="number"
+        coverDataUrl={null}
+        domain="momentu.art"
+      />
+    ),
+  },
+  {
+    // Issue #880: placeholder SIN PORTADA de "Invitar al viaje" — siempre
+    // OBTURADOR (el globo es solo del reto de ubicación, no aplica a invitar).
+    id: 'tarjeta-invitar-sin-portada',
+    title: 'Tarjeta de invitar al viaje sin portada (obturador)',
+    section: 'Grupo',
+    render: () => (
+      <TripInviteCard
+        tripName="Ruta por Japón"
+        metaLine="4 viajeros · 6 retos"
+        coverDataUrl={null}
+        domain="momentu.art"
       />
     ),
   },

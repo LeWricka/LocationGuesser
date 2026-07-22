@@ -39,6 +39,14 @@ export interface Moment {
    */
   isChallenge: boolean
   /**
+   * Tipo del reto (`challenge_kind`, migración 0029): 'location' (adivina
+   * dónde) o 'number' (adivina cuánto). No es spoiler (ver `lib/challenges.ts`).
+   * `undefined` para un RECUERDO puro (no tiene tipo de reto) o para fixtures
+   * que no lo necesitan; el compartir-de-un-reto-suelto (issue #880) es el
+   * único consumidor hoy, para elegir el placeholder sin foto (globo/obturador).
+   */
+  challengeKind?: 'location' | 'number'
+  /**
    * Fecha del momento: `happened_on` (fecha ELEGIDA por el dueño, `YYYY-MM-DD`,
    * sin hora ni huso — migración 0037, issue #566) si existe; si no,
    * `created_at` (ISO completo, proxy de siempre para momentos legado sin

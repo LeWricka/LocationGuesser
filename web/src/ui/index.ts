@@ -69,6 +69,11 @@ export { sortTrips } from './sortTrips'
 export { GlobeSheet } from './GlobeSheet'
 export { HomeGlobe } from './HomeGlobe'
 export type { GlobePin, GlobeRoute } from './HomeGlobe'
+
+// Fondos de marca del placeholder "sin foto" de las tarjetas-compartir (issue
+// #880): globo (reto de ubicación) y obturador (reto de número + invitación al
+// viaje). Ver `ShareCardScenes.tsx` para la restricción de rasterizado.
+export { ShareCardGlobeScene, ShareCardObturadorScene } from './ShareCardScenes'
 export { AuthScreen } from './AuthScreen'
 export { LoginScreen } from './LoginScreen'
 export { EnterCode } from './EnterCode'

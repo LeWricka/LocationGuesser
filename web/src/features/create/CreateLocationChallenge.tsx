@@ -864,6 +864,7 @@ export function CreateLocationChallenge({
           groupName={groupName}
           challengeId={created.id}
           challengeTitle={created.title}
+          challengeKind="location"
           imagePath={created.image_path}
           onPlay={() => onCreated(created)}
         />

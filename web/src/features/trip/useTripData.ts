@@ -518,6 +518,10 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
         description: ch.description,
         status,
         isChallenge: ch.is_challenge,
+        // No es spoiler (ver `lib/challenges.ts`): describe el TIPO del reto,
+        // no la respuesta. Issue #880: lo usa "Compartir reto" para elegir
+        // el placeholder sin foto (globo de ubicación / obturador de número).
+        challengeKind: ch.challenge_kind,
         // Fecha ELEGIDA (`happened_on`, #566) si existe; si no, `created_at` como
         // proxy (momento legado). Mismo criterio que ordena arriba.
         date: ch.happened_on ?? ch.created_at,

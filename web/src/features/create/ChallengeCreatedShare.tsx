@@ -30,6 +30,13 @@ interface Props {
   challengeId: string
   /** Nombre del reto, para la tarjeta y el título de la hoja. */
   challengeTitle: string
+  /**
+   * Tipo del reto recién creado (issue #880): decide el placeholder SIN FOTO
+   * de la tarjeta (globo si es de ubicación, obturador si es de número). El
+   * llamador ya lo sabe de sobra: es o bien `CreateLocationChallenge` o bien
+   * `CreateNumberChallenge`, nunca ambos.
+   */
+  challengeKind: 'location' | 'number'
   /** Path en Storage de la foto del reto (si tiene una, issue #595): PRIMERA
    * candidata de la cascada de portada de la tarjeta (antes que la del viaje). */
   imagePath?: string | null
@@ -50,6 +57,7 @@ export function ChallengeCreatedShare({
   groupName,
   challengeId,
   challengeTitle,
+  challengeKind,
   imagePath = null,
   onPlay,
 }: Props) {
@@ -219,6 +227,7 @@ export function ChallengeCreatedShare({
           ref={cardRef}
           challengeTitle={challengeTitle}
           groupName={groupName ?? null}
+          kind={challengeKind}
           coverDataUrl={cover ?? null}
           domain={domain}
         />

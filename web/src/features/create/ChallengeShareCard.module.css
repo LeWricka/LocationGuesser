@@ -22,33 +22,13 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Fondo: foto del reto → portada del viaje → mapa nocturno de marca ───── */
+/* ── Fondo: foto del reto → portada del viaje → globo/obturador de marca ─── */
 .media {
   position: absolute;
   inset: 0;
   background-size: cover;
   background-position: center;
   background-color: var(--scene-bg);
-}
-
-/* Mapa nocturno de marca (sin foto propia ni portada del viaje): mismo gradiente
-   grafito/teal que el placeholder de la home (HomeDashboard `.placeholder`). */
-.nightMap {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background-image:
-    radial-gradient(
-      90% 72% at 78% 16%,
-      color-mix(in srgb, var(--accent) 26%, transparent) 0%,
-      transparent 60%
-    ),
-    linear-gradient(160deg, var(--accent-deep) 0%, var(--scene-bg) 82%);
-}
-.nightMapPin {
-  color: var(--scene-ink-soft);
-  opacity: 0.32;
 }
 
 /* Velo de lectura al pie: el fondo manda, el texto blanco se lee AA encima
@@ -74,6 +54,7 @@
   right: 72px;
   display: flex;
   align-items: center;
+  gap: var(--space-2);
 }
 .wordmark {
   color: var(--scene-ink);
