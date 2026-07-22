@@ -332,6 +332,34 @@ export function TripPage({
     if (params.get('g') !== groupId || params.get('tour') !== 'reto') return null
     return params.get('rc')
   })
+  // Tour de BIENVENIDA en el viaje (issue #901): quien llega por un enlace de
+  // VIAJE (no de reto) y ve la intro del receptor (`GuestWelcomeFrame`), al
+  // pulsar "Ver el viaje" arranca aquí un recorrido Diario → Bitácora → retos que
+  // remata en el Diario. Mismo motor que `tour=reto` (`GuidedTour`), pero más
+  // corto y sin registro. A DIFERENCIA de `retoTourActive`, esta pantalla YA está
+  // montada cuando `ReceptorWelcomeGate` fija `tour=bienvenida` en el hash (la
+  // intro es un overlay ENCIMA de este viaje, no una ruta aparte), así que además
+  // de leerlo al montar (por si una recarga lo trae mientras corre) escuchamos el
+  // `hashchange` para arrancarlo en cuanto el gate lo fije. No consumimos el flag
+  // del hash hasta terminar (mismo criterio que `retoTourActive`): una recarga
+  // durante el tour lo reanuda; al terminar/saltar se limpia y ya no reaparece.
+  const [bienvenidaTourActive, setBienvenidaTourActive] = useState(() => {
+    if (isExampleTrip) return false
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    return params.get('g') === groupId && params.get('tour') === 'bienvenida'
+  })
+  useEffect(() => {
+    if (isExampleTrip) return
+    const onHashChange = () => {
+      const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      if (params.get('g') === groupId && params.get('tour') === 'bienvenida') {
+        setBienvenidaTourActive(true)
+      }
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
+  }, [groupId, isExampleTrip])
+
   // Cierre del tour del reto: registro opcional (`GuestRegisterPrompt`) y, tras
   // "Crear cuenta", el alta real (`AccountUpgradeModal`). Ambos dejan al usuario
   // en el Marcador (donde acaba el tour).
@@ -851,6 +879,44 @@ export function TripPage({
     [],
   )
 
+  // Pasos del tour de BIENVENIDA (issue #901): TRES pantallas reales del viaje,
+  // una por pestaña — Diario → Bitácora → Marcador. Igual de fino que el tour del
+  // reto (mismos refs, `blocking` en los tres para leer bien sobre el fondo con
+  // textura y no colar el toque al mapa vivo), pero con copy de "presentar el
+  // viaje" a quien acaba de entrar por el enlace, no de "ya has jugado".
+  const bienvenidaTourSteps: TourStep[] = useMemo(
+    () => [
+      {
+        targetRef: diarioMapRef,
+        step: 'El Diario',
+        title: 'El Diario',
+        ariaLabel: 'El Diario',
+        body: 'Dónde queda cada parada del viaje.',
+        onBeforeShow: () => setSection('diario'),
+        blocking: true,
+      },
+      {
+        targetRef: bitacoraFirstDayRef,
+        step: 'La Bitácora',
+        title: 'La Bitácora',
+        ariaLabel: 'La Bitácora',
+        body: 'El viaje entero, día a día.',
+        onBeforeShow: () => setSection('fotos'),
+        blocking: true,
+      },
+      {
+        targetRef: podioRef,
+        step: 'Los retos',
+        title: 'Los retos',
+        ariaLabel: 'Los retos',
+        body: 'Juegas a adivinar dónde es cada parada; aquí ves quién va ganando.',
+        onBeforeShow: () => setSection('marcador'),
+        blocking: true,
+      },
+    ],
+    [],
+  )
+
   // Limpia `tour=reto` del hash (preservando el resto): tras terminar/saltar, una
   // recarga no debe relanzar el tour. Igual criterio que `tourActive`, pero
   // aplazado al final (ver el comentario de `retoTourActive`).
@@ -896,6 +962,20 @@ export function TripPage({
     setRetoRegisterOpen(false)
     goToRetoReveal()
   }, [goToRetoReveal])
+
+  // Fin/salto del tour de BIENVENIDA (issue #901): SIN registro ni reto de
+  // retorno — solo dejamos al usuario en el DIARIO (la portada del viaje) y
+  // limpiamos `tour=bienvenida` del hash para que una recarga no lo relance.
+  // "Terminar" y "Saltar" hacen lo mismo: no hay nada más que ofrecer al cerrar.
+  const handleBienvenidaTourFinish = useCallback(() => {
+    setBienvenidaTourActive(false)
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    if (params.get('tour') === 'bienvenida') {
+      params.delete('tour')
+      window.history.replaceState(window.history.state, '', `#${params.toString()}`)
+    }
+    setSection('diario')
+  }, [])
 
   // Editor de reto a pantalla completa: toma la pantalla mientras está abierto.
   // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa
@@ -1034,11 +1114,16 @@ export function TripPage({
       {/* Issue #895: NO durante un tour (el pop-up de notis se colaba encima del
           coach-mark) ni para un ANÓNIMO (no gestiona notis en este flujo: primero
           se registra — el tour del reto remata con el alta). */}
-      {!isClosed && !isExampleTrip && !isAnonymous && !retoTourActive && !tourActive && (
-        <div className={styles.pushBannerWrap}>
-          <PushOptInPrompt surface="trip_banner" groupId={groupId} />
-        </div>
-      )}
+      {!isClosed &&
+        !isExampleTrip &&
+        !isAnonymous &&
+        !retoTourActive &&
+        !tourActive &&
+        !bienvenidaTourActive && (
+          <div className={styles.pushBannerWrap}>
+            <PushOptInPrompt surface="trip_banner" groupId={groupId} />
+          </div>
+        )}
 
       {/* Viewport de UN SOLO panel: renderizamos SOLO la sección activa (la inactiva
           NO está en el DOM). Antes había una pista al 200% con dos paneles hermanos y
@@ -1153,7 +1238,7 @@ export function TripPage({
           verse también a un ANÓNIMO (antes se ocultaba, #888) — pero al tocarlo
           NO abre el menú Momento/Reto (que RLS le bloquea): abre el alta real
           ("Regístrate para crear tus viajes"). Con cuenta, comportamiento de siempre. */}
-      {canCreate && !wrapOpen && !retoTourActive && !tourActive && (
+      {canCreate && !wrapOpen && !retoTourActive && !tourActive && !bienvenidaTourActive && (
         <div className={styles.fabWrap} ref={fabWrapRef}>
           {fabOpen && !isAnonymous && (
             <div className={styles.fabMenu} role="menu" aria-label="Crear">
@@ -1216,22 +1301,27 @@ export function TripPage({
           receptor ANÓNIMO (issue #888): jugar un reto suelto no debe
           convertirle en quien re-comparte el viaje/reto — ese gesto es de
           quien ya se identifica (miembro con cuenta o dueño). */}
-      {!wrapOpen && !isExampleTrip && !isAnonymous && !retoTourActive && !tourActive && (
-        <div className={styles.shareFabWrap}>
-          <button
-            type="button"
-            className={styles.shareFab}
-            onClick={() => {
-              setShareView('root')
-              setShareOpen(true)
-            }}
-            aria-label="Compartir"
-            aria-haspopup="dialog"
-          >
-            <Icon icon={Share2} size={24} />
-          </button>
-        </div>
-      )}
+      {!wrapOpen &&
+        !isExampleTrip &&
+        !isAnonymous &&
+        !retoTourActive &&
+        !tourActive &&
+        !bienvenidaTourActive && (
+          <div className={styles.shareFabWrap}>
+            <button
+              type="button"
+              className={styles.shareFab}
+              onClick={() => {
+                setShareView('root')
+                setShareOpen(true)
+              }}
+              aria-label="Compartir"
+              aria-haspopup="dialog"
+            >
+              <Icon icon={Share2} size={24} />
+            </button>
+          </div>
+        )}
 
       {/* Onboarding del CREADOR — aprender-haciendo (pieza 3/4): UN aviso cada
           vez, pegado a lo que el usuario acaba de hacer, nunca una pantalla-
@@ -1718,6 +1808,19 @@ export function TripPage({
           lastStepLabel="Listo"
           onFinish={handleRetoTourFinish}
           onSkip={handleRetoTourSkip}
+        />
+      )}
+
+      {/* Tour de BIENVENIDA en el viaje (issue #901): Diario → Bitácora → retos,
+          sin pantalla de cierre ni registro — el remate deja al usuario en el
+          Diario. Se arranca tras la intro del receptor ("Ver el viaje"). Nunca a
+          la vez que el del reto: `tour` solo puede valer un valor en el hash. */}
+      {bienvenidaTourActive && !isExampleTrip && (
+        <GuidedTour
+          steps={bienvenidaTourSteps}
+          lastStepLabel="Empezar"
+          onFinish={handleBienvenidaTourFinish}
+          onSkip={handleBienvenidaTourFinish}
         />
       )}
 
