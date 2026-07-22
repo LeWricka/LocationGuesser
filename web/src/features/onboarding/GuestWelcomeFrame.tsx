@@ -10,7 +10,7 @@
 // se monta (una vez por usuario) y qué pasa al completarlo (`onEnter`).
 
 import { ArrowRight, MapPin } from 'lucide-react'
-import { Button, Icon, AvatarStack, type AvatarStackMember } from '../../ui'
+import { Button, Icon, type AvatarStackMember } from '../../ui'
 import styles from './GuestWelcomeFrame.module.css'
 
 export interface Props {
@@ -18,10 +18,12 @@ export interface Props {
   tripName?: string
   /** Nombre de quien creó el viaje, protagonista del titular. */
   ownerName?: string
-  /** Miembros ya dentro del viaje (dueño incluido, el propio receptor no). */
-  avatarMembers: AvatarStackMember[]
-  /** Cuántos de esos miembros NO son el dueño (para "{ownerName} y N más"). */
-  othersCount: number
+  /** Miembros del viaje. Ya NO se pinta la línea "N más ya están dentro"
+   * (feedback: sobra); se conserva en Props para no tocar la cadena de datos
+   * (`useReceptorWelcome`/`ReceptorWelcomeGate`) que aún los calcula. */
+  avatarMembers?: AvatarStackMember[]
+  /** Idem: se conserva por compatibilidad, ya no se muestra. */
+  othersCount?: number
   /** Portada del viaje ya firmada, o null para el degradado de fondo. */
   coverImageUrl: string | null
   /** Hay un reto EN JUEGO ahora mismo: muestra el aviso "te toca jugar". */
@@ -32,23 +34,9 @@ export interface Props {
   onEnter: () => void
 }
 
-// "{ownerName} y N más ya están dentro" — grámatica correcta en singular/plural
-// y sin nombre (receptor sin dueño resuelto: copy genérico, nunca "de undefined").
-function avatarLine(ownerName: string | undefined, othersCount: number): string {
-  const name = ownerName?.trim()
-  if (!name) {
-    return othersCount > 0 ? `Ya sois ${othersCount + 1} en el viaje` : 'Tu gente ya está dentro'
-  }
-  if (othersCount <= 0) return `${name} ya está dentro`
-  if (othersCount === 1) return `${name} y 1 más ya están dentro`
-  return `${name} y ${othersCount} más ya están dentro`
-}
-
 export function GuestWelcomeFrame({
   tripName,
   ownerName,
-  avatarMembers,
-  othersCount,
   coverImageUrl,
   hasActiveChallenge,
   onEnter,
@@ -68,18 +56,11 @@ export function GuestWelcomeFrame({
       </div>
 
       <div className={styles.frame}>
-        <div className={styles.avatarline}>
-          <AvatarStack members={avatarMembers} max={2} />
-          <span className={`t-body ${styles.avatarText}`}>
-            {avatarLine(ownerName, othersCount)}
-          </span>
-        </div>
-
         <span className={`t-label ${styles.eyebrow}`}>{eyebrow}</span>
         <h1 className={`t-display ${styles.title}`}>{title}</h1>
         <p className={`t-body ${styles.body}`}>
           Momentu es la forma de guardar tus viajes y compartirlos con quien más quieres. Sigue este
-          viaje por el Diario y la Bitácora —y eres parte con los retos que os lanzáis.
+          viaje por el Diario y la Bitácora, y además participa en los retos que te mandan.
         </p>
 
         {hasActiveChallenge && (
