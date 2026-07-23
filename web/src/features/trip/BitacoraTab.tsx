@@ -67,9 +67,13 @@ interface Props {
   /** CTA discreto "Ver marcador" del cierre: salta a la pestaña Marcador. */
   onViewMarcador: () => void
   /**
-   * Ancla del PRIMER día para `GuidedTour` (viaje de ejemplo, onboarding nuevo
-   * pieza 4/4): "En la Bitácora lo hojeas entero, en orden." Opcional y sin
-   * efecto fuera de la guía.
+   * Ancla de la PRIMERA ENTRADA del primer día para `GuidedTour` (viaje de
+   * ejemplo, onboarding nuevo pieza 4/4): "En la Bitácora lo hojeas entero, en
+   * orden." Issue #918: antes apuntaba a la SECCIÓN del día entero (con todas
+   * sus entradas), que podía crecer más alta que el propio viewport y forzaba
+   * a `CoachMark` a recortar su aro a casi toda la pantalla — un highlight
+   * demasiado grande para comunicar nada. Una sola tarjeta de entrada es una
+   * unidad acotada y representativa. Opcional y sin efecto fuera de la guía.
    */
   firstDayRef?: RefObject<HTMLElement | null>
 }
@@ -303,7 +307,6 @@ export function BitacoraTab({
               key={day.key}
               aria-label={day.placesLabel ? `${day.label} — ${day.placesLabel}` : day.label}
               className={styles.day}
-              ref={i === 0 ? firstDayRef : undefined}
             >
               <h3 className={styles.dayHeader}>
                 <span className={styles.dayDate}>{day.label}</span>
@@ -320,7 +323,7 @@ export function BitacoraTab({
               </h3>
 
               <div className={`${styles.moments} lg-stagger`}>
-                {day.moments.map((moment) => {
+                {day.moments.map((moment, mi) => {
                   // Issue #910: sin foto ni vídeo, el momento no tiene el ancla
                   // visual que da el resto de la Bitácora (fotos a ancho
                   // completo) — sin una superficie propia se leería como un
@@ -334,6 +337,16 @@ export function BitacoraTab({
                       className={
                         hasMedia ? styles.moment : `${styles.moment} ${styles.momentTextOnly}`
                       }
+                      // Ancla de `GuidedTour` (issue #918): antes el ref vivía en la
+                      // SECCIÓN del día entero (cabecera + TODOS sus momentos), que
+                      // en un día con varias entradas se vuelve más alta que el
+                      // propio viewport — `CoachMark` entonces recorta su aro a
+                      // (casi) toda la pantalla, un highlight tan grande que deja de
+                      // comunicar nada. La PRIMERA ENTRADA del PRIMER día es una
+                      // unidad visual acotada y con sentido (kicker + título +
+                      // foto): un aro que la enmarca sí se lee como "esto es la
+                      // Bitácora". Compartido por los 3 tours (ejemplo/reto/bienvenida).
+                      ref={i === 0 && mi === 0 ? firstDayRef : undefined}
                     >
                       {/* Chip de reto (issue #821): diana + estado, MISMO lenguaje que
                         `ChallengeDetail` ("EN JUEGO" con punto vivo / "Cerrado") —

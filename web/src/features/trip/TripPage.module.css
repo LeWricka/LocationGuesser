@@ -141,6 +141,16 @@
 .tabs > * {
   pointer-events: auto;
 }
+/* Issue #918: mientras un `CoachMark`/`GuidedTour` está activo (en CUALQUIER
+   paso, de CUALQUIER tour: ejemplo/reto/bienvenida/creador/marcador), su
+   oscurecido a pantalla completa atenuaba esta barra igual que el resto de la
+   pantalla — el usuario perdía de vista en qué sección estaba durante el tour.
+   `CoachMark` marca `<html>` mientras está montado (ver CoachMark.tsx); aquí
+   decidimos, en nuestro propio CSS, subir la barra por encima de ese
+   oscurecido — el componente genérico no sabe nada de pestañas ni de viajes. */
+:global(html[data-coachmark-active='true']) .tabs {
+  z-index: var(--z-coachmark-pinned);
+}
 
 /* ---- Menú ⋯ (contenido de la hoja inferior) ---- */
 .menu {

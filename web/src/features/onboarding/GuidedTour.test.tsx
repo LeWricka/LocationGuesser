@@ -97,6 +97,48 @@ describe('GuidedTour', () => {
   })
 })
 
+// `pinnedRef` (issue #918): se reenvía tal cual a `CoachMark` en TODOS los
+// pasos — TripPage lo usa para que la burbuja no crezca por encima de su barra
+// de pestañas. Aquí solo confirmamos el reenvío (el cálculo en sí ya está
+// cubierto en CoachMark.test.tsx); la señal global que sube la barra por
+// delante del oscurecido no depende de `pinnedRef` — se marca en `<html>`
+// mientras la guía entera está montada, se mantenga en el paso que se
+// mantenga.
+describe('GuidedTour — pinnedRef (issue #918)', () => {
+  test('la guía entera marca <html> mientras está montada, sin importar el paso', () => {
+    const pinnedRef = {
+      current: document.createElement('div'),
+    } as RefObject<HTMLElement | null>
+    const diarioRef = { current: document.createElement('div') } as RefObject<HTMLElement | null>
+    const marcadorRef = { current: document.createElement('div') } as RefObject<HTMLElement | null>
+    const steps: TourStep[] = [
+      {
+        targetRef: diarioRef,
+        step: 'El Diario',
+        title: 'Cada parada, en su sitio',
+        body: 'Cuerpo',
+        ariaLabel: 'Cada parada, en su sitio',
+      },
+      {
+        targetRef: marcadorRef,
+        step: 'El Marcador',
+        title: 'Aquí se juega',
+        body: 'Cuerpo',
+        ariaLabel: 'Aquí se juega',
+      },
+    ]
+    const { unmount } = render(
+      <GuidedTour steps={steps} onFinish={vi.fn()} onSkip={vi.fn()} pinnedRef={pinnedRef} />,
+    )
+    expect(document.documentElement.getAttribute('data-coachmark-active')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }))
+    expect(screen.getByText('Aquí se juega')).toBeInTheDocument()
+    expect(document.documentElement.getAttribute('data-coachmark-active')).toBe('true')
+    unmount()
+    expect(document.documentElement.hasAttribute('data-coachmark-active')).toBe(false)
+  })
+})
+
 // Sin pantalla de cierre + paso bloqueante (issue #891): el tour del reto
 // compartido no tiene cierre genérico (remata con un registro que monta el
 // padre) y su primer paso ancla al mapa/globo vivo, así que va `blocking`.

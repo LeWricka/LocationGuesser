@@ -116,3 +116,49 @@ describe('CoachMark — modo blocking (issue #888)', () => {
     expect(blockingClassName).not.toBe(normalClassName)
   })
 })
+
+// Señal global `data-coachmark-active` (issue #918): mientras CUALQUIER
+// coach-mark está montado, marca `<html>` para que quien lo necesite (aquí,
+// `.tabs` de TripPage vía CSS) suba por encima del oscurecido — nunca muta el
+// nodo del `pinnedRef` directamente (eso violaría la regla de inmutabilidad de
+// props de `eslint-plugin-react-hooks`). El efecto VISUAL (que de verdad quede
+// legible sobre el scrim) lo cubren las capturas manuales/Playwright; aquí solo
+// lo observable en jsdom: la marca aparece al montar y desaparece al desmontar.
+describe('CoachMark — señal global data-coachmark-active (issue #918)', () => {
+  test('marca <html> al montar y la retira al desmontar', () => {
+    const targetRef = { current: document.createElement('div') } as RefObject<HTMLElement | null>
+    const { unmount } = render(
+      <CoachMark targetRef={targetRef} title="X" ariaLabel="X" body="X" onDismiss={vi.fn()} />,
+    )
+    expect(document.documentElement.getAttribute('data-coachmark-active')).toBe('true')
+
+    unmount()
+    expect(document.documentElement.hasAttribute('data-coachmark-active')).toBe(false)
+  })
+})
+
+// `pinnedRef` (issue #918): NO eleva z-index (eso lo hace la señal global de
+// arriba) — solo alimenta el cálculo de `cardStyle` para que la burbuja no
+// crezca por encima del elemento pinneado. Aquí verificamos que pasarlo no
+// rompe el render (el propio cálculo lo cubren las capturas manuales, que
+// dependen de layout real que jsdom no reproduce).
+describe('CoachMark — pinnedRef (issue #918)', () => {
+  test('con pinnedRef, sigue pintando título/cuerpo/acciones con normalidad', () => {
+    const targetRef = { current: document.createElement('div') } as RefObject<HTMLElement | null>
+    const pinnedRef = {
+      current: document.createElement('div'),
+    } as RefObject<HTMLElement | null>
+    render(
+      <CoachMark
+        targetRef={targetRef}
+        title="Aquí se juega"
+        ariaLabel="Aquí se juega"
+        body="Cuerpo"
+        onDismiss={vi.fn()}
+        pinnedRef={pinnedRef}
+      />,
+    )
+    expect(screen.getByText('Aquí se juega')).toBeInTheDocument()
+    expect(screen.getByText('Cuerpo')).toBeInTheDocument()
+  })
+})

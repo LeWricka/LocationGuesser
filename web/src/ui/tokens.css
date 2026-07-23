@@ -603,6 +603,12 @@
    *  - --z-sheet    = bottom sheets, por encima de la cabecera y por debajo de modal.
    *  - --z-modal    = modales/overlays a pantalla completa (alias de --z-overlay).
    *  - --z-toast    = avisos efímeros, por encima de todo.
+   *  - --z-coachmark-pinned = issue #918: la ÚNICA excepción por encima del propio
+   *    toast. `CoachMark` oscurece toda la pantalla salvo el aro del objetivo
+   *    (`--z-toast`); un elemento "fijado" (`pinnedRef`, p.ej. la barra de
+   *    pestañas del viaje) necesita quedar POR ENCIMA de ese oscurecido para
+   *    seguir siendo legible durante cualquier tour/coach-mark — si no, el
+   *    usuario pierde de vista en qué sección está mientras dura la guía.
    * --z-sticky y --z-overlay se conservan como alias para no tocar las features. */
   --z-base: 0;
   --z-header: 100;
@@ -611,6 +617,7 @@
   --z-modal: 1000;
   --z-overlay: var(--z-modal); /* alias histórico */
   --z-toast: 1100;
+  --z-coachmark-pinned: 1150;
 }
 
 /*

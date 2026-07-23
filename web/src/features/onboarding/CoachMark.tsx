@@ -64,6 +64,19 @@ export interface CoachMarkProps {
    * salir").
    */
   hideSkip?: boolean
+  /**
+   * Elemento REAL que se mantiene VISIBLE por encima del oscurecido mientras
+   * cualquier coach-mark está montado (issue #918: la barra de pestañas del
+   * viaje, para que el usuario nunca pierda de vista en qué sección está). La
+   * elevación en sí es una señal global que pone este componente (ver el
+   * efecto de `data-coachmark-active` más abajo) — no depende de esta prop.
+   * `pinnedRef` SOLO alimenta el cálculo de `cardStyle`: sin él, la burbuja
+   * podía crecer hacia arriba y acabar tapada DETRÁS del elemento pinneado
+   * (que ahora pinta por delante en z-index) cuando el objetivo deja poco
+   * hueco por encima (p.ej. el Marcador). Con `pinnedRef`, la burbuja nunca
+   * crece más allá de su borde inferior.
+   */
+  pinnedRef?: RefObject<HTMLElement | null>
 }
 
 // Re-medición barata: el objetivo típico (un FAB `position: fixed`) no se
@@ -100,14 +113,23 @@ export function CoachMark({
   onDismiss,
   blocking = false,
   hideSkip = false,
+  pinnedRef,
 }: CoachMarkProps) {
   const reducedMotion = useReducedMotion()
   const [rect, setRect] = useState<DOMRect | null>(null)
+  // Rect del elemento pinneado (issue #918): se remide junto al objetivo — lo
+  // necesita `cardStyle` de abajo para que la burbuja nunca crezca POR ENCIMA
+  // de él (si no, con un objetivo que deja poco hueco arriba del todo, como el
+  // Marcador, la burbuja se cuela detrás/debajo de la barra de pestañas
+  // pinneada y su título queda ilegible, tapado por ella).
+  const [pinnedRect, setPinnedRect] = useState<DOMRect | null>(null)
 
   useEffect(() => {
     const measure = () => {
       const el = targetRef.current
       setRect(el ? el.getBoundingClientRect() : null)
+      const pinned = pinnedRef?.current
+      setPinnedRect(pinned ? pinned.getBoundingClientRect() : null)
     }
     measure()
     window.addEventListener('resize', measure)
@@ -116,7 +138,24 @@ export function CoachMark({
       window.removeEventListener('resize', measure)
       window.clearInterval(id)
     }
-  }, [targetRef])
+  }, [targetRef, pinnedRef])
+
+  // Señal global para subir el elemento pinneado por encima del oscurecido
+  // (issue #918): en vez de mutar el ESTILO del nodo de `pinnedRef` directamente
+  // (un ref que llega por props — `eslint-plugin-react-hooks` lo trata como
+  // mutación de props no permitida, con razón: React no sabe de ese efecto
+  // secundario), marcamos `<html>` mientras este coach-mark está montado; quien
+  // quiera quedar pinneado (aquí, `.tabs` en TripPage.module.css) decide en su
+  // PROPIO CSS cómo reaccionar a esa marca — este componente genérico no
+  // necesita saber nada de pestañas ni de viajes, y funciona para CUALQUIER
+  // tour por igual, monte o no `pinnedRef` (que aquí solo hace falta para el
+  // cálculo de `cardStyle` de abajo).
+  useEffect(() => {
+    document.documentElement.setAttribute('data-coachmark-active', 'true')
+    return () => {
+      document.documentElement.removeAttribute('data-coachmark-active')
+    }
+  }, [])
 
   // Aro CONTENIDO (issue #888/#895): con un objetivo enorme (el mapa a pantalla
   // completa) el rect + el padding se salía del viewport. Antes recortábamos a
@@ -153,7 +192,15 @@ export function CoachMark({
     if (!rect) return null
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const spaceAbove = rect.top
+    // Tope superior real (issue #918): con `pinnedRef` (la barra de pestañas,
+    // por delante en z-index — ver el efecto de arriba), el hueco "de verdad"
+    // ARRIBA del objetivo no empieza en 0, empieza donde termina lo pinneado —
+    // contarlo YA en `spaceAbove` deja que el umbral de "objetivo enorme" de
+    // abajo decida bien: con poco hueco (el Marcador) cae sola al patrón
+    // clavado-abajo de siempre, en vez de encajar una burbuja tan baja de
+    // altura que sus propios botones quedan fuera sin scroll visible.
+    const topBound = pinnedRect ? pinnedRect.bottom + MARGIN_PX : 0
+    const spaceAbove = rect.top - topBound
     const spaceBelow = vh - rect.bottom
     const base = {
       left: MARGIN_PX,
@@ -173,8 +220,18 @@ export function CoachMark({
       return { ...base, top, maxHeight: `calc(100dvh - ${top}px - ${MARGIN_PX}px)` }
     }
     const bottom = Math.max(MARGIN_PX, vh - rect.top + MARGIN_PX)
-    return { ...base, bottom, maxHeight: `calc(100dvh - ${bottom}px - ${MARGIN_PX}px)` }
-  }, [rect])
+    // Red de seguridad extra: aunque `spaceAbove` ya descuenta `topBound`, el
+    // `min()` con el cálculo en dvh de siempre garantiza que, si aun así se
+    // eligiera esta rama, el borde SUPERIOR de la burbuja nunca pase de
+    // `pinnedRect.bottom` (sin `pinnedRef` es un no-op: coincide con el cálculo
+    // de siempre).
+    const maxAbovePinned = Math.max(0, vh - bottom - topBound)
+    return {
+      ...base,
+      bottom,
+      maxHeight: `min(calc(100dvh - ${bottom}px - ${MARGIN_PX}px), ${maxAbovePinned}px)`,
+    }
+  }, [rect, pinnedRect])
 
   // Sin objetivo medible todavía (aún no montado, o desapareció): no pintamos
   // nada a medias — mejor un frame sin guía que una burbuja huérfana.

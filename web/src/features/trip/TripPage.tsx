@@ -1404,6 +1404,7 @@ export function TripPage({
             },
           }}
           onDismiss={creador.dismissSuggest}
+          pinnedRef={tabBarRef}
         />
       )}
 
@@ -1419,7 +1420,9 @@ export function TripPage({
           Bitácora/Marcador sin señalarlos. Ahora nombra también el Diario y se
           ancla a la barra de pestañas real (`tabBarRef`) — el mismo motor de
           spotlight que el resto de la guía, coherente con "señala lo que
-          nombra" en vez de flotar aparte. */}
+          nombra" en vez de flotar aparte. Sin `pinnedRef` aquí (issue #918): el
+          OBJETIVO ya es la propia barra de pestañas, así que ya queda dentro
+          del aro — pinearla de más sería redundante. */}
       {creador.stage === 'remate' && section === 'diario' && (
         <CoachMark
           targetRef={tabBarRef}
@@ -1455,6 +1458,7 @@ export function TripPage({
           body="Quién va ganando en el viaje, reto tras reto. Debajo tienes los retos pasados y los premios."
           dismissLabel="Entendido"
           onDismiss={() => setMarcadorGuideActive(false)}
+          pinnedRef={tabBarRef}
         />
       )}
 
@@ -1872,6 +1876,11 @@ export function TripPage({
             if (tourFromNewUser) location.hash = 'nuevo'
           }}
           onSkip={() => setTourActive(false)}
+          // Issue #918: la barra de pestañas real queda siempre visible durante
+          // el recorrido (mismo mecanismo para los 3 tours, ver `pinnedRef` en
+          // `CoachMark`) — sin esto, el oscurecido del coach-mark la atenuaba y
+          // el usuario perdía de vista en qué sección estaba.
+          pinnedRef={tabBarRef}
         />
       )}
 
@@ -1884,6 +1893,7 @@ export function TripPage({
           lastStepLabel="Listo"
           onFinish={handleRetoTourFinish}
           onSkip={handleRetoTourSkip}
+          pinnedRef={tabBarRef}
         />
       )}
 
@@ -1897,6 +1907,7 @@ export function TripPage({
           lastStepLabel="Empezar"
           onFinish={handleBienvenidaTourFinish}
           onSkip={handleBienvenidaTourFinish}
+          pinnedRef={tabBarRef}
         />
       )}
 

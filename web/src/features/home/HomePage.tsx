@@ -22,7 +22,7 @@ import { useHomeData } from './useHomeData'
 import { useWorldTrips } from './useWorldTrips'
 import { HOME_DEMO_PINS } from './homeDemoPins'
 import { gotoChallenge, gotoCreateGroup, gotoGroup, gotoProfile } from './navigation'
-import { NuevoBienvenidaFrame, OnboardingSlideshow, getSlides, useOnboarding } from '../onboarding'
+import { NuevoBienvenidaFrame, useOnboarding } from '../onboarding'
 import { exampleTripHash } from '../../lib/route'
 import styles from './HomePage.module.css'
 
@@ -46,15 +46,6 @@ interface Props {
 export function HomePage({ active = true }: Props = {}) {
   const { user, profile, loading: sessionLoading, isAnonymous } = useSession()
   const { loading: dataLoading, error, data, reload } = useHomeData(user?.id)
-
-  // Tutorial ÚNICO de entrada (issue #742): un solo tutorial cuenta el bucle
-  // completo. Se muestra una vez al aterrizar en la home vacía (persistido por
-  // cuenta, #717) y se puede reabrir con "Ver tutorial". Sustituye a los tutoriales
-  // por-pantalla que saltaban de más al crear viaje/reto (gates retirados de App).
-  const entryTutorial = useOnboarding('entry', user?.id, profile?.onboarding)
-  // Reapertura manual desde "Ver tutorial": fuerza el slideshow aunque ya se haya
-  // visto (el flag solo gobierna el auto-show de la primera vez).
-  const [tutorialForced, setTutorialForced] = useState(false)
 
   // Bienvenida del usuario NUEVO (issue #905): la PRIMERA vez que alguien con
   // cuenta y sin viajes cae en su home vacía, un marco "Esto es Momentu" cuyo
@@ -145,14 +136,14 @@ export function HomePage({ active = true }: Props = {}) {
     gotoCreateGroup()
   }
 
-  // "Ver tutorial" → reabre el tutorial único. Al cerrarlo (completar o saltar) lo
-  // marcamos visto (idempotente si ya lo estaba) y bajamos la reapertura forzada.
+  // "Ver tutorial" (issue #918): antes abría el slideshow antiguo (`entry`);
+  // ahora arranca la MISMA guía conducida (`GuidedTour`) sobre el viaje de
+  // ejemplo que usan el resto de entradas de onboarding — un solo tutorial
+  // "de verdad" (pantallas reales, no diapositivas) en vez de dos lenguajes de
+  // tutorial distintos en la app. `exampleTripHash(true)` = `#g=ejemplo&tour=1`,
+  // sin `nuevo=1` (ese remate es solo para la bienvenida del usuario nuevo).
   function openTutorial() {
-    setTutorialForced(true)
-  }
-  function closeTutorial() {
-    setTutorialForced(false)
-    entryTutorial.markSeen()
+    location.hash = exampleTripHash(true)
   }
 
   // "Ver cómo funciona" (issue #905): marca la bienvenida como vista y arranca el
@@ -194,16 +185,6 @@ export function HomePage({ active = true }: Props = {}) {
   // iniciada; el fallback evita un id vacío en el render transitorio.
   const userId = user?.id ?? ''
   const hasGroups = data.groups.length > 0
-
-  // Tutorial de entrada (issue #742): YA NO se auto-muestra (onboarding nuevo,
-  // pieza 3/4) — quien de verdad crea un viaje ahora aprende HACIENDO, dentro
-  // del propio viaje vacío (intro de una pantalla → coach-mark sobre el "+" →
-  // sugerencia de reto → aviso de compartir, ver useCreadorOnboarding en
-  // TripPage). Auto-mostrar este slideshow ADEMÁS de esa guía sería explicar el
-  // mismo bucle dos veces seguidas. Se queda solo como repaso MANUAL desde "Ver
-  // tutorial" (`tutorialForced`); `entryTutorial` se conserva únicamente para
-  // marcar "visto" al cerrarlo (compatibilidad con el flag histórico).
-  const showEntryTutorial = tutorialForced
 
   // Bienvenida del usuario NUEVO (issue #905): se auto-muestra UNA vez a quien
   // tiene cuenta propia y aún no ha creado ningún viaje. NO a un receptor
@@ -357,17 +338,6 @@ export function HomePage({ active = true }: Props = {}) {
             />
           </div>
         </GlobeSheet>
-      )}
-
-      {/* Tutorial ÚNICO de entrada (issue #742): overlay modal sobre la home. Se
-          auto-muestra una vez en la home vacía y se reabre con "Ver tutorial".
-          Completar y saltar cierran igual (lo marcan visto). */}
-      {showEntryTutorial && (
-        <OnboardingSlideshow
-          slides={getSlides('entry')}
-          onComplete={closeTutorial}
-          onSkip={closeTutorial}
-        />
       )}
 
       {/* Bienvenida del usuario NUEVO (issue #905): overlay a pantalla completa
