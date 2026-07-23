@@ -113,6 +113,15 @@ type PendingPhoto = { kind: 'ready'; src: string } | { kind: 'sign'; path: strin
  * falta de más — la galería extra de un recuerdo (`moment_images`), pedida en
  * una sola consulta por lote (`listGroupMomentImages`, patrón dos-consultas).
  *
+ * SIN FOTO NO ES INVISIBLE (issue #910): un momento sin ninguna foto (ni
+ * propia ni de galería) sigue entrando en la Bitácora — antes se descartaba en
+ * silencio y, si además no tenía ubicación, tampoco aparecía en el globo del
+ * Diario: quedaba invisible del todo (el caso real reportado: un momento
+ * "Atardecer" sin foto). Se pinta con la misma tarjeta (kicker, título,
+ * descripción, nota de voz), envuelta en `.momentTextOnly` — una superficie de
+ * vidrio (mismos tokens que `.retoStrip`) que le da el ancla visual que en el
+ * resto de la pantalla aporta la foto.
+ *
  * La ruta interna sigue usando `v=fotos`/`section: 'fotos'` (ver `lib/route.ts`
  * y `TripPage.tsx`): es un identificador interno, no copy — cambiarlo no
  * aporta nada al usuario y arrastraría enlaces ya compartidos. Solo cambia lo
@@ -184,7 +193,12 @@ export function BitacoraTab({
         const galleryByMoment: Map<string, MomentImage[]> =
           groupId === EXAMPLE_TRIP_GROUP_ID ? new Map() : await listGroupMomentImages(recuerdoIds)
 
-        // Por momento, su tanda de fotos (ready/a firmar) EN ORDEN de galería.
+        // Por momento, su tanda de fotos (ready/a firmar) EN ORDEN de galería —
+        // TODOS los momentos visibles entran aquí, tengan o no foto (issue
+        // #910): antes, un momento sin NINGUNA foto se descartaba justo en este
+        // paso (`pending.length > 0`) y desaparecía de la Bitácora entera, aunque
+        // llevara título, nota, audio o vídeo (el caso real: un momento
+        // "Atardecer" sin foto ni ubicación se leía como "bitácora vacía").
         const perMoment: { moment: Moment; pending: PendingPhoto[] }[] = []
         for (const m of visible) {
           const gallery = !m.isChallenge ? galleryByMoment.get(m.challengeId) : undefined
@@ -194,7 +208,7 @@ export function BitacoraTab({
               : m.imageUrl
                 ? [{ kind: 'ready', src: m.imageUrl }]
                 : []
-          if (pending.length > 0) perMoment.push({ moment: m, pending })
+          perMoment.push({ moment: m, pending })
         }
 
         // UN solo Promise.all para todo el viaje: solo firma lo que hace falta
@@ -233,10 +247,10 @@ export function BitacoraTab({
             photos,
           }
         })
-        // Un momento puede quedarse sin fotos si TODAS fallaron al firmar: sin
-        // foto ni vídeo con poster, no hay nada que pintar de él aquí.
-        const nonEmpty = inputs.filter((i) => i.photos.length > 0)
-        if (!cancelled) setGrouped(groupMomentsByDay(nonEmpty))
+        // Un momento sin fotos (nunca tuvo ninguna, o todas fallaron al firmar)
+        // YA no se descarta (issue #910): pinta su propia tarjeta de solo texto
+        // más abajo (ver `.momentTextOnly`) — nunca vuelve a quedar invisible.
+        if (!cancelled) setGrouped(groupMomentsByDay(inputs))
       } catch (err) {
         reportError(err, { area: 'bitacora_tab_load' })
         if (!cancelled) setGrouped({ days: [], flatPhotos: [] })
@@ -306,120 +320,140 @@ export function BitacoraTab({
               </h3>
 
               <div className={`${styles.moments} lg-stagger`}>
-                {day.moments.map((moment) => (
-                  <article key={moment.momentId} className={styles.moment}>
-                    {/* Chip de reto (issue #821): diana + estado, MISMO lenguaje que
+                {day.moments.map((moment) => {
+                  // Issue #910: sin foto ni vídeo, el momento no tiene el ancla
+                  // visual que da el resto de la Bitácora (fotos a ancho
+                  // completo) — sin una superficie propia se leería como un
+                  // hueco flotando en la escena oscura. `momentTextOnly` lo
+                  // envuelve en una tarjeta de vidrio (mismos tokens que
+                  // `.retoStrip`), nunca vacía: título siempre presente.
+                  const hasMedia = Boolean(moment.videoUrl) || moment.photos.length > 0
+                  return (
+                    <article
+                      key={moment.momentId}
+                      className={
+                        hasMedia ? styles.moment : `${styles.moment} ${styles.momentTextOnly}`
+                      }
+                    >
+                      {/* Chip de reto (issue #821): diana + estado, MISMO lenguaje que
                         `ChallengeDetail` ("EN JUEGO" con punto vivo / "Cerrado") —
                         sin él, un reto y un recuerdo con la misma foto se leen como
                         duplicados. `practice` cae en "EN JUEGO" (nunca cierra de
                         verdad, igual criterio binario que `ChallengeDetail`). Un
                         recuerdo no lleva chip: su ausencia ES la marca. */}
-                    {moment.isChallenge && (
-                      <span className={styles.retoChip}>
-                        <Badge
-                          tone={moment.status === 'closed' ? 'neutral' : 'live'}
-                          dot={moment.status !== 'closed'}
-                        >
-                          <IconDiana size={13} />
-                          {moment.status === 'closed' ? 'Cerrado' : 'EN JUEGO'}
-                        </Badge>
-                      </span>
-                    )}
+                      {moment.isChallenge && (
+                        <span className={styles.retoChip}>
+                          <Badge
+                            tone={moment.status === 'closed' ? 'neutral' : 'live'}
+                            dot={moment.status !== 'closed'}
+                          >
+                            <IconDiana size={13} />
+                            {moment.status === 'closed' ? 'Cerrado' : 'EN JUEGO'}
+                          </Badge>
+                        </span>
+                      )}
 
-                    {/* El "◦ " es decorativo (CSS `::before`, ver .kicker): así el
+                      {/* El "◦ " es decorativo (CSS `::before`, ver .kicker): así el
                       texto accesible/testeable arranca en el lugar (o la fecha, si
                       no hay lugar), sin un nodo partido entre el símbolo y el texto.
                       Lugar y fecha legada (#686) van en el MISMO nodo de texto — un
                       "· " entre ambos, nunca en `<span>` hermanos — para que un
                       lector de pantalla los lea como una sola frase, no pegados. */}
-                    {(moment.placeLabel || moment.dateLabel) && (
-                      <p className={styles.kicker}>
-                        {[moment.placeLabel, moment.dateLabel].filter(Boolean).join(' · ')}
-                      </p>
-                    )}
-                    <button
-                      type="button"
-                      className={styles.titleBtn}
-                      onClick={() => openEntry(moment.momentId)}
-                    >
-                      <h4 className={styles.title}>{moment.momentTitle}</h4>
-                    </button>
+                      {(moment.placeLabel || moment.dateLabel) && (
+                        <p className={styles.kicker}>
+                          {[moment.placeLabel, moment.dateLabel].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        className={styles.titleBtn}
+                        onClick={() => openEntry(moment.momentId)}
+                      >
+                        <h4 className={styles.title}>{moment.momentTitle}</h4>
+                      </button>
 
-                    {moment.description && (
-                      <p className={styles.description}>{moment.description}</p>
-                    )}
+                      {moment.description && (
+                        <p className={styles.description}>{moment.description}</p>
+                      )}
 
-                    {/* Nota de voz (issue #648): reproducible aquí mismo, sin abrir
+                      {/* Nota de voz (issue #648): reproducible aquí mismo, sin abrir
                         el momento. Envuelta en tarjeta clara: `AudioPlayer` usa
                         tokens de PAPEL, ilegible directo sobre la escena oscura
                         (mismo motivo que `.emptyCard` más abajo). */}
-                    {moment.audioUrl && (
-                      <div className={styles.audioCard}>
-                        <AudioPlayer
-                          src={moment.audioUrl}
-                          onPlay={() =>
-                            track('voice_note_played', { challenge_id: moment.momentId })
-                          }
-                        />
-                      </div>
-                    )}
-
-                    <div className={styles.photos}>
-                      {/* Clip corto (issue #649): la primera "foto" del recuerdo es
-                          el vídeo, con su propia portada como poster (mismo
-                          criterio que "El clip" de MomentSheet). */}
-                      {moment.videoUrl && (
-                        <video
-                          className={styles.media}
-                          controls
-                          playsInline
-                          poster={moment.videoPoster ?? undefined}
-                          src={moment.videoUrl}
-                          data-testid="moment-video-player"
-                        />
+                      {moment.audioUrl && (
+                        <div className={styles.audioCard}>
+                          <AudioPlayer
+                            src={moment.audioUrl}
+                            onPlay={() =>
+                              track('voice_note_played', { challenge_id: moment.momentId })
+                            }
+                          />
+                        </div>
                       )}
-                      {moment.photos.map((photo) => (
-                        <BitacoraPhotoFrame
-                          key={photo.flatIndex}
-                          photo={photo}
-                          alt={moment.momentTitle}
-                          onOpen={() => setLightboxAt(photo.flatIndex)}
-                        />
-                      ))}
-                    </div>
 
-                    {/* Franja de reto FUSIONADO (issue #839): un reto asociado a
+                      {/* Sin foto ni vídeo, este bloque no pinta nada (issue #910):
+                        un `<div>` vacío no deja hueco visual, pero tampoco aporta
+                        nada — mejor omitirlo del todo y dejar que `momentTextOnly`
+                        (arriba) sea la única superficie de la tarjeta. */}
+                      {hasMedia && (
+                        <div className={styles.photos}>
+                          {/* Clip corto (issue #649): la primera "foto" del recuerdo es
+                            el vídeo, con su propia portada como poster (mismo
+                            criterio que "El clip" de MomentSheet). */}
+                          {moment.videoUrl && (
+                            <video
+                              className={styles.media}
+                              controls
+                              playsInline
+                              poster={moment.videoPoster ?? undefined}
+                              src={moment.videoUrl}
+                              data-testid="moment-video-player"
+                            />
+                          )}
+                          {moment.photos.map((photo) => (
+                            <BitacoraPhotoFrame
+                              key={photo.flatIndex}
+                              photo={photo}
+                              alt={moment.momentTitle}
+                              onOpen={() => setLightboxAt(photo.flatIndex)}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Franja de reto FUSIONADO (issue #839): un reto asociado a
                         este recuerdo (misma foto) ya no pinta su propia entrada
                         duplicada — vive integrado aquí, con el mismo lenguaje de
                         estado que el chip suelto de arriba (diana + "EN JUEGO"/
                         "Reto cerrado") más la acción que ya tenía el reto suelto
                         (tocar → `onOpenChallenge`, que en `TripPage` decide jugar
                         o ver el detalle, mismo anti-spoiler de siempre). */}
-                    {moment.reto && (
-                      <button
-                        type="button"
-                        className={[styles.retoStrip, 'lg-press'].join(' ')}
-                        onClick={() => onOpenChallenge(moment.reto!.challengeId)}
-                      >
-                        <Badge
-                          tone={moment.reto.status === 'closed' ? 'neutral' : 'live'}
-                          dot={moment.reto.status !== 'closed'}
+                      {moment.reto && (
+                        <button
+                          type="button"
+                          className={[styles.retoStrip, 'lg-press'].join(' ')}
+                          onClick={() => onOpenChallenge(moment.reto!.challengeId)}
                         >
-                          <IconDiana size={13} />
-                          {moment.reto.status === 'closed' ? 'Reto cerrado' : 'EN JUEGO'}
-                        </Badge>
-                        <span className={styles.retoStripMeta}>
-                          {moment.reto.status === 'closed'
-                            ? moment.reto.winnerName
-                              ? `Ganó ${moment.reto.winnerName}`
-                              : 'Se cerró sin votos'
-                            : formatDeadline(moment.reto.deadlineAt)}
-                        </span>
-                        <Icon icon={ChevronRight} size={16} className={styles.retoStripChevron} />
-                      </button>
-                    )}
-                  </article>
-                ))}
+                          <Badge
+                            tone={moment.reto.status === 'closed' ? 'neutral' : 'live'}
+                            dot={moment.reto.status !== 'closed'}
+                          >
+                            <IconDiana size={13} />
+                            {moment.reto.status === 'closed' ? 'Reto cerrado' : 'EN JUEGO'}
+                          </Badge>
+                          <span className={styles.retoStripMeta}>
+                            {moment.reto.status === 'closed'
+                              ? moment.reto.winnerName
+                                ? `Ganó ${moment.reto.winnerName}`
+                                : 'Se cerró sin votos'
+                              : formatDeadline(moment.reto.deadlineAt)}
+                          </span>
+                          <Icon icon={ChevronRight} size={16} className={styles.retoStripChevron} />
+                        </button>
+                      )}
+                    </article>
+                  )
+                })}
               </div>
             </section>
           ))}

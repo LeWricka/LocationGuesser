@@ -226,6 +226,97 @@ describe('BitacoraTab — recuerdo (kicker, título, descripción, fotos)', () =
   })
 })
 
+describe('BitacoraTab — momento SIN foto (issue #910)', () => {
+  test('un momento sin foto ni ubicación aparece igual, con título — nunca "bitácora vacía"', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-atardecer',
+        title: 'Atardecer',
+        imageUrl: null,
+        imagePath: null,
+        description: null,
+      }),
+    ]
+    renderTab(moments)
+
+    expect(await screen.findByRole('heading', { name: 'Atardecer' })).toBeInTheDocument()
+    expect(screen.queryByText('Tu bitácora está vacía')).not.toBeInTheDocument()
+    // Sin foto: no hay ningún botón "Ampliar foto" para este momento.
+    expect(screen.queryByRole('button', { name: /Ampliar foto/ })).not.toBeInTheDocument()
+  })
+
+  test('un momento sin foto pero con descripción la pinta igual', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-sin-foto-desc',
+        title: 'Charla de sobremesa',
+        imageUrl: null,
+        imagePath: null,
+        description: 'Hablamos hasta las tantas.',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Charla de sobremesa' })
+    expect(screen.getByText('Hablamos hasta las tantas.')).toBeInTheDocument()
+  })
+
+  test('un momento sin foto pero con nota de voz sigue reproduciéndose inline', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-sin-foto-audio',
+        title: 'Nota caminando',
+        imageUrl: null,
+        imagePath: null,
+        audioUrl: 'https://firmada.example/nota.webm',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Nota caminando' })
+    expect(screen.getByRole('button', { name: 'Reproducir nota de voz' })).toBeInTheDocument()
+  })
+
+  test('un momento sin foto pero con clip de vídeo sigue mostrando el <video>', async () => {
+    const moments = [
+      moment({
+        challengeId: 'c-sin-foto-video',
+        title: 'Clip sin portada',
+        imageUrl: null,
+        imagePath: null,
+        videoUrl: 'https://firmada.example/clip.mp4',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'Clip sin portada' })
+    const video = screen.getByTestId('moment-video-player')
+    expect(video.tagName).toBe('VIDEO')
+    expect(video).toHaveAttribute('src', 'https://firmada.example/clip.mp4')
+  })
+
+  test('un momento CON foto sigue mostrando su galería intacta junto a uno sin foto', async () => {
+    const moments = [
+      moment({ challengeId: 'c-con-foto', title: 'El mejor ramen' }),
+      moment({
+        challengeId: 'c-sin-foto',
+        title: 'Atardecer',
+        imageUrl: null,
+        imagePath: null,
+        date: '2026-06-15T12:00:00.000Z',
+      }),
+    ]
+    renderTab(moments)
+
+    await screen.findByRole('heading', { name: 'El mejor ramen' })
+    await screen.findByRole('heading', { name: 'Atardecer' })
+    expect(screen.getByRole('button', { name: 'Ampliar foto: El mejor ramen' })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Ampliar foto: Atardecer' }),
+    ).not.toBeInTheDocument()
+  })
+})
+
 describe('BitacoraTab — prefijo de fecha legado (issue #686)', () => {
   test('separa el prefijo "📅 <fecha>" de la descripción y lo pinta junto al kicker', async () => {
     const moments = [
