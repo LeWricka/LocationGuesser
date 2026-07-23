@@ -1154,7 +1154,6 @@ export function TripPage({
           >
             <TripDiario
               ref={carouselRef}
-              groupId={groupId}
               moments={moments}
               route={route}
               selectedId={selectedId}
