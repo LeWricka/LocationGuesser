@@ -20,16 +20,16 @@
 -- byte-a-byte más estricto en el servidor.
 --
 -- MIME permitidos, por lo que produce REALMENTE el cliente (`storage.ts`):
---   · Foto: SIEMPRE se re-exporta a JPEG en `compressAndStripExif`/
---     `squareCropToJpeg` (canvas → `image/jpeg`) — pero el HEIC/HEIF de
---     iPhone/Android entra en la lista igualmente por si algún flujo lo sube
---     sin pasar por la recompresión, y PNG/WebP por si se añade selección
---     directa de esos formatos más adelante.
---   · Vídeo: sube SIN transcodificar (`uploadVideo`) — mp4/webm/quicktime (.mov
---     de iPhone) son los que puede grabar/compartir un móvil.
---   · Audio: `MediaRecorder` graba `audio/webm;codecs=opus` (Chrome/Firefox) o
---     `audio/mp4` (Safari, AAC) — `audio/aac`/`audio/mpeg` de margen por si
---     cambia el `mimeType` exacto entre versiones de navegador.
+--   · Foto: tipos de imagen EXPLÍCITOS (no `image/*`) para NO permitir
+--     `image/svg+xml` (vector de scripts) aunque este bucket sea privado. La
+--     foto siempre se re-exporta a JPEG (`compressAndStripExif`/`squareCropToJpeg`,
+--     canvas → `image/jpeg`); HEIC/HEIF de iPhone y PNG/WebP entran por margen.
+--   · Vídeo y audio: WILDCARD (`video/*`, `audio/*`) A PROPÓSITO. `uploadAudio`
+--     sube con el `contentType` que da `MediaRecorder`, que incluye el parámetro
+--     de códec (`audio/webm;codecs=opus`) — una lista de tipos EXACTOS
+--     (`audio/webm`) NO casaría con ese Content-Type y Supabase rechazaría la
+--     nota de voz. El wildcard evita ese fallo y sigue bloqueando lo no-media
+--     (documentos, ejecutables, etc.); el tope de tamaño es la guarda real.
 update storage.buckets
 set
   file_size_limit = 42 * 1024 * 1024,
@@ -39,13 +39,8 @@ set
     'image/webp',
     'image/heic',
     'image/heif',
-    'video/mp4',
-    'video/webm',
-    'video/quicktime',
-    'audio/webm',
-    'audio/mp4',
-    'audio/aac',
-    'audio/mpeg'
+    'video/*',
+    'audio/*'
   ]
 where id = 'images';
 
