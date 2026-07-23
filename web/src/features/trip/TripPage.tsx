@@ -1368,7 +1368,7 @@ export function TripPage({
           trae el mismo scrim sólido + burbuja legible que ya resuelve el paso
           "coach" de arriba, y de paso señala el "+" real — el mismo flujo de
           siempre (promoteChallengeHash) cuelga ahora de `primaryAction`. */}
-      {creador.stage === 'suggest' && section === 'diario' && moments[0] && (
+      {creador.stage === 'suggest' && section === 'diario' && moments[0] && !fabOpen && (
         <CoachMark
           targetRef={fabButtonRef}
           title="¿Y si les lanzas un reto para que viajen contigo?"
@@ -1410,8 +1410,14 @@ export function TripPage({
               <strong>Marcador</strong> ves quién va ganando.
             </>
           }
-          dismissLabel="Entendido"
+          // Botón "Entendido" DENTRO de la burbuja (issue #908): antes el cierre
+          // era el flotante arriba-derecha, desconectado de este aviso anclado a
+          // la barra de pestañas → el usuario no lo encontraba ("no me deja
+          // salir"). `blocking` + `hideSkip` = un único botón claro para cerrar.
+          primaryAction={{ label: 'Entendido', onClick: creador.dismissRemate }}
+          hideSkip
           onDismiss={creador.dismissRemate}
+          blocking
         />
       )}
 

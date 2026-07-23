@@ -50,6 +50,21 @@ describe('useCreadorOnboarding', () => {
     expect(result.current.stage).toBeNull()
   })
 
+  test('reto creado por el menú del "+" (sin descartar la sugerencia) → salta suggest, sin bucle (#908)', () => {
+    // Crear el reto por el menú del "+" llama onAddChallenge, NO dismissSuggest,
+    // así que `suggestSeen` sigue false; sin el gate por `hasChallenge`, el
+    // coach 'suggest' reaparecía en bucle. Con reto ya creado debe saltar a 'share'.
+    const { result, rerender } = renderHook(
+      ({ hasChallenge }: { hasChallenge: boolean }) =>
+        useCreadorOnboarding('u908', null, true, 1, hasChallenge),
+      { initialProps: { hasChallenge: false } },
+    )
+    act(() => result.current.dismissIntro())
+    expect(result.current.stage).toBe('suggest')
+    rerender({ hasChallenge: true })
+    expect(result.current.stage).toBe('share')
+  })
+
   test('con un reto ya creado y la sugerencia resuelta → aviso de compartir, luego remate', () => {
     const { result, rerender } = renderHook(
       ({ hasChallenge }: { hasChallenge: boolean }) =>
