@@ -4,7 +4,7 @@
 
 ## Qué es este proyecto
 
-**Momentu** — un diario de viaje para, primero, documentar y guardar tus viajes como quieres (la base); compartirlos con la gente que más quieres; y que además esa gente pueda ser parte del viaje, participando y jugando a adivinar dónde estás. Lo personal es el cimiento; lo social —el reto— es lo que lo diferencia del resto. *(Frase ancla: "Comparte tus momentos de una forma diferente.")*
+**Momentu** — un diario de viaje para, primero, documentar y guardar tus viajes como quieres (la base); compartirlos con la gente que más quieres; y que además esa gente pueda ser parte del viaje, participando y jugando a adivinar dónde estás. Lo personal es el cimiento; lo social —el reto— es lo que lo diferencia del resto. *(Frase ancla: "Comparte tus viajes de una forma diferente.")*
 
 ## Estado actual
 

@@ -107,11 +107,14 @@ function StoryPart({ part }: { part: LandingStoryPart }) {
       className={[styles.part, revealed ? styles.partIn : null].filter(Boolean).join(' ')}
       aria-labelledby={`landing-story-${part.id}`}
     >
-      {/* Separador de parte: kicker teal (guardar) o dorado (jugar) — mismo idioma
-          visual de eyebrows sobre escena oscura (color-mix con blanco para AA). */}
-      <p className={styles.kicker} data-tone={part.tone}>
-        {part.kicker}
-      </p>
+      {/* Separador de parte (opcional): kicker teal (guardar) o dorado (jugar). Se
+          retiró el texto (feedback landing) — el eyebrow hace de encabezado —, así
+          que solo se pinta si un bloque futuro vuelve a traer kicker. */}
+      {part.kicker && (
+        <p className={styles.kicker} data-tone={part.tone}>
+          {part.kicker}
+        </p>
+      )}
 
       <div className={styles.grid}>
         <header className={styles.copy}>
