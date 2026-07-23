@@ -581,3 +581,34 @@ describe('TripPage — onboarding creador: sugerencia y remate anclados a un ele
     rectSpy.mockRestore()
   })
 })
+
+// Issue #904 — bug 1: el coach "Guarda tu primer momento" pintaba su scrim
+// (z-index 1100) incluso con el menú Momento/Reto del FAB abierto (z-index
+// --z-sticky=100 más bajo), tapándolo por completo: "Momento" no se podía
+// tocar y el paso nunca avanzaba. El fix oculta el coach del creador mientras
+// `fabOpen` sea true.
+describe('TripPage — coach del creador no tapa el menú del FAB (issue #904)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    window.location.hash = '#g=g1'
+    localStorage.setItem('lg:onboarding:creador:intro:u-me', '1')
+  })
+
+  test('con el menú Momento/Reto abierto, el coach-mark desaparece; al cerrarlo, vuelve', async () => {
+    mockTripData({ moments: [] })
+    renderTrip()
+
+    await screen.findByRole('note', { name: 'Guarda tu primer momento' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear momento o reto' }))
+    expect(screen.getByRole('menu', { name: 'Crear' })).toBeInTheDocument()
+    expect(screen.queryByRole('note', { name: 'Guarda tu primer momento' })).not.toBeInTheDocument()
+
+    // Cerrar el menú sin elegir nada (tocar el "+" de nuevo): el coach reaparece.
+    await userEvent.click(screen.getByRole('button', { name: 'Crear momento o reto' }))
+    expect(screen.queryByRole('menu', { name: 'Crear' })).not.toBeInTheDocument()
+    expect(
+      await screen.findByRole('note', { name: 'Guarda tu primer momento' }),
+    ).toBeInTheDocument()
+  })
+})
