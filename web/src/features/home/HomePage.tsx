@@ -22,7 +22,8 @@ import { useHomeData } from './useHomeData'
 import { useWorldTrips } from './useWorldTrips'
 import { HOME_DEMO_PINS } from './homeDemoPins'
 import { gotoChallenge, gotoCreateGroup, gotoGroup, gotoProfile } from './navigation'
-import { OnboardingSlideshow, getSlides, useOnboarding } from '../onboarding'
+import { NuevoBienvenidaFrame, OnboardingSlideshow, getSlides, useOnboarding } from '../onboarding'
+import { exampleTripHash } from '../../lib/route'
 import styles from './HomePage.module.css'
 
 // Home logueada (patrón GLOBO + HOJA, referencia Polarsteps): un globo héroe a sangre
@@ -43,7 +44,7 @@ interface Props {
 }
 
 export function HomePage({ active = true }: Props = {}) {
-  const { user, profile, loading: sessionLoading } = useSession()
+  const { user, profile, loading: sessionLoading, isAnonymous } = useSession()
   const { loading: dataLoading, error, data, reload } = useHomeData(user?.id)
 
   // Tutorial ÚNICO de entrada (issue #742): un solo tutorial cuenta el bucle
@@ -54,6 +55,13 @@ export function HomePage({ active = true }: Props = {}) {
   // Reapertura manual desde "Ver tutorial": fuerza el slideshow aunque ya se haya
   // visto (el flag solo gobierna el auto-show de la primera vez).
   const [tutorialForced, setTutorialForced] = useState(false)
+
+  // Bienvenida del usuario NUEVO (issue #905): la PRIMERA vez que alguien con
+  // cuenta y sin viajes cae en su home vacía, un marco "Esto es Momentu" cuyo
+  // CTA arranca el recorrido REAL del viaje de ejemplo (`#g=ejemplo&tour=1&nuevo=1`),
+  // no tarjetas abstractas. Se marca visto tanto al lanzarlo como al saltarlo:
+  // una vez y no más (persistido por cuenta, #717).
+  const bienvenidaNuevo = useOnboarding('bienvenida-nuevo', user?.id, profile?.onboarding)
 
   // Coordenadas de los viajes situados → pines-foto del globo héroe. Es presentación
   // derivada (anti-spoiler ya aplicado en useWorldTrips). La lista de grupos la trae
@@ -147,6 +155,13 @@ export function HomePage({ active = true }: Props = {}) {
     entryTutorial.markSeen()
   }
 
+  // "Ver cómo funciona" (issue #905): marca la bienvenida como vista y arranca el
+  // recorrido del viaje de ejemplo con `&nuevo=1` (su cierre remata en Crear viaje).
+  function seeHowMomentuWorks() {
+    bienvenidaNuevo.markSeen()
+    location.hash = exampleTripHash(true, true)
+  }
+
   // Mientras resolvemos la sesión persistida o cargamos la membresía → skeletons.
   // SIEMPRE damos feedback de carga (no pantalla en blanco).
   if (sessionLoading || dataLoading) {
@@ -189,6 +204,13 @@ export function HomePage({ active = true }: Props = {}) {
   // tutorial" (`tutorialForced`); `entryTutorial` se conserva únicamente para
   // marcar "visto" al cerrarlo (compatibilidad con el flag histórico).
   const showEntryTutorial = tutorialForced
+
+  // Bienvenida del usuario NUEVO (issue #905): se auto-muestra UNA vez a quien
+  // tiene cuenta propia y aún no ha creado ningún viaje. NO a un receptor
+  // ANÓNIMO (llega por un enlace de reto/viaje y tiene su propio onboarding de
+  // receptor) ni cuando ya hay viajes (la home muestra el dashboard). El flag
+  // `bienvenidaNuevo` garantiza que sea una sola vez por cuenta.
+  const showNuevoBienvenida = !hasGroups && !isAnonymous && bienvenidaNuevo.shouldShow
 
   // Cascada de portada por viaje: (1) portada propia firmada; (2) foto del recuerdo más
   // reciente (ya resuelta por useWorldTrips para el pin del globo, ver arriba); (3) null →
@@ -346,6 +368,13 @@ export function HomePage({ active = true }: Props = {}) {
           onComplete={closeTutorial}
           onSkip={closeTutorial}
         />
+      )}
+
+      {/* Bienvenida del usuario NUEVO (issue #905): overlay a pantalla completa
+          sobre la home vacía. "Ver cómo funciona" arranca el recorrido REAL del
+          viaje de ejemplo; "Ahora no" lo cierra. Ambas marcan visto (no reaparece). */}
+      {showNuevoBienvenida && (
+        <NuevoBienvenidaFrame onSeeHow={seeHowMomentuWorks} onSkip={bienvenidaNuevo.skip} />
       )}
     </main>
   )

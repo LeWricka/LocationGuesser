@@ -27,6 +27,10 @@ export { useRetoShareOnboarding } from './useRetoShareOnboarding'
 // el remate sobre la barra de pestañas) y el aviso de compartir. Enganchado en
 // TripPage.
 export { CreadorIntroFrame } from './CreadorIntroFrame'
+// Marco de bienvenida del usuario NUEVO (issue #905): "Esto es Momentu" en la
+// home vacía; "Ver cómo funciona" arranca el recorrido del viaje de ejemplo.
+export { NuevoBienvenidaFrame } from './NuevoBienvenidaFrame'
+export type { Props as NuevoBienvenidaFrameProps } from './NuevoBienvenidaFrame'
 export { CoachMark } from './CoachMark'
 export type { CoachMarkProps } from './CoachMark'
 export { CreadorNudge } from './CreadorNudge'

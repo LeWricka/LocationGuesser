@@ -43,6 +43,7 @@ import {
   RetoShareIntro,
   RetoShareGuide,
   CreadorIntroFrame,
+  NuevoBienvenidaFrame,
   CoachMark,
   CreadorNudge,
 } from '../features/onboarding'
@@ -1134,6 +1135,14 @@ export const cases: GalleryCase[] = [
     section: 'Onboarding',
     render: () => <CreadorIntroFrame onStart={noop} />,
   },
+  // Bienvenida del usuario NUEVO (issue #905): "Esto es Momentu" en la home
+  // vacía; "Ver cómo funciona" arranca el recorrido REAL del viaje de ejemplo.
+  {
+    id: 'onboarding-nuevo-bienvenida',
+    title: 'Onboarding · bienvenida del usuario nuevo (una pantalla)',
+    section: 'Onboarding',
+    render: () => <NuevoBienvenidaFrame onSeeHow={noop} onSkip={noop} />,
+  },
   {
     id: 'onboarding-creador-coach',
     title: 'Onboarding · creador — coach-mark sobre el "+" real',
@@ -1171,8 +1180,8 @@ export const cases: GalleryCase[] = [
           ariaLabel="Guarda tu primer momento"
           body={
             <>
-              Toca <strong>+</strong> y guarda dónde estás: una foto, un vídeo o una nota de voz.
-              Aparecerá aquí, en tu Diario.
+              Toca <strong>+</strong> y guarda dónde estás: varias fotos, un vídeo o una nota de
+              voz. Aparece aquí, en tu Diario.
             </>
           }
           onDismiss={noop}

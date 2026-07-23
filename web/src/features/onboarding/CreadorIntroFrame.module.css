@@ -70,6 +70,13 @@
   margin-bottom: 0;
 }
 
+/* Botón secundario "Ahora no" (solo NuevoBienvenidaFrame, issue #905): el marco
+   se auto-muestra una vez, así que hace falta una salida sin recorrer nada. */
+.skip {
+  margin-top: var(--space-2);
+  margin-bottom: 0;
+}
+
 .ctaLabel {
   display: inline-flex;
   align-items: center;

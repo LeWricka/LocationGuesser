@@ -34,8 +34,8 @@ export function CreadorIntroFrame({ onStart }: Props) {
         <span className={`t-label ${styles.eyebrow}`}>Momentu</span>
         <h1 className={`t-display ${styles.title}`}>Tu viaje, compartido con tu gente.</h1>
         <p className={`t-body ${styles.body}`}>
-          Un diario para tus viajes: guardas cada momento, lo compartes con tu gente y les retas
-          para que viajen contigo.
+          Guarda cada momento con todo: varias fotos, un vídeo, hasta una nota de voz. Compártelo
+          con tu gente y rétales a adivinar dónde estás.
         </p>
 
         <Button fullWidth onClick={onStart} className={styles.cta}>

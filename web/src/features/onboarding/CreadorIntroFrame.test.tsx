@@ -7,8 +7,8 @@ describe('CreadorIntroFrame', () => {
     render(<CreadorIntroFrame onStart={vi.fn()} />)
     expect(screen.getByText('Momentu')).toBeInTheDocument()
     expect(screen.getByText('Tu viaje, compartido con tu gente.')).toBeInTheDocument()
-    expect(screen.getByText(/Un diario para tus viajes: guardas cada momento/)).toBeInTheDocument()
-    expect(screen.getByText(/les retas para que viajen contigo\.$/)).toBeInTheDocument()
+    expect(screen.getByText(/Guarda cada momento con todo: varias fotos/)).toBeInTheDocument()
+    expect(screen.getByText(/rétales a adivinar dónde estás\.$/)).toBeInTheDocument()
   })
 
   test('"Empezar" llama a onStart', () => {

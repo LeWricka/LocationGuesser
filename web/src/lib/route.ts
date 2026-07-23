@@ -268,9 +268,16 @@ export function stripOwnerInviteToken(hash: string): string {
  * `withTour` añade `&tour=1` para arrancar además la guía conducida
  * (`GuidedTour`) — `TripPage` la consume una sola vez al montar y la retira
  * del hash, igual criterio que `ownerInviteToken`/`stripOwnerInviteToken`.
+ *
+ * `fromNewUser` añade además `&nuevo=1` (issue #905): marca que el recorrido
+ * NACE de la bienvenida del usuario nuevo (home vacía), no del perfil. Con él,
+ * `TripPage` remata el cierre de la guía con "Ahora crea el tuyo" → Crear viaje,
+ * en vez del cierre neutro de "Ver un viaje de ejemplo". Solo tiene sentido
+ * junto al tour (la guía conducida lo consume, igual que `tour`).
  */
-export function exampleTripHash(withTour = false): string {
+export function exampleTripHash(withTour = false, fromNewUser = false): string {
   const params = new URLSearchParams({ g: EXAMPLE_TRIP_GROUP_ID })
   if (withTour) params.set('tour', '1')
+  if (withTour && fromNewUser) params.set('nuevo', '1')
   return `#${params.toString()}`
 }

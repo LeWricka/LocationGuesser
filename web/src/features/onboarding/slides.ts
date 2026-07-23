@@ -222,7 +222,7 @@ const ENTRY_SLIDES: OnboardingSlide[] = [
 // no arrastrar copy muerto — `getSlides` los cubre con un array vacío.
 type SlideContext = Exclude<
   OnboardingContext,
-  'welcome' | 'guest-register' | 'reto_share' | 'creador'
+  'welcome' | 'guest-register' | 'reto_share' | 'creador' | 'bienvenida-nuevo'
 >
 
 const SLIDES: Record<SlideContext, OnboardingSlide[]> = {
@@ -239,7 +239,10 @@ export function getSlides(context: OnboardingContext): OnboardingSlide[] {
     context === 'welcome' ||
     context === 'guest-register' ||
     context === 'reto_share' ||
-    context === 'creador'
+    context === 'creador' ||
+    // La bienvenida del usuario nuevo (issue #905) es un marco de UNA pantalla
+    // (NuevoBienvenidaFrame), no un slideshow: sin slides que servir.
+    context === 'bienvenida-nuevo'
   )
     return []
   return SLIDES[context]

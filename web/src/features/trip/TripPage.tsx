@@ -272,11 +272,23 @@ export function TripPage({
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     return params.get('tour') === '1'
   })
+  // Recorrido lanzado desde la bienvenida del usuario NUEVO (issue #905,
+  // `&nuevo=1`): el cierre de la guía remata con "Ahora crea el tuyo" → Crear
+  // viaje, en vez del cierre neutro de "Ver un viaje de ejemplo" del perfil. Se
+  // lee UNA vez al montar (solo tiene sentido junto a `tour=1` del ejemplo).
+  const [tourFromNewUser] = useState(() => {
+    if (groupId !== EXAMPLE_TRIP_GROUP_ID) return false
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    return params.get('tour') === '1' && params.get('nuevo') === '1'
+  })
   useEffect(() => {
     if (!tourActive) return
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     if (params.get('g') !== groupId || !params.has('tour')) return
     params.delete('tour')
+    // `nuevo` se consume junto a `tour` (ya lo leímos en `tourFromNewUser`): una
+    // recarga posterior no debe re-arrancar la guía ni el remate de "crea el tuyo".
+    params.delete('nuevo')
     window.history.replaceState(window.history.state, '', `#${params.toString()}`)
     // Solo al arrancar la guía (una vez): no queremos re-escribir el hash en
     // cada render mientras `tourActive` sigue en true.
@@ -1343,8 +1355,8 @@ export function TripPage({
           ariaLabel="Guarda tu primer momento"
           body={
             <>
-              Toca <strong>+</strong> y guarda dónde estás: una foto, un vídeo o una nota de voz.
-              Aparecerá aquí, en tu Diario.
+              Toca <strong>+</strong> y guarda dónde estás: varias fotos, un vídeo o una nota de
+              voz. Aparece aquí, en tu Diario.
             </>
           }
           onDismiss={creador.skipGuide}
@@ -1797,10 +1809,23 @@ export function TripPage({
       {isExampleTrip && tourActive && (
         <GuidedTour
           steps={tourSteps}
-          closingTitle="Ya conoces el viaje"
-          closingBody="Así se ve un viaje entero en Momentu: un diario que se comparte, con retos de por medio."
-          closingCta="Entendido"
-          onFinish={() => setTourActive(false)}
+          // Cierre según el ORIGEN (issue #905): desde la bienvenida del usuario
+          // nuevo (`&nuevo=1`) remata con "Ahora crea el tuyo" → Crear viaje;
+          // desde el perfil ("Ver un viaje de ejemplo"), el cierre neutro de
+          // siempre (solo cierra, el usuario ya estaba explorando a su aire).
+          closingTitle={tourFromNewUser ? 'Ahora crea el tuyo' : 'Ya conoces el viaje'}
+          closingBody={
+            tourFromNewUser
+              ? 'Ya sabes cómo se ve un viaje en Momentu. Empieza el tuyo: guarda tu primer momento y compártelo con tu gente.'
+              : 'Así se ve un viaje entero en Momentu: un diario que se comparte, con retos de por medio.'
+          }
+          closingCta={tourFromNewUser ? 'Crear viaje' : 'Entendido'}
+          onFinish={() => {
+            setTourActive(false)
+            // Solo el recorrido del usuario nuevo lleva a Crear viaje (`#nuevo`);
+            // el del perfil se queda donde estaba (el propio viaje de ejemplo).
+            if (tourFromNewUser) location.hash = 'nuevo'
+          }}
           onSkip={() => setTourActive(false)}
         />
       )}
