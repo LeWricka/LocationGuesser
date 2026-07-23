@@ -274,10 +274,22 @@ export function stripOwnerInviteToken(hash: string): string {
  * `TripPage` remata el cierre de la guía con "Ahora crea el tuyo" → Crear viaje,
  * en vez del cierre neutro de "Ver un viaje de ejemplo". Solo tiene sentido
  * junto al tour (la guía conducida lo consume, igual que `tour`).
+ *
+ * `fromLanding` añade `&from=landing` (issue #916): marca que el recorrido lo
+ * arranca un VISITANTE SIN sesión desde la landing pública ("Ver un ejemplo").
+ * Con él, `TripPage` remata el cierre de la guía invitando a REGISTRARSE
+ * ("Empieza a compartir" → auth) en vez de navegar a `#nuevo` (que exige sesión).
+ * Excluyente con `fromNewUser` (orígenes distintos); solo tiene sentido junto al
+ * tour, que lo consume igual que `tour`/`nuevo`.
  */
-export function exampleTripHash(withTour = false, fromNewUser = false): string {
+export function exampleTripHash(
+  withTour = false,
+  fromNewUser = false,
+  fromLanding = false,
+): string {
   const params = new URLSearchParams({ g: EXAMPLE_TRIP_GROUP_ID })
   if (withTour) params.set('tour', '1')
   if (withTour && fromNewUser) params.set('nuevo', '1')
+  if (withTour && fromLanding) params.set('from', 'landing')
   return `#${params.toString()}`
 }

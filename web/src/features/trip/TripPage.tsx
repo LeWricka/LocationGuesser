@@ -94,6 +94,14 @@ interface Props {
   onAddChallenge: () => void
   /** Vuelve a la home. */
   onBack: () => void
+  /**
+   * Solo viaje de EJEMPLO servido a un VISITANTE SIN sesión desde la landing
+   * (issue #916, `#g=ejemplo&tour=1&from=landing`): al cerrar la guía conducida,
+   * en vez de navegar a `#nuevo` (que exige sesión), invitamos a REGISTRARSE. Lo
+   * cablea App al flujo de auth. Sin esta prop, el cierre se comporta como
+   * siempre (usuario logueado: → Crear viaje o cierre neutro).
+   */
+  onExampleRegister?: () => void
 }
 
 /**
@@ -139,6 +147,7 @@ export function TripPage({
   onAddMoment,
   onAddChallenge,
   onBack,
+  onExampleRegister,
 }: Props) {
   // `isAnonymous` (issue #888): gatea los dos FABs flotantes (crear/compartir)
   // más abajo — un receptor anónimo que juega un reto se hace miembro (RLS) y
@@ -281,6 +290,15 @@ export function TripPage({
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
     return params.get('tour') === '1' && params.get('nuevo') === '1'
   })
+  // Recorrido lanzado por un VISITANTE SIN sesión desde la landing (issue #916,
+  // `&from=landing`): el cierre de la guía invita a REGISTRARSE (ver `onFinish`
+  // abajo) en vez de navegar a `#nuevo` (que exige sesión). Se lee UNA vez al
+  // montar, igual que `tourFromNewUser`; solo tiene sentido junto a `tour=1`.
+  const [tourFromLanding] = useState(() => {
+    if (groupId !== EXAMPLE_TRIP_GROUP_ID) return false
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    return params.get('tour') === '1' && params.get('from') === 'landing'
+  })
   useEffect(() => {
     if (!tourActive) return
     const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
@@ -289,6 +307,10 @@ export function TripPage({
     // `nuevo` se consume junto a `tour` (ya lo leímos en `tourFromNewUser`): una
     // recarga posterior no debe re-arrancar la guía ni el remate de "crea el tuyo".
     params.delete('nuevo')
+    // `from=landing` se consume igual (ya leído en `tourFromLanding`); solo el
+    // marcador de la landing, nunca un `from=<momentId>` de reto (no aplica al
+    // ejemplo, que no tiene `add=reto`).
+    if (params.get('from') === 'landing') params.delete('from')
     window.history.replaceState(window.history.state, '', `#${params.toString()}`)
     // Solo al arrancar la guía (una vez): no queremos re-escribir el hash en
     // cada render mientras `tourActive` sigue en true.
@@ -1814,19 +1836,37 @@ export function TripPage({
       {isExampleTrip && tourActive && (
         <GuidedTour
           steps={tourSteps}
-          // Cierre según el ORIGEN (issue #905): desde la bienvenida del usuario
-          // nuevo (`&nuevo=1`) remata con "Ahora crea el tuyo" → Crear viaje;
-          // desde el perfil ("Ver un viaje de ejemplo"), el cierre neutro de
-          // siempre (solo cierra, el usuario ya estaba explorando a su aire).
-          closingTitle={tourFromNewUser ? 'Ahora crea el tuyo' : 'Ya conoces el viaje'}
-          closingBody={
-            tourFromNewUser
-              ? 'Ya sabes cómo se ve un viaje en Momentu. Empieza el tuyo: guarda tu primer momento y compártelo con tu gente.'
-              : 'Así se ve un viaje entero en Momentu: un diario que se comparte, con retos de por medio.'
+          // Cierre según el ORIGEN: un VISITANTE SIN sesión desde la landing
+          // (issue #916, `&from=landing`) remata invitando a REGISTRARSE
+          // (`onExampleRegister` abre el auth); desde la bienvenida del usuario
+          // nuevo (issue #905, `&nuevo=1`) remata con "Ahora crea el tuyo" →
+          // Crear viaje; desde el perfil ("Ver un viaje de ejemplo"), el cierre
+          // neutro de siempre (solo cierra, ya estaba explorando a su aire).
+          closingTitle={
+            tourFromLanding
+              ? 'Ahora empieza el tuyo'
+              : tourFromNewUser
+                ? 'Ahora crea el tuyo'
+                : 'Ya conoces el viaje'
           }
-          closingCta={tourFromNewUser ? 'Crear viaje' : 'Entendido'}
+          closingBody={
+            tourFromLanding
+              ? 'Ya sabes cómo se ve un viaje en Momentu. Crea tu cuenta y empieza a guardar y compartir los tuyos con tu gente.'
+              : tourFromNewUser
+                ? 'Ya sabes cómo se ve un viaje en Momentu. Empieza el tuyo: guarda tu primer momento y compártelo con tu gente.'
+                : 'Así se ve un viaje entero en Momentu: un diario que se comparte, con retos de por medio.'
+          }
+          closingCta={
+            tourFromLanding ? 'Empieza a compartir' : tourFromNewUser ? 'Crear viaje' : 'Entendido'
+          }
           onFinish={() => {
             setTourActive(false)
+            // Visitante desde la landing (sin sesión) → registrarse; el auto de
+            // Crear viaje (`#nuevo`) exige sesión, así que aquí abrimos el auth.
+            if (tourFromLanding && onExampleRegister) {
+              onExampleRegister()
+              return
+            }
             // Solo el recorrido del usuario nuevo lleva a Crear viaje (`#nuevo`);
             // el del perfil se queda donde estaba (el propio viaje de ejemplo).
             if (tourFromNewUser) location.hash = 'nuevo'

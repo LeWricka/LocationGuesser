@@ -274,4 +274,12 @@ describe('exampleTripHash', () => {
   test('nuevo solo tiene sentido con tour: sin tour no añade &nuevo', () => {
     expect(exampleTripHash(false, true)).toBe('#g=ejemplo')
   })
+
+  test('desde la landing sin sesión (issue #916): añade &from=landing', () => {
+    expect(exampleTripHash(true, false, true)).toBe('#g=ejemplo&tour=1&from=landing')
+  })
+
+  test('landing solo tiene sentido con tour: sin tour no añade &from', () => {
+    expect(exampleTripHash(false, false, true)).toBe('#g=ejemplo')
+  })
 })
