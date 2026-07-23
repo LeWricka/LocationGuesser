@@ -24,8 +24,9 @@ vi.mock('../../lib/storage', async (importOriginal) => {
   }
 })
 
-import { MomentGalleryPicker } from './MomentGalleryPicker'
+import { MomentGalleryPicker, MAX_PHOTOS } from './MomentGalleryPicker'
 import { VideoValidationError } from '../../lib/storage'
+import type { DraftPhoto } from './MomentGalleryPicker'
 
 function renderPicker(extraProps: Partial<ComponentProps<typeof MomentGalleryPicker>> = {}) {
   const onAdd = vi.fn()
@@ -53,6 +54,16 @@ function fakeFile(name: string, content = 'contenido'): File {
 
 function fakeVideoFile(name = 'clip.mp4', content = 'video-bytes'): File {
   return new File([content], name, { type: 'video/mp4' })
+}
+
+/** N fotos ya "en el estado" (como si el padre ya las hubiese añadido), para
+ * probar el tope MAX_PHOTOS sin depender de subir N archivos de verdad. */
+function fakeDraftPhotos(count: number): DraftPhoto[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `photo-${i}`,
+    file: fakeFile(`foto-${i}.jpg`),
+    previewUrl: `blob:foto-${i}`,
+  }))
 }
 
 function deferred<T>() {
@@ -213,5 +224,53 @@ describe('MomentGalleryPicker — clip de vídeo corto (issue #649)', () => {
     })
 
     expect(screen.getByLabelText('Quitar clip')).toBeInTheDocument()
+  })
+})
+
+describe('MomentGalleryPicker — tope de fotos por recuerdo (#911)', () => {
+  test('ya en el tope: no lee nada, avisa y no llama a onAdd', async () => {
+    const user = userEvent.setup()
+    const { onAdd } = renderPicker({ photos: fakeDraftPhotos(MAX_PHOTOS) })
+
+    await user.upload(screen.getByLabelText('Añadir más fotos'), [fakeFile('extra.jpg')])
+
+    expect(
+      await screen.findByText(
+        `Ya tienes el máximo de ${MAX_PHOTOS} fotos en este recuerdo. Quita alguna para añadir otra.`,
+      ),
+    ).toBeInTheDocument()
+    expect(onAdd).not.toHaveBeenCalled()
+  })
+
+  test('selección que se pasa del hueco disponible: añade solo hasta completar el tope y avisa de las ignoradas', async () => {
+    const user = userEvent.setup()
+    const already = MAX_PHOTOS - 2
+    const { onAdd } = renderPicker({ photos: fakeDraftPhotos(already) })
+
+    await user.upload(screen.getByLabelText('Añadir más fotos'), [
+      fakeFile('a.jpg'),
+      fakeFile('b.jpg'),
+      fakeFile('c.jpg'),
+    ])
+
+    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1))
+    const [copies] = onAdd.mock.calls[0] as [File[]]
+    expect(copies.map((f) => f.name)).toEqual(['a.jpg', 'b.jpg'])
+    expect(
+      await screen.findByText(
+        `Máximo ${MAX_PHOTOS} fotos por recuerdo: se añaden 2 y se ignoran 1.`,
+      ),
+    ).toBeInTheDocument()
+  })
+
+  test('selección que cabe entera dentro del hueco: no avisa de nada', async () => {
+    const user = userEvent.setup()
+    const already = MAX_PHOTOS - 5
+    const { onAdd } = renderPicker({ photos: fakeDraftPhotos(already) })
+
+    await user.upload(screen.getByLabelText('Añadir más fotos'), [fakeFile('a.jpg')])
+
+    await waitFor(() => expect(onAdd).toHaveBeenCalledTimes(1))
+    expect(screen.queryByText(/máximo/i)).not.toBeInTheDocument()
   })
 })
