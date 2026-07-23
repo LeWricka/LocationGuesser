@@ -62,6 +62,13 @@ interface Props {
   onFinish: () => void
   /** "Saltar" en cualquier paso: sale de la guía sin pasar por el cierre. */
   onSkip: () => void
+  /**
+   * Elemento que debe quedar VISIBLE durante TODA la guía, sin atenuar por el
+   * oscurecido de ningún paso (issue #918: la barra de pestañas del viaje, para
+   * que se siga viendo en qué sección se está). Se reenvía tal cual a cada
+   * `CoachMark` — ver ese fichero para el mecanismo (`pinnedRef`).
+   */
+  pinnedRef?: RefObject<HTMLElement | null>
 }
 
 // Margen antes de medir tras cambiar de paso: da tiempo a que `onBeforeShow`
@@ -83,6 +90,7 @@ export function GuidedTour({
   lastStepLabel,
   onFinish,
   onSkip,
+  pinnedRef,
 }: Props) {
   const [index, setIndex] = useState(0)
   const reducedMotion = useReducedMotion()
@@ -131,6 +139,7 @@ export function GuidedTour({
         primaryAction={{ label: primaryLabel, onClick: primaryOnClick }}
         onDismiss={onSkip}
         blocking={current.blocking}
+        pinnedRef={pinnedRef}
       />
     )
   }

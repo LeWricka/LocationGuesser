@@ -134,7 +134,8 @@ describe('HomePage', () => {
     // (#742) esto auto-mostraba el slideshow sobre la home vacía; ahora quien
     // de verdad crea un viaje aprende HACIENDO dentro del propio viaje (ver
     // useCreadorOnboarding en TripPage) — auto-mostrar aquí ADEMÁS repetiría el
-    // mismo bucle dos veces. El slideshow queda solo tras "Ver tutorial".
+    // mismo bucle dos veces. "Ver tutorial" (issue #918) ya no abre ningún
+    // slideshow: navega al recorrido conducido del viaje de ejemplo.
     // La bienvenida del usuario nuevo (#905) sí consta vista, para aislar que lo
     // que NO se auto-muestra es el slideshow de entrada (no la bienvenida).
     sessionState.profile = {
@@ -149,15 +150,17 @@ describe('HomePage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  test('"Ver tutorial" reabre el tutorial aunque ya se haya visto (#742)', async () => {
-    // beforeEach deja el tutorial como visto → no hay auto-show.
+  test('"Ver tutorial" arranca el recorrido guiado del viaje de ejemplo (#918)', async () => {
+    // Issue #918: unifica con el resto de tutoriales — ya no abre el slideshow
+    // antiguo (`entry`), navega al MISMO recorrido conducido que "Ver un viaje
+    // de ejemplo" del perfil o "Ver cómo funciona" de la bienvenida.
+    window.location.hash = ''
     render(<HomePage />)
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Ver tutorial' })).toBeInTheDocument(),
     )
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Ver tutorial' }))
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(window.location.hash).toBe('#g=ejemplo&tour=1')
   })
 
   test('usuario nuevo sin viajes y bienvenida no vista → muestra "Esto es Momentu" (#905)', async () => {
