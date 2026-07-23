@@ -11,6 +11,7 @@ import {
   promoteChallengeHash,
   ownerInviteHash,
   stripOwnerInviteToken,
+  exampleTripHash,
 } from './route'
 
 describe('parseHash', () => {
@@ -254,5 +255,23 @@ describe('ownerInviteHash / stripOwnerInviteToken', () => {
 
   test('stripOwnerInviteToken añade # si el hash no lo trae', () => {
     expect(stripOwnerInviteToken('g=abc123')).toBe('#g=abc123')
+  })
+})
+
+describe('exampleTripHash', () => {
+  test('sin tour: solo el viaje de ejemplo', () => {
+    expect(exampleTripHash()).toBe('#g=ejemplo')
+  })
+
+  test('con tour: arranca la guía conducida', () => {
+    expect(exampleTripHash(true)).toBe('#g=ejemplo&tour=1')
+  })
+
+  test('desde la bienvenida del usuario nuevo (issue #905): añade &nuevo=1', () => {
+    expect(exampleTripHash(true, true)).toBe('#g=ejemplo&tour=1&nuevo=1')
+  })
+
+  test('nuevo solo tiene sentido con tour: sin tour no añade &nuevo', () => {
+    expect(exampleTripHash(false, true)).toBe('#g=ejemplo')
   })
 })

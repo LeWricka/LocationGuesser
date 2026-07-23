@@ -11,6 +11,7 @@ const sessionState = {
   user: { id: 'u1' } as { id: string } | null,
   profile: { display_name: 'Lewis', avatar_url: null } as Partial<Profile> | null,
   loading: false,
+  isAnonymous: false,
   refreshProfile: vi.fn(),
 }
 vi.mock('../../lib/session-context', () => ({
@@ -74,13 +75,18 @@ beforeEach(() => {
   localStorage.clear()
   sessionState.loading = false
   sessionState.user = { id: 'u1' }
-  // Por defecto el tutorial de entrada consta como visto (issue #742): así los
-  // tests que no lo verifican no arrastran su overlay. Los tests del tutorial
-  // sobreescriben `onboarding` explícitamente.
+  sessionState.isAnonymous = false
+  // Por defecto tanto el tutorial de entrada (issue #742) como la bienvenida del
+  // usuario nuevo (issue #905) constan como vistos: así los tests que no los
+  // verifican no arrastran su overlay. Los tests de cada uno sobreescriben
+  // `onboarding` explícitamente.
   sessionState.profile = {
     display_name: 'Lewis',
     avatar_url: null,
-    onboarding: { entry: '2026-01-01T00:00:00.000Z' },
+    onboarding: {
+      entry: '2026-01-01T00:00:00.000Z',
+      'bienvenida-nuevo': '2026-01-01T00:00:00.000Z',
+    },
   }
   myGroupsMock.mockResolvedValue([])
   pendingChallengesMock.mockResolvedValue([])
@@ -129,7 +135,13 @@ describe('HomePage', () => {
     // de verdad crea un viaje aprende HACIENDO dentro del propio viaje (ver
     // useCreadorOnboarding en TripPage) — auto-mostrar aquí ADEMÁS repetiría el
     // mismo bucle dos veces. El slideshow queda solo tras "Ver tutorial".
-    sessionState.profile = { display_name: 'Lewis', avatar_url: null, onboarding: {} }
+    // La bienvenida del usuario nuevo (#905) sí consta vista, para aislar que lo
+    // que NO se auto-muestra es el slideshow de entrada (no la bienvenida).
+    sessionState.profile = {
+      display_name: 'Lewis',
+      avatar_url: null,
+      onboarding: { 'bienvenida-nuevo': '2026-01-01T00:00:00.000Z' },
+    }
     render(<HomePage />)
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Crear viaje' })).toBeInTheDocument(),
@@ -146,6 +158,48 @@ describe('HomePage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Ver tutorial' }))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  test('usuario nuevo sin viajes y bienvenida no vista → muestra "Esto es Momentu" (#905)', async () => {
+    // Onboarding sin `bienvenida-nuevo` = aún no vista → se auto-muestra el marco.
+    sessionState.profile = { display_name: 'Lewis', avatar_url: null, onboarding: {} }
+    render(<HomePage />)
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: 'Esto es Momentu' })).toBeInTheDocument(),
+    )
+    expect(screen.getByRole('button', { name: /Ver cómo funciona/ })).toBeInTheDocument()
+  })
+
+  test('"Ver cómo funciona" arranca el recorrido del ejemplo con nuevo=1 (#905)', async () => {
+    sessionState.profile = { display_name: 'Lewis', avatar_url: null, onboarding: {} }
+    render(<HomePage />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Ver cómo funciona/ })).toBeInTheDocument(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Ver cómo funciona/ }))
+    expect(window.location.hash).toBe('#g=ejemplo&tour=1&nuevo=1')
+  })
+
+  test('"Ahora no" cierra la bienvenida sin navegar (#905)', async () => {
+    window.location.hash = ''
+    sessionState.profile = { display_name: 'Lewis', avatar_url: null, onboarding: {} }
+    render(<HomePage />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Ahora no' })).toBeInTheDocument(),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Ahora no' }))
+    expect(screen.queryByRole('dialog', { name: 'Esto es Momentu' })).not.toBeInTheDocument()
+    expect(window.location.hash).toBe('')
+  })
+
+  test('receptor anónimo sin viajes → NO se auto-muestra la bienvenida (#905)', async () => {
+    sessionState.isAnonymous = true
+    sessionState.profile = { display_name: 'Lewis', avatar_url: null, onboarding: {} }
+    render(<HomePage />)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Crear viaje' })).toBeInTheDocument(),
+    )
+    expect(screen.queryByRole('dialog', { name: 'Esto es Momentu' })).not.toBeInTheDocument()
   })
 
   test('con grupos → feed de portadas con el viaje, sin montar mapamundi', async () => {

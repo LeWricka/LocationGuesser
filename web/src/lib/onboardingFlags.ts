@@ -40,6 +40,13 @@
 //    dentro del propio viaje) le tomó el relevo para quien de verdad va a crear
 //    uno—; el slideshow queda solo reabrible a mano con "Ver tutorial" (repaso
 //    rápido para quien lo pida antes de decidirse).
+//  - bienvenida-nuevo: primera entrada del usuario CON CUENTA y SIN viajes a su
+//    home vacía (issue #905). Un único marco "Esto es Momentu" que, al pulsar
+//    "Ver cómo funciona", lo lleva al recorrido REAL del viaje de ejemplo
+//    (`#g=ejemplo&tour=1&nuevo=1`), cuyo cierre remata con "Ahora crea el tuyo".
+//    Se marca visto al lanzarlo o al saltarlo (no se repite en la siguiente
+//    visita). Distinto de `entry` (que hoy es solo repaso manual desde "Ver
+//    tutorial"): este SÍ se auto-muestra, pero una sola vez.
 //  - creador: onboarding del CREADOR — aprender-haciendo (onboarding nuevo,
 //    pieza 3/4): quien acaba de crear un viaje y cae en su Diario vacío se guía
 //    de UNA acción cada vez (intro de una pantalla → coach-mark sobre el "+" real
@@ -71,6 +78,7 @@
 //    repaso manual desde "Ver tutorial".
 export type OnboardingContext =
   | 'entry'
+  | 'bienvenida-nuevo'
   | 'group'
   | 'challenge'
   | 'welcome'

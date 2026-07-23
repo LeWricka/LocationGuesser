@@ -16,8 +16,16 @@ vi.mock('./useTripData', () => ({ useTripData: vi.fn() }))
 // los coach-marks del `GuidedTour` tengan objetivo medible en jsdom (si el ref
 // queda sin nodo, `CoachMark` no pinta y el tour no avanzaría en el test).
 vi.mock('./TripDiario', () => ({
-  TripDiario: ({ mapRef }: { mapRef?: RefObject<HTMLDivElement | null> }) => (
-    <div data-testid="diario" ref={mapRef} />
+  TripDiario: ({
+    mapRef,
+    firstMomentRef,
+  }: {
+    mapRef?: RefObject<HTMLDivElement | null>
+    firstMomentRef?: RefObject<HTMLDivElement | null>
+  }) => (
+    <div data-testid="diario" ref={mapRef}>
+      <div data-testid="diario-first-moment" ref={firstMomentRef} />
+    </div>
   ),
 }))
 vi.mock('./BitacoraTab', () => ({
@@ -28,8 +36,20 @@ vi.mock('./BitacoraTab', () => ({
   ),
 }))
 vi.mock('./MarcadorTab', () => ({
-  MarcadorTab: ({ podioRef }: { podioRef?: RefObject<HTMLOListElement | null> }) => (
-    <ol data-testid="marcador" ref={podioRef} />
+  MarcadorTab: ({
+    podioRef,
+    caminoWrapRef,
+    firstHitoRef,
+  }: {
+    podioRef?: RefObject<HTMLOListElement | null>
+    caminoWrapRef?: RefObject<HTMLDivElement | null>
+    firstHitoRef?: RefObject<HTMLLIElement | null>
+  }) => (
+    <div ref={caminoWrapRef}>
+      <ol data-testid="marcador" ref={podioRef}>
+        <li data-testid="marcador-first-hito" ref={firstHitoRef} />
+      </ol>
+    </div>
   ),
 }))
 // Solo se sustituye AccountUpgradeModal (el resto del barril —p.ej.
@@ -420,6 +440,60 @@ describe('TripPage — tour del reto compartido (#891)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Saltar' }))
     expect(screen.queryByText('No pierdas tus retos')).not.toBeInTheDocument()
     expect(window.location.hash).toBe('#g=g1&c=cRETO')
+  })
+})
+
+// Guía CONDUCIDA del viaje de EJEMPLO (onboarding nuevo, pieza 4/4): el cierre
+// cambia según el ORIGEN. Desde la bienvenida del usuario nuevo (`&nuevo=1`,
+// issue #905) remata con "Ahora crea el tuyo" → Crear viaje; desde el perfil
+// ("Ver un viaje de ejemplo", sin `nuevo`) el cierre neutro de siempre.
+describe('TripPage — cierre de la guía del ejemplo según origen (#905)', () => {
+  function renderExampleTour(hash: string) {
+    window.location.hash = hash
+    render(
+      <SessionContext.Provider value={session}>
+        <ToastProvider>
+          <TripPage
+            groupId="ejemplo"
+            onPlayChallenge={vi.fn()}
+            onAddMoment={vi.fn()}
+            onAddChallenge={vi.fn()}
+            onBack={vi.fn()}
+          />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+  }
+
+  // Recorre los 6 pasos del tour del ejemplo hasta la pantalla de cierre: 5
+  // "Siguiente" (pasos 1→6) + "Ver cierre" en el último.
+  async function advanceToClosing() {
+    for (let i = 0; i < 5; i++) {
+      await userEvent.click(await screen.findByRole('button', { name: 'Siguiente' }))
+    }
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver cierre' }))
+  }
+
+  test('desde la bienvenida del usuario nuevo (nuevo=1): cierre "Ahora crea el tuyo" → Crear viaje', async () => {
+    mockTripData()
+    renderExampleTour('#g=ejemplo&tour=1&nuevo=1')
+    // El tour arranca en el Diario del ejemplo.
+    await screen.findByText('Cada parada, en su sitio')
+    await advanceToClosing()
+    expect(await screen.findByText('Ahora crea el tuyo')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Crear viaje' }))
+    expect(window.location.hash).toBe('#nuevo')
+  })
+
+  test('desde el perfil (sin nuevo): cierre neutro, NO navega a Crear viaje', async () => {
+    mockTripData()
+    renderExampleTour('#g=ejemplo&tour=1')
+    await screen.findByText('Cada parada, en su sitio')
+    await advanceToClosing()
+    expect(await screen.findByText('Ya conoces el viaje')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Entendido' }))
+    // El cierre del perfil solo cierra: no salta a Crear viaje.
+    expect(window.location.hash).not.toBe('#nuevo')
   })
 })
 

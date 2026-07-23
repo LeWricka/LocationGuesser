@@ -42,10 +42,11 @@ export const ME: Profile = {
   display_name: 'Lewis',
   avatar_url: null,
   created_at: isoFromNow(-30 * DAY),
-  // Tutorial de entrada YA visto (issue #742): así los casos de home (vacía y con
-  // datos) se capturan limpios, sin el overlay del tutorial encima. El tutorial
-  // tiene su propio caso de galería (`onboarding-entrada`).
-  onboarding: { entry: isoFromNow(-DAY) },
+  // Tutorial de entrada (issue #742) Y bienvenida del usuario nuevo (issue #905)
+  // YA vistos: así los casos de home (vacía y con datos) se capturan limpios, sin
+  // ninguno de los dos overlays encima. Cada uno tiene su propio caso de galería
+  // (`onboarding-entrada` / `onboarding-nuevo-bienvenida`).
+  onboarding: { entry: isoFromNow(-DAY), 'bienvenida-nuevo': isoFromNow(-DAY) },
 }
 
 interface GalleryMember {
