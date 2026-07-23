@@ -97,7 +97,13 @@ export function useCreadorOnboarding(
     if (!active || guideSkipped) return null
     if (!introSeen) return 'intro'
     if (momentsCount === 0) return 'coach'
-    if (!suggestSeen) return 'suggest'
+    // Sugerir crear un reto SOLO si aún no hay ninguno (issue #908): si el
+    // usuario ya creó un reto —por el botón "Crear un reto" O por el menú del
+    // "+" (que llama onAddChallenge, no dismissSuggest)— `hasChallenge` pasa a
+    // true y la sugerencia deja de tener sentido. Sin el `&& !hasChallenge`,
+    // crear el reto por el menú del "+" no marcaba `suggestSeen` y el mismo
+    // coach 'suggest' reaparecía en bucle.
+    if (!suggestSeen && !hasChallenge) return 'suggest'
     // Sin reto todavía: la sugerencia ya se resolvió (aceptada o no) y no hay
     // nada más que avisar hasta que exista un reto real que compartir.
     if (!hasChallenge) return null

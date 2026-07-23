@@ -56,6 +56,14 @@ export interface CoachMarkProps {
    * intacto (creador, FAB "+").
    */
   blocking?: boolean
+  /**
+   * Oculta el botón "Saltar" secundario cuando hay `primaryAction` (issue #908):
+   * para un paso TERMINAL (el remate del creador) que solo necesita UN botón
+   * claro DENTRO de la burbuja ("Entendido"), no un "Saltar" extra ni el cierre
+   * flotante arriba-derecha (que el usuario no asociaba al aviso → "no me deja
+   * salir").
+   */
+  hideSkip?: boolean
 }
 
 // Re-medición barata: el objetivo típico (un FAB `position: fixed`) no se
@@ -91,6 +99,7 @@ export function CoachMark({
   ariaLabel,
   onDismiss,
   blocking = false,
+  hideSkip = false,
 }: CoachMarkProps) {
   const reducedMotion = useReducedMotion()
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -187,9 +196,11 @@ export function CoachMark({
             3/4) se queda flotando arriba-derecha, fuera de la burbuja (`.dismiss`). */}
         {primaryAction && (
           <div className={styles.actions}>
-            <button type="button" className={styles.dismissInline} onClick={onDismiss}>
-              {dismissLabel}
-            </button>
+            {!hideSkip && (
+              <button type="button" className={styles.dismissInline} onClick={onDismiss}>
+                {dismissLabel}
+              </button>
+            )}
             <button type="button" className={styles.primary} onClick={primaryAction.onClick}>
               {primaryAction.label}
             </button>
