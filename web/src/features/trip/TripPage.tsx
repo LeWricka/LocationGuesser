@@ -1329,7 +1329,13 @@ export function TripPage({
           si ya hay un reto) — ver useCreadorOnboarding. */}
       {creador.stage === 'intro' && <CreadorIntroFrame onStart={creador.dismissIntro} />}
 
-      {creador.stage === 'coach' && (
+      {/* Issue #904: el scrim del coach vive a z-index 1100 con el hueco SOLO
+          sobre el "+" (56×56) — el menú Momento/Reto que el propio "+" abre
+          queda por debajo (--z-sticky=100) y tapado, así que "Momento" no se
+          podía tocar y el flujo se atascaba. Ocultamos el coach mientras
+          `fabOpen` para dejar el menú nítido; al cerrarlo sin elegir nada
+          vuelve a aparecer (comportamiento correcto, nada que "saltarse"). */}
+      {creador.stage === 'coach' && !fabOpen && (
         <CoachMark
           targetRef={fabButtonRef}
           step="Empieza aquí"
