@@ -69,6 +69,16 @@ interface UnreadableTile {
 }
 
 /**
+ * Tope de fotos por recuerdo (issue #911): sin límite, una galería con
+ * decenas/cientos de fotos (selección múltiple del móvil, sin querer) infla el
+ * bucket y ralentiza la tira de miniaturas sin aportar valor — 20 cubre de
+ * sobra un día de viaje normal. Es un tope de UX (avisa y recorta el exceso),
+ * no de Storage: la defensa dura de tamaño/tipo por archivo vive en los
+ * buckets (migración 0043).
+ */
+export const MAX_PHOTOS = 20
+
+/**
  * Selector de GALERÍA para un RECUERDO en el flujo de crear: varias fotos del
  * móvil, con miniaturas y una PORTADA (la primera). El dueño puede marcar otra
  * como portada o quitarla antes de guardar. La subida (comprimir + estripar EXIF)
@@ -98,7 +108,29 @@ export function MomentGalleryPicker({
   const [processingVideo, setProcessingVideo] = useState(false)
   const toast = useToast()
 
-  async function handleImages(files: File[]) {
+  async function handleImages(rawFiles: File[]) {
+    // Tope de fotos (#911): recorta ANTES de leer nada — no tiene sentido
+    // copiar bytes de un archivo que luego se va a descartar. Si ya se llegó
+    // al tope, avisa y no procesa ninguna; si la selección se pasa, añade
+    // hasta completar el hueco y avisa de cuántas se ignoraron.
+    const remaining = MAX_PHOTOS - photos.length
+    if (remaining <= 0) {
+      toast.show(
+        `Ya tienes el máximo de ${MAX_PHOTOS} fotos en este recuerdo. Quita alguna para añadir otra.`,
+        {
+          tone: 'danger',
+        },
+      )
+      return
+    }
+    const files = rawFiles.length > remaining ? rawFiles.slice(0, remaining) : rawFiles
+    if (rawFiles.length > remaining) {
+      toast.show(
+        `Máximo ${MAX_PHOTOS} fotos por recuerdo: se añaden ${remaining} y se ignoran ${rawFiles.length - remaining}.`,
+        { tone: 'neutral' },
+      )
+    }
+
     setReading({ done: 0, total: files.length })
     const copies: File[] = []
     const failedNames: string[] = []
