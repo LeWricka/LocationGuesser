@@ -43,10 +43,12 @@ import { isAdminEmail } from './lib/admin'
 import {
   AccountUpgradeModal,
   Landing,
+  LoginFlow,
   ProfileGate,
   useDeepLinkJoin,
   needsProfileStep,
 } from './features/auth'
+import { EXAMPLE_TRIP_GROUP_ID } from './lib/exampleTrip'
 import { ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { useSession } from './lib/session-context'
@@ -173,6 +175,14 @@ function AppRoutes() {
   // el receptor ve/juega sin dar ningún dato. Sin deep link (home a secas) cae
   // directo a la landing pública de siempre.
   if (!user) {
+    // Viaje de EJEMPLO abierto SIN sesión (issue #916, "Ver un ejemplo" de la
+    // landing): NO pasa por `AnonReceptorGate` (no queremos crearle una sesión
+    // anónima ni chocar con "este viaje ya no existe" — el ejemplo es un fixture
+    // en cliente, no una fila real). Se sirve el mismo viaje curado que ve un
+    // logueado, pero sin sesión y con el cierre de la guía invitando a registrar.
+    if (route.group === EXAMPLE_TRIP_GROUP_ID) {
+      return <ExampleTripPublic route={route} />
+    }
     if (route.group) {
       return <AnonReceptorGate route={route} />
     }
@@ -221,6 +231,48 @@ function AnonReceptorGate({ route }: { route: ReturnType<typeof parseHash> }) {
 
   if (failed) return <LoggedOut route={route} />
   return route.challenge ? <PlayRouteSkeleton /> : <TripRouteSkeleton />
+}
+
+// Viaje de EJEMPLO servido a un VISITANTE SIN sesión (issue #916, "Ver un
+// ejemplo" de la landing). El ejemplo es un fixture 100% en cliente
+// (`lib/exampleTrip.ts`, interceptado por `useTripData`), así que se pinta el
+// MISMO TripPage que ve un logueado —solo lectura, con su guía conducida— sin
+// tocar red ni pedir sesión. Cuando el visitante quiere pasar a la acción
+// (terminar el recorrido, o tocar crear/jugar/adivinar), no hay nada real que
+// hacer sin cuenta: abrimos el flujo de registro (`LoginFlow`, email → OTP), que
+// es justo la conversión que persigue la landing. "Atrás" (o volver del auth)
+// devuelve a la landing pública limpiando el hash.
+function ExampleTripPublic({ route }: { route: ReturnType<typeof parseHash> }) {
+  const [registering, setRegistering] = useState(false)
+  const toLanding = () => {
+    window.location.hash = ''
+  }
+
+  if (registering) {
+    return <LoginFlow onBack={toLanding} />
+  }
+
+  const initialSection =
+    route.groupView === 'marcador' ? 'marcador' : route.groupView === 'fotos' ? 'fotos' : 'diario'
+
+  return (
+    <GoogleMapsProvider>
+      <Suspense fallback={<TripRouteSkeleton />}>
+        <TripPage
+          groupId={EXAMPLE_TRIP_GROUP_ID}
+          initialSection={initialSection}
+          // Sin sesión no se puede jugar/crear de verdad: cualquier intento de
+          // pasar a la acción es una oportunidad de registro, no un callejón.
+          onPlayChallenge={() => setRegistering(true)}
+          onAddMoment={() => setRegistering(true)}
+          onAddChallenge={() => setRegistering(true)}
+          onBack={toLanding}
+          // Cierre de la guía conducida del ejemplo → registrarse (ver TripPage).
+          onExampleRegister={() => setRegistering(true)}
+        />
+      </Suspense>
+    </GoogleMapsProvider>
+  )
 }
 
 // Spinner de arranque, mientras AuthProvider resuelve la sesión persistida.

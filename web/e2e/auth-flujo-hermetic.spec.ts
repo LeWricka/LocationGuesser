@@ -174,8 +174,9 @@ test.describe('flujo auth email-first (hermético, issue #506)', () => {
     await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
       timeout: 20_000,
     })
-    // CTA único email-first.
-    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).toBeVisible()
+    // CTA primario email-first (repetido en héroe y cierre de la narrativa: por
+    // eso `.first()`, no es un "split" de signup/login).
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' }).first()).toBeVisible()
     // Ya NO hay dos CTAs separados.
     await expect(page.getByRole('button', { name: 'Crear tu viaje' })).not.toBeVisible()
     await expect(page.getByRole('button', { name: 'Ya tengo cuenta · Entrar' })).not.toBeVisible()
@@ -187,16 +188,16 @@ test.describe('flujo auth email-first (hermético, issue #506)', () => {
     page,
   }) => {
     await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).toBeVisible({
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' }).first()).toBeVisible({
       timeout: 20_000,
     })
-    await page.getByRole('button', { name: 'Empieza a compartir' }).click()
+    await page.getByRole('button', { name: 'Empieza a compartir' }).first().click()
     // Muestra campo de correo, sin campo de nombre.
     await expect(page.getByRole('textbox', { name: 'Tu correo' })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Tu nombre' })).not.toBeVisible()
     // Botón "Atrás" devuelve a la landing.
     await page.getByRole('button', { name: 'Atrás' }).click()
-    await expect(page.getByRole('button', { name: 'Empieza a compartir' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Empieza a compartir' }).first()).toBeVisible()
   })
 
   // ── Escenario b: email existente → código → home sin paso nombre ────────────
@@ -212,7 +213,7 @@ test.describe('flujo auth email-first (hermético, issue #506)', () => {
       timeout: 20_000,
     })
     // No debe mostrar ProfileGate (campo de nombre para jugar).
-    await expect(page.getByLabelText(/¿Con qué nombre juegas\?/i)).not.toBeVisible()
+    await expect(page.getByLabel(/¿Con qué nombre juegas\?/i)).not.toBeVisible()
     // No debe mostrar la pantalla de email (ya está logueado).
     await expect(page.getByRole('textbox', { name: 'Tu correo' })).not.toBeVisible()
   })
@@ -266,19 +267,28 @@ test.describe('flujo auth email-first (hermético, issue #506)', () => {
 
   // ── Escenario e: enlace compartido → ver/jugar sin cuenta ───────────────────
 
-  test('(e) enlace compartido → la landing se adapta SIN requerir sesión', async ({ page }) => {
-    // Sin sesión: simula un visitante que recibe un enlace de grupo.
-    // La landing muestra el copy de invitación si hay nombre de grupo.
-    // En el test hermético no mockeamos getGroup (sin sesión), así que el copy
-    // cae al genérico. Solo verificamos que NO se bloquea con un "login requerido".
+  test('(e) enlace compartido SIN sesión → entrada con gracia, sin muro de login', async ({
+    page,
+  }) => {
+    // Sin sesión: simula un visitante que recibe un enlace de grupo. Tras el
+    // issue #758, un deep link sin sesión ya NO cae directo a la landing: primero
+    // se intenta una sesión ANÓNIMA (`AnonReceptorGate`) para ver/jugar sin dar
+    // datos. Según el entorno hay DOS desenlaces legítimos, y este test acepta
+    // ambos con tal de que la entrada sea con GRACIA (nunca un muro de login ni
+    // una pantalla en blanco):
+    //   - anónimo HABILITADO (backend real): se crea sesión y el auto-join a un
+    //     grupo INEXISTENTE (id de prueba) falla con gracia → JoinErrorScreen
+    //     ("Este viaje ya no existe" + "Ir al inicio").
+    //   - anónimo DESHABILITADO: degradación a la landing pública ("Empieza a
+    //     compartir").
     await page.goto(`/#g=${FAKE_GROUP_ID}`)
 
-    // La landing pública debe mostrarse (sin muro de login forzado).
-    // Esperamos al spinner o la landing; en hermético sin BD muestra la landing genérica.
-    await expect(page.getByRole('button', { name: 'Empieza a compartir' }).first()).toBeVisible({
-      timeout: 20_000,
-    })
-    // No debe mostrar un muro bloqueante.
+    // Cualquiera de las dos salidas con gracia es válida.
+    const landingCta = page.getByRole('button', { name: 'Empieza a compartir' }).first()
+    const joinRecovery = page.getByRole('button', { name: 'Ir al inicio' })
+    await expect(landingCta.or(joinRecovery)).toBeVisible({ timeout: 20_000 })
+
+    // Nunca un muro bloqueante de "login requerido".
     await expect(page.getByText(/debes iniciar sesión/i)).not.toBeVisible()
     await expect(page.getByText(/necesitas cuenta/i)).not.toBeVisible()
   })

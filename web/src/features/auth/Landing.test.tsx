@@ -55,9 +55,14 @@ describe('Landing (email-first, issue #506)', () => {
     expect(screen.getByText('Reta a tus amigos')).toBeInTheDocument()
     expect(screen.getByText('Clasificación y premios')).toBeInTheDocument()
     expect(screen.getByAltText(/Pantalla de jugar un reto/i)).toBeInTheDocument()
-    // CTA único: "Empieza a compartir" (en el hero y al cierre de la narrativa). SIN
-    // dos CTAs separados de signup/login.
+    // Para-quién + gancho del juego en el héroe (issue #916).
+    expect(screen.getByText('Para tu grupo de viaje')).toBeInTheDocument()
+    expect(screen.getByText(/adivinar dónde es cada una/i)).toBeInTheDocument()
+    // CTA primario "Empieza a compartir" (en el hero y al cierre de la narrativa) +
+    // CTA secundario "Ver un ejemplo" en el hero (issue #916). SIN dos CTAs separados
+    // de signup/login.
     expect(screen.getAllByRole('button', { name: 'Empieza a compartir' })).toHaveLength(2)
+    expect(screen.getByRole('button', { name: 'Ver un ejemplo' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Crear tu viaje' })).not.toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: 'Ya tengo cuenta · Entrar' }),
@@ -68,6 +73,16 @@ describe('Landing (email-first, issue #506)', () => {
     expect(screen.queryByRole('button', { name: /Tengo un código/i })).not.toBeInTheDocument()
     // La nota de enlace está visible.
     expect(screen.getByText(/Te han pasado un enlace/i)).toBeInTheDocument()
+  })
+
+  test('"Ver un ejemplo" navega al viaje de ejemplo con guía y origen landing', async () => {
+    renderLanding()
+    await userEvent.click(screen.getByTestId('see-example'))
+    // Enruta por hash (App lo intercepta sin sesión): #g=ejemplo&tour=1&from=landing.
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    expect(params.get('g')).toBe('ejemplo')
+    expect(params.get('tour')).toBe('1')
+    expect(params.get('from')).toBe('landing')
   })
 
   test('"Empieza a compartir" abre el flujo de email (LoginFlow)', async () => {
@@ -124,6 +139,8 @@ describe('Landing (email-first, issue #506)', () => {
     ).toBeInTheDocument()
     // CTA de unirse (en vez del genérico).
     expect(screen.getByRole('button', { name: 'Únete al viaje' })).toBeInTheDocument()
+    // Sin "Ver un ejemplo" en el flujo de invitación: ya vienen a un viaje real.
+    expect(screen.queryByRole('button', { name: 'Ver un ejemplo' })).not.toBeInTheDocument()
     // Sin CTAs del modelo antiguo.
     expect(screen.queryByRole('button', { name: /Tengo un código/i })).not.toBeInTheDocument()
     // Sin nota de enlace en el flujo de invitación (ya vienen al viaje).

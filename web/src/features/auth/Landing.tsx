@@ -20,8 +20,17 @@
 // Ver `LandingShowcase`/`landingShowcaseData.ts` para el contenido de cada parte.
 //
 // La política es passwordless puro: sin contraseñas (cuentas-y-home.md §1.2).
-// MODELO EMAIL-FIRST (issue #506): un único CTA lleva a LoginFlow (email → código OTP).
-// Nuevo y recurrente usan el mismo flujo: Supabase detecta si existe la cuenta.
+// MODELO EMAIL-FIRST (issue #506): el CTA primario lleva a LoginFlow (email →
+// código OTP). Nuevo y recurrente usan el mismo flujo: Supabase detecta si existe
+// la cuenta.
+//
+// ENGANCHE DEL VISITANTE NUEVO (issue #916): el héroe deja claro QUÉ es Momentu y
+// PARA QUIÉN (grupos de viaje/amigos) y sube el gancho del juego (adivinar en el
+// mapa dónde es cada foto) al subtítulo, sin tocar la frase ancla de marca. Junto
+// al CTA primario, un CTA secundario "Ver un ejemplo" mete al visitante en el viaje
+// de EJEMPLO con recorrido guiado SIN registrarse (lo enruta App vía el hash
+// `#g=ejemplo&tour=1&from=landing`, ver `ExampleTripPublic`); al terminar el
+// recorrido, el cierre invita a registrarse.
 //
 // Reutiliza:
 //  - `ui/HomeGlobe` (el mismo motor que la home logueada) como protagonista del héroe,
@@ -36,6 +45,7 @@ import { HOME_DEMO_PINS } from '../home/homeDemoPins'
 import { LandingShowcase } from './LandingShowcase'
 import { LANDING_MAP_CREDIT } from './landingShowcaseData'
 import { LoginFlow } from './LoginFlow'
+import { exampleTripHash } from '../../lib/route'
 import styles from './Landing.module.css'
 
 interface Props {
@@ -56,6 +66,14 @@ export function Landing({ groupName, redirectTo }: Props) {
   const [showAuth, setShowAuth] = useState(false)
 
   const joining = Boolean(groupName)
+
+  // "Ver un ejemplo" (issue #916): navega al viaje de EJEMPLO con la guía conducida
+  // marcada como origen "landing". App lo intercepta (`ExampleTripPublic`) y lo sirve
+  // SIN sesión; el cierre de la guía invita a registrarse. No hace falta `showAuth`:
+  // el cambio de hash lo enruta App, no este componente.
+  const goToExample = () => {
+    window.location.hash = exampleTripHash(true, false, true)
+  }
 
   // LoginFlow: email → código OTP → sesión. Mismo flujo para nuevo y recurrente.
   if (showAuth) {
@@ -116,21 +134,46 @@ export function Landing({ groupName, redirectTo }: Props) {
             </>
           ) : (
             <>
+              {/* Para-quién arriba del todo (issue #916): que en el primer vistazo
+                  quede claro que Momentu es para un GRUPO (de viaje, de amigos), no
+                  una app en solitario. */}
+              <p className={[styles.eyebrow, 't-label'].join(' ')}>Para tu grupo de viaje</p>
+              {/* Frase ancla de marca, intacta (CLAUDE.md): el gancho es "compartir
+                  distinto"; la mecánica de adivinar baja al subtítulo. */}
               <h1 className={[styles.headline, 't-hero'].join(' ')}>
                 Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
               </h1>
+              {/* Valor + gancho del juego SUBIDO al héroe (issue #916): qué es (un
+                  diario de viaje) y el gancho (adivinar en el mapa dónde es cada
+                  foto), sin esperar al cierre de la narrativa. */}
               <p className={styles.lead}>
-                Guarda tus viajes para siempre y compártelos con tu gente.
+                Un diario de viaje que guardáis juntos en el mapa. Subid vuestras fotos y jugad a
+                adivinar dónde es cada una: gana quien más se acerca.
               </p>
             </>
           )}
 
           <Stack gap={2} className={styles.actions}>
-            {/* CTA único: email-first (nuevo y recurrente, mismo flujo). Variante
+            {/* CTA primario: email-first (nuevo y recurrente, mismo flujo). Variante
                 `primary` = teal sólido (token `--color-accent`, ver Button.module.css). */}
             <Button size="lg" fullWidth onClick={() => setShowAuth(true)} data-testid="open-auth">
               {joining ? 'Únete al viaje' : 'Empieza a compartir'}
             </Button>
+            {/* CTA secundario (issue #916): mete al visitante en el viaje de EJEMPLO
+                (`#g=ejemplo&tour=1&from=landing`) SIN registrarse — recorrido guiado,
+                solo lectura, 100% en cliente (ver App `ExampleTripPublic`). Solo en la
+                landing genérica: en el flujo de invitación ya vienen a un viaje real. */}
+            {!joining && (
+              <Button
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onClick={goToExample}
+                data-testid="see-example"
+              >
+                Ver un ejemplo
+              </Button>
+            )}
           </Stack>
 
           {/* Nota de ayuda: los viajes van por enlace, no por código manual. */}
