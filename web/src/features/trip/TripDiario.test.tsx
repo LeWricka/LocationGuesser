@@ -44,7 +44,6 @@ function renderDiario(props: Partial<Parameters<typeof TripDiario>[0]> = {}) {
   const onExpand = vi.fn()
   const { container } = render(
     <TripDiario
-      groupId="g1"
       moments={MOMENTS}
       route={[]}
       selectedId="a"
@@ -119,7 +118,6 @@ describe('TripDiario — fusión momento↔reto (issue #839)', () => {
     const onExpand = vi.fn()
     const { container } = render(
       <TripDiario
-        groupId="g1"
         moments={[memory, challenge]}
         route={[]}
         selectedId="recuerdo-1"
@@ -184,7 +182,6 @@ describe('TripDiario — fusión momento↔reto (issue #839)', () => {
     })
     const { container } = render(
       <TripDiario
-        groupId="g1"
         moments={[memory, surpriseChallenge]}
         route={[]}
         selectedId={null}
@@ -218,7 +215,6 @@ describe('TripDiario — fusión momento↔reto (issue #839)', () => {
     })
     const { container } = render(
       <TripDiario
-        groupId="g1"
         moments={[soloReto]}
         route={[]}
         selectedId="reto-suelto"

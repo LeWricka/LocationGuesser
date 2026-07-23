@@ -176,44 +176,17 @@ describe('HomeDashboard (escena única inmersiva, issue #568)', () => {
     expect(lastCall.activeTargetId).toBeNull()
   })
 
-  // Transición héroe home→diario (issue #589): view-transition-name compartido con
-  // TripDiario. Debe ser ÚNICO en pantalla, así que solo la tarjeta TOCADA lo lleva.
-  describe('transición héroe (issue #589)', () => {
-    // La foto/placeholder héroe vive dentro de la tarjeta (`li[data-gid]`), como
-    // `.cover` (con portada) o `.placeholder` (sin portada, caso de estas fixtures).
-    const heroNameOf = (container: HTMLElement, groupId: string) =>
-      container.querySelector<HTMLElement>(
-        `[data-gid="${groupId}"] span[class*="cover"], [data-gid="${groupId}"] span[class*="placeholder"]`,
-      )?.style.viewTransitionName
+  // Navegación al tocar una tarjeta (issue #914, antes cubierto por el bloque de
+  // "transición héroe" #589, ya retirado): tocar una tarjeta abre su viaje.
+  test('al tocar una tarjeta, abre su viaje', async () => {
+    const onOpenGroup = vi.fn()
+    render(
+      <HomeDashboard userId="u1" displayName="Lewis" groups={groups} onOpenGroup={onOpenGroup} />,
+    )
 
-    test('al tocar una tarjeta, solo ella reclama el nombre compartido', async () => {
-      const onOpenGroup = vi.fn()
-      const { container } = render(
-        <HomeDashboard userId="u1" displayName="Lewis" groups={groups} onOpenGroup={onOpenGroup} />,
-      )
+    await userEvent.click(screen.getByRole('button', { name: 'Abrir viaje Finde Lisboa' }))
 
-      await userEvent.click(screen.getByRole('button', { name: 'Abrir viaje Finde Lisboa' }))
-
-      expect(heroNameOf(container, 'b')).toBe('trip-hero-b')
-      // Las NO tocadas se quedan sin nombre (única en pantalla).
-      expect(heroNameOf(container, 'a')).toBeFalsy()
-      expect(heroNameOf(container, 'c')).toBeFalsy()
-    })
-
-    test('al volver del diario, la tarjeta de ese viaje reclama el nombre al montar', () => {
-      // Simula la "vuelta": HomeDashboard.tsx guardó este id en sessionStorage al
-      // salir hacia el viaje 'c'; ahora la Home se remonta de cero.
-      sessionStorage.setItem('lg-hero-trip-id', 'c')
-
-      const { container } = render(
-        <HomeDashboard userId="u1" displayName="Lewis" groups={groups} />,
-      )
-
-      expect(heroNameOf(container, 'c')).toBe('trip-hero-c')
-      expect(heroNameOf(container, 'a')).toBeFalsy()
-      // Consumo único: no debe quedar pendiente para una vuelta futura sin relación.
-      expect(sessionStorage.getItem('lg-hero-trip-id')).toBeNull()
-    })
+    expect(onOpenGroup).toHaveBeenCalledWith('b')
   })
 
   // Filtro Míos/De amigos sobre el carrusel (issue #609). `groups` ya trae mezcla

@@ -1343,7 +1343,6 @@ export const cases: GalleryCase[] = [
           }
         />
         <TripDiario
-          groupId="showcase-viaje"
           moments={SHOWCASE_MOMENTS}
           route={SHOWCASE_ROUTE}
           selectedId={SHOWCASE_SELECTED_MOMENT}

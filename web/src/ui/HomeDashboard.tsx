@@ -21,23 +21,6 @@ import { normalizePlaceName, resolvePlaceCover } from '../lib/placeCover'
 import styles from './HomeDashboard.module.css'
 
 /*
- * Transición héroe home↔diario (issue #589): la foto de la tarjeta TOCADA crece
- * hasta ser el mapa-héroe del Diario (TripDiario aplica el mismo nombre a su
- * capa de mapa, ver ese fichero); al volver, se contrae de vuelta. El nombre
- * debe ser ÚNICO en pantalla, así que NUNCA se pone de forma estática en el JSX
- * de todas las tarjetas — solo se asigna, de forma imperativa, sobre la tarjeta
- * que se toca (ver TripCard más abajo).
- *
- * La "vuelta" es el caso difícil: App.tsx desmonta la Home entera al navegar a
- * un viaje (router por hash) y la vuelve a montar de cero al volver, así que un
- * simple useState no sobrevive ese viaje de ida y vuelta. sessionStorage sí:
- * guardamos solo el id del viaje tocado y lo consumimos (leer + borrar) una
- * única vez al montar, para reclamar el nombre en la tarjeta correcta antes de
- * que la View Transition capture el estado "new" de esta pantalla.
- */
-const HERO_TRIP_KEY = 'lg-hero-trip-id'
-
-/*
  * Filtro Míos/De amigos (issue #609): sessionStorage para "recordar" la elección
  * dentro de la sesión (mismo patrón que el puente de la transición héroe de
  * arriba) — un login nuevo no debe arrastrar el filtro de otra persona/sesión.
@@ -76,10 +59,6 @@ function matchesFilter(group: HomeGroup, filter: TripFilter): boolean {
   return true
 }
 
-function heroTransitionName(groupId: string): string {
-  return `trip-hero-${groupId}`
-}
-
 /**
  * Centra el carrusel sobre la tarjeta `id` (issue #632): recorre las `[data-gid]`
  * (mismo patrón que el scroll-sync de abajo) y fija `scrollLeft` para que el
@@ -93,27 +72,6 @@ function centerCarouselOn(container: HTMLElement, id: string): void {
       container.scrollLeft = slide.offsetLeft + slide.offsetWidth / 2 - container.clientWidth / 2
       return
     }
-  }
-}
-
-/** Lee y BORRA el id pendiente (consumo único): una vuelta futura sin relación
- * con este viaje no debe reclamar el nombre por error. */
-function takeHeroReturnId(): string | null {
-  try {
-    const id = sessionStorage.getItem(HERO_TRIP_KEY)
-    if (id) sessionStorage.removeItem(HERO_TRIP_KEY)
-    return id
-  } catch {
-    return null // Storage no disponible (privado/bloqueado): sin restauración; no rompe nada.
-  }
-}
-
-function rememberHeroTrip(groupId: string): void {
-  try {
-    sessionStorage.setItem(HERO_TRIP_KEY, groupId)
-  } catch {
-    // Sin storage: la vuelta no reclamará el nombre, pero la ida (más abajo, en el
-    // propio click) sigue funcionando igual.
   }
 }
 
@@ -307,11 +265,6 @@ export function HomeDashboard({
     const nextFeed = feed.filter((g) => matchesFilter(g, next))
     setActiveId(nextFeed[0]?.id ?? NEW_TRIP_SENTINEL)
   }
-
-  // Transición héroe (issue #589), mitad de "vuelta": se consume UNA vez al montar
-  // (el initializer de useState solo corre en el mount, no en re-renders) para que
-  // la tarjeta del viaje del que venimos reclame el nombre compartido.
-  const [heroReturnId] = useState<string | null>(() => takeHeroReturnId())
 
   // Detección de la tarjeta activa "en reposo" al cargar (issue #632): con
   // `scrollLeft` en 0, la primera tarjeta queda pegada al padding izquierdo del
@@ -510,7 +463,6 @@ export function HomeDashboard({
                 <TripCard
                   group={group}
                   active={group.id === activeId}
-                  isReturningHero={group.id === heroReturnId}
                   onFocus={() => setActiveId(group.id)}
                   onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
                   onCoverError={onCoverError}
@@ -611,16 +563,12 @@ function PinnedChip({ pinned, onPlay }: { pinned: HomePinned; onPlay?: () => voi
 function TripCard({
   group,
   active,
-  isReturningHero,
   onClick,
   onFocus,
   onCoverError,
 }: {
   group: HomeGroup
   active: boolean
-  /** Venimos de este viaje (issue #589): reclama el nombre de la transición
-   * héroe en cuanto se monta, para que la foto se contraiga de vuelta sobre ella. */
-  isReturningHero?: boolean
   onClick?: () => void
   onFocus?: () => void
   /** Ver `Props.onCoverError` (issue #638). */
@@ -644,44 +592,13 @@ function TripCard({
   const coverState = useImagePreload(coverUrl, onCoverError)
   const coverLoaded = coverState === 'loaded'
 
-  // Elemento foto/placeholder que hace de héroe en la transición (issue #589). El
-  // nombre se gestiona SIEMPRE de forma imperativa (ref), nunca en el objeto
-  // `style` de React: así no compite con los re-renders (React solo reconcilia las
-  // propiedades que él mismo puso) y podemos asignarlo en el instante exacto que
-  // hace falta (ver los dos sitios de abajo).
-  const heroRef = useRef<HTMLSpanElement>(null)
-
-  useLayoutEffect(() => {
-    // Vuelta (issue #589): el diario YA lleva puesto este nombre en su mapa
-    // mientras existe (TripDiario, siempre activo), así que hace de "old" en el
-    // instante en que se navega de vuelta. Aquí reclamamos el "new": debe pasar en
-    // un layout effect (antes de pintar) para llegar a tiempo al snapshot que
-    // toma la View Transition ya en marcha (arrancada por App.tsx al cambiar el
-    // hash, ver ui/motion.ts).
-    if (isReturningHero && heroRef.current) {
-      heroRef.current.style.viewTransitionName = heroTransitionName(group.id)
-    }
-  }, [isReturningHero, group.id])
-
-  const handleActivate = () => {
-    if (!onClick) return
-    // Ida (issue #589): el nombre debe ser ÚNICO en pantalla, así que solo la
-    // tarjeta TOCADA lo lleva — se asigna aquí, antes de navegar, porque el
-    // hashchange (y con él el startViewTransition de App.tsx) llega en una tarea
-    // aparte: para cuando el navegador tome el snapshot "old", este nodo ya debe
-    // tener el nombre puesto.
-    rememberHeroTrip(group.id)
-    if (heroRef.current) heroRef.current.style.viewTransitionName = heroTransitionName(group.id)
-    onClick()
-  }
-
   return (
     <button
       type="button"
       className={['lg-press', styles.card].join(' ')}
       data-active={active}
       data-owned={group.owned ? 'true' : undefined}
-      onClick={handleActivate}
+      onClick={onClick}
       onFocus={onFocus}
       disabled={!isButton}
       aria-label={`Abrir viaje ${group.name}`}
@@ -692,10 +609,8 @@ function TripCard({
         // reservar sitio y una prueba puede leer la URL desde el primer render);
         // solo la OPACIDAD se retiene hasta que el bitmap decodifica. Mientras
         // tanto se ve el relleno propio de `.card` (`--accent-deep`), no un hueco
-        // en blanco. `heroRef` sigue en este nodo: es el que lleva el nombre de la
-        // View Transition (issue #589).
+        // en blanco.
         <span
-          ref={heroRef}
           className={[styles.cover, coverLoaded ? 'lg-photo-in' : styles.coverHidden].join(' ')}
           style={{ backgroundImage: `url('${coverUrl}')` }}
           aria-hidden="true"
@@ -703,7 +618,7 @@ function TripCard({
       ) : (
         // Sin portada todavía: fondo discreto de "mapa nocturno" (gradiente grafito/teal
         // con tokens de escena) más un pin a tamaño moderado y baja opacidad.
-        <span ref={heroRef} className={styles.placeholder} aria-hidden="true">
+        <span className={styles.placeholder} aria-hidden="true">
           <IconPin size={32} className={styles.placeholderIcon} />
         </span>
       )}

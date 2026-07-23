@@ -12,20 +12,7 @@ import { MomentCard } from './MomentCard'
 import { MomentTimeline } from './MomentTimeline'
 import styles from './TripDiario.module.css'
 
-/**
- * Nombre de la transición héroe home↔diario (issue #589). Misma función que
- * `heroTransitionName` en `ui/HomeDashboard.tsx` — se duplica (en vez de
- * importarse) a propósito: `ui/` no debe depender de `features/`, y es una línea
- * pura sin estado que ambos lados deben mantener en sincronía por convención de
- * nombre, no por import.
- */
-function heroTransitionName(groupId: string): string {
-  return `trip-hero-${groupId}`
-}
-
 interface Props {
-  /** Id del viaje: nombra la transición héroe compartida con la Home (issue #589). */
-  groupId: string
   moments: Moment[]
   route: RoutePoint[]
   selectedId: string | null
@@ -67,7 +54,6 @@ interface Props {
  */
 export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
   {
-    groupId,
     moments,
     route,
     selectedId,
@@ -117,19 +103,15 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
     <div className={styles.diario}>
       {/* Mapa A SANGRE: llena toda la sección (el protagonista del diario). Los pines
           de momentos viven sobre él; el dock de abajo flota encima.
-          Transición héroe home→diario (issue #589): este mapa es el aterrizaje más
-          honesto para la foto de la tarjeta tocada en HomeDashboard — es el elemento
-          que YA hace de protagonista del Diario (mismo criterio de sistema que el
-          resto de la app), así que crecer hacia él no inventa un héroe-foto nuevo y
-          pesado que el viaje no tiene. Mismo `view-transition-name` que la tarjeta
-          (HomeDashboard.tsx), puesto SIEMPRE mientras el Diario está montado: hace
-          de "new" al llegar y de "old" al volver (la Home reclama el nombre de
-          vuelta vía sessionStorage, ver `heroReturnId` en HomeDashboard.tsx). */}
-      <div
-        className={styles.map}
-        style={{ viewTransitionName: heroTransitionName(groupId) }}
-        ref={mapRef}
-      >
+          NOTA (issue #914): este mapa YA NO lleva `view-transition-name`. Antes
+          (issue #589) compartía `trip-hero-<id>` con la tarjeta de la Home para
+          "crecer" desde ella al entrar. Ese héroe solo disparaba en revisitas
+          (en la 1ª visita el viaje pinta esqueleto, sin el elemento héroe) y, cuando
+          sí disparaba, el mapa a pantalla completa crecía POR ENCIMA del chrome (la
+          barra Diario·Bitácora·Marcador y la cabecera), tapándolo a media transición:
+          se veían las pestañas → una "malla" cubriéndolo todo → las pestañas otra vez.
+          Sin nombre héroe, la navegación Home→viaje es un único cross-fade coherente. */}
+      <div className={styles.map} ref={mapRef}>
         <TripMap
           route={route}
           selectedChallengeId={selectedId}
