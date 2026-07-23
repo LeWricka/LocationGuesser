@@ -243,6 +243,12 @@ export const CH_MEMORY = 'ch-memory-ramen'
 // debe dejar un hueco raro donde iría el cuerpo de artículo si el dueño aún no
 // ha escrito nada — solo kicker + título + su única foto.
 export const CH_MEMORY_QUIET = 'ch-memory-togetsukyo'
+// Recuerdo SIN foto NI ubicación (issue #910, caso de galería `viaje-bitacora`
+// — el caso REAL que reportó el dueño: un momento "Atardecer" sin foto se leía
+// como "bitácora vacía" porque el filtro solo pintaba momentos con foto).
+// Guarda visual permanente: debe aparecer con su propia tarjeta de solo texto
+// (`.momentTextOnly`), nunca un hueco.
+export const CH_MEMORY_SIN_FOTO = 'ch-memory-atardecer'
 // Reto de NÚMERO cerrado: ¿cuánto costó?
 export const CH_NUMBER = 'ch-number-shinkansen'
 // Reto EN JUEGO con foto SORPRESA (`photo_is_hint: false`): la pestaña
@@ -353,6 +359,18 @@ export const CHALLENGES: ChallengeRow[] = [
     deadline_at: null,
     created_by: 'user-marta-0001',
     created_at: isoFromNow(-4 * DAY + HOUR),
+  }),
+  // Recuerdo SIN foto ni ubicación (issue #910, ver la constante más arriba):
+  // sin `image_path`, sin `audio_path`/`video_path`, sin `place_lat`/`place_lng`
+  // — el caso más "desnudo" posible, solo título. Debe pintarse igual, con su
+  // tarjeta de solo texto, nunca desaparecer de la Bitácora.
+  baseChallenge({
+    id: CH_MEMORY_SIN_FOTO,
+    title: 'Atardecer',
+    is_challenge: false,
+    deadline_at: null,
+    created_by: ME_ID,
+    created_at: isoFromNow(-4 * DAY + 2 * HOUR),
   }),
   // Reto EN JUEGO con foto SORPRESA: `photo_is_hint: false` + `deadline_at`
   // futuro. La pestaña Fotos debe OCULTAR esta foto (issue #645) — no debe

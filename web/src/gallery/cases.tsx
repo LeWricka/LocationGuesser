@@ -480,6 +480,10 @@ export const cases: GalleryCase[] = [
     //    estado los distingue aun compartiendo imagen. La clasificación con
     //    votos ya sembrados también deja ver el cierre de la Bitácora (podio +
     //    "Ver marcador", issue #822).
+    //  - CH_MEMORY_SIN_FOTO ("Atardecer"): recuerdo SIN foto ni ubicación
+    //    (issue #910, el caso real reportado) — guarda visual permanente de que
+    //    la Bitácora lo sigue pintando, con su tarjeta de solo texto
+    //    (`.momentTextOnly`), nunca un hueco ni "bitácora vacía".
     id: 'viaje-bitacora',
     title: 'Viaje · Bitácora',
     section: 'Viaje',

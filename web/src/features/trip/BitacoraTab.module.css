@@ -79,6 +79,21 @@
   gap: var(--space-3);
 }
 
+/* Momento SIN foto ni vídeo (issue #910): el resto de la Bitácora ancla cada
+ * entrada con una foto a ancho completo — sin ninguna, el título/nota flotaría
+ * sin peso visual sobre la escena oscura y se leería como un hueco entre las
+ * fotos de alrededor. Mismos tokens de vidrio que `.retoStrip` (la MISMA
+ * superficie flotante que ya usa esta pantalla), aquí solo como fondo — no es
+ * tappable en sí, el título ya lo es. */
+.momentTextOnly {
+  padding: var(--space-4);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+}
+
 /* Chip de reto (issue #821): diana + estado ("EN JUEGO" / "Cerrado"), MISMO
  * `Badge` que `ChallengeDetail`/`MomentCard` — sin tratamiento propio de color
  * (sus tonos ya son legibles sobre cualquier fondo, mismo criterio que el chip
