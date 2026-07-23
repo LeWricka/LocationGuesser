@@ -169,7 +169,8 @@
 
 .lead {
   margin: var(--space-3) 0 0;
-  max-width: 38ch;
+  /* Sin `max-width` (feedback landing): que ocupe el ancho del contenido del héroe
+     como el titular, en vez de quedar en una columna estrecha de 38ch. */
   color: var(--scene-ink-soft);
   font-size: var(--font-size-md);
   line-height: var(--line-height-normal);
@@ -191,7 +192,9 @@
 /* ── Scroll continuo tras el héroe: MISMA escena oscura, sin salto a papel ──────── */
 .below {
   background: var(--scene-bg);
-  padding: var(--space-9) var(--space-4);
+  /* Menos aire ARRIBA (feedback landing): el hueco entre el hint del héroe y el
+     primer bloque del showcase era excesivo; abajo se mantiene generoso. */
+  padding: var(--space-5) var(--space-4) var(--space-9);
   overflow-x: hidden;
 }
 

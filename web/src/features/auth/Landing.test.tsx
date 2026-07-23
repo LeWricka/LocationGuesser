@@ -38,19 +38,19 @@ describe('Landing (email-first, issue #506)', () => {
     renderLanding()
     // El hero lleva la frase ancla.
     expect(
-      screen.getByRole('heading', { name: /Comparte tus momentos de una forma diferente/i }),
+      screen.getByRole('heading', { name: /Comparte tus viajes de una forma diferente/i }),
     ).toBeInTheDocument()
     // Narrativa en dos partes (issue #731, reorientación de la Parte 2 en #733):
-    // Parte 1 "Guarda el viaje" (la esencia) y Parte 2 "Y que tu gente sea parte"
+    // Parte 1 "Guarda el viaje" (la esencia) y Parte 2 "Y lo viven contigo"
     // (compartir; jugar es solo una forma), cada una con capturas reales.
     expect(
       screen.getByRole('heading', { name: 'Guarda el viaje mientras lo vives' }),
     ).toBeInTheDocument()
     expect(screen.getByText('Foto, clip o audio')).toBeInTheDocument()
-    expect(screen.getByText('Cada momento, en su sitio')).toBeInTheDocument()
-    expect(screen.getByText('Todo en el diario')).toBeInTheDocument()
+    expect(screen.getByText('Cada momento, en un lugar')).toBeInTheDocument()
+    expect(screen.getByText('Bitácora de viaje')).toBeInTheDocument()
     expect(screen.getByAltText(/Bitácora de un viaje bien llena/i)).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Y que tu gente sea parte' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Y lo viven contigo' })).toBeInTheDocument()
     expect(screen.getByText('Comparte el viaje')).toBeInTheDocument()
     expect(screen.getByText('Reta a tus amigos')).toBeInTheDocument()
     expect(screen.getByText('Clasificación y premios')).toBeInTheDocument()

@@ -79,7 +79,7 @@ test.describe('smoke', () => {
     //    Damos margen porque al arrancar AuthProvider resuelve la sesión persistida.
     // La frase ancla aparece dos veces (hero h1 + sección "cómo funciona"); basta
     // con que el hero sea visible, así que tomamos el primero.
-    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Comparte tus viajes/ }).first()).toBeVisible({
       timeout: 20_000,
     })
     // CTA ÚNICO email-first (#506): "Empieza a compartir". Ya no hay separación

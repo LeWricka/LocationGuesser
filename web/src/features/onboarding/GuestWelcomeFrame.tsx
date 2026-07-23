@@ -80,7 +80,7 @@ export function GuestWelcomeFrame({
           </span>
         </Button>
 
-        <p className={`t-body ${styles.remate}`}>Comparte tus momentos de una forma diferente.</p>
+        <p className={`t-body ${styles.remate}`}>Comparte tus viajes de una forma diferente.</p>
       </div>
     </div>
   )

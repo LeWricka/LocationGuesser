@@ -65,9 +65,9 @@ export interface LandingStoryPart {
 const GUARDAR: LandingStoryPart = {
   id: 'guardar',
   tone: 'guardar',
-  // Sin numeración "Parte N ·" (issue #742): no es un temario, son dos bloques
-  // claros —una parte de GUARDAR, otra de COMPARTIR—. El kicker nombra el bloque.
-  kicker: 'Guarda los momentos',
+  // Kicker vacío (feedback landing): el "Guarda los momentos" redundaba con el
+  // eyebrow; el eyebrow "Tu viaje, para siempre" hace de encabezado del bloque.
+  kicker: '',
   eyebrow: 'Tu viaje, para siempre',
   title: 'Guarda el viaje mientras lo vives',
   lede: 'Foto, clip, audio, un sitio en el mapa. Todo lo del viaje, guardado como lo vivís.',
@@ -79,13 +79,13 @@ const GUARDAR: LandingStoryPart = {
     },
     {
       icon: 'pin',
-      title: 'Cada momento, en su sitio',
+      title: 'Cada momento, en un lugar',
       body: 'Se guarda en el mapa donde pasó. Queda grabado ahí para siempre.',
     },
     {
       icon: 'calendario',
-      title: 'Todo en el diario',
-      body: 'La bitácora lo reúne todo: fotos y momentos en orden. Para volver cuando queráis.',
+      title: 'Bitácora de viaje',
+      body: 'Aquí se reúne todo: fotos, momentos, en orden. Para volver cuando queráis.',
     },
   ],
   shot: {
@@ -104,11 +104,13 @@ const GUARDAR: LandingStoryPart = {
 const JUGAR: LandingStoryPart = {
   id: 'jugar',
   tone: 'jugar',
-  // Segundo bloque: COMPARTIR (jugar/retos viven dentro de compartir, no aparte).
-  kicker: 'Comparte los momentos',
-  eyebrow: 'Con tu gente',
-  title: 'Y que tu gente sea parte',
-  lede: 'Comparte el viaje y deja que se metan dentro: viéndolo, o siguiéndolo a su manera.',
+  // Kicker vacío (feedback landing): igual que la Parte 1, el eyebrow hace de
+  // encabezado y ENLAZA arriba con abajo — "Tu viaje, para siempre" (guardar) /
+  // "Tu viaje, con tu gente" (compartir).
+  kicker: '',
+  eyebrow: 'Tu viaje, con tu gente',
+  title: 'Y lo viven contigo',
+  lede: 'Comparte el viaje: viéndolo o jugando a adivinar dónde es cada foto.',
   items: [
     {
       icon: 'globo',

@@ -138,10 +138,12 @@ export function Landing({ groupName, redirectTo }: Props) {
                   quede claro que Momentu es para un GRUPO (de viaje, de amigos), no
                   una app en solitario. */}
               <p className={[styles.eyebrow, 't-label'].join(' ')}>Para tu grupo de viaje</p>
-              {/* Frase ancla de marca, intacta (CLAUDE.md): el gancho es "compartir
-                  distinto"; la mecánica de adivinar baja al subtítulo. */}
+              {/* Frase ancla de marca (CLAUDE.md): "viajes" (no "momentos") — decisión
+                  de producto para que se entienda de un vistazo que es una app de
+                  VIAJES; el gancho es "compartir distinto", la mecánica de adivinar
+                  baja al subtítulo. */}
               <h1 className={[styles.headline, 't-hero'].join(' ')}>
-                Comparte tus momentos <span className={styles.accent}>de una forma diferente</span>
+                Comparte tus viajes <span className={styles.accent}>de una forma diferente</span>
               </h1>
               {/* Valor + gancho del juego SUBIDO al héroe (issue #916): qué es (un
                   diario de viaje) y el gancho (adivinar en el mapa dónde es cada

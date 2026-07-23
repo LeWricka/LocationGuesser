@@ -30,7 +30,7 @@ describe('GuestWelcomeFrame', () => {
       ),
     ).toBeInTheDocument()
     expect(screen.getByText(/participa en los retos que te mandan/)).toBeInTheDocument()
-    expect(screen.getByText('Comparte tus momentos de una forma diferente.')).toBeInTheDocument()
+    expect(screen.getByText('Comparte tus viajes de una forma diferente.')).toBeInTheDocument()
   })
 
   test('sin dueño ni viaje resueltos, cae al copy genérico (nunca "de undefined")', () => {

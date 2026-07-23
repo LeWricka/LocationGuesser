@@ -31,7 +31,7 @@ La visión es el **norte** del proyecto. Define qué problema resolvemos, para q
 
 Las dos importan y no compiten: lo personal es condición necesaria; lo social es la ventaja. Un diario sin lo social es "otro Polarsteps"; lo social sin un buen diario personal no tiene sobre qué construirse.
 
-**Frase ancla de producto** (de `CLAUDE.md`): *"Comparte tus momentos de una forma diferente."* — el gancho es compartir distinto; la mecánica de adivinar baja al subtítulo.
+**Frase ancla de producto** (de `CLAUDE.md`): *"Comparte tus viajes de una forma diferente."* — el gancho es compartir distinto; la mecánica de adivinar baja al subtítulo.
 
 ---
 

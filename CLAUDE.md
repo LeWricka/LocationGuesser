@@ -2,7 +2,7 @@
 
 > Nombre de producto: **Momentu** (momentu = "momento" en euskera) — dominio [www.momentu.art](https://www.momentu.art). El repo conserva su nombre histórico.
 
-**Qué es:** una forma distinta de compartir con tu grupo. Compartes dónde estás (una foto y/o un Street View con tu ubicación real) y los demás adivinan en el mapa dónde es; gana quien más se acerca. Con cuenta atrás. La mecánica de adivinar una ubicación es el *cómo* (el gancho), no el *qué somos*: la identidad es el compartir social, no el juego. (Frase ancla de producto: **"Comparte tus momentos de una forma diferente."** — el gancho es compartir distinto; la mecánica de adivinar baja al subtítulo.)
+**Qué es:** una forma distinta de compartir con tu grupo. Compartes dónde estás (una foto y/o un Street View con tu ubicación real) y los demás adivinan en el mapa dónde es; gana quien más se acerca. Con cuenta atrás. La mecánica de adivinar una ubicación es el *cómo* (el gancho), no el *qué somos*: la identidad es el compartir social, no el juego. (Frase ancla de producto: **"Comparte tus viajes de una forma diferente."** — "viajes" (no "momentos") para que se entienda de un vistazo que es una app de viajes; el gancho es compartir distinto; la mecánica de adivinar baja al subtítulo.)
 
 **Origen:** caso real de un grupo de viaje en WhatsApp que ya juega a esto "a ojo". Objetivo: que el grupo juegue ≥1 reto durante el viaje y repita.
 

@@ -171,7 +171,7 @@ test.describe('flujo auth email-first (hermético, issue #506)', () => {
     page,
   }) => {
     await page.goto('/')
-    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Comparte tus viajes/ }).first()).toBeVisible({
       timeout: 20_000,
     })
     // CTA primario email-first (repetido en héroe y cierre de la narrativa: por
@@ -209,7 +209,7 @@ test.describe('flujo auth email-first (hermético, issue #506)', () => {
 
     // La home debe cargarse directamente (perfil tiene nombre → no ProfileGate).
     // Esperamos al GlobeSheet o al HomeEmptyState.
-    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Comparte tus viajes/ }).first()).toBeVisible({
       timeout: 20_000,
     })
     // No debe mostrar ProfileGate (campo de nombre para jugar).
@@ -226,7 +226,7 @@ test.describe('flujo auth email-first (hermético, issue #506)', () => {
     await page.goto('/')
 
     // Home directa sin mostrar la landing ni el flujo de email.
-    await expect(page.getByRole('heading', { name: /Comparte tus momentos/ }).first()).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Comparte tus viajes/ }).first()).toBeVisible({
       timeout: 20_000,
     })
     // La landing (sin sesión) nunca aparece.
