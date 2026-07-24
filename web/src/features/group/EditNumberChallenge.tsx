@@ -4,6 +4,7 @@ import { parseAnswer, symbolFor, unitKeyFor, UNIT_MAX, UNIT_OPTIONS } from '../c
 import { countVotes, updateNumberChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { deadlineFromMinutes, formatDeadlineDateTime, isPast } from '../../lib/time'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import {
   AppHeader,
   Banner,
@@ -182,6 +183,9 @@ export function EditNumberChallenge({ challenge, onBack, onSaved }: Props) {
       })
       onSaved(updated)
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932): `updateNumberChallenge`
+      // es justo uno de los que el bug de #931 dejó invisible en Sentry.
+      reportError(err, { area: 'edit_number_challenge', challengeId: challenge.id })
       const msg = err instanceof Error ? err.message : String(err)
       setStatus(null)
       toast.show(`No se pudieron guardar los cambios: ${msg}`, { tone: 'danger' })

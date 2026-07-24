@@ -8,6 +8,7 @@ import { findPanorama, type PanoramaMatch } from '../../lib/streetview'
 import { uploadImage } from '../../lib/storage'
 import { useSignedImage } from '../../lib/useSignedImage'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { Clock, Compass, Lock, MapPin, Trash2 } from 'lucide-react'
 import {
   AppHeader,
@@ -338,6 +339,9 @@ export function EditChallenge({ challenge, onBack, onSaved }: Props) {
       })
       onSaved(updated)
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932): `updateChallenge`
+      // es justo uno de los que el bug de #931 dejó invisible en Sentry.
+      reportError(err, { area: 'edit_challenge', challengeId: challenge.id })
       const msg = err instanceof Error ? err.message : String(err)
       setStatus(null)
       toast.show(`No se pudieron guardar los cambios: ${msg}`, { tone: 'danger' })

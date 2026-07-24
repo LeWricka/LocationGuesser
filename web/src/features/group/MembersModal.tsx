@@ -8,6 +8,7 @@ import {
   type GroupMemberInfo,
 } from '../../lib/membership'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { Crown, LogOut, UserMinus, UserPlus, Users } from 'lucide-react'
 import { Avatar, Badge, Button, Icon, Modal, Row, Skeleton, Stack, useToast } from '../../ui'
 // Estilos compartidos de la feature (youTag, empty, skelRow, radioRow, botón
@@ -102,11 +103,16 @@ export function MembersModal({ groupId, meId, onClose, onLeft, onChanged, onInvi
   const visibleMembers = (members ?? []).filter((m) => m.name !== '—')
 
   async function run(action: () => Promise<void>) {
+    // La acción concreta (promote/demote/kick/leave/transfer) la da la vista
+    // ANTES de que la acción corra: sirve de contexto si falla (issue #932).
+    const actionKind = view.kind
     setBusy(true)
     try {
       await action()
       setView({ kind: 'list' })
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'members_modal', groupId, action: actionKind })
       toast.show(`No se pudo completar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })

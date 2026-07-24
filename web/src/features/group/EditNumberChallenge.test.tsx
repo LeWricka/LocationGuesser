@@ -11,6 +11,11 @@ import type { ChallengeForPlay } from '../../lib/challenges'
 const trackMock = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
 
+const reportErrorMock = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportError: (...args: unknown[]) => reportErrorMock(...args),
+}))
+
 const updateNumberChallengeMock = vi.fn()
 const countVotesMock = vi.fn()
 vi.mock('../../lib/challenges', async (importOriginal) => {
@@ -57,6 +62,7 @@ function renderScreen(c: ChallengeForPlay, onSaved = vi.fn()) {
 
 beforeEach(() => {
   trackMock.mockClear()
+  reportErrorMock.mockClear()
   updateNumberChallengeMock.mockReset()
   countVotesMock.mockReset()
   countVotesMock.mockResolvedValue(0)
@@ -143,6 +149,39 @@ describe('EditNumberChallenge — guardar solo toca columnas de número', () => 
 
     await waitFor(() => expect(updateNumberChallengeMock).toHaveBeenCalledTimes(1))
     expect(updateNumberChallengeMock.mock.calls[0][1]).not.toHaveProperty('answer')
+  })
+
+  test('si updateNumberChallenge falla con un error inesperado (red/RLS/DB), se reporta a observabilidad además del toast (#932)', async () => {
+    updateNumberChallengeMock.mockRejectedValue({
+      message: 'permission denied for table challenges',
+      code: '42501',
+    })
+    const user = userEvent.setup()
+    renderScreen(numberChallenge())
+    await screen.findByDisplayValue('¿Cuánto creéis que nos costó?')
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByText(/no se pudieron guardar los cambios/i)).toBeInTheDocument()
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ code: '42501' }),
+      expect.objectContaining({ area: 'edit_number_challenge', challengeId: 'n1' }),
+    )
+  })
+
+  test('re-introducir la respuesta sin una cifra válida es un error de VALIDACIÓN: avisa pero no reporta a observabilidad', async () => {
+    const user = userEvent.setup()
+    renderScreen(numberChallenge())
+    await screen.findByDisplayValue('¿Cuánto creéis que nos costó?')
+
+    await user.click(screen.getByRole('button', { name: 'Cambiar la respuesta correcta' }))
+    // Sin escribir ninguna cifra: "Guardar cambios" dispara la validación de
+    // formulario, no llega a tocar updateNumberChallenge.
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByText(/escribe la nueva cifra correcta/i)).toBeInTheDocument()
+    expect(updateNumberChallengeMock).not.toHaveBeenCalled()
+    expect(reportErrorMock).not.toHaveBeenCalled()
   })
 })
 

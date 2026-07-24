@@ -234,6 +234,41 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
     expect(uploadImageMock).toHaveBeenCalledTimes(2)
     expect(await screen.findByText('Recuerdo guardado')).toBeInTheDocument()
   })
+
+  test('si createMoment falla con un error inesperado (red/RLS/DB, p.ej. el 42501 de #931), se reporta a observabilidad además del toast (#932)', async () => {
+    createMomentMock.mockRejectedValue({
+      message: 'permission denied for table moment_images',
+      code: '42501',
+    })
+
+    renderAddMoment()
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    expect(await screen.findByText(/no se pudo guardar/i)).toBeInTheDocument()
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ code: '42501' }),
+      expect.objectContaining({ area: 'add_moment' }),
+    )
+  })
+
+  test('sin sesión, el guardado avisa sin llegar a intentarlo: validación, no fallo — no reporta a observabilidad', async () => {
+    render(
+      <SessionContext.Provider value={{ ...session, user: null }}>
+        <ToastProvider>
+          <AddMoment groupId="g1" onBack={vi.fn()} onCreated={vi.fn()} onAddChallenge={vi.fn()} />
+        </ToastProvider>
+      </SessionContext.Provider>,
+    )
+
+    await userEvent.type(screen.getByLabelText(/título/i), 'Mi recuerdo')
+    await userEvent.click(screen.getByRole('button', { name: /guardar recuerdo/i }))
+
+    expect(await screen.findByText(/inicia sesión para añadir un recuerdo/i)).toBeInTheDocument()
+    expect(createMomentMock).not.toHaveBeenCalled()
+    expect(reportErrorMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('AddMoment — nota de voz (#648)', () => {

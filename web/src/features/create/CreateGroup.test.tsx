@@ -6,6 +6,11 @@ import type { User } from '@supabase/supabase-js'
 const trackMock = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
 
+const reportErrorMock = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportError: (...args: unknown[]) => reportErrorMock(...args),
+}))
+
 const createGroupMock = vi.fn()
 vi.mock('../../lib/groupData', () => ({
   createGroup: (...args: unknown[]) => createGroupMock(...args),
@@ -57,6 +62,7 @@ const DRAFT_KEY = 'group:new'
 describe('CreateGroup — borrador persistente (#718)', () => {
   beforeEach(async () => {
     trackMock.mockClear()
+    reportErrorMock.mockClear()
     createGroupMock.mockReset()
     joinGroupAsOwnerMock.mockReset()
     scrollIntoViewMock.mockClear()
@@ -114,6 +120,33 @@ describe('CreateGroup — borrador persistente (#718)', () => {
 
     await waitFor(() => expect(createGroupMock).toHaveBeenCalledTimes(1))
     expect(await loadDraft(DRAFT_KEY)).toBeNull()
+    unmount()
+  })
+
+  test('si createGroup falla con un error inesperado (red/RLS/DB), se reporta a observabilidad además del toast (#932)', async () => {
+    createGroupMock.mockRejectedValue(new Error('permission denied for table groups'))
+    const { unmount } = renderCreate()
+
+    await userEvent.type(screen.getByLabelText('Nombre del viaje'), 'Japón en otoño')
+    await userEvent.click(screen.getByRole('button', { name: /revisar y crear/i }))
+    await userEvent.click(screen.getByRole('button', { name: /^crear viaje$/i }))
+
+    expect(await screen.findByText(/no se pudo crear el viaje/i)).toBeInTheDocument()
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({ area: 'create_group' }),
+    )
+    unmount()
+  })
+
+  test('sin nombre, "Revisar y crear" es una validación de formulario: no reporta a observabilidad', async () => {
+    const { unmount } = renderCreate()
+
+    // Sin nombre el CTA de avanzar queda deshabilitado: no hay try/catch que
+    // ejecutar, solo el gating de la UI (nada que reportar).
+    expect(screen.getByRole('button', { name: /revisar y crear/i })).toBeDisabled()
+    expect(createGroupMock).not.toHaveBeenCalled()
+    expect(reportErrorMock).not.toHaveBeenCalled()
     unmount()
   })
 
