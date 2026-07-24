@@ -8,7 +8,7 @@ import { initAnalytics } from './lib/analytics'
 import { initObservability, reportSilentWarning } from './lib/observability'
 import { applyCleanRoute } from './lib/cleanRoute'
 import { isSafeUpdateRoute } from './lib/safeUpdateRoute'
-import { shouldReloadOnPreloadError } from './lib/reloadOnPreloadError'
+import { registerChunkReloadListeners } from './lib/chunkReload'
 import { registerSW } from 'virtual:pwa-register'
 
 // Observabilidad + analítica: init idempotente antes de montar la app (no-op en
@@ -25,21 +25,19 @@ initAnalytics()
 // recepción del enlace.
 void applyCleanRoute()
 
-// #761: cada deploy cambia los hashes de los assets (chunks JS/CSS). Un
-// cliente con el `index.html` viejo en una pestaña ya abierta pide un chunk
-// que ya no existe → Vite lo detecta y dispara `vite:preloadError`
-// ("Failed to fetch dynamically imported module" — LOCATIONGUESSER-H;
-// "Unable to preload CSS" — LOCATIONGUESSER-J). `event.preventDefault()`
-// evita que ese rechazo se propague como error sin manejar (lo que hoy llega
-// a Sentry); recargamos para traer el `index.html` nuevo con los hashes
-// correctos. Guard de una recarga por sesión (`shouldReloadOnPreloadError`,
-// puro y testeado aparte): si tras recargar el error VUELVE, no es un desfase
-// de deploy sino un fallo real — dejamos que fluya en vez de ciclar recargas.
-window.addEventListener('vite:preloadError', (event) => {
-  if (!shouldReloadOnPreloadError(sessionStorage)) return
-  event.preventDefault()
-  window.location.reload()
-})
+// #761 → #926: cada deploy cambia los hashes de los assets (chunks JS/CSS).
+// Un cliente con el `index.html` viejo en una pestaña ya abierta pide un
+// chunk que ya no existe → 404 ("Failed to fetch dynamically imported
+// module" — LOCATIONGUESSER-H; "Unable to preload CSS" — LOCATIONGUESSER-J).
+// Recargamos para traer el `index.html` nuevo con los hashes correctos.
+// `registerChunkReloadListeners` (puro y testeado en `lib/chunkReload.ts`)
+// cubre tanto la vía normal (`vite:preloadError`) como la red de seguridad
+// (`unhandledrejection`/`error` cuyo mensaje delata el mismo fallo sin haber
+// pasado por el mecanismo de preload de Vite), con guard anti-bucle por
+// ventana de tiempo: si el error VUELVE poco después de recargar, no es un
+// desfase de deploy sino un fallo real — se deja fluir a Sentry en vez de
+// ciclar recargas.
+registerChunkReloadListeners()
 
 // PWA: registra el service worker y SONDEA actualizaciones cada 60 s. Tabide es un
 // SPA (no navega entre páginas), así que sin este sondeo el navegador no detecta un
