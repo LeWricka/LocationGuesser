@@ -26,6 +26,7 @@ import { Button, Stack, useToast } from '../../ui'
 import { subscribeToPush, unsubscribeFromPush, type PushStatus } from '../../lib/push'
 import { isPushKindEnabled, setPushPref, type PushKind } from '../../lib/pushPrefs'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { usePushAvailability } from './usePushAvailability'
 import type { Profile } from '../../lib/database.types'
 import styles from './PushNotificationsControl.module.css'
@@ -101,7 +102,10 @@ export function PushNotificationsControl({ userId, profile }: Props) {
     try {
       await setPushPref(userId, kind, next, prefs)
       track('push_pref_changed', { kind, enabled: next })
-    } catch {
+    } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932): `setPushPref`
+      // escribe en `profiles.push_prefs`, un guardado real.
+      reportError(err, { area: 'push_prefs', kind })
       setPrefs((current) => ({ ...current, [kind]: !next }))
       toast.show('No pudimos guardar tu preferencia', { tone: 'danger' })
     } finally {
@@ -190,7 +194,11 @@ export function PushNotificationsControl({ userId, profile }: Props) {
     setBusy(true)
     try {
       applyStatus(await subscribeToPush(userId))
-    } catch {
+    } catch (err) {
+      // Fallo INESPERADO (red/RLS/DB, issue #932): `subscribeToPush` persiste en
+      // `push_subscriptions`, no es solo un permiso de navegador denegado (ese
+      // caso ya lo resuelve `applyStatus` con el status 'denied', sin excepción).
+      reportError(err, { area: 'push_subscribe' })
       toast.show('No pudimos activar los avisos', { tone: 'danger' })
     } finally {
       setBusy(false)
@@ -201,7 +209,10 @@ export function PushNotificationsControl({ userId, profile }: Props) {
     setBusy(true)
     try {
       applyStatus(await unsubscribeFromPush(userId))
-    } catch {
+    } catch (err) {
+      // Fallo INESPERADO (red/RLS/DB, issue #932): `unsubscribeFromPush` borra de
+      // `push_subscriptions`, un guardado real.
+      reportError(err, { area: 'push_unsubscribe' })
       toast.show('No pudimos desactivar los avisos', { tone: 'danger' })
     } finally {
       setBusy(false)

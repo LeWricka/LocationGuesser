@@ -11,6 +11,7 @@ import {
   type TripPhoto,
 } from '../../lib/groupData'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { Check, Flag, Image as ImageIcon, LockOpen, Settings } from 'lucide-react'
 import {
   Button,
@@ -167,6 +168,8 @@ export function GroupSettingsModal({
       toast.show('Viaje actualizado', { tone: 'success' })
       onRenamed()
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'group_settings_save', groupId })
       toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })
@@ -185,6 +188,8 @@ export function GroupSettingsModal({
       track('group_cover_set', { group_id: groupId, cleared: imagePath === null })
       onRenamed()
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'group_settings_cover', groupId })
       setCoverPath(previous)
       toast.show(
         `No se pudo cambiar la portada: ${err instanceof Error ? err.message : String(err)}`,
@@ -202,6 +207,8 @@ export function GroupSettingsModal({
       track('group_deleted', { group_id: groupId })
       onDeleted()
     } catch (err) {
+      // Fallo INESPERADO al borrar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'group_settings_delete', groupId })
       toast.show(`No se pudo borrar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })
@@ -217,6 +224,8 @@ export function GroupSettingsModal({
       toast.show('Temporada cerrada', { tone: 'success' })
       onSeasonChanged()
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'group_settings_close_season', groupId })
       toast.show(`No se pudo cerrar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })
@@ -232,6 +241,8 @@ export function GroupSettingsModal({
       toast.show('Temporada reabierta', { tone: 'success' })
       onSeasonChanged()
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'group_settings_reopen_season', groupId })
       toast.show(`No se pudo reabrir: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })

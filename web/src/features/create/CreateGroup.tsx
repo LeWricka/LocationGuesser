@@ -4,6 +4,7 @@ import { newGroupCode } from '../../lib/group'
 import { createGroup } from '../../lib/groupData'
 import { joinGroupAsOwner } from '../../lib/membership'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { useSession } from '../../lib/session-context'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { clearDraft, loadDraft, useDraftAutosave } from '../../lib/drafts'
@@ -262,6 +263,10 @@ export function CreateGroup({ onBack }: Props) {
       // (exige is_anonymous=false) y Postgres devuelve este texto crudo. Nunca lo
       // enseñamos tal cual: es indescifrable para quien no conoce la BD.
       const rlsish = /row-level security policy/i.test(msg)
+      // Fallo INESPERADO de guardado (red/RLS/DB, issue #932): antes solo se
+      // veía en el toast. `rlsish` es justo el caso "no debería pasar nunca"
+      // (#514) — el más importante de tener en Sentry, no menos.
+      reportError(err, { area: 'create_group', networkish, rlsish })
       toast.show(
         networkish
           ? 'Sin conexión con el servidor. Prueba con datos en vez de WiFi (o al revés) y desactiva VPN, DNS privado o bloqueador; luego reinténtalo.'

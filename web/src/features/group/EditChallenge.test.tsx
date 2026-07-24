@@ -12,6 +12,11 @@ import type { ChallengeForPlay } from '../../lib/challenges'
 const trackMock = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock(...args) }))
 
+const reportErrorMock = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportError: (...args: unknown[]) => reportErrorMock(...args),
+}))
+
 const updateChallengeMock = vi.fn()
 const countVotesMock = vi.fn()
 const getAnswerMock = vi.fn()
@@ -55,6 +60,7 @@ function renderScreen(c: ChallengeForPlay, onSaved = vi.fn()) {
 
 beforeEach(() => {
   trackMock.mockClear()
+  reportErrorMock.mockClear()
   updateChallengeMock.mockReset()
   countVotesMock.mockReset()
   countVotesMock.mockResolvedValue(1) // con jugadas: ubicación bloqueada, fuera del alcance de este test
@@ -99,6 +105,23 @@ describe('EditChallenge — plazo (reto EN JUEGO)', () => {
     expect(trackMock).toHaveBeenCalledWith(
       'challenge_edited',
       expect.not.objectContaining({ deadline_changed: true }),
+    )
+  })
+
+  test('si updateChallenge falla con un error inesperado (red/RLS/DB), se reporta a observabilidad además del toast (#932)', async () => {
+    updateChallengeMock.mockRejectedValue({
+      message: 'permission denied for table challenges',
+      code: '42501',
+    })
+    const user = userEvent.setup()
+    renderScreen(challenge())
+
+    await user.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByText(/no se pudieron guardar los cambios/i)).toBeInTheDocument()
+    expect(reportErrorMock).toHaveBeenCalledWith(
+      expect.objectContaining({ code: '42501' }),
+      expect.objectContaining({ area: 'edit_challenge', challengeId: 'ch-1' }),
     )
   })
 

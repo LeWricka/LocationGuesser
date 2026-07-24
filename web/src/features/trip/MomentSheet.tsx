@@ -388,6 +388,8 @@ export function MomentSheet({
       // el dato CACHEADO (sin la descripción nueva) y parecía que no se guardaba.
       onEdited?.()
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'moment_sheet_description', challengeId: moment.challengeId })
       toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })
@@ -458,6 +460,10 @@ export function MomentSheet({
       )
       onEdited?.()
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932). El fallo best-effort
+      // de la nota de voz (audioFailed, arriba) ya se reportó aparte; este catch es
+      // el de `updateMoment` en sí — un fallo real de guardado, no un best-effort.
+      reportError(err, { area: 'moment_sheet_meta', challengeId: moment.challengeId })
       toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })
@@ -480,6 +486,8 @@ export function MomentSheet({
       onDeleted?.()
       close()
     } catch (err) {
+      // Fallo INESPERADO al borrar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'moment_sheet_delete', challengeId: moment.challengeId })
       toast.show(`No se pudo borrar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })

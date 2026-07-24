@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Crown, Share2 } from 'lucide-react'
 import { Button, Icon, Modal, Spinner, useToast } from '../../ui'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { getGroupMembers } from '../../lib/membership'
 import { useSession } from '../../lib/session-context'
 import { createOwnerInvite } from '../../lib/ownerInvites'
@@ -199,6 +200,9 @@ export function InviteModal({
       track('owner_invite_created', { group_id: groupId })
       toast.show('Enlace de co-dueño copiado, pégalo en el chat', { tone: 'success' })
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932): `createOwnerInvite`
+      // escribe en `group_invites`, un guardado real, no una lectura best-effort.
+      reportError(err, { area: 'invite_generate_co_owner_link', groupId })
       const detail = err instanceof Error ? err.message : 'inténtalo de nuevo'
       toast.show(`No se pudo generar el enlace de co-dueño: ${detail}`, { tone: 'danger' })
     } finally {

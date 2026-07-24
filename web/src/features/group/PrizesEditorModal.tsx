@@ -4,6 +4,7 @@ import { Button, Icon, Input, Modal, Row, Stack, useToast } from '../../ui'
 import type { GroupPrizes } from '../../lib/database.types'
 import { updateGroupPrizes } from '../../lib/groupData'
 import { track } from '../../lib/analytics'
+import { reportError } from '../../lib/observability'
 import { PRIZE_SLOTS } from './prizes'
 import styles from './PrizesEditorModal.module.css'
 
@@ -44,6 +45,8 @@ export function PrizesEditorModal({ groupId, prizes, origin, onClose, onSaved }:
       toast.show('Premios guardados', { tone: 'success' })
       onSaved()
     } catch (err) {
+      // Fallo INESPERADO al guardar (red/RLS/DB, issue #932).
+      reportError(err, { area: 'prizes_editor', groupId })
       toast.show(`No se pudo guardar: ${err instanceof Error ? err.message : String(err)}`, {
         tone: 'danger',
       })
