@@ -942,3 +942,76 @@ test('con el lienzo a tamaño 0 (oculto/recién revelado) NO se llama a fitBound
   expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
   expect(mapInstances[0].easeToCalls).toHaveLength(0)
 })
+
+// Guarda de coords degeneradas (issue #923, Sentry LOCATIONGUESSER-9): un pin con
+// lat/lng no finitos, fuera de rango, o el sentinel (0,0) produce un bounds sin
+// sentido — `fitBounds` se lo pasa a maplibre-gl y su helper de cámara del globo
+// revienta leyendo `.center` de un resultado `undefined`. `frameRoute` filtra ANTES
+// de decidir el gesto de cámara (ver `hasValidGlobeCoord`).
+describe('HomeGlobe — guarda de bounds degenerados (#923, Sentry LOCATIONGUESSER-9)', () => {
+  test('0 pines con coordenada válida: NO se llama fitBounds ni easeTo (cámara intacta)', async () => {
+    const soloInvalidos: GlobePin[] = [
+      { id: 'nan', lat: NaN, lng: NaN, title: 'Sin GPS', imageUrl: null, targetId: 't1' },
+      { id: 'rango', lat: 200, lng: 400, title: 'Fuera de rango', imageUrl: null, targetId: 't1' },
+      {
+        id: 'null-island',
+        lat: 0,
+        lng: 0,
+        title: 'Sentinel (0,0)',
+        imageUrl: null,
+        targetId: 't1',
+      },
+    ]
+    render(<HomeGlobe pins={soloInvalidos} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    bootMap(mapInstances[0])
+    await new Promise((r) => setTimeout(r, 20))
+
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+  })
+
+  test('1 solo pin con coordenada válida (el resto inválidas): easeTo a ESE pin, no fitBounds', async () => {
+    const unaValida: GlobePin[] = [
+      { id: 'nan', lat: NaN, lng: NaN, title: 'Sin GPS', imageUrl: null, targetId: 't1' },
+      { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+      {
+        id: 'null-island',
+        lat: 0,
+        lng: 0,
+        title: 'Sentinel (0,0)',
+        imageUrl: null,
+        targetId: 't1',
+      },
+    ]
+    render(<HomeGlobe pins={unaValida} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    bootMap(mapInstances[0])
+
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(0)
+    expect(mapInstances[0].easeToCalls).toHaveLength(1)
+    expect(mapInstances[0].easeToCalls[0]).toMatchObject({ center: [-9.1393, 38.7223] })
+  })
+
+  test('≥2 pines válidos + uno inválido mezclado: fitBounds SOLO con los válidos', async () => {
+    const mezcla: GlobePin[] = [
+      { id: 'lisboa', lat: 38.7223, lng: -9.1393, title: 'Lisboa', imageUrl: null, targetId: 't1' },
+      { id: 'nan', lat: NaN, lng: NaN, title: 'Sin GPS', imageUrl: null, targetId: 't1' },
+      { id: 'roma', lat: 41.8902, lng: 12.4922, title: 'Roma', imageUrl: null, targetId: 't1' },
+    ]
+    render(<HomeGlobe pins={mezcla} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    bootMap(mapInstances[0])
+
+    expect(mapInstances[0].fitBoundsCalls).toHaveLength(1)
+    expect(mapInstances[0].easeToCalls).toHaveLength(0)
+    const { bounds } = mapInstances[0].fitBoundsCalls[0] as { bounds: MockLngLatBounds }
+    // El pin NaN no puede haber contaminado el min/max: el rango sale EXACTO al de
+    // Lisboa/Roma (span > MIN_FIT_SPAN_DEG, así que no se ensancha).
+    expect(bounds.sw).toEqual([-9.1393, 38.7223])
+    expect(bounds.ne).toEqual([12.4922, 41.8902])
+  })
+})

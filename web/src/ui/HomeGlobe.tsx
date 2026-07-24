@@ -338,6 +338,29 @@ function appendSonarRings(el: HTMLElement): void {
   }
 }
 
+/**
+ * ¿Coordenada usable para encuadrar cámara? (issue #923, Sentry LOCATIONGUESSER-9).
+ * `frameRoute` construye bounds/centros a partir de `lat`/`lng` de los pines; un
+ * valor no finito (NaN/Infinity, dato corrupto), fuera de rango, o el sentinel
+ * clásico "sin coordenada real" (0,0, "null island") produce un bounds degenerado.
+ * `map.fitBounds` se lo pasa tal cual a maplibre-gl, y en proyección GLOBO su
+ * helper de cámara (`GlobeCameraHelper.cameraForBoxAndBearing`) revienta leyendo
+ * `.center` de un resultado `undefined` que devolvió el cálculo mercator interno
+ * (`scaleX`/`scaleY` negativos ahí dentro) — exactamente el
+ * `TypeError: Cannot read properties of undefined (reading 'center')` del stack de
+ * Sentry (`fitBounds → cameraForBounds → cameraForBoxAndBearing`). Filtrar ANTES de
+ * decidir el gesto de cámara (0/1/≥2 puntos) es más robusto que solo envolver la
+ * llamada en try/catch (`conCamaraProtegida`, más abajo): evita construir un
+ * encuadre sin sentido en primer lugar, no solo absorber su fallo a posteriori.
+ */
+function hasValidGlobeCoord(pin: GlobePin): boolean {
+  const { lat, lng } = pin
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false
+  if (lat === 0 && lng === 0) return false
+  return true
+}
+
 /** Ids de fuente/capa de la ruta de un viaje (issue #702), únicos por `targetId`
  * para que las constelaciones de dos viajes nunca colisionen entre sí. */
 function routeIds(targetId: string): { sourceId: string; layerId: string } {
@@ -659,6 +682,13 @@ export function HomeGlobe({
     const map = mapRef.current
     const gl = glRef.current
     if (!map || !gl || route.length === 0) return
+    // Guarda de bounds degenerados (issue #923, Sentry LOCATIONGUESSER-9): descarta
+    // pines con coords no finitas/fuera de rango ANTES de decidir el gesto de cámara.
+    // Con 0 pines válidos no tocamos la cámara (vista actual, sin fit ni vuelo); con
+    // 1, `easeTo` (una coordenada no forma una caja, `fitBounds` no aplica); con ≥2,
+    // el `fitBounds` de siempre — ver `hasValidGlobeCoord`.
+    const validRoute = route.filter(hasValidGlobeCoord)
+    if (validRoute.length === 0) return
     // Keep-alive (issue #847) + guarda del #763: al REVELARSE la home oculta,
     // React re-ejecuta los efectos y este fit puede llegar ANTES del map.resize()
     // del efecto de `active` — con el lienzo aún en tamaño 0 (display:none), el
@@ -688,7 +718,7 @@ export function HomeGlobe({
         })
       }
     }
-    if (route.length === 1) {
+    if (validRoute.length === 1) {
       const offsetY = verticalFrameOffset(
         containerHeight,
         bottomObscuredRef.current,
@@ -696,7 +726,7 @@ export function HomeGlobe({
       )
       conCamaraProtegida(() =>
         map.easeTo({
-          center: [route[0].lng, route[0].lat],
+          center: [validRoute[0].lng, validRoute[0].lat],
           zoom: SINGLE_ZOOM,
           duration,
           offset: [0, offsetY],
@@ -704,12 +734,12 @@ export function HomeGlobe({
       )
       return
     }
-    // Extensión real de los pines del recorrido.
-    let minLng = route[0].lng
-    let maxLng = route[0].lng
-    let minLat = route[0].lat
-    let maxLat = route[0].lat
-    for (const { lng, lat } of route) {
+    // Extensión real de los pines del recorrido (ya filtrados a coords válidas).
+    let minLng = validRoute[0].lng
+    let maxLng = validRoute[0].lng
+    let minLat = validRoute[0].lat
+    let maxLat = validRoute[0].lat
+    for (const { lng, lat } of validRoute) {
       if (lng < minLng) minLng = lng
       if (lng > maxLng) maxLng = lng
       if (lat < minLat) minLat = lat
@@ -721,7 +751,8 @@ export function HomeGlobe({
     // mismo tratamiento que un pin único, misma banda visible.
     if (maxLng - minLng > MAX_FIT_SPAN_LNG_DEG || maxLat - minLat > MAX_FIT_SPAN_LAT_DEG) {
       const lead =
-        route.find((p) => p.lead) ?? (fallbackLead === 'first' ? route[0] : route[route.length - 1])
+        validRoute.find((p) => p.lead) ??
+        (fallbackLead === 'first' ? validRoute[0] : validRoute[validRoute.length - 1])
       const offsetY = verticalFrameOffset(
         containerHeight,
         bottomObscuredRef.current,
