@@ -3,6 +3,7 @@ import { AlertTriangle, Hash } from 'lucide-react'
 import { PhotoDropzone } from './PhotoDropzone'
 import { describeDeadlineEcho } from './deadlineEcho'
 import { ChallengeCreatedShare } from './ChallengeCreatedShare'
+import { parseAnswer, symbolFor, UNIT_MAX, UNIT_OPTIONS } from './numberAnswer'
 import { createNumberChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { DEFAULT_NUMBER_TOLERANCE } from '../../lib/geo'
 import { deadlineFromMinutes } from '../../lib/time'
@@ -29,7 +30,6 @@ import {
   SegmentedControl,
   Spinner,
   UnitInput,
-  type Unit,
   useToast,
 } from '../../ui'
 import { ShellUtilitario } from '../../ui/shells'
@@ -66,26 +66,6 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
 ]
 const DEFAULT_GUESS_INDEX = 1
 
-// Unidades del número (UnitInput): NO solo €. La unidad va al lado del número.
-// `custom` abre un campo libre ≤8 car (la respuesta del rediseño a "solo €").
-const UNIT_OPTIONS: readonly Unit[] = [
-  { value: 'eur', symbol: '€', label: 'euros (€)' },
-  { value: 'km', symbol: 'km', label: 'kilómetros (km)' },
-  { value: 'kg', symbol: 'kg', label: 'kilos (kg)' },
-  { value: 'pct', symbol: '%', label: 'por ciento (%)' },
-  { value: 'min', symbol: 'min', label: 'minutos (min)' },
-  { value: 'none', symbol: '—', label: 'sin unidad' },
-  { value: 'custom', symbol: '…', label: 'otra…' },
-]
-const UNIT_MAX = 8
-
-// El símbolo que se guarda/muestra para una clave de unidad (vacío = sin unidad).
-function symbolFor(unitKey: string, custom: string): string {
-  if (unitKey === 'custom') return custom.trim()
-  if (unitKey === 'none') return ''
-  return UNIT_OPTIONS.find((u) => u.value === unitKey)?.symbol ?? ''
-}
-
 // Etapas del formulario (issue #586 — de 3 pasos a 2, proceso con sentido):
 //  0 = la pregunta (nombre + pregunta + foto opcional).
 //  1 = respuesta y reglas (cifra + unidad + plazo + tiempo por jugada).
@@ -117,23 +97,6 @@ function hasContent(d: NumberChallengeDraft): boolean {
   return Boolean(
     d.title.trim() || d.question.trim() || d.answerRaw.trim() || d.customUnit.trim() || d.photo,
   )
-}
-
-/**
- * Parsea la respuesta escrita (formato es-ES: coma decimal) a número, infiriendo
- * los DECIMALES de cómo se escribió (lo que pide el reto). Devuelve null si no es
- * un número válido. "84,50" → { value: 84.5, decimals: 2 }.
- */
-function parseAnswer(raw: string): { value: number; decimals: number } | null {
-  // El UnitInput ya filtra a dígitos, coma/punto y signo; aquí normalizamos el
-  // punto a coma para tratar ambos separadores y validamos el formato es-ES.
-  const cleaned = raw.trim().replace(/\s/g, '').replace(/\./g, ',')
-  if (cleaned === '') return null
-  if (!/^\d+(,\d+)?$/.test(cleaned)) return null
-  const [intPart, decPart = ''] = cleaned.split(',')
-  const value = Number(`${intPart}.${decPart}`)
-  if (!Number.isFinite(value)) return null
-  return { value, decimals: Math.min(decPart.length, 4) }
 }
 
 // Reto de NÚMERO ("¿Adivinas?"): pregunta + cifra oculta + unidad. Sin mapa ni

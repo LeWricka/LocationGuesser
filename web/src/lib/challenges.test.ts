@@ -74,6 +74,7 @@ import {
   getAnswers,
   countVotes,
   updateChallenge,
+  updateNumberChallenge,
   updateMoment,
   isPracticeChallenge,
 } from './challenges'
@@ -677,6 +678,86 @@ describe('updateChallenge', () => {
     })
     const patch = calls.update.mock.calls.at(-1)?.[1] as Record<string, unknown>
     expect(patch).not.toHaveProperty('lat')
+  })
+})
+
+// Editor de reto de NÚMERO (issue #922): HERMANO de `updateChallenge` pero
+// NUNCA debe tocar lat/lng/sv_* (esas columnas son del reto de lugar).
+describe('updateNumberChallenge', () => {
+  const numberChallenge: Challenge = {
+    ...sampleChallenge,
+    id: 'n1',
+    challenge_kind: 'number',
+    number_question: '¿Cuánto creéis que nos costó?',
+    number_unit: '€',
+    number_decimals: 2,
+    number_tolerance: 'normal',
+    sv_pano_id: null,
+  }
+
+  test('edita título/pregunta/unidad/plazo sin tocar la respuesta ni lat/lng/sv_*', async () => {
+    results['challenges'] = { data: numberChallenge, error: null }
+    const out = await updateNumberChallenge('n1', {
+      title: 'Nuevo título',
+      question: '¿Cuánto costó al final?',
+      unit: 'km',
+      guessSeconds: 30,
+      deadlineAt: '2026-07-01T00:00:00.000Z',
+    })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      title: 'Nuevo título',
+      deadline_at: '2026-07-01T00:00:00.000Z',
+      guess_seconds: 30,
+      number_question: '¿Cuánto costó al final?',
+      number_unit: 'km',
+    })
+    const patch = calls.update.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(patch).not.toHaveProperty('lat')
+    expect(patch).not.toHaveProperty('lng')
+    expect(patch).not.toHaveProperty('sv_pano_id')
+    expect(patch).not.toHaveProperty('answer_number_src')
+    // No comprueba votos si no se toca la respuesta.
+    expect(calls.from).not.toHaveBeenCalledWith('votes')
+    expect(out.challenge_kind).toBe('number')
+  })
+
+  test('unidad vacía/espacios se guarda como null (sin unidad)', async () => {
+    results['challenges'] = { data: numberChallenge, error: null }
+    await updateNumberChallenge('n1', { unit: '   ' })
+    expect(calls.update).toHaveBeenCalledWith('challenges', { number_unit: null })
+  })
+
+  test('re-introducir la respuesta (sin votos) escribe answer_number_src + number_decimals, nunca lat/lng', async () => {
+    results['votes'] = { error: null, count: 0 }
+    results['challenges'] = { data: numberChallenge, error: null }
+    await updateNumberChallenge('n1', { answer: { answerNumber: 99.5, decimals: 2 } })
+    expect(calls.update).toHaveBeenCalledWith('challenges', {
+      answer_number_src: 99.5,
+      number_decimals: 2,
+    })
+    const patch = calls.update.mock.calls.at(-1)?.[1] as Record<string, unknown>
+    expect(patch).not.toHaveProperty('lat')
+    expect(patch).not.toHaveProperty('lng')
+    expect(patch).not.toHaveProperty('sv_pano_id')
+    // El cliente NO escribe challenge_answers: lo hace el trigger 0029.
+    const wroteAnswer = calls.upsert.mock.calls.some((c) => c[0] === 'challenge_answers')
+    expect(wroteAnswer).toBe(false)
+  })
+
+  test('RECHAZA re-introducir la respuesta si el reto ya tiene votos', async () => {
+    results['votes'] = { error: null, count: 3 }
+    await expect(
+      updateNumberChallenge('n1', { answer: { answerNumber: 1, decimals: 0 } }),
+    ).rejects.toThrow(/respuesta/)
+    expect(calls.update).not.toHaveBeenCalled()
+  })
+
+  test('sin `answer` en el input, no se toca la respuesta aunque haya votos', async () => {
+    results['challenges'] = { data: numberChallenge, error: null }
+    await updateNumberChallenge('n1', { title: 'Solo título' })
+    expect(calls.update).toHaveBeenCalledWith('challenges', { title: 'Solo título' })
+    // Ni siquiera se comprueban los votos: no hay respuesta que proteger.
+    expect(calls.from).not.toHaveBeenCalledWith('votes')
   })
 })
 

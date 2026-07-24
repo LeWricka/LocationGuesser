@@ -35,6 +35,7 @@ import { gotoProfile } from '../home/navigation'
 import { isMomentPhotoVisible, pairedChallengeByMemoryId, type Moment } from '../../lib/trip'
 import { EXAMPLE_TRIP_GROUP_ID, EXAMPLE_TRIP_SUBTITLE } from '../../lib/exampleTrip'
 import { EditChallenge } from '../group/EditChallenge'
+import { EditNumberChallenge } from '../group/EditNumberChallenge'
 import { InviteModal } from '../group/InviteModal'
 import { MembersModal } from '../group/MembersModal'
 import { GroupSettingsModal, type SettingsSection } from '../group/GroupSettingsModal'
@@ -1015,6 +1016,22 @@ export function TripPage({
   // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa
   // reflejan los cambios). Reutiliza el editor completo de la GroupPage clásica.
   if (editingChallenge) {
+    // Bifurcación por TIPO (issue #922): un reto de NÚMERO no tiene ubicación
+    // que editar (lat/lng/sv_* siempre a null) — montarle el editor de LUGAR
+    // (mapa, Street View) no solo confunde, escribe columnas que no le
+    // corresponden y corrompe el reto. `EditChallenge` se queda 100% de lugar.
+    if (editingChallenge.challenge_kind === 'number') {
+      return (
+        <EditNumberChallenge
+          challenge={editingChallenge}
+          onBack={() => setEditingChallenge(null)}
+          onSaved={() => {
+            setEditingChallenge(null)
+            void refresh()
+          }}
+        />
+      )
+    }
     return (
       <EditChallenge
         challenge={editingChallenge}

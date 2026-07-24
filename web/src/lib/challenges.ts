@@ -665,6 +665,86 @@ export async function updateChallenge(
 }
 
 /**
+ * Campos editables de un reto de NÚMERO ("¿Cuánto?"). HERMANO de
+ * `UpdateChallengeInput` pero para `challenge_kind = 'number'`: nunca toca
+ * lat/lng/sv_* (eso es del reto de lugar). `question`/`unit` son metadatos
+ * libres (se pueden editar siempre, con o sin jugadas). `answer`, en cambio, es
+ * la RESPUESTA: solo se puede tocar mientras el reto no tenga votos (mismo
+ * criterio que `location` en `UpdateChallengeInput`).
+ */
+export interface UpdateNumberChallengeInput {
+  title?: string
+  /** Plazo del reto en ISO absoluto (duración relativa ya congelada). */
+  deadlineAt?: string
+  /** Segundos por jugada; null = sin límite. */
+  guessSeconds?: number | null
+  /** Pregunta visible al jugar. Editable siempre (no es spoiler). */
+  question?: string
+  /** Unidad a mostrar; null/'' = sin unidad. Editable siempre (no es spoiler). */
+  unit?: string | null
+  /**
+   * Re-fija la cifra correcta (SPOILER, write-only: `answer_number_src` tiene
+   * el SELECT revocado, así que la actual NUNCA se puede releer para
+   * prefijar un formulario). Por eso solo se manda si el dueño la
+   * RE-INTRODUCE explícitamente; si no viene, `updateNumberChallenge` no
+   * toca ni la cifra ni los decimales. Solo se admite sin votos (ver abajo).
+   */
+  answer?: {
+    answerNumber: number
+    /** Decimales a mostrar (0–4); se infiere de cómo se escribe la nueva cifra. */
+    decimals: number
+  }
+}
+
+/**
+ * Edita un reto de NÚMERO. Solo el dueño del grupo lo consigue (misma RLS
+ * `challenges_update_owner`). NUNCA escribe lat/lng/sv_* (esas columnas son del
+ * reto de lugar; un reto de número las tiene siempre a null).
+ *
+ * REGLA DE INTEGRIDAD (hermana de `updateChallenge`/`location`): la RESPUESTA
+ * (`answer_number_src` + `number_decimals`) solo se puede cambiar mientras el
+ * reto no tenga votos. Con jugadas ya guardadas, cambiar la cifra dejaría el
+ * histórico de aciertos comparado contra una respuesta que ya no es la que se
+ * jugó. `countVotes` se comprueba aquí, en la capa de datos, aunque la UI ya
+ * bloquee el campo: la regla no debe depender solo del cliente.
+ */
+export async function updateNumberChallenge(
+  id: string,
+  input: UpdateNumberChallengeInput,
+): Promise<ChallengeForPlay> {
+  const patch: ChallengeUpdate = {}
+  if (input.title !== undefined) patch.title = input.title
+  if (input.deadlineAt !== undefined) patch.deadline_at = input.deadlineAt
+  if (input.guessSeconds !== undefined) patch.guess_seconds = input.guessSeconds
+  if (input.question !== undefined) patch.number_question = input.question
+  if (input.unit !== undefined) patch.number_unit = input.unit?.trim() ? input.unit.trim() : null
+
+  if (input.answer !== undefined) {
+    const votes = await countVotes(id)
+    if (votes > 0) {
+      throw new Error('No se puede cambiar la respuesta de un reto que ya tiene jugadas.')
+    }
+    // La cifra correcta (SPOILER): entra por answer_number_src, igual que al
+    // crear; el trigger `sync_challenge_answer` la re-espeja a
+    // challenge_answers.answer_number en la misma transacción.
+    patch.answer_number_src = input.answer.answerNumber
+    patch.number_decimals = input.answer.decimals
+  }
+
+  const { data, error } = await supabase
+    .from('challenges')
+    .update(patch)
+    .eq('id', id)
+    // RETURNING sin la respuesta (answer_number_src revocada). Si cambió la
+    // cifra, el trigger ya la sincronizó con challenge_answers.answer_number.
+    .select(CHALLENGE_COLUMNS_NO_ANSWER)
+    .single<ChallengeForPlay>()
+  if (error) throw error
+
+  return data
+}
+
+/**
  * Edita SOLO la descripción del día de un reto (texto editorial; no toca la
  * mecánica). Atajo de `updateChallenge` para la edición inline del detalle del
  * momento. Recorta espacios y guarda `null` si queda vacía (estado "sin texto").
