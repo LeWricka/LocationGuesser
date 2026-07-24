@@ -106,12 +106,60 @@ export function clearObservabilityUser(): void {
 }
 
 /**
+ * Normaliza cualquier valor a un `Error` REAL para Sentry. Motivo (LOCATIONGUESSER-1A):
+ * Sentry titula/agrupa/busca por el `message` de un `Error`; los errores de
+ * Supabase/PostgREST son OBJETOS PLANOS (`{ message, code, details, hint }`), no
+ * `Error`, así que `captureException(objeto)` los guardaba como "Object captured as
+ * exception with keys: …" — irreconocibles y NO searchable (así se ocultó el RLS
+ * 42501 de `moment_images`). Convertimos a un `Error` con el `message` y el `code`
+ * en el nombre; devolvemos `code/details/hint` como extra para no perderlos.
+ * Un `Error` de verdad se devuelve tal cual (comportamiento intacto).
+ */
+export function toReportableError(error: unknown): {
+  error: Error
+  extra?: Record<string, unknown>
+} {
+  if (error instanceof Error) return { error }
+  if (error && typeof error === 'object') {
+    const o = error as Record<string, unknown>
+    const message = typeof o.message === 'string' && o.message.length > 0 ? o.message : null
+    if (message) {
+      const normalized = new Error(message)
+      if (typeof o.code === 'string' && o.code.length > 0) {
+        // p.ej. 'SupabaseError(42501)': distingue la CLASE sin ensuciar el message.
+        normalized.name = `SupabaseError(${o.code})`
+      }
+      const extra: Record<string, unknown> = {}
+      for (const key of ['code', 'details', 'hint'] as const) {
+        if (o[key] != null) extra[key] = o[key]
+      }
+      return { error: normalized, extra: Object.keys(extra).length > 0 ? extra : undefined }
+    }
+  }
+  // Primitivo u objeto sin `message`: preserva algo legible sin arriesgar circulares.
+  const fallback = typeof error === 'string' ? error : safeStringify(error)
+  return { error: new Error(fallback) }
+}
+
+function safeStringify(value: unknown): string {
+  try {
+    return `Non-Error: ${JSON.stringify(value)}`
+  } catch {
+    return `Non-Error: ${String(value)}`
+  }
+}
+
+/**
  * Captura manual de un error con contexto opcional (área, ids…). Se encola si el
  * SDK aún no cargó. No-op si la observabilidad no está activa. Útil en `catch`
- * donde queremos registrar el fallo aunque la UI lo maneje con un toast.
+ * donde queremos registrar el fallo aunque la UI lo maneje con un toast. Normaliza
+ * los no-`Error` (p.ej. errores de Supabase) para que salgan legibles en Sentry.
  */
 export function reportError(error: unknown, context?: Record<string, unknown>): void {
-  enqueue((s) => s.captureException(error, context ? { extra: context } : undefined))
+  const { error: normalized, extra } = toReportableError(error)
+  const merged = { ...extra, ...context }
+  const hasExtra = Object.keys(merged).length > 0
+  enqueue((s) => s.captureException(normalized, hasExtra ? { extra: merged } : undefined))
 }
 
 /**
