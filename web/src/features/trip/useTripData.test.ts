@@ -50,6 +50,7 @@ function makeVote(overrides: Partial<VoteWithName>): VoteWithName {
     left_app: false,
     elapsed_seconds: null,
     play_started_at: null,
+    scored_seconds: null,
     created_at: '2026-07-01T10:00:00.000Z',
     ...overrides,
   }

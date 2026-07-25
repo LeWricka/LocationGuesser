@@ -66,6 +66,27 @@ export function fmtElapsed(seconds: number | null): string {
   return `${minutes} m ${secs.toString().padStart(2, '0')} s`
 }
 
+/**
+ * Tiempo de RESPUESTA con 1 decimal, formato es-ES (coma) — "33,4 s" (issue
+ * #946): `votes.scored_seconds` es el número EXACTO que el servidor usó para
+ * el factor de velocidad (migración 0047), así que mostrarlo tal cual acaba
+ * con el "mismo tiempo, distinta nota" que confundía al redondear a segundos
+ * enteros (dos personas con 33,2 s y 33,7 s salían ambas como "33 s"). A
+ * diferencia de `fmtElapsed` (segundos enteros, "1 m 05 s" pasado el minuto),
+ * esta SIEMPRE es la cifra corta en segundos — el límite por jugada no pasa
+ * de unos pocos minutos. `null` (voto legado sin `scored_seconds`, reto sin
+ * límite o `time_scoring` apagado) → "—": el llamador debe caer a `fmtElapsed`
+ * con `elapsed_seconds` en ese caso, no inventar un decimal que no hay.
+ */
+export function fmtElapsed1(seconds: number | null): string {
+  if (seconds == null) return '—'
+  const clamped = Math.max(0, seconds)
+  return `${clamped.toLocaleString('es-ES', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })} s`
+}
+
 // Fecha+hora ABSOLUTA en español, instanciada una sola vez (mismo patrón que
 // `dateFmt`/`longFmt` en MomentCard/TripWrap): coste de parseo de Intl una vez,
 // no en cada llamada.

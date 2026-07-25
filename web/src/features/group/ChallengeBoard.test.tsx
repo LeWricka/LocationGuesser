@@ -22,6 +22,7 @@ function vote(
     left_app: false,
     elapsed_seconds: null,
     play_started_at: null,
+    scored_seconds: null,
     created_at: '2026-01-01T00:00:00Z',
     avatar: null,
     ...over,
@@ -70,6 +71,45 @@ describe('ChallengeBoard — selección de fila (issue #824)', () => {
   test('sin onSelectUser, tocar una fila no revienta', () => {
     render(<ChallengeBoard votes={votes} myUserId={null} />)
     expect(() => fireEvent.click(screen.getByRole('button', { name: /Ana/ }))).not.toThrow()
+  })
+})
+
+// Issue #946 (migración 0047): el tiempo mostrado debe ser el MISMO que puntuó.
+describe('ChallengeBoard — tiempo mostrado = tiempo que puntuó (issue #946)', () => {
+  test('con scored_seconds: se pinta con 1 decimal, formato es-ES (coma)', () => {
+    render(
+      <ChallengeBoard
+        votes={[
+          vote({
+            user_id: 'a',
+            display_name: 'Ana',
+            points: 100,
+            elapsed_seconds: 33,
+            scored_seconds: 33.4,
+          }),
+        ]}
+        myUserId={null}
+      />,
+    )
+    expect(screen.getByText('33,4 s')).toBeInTheDocument()
+  })
+
+  test('scored_seconds null (legacy / número / Libre): cae a elapsed_seconds entero', () => {
+    render(
+      <ChallengeBoard
+        votes={[
+          vote({
+            user_id: 'a',
+            display_name: 'Ana',
+            points: 100,
+            elapsed_seconds: 12,
+            scored_seconds: null,
+          }),
+        ]}
+        myUserId={null}
+      />,
+    )
+    expect(screen.getByText('12 s')).toBeInTheDocument()
   })
 })
 

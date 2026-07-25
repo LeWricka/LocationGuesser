@@ -464,6 +464,7 @@ function vote(
     left_app: false,
     elapsed_seconds: 18,
     play_started_at: null,
+    scored_seconds: null,
     created_at: isoFromNow(-2 * DAY + HOUR),
     ...over,
   }

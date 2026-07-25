@@ -193,6 +193,7 @@ function vote(
     left_app: false,
     elapsed_seconds: 14,
     play_started_at: null,
+    scored_seconds: null,
     created_at: daysAgoIso(4),
     ...over,
   }

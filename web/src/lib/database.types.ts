@@ -385,6 +385,13 @@ export interface Database {
           // copiado aquí al confirmar el voto. Null = sin arranque registrado
           // (legacy, reto sin límite, o start_play falló). Migración 0034 (#628).
           play_started_at: string | null
+          // Tiempo EXACTO (acotado a [0, guess_seconds], redondeado a 1 decimal)
+          // que el servidor usó para el factor de velocidad — el MISMO número
+          // que se muestra en el marcador (issue #946, fin del empate falso de
+          // `elapsed_seconds` redondeado a segundos enteros). Null cuando el
+          // factor no aplicó (Libre, time_scoring OFF, sin arranque, legacy) o
+          // en voto de timeout. Migración 0047.
+          scored_seconds: number | null
           created_at: string
         }
         Insert: {
@@ -401,6 +408,7 @@ export interface Database {
           left_app?: boolean
           elapsed_seconds?: number | null
           play_started_at?: string | null
+          scored_seconds?: number | null
           created_at?: string
         }
         Update: {
@@ -417,6 +425,7 @@ export interface Database {
           left_app?: boolean
           elapsed_seconds?: number | null
           play_started_at?: string | null
+          scored_seconds?: number | null
           created_at?: string
         }
         Relationships: []
@@ -513,6 +522,9 @@ export interface Database {
           // time_scoring=false, legacy o sin arranque registrado). Migración 0034
           // (#628); ver `speedFactor` en lib/geo.ts.
           speed_factor: number
+          // Tiempo EXACTO (1 decimal) que usó ese factor; null si no aplicó.
+          // Migración 0047 (#946) — el mismo valor que `votes.scored_seconds`.
+          scored_seconds: number | null
         }[]
       }
       // Registra el arranque de la jugada (issue #628): lo llama el cliente al

@@ -3,7 +3,7 @@ import { Avatar, Icon } from '../../ui'
 import { Medal } from '../../ui/Medal'
 import type { VoteWithName } from '../../lib/leaderboard'
 import { fmtDist, fmtNumber } from '../../lib/geo'
-import { fmtElapsed } from '../../lib/time'
+import { fmtElapsed, fmtElapsed1 } from '../../lib/time'
 import styles from './ChallengeBoard.module.css'
 
 /** Fila ya ordenada y con el PUESTO calculado (issue #811: el mismo orden
@@ -18,6 +18,10 @@ export interface ChallengeBoardRow {
   guessNumber: number | null
   absError: number | null
   elapsedSeconds: number | null
+  /** Tiempo EXACTO (1 decimal) que puntuó, `votes.scored_seconds` (issue #946,
+   * migración 0047). Null en votos legado/`Libre`/número: la fila cae a
+   * `elapsedSeconds` (ver render de `boardTime` más abajo). */
+  scoredSeconds: number | null
   leftApp: boolean
   isMe: boolean
 }
@@ -43,6 +47,7 @@ export function rankedRowsOf(votes: VoteWithName[], myUserId: string | null): Ch
       guessNumber: v.guess_number,
       absError: v.abs_error,
       elapsedSeconds: v.elapsed_seconds,
+      scoredSeconds: v.scored_seconds,
       leftApp: v.left_app,
       isMe: v.user_id === myUserId,
     }))
@@ -115,7 +120,9 @@ interface Props {
 /**
  * Clasificación DE UN RETO (issue #800, extraída a compartible en el #811):
  * puesto (medalla top-3 / número) + avatar + nombre + puntos + distancia (o
- * cifra, en un reto de número) + TIEMPO de respuesta (`votes.elapsed_seconds`).
+ * cifra, en un reto de número) + TIEMPO de respuesta — `votes.scored_seconds`
+ * (1 decimal, el mismo número que puntuó, issue #946) con fallback a
+ * `votes.elapsed_seconds` (entero, votos legado/`Libre`/número).
  * La usan `ChallengeDetail` (histórico del viaje, detalle oscuro inmersivo —
  * `tone="dark"`) y `PlayChallenge` (revelado justo tras jugar, sobre papel —
  * `tone` por defecto) — mismo componente y mismos DATOS en los dos sitios,
@@ -195,7 +202,11 @@ export function ChallengeBoard({
                         ? fmtDist(row.distanceKm)
                         : '—'}
                   </span>
-                  <span className={styles.boardTime}>{fmtElapsed(row.elapsedSeconds)}</span>
+                  <span className={styles.boardTime}>
+                    {row.scoredSeconds != null
+                      ? fmtElapsed1(row.scoredSeconds)
+                      : fmtElapsed(row.elapsedSeconds)}
+                  </span>
                 </button>
               </li>
             )

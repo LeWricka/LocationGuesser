@@ -49,6 +49,7 @@ import { upsertProfile } from '../../lib/profile'
 import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
+import { fmtElapsed, fmtElapsed1 } from '../../lib/time'
 import { track } from '../../lib/analytics'
 import { ChallengeClosedError, describeError, ResourceGoneError } from '../../lib/errors'
 import { addBreadcrumb, reportError } from '../../lib/observability'
@@ -182,10 +183,17 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // tiene sentido con límite por jugada (guess_seconds no null): sin límite
   // ("Libre") no hay contra qué medir. `factor` es null cuando no se puede
   // confirmar que aplicó (degradación honesta): entonces solo se enseña el
-  // tiempo, sin la nota "×0,9 por rapidez".
-  const [speedInfo, setSpeedInfo] = useState<{ seconds: number; factor: number | null } | null>(
-    null,
-  )
+  // tiempo, sin la nota "×0,9 por rapidez". `seconds` es el tiempo que PUNTÚA
+  // (issue #946): `scored_seconds` del servidor (1 decimal) cuando el factor
+  // aplicó, o el entero medido en cliente como fallback. `exact` distingue cuál
+  // de los dos es (mismo criterio que `ChallengeBoard`): con `exact`, se pinta
+  // con `fmtElapsed1` (1 decimal, el número que REALMENTE puntuó); sin él, con
+  // `fmtElapsed` (entero) — nunca un decimal inventado sobre un dato aproximado.
+  const [speedInfo, setSpeedInfo] = useState<{
+    seconds: number
+    exact: boolean
+    factor: number | null
+  } | null>(null)
   // Nombre del grupo para la tarjeta de "compartir mi resultado". El componente
   // solo recibe el código del grupo (groupId); el nombre lo leemos aparte. Null
   // hasta resolver (o si no hay grupo / falla): la tarjeta cae a "tu grupo".
@@ -375,8 +383,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         // por jugada (sin límite, "Libre", no hay nada que medir). El factor viene
         // del SERVIDOR (res.speedFactor): es la verdad de lo que se aplicó, no una
         // estimación del reloj local (que podría no coincidir si `start_play` falló).
+        // El tiempo mostrado es el mismo que puntuó (issue #946): `res.scoredSeconds`
+        // (1 decimal) si el servidor lo calculó, y solo si no, el entero de cliente.
         if (current.guess_seconds != null && elapsedSeconds != null) {
-          setSpeedInfo({ seconds: elapsedSeconds, factor: res.speedFactor })
+          setSpeedInfo({
+            seconds: res.scoredSeconds ?? elapsedSeconds,
+            exact: res.scoredSeconds != null,
+            factor: res.speedFactor,
+          })
         }
         // Gran acierto: patrón háptico de celebración (si lo soporta y no hay
         // reduced-motion), en sincronía con el destello/confeti del revelado.
@@ -629,9 +643,13 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             // se intenta estimar); con él presente, se recalcula el factor con el
             // MISMO `elapsed_seconds` ya persistido (muy cercano al que usó el
             // servidor en su momento) — es una nota informativa, no repuntúa nada.
+            // El tiempo mostrado es `scored_seconds` (1 decimal, el que puntuó,
+            // issue #946) si el voto ya lo tiene persistido, y solo si no
+            // (voto anterior a la migración 0047), el entero de `elapsed_seconds`.
             if (c.guess_seconds != null && existing.elapsed_seconds != null) {
               setSpeedInfo({
-                seconds: existing.elapsed_seconds,
+                seconds: existing.scored_seconds ?? existing.elapsed_seconds,
+                exact: existing.scored_seconds != null,
                 factor:
                   existing.play_started_at != null
                     ? speedFactor(existing.elapsed_seconds, c.guess_seconds, c.time_scoring)
@@ -1457,7 +1475,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                       {speedInfo && (
                         <span className={`${styles.rank} ${styles.distIn}`}>
                           <Icon icon={Timer} size={14} />
-                          Respondiste en {speedInfo.seconds}s
+                          Respondiste en{' '}
+                          {speedInfo.exact
+                            ? fmtElapsed1(speedInfo.seconds)
+                            : fmtElapsed(speedInfo.seconds)}
                           {speedInfo.factor != null && Math.round(speedInfo.factor * 10) !== 10 && (
                             <>
                               {' · ×'}
