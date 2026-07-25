@@ -153,6 +153,71 @@ export async function linkAnonymousEmail(email: string): Promise<void> {
   if (error) throw error
 }
 
+// ── Fusión de cuentas: el email ya pertenece a otra cuenta (issue #944) ───────
+// Cuando `linkAnonymousEmail` (updateUser email) choca porque el correo YA está
+// registrado, en vez de morir con el error ofrecemos ENTRAR en esa cuenta y
+// traernos lo del invitado. Estas piezas soportan ese flujo. Ver
+// `useAccountUpgrade` y la migración 0046.
+
+/**
+ * ¿El error de `updateUser({email})` es "ese email ya tiene cuenta"? Lo
+ * detectamos por CÓDIGO/estado de Supabase, no por el texto en inglés (que
+ * cambia de redacción/idioma en el servidor). Supabase-js lanza un
+ * `AuthApiError` con `code: 'email_exists'` (y `status: 422`) en este caso;
+ * mantenemos también el emparejamiento por mensaje como red por si un despliegue
+ * antiguo aún no trae el código. Distinguir esto de un fallo genérico es lo que
+ * dispara el flujo de login+fusión en vez de un toast crudo.
+ */
+export function isEmailAlreadyRegisteredError(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false
+  const e = err as { code?: unknown; status?: unknown; message?: unknown }
+  if (e.code === 'email_exists' || e.code === 'user_already_exists') return true
+  const message = typeof e.message === 'string' ? e.message.toLowerCase() : ''
+  // "A user with this email address has already been registered"
+  return e.status === 422 && (message.includes('already') || message.includes('registered'))
+}
+
+/**
+ * Pide un token de fusión (issue #944). La llama el INVITADO ANÓNIMO, ANTES de
+ * abandonar su sesión anónima: el token prueba que controla esa sesión de origen
+ * y se queda SOLO en el dispositivo (nunca se persiste ni viaja fuera). Caduca a
+ * 15 min y es de un solo uso (server-side, migración 0046).
+ */
+export async function requestAccountMerge(): Promise<string> {
+  const { data, error } = await supabase.rpc('request_account_merge')
+  if (error) throw error
+  if (!data) throw new Error('No se pudo iniciar la fusión de cuentas')
+  return data
+}
+
+/**
+ * Completa la fusión (issue #944). La llama la cuenta DESTINO, YA logueada (tras
+ * `verifyEmailOtp`): el servidor valida el token del `sourceUid` anónimo y
+ * reasigna todos sus datos a la cuenta destino. Idempotente ante un reintento:
+ * si algunas filas ya se movieron, mover el resto y consumir el token.
+ */
+export async function completeAccountMerge(sourceUid: string, token: string): Promise<void> {
+  const { error } = await supabase.rpc('complete_account_merge', {
+    p_source_uid: sourceUid,
+    p_token: token,
+  })
+  if (error) throw error
+}
+
+/**
+ * Envía el código de login para ENTRAR en una cuenta que YA existe (issue #944).
+ * A diferencia de `sendEmailOtp`, aquí `shouldCreateUser: false`: no queremos
+ * crear una cuenta nueva, solo iniciar sesión en la existente para poder
+ * fusionar. El OTP resultante se canjea con `verifyEmailOtp` (type 'email').
+ */
+export async function sendExistingAccountLoginOtp(email: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: { shouldCreateUser: false },
+  })
+  if (error) throw error
+}
+
 /**
  * Canjea el código de 6 dígitos del paso anterior. `type: 'email_change'` es
  * el tipo de OTP que emite `updateUser({ email })` sobre una sesión ya

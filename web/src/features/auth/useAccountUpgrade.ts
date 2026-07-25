@@ -12,12 +12,33 @@
 // hacer si el usuario no quiere seguir — su sesión anónima y su voto quedan
 // intactos, esto nunca bloquea nada.
 
-import { useState } from 'react'
-import { linkAnonymousEmail, verifyLinkEmailOtp } from '../../lib/auth'
+import { useRef, useState } from 'react'
+import {
+  completeAccountMerge,
+  getUser,
+  isEmailAlreadyRegisteredError,
+  linkAnonymousEmail,
+  requestAccountMerge,
+  sendExistingAccountLoginOtp,
+  verifyEmailOtp,
+  verifyLinkEmailOtp,
+} from '../../lib/auth'
 import { track } from '../../lib/analytics'
 import { describeError } from '../../lib/errors'
+import { reportError } from '../../lib/observability'
 
 export type AccountUpgradeStep = 'email' | 'code'
+
+/**
+ * Vía por la que se resuelve el upgrade (issue #944):
+ *  - 'link': el email está LIBRE → se vincula la sesión anónima a ese email
+ *    conservando el mismo uid (flujo de #758, updateUser + OTP email_change).
+ *  - 'merge': el email YA pertenece a otra cuenta → se ENTRA en esa cuenta (OTP
+ *    de login) y se FUSIONAN en ella los datos de este dispositivo. El paso de
+ *    código es el mismo, pero verifica un OTP distinto y luego llama a la RPC de
+ *    fusión.
+ */
+export type AccountUpgradeMode = 'link' | 'merge'
 
 /**
  * Contexto de dónde se ofreció el CTA (issue #751): sin esto `account_upgraded`
@@ -38,6 +59,11 @@ export interface AccountUpgradeContext {
 
 export interface AccountUpgrade {
   step: AccountUpgradeStep
+  /**
+   * Vía en curso (issue #944). El paso de código cambia su copy según sea 'link'
+   * (vincular email libre) o 'merge' (entrar en la cuenta existente y fusionar).
+   */
+  mode: AccountUpgradeMode
   email: string
   setEmail: (value: string) => void
   code: string
@@ -71,14 +97,59 @@ function isValidCode(value: string): boolean {
   return /^\d{6}$/.test(value.trim())
 }
 
+function upgradedProps(context: AccountUpgradeContext, merged: boolean) {
+  return {
+    origin: context.origin,
+    ...(context.groupId && { group_id: context.groupId }),
+    ...(context.challengeId && { challenge_id: context.challengeId }),
+    // Solo marcamos la vía cuando fue fusión (issue #944); el flujo normal deja
+    // el evento intacto para no romper el resto del funnel ya instrumentado.
+    ...(merged && { merged: true }),
+  }
+}
+
 export function useAccountUpgrade(context: AccountUpgradeContext): AccountUpgrade {
   const [step, setStep] = useState<AccountUpgradeStep>('email')
+  const [mode, setMode] = useState<AccountUpgradeMode>('link')
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [resending, setResending] = useState(false)
   const [verifying, setVerifying] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Datos de la fusión (issue #944): el uid de la sesión anónima ORIGEN y su
+  // token, capturados mientras aún somos anónimos. Van en un ref (no state): son
+  // datos de control del flujo, no afectan al render, y no deben perderse entre
+  // repintados. El token nunca se persiste: vive solo aquí, en memoria.
+  const mergeRef = useRef<{ sourceUid: string; token: string } | null>(null)
+  // ¿Ya iniciamos sesión en la cuenta destino? (verifyEmailOtp hecho). Si un
+  // reintento de la fusión ocurre tras esto, NO hay que re-canjear el OTP (ya
+  // está consumido y la sesión ya es la destino): se salta directo a la RPC.
+  const targetSessionRef = useRef(false)
+
+  // Arranca el flujo de FUSIÓN cuando el email ya tiene cuenta (issue #944). Se
+  // ejecuta AÚN en la sesión anónima: (1) fija el uid origen, (2) pide el token,
+  // (3) manda el código de LOGIN a la cuenta existente. Devuelve false (con error
+  // fijado) si algo de esto falla.
+  async function startMerge(esReenvio: boolean): Promise<boolean> {
+    try {
+      const user = await getUser()
+      if (!user) {
+        setError('No pudimos preparar la fusión. Vuelve a intentarlo.')
+        return false
+      }
+      const token = await requestAccountMerge()
+      mergeRef.current = { sourceUid: user.id, token }
+      await sendExistingAccountLoginOtp(email.trim())
+      setMode('merge')
+      track('login_email_solicitado', { reenvio: esReenvio })
+      return true
+    } catch (err) {
+      setError(`No pudimos preparar el acceso a tu cuenta: ${describeError(err)}`)
+      return false
+    }
+  }
 
   async function send(esReenvio: boolean): Promise<boolean> {
     setError(null)
@@ -88,9 +159,15 @@ export function useAccountUpgrade(context: AccountUpgradeContext): AccountUpgrad
     }
     try {
       await linkAnonymousEmail(email.trim())
+      setMode('link')
       track('login_email_solicitado', { reenvio: esReenvio })
       return true
     } catch (err) {
+      // El email YA pertenece a otra cuenta: en vez de morir, ofrecemos ENTRAR en
+      // ella y fusionar (issue #944). Cualquier otro error → mensaje normal.
+      if (isEmailAlreadyRegisteredError(err)) {
+        return startMerge(esReenvio)
+      }
       setError(`No pudimos enviar el código: ${describeError(err)}`)
       return false
     }
@@ -102,14 +179,85 @@ export function useAccountUpgrade(context: AccountUpgradeContext): AccountUpgrad
     setLoading(false)
     if (ok) {
       setCode('')
+      targetSessionRef.current = false
       setStep('code')
     }
   }
 
   async function resend(): Promise<void> {
     setResending(true)
-    await send(true)
+    if (mode === 'merge') {
+      // Ya estamos en el flujo de fusión: reenviar es re-mandar el código de LOGIN
+      // a la cuenta existente (no volver a intentar el updateUser).
+      setError(null)
+      try {
+        await sendExistingAccountLoginOtp(email.trim())
+        track('login_email_solicitado', { reenvio: true })
+      } catch (err) {
+        setError(`No pudimos reenviar el código: ${describeError(err)}`)
+      }
+    } else {
+      await send(true)
+    }
     setResending(false)
+  }
+
+  async function verifyLink(): Promise<boolean> {
+    try {
+      // Al verificar, la sesión pasa de anónima a permanente CON EL MISMO uid:
+      // onAuthStateChange dispara y AuthProvider repinta solo (no hay que navegar).
+      await verifyLinkEmailOtp(email, code)
+      track('account_upgraded', upgradedProps(context, false))
+      return true
+    } catch {
+      setError('Código incorrecto o caducado. Revísalo o reenvía uno nuevo.')
+      return false
+    }
+  }
+
+  async function verifyMerge(): Promise<boolean> {
+    const merge = mergeRef.current
+    if (!merge) {
+      setError('Se perdió el contexto de la fusión. Vuelve a empezar.')
+      return false
+    }
+    // Paso 1: entrar en la cuenta EXISTENTE (salvo que ya lo hayamos hecho en un
+    // intento anterior — el OTP es de un solo uso, no se re-canjea).
+    if (!targetSessionRef.current) {
+      try {
+        await verifyEmailOtp(email, code)
+      } catch {
+        setError('Código incorrecto o caducado. Revísalo o reenvía uno nuevo.')
+        return false
+      }
+      targetSessionRef.current = true
+    }
+    // Paso 2: ya logueados en la cuenta destino, traer los datos del invitado.
+    try {
+      await completeAccountMerge(merge.sourceUid, merge.token)
+    } catch (err) {
+      // Estamos DENTRO de la cuenta, pero la fusión falló. No mentimos con éxito:
+      // dejamos el paso abierto para reintentar (Confirmar re-llama solo a la RPC,
+      // ya no al OTP). El invitado no pierde nada: sus datos siguen ahí.
+      //
+      // FALLO SILENCIOSO NO (es auth): reportamos a Sentry con el contexto justo
+      // para recuperar el huérfano a mano si el reintento tampoco cuaja —
+      // source_uid (la sesión anónima con los datos) y target_uid (la cuenta
+      // destino, ya la sesión actual). NUNCA el token (secreto de un solo uso).
+      const target = await getUser().catch(() => null)
+      reportError(err, {
+        area: 'account_merge_complete',
+        source_uid: merge.sourceUid,
+        target_uid: target?.id ?? null,
+      })
+      setError(
+        `Entraste en tu cuenta, pero no pudimos traer del todo lo de este ` +
+          `dispositivo (${describeError(err)}). Pulsa Confirmar para reintentar.`,
+      )
+      return false
+    }
+    track('account_upgraded', upgradedProps(context, true))
+    return true
   }
 
   async function verify(): Promise<boolean> {
@@ -120,18 +268,7 @@ export function useAccountUpgrade(context: AccountUpgradeContext): AccountUpgrad
     }
     setVerifying(true)
     try {
-      // Al verificar, la sesión pasa de anónima a permanente CON EL MISMO uid:
-      // onAuthStateChange dispara y AuthProvider repinta solo (no hay que navegar).
-      await verifyLinkEmailOtp(email, code)
-      track('account_upgraded', {
-        origin: context.origin,
-        ...(context.groupId && { group_id: context.groupId }),
-        ...(context.challengeId && { challenge_id: context.challengeId }),
-      })
-      return true
-    } catch {
-      setError('Código incorrecto o caducado. Revísalo o reenvía uno nuevo.')
-      return false
+      return mode === 'merge' ? await verifyMerge() : await verifyLink()
     } finally {
       setVerifying(false)
     }
@@ -139,12 +276,16 @@ export function useAccountUpgrade(context: AccountUpgradeContext): AccountUpgrad
 
   function reset(): void {
     setStep('email')
+    setMode('link')
     setCode('')
     setError(null)
+    mergeRef.current = null
+    targetSessionRef.current = false
   }
 
   return {
     step,
+    mode,
     email,
     setEmail,
     code,
