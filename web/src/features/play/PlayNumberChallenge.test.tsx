@@ -30,6 +30,13 @@ vi.mock('../../lib/challenges', async (importActual) => {
   }
 })
 
+// Issue #940: sin `preloaded`, la carga pasa por `getChallengeOrNullAwaitingMembership`
+// (no `getChallengeOrNull` a pelo). Delegamos en el mismo mock — la secuencia de
+// reintento en sí se prueba de forma aislada en lib/membership.test.ts.
+vi.mock('../../lib/membership', () => ({
+  getChallengeOrNullAwaitingMembership: () => getChallengeOrNullMock(),
+}))
+
 vi.mock('../../lib/analytics', () => ({ track: vi.fn() }))
 // Issue #760: espiamos ambas para comprobar que un recurso borrado (esperable)
 // deja breadcrumb, NUNCA una excepción.

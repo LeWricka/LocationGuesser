@@ -45,8 +45,13 @@ vi.mock('../../lib/groupData', () => ({
 // alimenta la comprobación de colisión en `submitName`; por defecto sin
 // miembros (sin colisión posible) salvo que un test la sobreescriba.
 const getGroupMembersMock = vi.fn<() => Promise<{ userId: string; name: string }[]>>()
+// Issue #940: la carga del reto pasa por `getChallengeOrNullAwaitingMembership`
+// (no `getChallengeOrNull` a pelo). Por defecto delegamos en el mismo mock —
+// el test dedicado a la carrera del auto-join (más abajo) sustituye esto por
+// una implementación que simula la secuencia real.
 vi.mock('../../lib/membership', () => ({
   getGroupMembers: () => getGroupMembersMock(),
+  getChallengeOrNullAwaitingMembership: () => getChallengeMock(),
 }))
 
 // Intensidad del CTA a partir de la 2ª partida (issue #756): `getGroupVotes`

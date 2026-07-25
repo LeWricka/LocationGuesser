@@ -33,12 +33,7 @@ import { RevealBurst } from './RevealBurst'
 import { remainingSeconds } from './resumeState'
 import { SceneImage } from './SceneImage'
 import { buildChallengeLink, buildResultShareText } from './shareResult'
-import {
-  getAnswer,
-  getChallengeOrNull,
-  isPracticeChallenge,
-  type ChallengeForPlay,
-} from '../../lib/challenges'
+import { getAnswer, isPracticeChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import {
   deleteMyVote,
   getExistingVote,
@@ -48,7 +43,7 @@ import {
   submitVote,
 } from '../../lib/votes'
 import { getGroup } from '../../lib/groupData'
-import { getGroupMembers } from '../../lib/membership'
+import { getChallengeOrNullAwaitingMembership, getGroupMembers } from '../../lib/membership'
 import { aggregateLeaderboard, getGroupVotes, type VoteWithName } from '../../lib/leaderboard'
 import { upsertProfile } from '../../lib/profile'
 import { marcadorGroupHash } from '../../lib/route'
@@ -579,7 +574,16 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     let cancelled = false
     async function load() {
       try {
-        const c = await getChallengeOrNull(challengeId)
+        // Issue #940: `getChallengeOrNullAwaitingMembership` (no `getChallengeOrNull`
+        // a pelo) desambigua la carrera del auto-join de un deep link — un `null`
+        // por RLS (aún no soy miembro) ya no se confunde con un reto de verdad
+        // borrado. Ver docblock en lib/membership.ts.
+        const c = await getChallengeOrNullAwaitingMembership(
+          challengeId,
+          groupId,
+          user?.id,
+          () => cancelled,
+        )
         if (cancelled) return
         if (!c) {
           // Esperable (issue #760, LOCATIONGUESSER-Z): el dueño borró el reto
@@ -697,7 +701,7 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     return () => {
       cancelled = true
     }
-  }, [challengeId, user, checkOwn])
+  }, [challengeId, groupId, user, checkOwn])
 
   // Nombre del grupo para la tarjeta de compartir. Solo si venimos de un grupo
   // (deep link con groupId). Falla en silencio: la tarjeta cae a "tu grupo".

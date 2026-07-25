@@ -51,6 +51,7 @@ import {
   kickMember,
   setMemberRole,
   transferOwnership,
+  getChallengeOrNullAwaitingMembership,
 } from './membership'
 import { ResourceGoneError } from './errors'
 
@@ -357,5 +358,75 @@ describe('transferOwnership', () => {
     results['group_members'] = { data: null, error: new Error('denied') }
     await expect(transferOwnership('g1', 'u-new', 'u-old')).rejects.toThrow('denied')
     expect(updateCalls).not.toHaveBeenCalledWith('groups', { created_by: 'u-new' })
+  })
+})
+
+// Issue #940 (grupo `sbkzhf`, reto Filipinas): "Este reto ya no existe" con el
+// reto EXISTIENDO — la RLS `challenges_select_member` da 0 filas si el que mira
+// aún no es miembro, indistinguible de un reto de verdad borrado. El auto-join
+// del deep link (`useDeepLinkJoin`, App.tsx) es asíncrono y fire-and-forget:
+// esta función desambigua sondeando la membresía antes de declarar 'gone'.
+describe('getChallengeOrNullAwaitingMembership', () => {
+  test('no soy miembro TODAVÍA: espera a que el auto-join termine y reintenta (no "gone" prematuro)', async () => {
+    results['challenges'] = { data: null, error: null } // 1ª lectura: 0 filas (RLS, aún no soy miembro)
+    results['group_members'] = { data: null, error: null } // isMember: false al principio
+
+    // Simula que el auto-join (fire-and-forget en paralelo) termina un poco
+    // después: ya soy miembro y el reto se hace visible.
+    setTimeout(() => {
+      results['group_members'] = { data: { group_id: 'g1' }, error: null }
+      results['challenges'] = { data: { id: 'c1', group_id: 'g1' }, error: null }
+    }, 20)
+
+    const result = await getChallengeOrNullAwaitingMembership('c1', 'g1', 'u1', () => false, {
+      attempts: 15,
+      intervalMs: 5,
+    })
+    expect(result).toEqual({ id: 'c1', group_id: 'g1' })
+  })
+
+  test('reto realmente borrado (ya soy miembro): null directo, sin esperar', async () => {
+    results['challenges'] = { data: null, error: null }
+    results['group_members'] = { data: { group_id: 'g1' }, error: null } // YA soy miembro
+
+    const result = await getChallengeOrNullAwaitingMembership('c1', 'g1', 'u1', () => false)
+    expect(result).toBeNull()
+  })
+
+  test('nunca llega a ser miembro: null acotado (sin bucle infinito de reintentos)', async () => {
+    results['challenges'] = { data: null, error: null }
+    results['group_members'] = { data: null, error: null } // nunca se une
+
+    const result = await getChallengeOrNullAwaitingMembership('c1', 'g1', 'u1', () => false, {
+      attempts: 3,
+      intervalMs: 2,
+    })
+    expect(result).toBeNull()
+  })
+
+  test('sin groupId/userId (enlace suelto): no hay nada que comprobar, null directo', async () => {
+    results['challenges'] = { data: null, error: null }
+    const result = await getChallengeOrNullAwaitingMembership(
+      'c1',
+      undefined,
+      undefined,
+      () => false,
+    )
+    expect(result).toBeNull()
+  })
+
+  test('cancelado (componente desmontado): corta sin reintentar', async () => {
+    results['challenges'] = { data: null, error: null }
+    results['group_members'] = { data: null, error: null }
+    const result = await getChallengeOrNullAwaitingMembership('c1', 'g1', 'u1', () => true)
+    expect(result).toBeNull()
+  })
+
+  test('el reto SÍ existe a la primera: no comprueba membresía', async () => {
+    results['challenges'] = { data: { id: 'c1' }, error: null }
+    const result = await getChallengeOrNullAwaitingMembership('c1', 'g1', 'u1', () => false)
+    expect(result).toEqual({ id: 'c1' })
+    // No debería haber consultado group_members: el reto ya se vio a la primera.
+    expect(eqCalls).not.toHaveBeenCalledWith('group_members', expect.anything(), expect.anything())
   })
 })
