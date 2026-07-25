@@ -1,5 +1,13 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "(www\\.)?tabide\\.app" }],
+      "destination": "https://www.momentu.art/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/v/:code", "destination": "/api/share?kind=trip&code=:code" },
     { "source": "/j/:code", "destination": "/api/share?kind=challenge&code=:code" }
