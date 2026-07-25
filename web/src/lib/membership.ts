@@ -4,7 +4,11 @@
 
 import { supabase } from './supabase'
 import { isLive } from './groupData'
-import { CHALLENGE_COLUMNS_NO_ANSWER, type ChallengeForPlay } from './challenges'
+import {
+  CHALLENGE_COLUMNS_NO_ANSWER,
+  getChallengeOrNull,
+  type ChallengeForPlay,
+} from './challenges'
 import { getErrorCode, ResourceGoneError } from './errors'
 
 /** Estado de un grupo en la home (cuentas-y-home.md §3.1, tarjetas "Tus grupos"). */
@@ -86,6 +90,68 @@ export async function isMember(groupId: string, userId: string): Promise<boolean
     .maybeSingle()
   if (error) throw error
   return data !== null
+}
+
+/**
+ * Sondea `isMember` a intervalos cortos hasta confirmar la membresía o agotar
+ * los intentos (issue #940). Se usa SOLO para desambiguar la carrera del
+ * auto-join de un deep link: sondear la causa real es más fiable que un
+ * retraso a ciegas (no sabemos cuánto tarda el `signInAnonymously` +
+ * `joinGroup` en curso). Nunca lanza: un fallo de red durante el sondeo cuenta
+ * como "todavía no confirmado" e intenta el siguiente turno; acotado por
+ * `attempts`, así que nunca queda en bucle infinito.
+ */
+async function waitForMembership(
+  groupId: string,
+  userId: string,
+  isCancelled: () => boolean,
+  attempts: number,
+  intervalMs: number,
+): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    if (isCancelled()) return false
+    const member = await isMember(groupId, userId).catch(() => false)
+    if (member) return true
+    if (i < attempts - 1) await new Promise((resolve) => setTimeout(resolve, intervalMs))
+  }
+  return false
+}
+
+/**
+ * Carga un reto tolerando la carrera del auto-join en un deep link compartido
+ * (issue #940, grupo `sbkzhf`/reto Filipinas: "Este reto ya no existe" con el
+ * reto existiendo). La RLS `challenges_select_member` exige ser miembro para
+ * leer un reto: quien abre `#g=<code>&c=<challengeId>` sin serlo TODAVÍA ve 0
+ * filas — INDISTINGUIBLE, en la respuesta, de un reto de verdad borrado. El
+ * auto-join (`useDeepLinkJoin`, en App.tsx) es asíncrono y fire-and-forget, así
+ * que puede no haber terminado cuando el player intenta leer el reto.
+ *
+ * Antes de declarar `null` (→ 'gone' en los players), si la primera lectura no
+ * encuentra el reto Y tenemos `groupId`/`userId` para comprobar la causa:
+ * 1. Si YA somos miembro, el `null` es real (la RLS no lo habría bloqueado) →
+ *    se devuelve sin más — un reto de verdad borrado sigue mostrando 'gone'.
+ * 2. Si aún NO somos miembro, esperamos (acotado) a que el auto-join termine
+ *    y reintentamos la lectura UNA sola vez. Sin `groupId`/`userId` (enlace
+ *    suelto, o sesión aún sin resolver), no hay nada que comprobar: se
+ *    devuelve el `null` de la primera lectura tal cual.
+ */
+export async function getChallengeOrNullAwaitingMembership(
+  challengeId: string,
+  groupId: string | undefined,
+  userId: string | undefined,
+  isCancelled: () => boolean,
+  { attempts = 6, intervalMs = 350 }: { attempts?: number; intervalMs?: number } = {},
+): Promise<ChallengeForPlay | null> {
+  const first = await getChallengeOrNull(challengeId)
+  if (first || !groupId || !userId || isCancelled()) return first
+
+  const alreadyMember = await isMember(groupId, userId).catch(() => false)
+  if (isCancelled() || alreadyMember) return first
+
+  const joined = await waitForMembership(groupId, userId, isCancelled, attempts, intervalMs)
+  if (isCancelled() || !joined) return first
+
+  return getChallengeOrNull(challengeId)
 }
 
 /** Miembro del grupo, con nombre para mostrar y rol, para la lista de gente (#146). */

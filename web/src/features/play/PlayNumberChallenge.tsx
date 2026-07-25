@@ -17,12 +17,8 @@ import { RevealBurst } from './RevealBurst'
 import { NumberPad } from './NumberPad'
 import { SceneImage } from './SceneImage'
 import { remainingSeconds } from './resumeState'
-import {
-  getNumberAnswer,
-  getChallengeOrNull,
-  isPracticeChallenge,
-  type ChallengeForPlay,
-} from '../../lib/challenges'
+import { getNumberAnswer, isPracticeChallenge, type ChallengeForPlay } from '../../lib/challenges'
+import { getChallengeOrNullAwaitingMembership } from '../../lib/membership'
 import { deleteMyVote, getExistingVote, getVotesWithNames, submitNumberVote } from '../../lib/votes'
 import type { VoteWithName } from '../../lib/leaderboard'
 import { fmtNumber, signedRelErrorPct } from '../../lib/geo'
@@ -247,7 +243,17 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
     let cancelled = false
     async function load() {
       try {
-        const c = preloaded ?? (await getChallengeOrNull(challengeId))
+        // Issue #940: sin `preloaded` (llegada directa a este componente, sin pasar
+        // por PlayChallenge), `getChallengeOrNullAwaitingMembership` desambigua la
+        // carrera del auto-join de un deep link — ver docblock en lib/membership.ts.
+        const c =
+          preloaded ??
+          (await getChallengeOrNullAwaitingMembership(
+            challengeId,
+            groupId,
+            user?.id,
+            () => cancelled,
+          ))
         if (cancelled) return
         if (!c) {
           // Esperable (issue #760): el dueño borró el reto tras compartir el
@@ -327,7 +333,7 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
     return () => {
       cancelled = true
     }
-  }, [challengeId, user, preloaded, checkOwn])
+  }, [challengeId, groupId, user, preloaded, checkOwn])
 
   // Inicio del cronómetro de respuesta (wall-clock desde el start_at persistido).
   useEffect(() => {
