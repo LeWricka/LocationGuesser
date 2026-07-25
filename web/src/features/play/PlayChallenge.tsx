@@ -814,10 +814,11 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   }
 
   // Autoridad de servidor para el factor de velocidad (issue #628): registra el
-  // arranque ANTES de que corra el reloj. Best-effort con UN reintento corto: si
-  // las dos llamadas fallan, el juego sigue igual — sin arranque registrado,
-  // `submit_vote` aplicará factor 1 (degradación honesta, nunca bloquea la
-  // partida). Fire-and-forget desde `start()`: no retrasa la cuenta atrás.
+  // arranque ANTES de que corra el reloj MOSTRADO. Best-effort con UN reintento
+  // corto: si las dos llamadas fallan, el juego sigue igual — sin arranque
+  // registrado, `submit_vote` aplicará factor 1 (degradación honesta, nunca
+  // bloquea la partida). Fire-and-forget desde `beginPlaying` (issue #942, NO
+  // desde `start()`): no retrasa la entrada en juego.
   async function callStartPlay(id: string) {
     try {
       await startPlay(id)
@@ -832,11 +833,14 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
 
   function start() {
     if (!challenge) return
-    void callStartPlay(challenge.id)
-    // Empezar NO arranca el reloj: primero la cuenta atrás 3·2·1 (sobre la foto del
-    // reto). El `start_at` se fija al TERMINAR la cuenta (beginPlaying), para que el
-    // reloj de la jugada arranque tras el 3-2-1, no durante. Si el jugador recarga
-    // durante la cuenta (aún sin start_at), vuelve a "¿Listo?": no perdió tiempo.
+    // Empezar NO arranca ningún reloj (ni el mostrado ni el del servidor): primero
+    // la cuenta atrás 3·2·1 (sobre la foto del reto). `start_at` (mostrado) y
+    // `start_play` (servidor) se fijan JUNTOS al TERMINAR la cuenta (beginPlaying,
+    // issue #942) — antes `start_play` se llamaba aquí, así que el factor de
+    // velocidad cobraba de más la cuenta atrás + la latencia de esta llamada
+    // (~3,5-4,5 s no mostrados). Si el jugador recarga durante la cuenta (aún sin
+    // start_at), vuelve a "¿Listo?": no perdió tiempo ni quedó un arranque huérfano
+    // en el servidor.
     setPhase('countdown')
   }
 
@@ -844,9 +848,16 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   // inicio SIEMPRE (con o sin límite): así, al salir y reentrar, el reto se REANUDA
   // en `playing` y nunca vuelve a "¿Listo para jugar?" (no hay reinicio limpio). Con
   // límite, además fija el origen del reloj para reconstruir el tiempo restante.
+  // `start_play` (servidor) se dispara AQUÍ, junto con `start_at` (issue #942): así
+  // el reloj que puntúa y el que se muestra arrancan exactamente a la vez. Solo se
+  // llama en el primer `beginPlaying` de la partida: al recargar durante `playing`,
+  // el efecto de resume (más abajo) entra directo a esa fase leyendo el `start_at`
+  // ya persistido, sin volver a pasar por aquí — `start_play` no se reinvoca (y da
+  // igual: es idempotente, ON CONFLICT DO NOTHING).
   function beginPlaying() {
     if (!challenge) return
     localStorage.setItem(startKey(challenge.id), String(Date.now()))
+    void callStartPlay(challenge.id)
     setPhase('playing')
   }
 
