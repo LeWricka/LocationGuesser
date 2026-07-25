@@ -2,13 +2,28 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-// lib/auth.ts importa ./supabase (lanza sin env vars); mockeamos los dos
-// helpers de vincular anónimo → permanente (issue #758).
+// lib/auth.ts importa ./supabase (lanza sin env vars); mockeamos los helpers de
+// vincular anónimo → permanente (issue #758) y de fusión (issue #944).
 const linkAnonymousEmail = vi.fn<(email: string) => Promise<void>>(async () => {})
 const verifyLinkEmailOtp = vi.fn<(email: string, token: string) => Promise<void>>(async () => {})
+const verifyEmailOtp = vi.fn<(email: string, token: string) => Promise<void>>(async () => {})
+const getUser = vi.fn<() => Promise<{ id: string } | null>>(async () => ({ id: 'anon-uid' }))
+const requestAccountMerge = vi.fn<() => Promise<string>>(async () => 'merge-token')
+const completeAccountMerge = vi.fn<(sourceUid: string, token: string) => Promise<void>>(
+  async () => {},
+)
+const sendExistingAccountLoginOtp = vi.fn<(email: string) => Promise<void>>(async () => {})
+const isEmailAlreadyRegisteredError = vi.fn<(err: unknown) => boolean>(() => false)
 vi.mock('../../lib/auth', () => ({
   linkAnonymousEmail: (email: string) => linkAnonymousEmail(email),
   verifyLinkEmailOtp: (email: string, token: string) => verifyLinkEmailOtp(email, token),
+  verifyEmailOtp: (email: string, token: string) => verifyEmailOtp(email, token),
+  getUser: () => getUser(),
+  requestAccountMerge: () => requestAccountMerge(),
+  completeAccountMerge: (sourceUid: string, token: string) =>
+    completeAccountMerge(sourceUid, token),
+  sendExistingAccountLoginOtp: (email: string) => sendExistingAccountLoginOtp(email),
+  isEmailAlreadyRegisteredError: (err: unknown) => isEmailAlreadyRegisteredError(err),
 }))
 const track = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => track(...args) }))
@@ -20,6 +35,18 @@ beforeEach(() => {
   linkAnonymousEmail.mockResolvedValue(undefined)
   verifyLinkEmailOtp.mockClear()
   verifyLinkEmailOtp.mockResolvedValue(undefined)
+  verifyEmailOtp.mockClear()
+  verifyEmailOtp.mockResolvedValue(undefined)
+  getUser.mockClear()
+  getUser.mockResolvedValue({ id: 'anon-uid' })
+  requestAccountMerge.mockClear()
+  requestAccountMerge.mockResolvedValue('merge-token')
+  completeAccountMerge.mockClear()
+  completeAccountMerge.mockResolvedValue(undefined)
+  sendExistingAccountLoginOtp.mockClear()
+  sendExistingAccountLoginOtp.mockResolvedValue(undefined)
+  isEmailAlreadyRegisteredError.mockClear()
+  isEmailAlreadyRegisteredError.mockReturnValue(false)
   track.mockClear()
 })
 
@@ -76,6 +103,43 @@ describe('AccountUpgradeModal (issue #758, "guárdate")', () => {
 
     expect(await screen.findByText(/incorrecto o caducado/i)).toBeInTheDocument()
     expect(onUpgraded).not.toHaveBeenCalled()
+  })
+})
+
+// Issue #944: si el correo YA pertenece a otra cuenta, en vez del error crudo el
+// modal ofrece ENTRAR en esa cuenta y fusionar los datos de este dispositivo.
+describe('AccountUpgradeModal — fusión cuando el email ya existe (issue #944)', () => {
+  beforeEach(() => {
+    linkAnonymousEmail.mockRejectedValue({ code: 'email_exists', status: 422 })
+    isEmailAlreadyRegisteredError.mockReturnValue(true)
+  })
+
+  test('correo existente → código de login → confirmar: entra y fusiona, avisa onUpgraded', async () => {
+    const onUpgraded = vi.fn()
+    const u = userEvent.setup()
+    render(
+      <AccountUpgradeModal
+        open
+        onClose={vi.fn()}
+        onUpgraded={onUpgraded}
+        origin="anon_create_gate"
+      />,
+    )
+
+    await u.type(screen.getByLabelText('Tu correo'), 'lewis@ej.com')
+    await u.click(screen.getByRole('button', { name: 'Mandar código' }))
+
+    // El copy del paso de código explica que ya hay cuenta y que se fusiona.
+    expect(await screen.findByText(/ya tiene una cuenta/i)).toBeInTheDocument()
+    expect(sendExistingAccountLoginOtp).toHaveBeenCalledWith('lewis@ej.com')
+
+    const code = await screen.findByLabelText('Código de 6 dígitos')
+    await u.type(code, '123456')
+    await u.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(verifyEmailOtp).toHaveBeenCalledWith('lewis@ej.com', '123456')
+    expect(completeAccountMerge).toHaveBeenCalledWith('anon-uid', 'merge-token')
+    expect(onUpgraded).toHaveBeenCalledTimes(1)
   })
 })
 

@@ -674,6 +674,22 @@ export interface Database {
         Args: { invite_token: string }
         Returns: string
       }
+      // La llama el INVITADO anónimo cuando su email de upgrade ya pertenece a otra
+      // cuenta (issue #944): emite/renueva un token de un solo uso (caduca 15 min)
+      // que prueba que controla la sesión anónima de origen. El token se guarda solo
+      // en el cliente y luego viaja a `complete_account_merge`. Migración 0046.
+      request_account_merge: {
+        Args: Record<string, never>
+        Returns: string
+      }
+      // La llama la cuenta DESTINO ya logueada (issue #944): valida el token del
+      // source anónimo (exacto + < 15 min + source anónimo + source≠target) y
+      // reasigna todo lo del invitado a la cuenta destino con seguridad de
+      // conflictos. SECURITY DEFINER, un solo uso. Migración 0046.
+      complete_account_merge: {
+        Args: { p_source_uid: string; p_token: string }
+        Returns: undefined
+      }
     }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>

@@ -76,6 +76,7 @@ export function AccountUpgradeModal({
 }: Props) {
   const {
     step,
+    mode,
     email,
     setEmail,
     code,
@@ -201,9 +202,17 @@ export function AccountUpgradeModal({
       ) : (
         <form onSubmit={handleSubmitCode} noValidate>
           <Stack gap={3}>
-            <p>
-              Mandamos un código a <strong>{email}</strong>.
-            </p>
+            {mode === 'merge' ? (
+              <p>
+                Este correo ya tiene una cuenta. Te mandamos un código a <strong>{email}</strong>{' '}
+                para <strong>entrar</strong>; al confirmarlo, traemos aquí lo que jugaste en este
+                dispositivo. No pierdes nada.
+              </p>
+            ) : (
+              <p>
+                Mandamos un código a <strong>{email}</strong>.
+              </p>
+            )}
             <Field label="Código de 6 dígitos" error={error}>
               {(fieldProps) => (
                 <Input

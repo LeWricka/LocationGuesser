@@ -10,13 +10,21 @@ const updateUserMock = vi.fn<
 const verifyOtpMock = vi.fn<
   (...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>
 >(async () => ({ data: {}, error: null }))
+const signInWithOtpMock = vi.fn<
+  (...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>
+>(async () => ({ data: {}, error: null }))
+const rpcMock = vi.fn<(...args: unknown[]) => Promise<{ data: unknown; error: Error | null }>>(
+  async () => ({ data: null, error: null }),
+)
 vi.mock('./supabase', () => ({
   supabase: {
     auth: {
       signInAnonymously: () => signInAnonymouslyMock(),
       updateUser: (...args: unknown[]) => updateUserMock(...args),
       verifyOtp: (...args: unknown[]) => verifyOtpMock(...args),
+      signInWithOtp: (...args: unknown[]) => signInWithOtpMock(...args),
     },
+    rpc: (...args: unknown[]) => rpcMock(...args),
   },
 }))
 
@@ -27,6 +35,10 @@ import {
   signInAnonymously,
   linkAnonymousEmail,
   verifyLinkEmailOtp,
+  isEmailAlreadyRegisteredError,
+  requestAccountMerge,
+  completeAccountMerge,
+  sendExistingAccountLoginOtp,
 } from './auth'
 
 beforeEach(() => {
@@ -34,6 +46,10 @@ beforeEach(() => {
   signInAnonymouslyMock.mockClear()
   updateUserMock.mockClear()
   verifyOtpMock.mockClear()
+  signInWithOtpMock.mockClear()
+  signInWithOtpMock.mockResolvedValue({ data: {}, error: null })
+  rpcMock.mockClear()
+  rpcMock.mockResolvedValue({ data: null, error: null })
 })
 
 describe('destino deep-link (lg.next)', () => {
@@ -101,5 +117,63 @@ describe('linkAnonymousEmail / verifyLinkEmailOtp (vincular anónimo → permane
   test('verifyLinkEmailOtp lanza si el código es incorrecto/caducado', async () => {
     verifyOtpMock.mockResolvedValueOnce({ data: {}, error: new Error('código inválido') })
     await expect(verifyLinkEmailOtp('lewis@ej.com', '000000')).rejects.toThrow('código inválido')
+  })
+})
+
+// Fusión cuando el email ya pertenece a otra cuenta (issue #944).
+describe('fusión de cuentas (issue #944)', () => {
+  describe('isEmailAlreadyRegisteredError: detecta por código/estado, no por texto', () => {
+    test('code email_exists → true', () => {
+      expect(isEmailAlreadyRegisteredError({ code: 'email_exists', status: 422 })).toBe(true)
+    })
+    test('status 422 con mensaje "already been registered" → true (red por si no hay code)', () => {
+      expect(
+        isEmailAlreadyRegisteredError({
+          status: 422,
+          message: 'A user with this email address has already been registered',
+        }),
+      ).toBe(true)
+    })
+    test('otro error (p.ej. rate limit 429) → false', () => {
+      expect(
+        isEmailAlreadyRegisteredError({ code: 'over_email_send_rate_limit', status: 429 }),
+      ).toBe(false)
+    })
+    test('no-objeto → false', () => {
+      expect(isEmailAlreadyRegisteredError('boom')).toBe(false)
+      expect(isEmailAlreadyRegisteredError(null)).toBe(false)
+    })
+  })
+
+  test('requestAccountMerge devuelve el token de la RPC', async () => {
+    rpcMock.mockResolvedValueOnce({ data: 'token-uuid', error: null })
+    await expect(requestAccountMerge()).resolves.toBe('token-uuid')
+    expect(rpcMock).toHaveBeenCalledWith('request_account_merge')
+  })
+
+  test('requestAccountMerge lanza si la RPC devuelve error', async () => {
+    rpcMock.mockResolvedValueOnce({ data: null, error: new Error('no anónimo') })
+    await expect(requestAccountMerge()).rejects.toThrow('no anónimo')
+  })
+
+  test('completeAccountMerge pasa source y token a la RPC', async () => {
+    await completeAccountMerge('src-uid', 'token-uuid')
+    expect(rpcMock).toHaveBeenCalledWith('complete_account_merge', {
+      p_source_uid: 'src-uid',
+      p_token: 'token-uuid',
+    })
+  })
+
+  test('completeAccountMerge lanza si la RPC devuelve error', async () => {
+    rpcMock.mockResolvedValueOnce({ data: null, error: new Error('token caducado') })
+    await expect(completeAccountMerge('src-uid', 'token-uuid')).rejects.toThrow('token caducado')
+  })
+
+  test('sendExistingAccountLoginOtp usa shouldCreateUser:false (login, no alta)', async () => {
+    await sendExistingAccountLoginOtp('lewis@ej.com')
+    expect(signInWithOtpMock).toHaveBeenCalledWith({
+      email: 'lewis@ej.com',
+      options: { shouldCreateUser: false },
+    })
   })
 })
