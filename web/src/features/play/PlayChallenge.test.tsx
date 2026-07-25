@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { User } from '@supabase/supabase-js'
 import type { ChallengeForPlay } from '../../lib/challenges'
@@ -217,6 +217,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
   window.location.hash = ''
 })
 
@@ -322,15 +323,44 @@ describe('PlayChallenge — reto borrado (issue #760)', () => {
 
 // Issue #628: la velocidad puntúa en el reto de lugar.
 describe('PlayChallenge — la velocidad puntúa (#628)', () => {
-  test('al pulsar Empezar se registra el arranque server-side (RPC start_play)', async () => {
+  // Issue #942: `start_play` (servidor) debía alinearse con `start_at` (mostrado),
+  // los dos fijados al TERMINAR la cuenta atrás — no al pulsar Empezar. Si no, el
+  // factor de velocidad cobraba de más la cuenta atrás + la latencia de la llamada.
+  test('start_play se registra al TERMINAR la cuenta atrás, no al pulsar Empezar', async () => {
+    // Fake timers instalados ANTES del click: la cuenta atrás crea su propio
+    // `setInterval` en cuanto se pulsa Empezar, así que si el reloj falso entrara
+    // después, ese intervalo ya habría quedado enganchado al reloj real.
+    // `fireEvent` (no `userEvent`) evita el retraso interno de puntero de
+    // user-event, pensado para reloj real (mismo patrón que VoiceRecorder.test.tsx).
+    vi.useFakeTimers({ shouldAdvanceTime: true })
     getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 30 })
-    const u = userEvent.setup()
     renderPlay()
 
-    await u.click(await screen.findByRole('button', { name: 'Empezar' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Empezar' }))
 
-    // Fire-and-forget desde `start()`: no espera a la cuenta atrás para llamar.
+    // Arranca la cuenta atrás 3·2·1: el servidor AÚN no debe saber que se empezó.
+    expect(startPlayMock).not.toHaveBeenCalled()
+
+    // Fin de la cuenta atrás (3 pasos de 1300ms, ver CountdownOverlay) → beginPlaying:
+    // ahí sí se registra el arranque, junto con `start_at`.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3 * 1300)
+    })
     expect(startPlayMock).toHaveBeenCalledTimes(1)
+  })
+
+  test('recargar durante la partida (resume) no vuelve a llamar a start_play', async () => {
+    // Simula un reload con la partida ya empezada: `start_at` persistido, sin
+    // pasar por "Empezar" ni por la cuenta atrás (issue #942 — el resume entra
+    // directo a `playing` leyendo localStorage, sin volver a invocar `beginPlaying`).
+    getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 30 })
+    localStorage.setItem('lg.play.startAt.c1', String(Date.now()))
+    renderPlay()
+
+    // Reanuda directo en 'playing': el overlay "Empezar" ni se pinta.
+    await screen.findByRole('button', { name: 'Salir (sigue el tiempo)' })
+    expect(screen.queryByRole('button', { name: 'Empezar' })).not.toBeInTheDocument()
+    expect(startPlayMock).not.toHaveBeenCalled()
   })
 
   test('revelado tras recargar un voto ya emitido: "Respondiste en Xs" + nota del factor', async () => {
