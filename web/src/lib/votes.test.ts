@@ -82,6 +82,7 @@ const sampleVote: Vote = {
   left_app: false,
   elapsed_seconds: null,
   play_started_at: null,
+  scored_seconds: null,
   created_at: '2026-06-19T00:00:00.000Z',
 }
 
@@ -96,7 +97,14 @@ describe('submitVote', () => {
   test('llama a la RPC submit_vote con la adivinanza (no calcula puntos en cliente)', async () => {
     rpcResult = {
       data: [
-        { distance_km: 12.3, points: 4900, answer_lat: 40.1, answer_lng: -3.1, speed_factor: 1 },
+        {
+          distance_km: 12.3,
+          points: 4900,
+          answer_lat: 40.1,
+          answer_lng: -3.1,
+          speed_factor: 1,
+          scored_seconds: null,
+        },
       ],
       error: null,
     }
@@ -117,6 +125,7 @@ describe('submitVote', () => {
       answerLat: 40.1,
       answerLng: -3.1,
       speedFactor: 1,
+      scoredSeconds: null,
     })
   })
 
@@ -131,6 +140,7 @@ describe('submitVote', () => {
           answer_lat: 40.1,
           answer_lng: -3.1,
           speed_factor: 0.9,
+          scored_seconds: 6.3,
         },
       ],
       error: null,
@@ -139,9 +149,38 @@ describe('submitVote', () => {
     expect(out.speedFactor).toBe(0.9)
   })
 
+  // Issue #946 (migración 0047): el mismo número que puntuó, con 1 decimal, para
+  // que el revelado y el marcador nunca muestren un tiempo distinto del real.
+  test('propaga el scored_seconds del servidor tal cual (#946)', async () => {
+    rpcResult = {
+      data: [
+        {
+          distance_km: 12.3,
+          points: 4410,
+          answer_lat: 40.1,
+          answer_lng: -3.1,
+          speed_factor: 0.9,
+          scored_seconds: 6.3,
+        },
+      ],
+      error: null,
+    }
+    const out = await submitVote({ challengeId: 'c1', guessLat: 40, guessLng: -3 })
+    expect(out.scoredSeconds).toBe(6.3)
+  })
+
   test('voto de timeout: manda lat/lng null y no recibe respuesta', async () => {
     rpcResult = {
-      data: [{ distance_km: null, points: 0, answer_lat: null, answer_lng: null, speed_factor: 1 }],
+      data: [
+        {
+          distance_km: null,
+          points: 0,
+          answer_lat: null,
+          answer_lng: null,
+          speed_factor: 1,
+          scored_seconds: null,
+        },
+      ],
       error: null,
     }
     const out = await submitVote({ challengeId: 'c1', guessLat: null, guessLng: null })
@@ -158,6 +197,7 @@ describe('submitVote', () => {
       answerLat: null,
       answerLng: null,
       speedFactor: 1,
+      scoredSeconds: null,
     })
   })
 

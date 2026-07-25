@@ -3,6 +3,7 @@ import {
   deadlineFromMinutes,
   deadlineFromNow,
   fmtElapsed,
+  fmtElapsed1,
   formatDeadline,
   isPast,
   parseMomentDate,
@@ -139,5 +140,27 @@ describe('fmtElapsed', () => {
 
   test('null (sin cronómetro, voto legado o reto sin límite) → "—"', () => {
     expect(fmtElapsed(null)).toBe('—')
+  })
+})
+
+// Issue #946 (migración 0047): el número que se muestra = el que puntuó,
+// con 1 decimal, formato es-ES (coma) — fin del "mismo tiempo, distinta nota".
+describe('fmtElapsed1', () => {
+  test('1 decimal, coma es-ES', () => {
+    expect(fmtElapsed1(33.4)).toBe('33,4 s')
+    expect(fmtElapsed1(33.7)).toBe('33,7 s')
+  })
+
+  test('entero: añade el decimal en ,0 (nunca oculta la precisión real)', () => {
+    expect(fmtElapsed1(6)).toBe('6,0 s')
+    expect(fmtElapsed1(0)).toBe('0,0 s')
+  })
+
+  test('nunca negativo (acotado a 0, como el propio servidor)', () => {
+    expect(fmtElapsed1(-2)).toBe('0,0 s')
+  })
+
+  test('null (sin scored_seconds: legacy, "Libre" o time_scoring OFF) → "—"', () => {
+    expect(fmtElapsed1(null)).toBe('—')
   })
 })

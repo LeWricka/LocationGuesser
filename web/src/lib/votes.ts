@@ -39,6 +39,15 @@ export interface SubmitVoteResultClient {
    * para recalcular puntos — la autoridad es el servidor.
    */
   speedFactor: number
+  /**
+   * Tiempo EXACTO (acotado a [0, guess_seconds], redondeado a 1 decimal) que el
+   * servidor usó para calcular `speedFactor` (issue #946, migración 0047). Es
+   * el MISMO número que queda guardado en `votes.scored_seconds`: mostrarlo tal
+   * cual en la nota del revelado acaba con el "mismo tiempo, distinta nota" que
+   * confundía al redondear a segundos enteros. Null cuando el factor no aplicó
+   * ('Libre', `time_scoring` apagado, legacy o sin arranque registrado).
+   */
+  scoredSeconds: number | null
 }
 
 /**
@@ -85,6 +94,7 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
     answerLat: row.answer_lat,
     answerLng: row.answer_lng,
     speedFactor: row.speed_factor,
+    scoredSeconds: row.scored_seconds,
   }
 }
 

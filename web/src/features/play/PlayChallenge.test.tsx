@@ -208,6 +208,7 @@ beforeEach(() => {
     answerLat: null,
     answerLng: null,
     speedFactor: 1,
+    scoredSeconds: null,
   })
   upsertProfileMock.mockResolvedValue({})
   getGroupMembersMock.mockResolvedValue([])
@@ -363,9 +364,10 @@ describe('PlayChallenge — la velocidad puntúa (#628)', () => {
     expect(startPlayMock).not.toHaveBeenCalled()
   })
 
-  test('revelado tras recargar un voto ya emitido: "Respondiste en Xs" + nota del factor', async () => {
+  test('revelado tras recargar un voto ya emitido: "Respondiste en X,X s" + nota del factor (#946)', async () => {
     // elapsed=6s de un límite de 30s con time_scoring ON → factor 0,9 (ejemplo
-    // del propio issue: "×0,9 por rapidez").
+    // del propio issue: "×0,9 por rapidez"). `scored_seconds` persistido (issue
+    // #946, migración 0047): se pinta con 1 decimal, el MISMO número que puntuó.
     getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 30, time_scoring: true })
     getExistingVoteMock.mockResolvedValue({
       id: 'v1',
@@ -380,6 +382,7 @@ describe('PlayChallenge — la velocidad puntúa (#628)', () => {
       points: 2000,
       left_app: false,
       elapsed_seconds: 6,
+      scored_seconds: 6,
       play_started_at: '2026-06-19T10:00:00.000Z',
       created_at: '2026-06-19T10:00:06.000Z',
     })
@@ -389,10 +392,10 @@ describe('PlayChallenge — la velocidad puntúa (#628)', () => {
 
     // Texto en un único <span> (icono + tiempo + nota): match EXACTO para no
     // ambigüar con ancestros que también "contienen" el mismo substring.
-    expect(await screen.findByText('Respondiste en 6s · ×0,9 por rapidez')).toBeInTheDocument()
+    expect(await screen.findByText('Respondiste en 6,0 s · ×0,9 por rapidez')).toBeInTheDocument()
   })
 
-  test('sin arranque registrado (play_started_at null): muestra el tiempo, SIN nota de factor', async () => {
+  test('sin scored_seconds (legacy, previo a la migración 0047): cae a elapsed_seconds entero', async () => {
     getChallengeMock.mockResolvedValue({ ...baseChallenge, guess_seconds: 30, time_scoring: true })
     getExistingVoteMock.mockResolvedValue({
       id: 'v1',
@@ -407,6 +410,7 @@ describe('PlayChallenge — la velocidad puntúa (#628)', () => {
       points: 2000,
       left_app: false,
       elapsed_seconds: 6,
+      scored_seconds: null,
       // Sin arranque: start_play falló o es legacy — degradación honesta, no se
       // puede confirmar que aplicó un factor, así que no se estima ninguno.
       play_started_at: null,
@@ -416,7 +420,7 @@ describe('PlayChallenge — la velocidad puntúa (#628)', () => {
 
     renderPlay()
 
-    expect(await screen.findByText('Respondiste en 6s')).toBeInTheDocument()
+    expect(await screen.findByText('Respondiste en 6 s')).toBeInTheDocument()
     expect(screen.queryByText(/por rapidez/)).not.toBeInTheDocument()
   })
 
