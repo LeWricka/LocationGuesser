@@ -25,6 +25,7 @@ import {
 } from '../../lib/auth'
 import { track } from '../../lib/analytics'
 import { describeError } from '../../lib/errors'
+import { reportError } from '../../lib/observability'
 
 export type AccountUpgradeStep = 'email' | 'code'
 
@@ -238,6 +239,17 @@ export function useAccountUpgrade(context: AccountUpgradeContext): AccountUpgrad
       // Estamos DENTRO de la cuenta, pero la fusión falló. No mentimos con éxito:
       // dejamos el paso abierto para reintentar (Confirmar re-llama solo a la RPC,
       // ya no al OTP). El invitado no pierde nada: sus datos siguen ahí.
+      //
+      // FALLO SILENCIOSO NO (es auth): reportamos a Sentry con el contexto justo
+      // para recuperar el huérfano a mano si el reintento tampoco cuaja —
+      // source_uid (la sesión anónima con los datos) y target_uid (la cuenta
+      // destino, ya la sesión actual). NUNCA el token (secreto de un solo uso).
+      const target = await getUser().catch(() => null)
+      reportError(err, {
+        area: 'account_merge_complete',
+        source_uid: merge.sourceUid,
+        target_uid: target?.id ?? null,
+      })
       setError(
         `Entraste en tu cuenta, pero no pudimos traer del todo lo de este ` +
           `dispositivo (${describeError(err)}). Pulsa Confirmar para reintentar.`,

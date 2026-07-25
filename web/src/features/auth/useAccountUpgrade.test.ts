@@ -29,6 +29,11 @@ vi.mock('../../lib/auth', () => ({
 const track = vi.fn()
 vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => track(...args) }))
 
+const reportError = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportError: (...args: unknown[]) => reportError(...args),
+}))
+
 import { useAccountUpgrade } from './useAccountUpgrade'
 
 beforeEach(() => {
@@ -49,6 +54,7 @@ beforeEach(() => {
   isEmailAlreadyRegisteredError.mockClear()
   isEmailAlreadyRegisteredError.mockReturnValue(false)
   track.mockClear()
+  reportError.mockClear()
 })
 
 describe('useAccountUpgrade (issue #758, vincular anónimo → permanente)', () => {
@@ -237,6 +243,17 @@ describe('useAccountUpgrade (issue #758, vincular anónimo → permanente)', () 
       })
       expect(ok).toBe(false)
       expect(result.current.error).toMatch(/no pudimos traer/i)
+
+      // Reporta a observabilidad el huérfano con source/target, SIN el token.
+      expect(reportError).toHaveBeenCalledTimes(1)
+      const [reportedErr, ctx] = reportError.mock.calls[0]
+      expect(reportedErr).toBeInstanceOf(Error)
+      expect(ctx).toMatchObject({
+        area: 'account_merge_complete',
+        source_uid: 'anon-uid',
+        target_uid: 'anon-uid',
+      })
+      expect(JSON.stringify(ctx)).not.toContain('merge-token')
 
       // Reintento: el OTP ya se consumió, así que NO se vuelve a canjear; solo se
       // re-llama a la RPC de fusión, que ahora sí funciona.
