@@ -9,6 +9,7 @@ import { initObservability, reportSilentWarning } from './lib/observability'
 import { applyCleanRoute } from './lib/cleanRoute'
 import { isSafeUpdateRoute } from './lib/safeUpdateRoute'
 import { registerChunkReloadListeners } from './lib/chunkReload'
+import { shouldReloadForSwUpdate } from './lib/swUpdateReload'
 import { registerSW } from 'virtual:pwa-register'
 
 // Observabilidad + analítica: init idempotente antes de montar la app (no-op en
@@ -78,6 +79,22 @@ const SW_UPDATE_INTERVAL_MS = 60_000
 let reloaded = false
 function reloadOnce() {
   if (reloaded) return
+  // Guardia ENTRE recargas (issue #948): el guard `reloaded` solo cubre esta
+  // carga; tras `location.reload()` se reinicia. Si el SW nuevo tarda en tomar
+  // el control (móvil/4G) y el cinturón recarga antes de tiempo, al recargar
+  // sigue en espera → se vuelve a aplicar → BUCLE. `shouldReloadForSwUpdate`
+  // (persistido en sessionStorage, como `chunkReload`) corta el ciclo: si ya
+  // recargamos por actualización del SW hace poco, NO recargamos otra vez —
+  // dejamos la app renderizar con el código actual (funciona) y lo anotamos.
+  try {
+    if (!shouldReloadForSwUpdate(sessionStorage)) {
+      reportSilentWarning('sw_update_reload_loop_avoided')
+      return
+    }
+  } catch {
+    // sessionStorage no disponible (algún modo privado): seguimos con el guard
+    // en memoria (`reloaded`), que al menos evita la doble recarga en esta carga.
+  }
   reloaded = true
   window.location.reload()
 }
