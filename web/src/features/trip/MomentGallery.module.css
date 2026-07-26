@@ -183,6 +183,156 @@
   flex: 0 0 auto;
 }
 
+/* Cuadrícula de REORDENAR (issue #952): sustituye al carrusel mientras el
+   dueño arrastra. `max-height` + `overflow-y: auto` la convierten en su propio
+   contenedor de scroll: así el autoscroll de `MomentGallery.tsx` (cerca de sus
+   bordes) no depende de la hoja/página que la envuelve. */
+.reorderGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  max-height: 50svh;
+  overflow-y: auto;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+}
+
+.reorderTile {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-surface);
+  /* El mantener-pulsado se cancela a mano si el dedo se mueve antes de tiempo
+     (`onTilePointerMove`); hasta entonces el scroll táctil normal sigue vivo. */
+  touch-action: pan-y;
+  cursor: grab;
+}
+
+.reorderTileDragging {
+  cursor: grabbing;
+  box-shadow: var(--shadow-photo-card);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  z-index: 1; /* design-lint-allow: piso LOCAL sobre sus hermanas de la cuadrícula, no un piso global (--z-*) */
+  /* La foto agarrada se lee "levantada" del resto de la cuadrícula. */
+  transform: scale(1.04);
+}
+
+.reorderPhoto {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Evita el "fantasma" de arrastre nativo del navegador sobre la imagen:
+     el arrastre lo gobierna nuestro Pointer Events, no el navegador. */
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.reorderCoverBadge {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.reorderHandle {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--scene-veil);
+  color: var(--scene-ink);
+}
+
+/* Fallback de teclado (mover ←/→): discreto, en la franja inferior de la
+   miniatura — visible siempre (no solo al foco) porque el gesto de arrastre
+   no es descubrible por sí solo en una pantalla táctil. */
+.reorderKeys {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 2px;
+  background: linear-gradient(to top, color-mix(in srgb, black 55%, transparent), transparent);
+}
+
+.reorderKeyBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--scene-veil);
+  color: var(--scene-ink);
+  cursor: pointer;
+}
+
+.reorderKeyBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Fila de acciones de orden: alterna carrusel/cuadrícula y, en manual, ofrece
+   volver a orden por fecha. Mismo lenguaje que `.addRow` (discreta, debajo de
+   la galería), en fila para que quepan las dos a la vez. */
+.reorderControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.reorderToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: transform var(--motion-duration-fast) var(--motion-ease-standard);
+}
+
+.reorderToggle:hover,
+.reorderToggle:focus-visible {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
+}
+
+.reorderToggle:active:not(:disabled) {
+  transform: scale(var(--motion-press-scale));
+}
+
+.reorderToggle:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
 /* Indicador de posición: puntos bajo el carrusel. */
 .dots {
   display: flex;
@@ -209,6 +359,12 @@
   .photoBtn:active,
   .action:active:not(:disabled),
   .addRow:active:not([aria-busy='true']) {
+    transform: none;
+  }
+  .reorderTileDragging {
+    transform: none;
+  }
+  .reorderToggle:active:not(:disabled) {
     transform: none;
   }
 }

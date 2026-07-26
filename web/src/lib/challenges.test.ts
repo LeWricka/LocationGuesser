@@ -108,6 +108,7 @@ const sampleChallenge: Challenge = {
   number_tolerance: 'normal',
   time_scoring: true,
   happened_on: null,
+  photos_manual_order: false,
   created_by: '00000000-0000-0000-0000-000000000001',
   created_at: '2026-06-19T10:00:00.000Z',
 }

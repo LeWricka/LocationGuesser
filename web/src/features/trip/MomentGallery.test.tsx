@@ -7,12 +7,21 @@ import type { MomentImage } from '../../lib/momentImages'
 const listMomentImagesMock = vi.fn<(id: string) => Promise<MomentImage[]>>()
 const removeMomentImageMock = vi.fn<(id: string, imageId: string) => Promise<void>>()
 const setMomentCoverMock = vi.fn<(id: string, imageId: string) => Promise<void>>()
+// Orden manual (issue #952): por defecto false (orden por fecha) — cada test
+// que necesite manual lo sobreescribe con `mockResolvedValue(true)`.
+const getPhotosManualOrderMock = vi.fn<(id: string) => Promise<boolean>>()
+const reorderMomentImagesMock = vi.fn<(id: string, orderedIds: string[]) => Promise<void>>()
+const setPhotosAutoOrderMock = vi.fn<(id: string) => Promise<void>>()
 
 vi.mock('../../lib/momentImages', () => ({
   listMomentImages: (id: string) => listMomentImagesMock(id),
   removeMomentImage: (id: string, imageId: string) => removeMomentImageMock(id, imageId),
   setMomentCover: (id: string, imageId: string) => setMomentCoverMock(id, imageId),
   addMomentImages: vi.fn(),
+  getPhotosManualOrder: (id: string) => getPhotosManualOrderMock(id),
+  reorderMomentImages: (id: string, orderedIds: string[]) =>
+    reorderMomentImagesMock(id, orderedIds),
+  setPhotosAutoOrder: (id: string) => setPhotosAutoOrderMock(id),
 }))
 
 // URLs firmadas y subida: irrelevantes para estos tests (no tocamos Storage aquí).
@@ -70,6 +79,9 @@ beforeEach(() => {
   listMomentImagesMock.mockResolvedValue(IMAGES)
   removeMomentImageMock.mockResolvedValue(undefined)
   setMomentCoverMock.mockResolvedValue(undefined)
+  getPhotosManualOrderMock.mockResolvedValue(false)
+  reorderMomentImagesMock.mockResolvedValue(undefined)
+  setPhotosAutoOrderMock.mockResolvedValue(undefined)
 })
 
 describe('MomentGallery', () => {
@@ -125,5 +137,62 @@ describe('MomentGallery', () => {
     const coverButtons = screen.getAllByRole('button', { name: 'Marcar como portada' })
     expect(coverButtons).toHaveLength(1)
     expect(screen.getByText('Portada')).toBeInTheDocument()
+  })
+
+  test('sin permiso de dueño no se ofrece "Ordenar fotos"', async () => {
+    renderGallery(false)
+    await screen.findAllByRole('button', { name: 'Ampliar foto' })
+    expect(screen.queryByRole('button', { name: 'Ordenar fotos' })).not.toBeInTheDocument()
+  })
+
+  test('orden por defecto (auto): no se ofrece "Volver a orden por fecha"', async () => {
+    getPhotosManualOrderMock.mockResolvedValue(false)
+    renderGallery()
+    await screen.findAllByRole('button', { name: 'Ampliar foto' })
+    expect(
+      screen.queryByRole('button', { name: 'Volver a orden por fecha' }),
+    ).not.toBeInTheDocument()
+  })
+
+  test('orden manual (#952): se ofrece "Volver a orden por fecha" y lo desactiva al tocarlo', async () => {
+    const user = userEvent.setup()
+    getPhotosManualOrderMock.mockResolvedValue(true)
+    renderGallery()
+
+    const autoOrderBtn = await screen.findByRole('button', { name: 'Volver a orden por fecha' })
+    await user.click(autoOrderBtn)
+    expect(setPhotosAutoOrderMock).toHaveBeenCalledWith('c1')
+  })
+
+  test('"Ordenar fotos" cambia a la cuadrícula de reordenar con fallback de teclado', async () => {
+    const user = userEvent.setup()
+    renderGallery()
+
+    await screen.findAllByRole('button', { name: 'Ampliar foto' })
+    await user.click(screen.getByRole('button', { name: 'Ordenar fotos' }))
+
+    // En la cuadrícula ya no está el carrusel de swipe (sin "Ampliar foto"),
+    // pero sí el fallback de teclado ←/→ de cada miniatura.
+    expect(screen.queryByRole('button', { name: 'Ampliar foto' })).not.toBeInTheDocument()
+    const moveRightButtons = screen.getAllByRole('button', { name: 'Mover foto a la derecha' })
+    expect(moveRightButtons).toHaveLength(2)
+    // La 1ª foto no puede moverse más a la izquierda (ya es la primera).
+    expect(screen.getAllByRole('button', { name: 'Mover foto a la izquierda' })[0]).toBeDisabled()
+
+    // Mover la 1ª foto (img-1) a la derecha: reasigna orden ['img-2', 'img-1'].
+    await user.click(moveRightButtons[0])
+    expect(reorderMomentImagesMock).toHaveBeenCalledWith('c1', ['img-2', 'img-1'])
+  })
+
+  test('el botón "Ordenar fotos" cambia a "Listo" y vuelve al carrusel al tocarlo de nuevo', async () => {
+    const user = userEvent.setup()
+    renderGallery()
+
+    await screen.findAllByRole('button', { name: 'Ampliar foto' })
+    await user.click(screen.getByRole('button', { name: 'Ordenar fotos' }))
+    const doneBtn = await screen.findByRole('button', { name: 'Listo' })
+    await user.click(doneBtn)
+
+    expect(await screen.findAllByRole('button', { name: 'Ampliar foto' })).toHaveLength(2)
   })
 })

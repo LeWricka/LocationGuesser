@@ -217,6 +217,7 @@ function baseChallenge(
     number_tolerance: 'normal',
     time_scoring: true,
     happened_on: null,
+    photos_manual_order: false,
     created_by: ME_ID,
     created_at: isoFromNow(-5 * DAY),
     ...over,

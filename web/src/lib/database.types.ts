@@ -219,6 +219,11 @@ export interface Database {
           // `created_at` como proxy (ver `Moment.date`, lib/trip.ts). No es spoiler:
           // se sirve siempre. Migración 0037 (#566).
           happened_on: string | null
+          // Orden de la galería del momento: false (default) = por fecha de
+          // captura (sort_at, #951); true = por sort_order tras arrastrar a mano
+          // (`reorderMomentImages`, issue #952). No es spoiler: se sirve siempre.
+          // Migración 0049.
+          photos_manual_order: boolean
           created_by: string
           created_at: string
         }
@@ -265,6 +270,8 @@ export interface Database {
           // Fecha ELEGIDA por el dueño (0037, #566); omitirla deja happened_on null
           // (el diario cae a created_at como proxy).
           happened_on?: string | null
+          // Default false en BD: omitirlo crea el momento en orden por fecha.
+          photos_manual_order?: boolean
           created_by: string
           created_at?: string
         }
@@ -304,6 +311,10 @@ export interface Database {
           time_scoring?: boolean
           // Fecha ELEGIDA por el dueño (0037, #566); null la limpia (cae a created_at).
           happened_on?: string | null
+          // Orden de la galería (0049, #952): true = manual (sort_order), false =
+          // por fecha (sort_at). Lo activa `reorderMomentImages`, lo apaga
+          // `setPhotosAutoOrder`.
+          photos_manual_order?: boolean
           created_by?: string
           created_at?: string
         }
