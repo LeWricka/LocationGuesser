@@ -7,7 +7,7 @@ import type { LatLng } from '../../lib/geo'
 import { createMoment, type ChallengeForPlay } from '../../lib/challenges'
 import { addMomentImages } from '../../lib/momentImages'
 import { ImageDecodeError, uploadAudio, uploadImage, uploadVideo } from '../../lib/storage'
-import { readGpsFromExif } from '../../lib/exif'
+import { readGpsFromExif, readPhotoMetaFromExif } from '../../lib/exif'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
@@ -515,7 +515,12 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       // entero — la saltamos y seguimos con las demás. Un error de
       // infraestructura (red, Storage caído) SÍ aborta: seguir intentando no
       // ayuda y el mensaje de red del catch de fuera es más útil que el de foto.
+      //
+      // El EXIF (fecha de captura + GPS) se lee del archivo ORIGINAL ANTES de
+      // subir (issue #950): `uploadImage` comprime a canvas y lo borra. `metas`
+      // va en paralelo a `paths` (mismo índice, solo las que sí subieron).
       const paths: string[] = []
+      const metas: { takenAt: string | null; lat: number | null; lng: number | null }[] = []
       const failedFileNames: string[] = []
       const failedIds: string[] = []
       for (let i = 0; i < photos.length; i++) {
@@ -523,7 +528,10 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
           photos.length > 1 ? `Subiendo fotos… (${i + 1}/${photos.length})` : 'Subiendo la foto…',
         )
         try {
-          paths.push(await uploadImage(photos[i].file))
+          const file = photos[i].file
+          const meta = await readPhotoMetaFromExif(file)
+          paths.push(await uploadImage(file))
+          metas.push(meta)
         } catch (err) {
           if (!(err instanceof ImageDecodeError)) throw err
           // `storage.ts` YA reportó este error con el detalle rico (MIME,
@@ -611,9 +619,13 @@ export function AddMoment({ groupId, onBack, onCreated, onAddChallenge }: Props)
       })
 
       // Galería del recuerdo: registramos TODAS las fotos en `moment_images` con su
-      // orden. `image_path` ya quedó espejado por `createMoment`.
+      // orden y su meta EXIF (fecha/GPS de captura). `image_path` ya quedó
+      // espejado por `createMoment`.
       if (paths.length > 0) {
-        await addMomentImages(challenge.id, paths)
+        await addMomentImages(
+          challenge.id,
+          paths.map((path, i) => ({ path, ...metas[i] })),
+        )
       }
 
       setStatus(null)

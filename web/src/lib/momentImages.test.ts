@@ -67,7 +67,24 @@ import {
 } from './momentImages'
 
 function img(id: string, sort: number, path = `${id}.jpg`, challengeId = 'c1'): MomentImage {
-  return { id, challenge_id: challengeId, image_path: path, sort_order: sort, created_at: 'now' }
+  return {
+    id,
+    challenge_id: challengeId,
+    image_path: path,
+    sort_order: sort,
+    taken_at: null,
+    gps_lat: null,
+    gps_lng: null,
+    sort_at: 'now',
+    created_at: 'now',
+  }
+}
+
+function newImage(
+  path: string,
+  meta: { takenAt?: string | null; lat?: number | null; lng?: number | null } = {},
+) {
+  return { path, takenAt: meta.takenAt ?? null, lat: meta.lat ?? null, lng: meta.lng ?? null }
 }
 
 beforeEach(() => {
@@ -111,39 +128,89 @@ describe('listGroupMomentImages', () => {
 describe('addMomentImages', () => {
   test('galería vacía: inserta desde 0 y espeja la 1ª en challenges.image_path', async () => {
     listResult.data = []
-    await addMomentImages('c1', ['x.jpg', 'y.jpg'])
+    await addMomentImages('c1', [newImage('x.jpg'), newImage('y.jpg')])
     expect(calls.insert).toHaveBeenCalledWith([
-      { challenge_id: 'c1', image_path: 'x.jpg', sort_order: 0 },
-      { challenge_id: 'c1', image_path: 'y.jpg', sort_order: 1 },
+      {
+        challenge_id: 'c1',
+        image_path: 'x.jpg',
+        sort_order: 0,
+        taken_at: null,
+        gps_lat: null,
+        gps_lng: null,
+      },
+      {
+        challenge_id: 'c1',
+        image_path: 'y.jpg',
+        sort_order: 1,
+        taken_at: null,
+        gps_lat: null,
+        gps_lng: null,
+      },
     ])
     // Portada espejada (no había portada previa).
     expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'x.jpg' }, id: 'c1' })
   })
 
-  test('con galería previa: continúa el sort_order y NO re-espeja portada', async () => {
-    listResult.data = [img('a', 0), img('b', 2)]
-    await addMomentImages('c1', ['z.jpg'])
+  test('inserta la meta EXIF (fecha de captura + GPS) de cada foto', async () => {
+    listResult.data = []
+    await addMomentImages('c1', [
+      newImage('x.jpg', { takenAt: '2026-06-01T10:00:00.000Z', lat: 40.4, lng: -3.7 }),
+    ])
     expect(calls.insert).toHaveBeenCalledWith([
-      { challenge_id: 'c1', image_path: 'z.jpg', sort_order: 3 },
+      {
+        challenge_id: 'c1',
+        image_path: 'x.jpg',
+        sort_order: 0,
+        taken_at: '2026-06-01T10:00:00.000Z',
+        gps_lat: 40.4,
+        gps_lng: -3.7,
+      },
+    ])
+  })
+
+  test('con galería previa: continúa tras el MAYOR sort_order y NO re-espeja portada', async () => {
+    // Ojo: el orden de listMomentImages ya no es por sort_order (es sort_at), así
+    // que el máximo puede no ser el ÚLTIMO elemento del array.
+    listResult.data = [img('a', 2), img('b', 0)]
+    await addMomentImages('c1', [newImage('z.jpg')])
+    expect(calls.insert).toHaveBeenCalledWith([
+      {
+        challenge_id: 'c1',
+        image_path: 'z.jpg',
+        sort_order: 3,
+        taken_at: null,
+        gps_lat: null,
+        gps_lng: null,
+      },
     ])
     expect(calls.mirror).not.toHaveBeenCalled()
   })
 
-  test('sin paths: no hace nada', async () => {
+  test('sin fotos: no hace nada', async () => {
     await addMomentImages('c1', [])
     expect(calls.insert).not.toHaveBeenCalled()
   })
 })
 
 describe('setMomentCover', () => {
-  test('mueve la elegida al frente y espeja su image_path', async () => {
+  test('intercambia el sort_order con la portada actual y espeja su image_path', async () => {
     listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg'), img('c', 2, 'c.jpg')]
     await setMomentCover('c1', 'c')
-    // 'c' pasa a sort_order 0; 'a'→1, 'b'→2. 'c' cambia (2→0), 'a' (0→1), 'b' (1→2).
+    // 'c' (elegida) hereda el sort_order de la portada actual ('a', 0); 'a' se
+    // queda con el que tenía 'c' (2). 'b' no se toca.
     expect(calls.reorder).toHaveBeenCalledWith({ id: 'c', patch: { sort_order: 0 } })
-    expect(calls.reorder).toHaveBeenCalledWith({ id: 'a', patch: { sort_order: 1 } })
-    expect(calls.reorder).toHaveBeenCalledWith({ id: 'b', patch: { sort_order: 2 } })
+    expect(calls.reorder).toHaveBeenCalledWith({ id: 'a', patch: { sort_order: 2 } })
+    expect(calls.reorder).toHaveBeenCalledTimes(2)
     expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'c.jpg' }, id: 'c1' })
+  })
+
+  test('la portada es la de menor sort_order, no la posición [0] de la lista', async () => {
+    // Lista ordenada por sort_at: 'b' va primero pero 'a' (sort_order 0) es la portada.
+    listResult.data = [img('b', 1, 'b.jpg'), img('a', 0, 'a.jpg')]
+    await setMomentCover('c1', 'b')
+    expect(calls.reorder).toHaveBeenCalledWith({ id: 'b', patch: { sort_order: 0 } })
+    expect(calls.reorder).toHaveBeenCalledWith({ id: 'a', patch: { sort_order: 1 } })
+    expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'b.jpg' }, id: 'c1' })
   })
 
   test('si ya es la portada, no toca nada', async () => {
@@ -173,5 +240,21 @@ describe('removeMomentImage', () => {
     await removeMomentImage('c1', 'b')
     expect(calls.delete).toHaveBeenCalledWith('b')
     expect(calls.mirror).not.toHaveBeenCalled()
+  })
+
+  test('la portada es la de menor sort_order, no la posición [0] de la lista', async () => {
+    // Lista ordenada por sort_at: 'b' primero, pero la portada real es 'a' (sort_order 0).
+    listResult.data = [img('b', 1, 'b.jpg'), img('a', 0, 'a.jpg')]
+    await removeMomentImage('c1', 'b')
+    expect(calls.delete).toHaveBeenCalledWith('b')
+    // 'b' no era la portada (aunque fuera la [0] de la lista): no re-espeja.
+    expect(calls.mirror).not.toHaveBeenCalled()
+  })
+
+  test('quita la portada aunque no esté en la posición [0]: re-espeja la siguiente', async () => {
+    listResult.data = [img('b', 1, 'b.jpg'), img('a', 0, 'a.jpg')]
+    await removeMomentImage('c1', 'a')
+    expect(calls.delete).toHaveBeenCalledWith('a')
+    expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'b.jpg' }, id: 'c1' })
   })
 })

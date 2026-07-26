@@ -263,14 +263,15 @@ export async function listTripPhotos(groupId: string): Promise<TripPhoto[]> {
   const rows = challenges ?? []
   const challengeIds = rows.map((c) => c.id)
 
-  // Galería completa de esos momentos (fotos extra más allá de la portada).
-  let gallery: { image_path: string; sort_order: number }[] = []
+  // Galería completa de esos momentos (fotos extra más allá de la portada), en
+  // orden de CAPTURA (sort_at asc, migración 0048/#950) — no de subida.
+  let gallery: { image_path: string }[] = []
   if (challengeIds.length > 0) {
     const { data: images, error: imgError } = await supabase
       .from('moment_images')
-      .select('image_path, sort_order')
+      .select('image_path')
       .in('challenge_id', challengeIds)
-      .order('sort_order', { ascending: true })
+      .order('sort_at', { ascending: true })
     if (imgError) throw imgError
     gallery = images ?? []
   }
