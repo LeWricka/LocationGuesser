@@ -5,10 +5,19 @@ import type { MomentImage } from './momentImages'
 // desde `listResult`; capturamos inserts/updates/deletes y los espejos a
 // `challenges.image_path` para verificar la lógica de portada.
 const listResult: { data: MomentImage[]; error: unknown } = { data: [], error: null }
+// Flag `challenges.photos_manual_order` que devuelve el mock al consultarlo
+// (`getPhotosManualOrder`/`listMomentImages`). Default false (orden por fecha).
+const manualOrderResult: { data: { photos_manual_order: boolean } | null; error: unknown } = {
+  data: { photos_manual_order: false },
+  error: null,
+}
+// Columna/orden con que `listMomentImages` consultó `moment_images.order(...)`
+// en la última llamada — verifica que respeta el flag (sort_order vs sort_at).
+const orderCalls: { column: string; ascending: boolean }[] = []
 const calls = {
   insert: vi.fn(),
   delete: vi.fn(),
-  // Updates de challenges (espejo de portada): [{ table, patch, id }]
+  // Updates de challenges (espejo de portada + flag de orden manual): [{ patch, id }]
   mirror: vi.fn(),
   // Updates de moment_images (reordenar): [{ id, patch }]
   reorder: vi.fn(),
@@ -19,7 +28,10 @@ function momentImagesBuilder() {
   builder.select = () => builder
   builder.eq = () => builder
   builder.in = () => builder
-  builder.order = () => Promise.resolve(listResult)
+  builder.order = (column: string, opts: { ascending: boolean }) => {
+    orderCalls.push({ column, ascending: opts.ascending })
+    return Promise.resolve(listResult)
+  }
   builder.insert = (rows: unknown) => {
     calls.insert(rows)
     return Promise.resolve({ error: null })
@@ -48,6 +60,12 @@ function challengesBuilder() {
       return Promise.resolve({ error: null })
     },
   })
+  // `getPhotosManualOrder`: select('photos_manual_order').eq('id', id).single()
+  builder.select = () => ({
+    eq: () => ({
+      single: () => Promise.resolve(manualOrderResult),
+    }),
+  })
   return builder
 }
 
@@ -60,10 +78,13 @@ vi.mock('./supabase', () => ({
 
 import {
   addMomentImages,
+  getPhotosManualOrder,
   listGroupMomentImages,
   listMomentImages,
   removeMomentImage,
+  reorderMomentImages,
   setMomentCover,
+  setPhotosAutoOrder,
 } from './momentImages'
 
 function img(id: string, sort: number, path = `${id}.jpg`, challengeId = 'c1'): MomentImage {
@@ -91,6 +112,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   listResult.data = []
   listResult.error = null
+  manualOrderResult.data = { photos_manual_order: false }
+  manualOrderResult.error = null
+  orderCalls.length = 0
 })
 
 describe('listMomentImages', () => {
@@ -98,6 +122,32 @@ describe('listMomentImages', () => {
     listResult.data = [img('a', 0), img('b', 1)]
     const out = await listMomentImages('c1')
     expect(out.map((i) => i.id)).toEqual(['a', 'b'])
+  })
+
+  test('orden AUTO (flag false, #951): consulta ordenada por sort_at', async () => {
+    manualOrderResult.data = { photos_manual_order: false }
+    listResult.data = [img('a', 0), img('b', 1)]
+    await listMomentImages('c1')
+    expect(orderCalls.at(-1)).toEqual({ column: 'sort_at', ascending: true })
+  })
+
+  test('orden MANUAL (flag true, #952): consulta ordenada por sort_order', async () => {
+    manualOrderResult.data = { photos_manual_order: true }
+    listResult.data = [img('a', 0), img('b', 1)]
+    await listMomentImages('c1')
+    expect(orderCalls.at(-1)).toEqual({ column: 'sort_order', ascending: true })
+  })
+})
+
+describe('getPhotosManualOrder', () => {
+  test('devuelve el flag de challenges.photos_manual_order', async () => {
+    manualOrderResult.data = { photos_manual_order: true }
+    expect(await getPhotosManualOrder('c1')).toBe(true)
+  })
+
+  test('sin dato: por defecto false (orden por fecha)', async () => {
+    manualOrderResult.data = null
+    expect(await getPhotosManualOrder('c1')).toBe(false)
   })
 })
 
@@ -256,5 +306,47 @@ describe('removeMomentImage', () => {
     await removeMomentImage('c1', 'a')
     expect(calls.delete).toHaveBeenCalledWith('a')
     expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'b.jpg' }, id: 'c1' })
+  })
+})
+
+describe('reorderMomentImages', () => {
+  test('reasigna sort_order 0..N-1 según el nuevo orden (arrastrar y soltar)', async () => {
+    listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg'), img('c', 2, 'c.jpg')]
+    await reorderMomentImages('c1', ['c', 'a', 'b'])
+    expect(calls.reorder).toHaveBeenCalledWith({ id: 'c', patch: { sort_order: 0 } })
+    expect(calls.reorder).toHaveBeenCalledWith({ id: 'a', patch: { sort_order: 1 } })
+    expect(calls.reorder).toHaveBeenCalledWith({ id: 'b', patch: { sort_order: 2 } })
+    expect(calls.reorder).toHaveBeenCalledTimes(3)
+  })
+
+  test('activa el orden manual en challenges.photos_manual_order', async () => {
+    listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg')]
+    await reorderMomentImages('c1', ['b', 'a'])
+    expect(calls.mirror).toHaveBeenCalledWith({
+      patch: { photos_manual_order: true },
+      id: 'c1',
+    })
+  })
+
+  test('re-espeja la portada: tras reordenar, la de menor sort_order es orderedIds[0]', async () => {
+    listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg'), img('c', 2, 'c.jpg')]
+    await reorderMomentImages('c1', ['c', 'a', 'b'])
+    expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'c.jpg' }, id: 'c1' })
+  })
+
+  test('lista vacía: no hace nada', async () => {
+    await reorderMomentImages('c1', [])
+    expect(calls.reorder).not.toHaveBeenCalled()
+    expect(calls.mirror).not.toHaveBeenCalled()
+  })
+})
+
+describe('setPhotosAutoOrder', () => {
+  test('apaga el flag de orden manual (vuelve a orden por fecha)', async () => {
+    await setPhotosAutoOrder('c1')
+    expect(calls.mirror).toHaveBeenCalledWith({
+      patch: { photos_manual_order: false },
+      id: 'c1',
+    })
   })
 })

@@ -106,6 +106,7 @@ function baseMoment(
     number_tolerance: 'normal',
     time_scoring: true,
     happened_on: null,
+    photos_manual_order: false,
     created_by: EXAMPLE_USER_LUCIA,
     created_at: daysAgoIso(7),
     ...over,

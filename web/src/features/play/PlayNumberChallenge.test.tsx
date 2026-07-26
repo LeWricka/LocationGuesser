@@ -94,6 +94,7 @@ const numberChallenge: ChallengeForPlay = {
   number_tolerance: 'normal',
   time_scoring: true,
   happened_on: null,
+  photos_manual_order: false,
   created_by: 'u-other',
   created_at: '2026-06-19T10:00:00.000Z',
 }

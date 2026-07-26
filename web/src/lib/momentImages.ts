@@ -6,15 +6,22 @@ import type { Database } from './database.types'
  * filas por momento (migración 0023). Reglas clave:
  *
  *  - La VISUALIZACIÓN se ordena por `sort_at` asc (fecha de captura EXIF si la
- *    hay, si no la hora de subida — columna generada, migración 0048/#950):
- *    así las fotos de varios subiendo a la vez salen en orden cronológico.
+ *    hay, si no la hora de subida — columna generada, migración 0048/#950) por
+ *    DEFECTO: así las fotos de varios subiendo a la vez salen en orden
+ *    cronológico. Si el dueño arrastra para reordenar a mano
+ *    (`reorderMomentImages`, migración 0049/#952), ESE momento pasa a orden
+ *    MANUAL (`challenges.photos_manual_order = true`) y la visualización se
+ *    ordena por `sort_order` en su lugar, hasta que vuelva a orden por fecha
+ *    (`setPhotosAutoOrder`).
  *  - La PORTADA es OTRA cosa: la fila de menor `sort_order` (el orden en que se
- *    subió/eligió), NO la posición [0] tras ordenar por `sort_at`. Por
+ *    subió/eligió), NO la posición [0] tras ordenar por `sort_at`/`sort_order`. Por
  *    COMPATIBILIDAD, `challenges.image_path` SIGUE siendo la portada: lo leen
  *    la tarjeta del viaje, el mapamundi, el pin-foto, etc. Por eso, cada vez que
- *    cambia la portada (subir la 1ª foto, marcar otra, o quitar la actual), hay
- *    que ESPEJARLA en `challenges.image_path` desde el cliente.
+ *    cambia la portada (subir la 1ª foto, marcar otra, quitar la actual o
+ *    reordenar), hay que ESPEJARLA en `challenges.image_path` desde el cliente.
  *  - RLS: SELECT = miembro del grupo; INSERT/UPDATE/DELETE = dueño del grupo.
+ *    `photos_manual_order` vive en `challenges`, mismo perímetro de UPDATE que
+ *    el resto de columnas del momento (dueño) — no necesita política propia.
  *
  * Solo aplica a RECUERDOS: el RETO se queda con su única foto (la que se adivina).
  */
@@ -37,15 +44,36 @@ function coverOf(images: MomentImage[]): MomentImage {
   return images.reduce((min, img) => (img.sort_order < min.sort_order ? img : min))
 }
 
-/** Lista la galería de un momento en orden CRONOLÓGICO de captura (sort_at asc). */
+/**
+ * ¿Está la galería de este momento en orden MANUAL (`challenges.photos_manual_order`,
+ * migración 0049/#952)? `false` (el default) = orden por fecha de captura
+ * (#951). Exportada para que la UI (`MomentGallery`) sepa si mostrar "Volver a
+ * orden por fecha" y si activar el arrastre.
+ */
+export async function getPhotosManualOrder(challengeId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('challenges')
+    .select('photos_manual_order')
+    .eq('id', challengeId)
+    .single()
+  if (error) throw error
+  return data?.photos_manual_order ?? false
+}
+
+/**
+ * Lista la galería de un momento en su orden de VISUALIZACIÓN: por
+ * `sort_order` si el momento está en orden MANUAL (tras arrastrar, #952), si
+ * no por `sort_at` (fecha de captura, comportamiento por defecto, #951).
+ */
 export async function listMomentImages(challengeId: string): Promise<MomentImage[]> {
+  const manual = await getPhotosManualOrder(challengeId)
   const { data, error } = await supabase
     .from('moment_images')
     .select(
       'id, challenge_id, image_path, sort_order, taken_at, gps_lat, gps_lng, sort_at, created_at',
     )
     .eq('challenge_id', challengeId)
-    .order('sort_at', { ascending: true })
+    .order(manual ? 'sort_order' : 'sort_at', { ascending: true })
   if (error) throw error
   return data ?? []
 }
@@ -178,4 +206,55 @@ export async function removeMomentImage(challengeId: string, imageId: string): P
     const remaining = images.filter((img) => img.id !== imageId)
     await mirrorCover(challengeId, remaining.length > 0 ? coverOf(remaining).image_path : null)
   }
+}
+
+/**
+ * Reordena la galería de un momento A MANO (arrastrar y soltar en
+ * `MomentGallery`, issue #952): reasigna `sort_order` 0..N-1 según
+ * `orderedIds` (el nuevo orden tras soltar), pasa el momento a orden MANUAL
+ * (`challenges.photos_manual_order = true`, así se queda aunque lleguen fotos
+ * nuevas por fecha) y re-espeja la portada. Tras reasignar 0..N-1 en ESE
+ * orden, la portada (menor `sort_order`) es SIEMPRE `orderedIds[0]` — no hace
+ * falta releer la galería para saberlo, basta con la foto que ya traíamos.
+ */
+export async function reorderMomentImages(
+  challengeId: string,
+  orderedIds: string[],
+): Promise<void> {
+  if (orderedIds.length === 0) return
+
+  // Necesitamos el `image_path` de la nueva portada (orderedIds[0]) para
+  // re-espejarla; lo sacamos de la galería actual (no depende del orden en que
+  // venga, solo de qué imagen es cuál).
+  const images = await listMomentImages(challengeId)
+  const pathById = new Map(images.map((img) => [img.id, img.image_path]))
+
+  const reassignments = orderedIds.map(async (id, i) => {
+    const { error } = await supabase.from('moment_images').update({ sort_order: i }).eq('id', id)
+    if (error) throw error
+  })
+  await Promise.all(reassignments)
+
+  const { error: flagError } = await supabase
+    .from('challenges')
+    .update({ photos_manual_order: true })
+    .eq('id', challengeId)
+  if (flagError) throw flagError
+
+  await mirrorCover(challengeId, pathById.get(orderedIds[0]) ?? null)
+}
+
+/**
+ * Vuelve el momento a orden AUTOMÁTICO (por fecha de captura, `sort_at` —
+ * comportamiento por defecto, #951): apaga `challenges.photos_manual_order`.
+ * El `sort_order` de cada foto se deja tal cual (no hace falta re-numerarlo:
+ * en orden automático no se usa para pintar la galería, solo para desempatar
+ * la portada).
+ */
+export async function setPhotosAutoOrder(challengeId: string): Promise<void> {
+  const { error } = await supabase
+    .from('challenges')
+    .update({ photos_manual_order: false })
+    .eq('id', challengeId)
+  if (error) throw error
 }
