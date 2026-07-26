@@ -13,12 +13,15 @@ import type { Database } from './database.types'
  *    MANUAL (`challenges.photos_manual_order = true`) y la visualización se
  *    ordena por `sort_order` en su lugar, hasta que vuelva a orden por fecha
  *    (`setPhotosAutoOrder`).
- *  - La PORTADA es OTRA cosa: la fila de menor `sort_order` (el orden en que se
- *    subió/eligió), NO la posición [0] tras ordenar por `sort_at`/`sort_order`. Por
- *    COMPATIBILIDAD, `challenges.image_path` SIGUE siendo la portada: lo leen
- *    la tarjeta del viaje, el mapamundi, el pin-foto, etc. Por eso, cada vez que
- *    cambia la portada (subir la 1ª foto, marcar otra, quitar la actual o
- *    reordenar), hay que ESPEJARLA en `challenges.image_path` desde el cliente.
+ *  - La PORTADA es OTRA cosa, DESACOPLADA del orden (issue #954: reordenar
+ *    cambiaba la portada sin querer): es SOLO `challenges.image_path`, una
+ *    elección explícita del dueño ("Marcar como portada"). Se determina por
+ *    COINCIDENCIA de `image_path` con la fila de `moment_images`, NUNCA por
+ *    `sort_order` ni por posición — así arrastrar para reordenar nunca cambia
+ *    la portada, y marcar portada nunca reordena. `challenges.image_path` lo
+ *    leen la tarjeta del viaje, el mapamundi, el pin-foto, etc.; por eso, cada
+ *    vez que cambia la portada (subir la 1ª foto, marcar otra o quitar la
+ *    actual), hay que ESPEJARLA en `challenges.image_path` desde el cliente.
  *  - RLS: SELECT = miembro del grupo; INSERT/UPDATE/DELETE = dueño del grupo.
  *    `photos_manual_order` vive en `challenges`, mismo perímetro de UPDATE que
  *    el resto de columnas del momento (dueño) — no necesita política propia.
@@ -35,29 +38,43 @@ export interface NewMomentImage {
   lng: number | null
 }
 
-/**
- * La PORTADA es la fila de menor `sort_order` — NO la posición [0] del array
- * (que ahora viene ordenado por `sort_at`, no por `sort_order`). Requiere
- * `images` no vacío.
- */
-function coverOf(images: MomentImage[]): MomentImage {
-  return images.reduce((min, img) => (img.sort_order < min.sort_order ? img : min))
+/** Metadatos de la galería que viven en `challenges`: el flag de orden manual
+ * y la portada (independiente entre sí, issue #954). */
+export interface MomentGalleryMeta {
+  manualOrder: boolean
+  /** Path de `challenges.image_path`, o null si el momento no tiene portada. */
+  coverPath: string | null
 }
 
 /**
- * ¿Está la galería de este momento en orden MANUAL (`challenges.photos_manual_order`,
- * migración 0049/#952)? `false` (el default) = orden por fecha de captura
- * (#951). Exportada para que la UI (`MomentGallery`) sepa si mostrar "Volver a
- * orden por fecha" y si activar el arrastre.
+ * Lee de una vez el flag de orden MANUAL (`challenges.photos_manual_order`,
+ * migración 0049/#952) y la portada (`challenges.image_path`, issue #954) de
+ * un momento — ambos viven en la misma fila de `challenges`, una sola
+ * consulta. Exportada para que la UI (`MomentGallery`) sepa si mostrar "Volver
+ * a orden por fecha", si activar el arrastre, y qué foto es la portada (por
+ * coincidencia de `image_path`, NO por `sort_order`).
  */
-export async function getPhotosManualOrder(challengeId: string): Promise<boolean> {
+export async function getMomentGalleryMeta(challengeId: string): Promise<MomentGalleryMeta> {
   const { data, error } = await supabase
     .from('challenges')
-    .select('photos_manual_order')
+    .select('photos_manual_order, image_path')
     .eq('id', challengeId)
     .single()
   if (error) throw error
-  return data?.photos_manual_order ?? false
+  return {
+    manualOrder: data?.photos_manual_order ?? false,
+    coverPath: data?.image_path ?? null,
+  }
+}
+
+/**
+ * ¿Está la galería de este momento en orden MANUAL? `false` (el default) =
+ * orden por fecha de captura (#951). Atajo sobre `getMomentGalleryMeta` para
+ * quien solo necesita el flag (p.ej. `listMomentImages`).
+ */
+export async function getPhotosManualOrder(challengeId: string): Promise<boolean> {
+  const { manualOrder } = await getMomentGalleryMeta(challengeId)
+  return manualOrder
 }
 
 /**
@@ -160,74 +177,63 @@ export async function addMomentImages(challengeId: string, items: NewMomentImage
 }
 
 /**
- * Marca una imagen como PORTADA y espeja su `image_path` en
- * `challenges.image_path`. La portada es la fila de menor `sort_order`
- * (independiente del orden de VISUALIZACIÓN, que es por `sort_at`): basta con
- * INTERCAMBIAR el `sort_order` de la elegida con el de la portada actual, así
- * la elegida hereda el mínimo sin tener que renumerar el resto de la galería.
- * No-op si la imagen ya es la portada.
+ * Marca una imagen como PORTADA: fija `challenges.image_path` a su
+ * `image_path` (issue #954). La portada es una elección EXPLÍCITA,
+ * desacoplada del orden — NO toca `sort_order` (marcar portada no debe
+ * reordenar la disposición manual de la galería). No-op si la imagen ya es la
+ * portada (mismo `image_path`).
  */
 export async function setMomentCover(challengeId: string, imageId: string): Promise<void> {
   const images = await listMomentImages(challengeId)
   const target = images.find((img) => img.id === imageId)
   if (!target) throw new Error('La foto ya no está en la galería.')
-  const current = coverOf(images)
-  if (current.id === imageId) return // Ya es la portada.
-
-  const { error: swapIn } = await supabase
-    .from('moment_images')
-    .update({ sort_order: current.sort_order })
-    .eq('id', target.id)
-  if (swapIn) throw swapIn
-  const { error: swapOut } = await supabase
-    .from('moment_images')
-    .update({ sort_order: target.sort_order })
-    .eq('id', current.id)
-  if (swapOut) throw swapOut
+  const { coverPath } = await getMomentGalleryMeta(challengeId)
+  if (coverPath === target.image_path) return // Ya es la portada.
 
   await mirrorCover(challengeId, target.image_path)
 }
 
 /**
- * Quita una foto de la galería. Si era la portada (menor `sort_order`), la
- * nueva portada es la que quede con menor `sort_order` y se re-espeja en
+ * Quita una foto de la galería. Si era la portada (su `image_path` coincidía
+ * con `challenges.image_path`, issue #954), la nueva portada es la primera
+ * que quede en orden de VISUALIZACIÓN (el mismo orden que ya trae `images` —
+ * `sort_at`/`sort_order` según `listMomentImages`) y se re-espeja en
  * `challenges.image_path`; si no queda ninguna, deja `image_path = null` (no
- * hay portada que mostrar). El archivo de Storage no se borra aquí (lo hace el
- * ciclo de limpieza del bucket si procede).
+ * hay portada que mostrar). Si NO era la portada, la portada no se toca. El
+ * archivo de Storage no se borra aquí (lo hace el ciclo de limpieza del bucket
+ * si procede).
  */
 export async function removeMomentImage(challengeId: string, imageId: string): Promise<void> {
-  const images = await listMomentImages(challengeId)
-  const wasCover = images.length > 0 && coverOf(images).id === imageId
+  const [images, { coverPath }] = await Promise.all([
+    listMomentImages(challengeId),
+    getMomentGalleryMeta(challengeId),
+  ])
+  const target = images.find((img) => img.id === imageId)
+  const wasCover = target != null && target.image_path === coverPath
 
   const { error } = await supabase.from('moment_images').delete().eq('id', imageId)
   if (error) throw error
 
   if (wasCover) {
     const remaining = images.filter((img) => img.id !== imageId)
-    await mirrorCover(challengeId, remaining.length > 0 ? coverOf(remaining).image_path : null)
+    await mirrorCover(challengeId, remaining.length > 0 ? remaining[0].image_path : null)
   }
 }
 
 /**
  * Reordena la galería de un momento A MANO (arrastrar y soltar en
  * `MomentGallery`, issue #952): reasigna `sort_order` 0..N-1 según
- * `orderedIds` (el nuevo orden tras soltar), pasa el momento a orden MANUAL
+ * `orderedIds` (el nuevo orden tras soltar) y pasa el momento a orden MANUAL
  * (`challenges.photos_manual_order = true`, así se queda aunque lleguen fotos
- * nuevas por fecha) y re-espeja la portada. Tras reasignar 0..N-1 en ESE
- * orden, la portada (menor `sort_order`) es SIEMPRE `orderedIds[0]` — no hace
- * falta releer la galería para saberlo, basta con la foto que ya traíamos.
+ * nuevas por fecha). NO toca `challenges.image_path` (issue #954): reordenar
+ * es puramente visual, la portada es una elección aparte (`setMomentCover`) y
+ * no debe cambiar solo porque el dueño arrastró las fotos.
  */
 export async function reorderMomentImages(
   challengeId: string,
   orderedIds: string[],
 ): Promise<void> {
   if (orderedIds.length === 0) return
-
-  // Necesitamos el `image_path` de la nueva portada (orderedIds[0]) para
-  // re-espejarla; lo sacamos de la galería actual (no depende del orden en que
-  // venga, solo de qué imagen es cuál).
-  const images = await listMomentImages(challengeId)
-  const pathById = new Map(images.map((img) => [img.id, img.image_path]))
 
   const reassignments = orderedIds.map(async (id, i) => {
     const { error } = await supabase.from('moment_images').update({ sort_order: i }).eq('id', id)
@@ -240,8 +246,6 @@ export async function reorderMomentImages(
     .update({ photos_manual_order: true })
     .eq('id', challengeId)
   if (flagError) throw flagError
-
-  await mirrorCover(challengeId, pathById.get(orderedIds[0]) ?? null)
 }
 
 /**

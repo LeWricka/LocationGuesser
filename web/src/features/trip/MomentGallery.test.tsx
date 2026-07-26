@@ -1,15 +1,16 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { MomentImage } from '../../lib/momentImages'
+import type { MomentGalleryMeta, MomentImage } from '../../lib/momentImages'
 
 // Mocks de la capa de datos: la galería solo orquesta estas funciones; aislamos la BD.
 const listMomentImagesMock = vi.fn<(id: string) => Promise<MomentImage[]>>()
 const removeMomentImageMock = vi.fn<(id: string, imageId: string) => Promise<void>>()
 const setMomentCoverMock = vi.fn<(id: string, imageId: string) => Promise<void>>()
-// Orden manual (issue #952): por defecto false (orden por fecha) — cada test
-// que necesite manual lo sobreescribe con `mockResolvedValue(true)`.
-const getPhotosManualOrderMock = vi.fn<(id: string) => Promise<boolean>>()
+// Flag de orden manual (#952) + portada por path (#954): por defecto orden
+// auto y portada = 'a.jpg' (img-1) — cada test que necesite otro estado lo
+// sobreescribe con `mockResolvedValue(...)`.
+const getMomentGalleryMetaMock = vi.fn<(id: string) => Promise<MomentGalleryMeta>>()
 const reorderMomentImagesMock = vi.fn<(id: string, orderedIds: string[]) => Promise<void>>()
 const setPhotosAutoOrderMock = vi.fn<(id: string) => Promise<void>>()
 
@@ -18,7 +19,7 @@ vi.mock('../../lib/momentImages', () => ({
   removeMomentImage: (id: string, imageId: string) => removeMomentImageMock(id, imageId),
   setMomentCover: (id: string, imageId: string) => setMomentCoverMock(id, imageId),
   addMomentImages: vi.fn(),
-  getPhotosManualOrder: (id: string) => getPhotosManualOrderMock(id),
+  getMomentGalleryMeta: (id: string) => getMomentGalleryMetaMock(id),
   reorderMomentImages: (id: string, orderedIds: string[]) =>
     reorderMomentImagesMock(id, orderedIds),
   setPhotosAutoOrder: (id: string) => setPhotosAutoOrderMock(id),
@@ -79,7 +80,8 @@ beforeEach(() => {
   listMomentImagesMock.mockResolvedValue(IMAGES)
   removeMomentImageMock.mockResolvedValue(undefined)
   setMomentCoverMock.mockResolvedValue(undefined)
-  getPhotosManualOrderMock.mockResolvedValue(false)
+  // Portada por defecto = 'a.jpg' (img-1), igual que antes de #954 (menor sort_order).
+  getMomentGalleryMetaMock.mockResolvedValue({ manualOrder: false, coverPath: 'a.jpg' })
   reorderMomentImagesMock.mockResolvedValue(undefined)
   setPhotosAutoOrderMock.mockResolvedValue(undefined)
 })
@@ -122,14 +124,16 @@ describe('MomentGallery', () => {
     expect(screen.queryByLabelText('Añadir más fotos a la galería')).not.toBeInTheDocument()
   })
 
-  test('la portada la marca sort_order, no la posición [0] tras ordenar por fecha (#950)', async () => {
-    // 'img-2' viene PRIMERO en la lista (orden de captura, sort_at), pero la
-    // portada real es 'img-1' (menor sort_order). El badge y el botón "Marcar
-    // como portada" deben seguir al sort_order, no a la posición del array.
+  test('la portada la marca challenges.image_path, no sort_order ni la posición [0] (#954)', async () => {
+    // 'img-2' viene PRIMERO en la lista (orden de captura, sort_at) y tiene
+    // sort_order mayor, pero la portada real es la que coincide con el path
+    // devuelto por getMomentGalleryMeta ('a.jpg' = img-1). El badge y el botón
+    // "Marcar como portada" deben seguir al path, no a sort_order ni posición.
     listMomentImagesMock.mockResolvedValue([
       { ...IMAGES[1], sort_order: 1 },
       { ...IMAGES[0], sort_order: 0 },
     ])
+    getMomentGalleryMetaMock.mockResolvedValue({ manualOrder: false, coverPath: 'a.jpg' })
     renderGallery()
 
     await screen.findAllByRole('button', { name: 'Ampliar foto' })
@@ -146,7 +150,7 @@ describe('MomentGallery', () => {
   })
 
   test('orden por defecto (auto): no se ofrece "Volver a orden por fecha"', async () => {
-    getPhotosManualOrderMock.mockResolvedValue(false)
+    getMomentGalleryMetaMock.mockResolvedValue({ manualOrder: false, coverPath: 'a.jpg' })
     renderGallery()
     await screen.findAllByRole('button', { name: 'Ampliar foto' })
     expect(
@@ -156,7 +160,7 @@ describe('MomentGallery', () => {
 
   test('orden manual (#952): se ofrece "Volver a orden por fecha" y lo desactiva al tocarlo', async () => {
     const user = userEvent.setup()
-    getPhotosManualOrderMock.mockResolvedValue(true)
+    getMomentGalleryMetaMock.mockResolvedValue({ manualOrder: true, coverPath: 'a.jpg' })
     renderGallery()
 
     const autoOrderBtn = await screen.findByRole('button', { name: 'Volver a orden por fecha' })
@@ -182,6 +186,22 @@ describe('MomentGallery', () => {
     // Mover la 1ª foto (img-1) a la derecha: reasigna orden ['img-2', 'img-1'].
     await user.click(moveRightButtons[0])
     expect(reorderMomentImagesMock).toHaveBeenCalledWith('c1', ['img-2', 'img-1'])
+  })
+
+  test('al persistir el reorden, recarga la galería para que el carrusel refleje el nuevo orden (#954)', async () => {
+    const user = userEvent.setup()
+    renderGallery()
+
+    await screen.findAllByRole('button', { name: 'Ampliar foto' })
+    await user.click(screen.getByRole('button', { name: 'Ordenar fotos' }))
+    const moveRightButtons = screen.getAllByRole('button', { name: 'Mover foto a la derecha' })
+
+    // Solo la carga inicial hasta aquí; tras mover y persistir con éxito debe
+    // volver a llamar a listMomentImages (load()) para refrescar `images`, que
+    // es lo que pinta el carrusel — antes de #954 solo se llamaba onChanged().
+    expect(listMomentImagesMock).toHaveBeenCalledTimes(1)
+    await user.click(moveRightButtons[0])
+    await waitFor(() => expect(listMomentImagesMock).toHaveBeenCalledTimes(2))
   })
 
   test('el botón "Ordenar fotos" cambia a "Listo" y vuelve al carrusel al tocarlo de nuevo', async () => {

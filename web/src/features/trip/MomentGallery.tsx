@@ -15,7 +15,7 @@ import { Icon, IconCamara, Spinner, useToast } from '../../ui'
 import { Lightbox } from '../../ui/Lightbox'
 import {
   addMomentImages,
-  getPhotosManualOrder,
+  getMomentGalleryMeta,
   listMomentImages,
   removeMomentImage,
   reorderMomentImages,
@@ -92,6 +92,9 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
   // (default) = por fecha de captura (#951). Gobierna el aviso "Volver a orden
   // por fecha".
   const [manualOrder, setManualOrder] = useState(false)
+  // Path de la portada (`challenges.image_path`, issue #954): decide qué foto
+  // lleva el badge/star, DESACOPLADO del orden (`sort_order`/`sort_at`).
+  const [coverPath, setCoverPath] = useState<string | null>(null)
   // ¿Se está mostrando la cuadrícula de reordenar (en vez del carrusel)?
   const [reordering, setReordering] = useState(false)
   // Orden de trabajo de la cuadrícula (ids): se actualiza EN VIVO mientras se
@@ -109,19 +112,20 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
 
   // Carga la galería (orden de VISUALIZACIÓN: sort_order si manual, sort_at si
   // auto — lo decide `listMomentImages`) y firma las URLs en lote (bucket
-  // privado). La portada se calcula aparte (menor sort_order, ver `coverId`
-  // más abajo): ya no coincide necesariamente con la posición [0].
+  // privado). La portada se lee aparte (`challenges.image_path`, issue #954,
+  // ver `coverId` más abajo): es una elección independiente del orden.
   const load = useCallback(async () => {
     try {
-      const [rows, manual] = await Promise.all([
+      const [rows, meta] = await Promise.all([
         listMomentImages(challengeId),
-        getPhotosManualOrder(challengeId),
+        getMomentGalleryMeta(challengeId),
       ])
       const signed = await Promise.all(
         rows.map(async (row) => ({ ...row, url: await signedImageUrl(row.image_path) })),
       )
       setImages(signed)
-      setManualOrder(manual)
+      setManualOrder(meta.manualOrder)
+      setCoverPath(meta.coverPath)
       setOrderIds(signed.map((img) => img.id))
     } catch (err) {
       reportError(err, { area: 'moment_gallery_load' })
@@ -203,14 +207,17 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
     }
   }
 
-  // Persiste un nuevo orden (arrastrar o mover por teclado): optimista (la
-  // cuadrícula ya está pintada en `newOrder`, `setOrderIds` de quien llama) y,
-  // si falla, recarga desde el servidor para no dejar la UI desincronizada.
+  // Persiste un nuevo orden (arrastrar o mover por teclado): la cuadrícula ya
+  // está pintada en `newOrder` (optimista, `setOrderIds` de quien llama), pero
+  // el CARRUSEL pinta desde `images` — hay que recargar (`load`) tras guardar
+  // para que el carrusel refleje el nuevo orden al salir de "Ordenar fotos"
+  // (issue #954: antes se quedaba con el orden viejo hasta un refresco). Si
+  // falla, recargar también evita dejar la UI desincronizada del servidor.
   async function persistReorder(newOrder: string[]) {
     setBusy(true)
     try {
       await reorderMomentImages(challengeId, newOrder)
-      setManualOrder(true)
+      await load()
       onChanged?.()
     } catch (err) {
       reportError(err, { area: 'moment_gallery_reorder' })
@@ -359,13 +366,10 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
     )
   }
 
-  // La PORTADA es la foto de menor `sort_order` (elección explícita del
-  // dueño/subida) — YA NO la posición [0]: la lista se pinta en orden de
-  // CAPTURA (`sort_at`), que puede diferir del orden de portada.
-  const coverId =
-    images.length > 0
-      ? images.reduce((min, img) => (img.sort_order < min.sort_order ? img : min)).id
-      : null
+  // La PORTADA es la foto cuyo `image_path` coincide con `challenges.image_path`
+  // (issue #954) — NI la posición [0] ni el menor `sort_order`: es una
+  // elección explícita, desacoplada del orden de visualización/arrastre.
+  const coverId = images.find((img) => img.image_path === coverPath)?.id ?? null
 
   return (
     <div className={styles.gallery}>
