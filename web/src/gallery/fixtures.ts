@@ -603,11 +603,20 @@ export const PHOTO_LABELS: Record<string, string> = {
 
 // Galería del recuerdo del ramen: varias fotos ordenadas por sort_order (la de 0
 // es la portada). Sirve para capturar MomentGallery con controles de dueño.
+// `sort_at` (columna generada en BD real, migración 0048/#950) se sembra a mano
+// aquí como `coalesce(taken_at, created_at)`, igual que hace Postgres: sin EXIF
+// de fecha (`taken_at: null`), cae en `created_at`, así el orden de
+// VISUALIZACIÓN coincide con el de portada en este fixture (no hay fotos con
+// fecha de captura real que lo desordene).
 export interface MomentImageRow {
   id: string
   challenge_id: string
   image_path: string
   sort_order: number
+  taken_at: string | null
+  gps_lat: number | null
+  gps_lng: number | null
+  sort_at: string
   created_at: string
 }
 export const MOMENT_IMAGES: MomentImageRow[] = [
@@ -616,6 +625,10 @@ export const MOMENT_IMAGES: MomentImageRow[] = [
     challenge_id: CH_MEMORY,
     image_path: 'photo-ramen.jpg',
     sort_order: 0,
+    taken_at: null,
+    gps_lat: null,
+    gps_lng: null,
+    sort_at: isoFromNow(-4 * DAY),
     created_at: isoFromNow(-4 * DAY),
   },
   {
@@ -623,6 +636,10 @@ export const MOMENT_IMAGES: MomentImageRow[] = [
     challenge_id: CH_MEMORY,
     image_path: 'photo-ramen-2.jpg',
     sort_order: 1,
+    taken_at: null,
+    gps_lat: null,
+    gps_lng: null,
+    sort_at: isoFromNow(-4 * DAY),
     created_at: isoFromNow(-4 * DAY),
   },
   {
@@ -630,6 +647,10 @@ export const MOMENT_IMAGES: MomentImageRow[] = [
     challenge_id: CH_MEMORY,
     image_path: 'photo-ramen-3.jpg',
     sort_order: 2,
+    taken_at: null,
+    gps_lat: null,
+    gps_lng: null,
+    sort_at: isoFromNow(-4 * DAY),
     created_at: isoFromNow(-4 * DAY),
   },
 ]

@@ -313,11 +313,19 @@ export interface Database {
         // Galería de fotos de un MOMENTO (recuerdo): N filas por momento. La
         // PORTADA es la de menor `sort_order` y se espeja en `challenges.image_path`.
         // Migración 0023. RLS: SELECT miembro del grupo; INSERT/UPDATE/DELETE dueño.
+        // `taken_at`/`gps_lat`/`gps_lng`: metadatos EXIF de captura leídos del
+        // archivo original antes de comprimir (migración 0048/#950). `sort_at` es
+        // GENERADA (`coalesce(taken_at, created_at)`, stored): clave de orden de
+        // VISUALIZACIÓN de la galería, no se escribe desde el cliente.
         Row: {
           id: string
           challenge_id: string
           image_path: string
           sort_order: number
+          taken_at: string | null
+          gps_lat: number | null
+          gps_lng: number | null
+          sort_at: string
           created_at: string
         }
         Insert: {
@@ -325,6 +333,9 @@ export interface Database {
           challenge_id: string
           image_path: string
           sort_order?: number
+          taken_at?: string | null
+          gps_lat?: number | null
+          gps_lng?: number | null
           created_at?: string
         }
         Update: {
@@ -332,6 +343,9 @@ export interface Database {
           challenge_id?: string
           image_path?: string
           sort_order?: number
+          taken_at?: string | null
+          gps_lat?: number | null
+          gps_lng?: number | null
           created_at?: string
         }
         Relationships: []

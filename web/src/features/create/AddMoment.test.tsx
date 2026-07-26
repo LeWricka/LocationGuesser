@@ -24,8 +24,12 @@ vi.mock('../../lib/momentImages', () => ({
 }))
 
 // El GPS del EXIF es irrelevante para el caso de subida parcial: sin GPS, el
-// usuario marca el lugar a mano (o ninguno, es opcional).
-vi.mock('../../lib/exif', () => ({ readGpsFromExif: async () => null }))
+// usuario marca el lugar a mano (o ninguno, es opcional). La meta EXIF
+// (fecha/GPS de captura, issue #950) tampoco importa aquí: sin ella, null.
+vi.mock('../../lib/exif', () => ({
+  readGpsFromExif: async () => null,
+  readPhotoMetaFromExif: async () => ({ takenAt: null, lat: null, lng: null }),
+}))
 
 // El mapa (Leaflet) es pesado e irrelevante para este caso (mismo patrón que
 // MomentSheet.test.tsx).
@@ -178,7 +182,9 @@ describe('AddMoment — subida de fotos resiliente (#531, remate del #520)', () 
     expect(createMomentMock).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Mi recuerdo', imagePath: 'ok/foto2.jpg' }),
     )
-    expect(addMomentImagesMock).toHaveBeenCalledWith('m1', ['ok/foto2.jpg'])
+    expect(addMomentImagesMock).toHaveBeenCalledWith('m1', [
+      { path: 'ok/foto2.jpg', takenAt: null, lat: null, lng: null },
+    ])
 
     // Avisa cuál falló, sin bloquear el camino feliz.
     expect(await screen.findByText(/no se pudo subir «rota\.jpg»/i)).toBeInTheDocument()
@@ -382,7 +388,9 @@ describe('AddMoment — clip corto de vídeo (#649)', () => {
     expect(createMomentMock).toHaveBeenCalledWith(
       expect.objectContaining({ videoPath: 'video/clip-1.mp4', imagePath: 'ok/clip-portada.jpg' }),
     )
-    expect(addMomentImagesMock).toHaveBeenCalledWith('m1', ['ok/clip-portada.jpg'])
+    expect(addMomentImagesMock).toHaveBeenCalledWith('m1', [
+      { path: 'ok/clip-portada.jpg', takenAt: null, lat: null, lng: null },
+    ])
     expect(trackMock).toHaveBeenCalledWith(
       'moment_created',
       expect.objectContaining({ has_video: true }),

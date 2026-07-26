@@ -10,6 +10,7 @@ import {
   type MomentImage,
 } from '../../lib/momentImages'
 import { signedImageUrl, uploadImage } from '../../lib/storage'
+import { readPhotoMetaFromExif } from '../../lib/exif'
 import { reportError } from '../../lib/observability'
 import { describeError } from '../../lib/errors'
 import styles from './MomentGallery.module.css'
@@ -52,8 +53,9 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
   const toast = useToast()
   const trackRef = useRef<HTMLUListElement>(null)
 
-  // Carga la galería y firma las URLs en lote (bucket privado). La portada es la
-  // de menor sort_order (ya viene ordenada de la capa de datos).
+  // Carga la galería (orden de CAPTURA, sort_at asc) y firma las URLs en lote
+  // (bucket privado). La portada se calcula aparte (menor sort_order, ver
+  // `coverId` más abajo): ya no coincide necesariamente con la posición [0].
   const load = useCallback(async () => {
     try {
       const rows = await listMomentImages(challengeId)
@@ -85,11 +87,20 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
     if (files.length === 0) return
     setBusy(true)
     try {
-      const paths: string[] = []
+      // El EXIF (fecha de captura + GPS) se lee del archivo ORIGINAL antes de
+      // subir: `uploadImage` comprime a canvas y lo borra (issue #950).
+      const items: {
+        path: string
+        takenAt: string | null
+        lat: number | null
+        lng: number | null
+      }[] = []
       for (const file of files) {
-        paths.push(await uploadImage(file))
+        const meta = await readPhotoMetaFromExif(file)
+        const path = await uploadImage(file)
+        items.push({ path, ...meta })
       }
-      await addMomentImages(challengeId, paths)
+      await addMomentImages(challengeId, items)
       await load()
       onChanged?.()
       toast.show(files.length === 1 ? 'Foto añadida' : 'Fotos añadidas', { tone: 'success' })
@@ -150,6 +161,14 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
     )
   }
 
+  // La PORTADA es la foto de menor `sort_order` (elección explícita del
+  // dueño/subida) — YA NO la posición [0]: la lista se pinta en orden de
+  // CAPTURA (`sort_at`), que puede diferir del orden de portada.
+  const coverId =
+    images.length > 0
+      ? images.reduce((min, img) => (img.sort_order < min.sort_order ? img : min)).id
+      : null
+
   return (
     <div className={styles.gallery}>
       <ul ref={trackRef} className={styles.track} onScroll={onScroll}>
@@ -160,87 +179,90 @@ export function MomentGallery({ challengeId, initialCoverUrl, canEdit, onChanged
             </span>
           </li>
         ) : (
-          images.map((img, i) => (
-            <li key={img.id} className={styles.slide}>
-              {img.url ? (
-                <button
-                  type="button"
-                  className={styles.photoBtn}
-                  onClick={() => setLightboxAt(i)}
-                  aria-label="Ampliar foto"
-                >
-                  <img className={styles.photo} src={img.url} alt="" loading="lazy" />
-                </button>
-              ) : (
-                <span className={styles.placeholder} aria-hidden>
-                  <IconCamara size={28} className={styles.placeholderIcon} />
-                </span>
-              )}
-              {i === 0 && (
-                <span className={styles.coverBadge}>
-                  <Icon icon={Star} size={13} fill="currentColor" /> Portada
-                </span>
-              )}
-              {canEdit &&
-                (confirmingRemove === img.id ? (
-                  // Confirmación en línea del borrado: dos toques para una acción
-                  // destructiva. Si la foto es la portada (i === 0), avisamos de que
-                  // se promoverá la siguiente (lo hace la capa de datos al quitarla).
-                  <div
-                    className={styles.confirmRemove}
-                    role="group"
-                    aria-label="Confirmar quitar foto"
+          images.map((img, i) => {
+            const isCover = img.id === coverId
+            return (
+              <li key={img.id} className={styles.slide}>
+                {img.url ? (
+                  <button
+                    type="button"
+                    className={styles.photoBtn}
+                    onClick={() => setLightboxAt(i)}
+                    aria-label="Ampliar foto"
                   >
-                    <span className={styles.confirmText}>
-                      {i === 0 ? '¿Quitar la portada?' : '¿Quitar foto?'}
-                    </span>
-                    <div className={styles.confirmActions}>
-                      <button
-                        type="button"
-                        className={`${styles.action} ${styles.actionDanger}`}
-                        disabled={busy}
-                        onClick={() => void handleRemove(img.id)}
-                        aria-label="Confirmar quitar foto"
-                      >
-                        <Icon icon={Check} size={16} />
-                      </button>
+                    <img className={styles.photo} src={img.url} alt="" loading="lazy" />
+                  </button>
+                ) : (
+                  <span className={styles.placeholder} aria-hidden>
+                    <IconCamara size={28} className={styles.placeholderIcon} />
+                  </span>
+                )}
+                {isCover && (
+                  <span className={styles.coverBadge}>
+                    <Icon icon={Star} size={13} fill="currentColor" /> Portada
+                  </span>
+                )}
+                {canEdit &&
+                  (confirmingRemove === img.id ? (
+                    // Confirmación en línea del borrado: dos toques para una acción
+                    // destructiva. Si la foto es la portada, avisamos de que se
+                    // promoverá la siguiente (lo hace la capa de datos al quitarla).
+                    <div
+                      className={styles.confirmRemove}
+                      role="group"
+                      aria-label="Confirmar quitar foto"
+                    >
+                      <span className={styles.confirmText}>
+                        {isCover ? '¿Quitar la portada?' : '¿Quitar foto?'}
+                      </span>
+                      <div className={styles.confirmActions}>
+                        <button
+                          type="button"
+                          className={`${styles.action} ${styles.actionDanger}`}
+                          disabled={busy}
+                          onClick={() => void handleRemove(img.id)}
+                          aria-label="Confirmar quitar foto"
+                        >
+                          <Icon icon={Check} size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.action}
+                          disabled={busy}
+                          onClick={() => setConfirmingRemove(null)}
+                          aria-label="Cancelar"
+                        >
+                          <Icon icon={X} size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.slideActions}>
+                      {!isCover && (
+                        <button
+                          type="button"
+                          className={styles.action}
+                          disabled={busy}
+                          onClick={() => void handleCover(img.id)}
+                          aria-label="Marcar como portada"
+                        >
+                          <Icon icon={Star} size={16} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={styles.action}
                         disabled={busy}
-                        onClick={() => setConfirmingRemove(null)}
-                        aria-label="Cancelar"
+                        onClick={() => setConfirmingRemove(img.id)}
+                        aria-label="Quitar foto"
                       >
-                        <Icon icon={X} size={16} />
+                        <Icon icon={Trash2} size={16} />
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className={styles.slideActions}>
-                    {i !== 0 && (
-                      <button
-                        type="button"
-                        className={styles.action}
-                        disabled={busy}
-                        onClick={() => void handleCover(img.id)}
-                        aria-label="Marcar como portada"
-                      >
-                        <Icon icon={Star} size={16} />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className={styles.action}
-                      disabled={busy}
-                      onClick={() => setConfirmingRemove(img.id)}
-                      aria-label="Quitar foto"
-                    >
-                      <Icon icon={Trash2} size={16} />
-                    </button>
-                  </div>
-                ))}
-            </li>
-          ))
+                  ))}
+              </li>
+            )
+          })
         )}
       </ul>
 

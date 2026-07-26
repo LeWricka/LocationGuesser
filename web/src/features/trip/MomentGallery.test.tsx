@@ -33,6 +33,10 @@ const IMAGES: MomentImage[] = [
     challenge_id: 'c1',
     image_path: 'a.jpg',
     sort_order: 0,
+    taken_at: null,
+    gps_lat: null,
+    gps_lng: null,
+    sort_at: '2026-06-28T10:00:00.000Z',
     created_at: '2026-06-28T10:00:00.000Z',
   },
   {
@@ -40,6 +44,10 @@ const IMAGES: MomentImage[] = [
     challenge_id: 'c1',
     image_path: 'b.jpg',
     sort_order: 1,
+    taken_at: null,
+    gps_lat: null,
+    gps_lng: null,
+    sort_at: '2026-06-28T10:00:00.000Z',
     created_at: '2026-06-28T10:00:00.000Z',
   },
 ]
@@ -100,5 +108,22 @@ describe('MomentGallery', () => {
     await screen.findAllByRole('button', { name: 'Ampliar foto' })
     expect(screen.queryByRole('button', { name: 'Quitar foto' })).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Añadir más fotos a la galería')).not.toBeInTheDocument()
+  })
+
+  test('la portada la marca sort_order, no la posición [0] tras ordenar por fecha (#950)', async () => {
+    // 'img-2' viene PRIMERO en la lista (orden de captura, sort_at), pero la
+    // portada real es 'img-1' (menor sort_order). El badge y el botón "Marcar
+    // como portada" deben seguir al sort_order, no a la posición del array.
+    listMomentImagesMock.mockResolvedValue([
+      { ...IMAGES[1], sort_order: 1 },
+      { ...IMAGES[0], sort_order: 0 },
+    ])
+    renderGallery()
+
+    await screen.findAllByRole('button', { name: 'Ampliar foto' })
+    // Solo una foto con "Marcar como portada" (la que NO es portada: 'img-2').
+    const coverButtons = screen.getAllByRole('button', { name: 'Marcar como portada' })
+    expect(coverButtons).toHaveLength(1)
+    expect(screen.getByText('Portada')).toBeInTheDocument()
   })
 })
