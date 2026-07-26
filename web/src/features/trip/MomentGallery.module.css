@@ -189,7 +189,9 @@
    bordes) no depende de la hoja/página que la envuelve. */
 .reorderGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+  /* ~3 por fila en móvil (issue #954: 84px salía diminuto); auto-fill sigue
+     dejando más columnas en pantallas anchas. */
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
   gap: var(--space-2);
   margin: 0;
   padding: var(--space-1);

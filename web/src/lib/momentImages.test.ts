@@ -5,10 +5,15 @@ import type { MomentImage } from './momentImages'
 // desde `listResult`; capturamos inserts/updates/deletes y los espejos a
 // `challenges.image_path` para verificar la lógica de portada.
 const listResult: { data: MomentImage[]; error: unknown } = { data: [], error: null }
-// Flag `challenges.photos_manual_order` que devuelve el mock al consultarlo
-// (`getPhotosManualOrder`/`listMomentImages`). Default false (orden por fecha).
-const manualOrderResult: { data: { photos_manual_order: boolean } | null; error: unknown } = {
-  data: { photos_manual_order: false },
+// Fila de `challenges` (flag de orden manual + portada) que devuelve el mock
+// al consultarla (`getMomentGalleryMeta`/`getPhotosManualOrder`/
+// `listMomentImages`/`setMomentCover`/`removeMomentImage`). Default: orden
+// por fecha (#951) y sin portada.
+const challengeMetaResult: {
+  data: { photos_manual_order: boolean; image_path: string | null } | null
+  error: unknown
+} = {
+  data: { photos_manual_order: false, image_path: null },
   error: null,
 }
 // Columna/orden con que `listMomentImages` consultó `moment_images.order(...)`
@@ -60,10 +65,10 @@ function challengesBuilder() {
       return Promise.resolve({ error: null })
     },
   })
-  // `getPhotosManualOrder`: select('photos_manual_order').eq('id', id).single()
+  // `getMomentGalleryMeta`: select('photos_manual_order, image_path').eq('id', id).single()
   builder.select = () => ({
     eq: () => ({
-      single: () => Promise.resolve(manualOrderResult),
+      single: () => Promise.resolve(challengeMetaResult),
     }),
   })
   return builder
@@ -78,6 +83,7 @@ vi.mock('./supabase', () => ({
 
 import {
   addMomentImages,
+  getMomentGalleryMeta,
   getPhotosManualOrder,
   listGroupMomentImages,
   listMomentImages,
@@ -112,8 +118,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   listResult.data = []
   listResult.error = null
-  manualOrderResult.data = { photos_manual_order: false }
-  manualOrderResult.error = null
+  challengeMetaResult.data = { photos_manual_order: false, image_path: null }
+  challengeMetaResult.error = null
   orderCalls.length = 0
 })
 
@@ -125,14 +131,14 @@ describe('listMomentImages', () => {
   })
 
   test('orden AUTO (flag false, #951): consulta ordenada por sort_at', async () => {
-    manualOrderResult.data = { photos_manual_order: false }
+    challengeMetaResult.data = { photos_manual_order: false, image_path: null }
     listResult.data = [img('a', 0), img('b', 1)]
     await listMomentImages('c1')
     expect(orderCalls.at(-1)).toEqual({ column: 'sort_at', ascending: true })
   })
 
   test('orden MANUAL (flag true, #952): consulta ordenada por sort_order', async () => {
-    manualOrderResult.data = { photos_manual_order: true }
+    challengeMetaResult.data = { photos_manual_order: true, image_path: null }
     listResult.data = [img('a', 0), img('b', 1)]
     await listMomentImages('c1')
     expect(orderCalls.at(-1)).toEqual({ column: 'sort_order', ascending: true })
@@ -141,13 +147,25 @@ describe('listMomentImages', () => {
 
 describe('getPhotosManualOrder', () => {
   test('devuelve el flag de challenges.photos_manual_order', async () => {
-    manualOrderResult.data = { photos_manual_order: true }
+    challengeMetaResult.data = { photos_manual_order: true, image_path: null }
     expect(await getPhotosManualOrder('c1')).toBe(true)
   })
 
   test('sin dato: por defecto false (orden por fecha)', async () => {
-    manualOrderResult.data = null
+    challengeMetaResult.data = null
     expect(await getPhotosManualOrder('c1')).toBe(false)
+  })
+})
+
+describe('getMomentGalleryMeta', () => {
+  test('devuelve el flag de orden manual y el path de portada de challenges', async () => {
+    challengeMetaResult.data = { photos_manual_order: true, image_path: 'a.jpg' }
+    expect(await getMomentGalleryMeta('c1')).toEqual({ manualOrder: true, coverPath: 'a.jpg' })
+  })
+
+  test('sin dato: manualOrder false y coverPath null', async () => {
+    challengeMetaResult.data = null
+    expect(await getMomentGalleryMeta('c1')).toEqual({ manualOrder: false, coverPath: null })
   })
 })
 
@@ -242,38 +260,39 @@ describe('addMomentImages', () => {
   })
 })
 
-describe('setMomentCover', () => {
-  test('intercambia el sort_order con la portada actual y espeja su image_path', async () => {
+describe('setMomentCover (#954: SIN reordenar — la portada es solo challenges.image_path)', () => {
+  test('fija image_path a la foto elegida, SIN tocar sort_order de nadie', async () => {
     listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg'), img('c', 2, 'c.jpg')]
+    challengeMetaResult.data = { photos_manual_order: false, image_path: 'a.jpg' }
     await setMomentCover('c1', 'c')
-    // 'c' (elegida) hereda el sort_order de la portada actual ('a', 0); 'a' se
-    // queda con el que tenía 'c' (2). 'b' no se toca.
-    expect(calls.reorder).toHaveBeenCalledWith({ id: 'c', patch: { sort_order: 0 } })
-    expect(calls.reorder).toHaveBeenCalledWith({ id: 'a', patch: { sort_order: 2 } })
-    expect(calls.reorder).toHaveBeenCalledTimes(2)
+    expect(calls.reorder).not.toHaveBeenCalled()
     expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'c.jpg' }, id: 'c1' })
   })
 
-  test('la portada es la de menor sort_order, no la posición [0] de la lista', async () => {
-    // Lista ordenada por sort_at: 'b' va primero pero 'a' (sort_order 0) es la portada.
+  test('la portada actual se determina por image_path, no por sort_order ni posición', async () => {
+    // Lista ordenada por sort_at: 'b' va primero, pero la portada real (por
+    // challenges.image_path) es 'a'. Elegir 'b' como nueva portada solo espeja
+    // su path, no reordena nada.
     listResult.data = [img('b', 1, 'b.jpg'), img('a', 0, 'a.jpg')]
+    challengeMetaResult.data = { photos_manual_order: false, image_path: 'a.jpg' }
     await setMomentCover('c1', 'b')
-    expect(calls.reorder).toHaveBeenCalledWith({ id: 'b', patch: { sort_order: 0 } })
-    expect(calls.reorder).toHaveBeenCalledWith({ id: 'a', patch: { sort_order: 1 } })
+    expect(calls.reorder).not.toHaveBeenCalled()
     expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'b.jpg' }, id: 'c1' })
   })
 
-  test('si ya es la portada, no toca nada', async () => {
-    listResult.data = [img('a', 0), img('b', 1)]
+  test('si ya es la portada (mismo image_path), no toca nada', async () => {
+    listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg')]
+    challengeMetaResult.data = { photos_manual_order: false, image_path: 'a.jpg' }
     await setMomentCover('c1', 'a')
     expect(calls.reorder).not.toHaveBeenCalled()
     expect(calls.mirror).not.toHaveBeenCalled()
   })
 })
 
-describe('removeMomentImage', () => {
-  test('quita la portada: re-espeja la siguiente', async () => {
+describe('removeMomentImage (#954: portada por image_path, no por sort_order)', () => {
+  test('quita la portada (coincide con challenges.image_path): re-espeja la primera restante', async () => {
     listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg')]
+    challengeMetaResult.data = { photos_manual_order: false, image_path: 'a.jpg' }
     await removeMomentImage('c1', 'a')
     expect(calls.delete).toHaveBeenCalledWith('a')
     expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'b.jpg' }, id: 'c1' })
@@ -281,30 +300,36 @@ describe('removeMomentImage', () => {
 
   test('quita la última foto: deja image_path null', async () => {
     listResult.data = [img('a', 0, 'a.jpg')]
+    challengeMetaResult.data = { photos_manual_order: false, image_path: 'a.jpg' }
     await removeMomentImage('c1', 'a')
     expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: null }, id: 'c1' })
   })
 
   test('quita una NO-portada: no re-espeja', async () => {
-    listResult.data = [img('a', 0), img('b', 1)]
+    listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg')]
+    challengeMetaResult.data = { photos_manual_order: false, image_path: 'a.jpg' }
     await removeMomentImage('c1', 'b')
     expect(calls.delete).toHaveBeenCalledWith('b')
     expect(calls.mirror).not.toHaveBeenCalled()
   })
 
-  test('la portada es la de menor sort_order, no la posición [0] de la lista', async () => {
-    // Lista ordenada por sort_at: 'b' primero, pero la portada real es 'a' (sort_order 0).
+  test('la portada se determina por image_path, no por sort_order ni posición [0] de la lista', async () => {
+    // Lista ordenada por sort_at: 'b' primero (y sort_order mayor), pero la
+    // portada real (por challenges.image_path) es 'a'.
     listResult.data = [img('b', 1, 'b.jpg'), img('a', 0, 'a.jpg')]
+    challengeMetaResult.data = { photos_manual_order: false, image_path: 'a.jpg' }
     await removeMomentImage('c1', 'b')
     expect(calls.delete).toHaveBeenCalledWith('b')
-    // 'b' no era la portada (aunque fuera la [0] de la lista): no re-espeja.
+    // 'b' no era la portada real (aunque fuera la [0] de la lista): no re-espeja.
     expect(calls.mirror).not.toHaveBeenCalled()
   })
 
-  test('quita la portada aunque no esté en la posición [0]: re-espeja la siguiente', async () => {
+  test('quita la portada real aunque no esté en la posición [0]: re-espeja la primera restante EN ORDEN DE VISUALIZACIÓN', async () => {
     listResult.data = [img('b', 1, 'b.jpg'), img('a', 0, 'a.jpg')]
+    challengeMetaResult.data = { photos_manual_order: false, image_path: 'a.jpg' }
     await removeMomentImage('c1', 'a')
     expect(calls.delete).toHaveBeenCalledWith('a')
+    // Queda solo 'b' (única restante, primera en orden de visualización).
     expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'b.jpg' }, id: 'c1' })
   })
 })
@@ -328,10 +353,20 @@ describe('reorderMomentImages', () => {
     })
   })
 
-  test('re-espeja la portada: tras reordenar, la de menor sort_order es orderedIds[0]', async () => {
+  test('NO toca challenges.image_path: reordenar no debe cambiar la portada (issue #954)', async () => {
     listResult.data = [img('a', 0, 'a.jpg'), img('b', 1, 'b.jpg'), img('c', 2, 'c.jpg')]
     await reorderMomentImages('c1', ['c', 'a', 'b'])
-    expect(calls.mirror).toHaveBeenCalledWith({ patch: { image_path: 'c.jpg' }, id: 'c1' })
+    expect(calls.mirror).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        patch: expect.objectContaining({ image_path: expect.anything() }),
+      }),
+    )
+    // El único update a `challenges` es el flag de orden manual.
+    expect(calls.mirror).toHaveBeenCalledTimes(1)
+    expect(calls.mirror).toHaveBeenCalledWith({
+      patch: { photos_manual_order: true },
+      id: 'c1',
+    })
   })
 
   test('lista vacía: no hace nada', async () => {
