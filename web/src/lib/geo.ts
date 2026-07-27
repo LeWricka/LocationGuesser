@@ -37,12 +37,27 @@ export const SCORE_DECAY_KM: Record<ScoreScale, number> = {
 export const DEFAULT_SCORE_SCALE: ScoreScale = 'mundo'
 
 /**
- * Puntos del reto a partir de la distancia: 5000·e^(−km/D). D sale de la precisión
- * (`scale`); por defecto 'mundo' (D=2000) → la fórmula histórica 5000·e^(−km/2000).
+ * SUELO de puntos para todo voto ENVIADO (con adivinanza) — issue #956. Feedback
+ * real de un grupo jugando (viaje Filipinas): un reto en 'ciudad' (D=25) daba 0
+ * seco a quien fallaba el país, y eso se sentía como un bug/castigo injusto, no
+ * como "quedaste lejos". Con guess, nunca menos de esto — falla el país y aun
+ * así puntúa algo. NO aplica a timeouts (sin guess: siguen siendo 0, no pasan
+ * por `scoreFor`). Espejo EXACTO de la constante en `submit_vote` (migración
+ * 0050): cambiar una implica cambiar la otra.
+ */
+export const MIN_GUESS_POINTS = 250
+
+/**
+ * Puntos del reto a partir de la distancia: max(SUELO, 5000·e^(−km/D)). D sale de
+ * la precisión (`scale`); por defecto 'mundo' (D=2000) → la fórmula histórica
+ * 5000·e^(−km/2000). El suelo `MIN_GUESS_POINTS` (issue #956) es válido aquí
+ * porque `scoreFor` SIEMPRE representa un voto CON adivinanza (hay una distancia
+ * `km` que medir); un timeout no tiene km y se puntúa 0 por otra vía, sin pasar
+ * por esta función.
  */
 export function scoreFor(km: number, scale: ScoreScale = DEFAULT_SCORE_SCALE): number {
   const decay = SCORE_DECAY_KM[scale]
-  return Math.max(0, Math.round(5000 * Math.exp(-km / decay)))
+  return Math.max(MIN_GUESS_POINTS, Math.round(5000 * Math.exp(-km / decay)))
 }
 
 /**

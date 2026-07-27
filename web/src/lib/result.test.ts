@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'vitest'
 import { computeResult } from './result'
+import { MIN_GUESS_POINTS } from './geo'
 
 describe('computeResult', () => {
   test('mismo punto: 0 km y máximo de puntos', () => {
@@ -26,10 +27,11 @@ describe('computeResult', () => {
     expect(points).toBe(Math.round(5000 * Math.exp(-km / 2000)))
   })
 
-  test('antípodas: distancia enorme y 0 puntos', () => {
+  test('antípodas: distancia enorme, pero nunca baja del suelo (issue #956)', () => {
     const { km, points } = computeResult({ lat: 0, lng: 0 }, { lat: 0, lng: 180 })
     expect(km).toBeGreaterThan(19000)
-    expect(points).toBe(0)
+    // Antes daba 0 seco; con guess enviado, el suelo asegura MIN_GUESS_POINTS.
+    expect(points).toBe(MIN_GUESS_POINTS)
   })
 
   test('sin escala == "mundo": el cálculo no cambia para los retos de siempre', () => {
