@@ -1,14 +1,24 @@
 // Imagen OG (1200×630) de un viaje/reto para la previsualización al compartir.
 //
 // Enfoque ROBUSTO (sin Satori/WASM ni runtime Edge, que rompían el build de
-// Vercel): esta función Node resuelve la PORTADA real del viaje/reto y REDIRIGE
-// (302) a su URL firmada del bucket privado `images`. Así la tarjeta enseña la
-// FOTO real —lo que da confianza— sin componer la imagen aquí. Si no hay foto (o
-// no hay credenciales de servidor), redirige a una imagen de marca estática.
+// Vercel): esta función Node resuelve la PORTADA real del viaje/reto, la firma
+// en el bucket privado `images` y REENVÍA LOS BYTES ella misma (200 + Content-Type
+// de imagen). Si no hay foto (o no hay credenciales de servidor), sirve la imagen
+// de marca estática por el mismo camino.
+//
+// ⚠️ Bug #958 (tarjeta SIEMPRE en negro en WhatsApp, aunque el reto SÍ tenía
+// foto): la versión anterior hacía `res.redirect(302, urlFirmada)`. Los
+// crawlers de previsualización (WhatsApp/Facebook comparten `facebookexternalhit`)
+// exigen que `og:image` devuelva 200 SIN redirecciones — no reintentan, cachean
+// el fallo al primer tropiezo, y cada salto consume su presupuesto de timeout.
+// Un 302 a una URL firmada de Supabase Storage es exactamente lo que rompe: el
+// crawler se queda sin imagen y WhatsApp pinta la tarjeta con el título sobre un
+// fondo oscuro — lo que se reportaba como "negro, sin foto". Fix: la función
+// hace ELLA MISMA el fetch de la URL firmada (o de la imagen de marca) y
+// devuelve los bytes con 200 — cero redirecciones expuestas al crawler.
 //
 // La firma usa el SERVICE ROLE (env var en Vercel, NUNCA en repo): el crawler es
 // anónimo y la RLS le ocultaría la foto; service_role la salta (migración 0025).
-// El crawler sigue la redirección y cachea el PNG resultante.
 //
 // ⚠️ P0 — AUTOCONTENIDO A PROPÓSITO (sin imports relativos): ver el porqué en la
 // cabecera de `api/share.ts`. `@vercel/node` (`ts.transpileModule` + renombrado
@@ -135,8 +145,10 @@ function resolveMeta(kind: ShareKind, code: string): Promise<ShareMeta | null> {
 /**
  * URL FIRMADA (temporal) de una imagen del bucket privado `images`, generada con
  * el service role (la firma no requiere membresía). Null si no se puede firmar.
+ * Vida corta: la consumimos NOSOTROS al momento (fetch server-to-server, nunca
+ * se expone al crawler), así que no hace falta que dure horas.
  */
-async function signedCoverUrl(path: string, expiresIn = 3600): Promise<string | null> {
+async function signedCoverUrl(path: string, expiresIn = 120): Promise<string | null> {
   if (!hasServerCreds()) return null
   const { url, key } = serverCreds()
   const res = await fetch(`${url}/storage/v1/object/sign/images/${encodeURI(path)}`, {
@@ -159,6 +171,25 @@ function firstParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
 }
 
+/** Content-Type de reserva si la respuesta de origen no trae uno usable. */
+const DEFAULT_CONTENT_TYPE = 'image/jpeg'
+
+/**
+ * Trae los BYTES de `imageUrl` y los escribe en la respuesta (200 + Content-Type
+ * de imagen real). Lanza si el fetch falla o la respuesta no es 2xx, para que el
+ * llamador pueda caer al fallback de marca — nunca deja la respuesta a medio
+ * escribir (no toca `res` hasta tener el buffer completo).
+ */
+async function proxyImage(res: VercelResponse, imageUrl: string): Promise<void> {
+  const upstream = await fetch(imageUrl)
+  if (!upstream.ok) throw new Error(`fetch de imagen falló: ${upstream.status}`)
+  const buffer = Buffer.from(await upstream.arrayBuffer())
+  const contentType = upstream.headers.get('content-type') || DEFAULT_CONTENT_TYPE
+  res.setHeader('Content-Type', contentType)
+  res.setHeader('Content-Length', String(buffer.length))
+  res.status(200).send(buffer)
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const kind: ShareKind = firstParam(req.query.kind) === 'challenge' ? 'challenge' : 'trip'
   const code = firstParam(req.query.code)
@@ -172,9 +203,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     if (code) {
       const meta = await resolveMeta(kind, code)
       if (meta?.coverPath) {
-        // Firma larga (24 h): la URL la cachea el crawler/CDN; no es secreta para
-        // quien ya recibió el enlace de compartir.
-        const signed = await signedCoverUrl(meta.coverPath, 86400)
+        const signed = await signedCoverUrl(meta.coverPath)
         if (signed) target = signed
       }
     }
@@ -189,18 +218,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     target = fallbackUrl
   }
 
+  // Cache en el CDN: la portada cambia poco; revalida en segundo plano. Como
+  // ahora servimos los BYTES (no una redirección), el CDN cachea la imagen en
+  // sí — el crawler ni siquiera vuelve a tocar Supabase en visitas repetidas.
+  res.setHeader(
+    'Cache-Control',
+    'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
+  )
+
   try {
-    // Cache en el CDN: la portada cambia poco; revalida en segundo plano. La propia
-    // redirección se cachea para no re-firmar en cada visita del crawler.
-    res.setHeader(
-      'Cache-Control',
-      'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
-    )
-    res.redirect(302, target)
+    await proxyImage(res, target)
   } catch (err) {
-    // Red de seguridad de P0: si incluso la redirección de marca fallara, no
+    console.error('[api/og] fallo trayendo la portada, usando imagen de marca', {
+      kind,
+      code,
+      err,
+    })
+    if (target !== fallbackUrl) {
+      try {
+        await proxyImage(res, fallbackUrl)
+        return
+      } catch (fallbackErr) {
+        console.error('[api/og] fallo también trayendo la imagen de marca', {
+          kind,
+          code,
+          err: fallbackErr,
+        })
+      }
+    }
+    // Red de seguridad final de P0: si hasta la imagen de marca falla, no
     // dejamos que la función explote — devolvemos 200 vacío antes que un 500.
-    console.error('[api/og] fallo inesperado sirviendo la imagen', { kind, code, err })
-    res.status(200).send('')
+    try {
+      res.status(200).send('')
+    } catch (finalErr) {
+      console.error('[api/og] fallo inesperado sirviendo la respuesta final', {
+        kind,
+        code,
+        err: finalErr,
+      })
+    }
   }
 }
