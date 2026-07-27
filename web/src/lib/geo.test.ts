@@ -7,12 +7,16 @@ import {
   signedRelErrorPct,
   SCORE_DECAY_KM,
   DEFAULT_SCORE_SCALE,
+  MIN_GUESS_POINTS,
   scoreForNumber,
   NUMBER_DECAY_K,
   DEFAULT_NUMBER_TOLERANCE,
   speedFactor,
   DEFAULT_TIME_SCORING,
 } from './geo'
+
+// Fórmula CRUDA sin el suelo (issue #956), para comparar contra `scoreFor`.
+const rawScore = (km: number, decay: number) => Math.round(5000 * Math.exp(-km / decay))
 
 describe('geo', () => {
   test('haversine: mismo punto = 0 km', () => {
@@ -31,18 +35,38 @@ describe('geo', () => {
     expect(scoreFor(0)).toBe(5000)
   })
 
-  test('scoreFor: decrece con la distancia y nunca es negativo', () => {
+  test('scoreFor: decrece con la distancia, pero nunca baja del SUELO (issue #956)', () => {
     expect(scoreFor(2000)).toBeLessThan(scoreFor(0))
-    expect(scoreFor(100000)).toBe(0)
+    // Antes del suelo esto daba 0 seco (fallo de país = 0, feedback real del
+    // viaje Filipinas); ahora un voto CON adivinanza nunca baja de 250.
+    expect(scoreFor(100000)).toBe(MIN_GUESS_POINTS)
+  })
+
+  // ── Suelo mínimo por voto enviado (issue #956) ────────────────────────────
+  test('MIN_GUESS_POINTS es 250 (constante nombrada, fácil de tocar)', () => {
+    expect(MIN_GUESS_POINTS).toBe(250)
+  })
+
+  test('scoreFor: nunca por debajo del suelo, en ninguna escala, por lejos que falle', () => {
+    for (const scale of ['mundo', 'pais', 'ciudad', 'barrio'] as const) {
+      expect(scoreFor(100000, scale)).toBe(MIN_GUESS_POINTS)
+      expect(scoreFor(100000, scale)).toBeGreaterThanOrEqual(MIN_GUESS_POINTS)
+    }
+  })
+
+  test('scoreFor: por encima del suelo, el cálculo crudo no cambia (el suelo no "infla" nada)', () => {
+    // A 0 km y a poca distancia el crudo ya supera 250: el suelo no interviene.
+    expect(scoreFor(0, 'mundo')).toBe(rawScore(0, SCORE_DECAY_KM.mundo))
+    expect(scoreFor(10, 'mundo')).toBe(rawScore(10, SCORE_DECAY_KM.mundo))
   })
 
   // ── Precisión del reto (score_scale → D) ──────────────────────────────────
-  test('scoreFor: por defecto es "mundo" = el comportamiento histórico (D=2000)', () => {
+  test('scoreFor: por defecto es "mundo" = el comportamiento histórico (D=2000) por encima del suelo', () => {
     // Sin escala == escala 'mundo' == la fórmula de siempre 5000·e^(−km/2000).
     expect(DEFAULT_SCORE_SCALE).toBe('mundo')
-    for (const km of [0, 50, 500, 2000, 9000]) {
+    for (const km of [0, 50, 500, 2000]) {
       expect(scoreFor(km)).toBe(scoreFor(km, 'mundo'))
-      expect(scoreFor(km, 'mundo')).toBe(Math.round(5000 * Math.exp(-km / 2000)))
+      expect(scoreFor(km, 'mundo')).toBe(rawScore(km, 2000))
     }
   })
 
@@ -60,10 +84,12 @@ describe('geo', () => {
     expect(scoreFor(km, 'pais')).toBeLessThan(scoreFor(km, 'mundo'))
   })
 
-  test('scoreFor: cada escala usa su D (5000·e^(−km/D))', () => {
+  test('scoreFor: cada escala usa su D, con el suelo aplicado por igual (max(250, 5000·e^(−km/D)))', () => {
     const km = 10
     for (const scale of ['mundo', 'pais', 'ciudad', 'barrio'] as const) {
-      expect(scoreFor(km, scale)).toBe(Math.round(5000 * Math.exp(-km / SCORE_DECAY_KM[scale])))
+      expect(scoreFor(km, scale)).toBe(
+        Math.max(MIN_GUESS_POINTS, rawScore(km, SCORE_DECAY_KM[scale])),
+      )
     }
   })
 
