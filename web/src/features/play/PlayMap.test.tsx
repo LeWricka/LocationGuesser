@@ -18,6 +18,11 @@ interface MockMapProps {
 // mientras el SDK "no cargó"): permite espiar `setCenter` para cubrir el
 // seguimiento de `centerOn` (issue #789) sin montar el SDK real.
 const mockMap: { current: { setCenter: (p: unknown) => void } | null } = { current: null }
+// `apiLoaded` empieza en false y solo pasa a true si un test lo pide
+// explícitamente (issue #957): mismo criterio que `mockMap` — un doble
+// mutable que cada test puede ajustar sin tocar el factory de `vi.mock`
+// (hoisted, no puede cerrar sobre variables declaradas después).
+const mockApiLoaded = { current: false }
 vi.mock('@vis.gl/react-google-maps', () => ({
   Map: ({ mapTypeId, children }: MockMapProps) => (
     <div data-testid="google-map" data-map-type={mapTypeId}>
@@ -27,6 +32,7 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Marker: () => null,
   Polyline: () => null,
   useMap: () => mockMap.current,
+  useApiIsLoaded: () => mockApiLoaded.current,
 }))
 
 // Misma clave que el toggle de MapPicker (ver comentario en PlayMap.tsx junto
@@ -40,6 +46,7 @@ describe('PlayMap — centerOn re-centra la vista (issue #789)', () => {
   beforeEach(() => {
     localStorage.clear()
     mockMap.current = null
+    mockApiLoaded.current = false
   })
 
   // `guess={null}` a propósito en ambos renders: el pin del jugador construye su
@@ -91,6 +98,7 @@ describe('PlayMap — capa base satélite y toggle (issue #602)', () => {
   beforeEach(() => {
     localStorage.clear()
     mockMap.current = null
+    mockApiLoaded.current = false
   })
 
   test('adivinando: satélite (hybrid) por defecto, sin preferencia guardada', () => {
@@ -145,5 +153,36 @@ describe('PlayMap — capa base satélite y toggle (issue #602)', () => {
     expect(screen.getByTestId('google-map')).toHaveAttribute('data-map-type', 'hybrid')
     expect(screen.queryByRole('button', { name: 'Satélite' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Mapa' })).not.toBeInTheDocument()
+  })
+})
+
+// Issue #957 (Sentry LOCATIONGUESSER-1H): `guessIcon`/`answerIcon` construyen
+// `new google.maps.Size/Point(...)` directamente en el JSX de `PlayMap` (no
+// dentro de un efecto), así que si se evalúan antes de que el SDK real cargue
+// revientan con "undefined is not a constructor". Estos tests cubren la
+// guarda (`useApiIsLoaded`): con la API "sin cargar" (el estado real en el
+// primer paint, antes de que el script de Google resuelva), montar con
+// `guess`/`answer` NO debe lanzar, aunque no exista `window.google` en jsdom.
+describe('PlayMap — guarda de carga del SDK (issue #957)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    mockMap.current = null
+    mockApiLoaded.current = false
+  })
+
+  test('con guess/answer pero la API de Google Maps sin cargar, no revienta', () => {
+    expect(() =>
+      render(
+        <PlayMap
+          guess={{ lat: 1, lng: 2 }}
+          answer={{ lat: 3, lng: 4 }}
+          locked
+          onPick={noop}
+          meUserId="u1"
+        />,
+      ),
+    ).not.toThrow()
+
+    expect(screen.getByTestId('google-map')).toBeInTheDocument()
   })
 })

@@ -1,6 +1,6 @@
 /// <reference types="google.maps" />
 import { useEffect } from 'react'
-import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
+import { Map, Marker, Polyline, useApiIsLoaded, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
 import {
   avatarPinFromProfile,
@@ -248,6 +248,12 @@ function PanToSelected({ target }: { target: LatLng | null }) {
  */
 export function AllGuessesMap({ answer, guesses, meUserId, selectedUserId }: Props) {
   const selected = selectedUserId != null ? guesses.find((g) => g.userId === selectedUserId) : null
+  // Guarda de carga (issue #957, Sentry LOCATIONGUESSER-1H): igual que en
+  // `PlayMap`, `answerIcon`/`guessIcon`/`selectedGuessIcon` construyen `new
+  // google.maps.Size/Point(...)` directamente en el JSX de abajo; sin esta
+  // guarda revientan si este mapa (dentro del mismo `<APIProvider>`) se monta
+  // antes de que el SDK termine de cargar.
+  const apiLoaded = useApiIsLoaded()
   return (
     <Map
       className="lg-map"
@@ -267,26 +273,27 @@ export function AllGuessesMap({ answer, guesses, meUserId, selectedUserId }: Pro
       // lleve (PlayMap en revelado tampoco, MomentMiniMap ya lo lleva a false).
       clickableIcons={false}
     >
-      <Marker position={answer} icon={answerIcon()} clickable={false} />
+      {apiLoaded && <Marker position={answer} icon={answerIcon()} clickable={false} />}
       <GuessLines answer={answer} guesses={guesses} meUserId={meUserId} />
-      {guesses.map((g) => {
-        const isSelected = g.userId === selectedUserId
-        return (
-          <Marker
-            key={g.userId}
-            position={{ lat: g.lat, lng: g.lng }}
-            icon={
-              isSelected
-                ? selectedGuessIcon(g.avatar, g.userId, g.rank)
-                : guessIcon(g.avatar, g.userId, g.userId === meUserId, g.rank)
-            }
-            label={nameLabel(g.name, isSelected)}
-            zIndex={isSelected ? SELECTED_Z_INDEX : undefined}
-            clickable={false}
-            title={g.name}
-          />
-        )
-      })}
+      {apiLoaded &&
+        guesses.map((g) => {
+          const isSelected = g.userId === selectedUserId
+          return (
+            <Marker
+              key={g.userId}
+              position={{ lat: g.lat, lng: g.lng }}
+              icon={
+                isSelected
+                  ? selectedGuessIcon(g.avatar, g.userId, g.rank)
+                  : guessIcon(g.avatar, g.userId, g.userId === meUserId, g.rank)
+              }
+              label={nameLabel(g.name, isSelected)}
+              zIndex={isSelected ? SELECTED_Z_INDEX : undefined}
+              clickable={false}
+              title={g.name}
+            />
+          )
+        })}
       <FitToAll answer={answer} guesses={guesses} meUserId={meUserId} />
       <PanToSelected target={selected ? { lat: selected.lat, lng: selected.lng } : null} />
     </Map>

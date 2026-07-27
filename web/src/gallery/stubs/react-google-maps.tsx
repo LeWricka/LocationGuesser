@@ -75,3 +75,23 @@ export function useMap(): null {
 export function useMapsLibrary(): null {
   return null
 }
+
+// Espejo de `APILoadingStatus` del paquete real (issue #957): PlayMap/
+// AllGuessesMap/GoogleMapsProvider lo usan para no construir `google.maps.*`
+// hasta que el SDK real esté cargado. La galería nunca lo carga de verdad, así
+// que se queda en LOADING para siempre — mismo "aún no cargó" que `useMap`/
+// `useMapsLibrary` de arriba.
+export const APILoadingStatus = {
+  NOT_LOADED: 'NOT_LOADED',
+  LOADING: 'LOADING',
+  LOADED: 'LOADED',
+  FAILED: 'FAILED',
+  AUTH_FAILURE: 'AUTH_FAILURE',
+} as const
+
+export function useApiIsLoaded(): boolean {
+  return false
+}
+export function useApiLoadingStatus(): (typeof APILoadingStatus)[keyof typeof APILoadingStatus] {
+  return APILoadingStatus.LOADING
+}

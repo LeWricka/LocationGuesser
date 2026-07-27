@@ -9,7 +9,9 @@
 // <APIProvider> como ancestro.
 
 import type { ReactNode } from 'react'
-import { APIProvider } from '@vis.gl/react-google-maps'
+import { APILoadingStatus, APIProvider, useApiLoadingStatus } from '@vis.gl/react-google-maps'
+import { Banner } from '../ui/Banner'
+import { Button } from '../ui/Button'
 
 interface Props {
   children: ReactNode
@@ -18,6 +20,38 @@ interface Props {
 // Clave pública (restringida por dominio) para Maps/Street View.
 const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY
 
+// Robustez (issue #957): si el script del SDK falla (cuota agotada, referrer
+// mal configurado en la key, o simplemente sin red) el resto de la app NO debe
+// quedar con un mapa a medio pintar ni crashear al construir `google.maps.*`
+// (los componentes de mapa ya se protegen con `useApiIsLoaded`, ver PlayMap/
+// AllGuessesMap) — aquí cubrimos el caso "nunca llegó a cargar" con un aviso y
+// un reintento explícito. Recargar la página es la vía más simple y fiable de
+// reintentar: el loader de `@vis.gl/react-google-maps` inserta el <script> una
+// única vez por documento, así que un componente que solo remonte el
+// `<APIProvider>` no vuelve a pedirlo.
+function MapsLoadGuard({ children }: Props) {
+  const status = useApiLoadingStatus()
+  if (status === APILoadingStatus.FAILED || status === APILoadingStatus.AUTH_FAILURE) {
+    return (
+      <Banner
+        tone="aviso"
+        action={
+          <Button size="sm" onClick={() => window.location.reload()}>
+            Reintentar
+          </Button>
+        }
+      >
+        No se pudo cargar el mapa. Comprueba tu conexión y reintenta.
+      </Banner>
+    )
+  }
+  return <>{children}</>
+}
+
 export function GoogleMapsProvider({ children }: Props) {
-  return <APIProvider apiKey={mapsApiKey}>{children}</APIProvider>
+  return (
+    <APIProvider apiKey={mapsApiKey}>
+      <MapsLoadGuard>{children}</MapsLoadGuard>
+    </APIProvider>
+  )
 }
