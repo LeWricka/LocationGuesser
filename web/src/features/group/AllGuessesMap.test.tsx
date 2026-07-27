@@ -68,6 +68,10 @@ vi.mock('@vis.gl/react-google-maps', () => ({
     />
   ),
   useMap: () => null,
+  // Todos los tests de este fichero inyectan un `google.maps` real (ver
+  // beforeAll arriba) y esperan ver los iconos calculados, así que la guarda
+  // de carga (issue #957, `useApiIsLoaded` en AllGuessesMap) debe dejarlos pasar.
+  useApiIsLoaded: () => true,
 }))
 
 function guess(over: Partial<GuessMarker> & Pick<GuessMarker, 'userId' | 'name'>): GuessMarker {

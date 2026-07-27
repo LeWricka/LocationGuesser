@@ -1,6 +1,6 @@
 /// <reference types="google.maps" />
 import { useEffect, useState } from 'react'
-import { Map, Marker, Polyline, useMap } from '@vis.gl/react-google-maps'
+import { Map, Marker, Polyline, useApiIsLoaded, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
 import { avatarPinFromProfile, targetPinSvg, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
 import type { MapPreset } from '../../lib/mapPresets'
@@ -337,6 +337,18 @@ export function PlayMap({
   const [mapReady, setMapReady] = useState(false)
   const [skeletonGone, setSkeletonGone] = useState(false)
 
+  // Guarda de carga (issue #957, Sentry LOCATIONGUESSER-1H): `<APIProvider>`
+  // (GoogleMapsProvider) empieza a descargar el SDK pero NO retrasa el montaje
+  // de sus hijos — este componente ya renderizaba en el primer paint, antes de
+  // que existiera `window.google`. `guessIcon`/`answerIcon` construyen `new
+  // google.maps.Size(...)` DIRECTAMENTE en el JSX de abajo (no dentro de un
+  // efecto), así que si se evalúan antes de tiempo revientan con
+  // "undefined is not a constructor". `useApiIsLoaded` es la señal oficial del
+  // SDK (@vis.gl/react-google-maps) de que el namespace `google.maps` ya
+  // existe; hasta entonces NO montamos ningún pin (el `MapSkeleton` de abajo ya
+  // cubre visualmente la espera).
+  const apiLoaded = useApiIsLoaded()
+
   return (
     <div className={styles.wrap}>
       <Map
@@ -372,10 +384,10 @@ export function PlayMap({
       >
         {/* En modo clásico, el pin-avatar clavado donde tocaste. En modo centro fijo
             no se dibuja (lo sustituye el pin estático del overlay). */}
-        {guess && !centerPinMode && (
+        {guess && !centerPinMode && apiLoaded && (
           <Marker position={guess} icon={guessIcon(meAvatar, meUserId)} clickable={false} />
         )}
-        {answer && <AnswerMarker answer={answer} />}
+        {answer && apiLoaded && <AnswerMarker answer={answer} />}
         {guess && answer && <DrawnLine guess={guess} answer={answer} />}
         {guess && answer && <FitToReveal guess={guess} answer={answer} />}
         {centerPinMode && <CenterPinTracker locked={locked} onPick={onPick} />}
