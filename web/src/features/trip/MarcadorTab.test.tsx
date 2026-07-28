@@ -82,8 +82,8 @@ function renderMarcador(
 describe('MarcadorTab', () => {
   // --- Vacío (issue #753: podio visual, no párrafo) --------------------------
 
-  test('vacío: podio de 3 huecos de avatar + copy de una línea + invitar (y crear reto si puede)', () => {
-    renderMarcador({ leaderboard: [], canCreate: true })
+  test('vacío (dueño/co-dueño): podio de 3 huecos de avatar + copy de una línea + invitar + crear reto', () => {
+    renderMarcador({ leaderboard: [], canCreate: true, isOwner: true })
     // El podio "promesa" existe aunque no haya jugadores (mismo landmark que el real).
     const podio = screen.getByRole('list', { name: 'Podio' })
     expect(podio.querySelectorAll('li')).toHaveLength(3)
@@ -92,6 +92,14 @@ describe('MarcadorTab', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Invitar/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Crear un reto/ })).toBeInTheDocument()
+  })
+
+  // Issue #962 (revierte #783): un miembro (no dueño) ya NO ve "Invitar" ni
+  // "Crear un reto" en el vacío del marcador — ambos son de dueño/co-dueño.
+  test('vacío (miembro, no dueño): ni "Invitar" ni "Crear un reto"', () => {
+    renderMarcador({ leaderboard: [], canCreate: false, isOwner: false })
+    expect(screen.queryByRole('button', { name: /Invitar/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Crear un reto/ })).not.toBeInTheDocument()
   })
 
   test('vacío: sin poder crear, no se ofrece "Crear un reto"', () => {
@@ -243,15 +251,6 @@ describe('MarcadorTab', () => {
 
   test('premios: un miembro (no dueño) no ve la CTA del vacío', () => {
     renderMarcador({ leaderboard: [], canCreate: true, isOwner: false })
-    expect(screen.queryByRole('button', { name: /¿Qué se juega\?/ })).not.toBeInTheDocument()
-  })
-
-  // Issue #783: separación explícita canCreate (crear, miembro) vs isOwner
-  // (premios, dueño) — un miembro que NO es dueño ve "Crear un reto" pero no
-  // la CTA de premios en el mismo podio vacío.
-  test('issue #783: un miembro ve "Crear un reto" pero NO la CTA de premios', () => {
-    renderMarcador({ leaderboard: [], canCreate: true, isOwner: false })
-    expect(screen.getByRole('button', { name: /Crear un reto/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /¿Qué se juega\?/ })).not.toBeInTheDocument()
   })
 

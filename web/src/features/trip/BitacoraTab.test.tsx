@@ -458,15 +458,15 @@ describe('BitacoraTab — clip de vídeo (issue #649)', () => {
 })
 
 describe('BitacoraTab — estado vacío', () => {
-  // Issue #783: crear ya es de cualquier MIEMBRO (no solo el dueño) — `canCreate`
-  // es true para todo miembro del viaje.
-  test('miembro: mensaje + CTA "Añadir momento"', async () => {
+  // Issue #962 (revierte #783): crear vuelve a ser de DUEÑO/CO-DUEÑO —
+  // `canCreate` es alias de `isOwner` en TripPage.
+  test('dueño/co-dueño: mensaje + CTA "Añadir momento"', async () => {
     renderTab([])
     expect(await screen.findByText('Tu bitácora está vacía')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Añadir momento' })).toBeInTheDocument()
   })
 
-  test('sin permiso de crear (aún sin confirmar membresía): solo el mensaje, sin CTA', async () => {
+  test('miembro (no dueño): solo el mensaje, sin CTA', async () => {
     renderTab([], { canCreate: false })
     expect(await screen.findByText('Tu bitácora está vacía')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Añadir momento' })).not.toBeInTheDocument()

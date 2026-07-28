@@ -29,17 +29,17 @@ interface Props {
   leaderboard: LeaderboardEntry[]
   /** userId del usuario en sesión: resalta su fila con acento teal. */
   myUserId?: string | null
-  /** Abre la hoja de invitar (CTA del vacío: sin retos ni marcador, invitar es el
-   * siguiente paso obvio, no un texto sin acción — issue #510). */
+  /** Abre la hoja de invitar (CTA del vacío, gateado por `isOwner` — issue
+   * #962/#510: invitar es del dueño/co-dueño, no un texto sin acción). */
   onInvite: () => void
-  /** Abre el flujo de crear reto. Se ofrece a cualquier MIEMBRO (issue #783). */
+  /** Abre el flujo de crear reto. Issue #962 (revierte #783): solo
+   * DUEÑO/CO-DUEÑO, gateado por `canCreate`. */
   onAddChallenge: () => void
-  /** ¿Puede el usuario crear retos? (issue #783: cualquier MIEMBRO del viaje).
-   * Gobierna SOLO el CTA "Crear un reto" del vacío — los premios ya NO
-   * dependen de este prop, ver `isOwner`. */
+  /** ¿Puede el usuario crear retos? Issue #962 (revierte #783): alias de
+   * `isOwner` — gobierna el CTA "Crear un reto" del vacío. */
   canCreate: boolean
-  /** ¿Es DUEÑO del viaje? (issue #783, separado de `canCreate`) — gobierna la
-   * edición de premios: es el mismo permiso que en GroupPage/GroupSettings. */
+  /** ¿Es DUEÑO (o CO-DUEÑO) del viaje? Gobierna la edición de premios y,
+   * desde el #962, también "Invitar" en el vacío del marcador. */
   isOwner: boolean
   /** Código del viaje: guarda los premios (`PrizesEditorModal`). */
   groupId: string
@@ -153,10 +153,10 @@ function PremioTappable({
  * mismo aspecto que el texto plano (issue #608: para el resto de miembros nunca
  * debe leerse como un botón).
  *
- * v5 (issue #783 — cualquier miembro crea): `canCreate` (CTA "Crear un reto")
- * pasa a ser "soy miembro del viaje"; los premios (chips tappables, CTA "¿Qué
- * se juega?" y el editor) siguen siendo cosa del dueño, ahora tras `isOwner`
- * — un prop nuevo y separado.
+ * v5 (issue #783, REVERTIDO por el #962): `canCreate` llegó a significar "soy
+ * miembro del viaje"; ahora vuelve a ser alias de `isOwner` — crear, invitar y
+ * los premios (chips tappables, CTA "¿Qué se juega?" y el editor) son todos
+ * cosa del dueño/co-dueño.
  *
  * v6 (issue #800 — detalle del reto): "Retos anteriores" pasa a incluir los
  * retos EN JUEGO además de los cerrados (chip "EN JUEGO" + cuenta atrás, sin
@@ -480,9 +480,13 @@ export function MarcadorTab({
             {/* Poco texto, visual-first (issue #753): una línea, el podio ya habla. */}
             <p>Aún no hay clasificación. Juega el primer reto y aparecerá aquí.</p>
             <div className={styles.vacioAcciones}>
-              <Button variant="secondary" size="sm" onClick={onInvite}>
-                <Icon icon={Share2} size={16} /> Invitar
-              </Button>
+              {/* Issue #962 (revierte #783): invitar vuelve a ser de
+                  DUEÑO/CO-DUEÑO, igual que crear un reto. */}
+              {isOwner && (
+                <Button variant="secondary" size="sm" onClick={onInvite}>
+                  <Icon icon={Share2} size={16} /> Invitar
+                </Button>
+              )}
               {canCreate && (
                 <Button size="sm" onClick={onAddChallenge}>
                   <IconDiana size={16} /> Crear un reto
