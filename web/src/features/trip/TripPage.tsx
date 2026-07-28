@@ -134,9 +134,10 @@ const PLAYBACK_INTERVAL_MS = 1100
  * Un solo chrome: la cabecera es el `AppHeader` (atrás · nombre del viaje · ⋯). El
  * menú ⋯ tiene contenido FIJO (Miembros · Marcador · Ajustes · Cerrar viaje · Borrar),
  * el FAB "＋" (abajo-derecha) es el ÚNICO punto de crear (Recuerdo / Reto) y el FAB
- * "Compartir" (abajo-izquierda, issue #758 — misma posición/aspecto en los 3 tabs,
- * para cualquier miembro) abre Invitar al viaje / Compartir un reto / Compartir
- * clasificación: derecha crea, izquierda comparte.
+ * "Compartir" (abajo-izquierda, issue #758 — misma posición/aspecto en los 3 tabs)
+ * abre Invitar al viaje / Compartir un reto / Compartir clasificación: derecha
+ * crea, izquierda comparte. Issue #962: AMBOS son solo de DUEÑO/CO-DUEÑO — los
+ * miembros solo juegan y ven.
  *
  * La lógica de selección carrusel↔mapa y de reproducción del recorrido vive aquí
  * (es transversal a la sección Diario) y se delega a TripDiario por props.
@@ -250,13 +251,16 @@ export function TripPage({
   const [editingChallenge, setEditingChallenge] = useState<ChallengeForPlay | null>(null)
   // Momento seleccionado (centra su pin en el mapa). Se sincroniza carrusel↔mapa.
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  // ¿Puede el usuario crear momentos/retos? (issue #783: cualquier MIEMBRO, ya
-  // no solo el dueño — el RLS `challenges_insert_member` lo respalda igual). Es
-  // siempre true una vez `reloadMembership` confirma la membresía.
+  // ¿Puede el usuario crear momentos/retos, invitar y compartir? Issue #962:
+  // REVIERTE el #783 — el viaje lo "curan" el dueño y los co-dueños; los
+  // miembros solo juegan y ven. `canCreate` queda como alias de `isOwner`
+  // (mismo valor) para no renombrar el prop en los hijos que ya lo reciben
+  // (TripDiario/BitacoraTab/MarcadorTab).
   const [canCreate, setCanCreate] = useState(false)
-  // ¿Es DUEÑO del viaje? (premios, ajustes, cerrar/reabrir, borrar, enlace de
-  // co-dueño, editar/borrar momentos ajenos). Antes era lo que calculaba
-  // `canCreate`; separado en el issue #783 porque crear ya no es de dueño.
+  // ¿Es DUEÑO (o CO-DUEÑO) del viaje? Gobierna crear, editar, invitar,
+  // compartir, premios, ajustes, cerrar/reabrir y borrar — el RLS
+  // (`challenges_insert_owner`/`moment_images_insert_owner`, migración 0051)
+  // lo respalda igual.
   const [isOwner, setIsOwner] = useState(false)
   const [memberNames, setMemberNames] = useState<string[]>([])
 
@@ -427,10 +431,11 @@ export function TripPage({
 
   // Menú ⋯ de la cabecera (hoja inferior con acciones fijas del viaje).
   const [menuOpen, setMenuOpen] = useState(false)
-  // Invitar al viaje: hoja de compartir (reusa InviteModal). Es SIEMPRE
-  // accesible (P0): cualquier miembro puede repartir el enlace. Se abre desde
-  // varios sitios (CTAs del vacío, Miembros, la hoja "Compartir" nueva); `inviteOrigin`
-  // (issue #758) guarda desde cuál para etiquetar la analítica, y se resetea en
+  // Invitar al viaje: hoja de compartir (reusa InviteModal). Issue #962
+  // (revierte #783): solo DUEÑO/CO-DUEÑO reparte el enlace — los puntos de
+  // entrada (CTAs del vacío, la hoja "Compartir" nueva) ya se gatean por
+  // `isOwner`/`canCreate` antes de llegar aquí. `inviteOrigin` (issue #758)
+  // guarda desde cuál se abrió para etiquetar la analítica, y se resetea en
   // CADA apertura (openInvite) para que no quede un valor de una apertura previa.
   const [inviting, setInviting] = useState(false)
   const [inviteOrigin, setInviteOrigin] = useState<string | undefined>(undefined)
@@ -510,10 +515,11 @@ export function TripPage({
       const member = await isMember(groupId, user.id)
       if (!member) return
       const [mine, members] = await Promise.all([myGroups(user.id), getGroupMembers(groupId)])
-      // Issue #783: crear ya es de cualquier MIEMBRO — `isMember` de arriba ya lo
-      // confirmó, así que canCreate es simplemente true a partir de aquí.
-      setCanCreate(true)
-      setIsOwner(mine.find((g) => g.id === groupId)?.isOwner ?? false)
+      // Issue #962 (revierte #783): crear vuelve a ser de DUEÑO/CO-DUEÑO —
+      // `canCreate` se queda como alias de `isOwner`, no de "soy miembro".
+      const owner = mine.find((g) => g.id === groupId)?.isOwner ?? false
+      setCanCreate(owner)
+      setIsOwner(owner)
       setMemberNames(members.map((m) => m.name))
     } catch {
       // Permisos/miembros no resueltos: tratamos como miembro sin gestión.
@@ -1282,10 +1288,11 @@ export function TripPage({
       </div>
 
       {/* FAB "＋" flotante con menú de dos acciones: Momento (recuerdo) o Reto (a
-          adivinar). ÚNICO punto de crear del viaje. Issue #783: CUALQUIER miembro
-          (ya no solo el dueño) y siempre disponible (fijo abajo), salvo con el
-          recap abierto (es una pantalla de cierre). Issue #891: el "+" vuelve a
-          verse también a un ANÓNIMO (antes se ocultaba, #888) — pero al tocarlo
+          adivinar). ÚNICO punto de crear del viaje. Issue #962 (revierte #783):
+          solo DUEÑO/CO-DUEÑO (`canCreate`, alias de `isOwner`) y siempre
+          disponible (fijo abajo) mientras lo sea, salvo con el recap abierto
+          (es una pantalla de cierre). Issue #891: el "+" vuelve a verse también
+          a un ANÓNIMO que sea dueño (antes se ocultaba, #888) — pero al tocarlo
           NO abre el menú Momento/Reto (que RLS le bloquea): abre el alta real
           ("Regístrate para crear tus viajes"). Con cuenta, comportamiento de siempre. */}
       {canCreate && !wrapOpen && !retoTourActive && !tourActive && !bienvenidaTourActive && (
@@ -1341,17 +1348,18 @@ export function TripPage({
       )}
 
       {/* FAB "Compartir" flotante abajo-IZQUIERDA (issue #758): espejo del "＋" de
-          crear (misma posición/aspecto en los 3 tabs), pero para CUALQUIER
-          miembro (sin gate de canCreate) — compartir no es una acción de dueño.
-          Abre la hoja "Compartir" (Invitar al viaje / Compartir un reto /
-          Compartir clasificación). Nunca dos flotantes a la vez en el mismo tab:
-          sustituye al FAB de clasificación que vivía solo en Marcador (issue
-          #608) y al item "Invitar" del menú ⋯. Nunca en el viaje de ejemplo
-          (solo lectura): no hay nada real que invitar/compartir. Tampoco a un
-          receptor ANÓNIMO (issue #888): jugar un reto suelto no debe
-          convertirle en quien re-comparte el viaje/reto — ese gesto es de
-          quien ya se identifica (miembro con cuenta o dueño). */}
-      {!wrapOpen &&
+          crear (misma posición/aspecto en los 3 tabs). Issue #962 (revierte
+          #783): ahora es solo del DUEÑO/CO-DUEÑO — compartir (invitar al viaje,
+          un reto o la clasificación) vuelve a ser una acción de gestión, igual
+          que crear. Abre la hoja "Compartir" (Invitar al viaje / Compartir un
+          reto / Compartir clasificación). Nunca dos flotantes a la vez en el
+          mismo tab: sustituye al FAB de clasificación que vivía solo en
+          Marcador (issue #608) y al item "Invitar" del menú ⋯. Nunca en el
+          viaje de ejemplo (solo lectura): no hay nada real que invitar/
+          compartir. Tampoco a un receptor ANÓNIMO (issue #888): jugar un reto
+          suelto no debe convertirle en quien re-comparte el viaje/reto. */}
+      {isOwner &&
+        !wrapOpen &&
         !isExampleTrip &&
         !isAnonymous &&
         !retoTourActive &&
@@ -1641,8 +1649,7 @@ export function TripPage({
           </button>
           {/* Ajustes (renombrar), Cerrar/Reabrir temporada y Borrar son del dueño y
               viven en el modal de ajustes; los miembros no ven estas tres acciones.
-              Issue #783: gate por `isOwner` (ya NO `canCreate`, que ahora es
-              "soy miembro") — si no, cualquier miembro vería borrar el viaje. */}
+              Gate por `isOwner` — si no, cualquier miembro vería borrar el viaje. */}
           {isOwner && (
             <>
               <button
@@ -1684,9 +1691,9 @@ export function TripPage({
           dueño) "Convertir en reto", que NAVEGA al asistente completo de crear reto
           en modo promoción (issue #723) — al volver, TripPage remonta con datos
           frescos y el momento aparece ya como reto en el mapa y el carrusel.
-          Issue #783: `canEdit` sigue siendo de DUEÑO (`isOwner`) — el RLS
-          (`challenges_update_owner`/`_delete_owner`) solo deja editar/borrar al
-          dueño; crear es lo único que se abrió a cualquier miembro. */}
+          `canEdit={isOwner}`: el RLS (`challenges_update_owner`/`_delete_owner`,
+          `moment_images_update/delete_owner`) solo deja editar/borrar/añadir
+          fotos al dueño/co-dueño (issue #962, revierte #783/0045). */}
       <MomentSheet
         moment={openMoment}
         canEdit={isOwner}
@@ -1702,8 +1709,10 @@ export function TripPage({
         // "Compartir reto" (issue #739): solo con el reto EN JUEGO (un reto
         // cerrado ya no se juega — para ese caso está "Ver marcador"). Nunca en
         // el viaje de ejemplo: no hay nada real que compartir (solo lectura).
+        // Issue #962 (revierte #783): solo DUEÑO/CO-DUEÑO — compartir un reto
+        // es una acción de gestión, un miembro ya no la ve.
         onShareChallenge={
-          openMoment?.status === 'active' && !isExampleTrip
+          openMoment?.status === 'active' && !isExampleTrip && isOwner
             ? () => {
                 openShareChallenge(openMoment)
                 setOpenMoment(null)

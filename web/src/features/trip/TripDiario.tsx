@@ -16,8 +16,9 @@ interface Props {
   moments: Moment[]
   route: RoutePoint[]
   selectedId: string | null
-  /** ¿Puede el usuario añadir momentos? (issue #783: cualquier MIEMBRO del
-   * viaje) — gobierna el CTA del vacío. */
+  /** ¿Puede el usuario añadir momentos/invitar? (issue #962, revierte #783:
+   * solo DUEÑO/CO-DUEÑO — gobierna el CTA "Añadir momento" y el "Invitar"
+   * secundario del vacío). */
   canCreate: boolean
   /** Reproducción del recorrido (undefined bajo reduced-motion: sin control). */
   playing?: boolean
@@ -26,8 +27,8 @@ interface Props {
   onExpand: (moment: Moment) => void
   onPlay: (challengeId: string) => void
   onAddMoment: () => void
-  /** Abre la hoja de invitar (CTA secundario del vacío: invitar es tan visible
-   * como añadir el primer momento — issue #510, invitar quedaba escondido tras el ···). */
+  /** Abre la hoja de invitar (CTA secundario del vacío, gateado por
+   * `canCreate` — issue #510, invitar quedaba escondido tras el ···). */
   onInvite: () => void
   /**
    * Ancla del mapa a sangre para `GuidedTour` (viaje de ejemplo, onboarding
@@ -180,8 +181,8 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
         </div>
       ) : (
         /* Sin momentos: tarjeta flotante centrada sobre el mapa (no rompe el a-sangre).
-           Además de "Añadir momento" (dueño), un secundario "Invitar" — cualquier
-           miembro puede repartir el enlace, y antes solo vivía tras el menú ···. */
+           Además de "Añadir momento", un secundario "Invitar" — issue #962:
+           ambos son de DUEÑO/CO-DUEÑO (antes "Invitar" vivía tras el menú ···). */
         <div className={styles.emptyDock}>
           <EmptyState
             icon={<Icon icon={MapIcon} size={32} />}
@@ -190,15 +191,20 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
             actionLabel={canCreate ? 'Añadir momento' : undefined}
             onAction={canCreate ? onAddMoment : undefined}
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            fullWidth
-            className={styles.emptyInvite}
-            onClick={onInvite}
-          >
-            <Icon icon={Share2} size={16} /> Invitar
-          </Button>
+          {/* Issue #962 (revierte #783): invitar vuelve a ser de DUEÑO/CO-DUEÑO
+              (`canCreate`, alias de `isOwner` en TripPage) — un miembro ya no
+              reparte el enlace del viaje. */}
+          {canCreate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              fullWidth
+              className={styles.emptyInvite}
+              onClick={onInvite}
+            >
+              <Icon icon={Share2} size={16} /> Invitar
+            </Button>
+          )}
         </div>
       )}
     </div>

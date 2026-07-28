@@ -344,12 +344,13 @@
 }
 
 /* FAB "Compartir" flotante FIJO abajo-IZQUIERDA (issue #758): espejo del FAB "＋"
-   de crear (mismo tamaño/sombra/piso `z-sticky`), pero para CUALQUIER miembro
-   (sin gate de `canCreate`) — compartir no es una acción de dueño. Nunca dos
-   flotantes a la vez en el mismo tab: sustituye al FAB de clasificación que
-   vivía solo en Marcador (`MarcadorTab`, issue #608) y al item "Invitar" del
-   menú ⋯. Sin menú propio (a diferencia de `.fabWrap`): un tap abre directo la
-   hoja "Compartir" (`BottomSheet`). */
+   de crear (mismo tamaño/sombra/piso `z-sticky`). Issue #962 (revierte #783):
+   solo DUEÑO/CO-DUEÑO (gate `isOwner` en TripPage) — compartir vuelve a ser una
+   acción de gestión, igual que crear. Nunca dos flotantes a la vez en el mismo
+   tab: sustituye al FAB de clasificación que vivía solo en Marcador
+   (`MarcadorTab`, issue #608) y al item "Invitar" del menú ⋯. Sin menú propio
+   (a diferencia de `.fabWrap`): un tap abre directo la hoja "Compartir"
+   (`BottomSheet`). */
 .shareFabWrap {
   position: fixed;
   left: var(--space-4);

@@ -83,10 +83,15 @@ vi.mock('./ChallengeDetail', () => ({
 vi.mock('../group/EditChallenge', () => ({ EditChallenge: () => null }))
 vi.mock('../group/GroupSettingsModal', () => ({ GroupSettingsModal: () => null }))
 
+// `myGroups` como vi.fn con default DUEÑO (la mayoría de tests de este fichero
+// no gira en torno a permisos): issue #962, algún test puntual sobrescribe con
+// `mockResolvedValueOnce` un miembro NO dueño para comprobar que los FABs de
+// crear/compartir se ocultan (mockResolvedValueOnce solo afecta a UNA llamada,
+// así que el resto de tests siguen viendo el dueño por defecto).
 vi.mock('../../lib/membership', () => ({
-  isMember: async () => true,
-  myGroups: async () => [{ id: 'g1', isOwner: true }],
-  getGroupMembers: async () => [{ name: 'Iker' }],
+  isMember: vi.fn(async () => true),
+  myGroups: vi.fn(async () => [{ id: 'g1', isOwner: true }]),
+  getGroupMembers: vi.fn(async () => [{ name: 'Iker' }]),
 }))
 
 vi.mock('../group/InviteModal', () => ({
@@ -114,9 +119,29 @@ vi.mock('../group/MembersModal', () => ({
 }))
 
 import { TripPage } from './TripPage'
+import { myGroups, type MyGroup } from '../../lib/membership'
 import { useTripData } from './useTripData'
 import { SessionContext, type SessionState } from '../../lib/session-context'
 import { ToastProvider } from '../../ui'
+
+// Fixture MÍNIMA de `MyGroup` para forzar "miembro (no dueño)" en `myGroups`
+// (issue #962): el resto de campos no los lee `reloadMembership` (solo
+// `id`/`isOwner`), pero el tipo real los exige.
+function myGroupFixture(overrides: Partial<MyGroup> = {}): MyGroup {
+  return {
+    id: 'g1',
+    name: 'Japón 2026',
+    role: 'member',
+    isOwner: false,
+    status: 'idle',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    closed: false,
+    startsOn: null,
+    endsOn: null,
+    coverImagePath: null,
+    ...overrides,
+  }
+}
 
 // jsdom no implementa scrollIntoView; el GuidedTour del tour del reto (#891) lo
 // usa para llevar cada paso a la vista.
@@ -225,7 +250,7 @@ describe('TripPage — FAB "Compartir" (#758)', () => {
   test('sin retos en juego ni clasificación: solo ofrece "Invitar al viaje"', async () => {
     mockTripData()
     renderTrip()
-    await userEvent.click(screen.getByRole('button', { name: /^compartir$/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^compartir$/i }))
     expect(screen.getByRole('button', { name: /invitar al viaje/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /compartir un reto/i })).not.toBeInTheDocument()
     expect(
@@ -236,7 +261,7 @@ describe('TripPage — FAB "Compartir" (#758)', () => {
   test('"Invitar al viaje" abre el InviteModal con origin "share_fab"', async () => {
     mockTripData()
     renderTrip()
-    await userEvent.click(screen.getByRole('button', { name: /^compartir$/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^compartir$/i }))
     await userEvent.click(screen.getByRole('button', { name: /invitar al viaje/i }))
     const modal = await screen.findByTestId('invite-modal')
     expect(modal).toHaveTextContent('/v/g1|share_fab')
@@ -245,7 +270,7 @@ describe('TripPage — FAB "Compartir" (#758)', () => {
   test('con UN reto en juego: "Compartir un reto" abre ShareChallengeModal directo', async () => {
     mockTripData({ moments: [activeChallenge({ challengeId: 'c1' })] })
     renderTrip()
-    await userEvent.click(screen.getByRole('button', { name: /^compartir$/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^compartir$/i }))
     await userEvent.click(screen.getByRole('button', { name: /compartir un reto/i }))
     const modal = await screen.findByTestId('share-challenge-modal')
     expect(modal).toHaveTextContent('c1|share_fab')
@@ -259,7 +284,7 @@ describe('TripPage — FAB "Compartir" (#758)', () => {
       ],
     })
     renderTrip()
-    await userEvent.click(screen.getByRole('button', { name: /^compartir$/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^compartir$/i }))
     await userEvent.click(screen.getByRole('button', { name: /compartir un reto/i }))
 
     expect(screen.getByText('Elige un reto')).toBeInTheDocument()
@@ -275,7 +300,7 @@ describe('TripPage — FAB "Compartir" (#758)', () => {
       leaderboard: [{ userId: 'u1', name: 'Ana', avatar: null, points: 10, plays: 1 }],
     })
     renderTrip()
-    await userEvent.click(screen.getByRole('button', { name: /^compartir$/i }))
+    await userEvent.click(await screen.findByRole('button', { name: /^compartir$/i }))
     await userEvent.click(screen.getByRole('button', { name: /compartir clasificación/i }))
     const modal = await screen.findByTestId('share-leaderboard-modal')
     expect(modal).toHaveTextContent('share_fab')
@@ -331,11 +356,47 @@ describe('TripPage — FABs para usuarios ANÓNIMOS (#888/#891)', () => {
     expect(screen.queryByRole('menuitem', { name: /reto/i })).not.toBeInTheDocument()
   })
 
-  test('miembro con cuenta (no anónimo): SÍ ve los dos FABs', async () => {
+  test('dueño con cuenta (no anónimo): SÍ ve los dos FABs', async () => {
     mockTripData()
     renderTrip()
     expect(await screen.findByRole('button', { name: 'Crear momento o reto' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^compartir$/i })).toBeInTheDocument()
+  })
+})
+
+// Issue #962 (revierte #783 y la migración 0045): solo dueño/co-dueño
+// crean/editan/invitan/comparten; un miembro raso solo juega y ve.
+describe('TripPage — permisos dueño vs miembro (issue #962)', () => {
+  test('miembro (no dueño): NO ve el FAB "+" ni el FAB "Compartir"', async () => {
+    vi.mocked(myGroups).mockResolvedValueOnce([myGroupFixture()])
+    mockTripData()
+    renderTrip()
+    // Esperamos a que `reloadMembership` (async) asiente antes de afirmar ausencia.
+    expect(await screen.findByRole('radio', { name: 'Marcador' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Crear momento o reto' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^compartir$/i })).not.toBeInTheDocument()
+  })
+
+  test('miembro (no dueño): el menú ⋯ no ofrece Ajustes/Cerrar/Borrar', async () => {
+    vi.mocked(myGroups).mockResolvedValueOnce([myGroupFixture()])
+    mockTripData()
+    renderTrip()
+    await userEvent.click(await screen.findByRole('button', { name: 'Más opciones del viaje' }))
+    expect(await screen.findByRole('button', { name: 'Miembros' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ajustes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cerrar viaje/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Borrar viaje' })).not.toBeInTheDocument()
+  })
+
+  test('dueño/co-dueño: SÍ ve el FAB "+", el FAB "Compartir" y Ajustes/Cerrar/Borrar', async () => {
+    mockTripData()
+    renderTrip()
+    expect(await screen.findByRole('button', { name: 'Crear momento o reto' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^compartir$/i })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Más opciones del viaje' }))
+    expect(await screen.findByRole('button', { name: 'Ajustes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Cerrar viaje/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Borrar viaje' })).toBeInTheDocument()
   })
 })
 
