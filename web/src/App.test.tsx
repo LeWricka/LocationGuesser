@@ -44,6 +44,19 @@ vi.mock('./lib/admin', () => ({ isAdminEmail: () => false }))
 vi.mock('./lib/session', () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => children,
 }))
+// `App` dispara `prefetchMainRoutes()` (idle-callback, con respaldo en
+// `setTimeout`) en un `useEffect` de montaje incondicional — SIEMPRE se llama,
+// para cualquier ruta. Sin mockearlo, cada `renderApp()` de este fichero
+// dispara `import()` reales de los chunks de viaje/jugar/crear (justo los
+// "chunks lazy... fuera de alcance aquí" que este test ya declara evitar
+// arriba): esos imports tiran de Leaflet, que toca `window` en su carga
+// top-level, y si esa carga sigue en vuelo cuando Vitest desmonta el entorno
+// jsdom del fichero, revienta con "ReferenceError: window is not defined"
+// DESPUÉS del teardown (issue #966) — no determinista porque depende de si el
+// import ya resolvió antes de que termine el último test. `AppRoutes` es lo
+// único que este fichero ejercita; el prefetch es ortogonal y no aporta nada
+// al test, así que se mockea igual que los demás efectos de infraestructura.
+vi.mock('./lib/prefetch', () => ({ prefetchMainRoutes: () => () => {} }))
 
 // Estado de sesión controlado a mano por cada test (sin AuthProvider real: no
 // hay Supabase que resolver). `loading:false` y `user:null` por defecto — el

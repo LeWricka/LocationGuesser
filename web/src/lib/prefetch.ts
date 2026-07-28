@@ -13,16 +13,30 @@
  * implementa `requestIdleCallback`). Los `import()` quedan cacheados por el
  * propio bundler: cuando `React.lazy` los pida de verdad, ya están en caché
  * (o en vuelo) en vez de arrancar de cero.
+ *
+ * Devuelve una función de cancelación (issue #966): si el componente que la
+ * llamó se desmonta ANTES de que el idle-callback/timeout dispare, el efecto
+ * que la programó debe cancelarla — si no, el `prefetch()` puede ejecutarse
+ * más tarde, con `window`/el entorno ya desmontados (exactamente lo que pasaba
+ * en tests: `App.test.tsx` monta `<App/>` sin esperar este idle callback, y
+ * tras el teardown de jsdom el `import()` de rutas con Leaflet revienta con
+ * "window is not defined" porque el módulo lo toca en su carga top-level).
  */
-export function prefetchMainRoutes(): void {
+export function prefetchMainRoutes(): () => void {
   const prefetch = () => {
     void import('../features/trip/TripPage')
     void import('../features/play/PlayChallenge')
     void import('../features/create/CreateGroup')
   }
 
-  const ric = (window as typeof window & { requestIdleCallback?: (cb: () => void) => void })
-    .requestIdleCallback
-  if (typeof ric === 'function') ric(prefetch)
-  else setTimeout(prefetch, 1)
+  const ricWindow = window as typeof window & {
+    requestIdleCallback?: (cb: () => void) => number
+    cancelIdleCallback?: (handle: number) => void
+  }
+  if (typeof ricWindow.requestIdleCallback === 'function') {
+    const handle = ricWindow.requestIdleCallback(prefetch)
+    return () => ricWindow.cancelIdleCallback?.(handle)
+  }
+  const timer = setTimeout(prefetch, 1)
+  return () => clearTimeout(timer)
 }
