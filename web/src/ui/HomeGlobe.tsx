@@ -3,6 +3,7 @@ import { Info } from 'lucide-react'
 // Tipos SOLO (import type → cero coste en bundle). El runtime de maplibre entra por
 // import() dinámico dentro del efecto, para que quede en su propio chunk WebGL.
 import type { Map as MapLibreMap, Marker as MapLibreMarker, StyleSpecification } from 'maplibre-gl'
+import { isValidLatLng } from '../lib/geo'
 import { MAP_PRESETS, SCENE_GLOBE } from '../lib/mapPresets'
 import { reportSilentWarning } from '../lib/observability'
 import { hasWebGL } from '../lib/webglSupport'
@@ -338,29 +339,6 @@ function appendSonarRings(el: HTMLElement): void {
   }
 }
 
-/**
- * ¿Coordenada usable para encuadrar cámara? (issue #923, Sentry LOCATIONGUESSER-9).
- * `frameRoute` construye bounds/centros a partir de `lat`/`lng` de los pines; un
- * valor no finito (NaN/Infinity, dato corrupto), fuera de rango, o el sentinel
- * clásico "sin coordenada real" (0,0, "null island") produce un bounds degenerado.
- * `map.fitBounds` se lo pasa tal cual a maplibre-gl, y en proyección GLOBO su
- * helper de cámara (`GlobeCameraHelper.cameraForBoxAndBearing`) revienta leyendo
- * `.center` de un resultado `undefined` que devolvió el cálculo mercator interno
- * (`scaleX`/`scaleY` negativos ahí dentro) — exactamente el
- * `TypeError: Cannot read properties of undefined (reading 'center')` del stack de
- * Sentry (`fitBounds → cameraForBounds → cameraForBoxAndBearing`). Filtrar ANTES de
- * decidir el gesto de cámara (0/1/≥2 puntos) es más robusto que solo envolver la
- * llamada en try/catch (`conCamaraProtegida`, más abajo): evita construir un
- * encuadre sin sentido en primer lugar, no solo absorber su fallo a posteriori.
- */
-function hasValidGlobeCoord(pin: GlobePin): boolean {
-  const { lat, lng } = pin
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
-  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false
-  if (lat === 0 && lng === 0) return false
-  return true
-}
-
 /** Ids de fuente/capa de la ruta de un viaje (issue #702), únicos por `targetId`
  * para que las constelaciones de dos viajes nunca colisionen entre sí. */
 function routeIds(targetId: string): { sourceId: string; layerId: string } {
@@ -686,8 +664,9 @@ export function HomeGlobe({
     // pines con coords no finitas/fuera de rango ANTES de decidir el gesto de cámara.
     // Con 0 pines válidos no tocamos la cámara (vista actual, sin fit ni vuelo); con
     // 1, `easeTo` (una coordenada no forma una caja, `fitBounds` no aplica); con ≥2,
-    // el `fitBounds` de siempre — ver `hasValidGlobeCoord`.
-    const validRoute = route.filter(hasValidGlobeCoord)
+    // el `fitBounds` de siempre — ver `isValidLatLng` (lib/geo, compartido con
+    // TripMapGlobe, #964).
+    const validRoute = route.filter(isValidLatLng)
     if (validRoute.length === 0) return
     // Keep-alive (issue #847) + guarda del #763: al REVELARSE la home oculta,
     // React re-ejecuta los efectos y este fit puede llegar ANTES del map.resize()

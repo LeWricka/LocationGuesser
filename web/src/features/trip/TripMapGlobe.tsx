@@ -8,6 +8,7 @@ import type {
   SkySpecification,
   StyleSpecification,
 } from 'maplibre-gl'
+import { isValidLatLng } from '../../lib/geo'
 import {
   ESRI_REFERENCE_LABELS,
   ESRI_SATELLITE,
@@ -16,6 +17,7 @@ import {
   SELECT_ZOOM,
   SINGLE_ZOOM,
 } from '../../lib/mapPresets'
+import { reportSilentWarning } from '../../lib/observability'
 import { Icon } from '../../ui/Icon'
 import { MapSkeleton } from '../../ui/MapSkeleton'
 import type { TripMapProps as Props } from './TripMap.types'
@@ -309,7 +311,13 @@ export function TripMapGlobe({
     const map = mapRef.current
     const gl = glRef.current
     if (!map || !gl) return
-    const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
+    // Guarda de bounds degenerados (issue #964, Sentry LOCATIONGUESSER-9): descarta
+    // puntos con coords no finitas/fuera de rango ANTES de decidir el gesto de
+    // cámara — mismo criterio que `HomeGlobe` (#923, `isValidLatLng` en lib/geo).
+    // Sin este filtro, un momento con lat/lng corrupto (o el sentinel 0,0) puede
+    // colar un bounds sin sentido en `cameraForBounds` más abajo.
+    const validPts = routeRef.current.filter(isValidLatLng)
+    const pts: [number, number][] = validPts.map((p) => [p.lng, p.lat])
     // Antes del REVELADO (skeleton delante), toda cámara es instantánea ("perf
     // (cargas): entrada sin saltos"): el encuadre inicial aterriza oculto y el
     // usuario nunca ve moverse la escena al entrar. La animación queda para los
@@ -318,16 +326,17 @@ export function TripMapGlobe({
     const rect = containerRef.current?.getBoundingClientRect()
     const minFill = computeMinFillZoom(rect?.width ?? 0, rect?.height ?? 0)
     if (pts.length === 0) {
-      // Viaje vacío: no hay destino NI bounds que proteger (#640) — el suelo de
-      // relleno manda sin restricción (esfera a sangre, #593). Antes lo hacía la
-      // entrada cinematográfica; al retirarla, el caso vive aquí.
+      // Viaje vacío (o sin ningún punto con coordenada válida): no hay destino NI
+      // bounds que proteger (#640) — el suelo de relleno manda sin restricción
+      // (esfera a sangre, #593). Antes lo hacía la entrada cinematográfica; al
+      // retirarla, el caso vive aquí.
       map.setMinZoom(minFill)
       map.easeTo({ zoom: Math.max(WORLD_ZOOM, minFill), duration })
       return
     }
     if (pts.length === 1) {
-      // Un solo punto: zoom de ciudad (no de continente). fitBounds con un único
-      // punto degenera en un zoom máximo absurdo, así que centramos a mano.
+      // Un solo punto válido: zoom de ciudad (no de continente). fitBounds con un
+      // único punto degenera en un zoom máximo absurdo, así que centramos a mano.
       // El suelo de relleno nunca puede exigir MÁS zoom que el que vamos a usar
       // (#640) — con un solo pin SINGLE_ZOOM siempre sobra, pero el `min` deja la
       // invariante explícita en vez de asumirlo por los valores actuales. Se
@@ -340,15 +349,34 @@ export function TripMapGlobe({
     }
     const bounds = new gl.LngLatBounds(pts[0], pts[0])
     for (const p of pts) bounds.extend(p)
-    // `cameraForBounds` calcula el centro/zoom que ENCUADRARÍA el bounds SIN
-    // moverla (a diferencia de `fitBounds`, que ya aplicaría la cámara): así
-    // decidimos el zoom final (`safeFitZoom`, #640) antes de tocar el mapa.
-    const natural = map.cameraForBounds(bounds, { padding: FIT_PADDING })
-    const zoom = safeFitZoom(natural?.zoom ?? FIT_MAX_ZOOM, minFill, FIT_MAX_ZOOM)
-    // Suelo ANTES del `easeTo` (mismo motivo que arriba): nunca clampar el vuelo
-    // que estamos a punto de lanzar con un suelo más alto de un encuadre previo.
-    map.setMinZoom(Math.min(minFill, zoom))
-    map.easeTo({ center: natural?.center ?? map.getCenter(), zoom, duration })
+    // Guarda #964: en proyección GLOBO, `cameraForBounds` puede reventar
+    // internamente en estados límite (transform sin tamaño real, bounds cerca de
+    // los polos/antimeridiano) — su helper de cámara `cameraForBoxAndBearing` lee
+    // `.center` de un resultado `undefined` (el `TypeError` exacto de Sentry
+    // LOCATIONGUESSER-9), y lo hace DENTRO de maplibre, así que ni el `?? ` de
+    // abajo ni un ErrorBoundary lo atraparían. Mismo try/catch-y-cámara-intacta
+    // que `HomeGlobe` (#923, `conCamaraProtegida`): si revienta, no tocamos la
+    // cámara (se queda la vista actual, razonable) y lo dejamos anotado sin
+    // mandarlo como excepción a Sentry (ya lo tenemos manejado).
+    try {
+      // `cameraForBounds` calcula el centro/zoom que ENCUADRARÍA el bounds SIN
+      // moverla (a diferencia de `fitBounds`, que ya aplicaría la cámara): así
+      // decidimos el zoom final (`safeFitZoom`, #640) antes de tocar el mapa.
+      const natural = map.cameraForBounds(bounds, { padding: FIT_PADDING })
+      const zoom = safeFitZoom(natural?.zoom ?? FIT_MAX_ZOOM, minFill, FIT_MAX_ZOOM)
+      // Suelo ANTES del `easeTo` (mismo motivo que arriba): nunca clampar el vuelo
+      // que estamos a punto de lanzar con un suelo más alto de un encuadre previo.
+      map.setMinZoom(Math.min(minFill, zoom))
+      map.easeTo({ center: natural?.center ?? map.getCenter(), zoom, duration })
+    } catch (err) {
+      reportSilentWarning(
+        'TripMapGlobe: cameraForBounds reventó (proyección globo); cámara intacta',
+        {
+          error: String(err),
+          pointCount: pts.length,
+        },
+      )
+    }
   }, [])
 
   // ── Montaje: crea el mapa una sola vez (import dinámico de maplibre + su CSS). ──
@@ -400,16 +428,29 @@ export function TripMapGlobe({
           if (disposed) return
           const r = container.getBoundingClientRect()
           const minFill = computeMinFillZoom(r.width, r.height)
-          const pts: [number, number][] = routeRef.current.map((p) => [p.lng, p.lat])
+          // Mismo guard que `fitToPins` (issue #964): descarta coords inválidas
+          // antes de construir el bounds.
+          const validPts = routeRef.current.filter(isValidLatLng)
+          const pts: [number, number][] = validPts.map((p) => [p.lng, p.lat])
           if (pts.length < 2) {
             map.setMinZoom(minFill)
             return
           }
           const bounds = new gl.LngLatBounds(pts[0], pts[0])
           for (const p of pts) bounds.extend(p)
-          const natural = map.cameraForBounds(bounds, { padding: FIT_PADDING })
-          const zoom = safeFitZoom(natural?.zoom ?? FIT_MAX_ZOOM, minFill, FIT_MAX_ZOOM)
-          map.setMinZoom(Math.min(minFill, zoom))
+          // Mismo try/catch que `fitToPins`: un resize no puede tumbar el globo si
+          // `cameraForBounds` revienta en proyección globo (#964). Sin encuadre
+          // nuevo, el suelo de zoom se queda como estaba.
+          try {
+            const natural = map.cameraForBounds(bounds, { padding: FIT_PADDING })
+            const zoom = safeFitZoom(natural?.zoom ?? FIT_MAX_ZOOM, minFill, FIT_MAX_ZOOM)
+            map.setMinZoom(Math.min(minFill, zoom))
+          } catch (err) {
+            reportSilentWarning(
+              'TripMapGlobe: cameraForBounds (resize) reventó (proyección globo); minZoom intacto',
+              { error: String(err), pointCount: pts.length },
+            )
+          }
         }
         window.addEventListener('resize', onResize)
 

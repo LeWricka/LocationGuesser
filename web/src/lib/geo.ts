@@ -3,6 +3,27 @@ export interface LatLng {
   lng: number
 }
 
+/**
+ * ¿Coordenada usable para encuadrar la cámara de un mapa MapLibre? (issues #923 y
+ * #964, Sentry LOCATIONGUESSER-9). Un valor no finito (NaN/Infinity, dato
+ * corrupto), fuera de rango, o el sentinel clásico "sin coordenada real" (0,0,
+ * "null island") produce un bounds degenerado: `fitBounds`/`cameraForBounds` se lo
+ * pasan tal cual a maplibre-gl y, en proyección GLOBO, su helper de cámara
+ * (`GlobeCameraHelper.cameraForBoxAndBearing`) revienta leyendo `.center` de un
+ * resultado `undefined` — el `TypeError: Cannot read properties of undefined
+ * (reading 'center')` del stack de Sentry. Filtrar ANTES de decidir el gesto de
+ * cámara (0/1/≥2 puntos) es más robusto que solo envolver la llamada en try/catch:
+ * evita construir un encuadre sin sentido en primer lugar, no solo absorber su
+ * fallo a posteriori. Compartida por `HomeGlobe` (#923) y `TripMapGlobe` (#964):
+ * mismo bug, mismo guard.
+ */
+export function isValidLatLng({ lat, lng }: LatLng): boolean {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false
+  if (lat === 0 && lng === 0) return false
+  return true
+}
+
 const EARTH_RADIUS_KM = 6371
 const toRad = (deg: number) => (deg * Math.PI) / 180
 

@@ -2,6 +2,17 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, waitFor, act } from '@testing-library/react'
 import type { RoutePoint } from '../../lib/trip'
 
+// Espía de `reportSilentWarning` (issue #964, Sentry LOCATIONGUESSER-9): los
+// tests del guard try/catch comprueban que un fallo de `cameraForBounds` queda
+// anotado como aviso silencioso (no como excepción real). `vi.hoisted` es
+// obligatorio aquí (a diferencia de main.test.ts, que importa el módulo real de
+// forma DINÁMICA dentro del test): este fichero importa `TripMapGlobe` de forma
+// ESTÁTICA, y los imports ESM se ejecutan antes que cualquier `const` de nivel de
+// módulo — sin `vi.hoisted`, la factory de `vi.mock` referenciaría la variable
+// antes de inicializarse (TDZ).
+const { reportSilentWarningMock } = vi.hoisted(() => ({ reportSilentWarningMock: vi.fn() }))
+vi.mock('../../lib/observability', () => ({ reportSilentWarning: reportSilentWarningMock }))
+
 // --- Doble de maplibre-gl con un motor de proyección Mercator REAL --------------
 //
 // A diferencia de otros dobles del repo (p.ej. HomeGlobe.test.tsx), este necesita
@@ -229,6 +240,7 @@ const MIN_FILL_ZOOM = 3.2
 beforeEach(() => {
   mapInstances = []
   markerInstances = []
+  reportSilentWarningMock.mockClear()
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
     width: CONTAINER.width,
     height: CONTAINER.height,
@@ -325,6 +337,98 @@ describe('TripMapGlobe — encuadre inicial no recorta el viaje (#640)', () => {
     expect(zoom).toBeLessThan(15)
     // El suelo nunca queda por encima del zoom usado.
     expect(map.getMinZoom()).toBeLessThanOrEqual(zoom)
+  })
+})
+
+// Guarda de bounds degenerados (issue #964, Sentry LOCATIONGUESSER-9): un punto
+// con lat/lng no finitos, fuera de rango, o el sentinel (0,0) produce un bounds
+// sin sentido — `cameraForBounds` se lo pasa tal cual a maplibre-gl y su helper de
+// cámara del globo revienta leyendo `.center` de un resultado `undefined`.
+// `fitToPins` filtra ANTES de decidir el gesto de cámara (0/1/≥2 puntos), mismo
+// guard compartido (`isValidLatLng`, lib/geo) que `HomeGlobe` (#923).
+describe('TripMapGlobe — guarda de bounds degenerados (#964, Sentry LOCATIONGUESSER-9)', () => {
+  test('0 puntos con coordenada válida: cae al relleno por defecto, sin llamar a cameraForBounds', async () => {
+    const soloInvalidos = [
+      point('nan', NaN, NaN, 'Sin GPS'),
+      point('rango', 200, 400, 'Fuera de rango'),
+      point('sentinel', 0, 0, 'Null island'),
+    ]
+    render(
+      <TripMapGlobe route={soloInvalidos} selectedChallengeId={null} onSelectMoment={() => {}} />,
+    )
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    const map = mapInstances[0]
+    const cameraForBoundsSpy = vi.spyOn(map, 'cameraForBounds')
+    map.fire('load')
+
+    expect(cameraForBoundsSpy).not.toHaveBeenCalled()
+    // Rama "viaje vacío" (#640/#593): suelo de relleno sin restricción de bounds.
+    expect(map.getZoom()).toBeCloseTo(MIN_FILL_ZOOM, 5)
+  })
+
+  test('1 solo punto con coordenada válida (el resto inválidas): easeTo a ESE punto, sin cameraForBounds', async () => {
+    const unaValida = [
+      point('nan', NaN, NaN, 'Sin GPS'),
+      point('pamplona', 42.8169, -1.6432, 'Pamplona'),
+      point('sentinel', 0, 0, 'Null island'),
+    ]
+    render(<TripMapGlobe route={unaValida} selectedChallengeId={null} onSelectMoment={() => {}} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    const map = mapInstances[0]
+    const cameraForBoundsSpy = vi.spyOn(map, 'cameraForBounds')
+    map.fire('load')
+
+    expect(cameraForBoundsSpy).not.toHaveBeenCalled()
+    expect(map.getCenter()).toEqual({ lng: -1.6432, lat: 42.8169 })
+  })
+
+  test('≥2 puntos válidos + uno inválido mezclado: el bounds de cameraForBounds SOLO contiene los válidos', async () => {
+    const mezcla = [
+      point('pamplona', 42.8169, -1.6432, 'Pamplona'),
+      point('nan', NaN, NaN, 'Sin GPS'),
+      point('madrid', 40.4168, -3.7038, 'Madrid'),
+    ]
+    render(<TripMapGlobe route={mezcla} selectedChallengeId={null} onSelectMoment={() => {}} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    const map = mapInstances[0]
+    const cameraForBoundsSpy = vi.spyOn(map, 'cameraForBounds')
+    map.fire('load')
+
+    expect(cameraForBoundsSpy).toHaveBeenCalledTimes(1)
+    const bounds = cameraForBoundsSpy.mock.calls[0][0] as MockLngLatBounds
+    // El punto NaN no puede haber contaminado el min/max: el rango sale exacto al
+    // de Pamplona/Madrid.
+    expect(bounds.sw).toEqual([-3.7038, 40.4168])
+    expect(bounds.ne).toEqual([-1.6432, 42.8169])
+  })
+
+  test('cameraForBounds revienta (proyección globo, Sentry LOCATIONGUESSER-9): no rompe, cae a la cámara actual y avisa en silencio', async () => {
+    const route = [
+      point('pamplona', 42.8169, -1.6432, 'Pamplona'),
+      point('madrid', 40.4168, -3.7038, 'Madrid'),
+    ]
+    render(<TripMapGlobe route={route} selectedChallengeId={null} onSelectMoment={() => {}} />)
+
+    await waitFor(() => expect(mapInstances).toHaveLength(1))
+    const map = mapInstances[0]
+    vi.spyOn(map, 'cameraForBounds').mockImplementation(() => {
+      throw new TypeError("Cannot read properties of undefined (reading 'center')")
+    })
+
+    // El throw ocurre DENTRO del handler `load` (rAF de MapLibre real); si el
+    // componente no lo atrapara, esta llamada lanzaría y tumbaría el test (y, en
+    // producción, el globo entero).
+    expect(() => map.fire('load')).not.toThrow()
+
+    // Cámara intacta: sin `easeTo` para el fit (el catch aborta antes de moverla).
+    expect(map.easeToCalls).toHaveLength(0)
+    expect(reportSilentWarningMock).toHaveBeenCalledWith(
+      expect.stringContaining('cameraForBounds'),
+      expect.objectContaining({ error: expect.stringContaining('center') }),
+    )
   })
 })
 
