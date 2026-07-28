@@ -54,6 +54,7 @@ import { upsertProfile } from '../../lib/profile'
 import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
 import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
+import { useOverlayLayer } from '../../lib/overlayBack'
 import { fmtElapsed, fmtElapsed1 } from '../../lib/time'
 import { track } from '../../lib/analytics'
 import { ChallengeClosedError, describeError, ResourceGoneError } from '../../lib/errors'
@@ -308,6 +309,19 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   useEffect(() => {
     reducedMotionRef.current = reducedMotion
   }, [reducedMotion])
+
+  // Atrás cierra las capas de esta pantalla en vez de salir del reto (issue
+  // #972). Solo las de CIERRE PURO (no las que al cerrarse navegan, como el
+  // pop-up "¿Listo para jugar?", cuyo cierre = salir): el mapa desplegable, la
+  // confirmación de salida, recuperar identidad y el upgrade de cuenta. El
+  // Lightbox de la foto ampliada (`photoExpanded`) se declara SOLO él mismo
+  // (auto-registrado en el propio Lightbox), no aquí, para no duplicar la capa.
+  // `cancelRecover`/los setters van en arrow: se invocan en tiempo de ejecución
+  // (ya definidos), aunque `cancelRecover` se declare más abajo.
+  useOverlayLayer(mapOpen, () => setMapOpen(false))
+  useOverlayLayer(confirmingExit, () => setConfirmingExit(false))
+  useOverlayLayer(recoverOpen, () => cancelRecover())
+  useOverlayLayer(upgradeOpen, () => setUpgradeOpen(false))
   // URL firmada de la foto del reto (bucket privado). Hook al tope del componente
   // —no tras los early-return de carga— para no romper el orden de hooks.
   const photoUrl = useSignedImage(challenge?.image_path ?? null)

@@ -31,7 +31,7 @@ import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { marcadorGroupHash, promoteChallengeHash } from '../../lib/route'
-import { useOverlayBack } from '../../lib/useOverlayBack'
+import { useOverlayLayer } from '../../lib/overlayBack'
 import { useScrollRestore } from '../../lib/useScrollRestore'
 import { gotoProfile } from '../home/navigation'
 import { isMomentPhotoVisible, pairedChallengeByMemoryId, type Moment } from '../../lib/trip'
@@ -1032,15 +1032,25 @@ export function TripPage({
     setSection('diario')
   }, [])
 
-  // Política "atrás cierra la capa de encima" (issue #967): mientras haya
-  // alguna hoja/modal/detalle abierto, el gesto atrás del navegador (o el
-  // swipe-back) lo CIERRA en vez de sacar del viaje. `anyOverlayOpen` refleja
-  // EXACTAMENTE lo que se pinta como capa más abajo (mismos guards: `isOwner`
-  // para ajustes, `isClosed` para el recap) para que el booleano y el cierre no
-  // se desincronicen. Se declara aquí, antes de los early-returns, para que el
-  // hook corra en TODOS los renders (regla de hooks). Excluye a propósito los
-  // recorridos guiados (GuidedTour) y sus remates de registro, y el menú-popover
-  // del FAB "＋" (ya se cierra al tocar fuera): son flujos con su propia lógica.
+  // Política "atrás cierra la capa de encima" (issue #967, ola 3 en #972):
+  // mientras haya alguna hoja/modal/detalle abierto, el gesto atrás del
+  // navegador (o el swipe-back) lo CIERRA en vez de sacar del viaje.
+  // `anyOverlayOpen` refleja EXACTAMENTE lo que se pinta como capa más abajo
+  // (mismos guards: `isOwner` para ajustes, `isClosed` para el recap) para que
+  // el booleano y el cierre no se desincronicen. Se declara aquí, antes de los
+  // early-returns, para que el hook corra en TODOS los renders (regla de hooks).
+  // Excluye a propósito los recorridos guiados (GuidedTour) y sus remates de
+  // registro, y el menú-popover del FAB "＋" (ya se cierra al tocar fuera): son
+  // flujos con su propia lógica.
+  //
+  // Ola 3 (#972): en vez de tocar el historial directamente (`useOverlayBack`),
+  // estas capas se declaran al COORDINADOR global (`useOverlayLayer`). Así se
+  // apilan bien con capas HIJAS que hoy este booleano no ve —un Lightbox de una
+  // galería sobre una hoja (MomentSheet), el detalle de reto, etc.—, que se
+  // registran por su cuenta: el atrás cierra el Lightbox primero y, en el
+  // siguiente, esta capa. El conjunto de capas del viaje sigue siendo mutuamente
+  // excluyente, así que cuenta como UNA capa; `closeTopmostOverlay` cierra la
+  // única abierta.
   const anyOverlayOpen =
     menuOpen ||
     shareOpen ||
@@ -1073,7 +1083,7 @@ export function TripPage({
     else if (menuOpen) setMenuOpen(false)
     else if (editingChallenge != null) setEditingChallenge(null)
   }
-  useOverlayBack(anyOverlayOpen, closeTopmostOverlay)
+  useOverlayLayer(anyOverlayOpen, closeTopmostOverlay)
 
   // Editor de reto a pantalla completa: toma la pantalla mientras está abierto.
   // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa

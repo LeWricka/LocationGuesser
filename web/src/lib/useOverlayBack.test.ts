@@ -96,4 +96,110 @@ describe('useOverlayBack', () => {
 
     expect(pushSpy).toHaveBeenCalledTimes(1)
   })
+
+  // ── Profundidad: capas anidadas (issue #972.2) ──────────────────────────────
+  // Caso real: un Lightbox abierto SOBRE una hoja (MomentSheet). `depth` cuenta
+  // las capas apiladas; cada atrás cierra la de encima y re-empuja la centinela
+  // mientras queden capas por debajo.
+
+  test('con profundidad, el atrás cierra capa a capa y re-empuja mientras queden', () => {
+    const pushSpy = vi.spyOn(window.history, 'pushState')
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    const close = vi.fn()
+
+    // Dos capas abiertas (hoja + lightbox encima).
+    const { rerender } = renderHook(({ depth }) => useOverlayBack(depth, close), {
+      initialProps: { depth: 2 },
+    })
+    // Una sola centinela, aunque haya dos capas.
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+
+    // 1er atrás: cierra la de encima (lightbox). Como aún queda la hoja
+    // (`depth` era 2 en el momento del atrás), RE-EMPUJA la centinela.
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(pushSpy).toHaveBeenCalledTimes(2)
+
+    // El padre baja `depth` a 1 (la capa de encima ya se cerró).
+    rerender({ depth: 1 })
+
+    // 2º atrás: cierra la hoja. Ya no quedan capas → NO re-empuja.
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    expect(close).toHaveBeenCalledTimes(2)
+    expect(pushSpy).toHaveBeenCalledTimes(2)
+
+    // El padre baja `depth` a 0: la capa se cerró por ATRÁS, así que la limpieza
+    // NO debe consumir otra entrada (no hay doble-consumo).
+    rerender({ depth: 0 })
+    expect(backSpy).not.toHaveBeenCalled()
+  })
+
+  test('tras cerrar todo por atrás, un adelante (popstate) ya no cierra nada', () => {
+    // Adelante coherente (#972.3): al cerrarse la última capa el hook deja de
+    // escuchar `popstate`, así que re-navegar a la entrada-fantasma hacia
+    // delante no reabre ni cierra nada (se consume sin efecto visible).
+    const close = vi.fn()
+    const { rerender } = renderHook(({ depth }) => useOverlayBack(depth, close), {
+      initialProps: { depth: 1 },
+    })
+
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    expect(close).toHaveBeenCalledTimes(1)
+
+    // Capa cerrada → sin capas.
+    rerender({ depth: 0 })
+
+    // "Adelante" dispara otro popstate: el listener ya no está, no hay efecto.
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    expect(close).toHaveBeenCalledTimes(1)
+  })
+
+  test('cerrar la capa de arriba por UI a profundidad 2 no roba backs', () => {
+    const pushSpy = vi.spyOn(window.history, 'pushState')
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+    const close = vi.fn()
+
+    const { rerender } = renderHook(({ depth }) => useOverlayBack(depth, close), {
+      initialProps: { depth: 2 },
+    })
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+
+    // El usuario cierra la capa de encima con la ✕ (no con atrás): `depth` baja
+    // a 1 sin cruzar `active`. Ni se empuja otra entrada ni se deshace ninguna.
+    rerender({ depth: 1 })
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+    expect(backSpy).not.toHaveBeenCalled()
+
+    // El atrás siguiente cierra la capa que queda (una sola vez), sin re-empujar.
+    act(() => {
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(pushSpy).toHaveBeenCalledTimes(1)
+
+    rerender({ depth: 0 })
+    expect(backSpy).not.toHaveBeenCalled()
+  })
+
+  test('cerrar todo por UI a profundidad 2 deshace la única entrada una sola vez', () => {
+    const backSpy = vi.spyOn(window.history, 'back').mockImplementation(() => {})
+
+    const { rerender } = renderHook(({ depth }) => useOverlayBack(depth, () => {}), {
+      initialProps: { depth: 2 },
+    })
+
+    // Cierra ambas por UI (lightbox y luego hoja): al llegar a 0 se deshace la
+    // centinela EXACTAMENTE una vez (no una por capa).
+    rerender({ depth: 1 })
+    rerender({ depth: 0 })
+    expect(backSpy).toHaveBeenCalledTimes(1)
+  })
 })

@@ -22,6 +22,7 @@ import { getChallengeOrNullAwaitingMembership } from '../../lib/membership'
 import { deleteMyVote, getExistingVote, getVotesWithNames, submitNumberVote } from '../../lib/votes'
 import type { VoteWithName } from '../../lib/leaderboard'
 import { fmtNumber, signedRelErrorPct } from '../../lib/geo'
+import { useOverlayLayer } from '../../lib/overlayBack'
 import { track } from '../../lib/analytics'
 import { ChallengeClosedError, describeError, ResourceGoneError } from '../../lib/errors'
 import { addBreadcrumb, reportError } from '../../lib/observability'
@@ -118,6 +119,10 @@ export function PlayNumberChallenge({ challengeId, groupId, preloaded }: Props) 
   // Confirmación de "salir mientras juegas" (issue #663): sustituye window.confirm
   // por el modal del UI kit (ver ExitConfirmModal).
   const [confirmingExit, setConfirmingExit] = useState(false)
+  // Atrás cierra la confirmación de salida en vez de salir del reto (issue
+  // #972). El pop-up "¿Listo para jugar?" NO se cablea: su cierre = salir de la
+  // pantalla (navega), no es una capa de cierre puro.
+  useOverlayLayer(confirmingExit, () => setConfirmingExit(false))
 
   const toast = useToast()
   const { user, isAnonymous } = useSession()

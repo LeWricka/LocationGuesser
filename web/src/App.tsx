@@ -51,6 +51,7 @@ import {
 import { EXAMPLE_TRIP_GROUP_ID } from './lib/exampleTrip'
 import { ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
+import { OverlayBackProvider } from './lib/OverlayBackProvider'
 import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
 import { GoogleMapsProvider } from './lib/GoogleMapsProvider'
@@ -120,7 +121,9 @@ function App() {
 
   return (
     <AuthProvider>
-      <AppRoutes />
+      <OverlayBackProvider>
+        <AppRoutes />
+      </OverlayBackProvider>
     </AuthProvider>
   )
 }
