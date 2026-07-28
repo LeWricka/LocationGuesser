@@ -20,6 +20,7 @@ import { signedImageUrl } from '../../lib/storage'
 import { track } from '../../lib/analytics'
 import { useHomeData } from './useHomeData'
 import { useWorldTrips } from './useWorldTrips'
+import { prefetchTripData } from '../trip/useTripData'
 import { HOME_DEMO_PINS } from './homeDemoPins'
 import { gotoChallenge, gotoCreateGroup, gotoGroup, gotoProfile } from './navigation'
 import { NuevoBienvenidaFrame, useOnboarding } from '../onboarding'
@@ -275,6 +276,11 @@ export function HomePage({ active = true }: Props = {}) {
           onOpenProfile={gotoProfile}
           onCreateGroup={onCreateGroup}
           onOpenGroup={gotoGroup}
+          // Precarga de datos del viaje probable (issue #970, ola 2): al
+          // `pointerdown` sobre una tarjeta, adelanta el MISMO fetch que hará
+          // `useTripData` al entrar — si el toque completa la navegación,
+          // `TripPage` pinta con lo ya cargado, sin esqueleto.
+          onPrefetchGroup={(id) => void prefetchTripData(id, user?.id ?? null)}
           onPlayPinned={
             pinned ? () => gotoChallenge(pinned.groupId, pinned.challengeId) : undefined
           }

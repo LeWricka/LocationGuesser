@@ -33,7 +33,12 @@ import { RevealBurst } from './RevealBurst'
 import { remainingSeconds } from './resumeState'
 import { SceneImage } from './SceneImage'
 import { buildChallengeLink, buildResultShareText } from './shareResult'
-import { getAnswer, isPracticeChallenge, type ChallengeForPlay } from '../../lib/challenges'
+import {
+  getAnswer,
+  getPrefetchedChallenge,
+  isPracticeChallenge,
+  type ChallengeForPlay,
+} from '../../lib/challenges'
 import {
   deleteMyVote,
   getExistingVote,
@@ -588,16 +593,24 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
     let cancelled = false
     async function load() {
       try {
-        // Issue #940: `getChallengeOrNullAwaitingMembership` (no `getChallengeOrNull`
-        // a pelo) desambigua la carrera del auto-join de un deep link — un `null`
-        // por RLS (aún no soy miembro) ya no se confunde con un reto de verdad
-        // borrado. Ver docblock en lib/membership.ts.
-        const c = await getChallengeOrNullAwaitingMembership(
-          challengeId,
-          groupId,
-          user?.id,
-          () => cancelled,
-        )
+        // Precarga (issue #970, ola 2): si el usuario tocó la tarjeta/CTA de este
+        // reto hace un instante (pointerdown en TripDiario/Camino), la respuesta
+        // ya está resuelta — nos ahorramos la ida y vuelta de red que sigue.
+        // Solo aplica cuando la precarga sigue FRESCA (`undefined` = no hay nada
+        // o ya caducó): en ese caso caemos al camino de siempre, que además
+        // cubre la carrera del auto-join de un deep link (issue #940) que la
+        // precarga no necesita resolver (se dispara desde DENTRO del viaje,
+        // donde el usuario ya es miembro).
+        const prefetched = getPrefetchedChallenge(challengeId)
+        const c =
+          prefetched !== undefined
+            ? prefetched
+            : await getChallengeOrNullAwaitingMembership(
+                challengeId,
+                groupId,
+                user?.id,
+                () => cancelled,
+              )
         if (cancelled) return
         if (!c) {
           // Esperable (issue #760, LOCATIONGUESSER-Z): el dueño borró el reto

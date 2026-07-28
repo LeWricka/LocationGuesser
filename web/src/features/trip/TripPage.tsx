@@ -32,6 +32,7 @@ import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { marcadorGroupHash, promoteChallengeHash } from '../../lib/route'
 import { useOverlayBack } from '../../lib/useOverlayBack'
+import { useScrollRestore } from '../../lib/useScrollRestore'
 import { gotoProfile } from '../home/navigation'
 import { isMomentPhotoVisible, pairedChallengeByMemoryId, type Moment } from '../../lib/trip'
 import { EXAMPLE_TRIP_GROUP_ID, EXAMPLE_TRIP_SUBTITLE } from '../../lib/exampleTrip'
@@ -179,6 +180,18 @@ export function TripPage({
 
   // Sección activa (diario|marcador). Gobierna el desplazamiento de la pista.
   const [section, setSection] = useState<Section>(initialSection)
+  // Restauración de scroll (issue #970, ola 2): SOLO una sección está montada a
+  // la vez (`.viewport`, más abajo), así que las tres `<section className=
+  // styles.panel>` comparten el MISMO ref — al cambiar de sección o al
+  // remontar `TripPage` entero (volver de un reto: App.tsx NO mantiene viva
+  // esta pantalla, a diferencia de la home, issue #847), `useScrollRestore`
+  // pinta con el `scrollTop` de la última visita a ESA sección de ESE viaje en
+  // vez de arrancar arriba del todo. `.panelBleed` (Diario) no tiene scroll
+  // propio (`overflow: hidden`, el mapa llena la pantalla) — el hook es
+  // inofensivo ahí (leer/escribir `scrollTop` en un contenedor sin overflow es
+  // un no-op), así que no hace falta distinguir secciones aquí.
+  const panelRef = useRef<HTMLElement>(null)
+  useScrollRestore(`${groupId}:${section}`, panelRef)
   // La sección se refleja en la URL (`&v=marcador`/`&v=fotos`) para que
   // REFRESCAR conserve la pestaña: sin esto, F5 en Marcador te devolvía a
   // Diario porque el estado solo vivía en React. `replaceState` a propósito:
@@ -1237,6 +1250,7 @@ export function TripPage({
         {section === 'diario' && (
           <section
             key="diario"
+            ref={panelRef}
             className={`${styles.panel} ${styles.panelBleed} ${reducedMotion ? '' : styles.panelEnter}`}
             role="tabpanel"
             aria-label="Diario"
@@ -1272,12 +1286,14 @@ export function TripPage({
              `onViewMarcador` de `MomentSheet` más abajo. */
           <section
             key="fotos"
+            ref={panelRef}
             className={`${styles.panel} ${styles.panelFotos} ${reducedMotion ? '' : styles.panelEnter}`}
             role="tabpanel"
             aria-label="Bitácora"
           >
             <BitacoraTab
               groupId={groupId}
+              myUserId={user?.id ?? null}
               moments={moments}
               canCreate={canCreate}
               onAddMoment={onAddMoment}
@@ -1301,6 +1317,7 @@ export function TripPage({
              de useTripData (leaderboard ya calculado). */
           <section
             key="marcador"
+            ref={panelRef}
             className={`${styles.panel} ${styles.panelMarcador} ${reducedMotion ? '' : styles.panelEnter}`}
             role="tabpanel"
             aria-label="Marcador"

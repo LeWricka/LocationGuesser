@@ -16,7 +16,7 @@ vi.mock('../../lib/storage', () => ({
   signedImageUrl: (path: string) => Promise.resolve(`signed://${path}`),
 }))
 
-import { BitacoraTab } from './BitacoraTab'
+import { BitacoraTab, __resetBitacoraCacheForTests } from './BitacoraTab'
 
 function moment(over: Partial<Moment> & Pick<Moment, 'challengeId' | 'title'>): Moment {
   return {
@@ -84,6 +84,10 @@ function renderTab(moments: Moment[], overrides: Partial<Parameters<typeof Bitac
 beforeEach(() => {
   vi.clearAllMocks()
   listGroupMomentImagesMock.mockResolvedValue(new Map())
+  // Todos los tests de este fichero comparten groupId="g1" (ver `renderTab`): sin
+  // este reset, la caché de módulo (issue #970, ola 2) filtraría el `grouped` de
+  // un test al siguiente, aunque las fixtures de `moments`/`pastChallenges` cambien.
+  __resetBitacoraCacheForTests()
 })
 
 describe('BitacoraTab — agrupación por día', () => {
@@ -808,5 +812,77 @@ describe('BitacoraTab — cierre con la clasificación (issue #822)', () => {
 
     await user.click(await screen.findByRole('button', { name: /Ver marcador/ }))
     expect(onViewMarcador).toHaveBeenCalled()
+  })
+})
+
+// Issue #970 (ola 2, "volver sin skeletons"): al remontar `TripPage` (volver de
+// un reto, o de Diario/Marcador tras un remonte completo de la pantalla) esta
+// pestaña arrancaba SIEMPRE en `grouped=null` — su propio esqueleto, aunque
+// `moments`/`pastChallenges` fueran los mismos de hace un instante (la
+// referencia del array cambia en cada remonte, aunque el contenido no). La
+// caché de módulo (`bitacoraCache`) sirve el ÚLTIMO resultado bueno de forma
+// SÍNCRONA al re-montar, y revalida en segundo plano igual que siempre.
+describe('BitacoraTab — caché por viaje+usuario (issue #970, ola 2)', () => {
+  test('remontar el MISMO viaje+usuario pinta sin esqueleto, con lo último bueno, y revalida detrás', async () => {
+    const moments = [moment({ challengeId: 'c1', title: 'Primera vez' })]
+    const first = renderTab(moments)
+    await screen.findByRole('heading', { name: 'Primera vez' })
+    first.unmount()
+
+    // El servidor cambió entre visitas (galería extra distinta) — la
+    // revalidación en segundo plano debe reflejarlo, pero el remonte debe
+    // pintar YA con lo cacheado, sin pasar por el esqueleto propio.
+    const nextMoments = [moment({ challengeId: 'c1', title: 'Revalidado' })]
+    const { container } = renderTab(nextMoments)
+
+    // Síncrono: el título de la visita ANTERIOR ya está en pantalla antes de
+    // que la revalidación de fondo resuelva (nunca pasa por el skeleton propio).
+    expect(screen.getByRole('heading', { name: 'Primera vez' })).toBeInTheDocument()
+    expect(container.querySelector('[class*="skeleton" i]')).not.toBeInTheDocument()
+
+    // Stale-while-revalidate: el efecto de fondo trae el dato fresco.
+    await screen.findByRole('heading', { name: 'Revalidado' })
+  })
+
+  test('cambio de usuario (logout/otra cuenta) en el MISMO viaje: cache-miss, nunca hereda la vista de otra identidad', async () => {
+    const moments = [moment({ challengeId: 'c1', title: 'De usuario A' })]
+    const asUserA = render(
+      <BitacoraTab
+        groupId="g1"
+        myUserId="u-a"
+        moments={moments}
+        canCreate
+        onAddMoment={vi.fn()}
+        onOpenMoment={vi.fn()}
+        onOpenChallenge={vi.fn()}
+        pastChallenges={[]}
+        leaderboard={[]}
+        prizes={null}
+        onViewMarcador={vi.fn()}
+      />,
+    )
+    await screen.findByRole('heading', { name: 'De usuario A' })
+    asUserA.unmount()
+
+    const nextMoments = [moment({ challengeId: 'c1', title: 'De usuario B' })]
+    render(
+      <BitacoraTab
+        groupId="g1"
+        myUserId="u-b"
+        moments={nextMoments}
+        canCreate
+        onAddMoment={vi.fn()}
+        onOpenMoment={vi.fn()}
+        onOpenChallenge={vi.fn()}
+        pastChallenges={[]}
+        leaderboard={[]}
+        prizes={null}
+        onViewMarcador={vi.fn()}
+      />,
+    )
+
+    // Usuario DISTINTO en el mismo viaje: NO debe arrancar con la vista de u-a.
+    expect(screen.queryByRole('heading', { name: 'De usuario A' })).not.toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'De usuario B' })
   })
 })

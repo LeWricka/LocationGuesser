@@ -69,6 +69,8 @@ import {
   promoteToChallenge,
   getChallenge,
   getChallengeOrNull,
+  getPrefetchedChallenge,
+  prefetchChallenge,
   getAnswer,
   getNumberAnswer,
   getAnswers,
@@ -542,6 +544,64 @@ describe('getChallengeOrNull', () => {
   test('error real de Supabase (no "sin filas"): sigue propagándolo', async () => {
     results['challenges'] = { data: null, error: new Error('network down') }
     await expect(getChallengeOrNull('c1')).rejects.toThrow('network down')
+  })
+})
+
+// `prefetchChallenge` es fire-and-forget (issue #970, ola 2): no devuelve la
+// promesa interna a propósito (el llamante real, un `onPointerDown`, nunca debe
+// esperarla). Los tests dejan pasar una vuelta de microtareas/macrotarea para
+// que la cadena `.then/.catch/.finally` interna termine de resolver.
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+// Issue #970 (ola 2 — "precarga de UN reto"): `prefetchChallenge` calienta
+// `getChallengeOrNull` en segundo plano; `getPrefetchedChallenge` sirve ese
+// resultado mientras siga FRESCO, para que `PlayChallenge` se ahorre la ida y
+// vuelta de red si el usuario tocó la tarjeta/CTA hace un instante.
+describe('prefetchChallenge / getPrefetchedChallenge', () => {
+  test('sin precarga previa, no hay nada cacheado', () => {
+    expect(getPrefetchedChallenge('c-nunca-precargado')).toBeUndefined()
+  })
+
+  test('tras precargar, sirve el reto resuelto de forma SÍNCRONA', async () => {
+    const { lat: _lat, lng: _lng, ...play } = sampleChallenge
+    void _lat
+    void _lng
+    results['challenges'] = { data: play, error: null }
+
+    prefetchChallenge('c1')
+    await flushPromises()
+
+    expect(getPrefetchedChallenge('c1')).toEqual(play)
+  })
+
+  test('reto borrado (0 filas): la precarga cachea null (resultado válido, no "sin precargar")', async () => {
+    results['challenges'] = { data: null, error: null }
+
+    prefetchChallenge('c-borrado')
+    await flushPromises()
+
+    expect(getPrefetchedChallenge('c-borrado')).toBeNull()
+  })
+
+  test('un fallo de red al precargar no revienta y no deja nada cacheado', async () => {
+    results['challenges'] = { data: null, error: new Error('red caída') }
+
+    expect(() => prefetchChallenge('c-fallo')).not.toThrow()
+    await flushPromises()
+
+    expect(getPrefetchedChallenge('c-fallo')).toBeUndefined()
+  })
+
+  test('viaje de EJEMPLO (ids "ejemplo-reto-*"): nunca precarga contra Supabase', async () => {
+    calls.from.mockClear()
+
+    prefetchChallenge('ejemplo-reto-roma')
+    await flushPromises()
+
+    expect(calls.from).not.toHaveBeenCalled()
+    expect(getPrefetchedChallenge('ejemplo-reto-roma')).toBeUndefined()
   })
 })
 

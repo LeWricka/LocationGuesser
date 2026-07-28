@@ -207,6 +207,116 @@ export function __resetTripDataCacheForTests(): void {
 }
 
 /**
+ * Pide al servidor el snapshot COMPLETO de un viaje (grupo + retos + votos +
+ * respuestas + fotos/audio/vídeo firmados), sin tocar ningún `useState`: es la
+ * misma secuencia de peticiones que antes vivía inline en `refresh()` de abajo,
+ * extraída para poder reutilizarla también desde `prefetchTripData` (issue #970,
+ * ola 2 — precarga de datos del destino probable). Nunca se llama para el viaje
+ * de EJEMPLO (ese groupId centinela se corta antes, en los dos llamantes).
+ */
+async function loadTripSnapshot(groupId: string): Promise<TripDataSnapshot> {
+  const [g, c, v] = await Promise.all([
+    getGroup(groupId),
+    getGroupChallenges(groupId),
+    getGroupVotes(groupId),
+  ])
+
+  const now = new Date()
+  const { past } = splitByStatus(c, now)
+  // Respuestas solo de los cerrados (la RLS no sirve las de activos no jugados).
+  const answers = await getAnswers(past.map((ch) => ch.id))
+
+  // Firmar todas las fotos en lote (patrón GroupPage): una sola tanda.
+  const withImage = c.filter((ch) => ch.image_path)
+  const pairs = await Promise.all(
+    withImage.map(async (ch) => [ch.id, await signedImageUrl(ch.image_path as string)] as const),
+  )
+  const imageUrlById = Object.fromEntries(pairs.filter((p): p is [string, string] => p[1] != null))
+
+  // Firmar las notas de voz en lote, mismo patrón que las fotos (#648).
+  const withAudio = c.filter((ch) => ch.audio_path)
+  const audioPairs = await Promise.all(
+    withAudio.map(async (ch) => [ch.id, await signedImageUrl(ch.audio_path as string)] as const),
+  )
+  const audioUrlById = Object.fromEntries(
+    audioPairs.filter((p): p is [string, string] => p[1] != null),
+  )
+
+  // Vídeo (#649): consulta APARTE, solo sobre los ids de RECUERDO del lote
+  // (nunca un reto — ver el comentario de `videoUrlById` de `TripDataSnapshot`).
+  // Patrón dos-consultas, igual que `listGroupMomentImages`.
+  const recuerdoIds = c.filter((ch) => !ch.is_challenge).map((ch) => ch.id)
+  let videoUrlById: Record<string, string> = {}
+  if (recuerdoIds.length > 0) {
+    const { data: videoRows, error: videoError } = await supabase
+      .from('challenges')
+      .select('id, video_path')
+      .in('id', recuerdoIds)
+      .not('video_path', 'is', null)
+    if (videoError) throw videoError
+    const videoPairs = await Promise.all(
+      (videoRows ?? []).map(
+        async (row) => [row.id, await signedImageUrl(row.video_path as string)] as const,
+      ),
+    )
+    videoUrlById = Object.fromEntries(videoPairs.filter((p): p is [string, string] => p[1] != null))
+  }
+
+  return {
+    group: g,
+    challenges: c,
+    votes: v,
+    answersById: answers,
+    imageUrlById,
+    audioUrlById,
+    videoUrlById,
+  }
+}
+
+// Precargas en VUELO (issue #970): evita que dos toques seguidos sobre la MISMA
+// tarjeta (p.ej. `touchstart` + `pointerdown`, o un doble toque nervioso) disparen
+// dos veces la misma tanda de peticiones mientras la primera sigue en curso.
+const inFlightPrefetches = new Set<string>()
+
+// Ventana de frescura para NO repetir una precarga si ya hay una respuesta
+// reciente en caché (issue #970): tocar dos tarjetas del mismo viaje seguidas, o
+// pasar el dedo por encima sin entrar, no debe machacar la red a cada toque.
+const PREFETCH_FRESH_MS = 15_000
+
+/**
+ * Precarga en segundo plano los datos de UN viaje (issue #970, ola 2: "entrar
+ * es pintado inmediato"). Se dispara desde la home al primer `pointerdown`
+ * sobre la tarjeta de un viaje: si el usuario de verdad entra un instante
+ * después, `useTripData` encuentra la caché ya caliente y arranca sin
+ * esqueleto. Best-effort a propósito (issue #970): el llamante de producción
+ * nunca espera esta promesa (dispara y sigue) y un fallo NUNCA se propaga — si
+ * la precarga no llega a tiempo o falla, la entrada real simplemente carga como
+ * si no hubiera precarga (el camino de siempre). Devuelve una promesa solo para
+ * que los TESTS puedan esperar a que la caché quede escrita antes de aserción;
+ * ningún llamante de producción necesita su valor de resolución (`void`).
+ */
+export async function prefetchTripData(groupId: string, myUserId: string | null): Promise<void> {
+  // Viaje de EJEMPLO: sus datos son un fixture en cliente (`getExampleTripSnapshot`),
+  // nunca pasan por esta caché — no hay nada que precargar contra Supabase.
+  if (groupId === EXAMPLE_TRIP_GROUP_ID) return
+  const cacheKey = tripCacheKey(groupId, myUserId)
+  if (inFlightPrefetches.has(cacheKey)) return
+  const cached = tripDataCache.get(cacheKey)
+  if (cached && Date.now() - cached.resolvedAt < PREFETCH_FRESH_MS) return
+
+  inFlightPrefetches.add(cacheKey)
+  try {
+    const snapshot = await loadTripSnapshot(groupId)
+    tripDataCache.set(cacheKey, { snapshot, resolvedAt: Date.now() })
+  } catch {
+    // Best-effort: si falla, la carga real (al entrar de verdad) reintenta por
+    // su cuenta con el camino de siempre — no hay nada que propagar aquí.
+  } finally {
+    inFlightPrefetches.delete(cacheKey)
+  }
+}
+
+/**
  * Orquesta los datos del viaje (grupo + momentos + ruta) reusando la misma capa
  * de datos que `GroupPage`: una sola carga conjunta y una derivación pura encima.
  *
@@ -296,6 +406,15 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
   // Carga conjunta (grupo + retos + votos), reutilizable en el montaje y en cada
   // evento de Realtime. Tras tenerlos, resuelve respuestas e imágenes (asíncrono,
   // así que el setState nunca corre síncrono en el cuerpo de un efecto).
+  //
+  // DELIBERADAMENTE progresiva, NO delega en `loadTripSnapshot` (issue #970):
+  // cada pieza actualiza su PROPIO estado en cuanto resuelve, así que si algo
+  // de más abajo falla (p.ej. la consulta de vídeo, o firmar una foto) las
+  // piezas YA resueltas (grupo/retos/votos/respuestas) se quedan pintadas —
+  // solo `error` avisa de que algo quedó a medias. `loadTripSnapshot` (que SÍ
+  // usa `prefetchTripData`) es ATÓMICA a propósito: una precarga con un fallo
+  // parcial no debe cachear un snapshot incompleto, pero esta ruta (la que ve
+  // el usuario en vivo) no debe perder datos ya buenos por un fallo posterior.
   const refresh = useCallback(async () => {
     // Viaje de ejemplo: los 7 datos ya están sembrados en memoria (ver los
     // `useState` de arriba) — solo lectura, nunca pega a Supabase. Este `return`
@@ -344,8 +463,8 @@ export function useTripData(groupId: string, myUserId: string | null): TripData 
       setAudioUrlById(audioUrlByIdNext)
 
       // Vídeo (#649): consulta APARTE, solo sobre los ids de RECUERDO del lote
-      // (nunca un reto — ver el comentario de `videoUrlById` de arriba). Patrón
-      // dos-consultas, igual que `listGroupMomentImages`: `challenges` no se
+      // (nunca un reto — ver el comentario de `videoUrlById` de `TripDataSnapshot`).
+      // Patrón dos-consultas, igual que `listGroupMomentImages`: `challenges` no se
       // puede filtrar por columna revocada/excluida en el mismo select que ya
       // trajo `c`, así que se pide de nuevo, mínima (dos columnas).
       const recuerdoIds = c.filter((ch) => !ch.is_challenge).map((ch) => ch.id)

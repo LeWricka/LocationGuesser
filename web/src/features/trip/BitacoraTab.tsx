@@ -30,6 +30,10 @@ import styles from './BitacoraTab.module.css'
 
 interface Props {
   groupId: string
+  /** userId de la sesión actual, o null/undefined sin sesión (anónimo/ejemplo).
+   * Solo gobierna la CLAVE de la caché de módulo (issue #970, ola 2): un cambio
+   * de cuenta en el mismo navegador nunca debe heredar la vista de otra. */
+  myUserId?: string | null
   /** Momentos del viaje en orden cronológico ASC — el mismo dato que ya carga
    * `useTripData` para el Diario: no se vuelve a pedir el grupo/los retos aquí. */
   moments: Moment[]
@@ -101,6 +105,37 @@ function retoInfoFor(challenge: Moment, pastChallenges: PastChallengeSummary[]):
 // `Promise.all` compartido, antes de repartir el resultado de vuelta.
 type PendingPhoto = { kind: 'ready'; src: string } | { kind: 'sign'; path: string }
 
+// Caché a nivel de módulo (issue #970, ola 2 — mismo patrón que `tripDataCache`
+// de `useTripData.ts`): sin ella, CADA montaje de esta pestaña (incluida la
+// vuelta desde Diario/Marcador, o desde un reto jugado) arrancaba en
+// `grouped=null` y pintaba su PROPIO esqueleto — aunque `moments`/`pastChallenges`
+// fueran, con toda seguridad, los mismos de hace un instante (su referencia
+// SIEMPRE cambia al remontar `TripPage` entero, aunque el contenido no). Con la
+// caché, si ya hay un resultado previo para este viaje+usuario, el estado
+// arranca YA agrupado (sin esqueleto) y el efecto de abajo revalida en segundo
+// plano igual que siempre (stale-while-revalidate).
+//
+// Clave POR USUARIO además de por viaje (igual que `tripDataCache`): el
+// anti-spoiler (`isMomentPhotoVisible`, `isOwn`) depende de la sesión, así que
+// un cambio de cuenta en el mismo navegador debe ser SIEMPRE un cache-miss, no
+// heredar la vista fusionada de otra identidad.
+const bitacoraCache = new Map<string, BitacoraGrouped>()
+
+function bitacoraCacheKey(groupId: string, myUserId: string | null | undefined): string {
+  return `${groupId}:${myUserId ?? 'anon'}`
+}
+
+/**
+ * SOLO para tests: vacía la caché de módulo entre casos que reutilizan el mismo
+ * `groupId` con fixtures distintas (`BitacoraTab.test.tsx`, que no puede
+ * mockear este propio módulo sin perder la implementación real). Nunca se
+ * llama desde código de producción.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- re-export de una función de test junto al componente, mismo criterio que ChallengeBoard.tsx/AddMoment.tsx.
+export function __resetBitacoraCacheForTests(): void {
+  bitacoraCache.clear()
+}
+
 /**
  * Pestaña BITÁCORA del viaje (antes "Fotos" — issue #645; el diario que se
  * hojea, esta issue): TODOS los momentos visibles, agrupados por día y en
@@ -153,6 +188,7 @@ type PendingPhoto = { kind: 'ready'; src: string } | { kind: 'sign'; path: strin
  */
 export function BitacoraTab({
   groupId,
+  myUserId,
   moments,
   canCreate,
   onAddMoment,
@@ -164,8 +200,12 @@ export function BitacoraTab({
   onViewMarcador,
   firstDayRef,
 }: Props) {
-  // null = cargando.
-  const [grouped, setGrouped] = useState<BitacoraGrouped | null>(null)
+  const cacheKey = bitacoraCacheKey(groupId, myUserId)
+  // null = cargando (sin nada en caché todavía); con caché previa, arranca YA
+  // agrupado (issue #970, ola 2 — ver `bitacoraCache` arriba).
+  const [grouped, setGrouped] = useState<BitacoraGrouped | null>(
+    () => bitacoraCache.get(cacheKey) ?? null,
+  )
   const [lightboxAt, setLightboxAt] = useState<number | null>(null)
   // Resumen de la liga (issue #849, punto 3): cerrados = con resultado ya
   // resuelto (los EN JUEGO todavía no cuentan como "jugados" del todo). Se
@@ -254,10 +294,20 @@ export function BitacoraTab({
         // Un momento sin fotos (nunca tuvo ninguna, o todas fallaron al firmar)
         // YA no se descarta (issue #910): pinta su propia tarjeta de solo texto
         // más abajo (ver `.momentTextOnly`) — nunca vuelve a quedar invisible.
-        if (!cancelled) setGrouped(groupMomentsByDay(inputs))
+        const result = groupMomentsByDay(inputs)
+        if (!cancelled) {
+          setGrouped(result)
+          // Última agrupación buena → caché del módulo (stale-while-revalidate,
+          // issue #970): la próxima vez que se monte esta pestaña para este
+          // mismo viaje+usuario, arranca con esto en vez del esqueleto propio.
+          bitacoraCache.set(cacheKey, result)
+        }
       } catch (err) {
         reportError(err, { area: 'bitacora_tab_load' })
-        if (!cancelled) setGrouped({ days: [], flatPhotos: [] })
+        // Un fallo NO pisa una caché previa buena (issue #970): mejor mostrar lo
+        // último que funcionó (revalidará en el próximo montaje/realtime) que
+        // vaciar la Bitácora entera por un error transitorio de red.
+        if (!cancelled) setGrouped((prev) => prev ?? { days: [], flatPhotos: [] })
       }
     }
 
@@ -265,7 +315,7 @@ export function BitacoraTab({
     return () => {
       cancelled = true
     }
-  }, [groupId, moments, pastChallenges])
+  }, [groupId, moments, pastChallenges, cacheKey])
 
   const days = grouped?.days ?? []
   const flatPhotos = grouped?.flatPhotos ?? []

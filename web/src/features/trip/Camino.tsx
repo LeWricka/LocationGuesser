@@ -3,6 +3,7 @@ import type { CSSProperties, RefObject } from 'react'
 import { AlertTriangle, ChevronRight, Compass, Trophy } from 'lucide-react'
 import { Avatar, Badge, ChallengePhoto, Icon, useReducedMotion } from '../../ui'
 import { formatDeadline } from '../../lib/time'
+import { prefetchChallenge } from '../../lib/challenges'
 import type { PastChallengeSummary } from './useTripData'
 import styles from './Camino.module.css'
 
@@ -115,6 +116,11 @@ function Hito({ challenge: c, index, onPlayChallenge, onViewChallenge, hitoRef }
         onClick={() =>
           antiSpoiler ? onPlayChallenge(c.challengeId) : onViewChallenge(c.challengeId)
         }
+        // Precarga (issue #970, ola 2): solo el destino PROBABLE — un hito que va
+        // a JUGAR (antiSpoiler), nunca el que abre el detalle (`onViewChallenge`,
+        // que no pasa por `PlayChallenge`). Dispara en `pointerdown` (antes de
+        // que el toque complete la navegación real), best-effort y en silencio.
+        onPointerDown={antiSpoiler ? () => prefetchChallenge(c.challengeId) : undefined}
       >
         <ChallengePhoto
           src={c.imageUrl}
