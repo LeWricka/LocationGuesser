@@ -24,11 +24,24 @@ export function withViewTransition(update: () => void): void {
   const prefersReduced =
     typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
 
-  if (prefersReduced || typeof document.startViewTransition !== 'function') {
+  // Pestaña oculta (`document.hidden`): no hay nada que animar y
+  // `startViewTransition` se aborta al no poder tomar la "foto" del ANTES —
+  // dejaba un rechazo de promesa sin capturar (breadcrumb "-15" recurrente en
+  // Sentry). Aplicamos el cambio directo, sin transición.
+  if (
+    prefersReduced ||
+    typeof document.startViewTransition !== 'function' ||
+    (typeof document !== 'undefined' && document.hidden)
+  ) {
     update()
     return
   }
-  document.startViewTransition(() => flushSync(update))
+  const transition = document.startViewTransition(() => flushSync(update))
+  // Traga el rechazo si la transición se ABORTA (la pestaña se oculta a mitad, o
+  // llega otra navegación que la reemplaza al pulsar rápido): el cambio de DOM
+  // ya se aplicó vía `flushSync`, solo se descarta la animación. Sin este
+  // `catch`, ese abort viaja como "unhandled rejection" a la consola/Sentry.
+  transition.finished?.catch(() => {})
 }
 
 /**
