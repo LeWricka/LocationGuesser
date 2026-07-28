@@ -21,6 +21,7 @@ import { getExistingVote } from '../../lib/votes'
 import type { Vote } from '../../lib/database.types'
 import { parseMomentDate } from '../../lib/time'
 import { lockBodyScroll } from '../../lib/scrollLock'
+import { useOverlayLayer } from '../../lib/overlayBack'
 import { uploadAudio } from '../../lib/storage'
 import { track } from '../../lib/analytics'
 import { reportError } from '../../lib/observability'
@@ -261,6 +262,15 @@ export function MomentSheet({
   // ── Borrar el momento (recuerdo o reto) con confirmación ────────────────────
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  // El modal de confirmación de borrado es una capa ANIDADA sobre la hoja (issue
+  // #972): se declara al coordinador para que el atrás lo cierre primero, sin
+  // llevarse la hoja por delante. Mientras se borra (`deleting`) el modal no es
+  // descartable (igual que su ✕/Escape, ver el <Modal> de abajo): el atrás no
+  // hace nada hasta que termine.
+  useOverlayLayer(confirmingDelete, () => {
+    if (!deleting) setConfirmingDelete(false)
+  })
 
   // "Convertir en reto" ya no vive aquí (issue #723): el botón solo NAVEGA
   // (`onPromote`) al asistente completo de crear reto en modo promoción. El

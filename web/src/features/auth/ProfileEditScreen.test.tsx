@@ -1,7 +1,9 @@
+import { act } from 'react'
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Profile } from '../../lib/database.types'
+import { OverlayBackProvider } from '../../lib/OverlayBackProvider'
 
 // Issue #596: ProfileEditScreen migró de AuthScreen (tarjeta centrada) a
 // ShellUtilitario + AppHeader (patrón CreateGroup post-#494). Este test cubre el
@@ -17,6 +19,8 @@ vi.mock('../../lib/analytics', () => ({ track: (...args: unknown[]) => trackMock
 const upsertProfileMock = vi.fn()
 vi.mock('../../lib/profile', () => ({
   upsertProfile: (...args: unknown[]) => upsertProfileMock(...args),
+  // Lo usa `useOnboarding` al marcar un tutorial como visto (`closeTutorial`).
+  persistOnboardingSeen: (...args: unknown[]) => Promise.resolve(args),
 }))
 
 const signOutMock = vi.fn()
@@ -108,5 +112,31 @@ describe('ProfileEditScreen — markup ShellUtilitario + AppHeader (#596)', () =
     expect(upsertProfileMock).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'u-me', displayName: 'Nuevo nombre' }),
     )
+  })
+
+  // Cableado a "atrás cierra la capa" (issue #972): con el slideshow del
+  // tutorial abierto, el gesto atrás del navegador lo cierra en vez de sacar del
+  // perfil.
+  test('el atrás del navegador cierra el tutorial sin salir del perfil', async () => {
+    const user = userEvent.setup()
+    render(
+      <OverlayBackProvider>
+        <ToastProvider>
+          <ProfileEditScreen userId="u-me" profile={profile} onSaved={vi.fn()} onBack={vi.fn()} />
+        </ToastProvider>
+      </OverlayBackProvider>,
+    )
+
+    await user.click(screen.getByRole('button', { name: /Empezar un viaje/ }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    // Atrás del navegador (mismo popstate que el swipe-back).
+    act(() => {
+      window.history.back()
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    // La pantalla del perfil sigue ahí (no nos ha sacado).
+    expect(screen.getByLabelText('Tu nombre')).toBeInTheDocument()
   })
 })

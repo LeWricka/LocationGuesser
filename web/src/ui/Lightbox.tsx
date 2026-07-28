@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { Icon } from './Icon'
+import { useOverlayLayer } from '../lib/overlayBack'
 import styles from './Lightbox.module.css'
 
 /** Una imagen del visor: URL + texto alternativo. */
@@ -95,6 +96,14 @@ export function Lightbox({
     setZoomed(false)
     onClose()
   }, [onClose])
+
+  // Atrás cierra el visor antes de salir de la pantalla (issue #972). Un
+  // Lightbox SIEMPRE es una capa de cierre puro (nunca navega al cerrarse), y
+  // suele abrirse ENCIMA de otra capa (una hoja o un detalle): al declararlo al
+  // coordinador global, el atrás lo cierra primero y, en el siguiente, la capa
+  // de debajo — capa a capa. Cablearlo aquí lo cubre en todas sus superficies
+  // (galerías del viaje, detalle de reto, escena de juego) de una vez.
+  useOverlayLayer(open, close)
 
   // Navegación cíclica entre imágenes. Cambiar de foto resetea el zoom para que
   // la siguiente empiece ajustada al viewport.

@@ -1,7 +1,9 @@
+import { act } from 'react'
 import { describe, test, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Lightbox } from './Lightbox'
+import { OverlayBackProvider } from '../lib/OverlayBackProvider'
 
 describe('Lightbox', () => {
   test('no renderiza nada cuando está cerrado', () => {
@@ -30,6 +32,25 @@ describe('Lightbox', () => {
     const user = userEvent.setup()
     render(<Lightbox open src="/f.jpg" onClose={onClose} />)
     await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  // El Lightbox se declara al coordinador global (issue #972): bajo un
+  // OverlayBackProvider, el atrás del navegador lo cierra igual que ✕/Escape.
+  // Así queda cubierta la capa en TODAS sus superficies (galerías, detalle,
+  // escena de juego), incluida cuando se abre ENCIMA de otra capa.
+  test('con OverlayBackProvider, el atrás del navegador llama a onClose', () => {
+    window.history.replaceState(null, '', window.location.href)
+    const onClose = vi.fn()
+    render(
+      <OverlayBackProvider>
+        <Lightbox open src="/f.jpg" onClose={onClose} />
+      </OverlayBackProvider>,
+    )
+    act(() => {
+      window.history.back()
+      window.dispatchEvent(new PopStateEvent('popstate'))
+    })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 

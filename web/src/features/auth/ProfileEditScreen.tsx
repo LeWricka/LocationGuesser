@@ -14,6 +14,7 @@ import { Check, ChevronRight, Compass, MapPinned, Plus, UserPlus, Wrench } from 
 import { AppHeader, Avatar, Button, Field, Icon, Input, Stack, useToast } from '../../ui'
 import { ShellUtilitario } from '../../ui/shells'
 import { upsertProfile } from '../../lib/profile'
+import { useOverlayLayer } from '../../lib/overlayBack'
 import { signOut } from '../../lib/auth'
 import { exampleTripHash } from '../../lib/route'
 import { PushNotificationsControl } from './PushNotificationsControl'
@@ -76,6 +77,10 @@ export function ProfileEditScreen({ userId, profile, onSaved, onBack, onOpenAdmi
     if (openTutorial) TUTORIAL_GATE[openTutorial].markSeen()
     setOpenTutorial(null)
   }
+  // El slideshow del tutorial es una capa sobre esta pantalla (cierra con
+  // ✕/scrim/Escape): el atrás del navegador debe cerrarlo también, sin sacar
+  // del perfil (issue #972).
+  useOverlayLayer(openTutorial != null, closeTutorial)
 
   // Emoji actualmente seleccionado (para marcarlo en el grid). Si el perfil aún
   // no tiene animal explícito, se resalta el animal por defecto del id.
