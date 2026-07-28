@@ -115,7 +115,7 @@ function App() {
     // jugar, crear) — así la primera navegación a ellas no paga el fetch entero
     // a pelo. No compite con el primer render (requestIdleCallback) ni con datos
     // que sí bloquean contenido.
-    prefetchMainRoutes()
+    return prefetchMainRoutes()
   }, [])
 
   return (
