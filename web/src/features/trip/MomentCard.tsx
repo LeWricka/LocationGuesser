@@ -12,6 +12,12 @@ interface Props {
   onExpand: () => void
   /** Solo en momentos en juego: lanza el flujo de adivinar. */
   onPlay?: () => void
+  /**
+   * Precarga (issue #970, ola 2): se dispara en `pointerdown` sobre "Adivina →",
+   * ANTES de que el toque complete la navegación real — best-effort, en
+   * silencio. Mismo id que `onPlay` (el reto asociado real, ver `TripDiario`).
+   */
+  onPlayPointerDown?: () => void
 }
 
 // Fecha compacta del momento ("8 abr"). Sin año: el viaje suele caber en uno y la
@@ -67,7 +73,7 @@ function formatMomentDate(value: string): string | null {
  * chip/CTA de estado del reto, así que esta tarjeta no necesita saber de la
  * asociación en absoluto.
  */
-export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
+export function MomentCard({ moment, selected, onExpand, onPlay, onPlayPointerDown }: Props) {
   const isActive = moment.status === 'active'
   // Lleva capa de reto (en juego, cerrado o práctica) → chip "🎯 Reto". Un recuerdo
   // puro no lo lleva: la tarjeta lee como contenido, no como juego.
@@ -188,7 +194,7 @@ export function MomentCard({ moment, selected, onExpand, onPlay }: Props) {
           {/* CTA cálido SOLO si está en juego Y no es mío. */}
           {isActive && !moment.isOwn && onPlay && (
             <div className={styles.ctaSlot}>
-              <Button size="sm" onClick={onPlay}>
+              <Button size="sm" onClick={onPlay} onPointerDown={onPlayPointerDown}>
                 Adivina →
               </Button>
             </div>

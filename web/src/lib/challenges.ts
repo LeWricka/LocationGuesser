@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { EXAMPLE_TRIP_GROUP_ID } from './exampleTrip'
 import type { Challenge, Database } from './database.types'
 import {
   DEFAULT_NUMBER_TOLERANCE,
@@ -480,6 +481,69 @@ export async function getChallengeOrNull(id: string): Promise<ChallengeForPlay |
     .maybeSingle<ChallengeForPlay>()
   if (error) throw error
   return data
+}
+
+// Precarga de UN reto (issue #970, ola 2 — "sensación de instantáneo"): guarda el
+// ÚLTIMO resultado de `getChallengeOrNull` por challengeId durante una ventana
+// corta, para que `PlayChallenge` lo sirva sin esperar la red si el usuario lo
+// tocó hace un instante (`pointerdown` sobre "Adivina →" o un hito de "El
+// camino"). TTL corto A PROPÓSITO — NO es una caché del "estado del reto": un
+// reto EN JUEGO puede sumar votos o cerrar en segundos, así que esto solo cubre
+// la ventana entre el toque y el montaje real de la pantalla. El resto de la
+// carga de `PlayChallenge` (votos, respuesta si ya jugué, miembros…) sigue
+// pidiéndose siempre a la red, sin caché.
+interface ChallengePrefetchEntry {
+  challenge: ChallengeForPlay | null
+  resolvedAt: number
+}
+const challengePrefetchCache = new Map<string, ChallengePrefetchEntry>()
+const CHALLENGE_PREFETCH_TTL_MS = 10_000
+
+/**
+ * Lee la precarga de un reto si sigue FRESCA (dentro del TTL); `undefined` si no
+ * hay nada cacheado o ya caducó — en ese caso el llamante debe pedirlo a la red
+ * como siempre. Un valor `null` sigue siendo un resultado VÁLIDO y fresco: el
+ * reto ya no existe (borrado tras compartir el enlace, issue #760).
+ */
+export function getPrefetchedChallenge(id: string): ChallengeForPlay | null | undefined {
+  const cached = challengePrefetchCache.get(id)
+  if (!cached || Date.now() - cached.resolvedAt > CHALLENGE_PREFETCH_TTL_MS) return undefined
+  return cached.challenge
+}
+
+// Precargas en VUELO (issue #970): un mismo toque puede disparar `pointerdown` y
+// `touchstart` casi a la vez — sin esta guarda, dispararían dos peticiones
+// idénticas por el mismo reto.
+const pendingChallengePrefetches = new Set<string>()
+
+/**
+ * Precarga en segundo plano UN reto (issue #970): se dispara al `pointerdown`
+ * sobre su CTA de jugar, antes de que el toque termine de navegar de verdad —
+ * si el usuario entra un instante después, `PlayChallenge` encuentra la
+ * respuesta ya resuelta. Best-effort a propósito: nunca bloquea la interacción
+ * (no se espera su promesa) y falla en silencio; si no llega a tiempo o falla,
+ * la pantalla real simplemente carga como si no hubiera precarga.
+ */
+export function prefetchChallenge(id: string): void {
+  // Viaje de EJEMPLO (onboarding nuevo, pieza 4/4): sus retos son un fixture en
+  // cliente (ids `ejemplo-reto-*`, ver `lib/exampleTrip.ts`) que nunca existen
+  // en Supabase — precargarlos solo gastaría una petición condenada a fallar
+  // (capturada en silencio, pero inútil). El propio `onPlayChallenge` de ese
+  // viaje ya intercepta el toque real con un aviso ("aquí no se juega de
+  // verdad"), así que esta precarga tampoco tiene destino al que servir.
+  if (id.startsWith(`${EXAMPLE_TRIP_GROUP_ID}-`)) return
+  if (pendingChallengePrefetches.has(id)) return
+  pendingChallengePrefetches.add(id)
+  void getChallengeOrNull(id)
+    .then((challenge) => {
+      challengePrefetchCache.set(id, { challenge, resolvedAt: Date.now() })
+    })
+    .catch(() => {
+      // Best-effort: el intento real (al entrar de verdad) reintenta por su cuenta.
+    })
+    .finally(() => {
+      pendingChallengePrefetches.delete(id)
+    })
 }
 
 /**

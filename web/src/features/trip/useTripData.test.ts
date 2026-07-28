@@ -76,7 +76,15 @@ vi.mock('../../lib/supabase', () => ({
   },
 }))
 
-import { useTripData, __resetTripDataCacheForTests } from './useTripData'
+// `signedImageUrl` (lib/storage) pega a `supabase.storage`, que el stub de
+// arriba no implementa — sin este mock, cualquier fixture con `image_path`
+// (fotos/notas de voz) tumbaba `loadTripSnapshot` entero con un TypeError real,
+// mismo patrón que `BitacoraTab.test.tsx`/`MomentGallery.test.tsx`.
+vi.mock('../../lib/storage', () => ({
+  signedImageUrl: (path: string) => Promise.resolve(`signed://${path}`),
+}))
+
+import { useTripData, prefetchTripData, __resetTripDataCacheForTests } from './useTripData'
 
 function activeChallenge(overrides: Partial<ChallengeForPlay>): ChallengeForPlay {
   return {
@@ -586,6 +594,49 @@ describe('useTripData — caché por viaje+usuario (issue "entrada al viaje sin 
 
     await waitFor(() =>
       expect(asUserB.result.current.moments.map((m) => m.title)).toEqual(['De u-b']),
+    )
+  })
+})
+
+// Issue #970 (ola 2 — "precarga de datos del destino probable"): la home
+// dispara `prefetchTripData` al `pointerdown` sobre la tarjeta de un viaje,
+// ANTES de que el usuario complete la navegación real. Si acierta, `useTripData`
+// debe encontrar la caché ya caliente y arrancar SIN esqueleto.
+describe('useTripData — prefetchTripData (issue #970, ola 2)', () => {
+  test('tras precargar, montar el hook para el MISMO viaje+usuario arranca sin esqueleto', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1', title: 'Precargado' })])
+
+    await prefetchTripData('g-prefetch-hit', 'u-cache')
+
+    const { result } = renderHook(() => useTripData('g-prefetch-hit', 'u-cache'))
+    // Síncrono: la precarga ya dejó la caché caliente antes del montaje.
+    expect(result.current.loading).toBe(false)
+    expect(result.current.moments.map((m) => m.title)).toEqual(['Precargado'])
+  })
+
+  test('sin precarga previa, montar el hook sigue arrancando con el esqueleto de siempre', async () => {
+    getGroupChallengesMock.mockResolvedValue([closedChallenge({ id: 'c1' })])
+
+    const { result } = renderHook(() => useTripData('g-prefetch-cold', 'u-cache'))
+    expect(result.current.loading).toBe(true)
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+  })
+
+  test('un fallo de red al precargar no revienta: la carga real, al entrar de verdad, sigue funcionando', async () => {
+    getGroupChallengesMock.mockRejectedValueOnce(new Error('red caída'))
+
+    // Best-effort: la promesa de prefetchTripData nunca rechaza para el llamante.
+    await expect(prefetchTripData('g-prefetch-fail', 'u-cache')).resolves.toBeUndefined()
+
+    getGroupChallengesMock.mockResolvedValue([
+      closedChallenge({ id: 'c1', title: 'Tras el fallo' }),
+    ])
+    const { result } = renderHook(() => useTripData('g-prefetch-fail', 'u-cache'))
+    // Sin caché (el fallo no dejó nada escrito): el esqueleto de siempre.
+    expect(result.current.loading).toBe(true)
+    await waitFor(() =>
+      expect(result.current.moments.map((m) => m.title)).toEqual(['Tras el fallo']),
     )
   })
 })

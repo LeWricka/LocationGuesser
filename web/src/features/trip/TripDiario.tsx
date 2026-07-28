@@ -1,6 +1,7 @@
 import { forwardRef, useMemo, type RefObject } from 'react'
 import { Map as MapIcon, Share2 } from 'lucide-react'
 import { Button, EmptyState, Icon } from '../../ui'
+import { prefetchChallenge } from '../../lib/challenges'
 import {
   fuseMemoryWithChallenge,
   pairedChallengeByMemoryId,
@@ -172,6 +173,18 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
                     m.status === 'active' && !m.isOwn
                       ? () =>
                           onPlay(pairedByMemoryId.get(m.challengeId)?.challengeId ?? m.challengeId)
+                      : undefined
+                  }
+                  // Precarga (issue #970, ola 2): mismo id resuelto que `onPlay`
+                  // (el reto asociado real en una tarjeta fusionada), disparada
+                  // en `pointerdown` — antes de que el toque complete la
+                  // navegación a jugar de verdad.
+                  onPlayPointerDown={
+                    m.status === 'active' && !m.isOwn
+                      ? () =>
+                          prefetchChallenge(
+                            pairedByMemoryId.get(m.challengeId)?.challengeId ?? m.challengeId,
+                          )
                       : undefined
                   }
                 />

@@ -176,6 +176,14 @@ interface Props {
   onOpenProfile?: () => void
   onCreateGroup?: () => void
   onOpenGroup?: (id: string) => void
+  /**
+   * Precarga de DATOS del viaje probable (issue #970, ola 2): se dispara en
+   * `pointerdown` sobre la tarjeta de un viaje, ANTES de que el toque complete
+   * la navegación real — si el usuario entra un instante después, `TripPage`
+   * pinta con lo ya cargado, sin esqueleto. Best-effort y en silencio (lo
+   * resuelve `prefetchTripData`); opcional, sin efecto si no se pasa.
+   */
+  onPrefetchGroup?: (id: string) => void
   /** Jugar el reto fijado (lo cablea HomePage a #g=<id>&c=<challengeId>). */
   onPlayPinned?: () => void
   /**
@@ -217,6 +225,7 @@ export function HomeDashboard({
   onOpenProfile,
   onCreateGroup,
   onOpenGroup,
+  onPrefetchGroup,
   onPlayPinned,
   onCoverError,
   active = true,
@@ -465,6 +474,7 @@ export function HomeDashboard({
                   active={group.id === activeId}
                   onFocus={() => setActiveId(group.id)}
                   onClick={onOpenGroup ? () => onOpenGroup(group.id) : undefined}
+                  onPointerDown={onPrefetchGroup ? () => onPrefetchGroup(group.id) : undefined}
                   onCoverError={onCoverError}
                 />
               </li>
@@ -565,12 +575,15 @@ function TripCard({
   active,
   onClick,
   onFocus,
+  onPointerDown,
   onCoverError,
 }: {
   group: HomeGroup
   active: boolean
   onClick?: () => void
   onFocus?: () => void
+  /** Ver `Props.onPrefetchGroup` (issue #970, ola 2). */
+  onPointerDown?: () => void
   /** Ver `Props.onCoverError` (issue #638). */
   onCoverError?: () => void
 }) {
@@ -600,6 +613,7 @@ function TripCard({
       data-owned={group.owned ? 'true' : undefined}
       onClick={onClick}
       onFocus={onFocus}
+      onPointerDown={onPointerDown}
       disabled={!isButton}
       aria-label={`Abrir viaje ${group.name}`}
     >
