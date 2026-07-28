@@ -947,7 +947,7 @@ test('con el lienzo a tamaño 0 (oculto/recién revelado) NO se llama a fitBound
 // lat/lng no finitos, fuera de rango, o el sentinel (0,0) produce un bounds sin
 // sentido — `fitBounds` se lo pasa a maplibre-gl y su helper de cámara del globo
 // revienta leyendo `.center` de un resultado `undefined`. `frameRoute` filtra ANTES
-// de decidir el gesto de cámara (ver `hasValidGlobeCoord`).
+// de decidir el gesto de cámara (ver `isValidLatLng` en lib/geo).
 describe('HomeGlobe — guarda de bounds degenerados (#923, Sentry LOCATIONGUESSER-9)', () => {
   test('0 pines con coordenada válida: NO se llama fitBounds ni easeTo (cámara intacta)', async () => {
     const soloInvalidos: GlobePin[] = [
