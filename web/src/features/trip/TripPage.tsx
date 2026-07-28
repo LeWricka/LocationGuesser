@@ -31,6 +31,7 @@ import { getGroupMembers, isMember, myGroups } from '../../lib/membership'
 import { getChallenge, type ChallengeForPlay } from '../../lib/challenges'
 import { tripShareUrl } from '../../lib/shareLinks'
 import { marcadorGroupHash, promoteChallengeHash } from '../../lib/route'
+import { useOverlayBack } from '../../lib/useOverlayBack'
 import { gotoProfile } from '../home/navigation'
 import { isMomentPhotoVisible, pairedChallengeByMemoryId, type Moment } from '../../lib/trip'
 import { EXAMPLE_TRIP_GROUP_ID, EXAMPLE_TRIP_SUBTITLE } from '../../lib/exampleTrip'
@@ -1017,6 +1018,49 @@ export function TripPage({
     }
     setSection('diario')
   }, [])
+
+  // Política "atrás cierra la capa de encima" (issue #967): mientras haya
+  // alguna hoja/modal/detalle abierto, el gesto atrás del navegador (o el
+  // swipe-back) lo CIERRA en vez de sacar del viaje. `anyOverlayOpen` refleja
+  // EXACTAMENTE lo que se pinta como capa más abajo (mismos guards: `isOwner`
+  // para ajustes, `isClosed` para el recap) para que el booleano y el cierre no
+  // se desincronicen. Se declara aquí, antes de los early-returns, para que el
+  // hook corra en TODOS los renders (regla de hooks). Excluye a propósito los
+  // recorridos guiados (GuidedTour) y sus remates de registro, y el menú-popover
+  // del FAB "＋" (ya se cierra al tocar fuera): son flujos con su propia lógica.
+  const anyOverlayOpen =
+    menuOpen ||
+    shareOpen ||
+    openMoment != null ||
+    sharingChallenge != null ||
+    sharingLeaderboard ||
+    membersOpen ||
+    inviting ||
+    anonCreateOpen ||
+    (isOwner && settingsOpen) ||
+    (isClosed && wrapOpen) ||
+    viewingChallengeId != null ||
+    editingChallenge != null
+  // Cierra la capa de MÁS ARRIBA. Las capas del viaje son mutuamente excluyentes
+  // en la práctica (abrir una cierra la anterior en el mismo gesto), así que
+  // basta con cerrar la única abierta; el orden solo desempata por si en algún
+  // flujo coincidieran. No memorizamos: el hook la lee por ref (no es dependencia
+  // de nadie), así que recrearla por render es inocuo.
+  const closeTopmostOverlay = () => {
+    if (anonCreateOpen) setAnonCreateOpen(false)
+    else if (sharingChallenge != null) setSharingChallenge(null)
+    else if (sharingLeaderboard) setSharingLeaderboard(false)
+    else if (isOwner && settingsOpen) setSettingsOpen(false)
+    else if (membersOpen) setMembersOpen(false)
+    else if (inviting) setInviting(false)
+    else if (isClosed && wrapOpen) setWrapOpen(false)
+    else if (viewingChallengeId != null) setViewingChallengeId(null)
+    else if (openMoment != null) setOpenMoment(null)
+    else if (shareOpen) closeShareSheet()
+    else if (menuOpen) setMenuOpen(false)
+    else if (editingChallenge != null) setEditingChallenge(null)
+  }
+  useOverlayBack(anyOverlayOpen, closeTopmostOverlay)
 
   // Editor de reto a pantalla completa: toma la pantalla mientras está abierto.
   // Al guardar/cancelar volvemos al viaje y refrescamos (la tarjeta y el mapa
