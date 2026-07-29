@@ -245,9 +245,21 @@ function whenIdle(cb: () => void): void {
 }
 
 // Carga e inicializa el SDK real una sola vez; al estar listo, vacía la cola.
+//
+// El `import()` puede FALLAR en producción (Sentry LOCATIONGUESSER-1E): tras un
+// deploy, un cliente con el index.html viejo pide el chunk de mixpanel con un
+// hash que ya no existe → 404/undefined. La analítica es mejora progresiva:
+// ese fallo no debe salir como unhandled rejection — se degrada en silencio
+// (la cola queda encolada; si nunca carga, no se envía nada y no pasa nada).
 async function loadMixpanel(): Promise<void> {
   if (mp) return
-  const mixpanel = (await import('mixpanel-browser')).default
+  let mixpanel: MixpanelClient
+  try {
+    mixpanel = (await import('mixpanel-browser')).default
+  } catch (err) {
+    console.warn('[analytics] no se pudo cargar mixpanel (chunk viejo tras deploy?):', err)
+    return
+  }
   mixpanel.init(token, {
     api_host: 'https://api-eu.mixpanel.com',
     autocapture: true,
