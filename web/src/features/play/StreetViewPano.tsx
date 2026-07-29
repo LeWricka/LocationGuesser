@@ -1,9 +1,13 @@
 /// <reference types="google.maps" />
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { useMapsLibrary } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
 import { Spinner } from '../../ui'
 import styles from './StreetViewPano.module.css'
+
+// Red de seguridad si `status_changed` no llega (ver el efecto principal):
+// no dejamos el panorama oculto para siempre.
+const READY_FALLBACK_MS = 2000
 
 interface Props {
   /** Panorama exacto guardado en creación; preferido si existe (robusto frente a cambios de cobertura). */
@@ -49,6 +53,12 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
   const streetViewLib = useMapsLibrary('streetView')
   const containerRef = useRef<HTMLDivElement>(null)
   const panoRef = useRef<google.maps.StreetViewPanorama | null>(null)
+  // Issue #978: al resolver la posición/panoId, Google puede asentar la vista en
+  // un heading propio (p.ej. el sentido de la calle) ANTES de aplicar el nuestro,
+  // lo que se ve como un giro de más de una vuelta al abrir. Lo evitamos montando
+  // el panorama oculto y revelándolo solo cuando confirmamos el heading real
+  // (ver el listener `status_changed` más abajo): así nunca se ve el giro.
+  const [ready, setReady] = useState(false)
   // Dependemos de primitivos, no del objeto `position` (que el padre recrea en
   // cada render del timer): así el panorama se monta una vez y no parpadea.
   const { lat, lng } = position
@@ -80,6 +90,7 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
 
   useEffect(() => {
     if (!streetViewLib || !containerRef.current) return
+    setReady(false)
 
     // Spoiler-free + explorable: ocultamos lo que delata el sitio
     // (dirección, nombres de calle, fullscreen, cerrar) y dejamos navegar
@@ -92,6 +103,9 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
     //    pov_changed más abajo, que es lo único que el SDK respeta de verdad).
     const options: google.maps.StreetViewPanoramaOptions = {
       pov: { heading: startHeading, pitch: startPitch },
+      // Oculto hasta confirmar el heading real (ver comentario de `ready` arriba):
+      // issue #978, evita el giro de asentamiento visible al abrir.
+      visible: false,
       addressControl: false,
       showRoadLabels: false,
       fullscreenControl: false,
@@ -113,6 +127,25 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
     const pano = new streetViewLib.StreetViewPanorama(containerRef.current, options)
     panoRef.current = pano
 
+    // Revela el panorama YA orientado (issue #978): forzamos de nuevo el heading
+    // exacto (por si Google lo reajustó al resolver el pano/posición) y solo
+    // ENTONCES lo mostramos, cuando `status_changed` confirma la carga. Con
+    // `visible:false` de entrada, cualquier giro de asentamiento interno pasa
+    // oculto — el jugador nunca lo ve. `revealed` evita re-ejecutar si el status
+    // cambia más de una vez (p.ej. reintento tras error).
+    let revealed = false
+    const reveal = () => {
+      if (revealed) return
+      revealed = true
+      if (pano.getStatus() === 'OK') {
+        pano.setPov({ heading: startHeading, pitch: startPitch })
+      }
+      pano.setVisible(true)
+      setReady(true)
+    }
+    const statusListener = pano.addListener('status_changed', reveal)
+    const revealFallback = window.setTimeout(reveal, READY_FALLBACK_MS)
+
     // La brújula sigue el giro: emitimos el heading en cada cambio de POV.
     onPovChangedRef.current?.(startHeading)
     const listener = pano.addListener('pov_changed', () => {
@@ -133,6 +166,8 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
     })
 
     return () => {
+      window.clearTimeout(revealFallback)
+      statusListener.remove()
       listener.remove()
       // Suelta la cámara/listeners; el div lo desmonta React.
       pano.setVisible(false)
@@ -143,7 +178,7 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
   return (
     <div className={styles.pano}>
       <div ref={containerRef} className={styles.canvas} />
-      {!streetViewLib && (
+      {(!streetViewLib || !ready) && (
         <div className={styles.loading}>
           <Spinner size={32} />
         </div>
