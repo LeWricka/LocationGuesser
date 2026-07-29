@@ -16,6 +16,7 @@ import {
 import {
   Badge,
   ChallengePhoto,
+  DelayedFallback,
   EmptyState,
   Icon,
   IconDiana,
@@ -1142,7 +1143,11 @@ export function TripPage({
     // motivó la key). El tipo de elemento raíz ya cambia (`main` aquí vs `div`
     // del contenido, ver más abajo), pero se deja explícita por claridad y como
     // red de seguridad si el contenido cambia de raíz en el futuro.
-    return <TripRouteSkeleton key="loading" ariaLabel="Cargando el viaje" />
+    return (
+      <DelayedFallback key="loading" bg="scene">
+        <TripRouteSkeleton ariaLabel="Cargando el viaje" />
+      </DelayedFallback>
+    )
   }
 
   if (error) {

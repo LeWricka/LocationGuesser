@@ -76,6 +76,7 @@ import {
   PlayRouteSkeleton,
   UtilityRouteSkeleton,
   HomeRouteSkeleton,
+  DelayedFallback,
   useToast,
 } from './ui'
 import styles from './App.module.css'
@@ -235,7 +236,15 @@ function AnonReceptorGate({ route }: { route: ReturnType<typeof parseHash> }) {
   }, [route.challenge, route.group])
 
   if (failed) return <LoggedOut route={route} />
-  return route.challenge ? <PlayRouteSkeleton /> : <TripRouteSkeleton />
+  return route.challenge ? (
+    <DelayedFallback bg="scene">
+      <PlayRouteSkeleton />
+    </DelayedFallback>
+  ) : (
+    <DelayedFallback bg="scene">
+      <TripRouteSkeleton />
+    </DelayedFallback>
+  )
 }
 
 // Viaje de EJEMPLO servido a un VISITANTE SIN sesión (issue #916, "Ver un
@@ -262,7 +271,13 @@ function ExampleTripPublic({ route }: { route: ReturnType<typeof parseHash> }) {
 
   return (
     <GoogleMapsProvider>
-      <Suspense fallback={<TripRouteSkeleton />}>
+      <Suspense
+        fallback={
+          <DelayedFallback bg="scene">
+            <TripRouteSkeleton />
+          </DelayedFallback>
+        }
+      >
         <TripPage
           groupId={EXAMPLE_TRIP_GROUP_ID}
           initialSection={initialSection}
@@ -419,7 +434,13 @@ function LoggedIn({
   if (adminRoute) {
     if (isAdminEmail(user?.email))
       return (
-        <Suspense fallback={<UtilityRouteSkeleton />}>
+        <Suspense
+          fallback={
+            <DelayedFallback bg="paper">
+              <UtilityRouteSkeleton />
+            </DelayedFallback>
+          }
+        >
           <AdminPage onBack={() => goHome()} />
         </Suspense>
       )
@@ -484,13 +505,25 @@ function LoggedIn({
     // el mismo CTA "guárdate" que ofrecemos tras jugar.
     if (isAnonymous) {
       return (
-        <Suspense fallback={<UtilityRouteSkeleton />}>
+        <Suspense
+          fallback={
+            <DelayedFallback bg="paper">
+              <UtilityRouteSkeleton />
+            </DelayedFallback>
+          }
+        >
           <AnonCreateGate onBack={() => goHome()} />
         </Suspense>
       )
     }
     return (
-      <Suspense fallback={<UtilityRouteSkeleton />}>
+      <Suspense
+        fallback={
+          <DelayedFallback bg="paper">
+            <UtilityRouteSkeleton />
+          </DelayedFallback>
+        }
+      >
         <CreateGroup onBack={() => goHome()} />
       </Suspense>
     )
@@ -512,7 +545,13 @@ function LoggedIn({
     // bienvenida le espera en la pantalla del viaje, donde no hay cronómetro.
     activeRoute = (
       <GoogleMapsProvider>
-        <Suspense fallback={<PlayRouteSkeleton />}>
+        <Suspense
+          fallback={
+            <DelayedFallback bg="scene">
+              <PlayRouteSkeleton />
+            </DelayedFallback>
+          }
+        >
           <PlayChallenge challengeId={route.challenge} groupId={route.group} />
         </Suspense>
       </GoogleMapsProvider>
@@ -526,7 +565,13 @@ function LoggedIn({
       // directo al asistente de reto clásico.
       activeRoute = (
         <GoogleMapsProvider>
-          <Suspense fallback={<UtilityRouteSkeleton />}>
+          <Suspense
+            fallback={
+              <DelayedFallback bg="paper">
+                <UtilityRouteSkeleton />
+              </DelayedFallback>
+            }
+          >
             <AddMoment
               groupId={groupId}
               onBack={() => {
@@ -551,7 +596,13 @@ function LoggedIn({
       // propio reto (#509); el enlace para compartir se ofrece desde el viaje.
       activeRoute = (
         <GoogleMapsProvider>
-          <Suspense fallback={<UtilityRouteSkeleton />}>
+          <Suspense
+            fallback={
+              <DelayedFallback bg="paper">
+                <UtilityRouteSkeleton />
+              </DelayedFallback>
+            }
+          >
             <CreateChallengeFlow
               groupId={groupId}
               // Nombre real del viaje (issue #974): alimenta el chip de la tarjeta
@@ -580,7 +631,13 @@ function LoggedIn({
     // reto o a la home, para volver a ella sin re-instanciar el mapa/globo.
   } else if (route.view === 'profile') {
     activeRoute = (
-      <Suspense fallback={<UtilityRouteSkeleton />}>
+      <Suspense
+        fallback={
+          <DelayedFallback bg="paper">
+            <UtilityRouteSkeleton />
+          </DelayedFallback>
+        }
+      >
         <ProfileEditScreen
           userId={user!.id}
           profile={profile}
@@ -639,7 +696,13 @@ function LoggedIn({
             {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos con
                 Google Maps) y EditChallenge (preview Street View); por eso necesita Maps. */}
             <GoogleMapsProvider>
-              <Suspense fallback={<TripRouteSkeleton />}>
+              <Suspense
+                fallback={
+                  <DelayedFallback bg="scene">
+                    <TripRouteSkeleton />
+                  </DelayedFallback>
+                }
+              >
                 <TripPage
                   groupId={tripGroupId}
                   active={!tripHidden}
@@ -676,7 +739,13 @@ function LoggedIn({
           {/* Fallback `HomeRouteSkeleton` (perf "entrada sin saltos"): un único layout de
               espera (globo+feed) mientras llega el chunk y `useHomeData` resuelve, en vez
               del esqueleto genérico de formulario seguido del de la home (doble-swap). */}
-          <Suspense fallback={<HomeRouteSkeleton />}>
+          <Suspense
+            fallback={
+              <DelayedFallback bg="scene" fixed>
+                <HomeRouteSkeleton />
+              </DelayedFallback>
+            }
+          >
             <HomePage active={!homeHidden} />
             {isAdminEmail(user?.email) && <AdminLink />}
           </Suspense>
@@ -761,7 +830,13 @@ function RedirectHome() {
     goHome()
   }, [])
   return (
-    <Suspense fallback={<HomeRouteSkeleton />}>
+    <Suspense
+      fallback={
+        <DelayedFallback bg="scene" fixed>
+          <HomeRouteSkeleton />
+        </DelayedFallback>
+      }
+    >
       <HomePage />
     </Suspense>
   )

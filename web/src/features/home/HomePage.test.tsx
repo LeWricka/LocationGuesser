@@ -1,5 +1,6 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { SKELETON_DELAY_MS } from '../../ui'
 import type { MemberAvatar, MyGroup, PendingChallenge } from '../../lib/membership'
 import type { Profile } from '../../lib/database.types'
 import type { ChallengeForPlay } from '../../lib/challenges'
@@ -70,6 +71,10 @@ vi.mock('../../lib/supabase', () => ({
 
 import { HomePage } from './HomePage'
 
+afterEach(() => {
+  vi.useRealTimers()
+})
+
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
@@ -97,9 +102,14 @@ beforeEach(() => {
 })
 
 describe('HomePage', () => {
-  test('muestra skeleton mientras carga la sesión', () => {
+  test('muestra skeleton mientras carga la sesión (pasado el umbral de DelayedFallback, issue #984)', () => {
+    vi.useFakeTimers()
     sessionState.loading = true
     render(<HomePage />)
+    // Bajo el umbral (contrato AC-3): todavía no se pinta el esqueleto real, solo
+    // el hueco con el fondo de escena (DelayedFallback).
+    expect(screen.queryByRole('status', { name: 'Cargando tu inicio' })).not.toBeInTheDocument()
+    act(() => void vi.advanceTimersByTime(SKELETON_DELAY_MS))
     expect(screen.getByRole('status', { name: 'Cargando tu inicio' })).toBeInTheDocument()
   })
 
