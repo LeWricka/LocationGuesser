@@ -192,6 +192,7 @@ export function TripMapGlobe({
   selectedChallengeId,
   playing = false,
   onSelectMoment,
+  active = true,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -539,6 +540,32 @@ export function TripMapGlobe({
   useEffect(() => {
     repaint()
   }, [route, selectedChallengeId, playing, repaint])
+
+  // KEEP-ALIVE del último viaje (issue #979): TripPage no se desmonta al navegar a
+  // un reto o a la home; se OCULTA (`display:none`, ver App.tsx → KeepAliveTrip). Con
+  // el lienzo oculto MapLibre ya deja de pintar (no tiene rAF de deriva propio como el
+  // globo de la home), así que ocultar no necesita pausar nada extra: solo detenemos
+  // cualquier animación de cámara EN VUELO (`map.stop()`) para no gastar frames a
+  // ciegas. Al VOLVER, el punto crítico es `map.resize()`: tras un `display:none` el
+  // canvas quedó a tamaño 0 y MapLibre NO recalcula dimensiones solo (su `trackResize`
+  // solo escucha el `resize` de la ventana, no el cambio de tamaño del contenedor) —
+  // sin este `resize`, el globo reaparecería en blanco o mal encuadrado (justo el
+  // "re-init visible" que este keep-alive elimina). NO reencuadramos: preservar la
+  // cámara donde quedó es lo que hace instantáneo el regreso. Los datos que hayan
+  // llegado mientras estaba oculto ya se pintaron (el efecto de `route` de abajo corre
+  // aunque el viaje esté oculto: mutar markers en un contenedor `display:none` es barato).
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !readyRef.current) return
+    if (!active) {
+      // `stop` es opcional en la API real y ausente en algún doble de test: guard.
+      if (typeof map.stop === 'function') map.stop()
+      return
+    }
+    // `resize` recalcula las dimensiones del canvas tras el `display:none`; opcional en
+    // algún doble de test, por eso el guard.
+    if (typeof map.resize === 'function') map.resize()
+  }, [active])
 
   // ── Vuela al pin seleccionado (sin re-encuadrar todo). ──
   useEffect(() => {

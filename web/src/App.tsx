@@ -36,7 +36,7 @@
 // sign-ins" apagado en el dashboard, ver docs/operativa.md), degradamos con
 // gracia al flujo de hoy (Landing + código OTP): nunca pantalla en blanco.
 
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { isAdminEmail } from './lib/admin'
@@ -52,6 +52,7 @@ import { EXAMPLE_TRIP_GROUP_ID } from './lib/exampleTrip'
 import { ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { OverlayBackProvider } from './lib/OverlayBackProvider'
+import { OverlayBackContext } from './lib/overlayBack'
 import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
 import { GoogleMapsProvider } from './lib/GoogleMapsProvider'
@@ -61,6 +62,7 @@ import { track } from './lib/analytics'
 import { reportError } from './lib/observability'
 import { prefetchMainRoutes } from './lib/prefetch'
 import { KeepAliveHome } from './features/home/KeepAliveHome'
+import { KeepAliveTrip } from './features/trip/KeepAliveTrip'
 import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
 import {
   BackHomeButton,
@@ -346,6 +348,36 @@ function LoggedIn({
   const [homeMounted, setHomeMounted] = useState(false)
   if (homeIsActiveRoute && !homeMounted) setHomeMounted(true)
 
+  // Coordinador de overlays (issue #972): lo leemos para poder CORTARLO en el subárbol
+  // del viaje mientras queda oculto (keep-alive, issue #979). Un viaje montado pero
+  // invisible NO debe registrar sus capas (hoja de momento, lightbox, menú…) en la pila
+  // del coordinador —si no, el gesto atrás intentaría cerrar una capa que no se ve—. Al
+  // ocultarlo re-proveemos `null` en ese subárbol y `useOverlayLayer` se vuelve inocuo.
+  const overlayApi = useContext(OverlayBackContext)
+
+  // KEEP-ALIVE del último viaje (issue #979, ola 4): ¿la ruta ACTUAL es la vista PLANA de
+  // un viaje (diario/bitácora/marcador), no un reto ni un flujo de crear? Solo esas fijan
+  // el viaje que mantenemos vivo; un reto de ESE viaje —o la home— lo dejan montado+oculto.
+  const plainTripGroupId =
+    route.group && !route.challenge && !route.groupAddMoment && !route.groupAddChallenge
+      ? route.group
+      : null
+  // Sección inicial derivada del hash (MISMA regla que el render del viaje, más abajo).
+  const plainTripSection =
+    route.groupView === 'marcador' ? 'marcador' : route.groupView === 'fotos' ? 'fotos' : 'diario'
+  // El último viaje visto en vista plana se mantiene MONTADO (oculto) al navegar fuera y
+  // se re-MUESTRA al volver (reto→atrás→viaje, home→viaje reciente) sin re-instanciar el
+  // mapa/globo. Solo UN viaje vivo: entrar a un grupo DISTINTO reemplaza (su `key`=groupId
+  // desmonta el anterior y limpia su globo). Cerrojo derivado en render (patrón oficial
+  // "ajustar estado según props", como `homeMounted`): condicional → sin bucle de renders.
+  const [keepAliveTrip, setKeepAliveTrip] = useState<{
+    groupId: string
+    initialSection: 'diario' | 'fotos' | 'marcador'
+  } | null>(null)
+  if (plainTripGroupId && plainTripGroupId !== keepAliveTrip?.groupId) {
+    setKeepAliveTrip({ groupId: plainTripGroupId, initialSection: plainTripSection })
+  }
+
   // Al volver del email: si guardamos un destino (#g…), lo restauramos (auto-join
   // + navegación). Lo consumimos una sola vez. Si el destino no era de grupo,
   // takeNextDestination devuelve algo no-grupo y joinIfGroup nos manda a la home.
@@ -542,55 +574,10 @@ function LoggedIn({
           </Suspense>
         </GoogleMapsProvider>
       )
-    } else {
-      // UNA vista por viaje: el grupo SIEMPRE abre la pantalla "Viaje", que tiene TRES
-      // secciones con un tab (Diario · Fotos · Marcador, issue #645). El marcador
-      // completo + gestión ya no es una pantalla suelta: es una pestaña del propio
-      // viaje (GroupPage incrustada). Los enlaces viejos `#g=…&v=clasico` aterrizan
-      // en esa pestaña (`groupView === 'marcador'`), así que no se rompe nada.
-      activeRoute = (
-        <ReceptorWelcomeGate
-          groupId={groupId}
-          userId={user?.id}
-          isAnonymous={isAnonymous}
-          profileOnboarding={profile?.onboarding}
-        >
-          {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos
-              con Google Maps) y EditChallenge (preview Street View); por eso el
-              viaje necesita el provider de Maps. */}
-          <GoogleMapsProvider>
-            <Suspense fallback={<TripRouteSkeleton />}>
-              <TripPage
-                groupId={groupId}
-                // Sección inicial: "Marcador" o "Fotos" si el enlace lo pide (legado
-                // v=clasico / v=marcador, o v=fotos), si no "Diario".
-                initialSection={
-                  route.groupView === 'marcador'
-                    ? 'marcador'
-                    : route.groupView === 'fotos'
-                      ? 'fotos'
-                      : 'diario'
-                }
-                // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
-                onPlayChallenge={(challengeId) => {
-                  location.hash = groupHash(groupId, challengeId)
-                }}
-                // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo),
-                // un momento sin reto por defecto (el reto es una capa opcional con toggle).
-                onAddMoment={() => {
-                  location.hash = addMomentHash(groupId)
-                }}
-                // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
-                onAddChallenge={() => {
-                  location.hash = addChallengeHash(groupId)
-                }}
-                onBack={() => goHome()}
-              />
-            </Suspense>
-          </GoogleMapsProvider>
-        </ReceptorWelcomeGate>
-      )
     }
+    // La vista PLANA del viaje (Diario · Bitácora · Marcador) NO se sirve aquí: la
+    // mantiene VIVA `keepAliveTripNode` (issue #979), montada aunque naveguemos a un
+    // reto o a la home, para volver a ella sin re-instanciar el mapa/globo.
   } else if (route.view === 'profile') {
     activeRoute = (
       <Suspense fallback={<UtilityRouteSkeleton />}>
@@ -627,6 +614,61 @@ function LoggedIn({
   // añadimos un acceso DISCRETO a `#admin` (un enlace flotante), invisible para el resto;
   // solo en la home (no estorba en viaje/jugar/perfil).
   const homeHidden = !homeIsActiveRoute
+
+  // KEEP-ALIVE del último viaje (issue #979): el TripPage del último grupo visto se pinta
+  // SIEMPRE que exista (montado), y se OCULTA (`KeepAliveTrip`) cuando la ruta actual no es
+  // su vista plana —estamos en un reto de ese viaje, en la home, o en un flujo de crear—.
+  // Así reto→atrás→viaje y home→viaje reciente reaparecen sin flash de canvas ni re-init.
+  // `key`=groupId: cambiar de grupo desmonta el viaje anterior (limpia su globo) y monta el
+  // nuevo. Con el viaje oculto, cortamos el coordinador de overlays (`OverlayBackContext` a
+  // `null`) para que sus capas no se registren en la pila del gesto atrás; y `active={false}`
+  // detiene el mapa y le hace revalidar el lienzo al volver (ver TripPage → TripMap).
+  let keepAliveTripNode: ReactNode = null
+  if (keepAliveTrip) {
+    const tripGroupId = keepAliveTrip.groupId
+    const tripHidden = plainTripGroupId !== tripGroupId
+    keepAliveTripNode = (
+      <KeepAliveTrip key={tripGroupId} hidden={tripHidden}>
+        <OverlayBackContext.Provider value={tripHidden ? null : overlayApi}>
+          <ReceptorWelcomeGate
+            groupId={tripGroupId}
+            userId={user?.id}
+            isAnonymous={isAnonymous}
+            profileOnboarding={profile?.onboarding}
+          >
+            {/* La pestaña "Marcador" del viaje incrusta GroupPage (mapa de aciertos con
+                Google Maps) y EditChallenge (preview Street View); por eso necesita Maps. */}
+            <GoogleMapsProvider>
+              <Suspense fallback={<TripRouteSkeleton />}>
+                <TripPage
+                  groupId={tripGroupId}
+                  active={!tripHidden}
+                  // Sección inicial capturada al FIJAR este viaje (Marcador/Bitácora si el
+                  // enlace lo pidió, si no Diario). Solo aplica al primer montaje; al volver,
+                  // TripPage conserva la sección donde lo dejaste (sigue montado).
+                  initialSection={keepAliveTrip.initialSection}
+                  // "Adivina →": al flujo de juego EXISTENTE (#g=…&c=… → PlayChallenge).
+                  onPlayChallenge={(challengeId) => {
+                    location.hash = groupHash(tripGroupId, challengeId)
+                  }}
+                  // "Añadir momento": al flujo ligero "Añadir recuerdo" (#g=…&add=recuerdo).
+                  onAddMoment={() => {
+                    location.hash = addMomentHash(tripGroupId)
+                  }}
+                  // "Reto" (menú del FAB "＋"): al flujo inmersivo de crear reto (#g=…&add=reto).
+                  onAddChallenge={() => {
+                    location.hash = addChallengeHash(tripGroupId)
+                  }}
+                  onBack={() => goHome()}
+                />
+              </Suspense>
+            </GoogleMapsProvider>
+          </ReceptorWelcomeGate>
+        </OverlayBackContext.Provider>
+      </KeepAliveTrip>
+    )
+  }
+
   return (
     <>
       {(homeIsActiveRoute || homeMounted) && (
@@ -640,6 +682,7 @@ function LoggedIn({
           </Suspense>
         </KeepAliveHome>
       )}
+      {keepAliveTripNode}
       {activeRoute}
     </>
   )

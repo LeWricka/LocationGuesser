@@ -105,6 +105,15 @@ interface Props {
    * siempre (usuario logueado: → Crear viaje o cierre neutro).
    */
   onExampleRegister?: () => void
+  /**
+   * ¿Es este viaje la ruta VISIBLE? (keep-alive del último viaje, issue #979). Por
+   * defecto `true`. App mantiene el último viaje MONTADO pero oculto al navegar a un
+   * reto/home/flujo de crear (`KeepAliveTrip`), y le pasa `active={false}`: se propaga
+   * al mapa (`TripMap`) para que, al re-mostrarse (`active` vuelve a `true`), revalide
+   * el tamaño del lienzo sin reencuadrar — así volver al viaje es instantáneo, sin
+   * flash de canvas ni re-init del mapa/globo.
+   */
+  active?: boolean
 }
 
 /**
@@ -152,6 +161,7 @@ export function TripPage({
   onAddChallenge,
   onBack,
   onExampleRegister,
+  active = true,
 }: Props) {
   // `isAnonymous` (issue #888): gatea los dos FABs flotantes (crear/compartir)
   // más abajo — un receptor anónimo que juega un reto se hace miembro (RLS) y
@@ -1280,6 +1290,7 @@ export function TripPage({
               onInvite={() => openInvite()}
               mapRef={diarioMapRef}
               firstMomentRef={firstMomentRef}
+              active={active}
             />
           </section>
         )}
