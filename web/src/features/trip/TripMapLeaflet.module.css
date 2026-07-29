@@ -15,9 +15,12 @@
 .map {
   width: 100%;
   height: 100%;
-  /* Fondo "papel" bajo los tiles que aún no han cargado (token remapeado a papel
-     claro: el flash de carga ya no es océano oscuro, sino el papel del diario). */
-  background: var(--ocean-900);
+  /* Fondo de ESCENA bajo los tiles que aún no han cargado (issue #982): este mapa
+     vive en el Viaje, una pantalla oscura a sangre (--scene-bg) — `--ocean-900`
+     está remapeado a `--paper` (tokens.css) para el estilo viejo/claro y aquí
+     revelaba papel claro en cada resize/keep-alive/carga inicial, un "parche"
+     visible sobre la escena oscura. */
+  background: var(--scene-bg);
 }
 
 /* Toggle de capa (claro ↔ satélite): disco flotante abajo-derecha del mapa, sobre

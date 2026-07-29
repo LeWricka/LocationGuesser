@@ -79,6 +79,7 @@ vi.mock('./features/onboarding', () => ({
   ReceptorWelcomeGate: ({ children }: { children: ReactNode }) => children,
 }))
 
+import { BOOT_SCENE_CLASS } from './lib/bootScene'
 import App from './App'
 
 // `AnonCreateGate` (App.tsx) usa `useToast`, que exige un `<ToastProvider>`
@@ -110,6 +111,33 @@ beforeEach(() => {
   reportErrorMock.mockClear()
   window.location.hash = ''
   sessionState = baseSession()
+  document.documentElement.classList.remove(BOOT_SCENE_CLASS)
+})
+
+// Boot oscuro por hash (issue #982): un script inline de index.html pone esta
+// clase en <html> ANTES de que exista el bundle, para un deep link oscuro
+// (`#g=…`). App debe retirarla en su primer commit (BootScreen ya pinta su
+// propio fondo oscuro equivalente para ese mismo caso, así la retirada no
+// produce un flash de vuelta a papel — ver App.module.css `.bootSceneDark`).
+describe('App — retira la clase de boot oscuro al montar (issue #982)', () => {
+  test('con la sesión aún resolviendo (loading), la clase puesta por index.html se retira igual', () => {
+    window.location.hash = '#g=ABC'
+    document.documentElement.classList.add(BOOT_SCENE_CLASS)
+    sessionState = baseSession({ loading: true })
+
+    renderApp()
+
+    expect(document.documentElement.classList.contains(BOOT_SCENE_CLASS)).toBe(false)
+  })
+
+  test('sin deep link oscuro, tampoco queda la clase (arranque normal)', () => {
+    window.location.hash = ''
+    sessionState = baseSession({ loading: true })
+
+    renderApp()
+
+    expect(document.documentElement.classList.contains(BOOT_SCENE_CLASS)).toBe(false)
+  })
 })
 
 describe('AppRoutes — receptor sin cuenta en deep link (issue #758)', () => {

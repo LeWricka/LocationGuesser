@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Info } from 'lucide-react'
 // Tipos SOLO (import type → cero coste en bundle). El runtime de maplibre entra por
 // import() dinámico dentro del efecto, para que quede en su propio chunk WebGL.
@@ -1077,7 +1077,13 @@ export function HomeGlobe({
   //    nuevos mientras estaba oculta (realtime), repintamos los markers UNA vez —también
   //    sin mover cámara— para no dejar el globo desincronizado. La deriva se reanuda solo
   //    donde procede (landing decorativa `world`, hoja recogida).
-  useEffect(() => {
+  //
+  // `useLayoutEffect` (issue #982), no `useEffect`: con `useEffect` el navegador podía
+  // pintar un frame con el canvas aún a tamaño 0 (o mal encuadrado) antes de que el
+  // efecto corriera tras el paint — un flash del papel/escena de detrás asomando por el
+  // hueco. `resize` es una medición/repintado síncronos del propio MapLibre; corre ANTES
+  // del primer paint tras reaparecer, así ese frame intermedio nunca llega a pintarse.
+  useLayoutEffect(() => {
     const map = mapRef.current
     if (!map || !readyRef.current) return
     if (!active) {

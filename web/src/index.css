@@ -19,6 +19,30 @@ html {
    * un salto de layout evitable reservando el hueco desde el primer pintado. En
    * móvil (scrollbars overlay) es un no-op. */
   scrollbar-gutter: stable;
+  /* Fondo del lienzo/viewport que la View Transition compone DETRÁS (issue #982):
+   * sin fondo propio aquí, `body` (--color-bg, papel) propaga el suyo al raíz (regla
+   * CSS de propagación body→html) y ES lo que se ve tras el overlay top-layer de la
+   * transición — a mitad de cada cross-fade el par old/new se transparenta ~25% y
+   * compone sobre ese fondo. El bucle principal (home/viaje/jugar) es TODO escena
+   * oscura (--scene-bg), así que ese lavado se veía como un flash claro muy visible;
+   * con --scene-bg aquí, ese fundido queda limpio. Coste asumido: un cross-fade entre
+   * dos pantallas utilitarias (crear/perfil/admin, papel↔papel, secundarias e
+   * infrecuentes) tiñe de oscuro en vez de blanco — trade-off documentado a favor del
+   * bucle principal, no de las pantallas de utilidad. */
+  background: var(--scene-bg);
+}
+
+/* Boot oscuro por hash (issue #982): un script inline en index.html añade esta
+ * clase a <html> ANTES de que cargue el bundle si el deep link apunta a una
+ * escena oscura (`#g=…`, viaje/reto). Sobreescribe el papel de `body` (grano +
+ * halos incluidos, `background-image: none` para no dejarlos asomar sobre
+ * oscuro) hasta que App.tsx la retira al montar (`clearBootScene`,
+ * src/lib/bootScene.ts) — para entonces BootScreen ya pinta su propio fondo
+ * oscuro equivalente, así la retirada no se ve. */
+html.boot-scene,
+html.boot-scene body {
+  background-color: var(--scene-bg);
+  background-image: none;
 }
 
 body {
@@ -499,6 +523,15 @@ img {
 ::view-transition-new(root) {
   animation-duration: var(--duration-base);
   animation-timing-function: var(--ease-smooth);
+}
+
+/* Cinturón extra (issue #982): el contenedor del PAR de snapshots también opaco,
+ * por si el navegador no cubre el 100% del área con la imagen capturada durante
+ * el resize/la animación (p.ej. cambio de aspect ratio a mitad de fundido). El
+ * fondo real que arregla el lavado es el de `html` (arriba); esto es redundancia
+ * barata en la misma capa que compone el cross-fade. */
+::view-transition-group(root) {
+  background-color: var(--scene-bg);
 }
 
 /* ----------------------------------------------------------------------

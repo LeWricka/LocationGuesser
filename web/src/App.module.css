@@ -18,6 +18,16 @@
   color: var(--color-accent);
 }
 
+/* Deep link a escena oscura (viaje/reto, issue #982): fondo oscuro propio,
+ * equivalente al que puso `html.boot-scene` (index.css) antes de que React
+ * montara — la clase de <html> se retira en cuanto App monta, así que este
+ * fondo es lo que evita el flash de vuelta a papel mientras dura el arranque.
+ * `--color-accent` no lee bien sobre `--scene-bg`; el spinner pasa a tinta clara. */
+.bootSceneDark {
+  background-color: var(--scene-bg);
+  color: var(--scene-ink);
+}
+
 /* Globo de marca sobre fondo con halo de acento QUIETO. El pin entra con `lg-pop`
  * (una pasada); el halo es una capa estática detrás, sin latido en bucle: el
  * sistema reserva el movimiento a entradas y feedback (nada decorativo permanente). */

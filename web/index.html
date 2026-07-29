@@ -4,6 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!-- Boot oscuro por hash (issue #982): un deep link de viaje/reto (`#g=…`)
+         aterriza en una escena OSCURA (TripPage/PlayChallenge, --scene-bg). Sin
+         esto, la primera pintura (este HTML crudo, antes de que cargue el bundle)
+         usa el papel por defecto de `body` y se ve un flash claro justo antes de
+         que React monte con su propio fondo de escena. Clase mínima en <html>,
+         retirada por App.tsx (`clearBootScene`, src/lib/bootScene.ts) en cuanto
+         monta — la regla de fondo vive en index.css (`html.boot-scene`). Mismo
+         criterio que `isDarkSceneHash` en src/lib/bootScene.ts, duplicado aquí
+         porque este script corre ANTES de que exista el bundle: si tocas la
+         regex, actualiza los dos sitios. -->
+    <script>
+      if (/(^|[#&])g=/.test(location.hash)) {
+        document.documentElement.classList.add('boot-scene')
+      }
+    </script>
+
     <!-- Marca "Momentu": favicon SVG vectorial (con respaldo en PNG para
          navegadores que no lo soporten) y apple-touch-icon para "añadir a inicio". -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
