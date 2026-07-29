@@ -58,11 +58,13 @@ export function ShareCardGlobeScene() {
             <stop offset="1" stopColor={ROUTE_GOLD_DEEP} />
           </linearGradient>
         </defs>
-        {/* meridianos y paralelos: el alambre de la esfera */}
+        {/* meridianos y paralelos: el alambre de la esfera. Trazo algo más grueso
+            (issue #974) para que la esfera se reconozca como globo a tamaño
+            miniatura en el chat, no solo en la previa a tamaño completo. */}
         <g
           clipPath={`url(#${clipId})`}
           stroke="var(--scene-hairline)"
-          strokeWidth="1.6"
+          strokeWidth="2.4"
           fill="none"
         >
           <ellipse cx="540" cy="520" rx="430" ry="120" />

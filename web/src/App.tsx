@@ -360,6 +360,26 @@ function LoggedIn({
     if (route.group && user?.id) void joinIfGroup(window.location.hash)
   }, [route.group, route.challenge, user?.id, joinIfGroup])
 
+  // Nombre del viaje de la ruta actual (barato: un select por id, mismo circuito
+  // que `LoggedOut`). Lo consume la tarjeta-imagen de "¡Reto creado!"
+  // (`CreateChallengeFlow` → `ChallengeCreatedShare`, issue #974): sin él, el chip
+  // caía a «Un viaje» Y la cascada de portada perdía el nivel «portada derivada
+  // del lugar» (`resolvePlaceCover(null)`). Async, NO bloquea la ruta: mientras
+  // resuelve (o si RLS/red fallan), la tarjeta usa su copy genérico igual que antes.
+  const [groupName, setGroupName] = useState<string | null>(null)
+  useEffect(() => {
+    if (!route.group) return
+    let active = true
+    void getGroup(route.group)
+      .then((g) => {
+        if (active) setGroupName(g?.name ?? null)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+    }
+  }, [route.group])
+
   // `#admin`: pantalla de administración SOLO para el admin. Un no-admin que
   // fuerce el hash cae a la home (no ve nada de admin); aun así, las RPCs `admin_*`
   // deniegan en servidor. Tras los hooks (no condicionarlos) y antes del resto del
@@ -502,6 +522,9 @@ function LoggedIn({
           <Suspense fallback={<UtilityRouteSkeleton />}>
             <CreateChallengeFlow
               groupId={groupId}
+              // Nombre real del viaje (issue #974): alimenta el chip de la tarjeta
+              // de "¡Reto creado!" y el nivel «portada del lugar» de su cascada.
+              groupName={groupName}
               // Si el reto nace de un recuerdo (`&from=<id>`), pre-rellena foto y lugar.
               fromMomentId={route.groupChallengeFrom}
               // Promoción de un recuerdo YA guardado (`&promote=<id>`, issue #723):

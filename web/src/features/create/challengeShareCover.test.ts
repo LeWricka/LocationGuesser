@@ -13,6 +13,11 @@ vi.mock('../../lib/placeCover', () => ({
   resolvePlaceCover: (...args: unknown[]) => resolvePlaceCoverMock(...args),
 }))
 
+const reportSilentWarningMock = vi.fn()
+vi.mock('../../lib/observability', () => ({
+  reportSilentWarning: (...args: unknown[]) => reportSilentWarningMock(...args),
+}))
+
 import { resolveChallengeShareCover } from './challengeShareCover'
 
 // Respuesta de `fetch` con un blob descargable (jsdom soporta Blob/FileReader).
@@ -25,6 +30,7 @@ describe('resolveChallengeShareCover — cascada de portada de la tarjeta (#595)
     getGroupMock.mockReset()
     signedImageUrlMock.mockReset()
     resolvePlaceCoverMock.mockReset()
+    reportSilentWarningMock.mockReset()
     vi.stubGlobal('fetch', vi.fn())
   })
 
@@ -38,6 +44,8 @@ describe('resolveChallengeShareCover — cascada de portada de la tarjeta (#595)
     expect(signedImageUrlMock).toHaveBeenCalledWith('u1/foto.jpg')
     expect(getGroupMock).not.toHaveBeenCalled()
     expect(resolvePlaceCoverMock).not.toHaveBeenCalled()
+    // Camino feliz: la foto del reto resolvió, nada que avisar (issue #974).
+    expect(reportSilentWarningMock).not.toHaveBeenCalled()
   })
 
   test('2) sin foto del reto: cae a la portada PROPIA del viaje', async () => {
@@ -86,6 +94,32 @@ describe('resolveChallengeShareCover — cascada de portada de la tarjeta (#595)
     const result = await resolveChallengeShareCover('u1/foto.jpg', 'g1', 'Lisboa')
 
     expect(result).toMatch(/^data:/)
+  })
+
+  test('reto CON foto pero TODA la cascada falla → null + aviso a observabilidad (#974)', async () => {
+    // La foto del reto NO baja (red/CORS/decode), y ni el viaje ni el lugar tienen
+    // portada: el bug reportado. La tarjeta caerá al fondo de marca; dejamos rastro.
+    signedImageUrlMock.mockResolvedValueOnce('https://storage/foto-reto.jpg')
+    vi.mocked(fetch).mockResolvedValueOnce({ ok: false } as Response)
+    getGroupMock.mockResolvedValue(null)
+    resolvePlaceCoverMock.mockResolvedValue({ imageUrl: null, pageUrl: null, title: null })
+
+    const result = await resolveChallengeShareCover('u1/foto.jpg', 'g1', 'Lisboa')
+
+    expect(result).toBeNull()
+    expect(reportSilentWarningMock).toHaveBeenCalledWith('challenge_share_cover_photo_missing', {
+      groupId: 'g1',
+    })
+  })
+
+  test('SIN foto del reto y cascada a null: null pero SIN aviso (no había foto que perder)', async () => {
+    getGroupMock.mockResolvedValue(null)
+    resolvePlaceCoverMock.mockResolvedValue({ imageUrl: null, pageUrl: null, title: null })
+
+    const result = await resolveChallengeShareCover(null, 'g1', 'Sin nombre')
+
+    expect(result).toBeNull()
+    expect(reportSilentWarningMock).not.toHaveBeenCalled()
   })
 
   test('getGroup lanza (best-effort): no rompe, sigue a la portada del lugar', async () => {

@@ -37,6 +37,21 @@ interface Props {
    * según el anti-spoiler de `isMomentPhotoVisible` (lib/trip): `null` si la
    * foto sigue siendo SORPRESA (`photo_is_hint = false`) — este componente NUNCA
    * decide esa regla por su cuenta, confía en lo que le pasan.
+   *
+   * POLÍTICA de la tarjeta ante la foto (issue #974, decidida aquí):
+   *  - Foto PISTA (`photo_is_hint = true`, el caso por defecto de TODO reto nuevo):
+   *    la tarjeta SÍ la enseña. Una pista ya se ve al jugar, así que ponerla en el
+   *    teaser no filtra nada nuevo — y es justamente lo que se comparte
+   *    («¿dónde es esta foto?»). Era el bug reportado: salía en negro pese a tener
+   *    foto pista.
+   *  - Foto SORPRESA (`photo_is_hint = false`): la tarjeta NO la enseña, cae al
+   *    fondo de marca. Quien recibe el teaser es justo el futuro jugador; revelar
+   *    la sorpresa antes de jugar rompería su mecánica, y que el creador comparta
+   *    no le da derecho a estropeársela a los demás. Si algún día se quisiera un
+   *    override del creador para la sorpresa, sería un cambio de producto
+   *    deliberado, no este arreglo.
+   * `isMomentPhotoVisible` ya codifica exactamente esta política, por eso el gate
+   * del llamador no cambia.
    */
   imagePath: string | null
   /**
