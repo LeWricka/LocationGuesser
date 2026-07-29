@@ -20,6 +20,7 @@
 import { getGroup } from '../../lib/groupData'
 import { signedImageUrl } from '../../lib/storage'
 import { resolvePlaceCover } from '../../lib/placeCover'
+import { reportSilentWarning } from '../../lib/observability'
 
 /** Convierte un Blob a data URL (base64). */
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -74,6 +75,13 @@ export async function resolveChallengeShareCover(
     const own = await storagePathToDataUrl(challengeImagePath)
     if (own) return own
   }
+  // Marca: el reto TENÍA foto pero su descarga a data URL falló (red/CORS/decode
+  // en un dispositivo concreto). Best-effort silencioso por diseño (no bloquea el
+  // compartir), pero seguimos bajando la cascada y, si TODO acaba en null, dejamos
+  // rastro en observabilidad (issue #974): así, si la tarjeta vuelve a salir sin
+  // la foto pese a tener `image_path`, se ve en Sentry en vez de perderse en
+  // silencio. Ver el `reportSilentWarning` del final.
+  const ownPhotoFailed = Boolean(challengeImagePath)
 
   // 2. Portada del viaje: propia o derivada del lugar (mismo circuito de la home).
   try {
@@ -92,6 +100,12 @@ export async function resolveChallengeShareCover(
     if (derived) return derived
   }
 
-  // 3. Nada resuelto: la tarjeta cae a su fondo de marca.
+  // 3. Nada resuelto: la tarjeta cae a su fondo de marca. Si el reto tenía foto
+  // propia y aun así llegamos aquí, la portada esperada (la foto) NO salió: la
+  // tarjeta se verá con el fondo de marca en vez de la foto del reto. Es el bug
+  // reportado (#974); dejamos rastro para cazarlo si reaparece en un dispositivo.
+  if (ownPhotoFailed) {
+    reportSilentWarning('challenge_share_cover_photo_missing', { groupId })
+  }
   return null
 }

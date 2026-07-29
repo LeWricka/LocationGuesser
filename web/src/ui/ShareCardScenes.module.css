@@ -30,17 +30,30 @@
   inset: 0;
   /* Esfera nocturna bespoke (dirección "Globo" aprobada, issue #880): no hay
      token de tema para este triple de azules, es geometría/color de escena
-     fijo, igual criterio que la paleta de LogoMomentu. */
+     fijo, igual criterio que la paleta de LogoMomentu.
+     Issue #974: subida de luminosidad. Los azules de antes (#2d4a5e→#16242f) y
+     una viñeta que fundía a `--scene-bg` (#0b1016, casi negro) hacían que la
+     tarjeta, a tamaño MINIATURA en el chat, se leyera como un rectángulo negro
+     cuando la escena globo era el fallback (foto no resuelta). Ahora la esfera
+     arranca de un azul cielo-noche visiblemente más claro y la viñeta funde a un
+     grafito-azul (no al casi-negro): sigue siendo nocturna, pero legible como
+     globo iluminado en miniatura, nunca negro plano. */
   background:
-    radial-gradient(58% 46% at 50% 40%, #2d4a5e 0%, #233c4d 52%, #16242f 100%), var(--scene-bg); /* design-lint-allow: esfera nocturna bespoke (issue #880), no es color de tema */
+    radial-gradient(58% 46% at 50% 40%, #3f6c8c 0%, #2b4a60 52%, #1b3242 100%), #16242f; /* design-lint-allow: esfera nocturna bespoke (issue #880/#974), no es color de tema */
 }
 
-/* Viñeta de integración: la esfera no llena el rectángulo, funde a cielo oscuro. */
+/* Viñeta de integración: la esfera no llena el rectángulo, funde a cielo oscuro
+   —pero a un grafito-azul, no al casi-negro `--scene-bg`, para no ennegrecer los
+   bordes en miniatura (issue #974). */
 .globeBg::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(78% 62% at 50% 40%, transparent 52%, var(--scene-bg) 100%);
+  background: radial-gradient(
+    80% 64% at 50% 40%,
+    transparent 58%,
+    #16242f 100%
+  ); /* design-lint-allow: grafito-azul de escena bespoke (issue #974), no es color de tema */
 }
 
 /* Halo del destino: radial-gradient que ya se apaga a transparente (sin blur). */
