@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
-import { OverlayBackContext, type OverlayBackApi } from './overlayBack'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { OverlayBackContext, markHistoryFloor, type OverlayBackApi } from './overlayBack'
 import { useOverlayBack } from './useOverlayBack'
 
 // Proveedor del coordinador global de "atrás cierra la capa de encima" (issue
@@ -19,6 +19,15 @@ export function OverlayBackProvider({ children }: { children: ReactNode }) {
   // estado que alimenta a `useOverlayBack` y dispara el push/pop del historial.
   const entriesRef = useRef<Entry[]>([])
   const [depth, setDepth] = useState(0)
+
+  // Marca la entrada actual como SUELO del historial (issue #983). El proveedor
+  // se monta una vez cerca de la raíz, ANTES de cualquier navegación propia de
+  // la app, así que la entrada actual es la primera de la sesión: la que un
+  // `history.back()` no puede cruzar sin recargar el documento. La guarda de
+  // suelo de `useOverlayBack` lee esta marca para no emitir ese back fatal.
+  useEffect(() => {
+    markHistoryFloor()
+  }, [])
 
   const register = useCallback((close: () => void) => {
     const id = ++nextEntryId
