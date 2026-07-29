@@ -20,4 +20,13 @@ export interface TripMapProps {
    */
   playing?: boolean
   onSelectMoment: (challengeId: string) => void
+  /**
+   * ¿Está el viaje VISIBLE? (keep-alive del último viaje, issue #979). Por defecto
+   * `true`. Con `active={false}` el viaje sigue MONTADO pero oculto (`display:none`):
+   * el motor detiene cualquier animación de cámara en vuelo y NO reencuadra. Al volver
+   * a `active={true}` revalida el tamaño del lienzo (MapLibre `resize()` / Leaflet
+   * `invalidateSize()`, que tras un `display:none` no se recalculan solos) para
+   * reaparecer EN LA MISMA cámara, sin flash ni re-init.
+   */
+  active?: boolean
 }

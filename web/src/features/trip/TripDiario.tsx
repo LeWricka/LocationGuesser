@@ -31,6 +31,9 @@ interface Props {
   /** Abre la hoja de invitar (CTA secundario del vacío, gateado por
    * `canCreate` — issue #510, invitar quedaba escondido tras el ···). */
   onInvite: () => void
+  /** ¿Está el viaje VISIBLE? (keep-alive del último viaje, issue #979). Se propaga
+   * al mapa para que, al re-mostrarse, revalide el tamaño del lienzo sin reencuadrar. */
+  active?: boolean
   /**
    * Ancla del mapa a sangre para `GuidedTour` (viaje de ejemplo, onboarding
    * nuevo pieza 4/4): "Cada parada del viaje queda aquí, en el Diario." Opcional
@@ -69,6 +72,7 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
     onInvite,
     mapRef,
     firstMomentRef,
+    active = true,
   },
   carouselRef,
 ) {
@@ -119,6 +123,7 @@ export const TripDiario = forwardRef<HTMLDivElement, Props>(function TripDiario(
           selectedChallengeId={selectedId}
           playing={playing}
           onSelectMoment={onSelectFromMap}
+          active={active}
         />
       </div>
 

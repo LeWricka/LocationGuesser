@@ -120,6 +120,21 @@ function PanToSelected({
 }
 
 /**
+ * Keep-alive del último viaje (issue #979): al volver de un reto/home, TripPage se
+ * re-MUESTRA (no se remonta). Tras el `display:none` el contenedor recuperó tamaño,
+ * pero Leaflet no lo detecta solo — sin `invalidateSize()` el lienzo se queda con el
+ * viewport viejo (gris/mal encuadrado). Al pasar `active` a `true` lo revalidamos SIN
+ * reencuadrar (preservar la cámara donde quedó es lo que hace instantáneo el regreso).
+ */
+function InvalidateOnActive({ active }: { active: boolean }) {
+  const map = useMap()
+  useEffect(() => {
+    if (active) map.invalidateSize()
+  }, [active, map])
+  return null
+}
+
+/**
  * Mapa PLANO de la ruta del viaje (Leaflet + satélite Esri por defecto) — el "suelo"
  * garantizado del pivote (el globo 3D/MapLibre es otra tarea). Pinta:
  *  - un pin-foto circular por momento cerrado, clavado en su lat/lng;
@@ -133,6 +148,7 @@ export function TripMapLeaflet({
   selectedChallengeId,
   playing = false,
   onSelectMoment,
+  active = true,
 }: Props) {
   // Capa de fondo: SATÉLITE (Esri) por defecto (fase "nuevo enfoque"); el plano
   // claro (Positron) solo si el usuario lo pide con el toggle del chrome (opt-in).
@@ -265,6 +281,7 @@ export function TripMapLeaflet({
 
         <FitToPins route={route} />
         <PanToSelected selectedChallengeId={selectedChallengeId} route={route} />
+        <InvalidateOnActive active={active} />
       </MapContainer>
 
       {/* Estado de carga: tapa el lienzo hasta que la capa base carga sus teselas
