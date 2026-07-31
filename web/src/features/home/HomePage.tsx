@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react'
 import {
   Avatar,
   Card,
+  DelayedFallback,
   EmptyState,
   GlobeSheet,
   HomeDashboard,
@@ -157,7 +158,11 @@ export function HomePage({ active = true }: Props = {}) {
   // Mientras resolvemos la sesión persistida o cargamos la membresía → skeletons.
   // SIEMPRE damos feedback de carga (no pantalla en blanco).
   if (sessionLoading || dataLoading) {
-    return <HomeRouteSkeleton />
+    return (
+      <DelayedFallback bg="scene" fixed>
+        <HomeRouteSkeleton />
+      </DelayedFallback>
+    )
   }
 
   if (error) {

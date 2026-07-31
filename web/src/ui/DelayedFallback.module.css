@@ -1,0 +1,30 @@
+/*
+ * Hueco pre-umbral de DelayedFallback (issue #984): sin contenido, pero NUNCA
+ * blanco — el fondo de la familia de la ruta que está resolviendo, para que una
+ * carga rápida no deje ni un fogonazo del papel/blanco por defecto del body.
+ */
+
+.gap {
+  min-height: 100dvh;
+}
+
+/* Familias oscuras a sangre (viaje/jugar/home): mismo tono que `.pageDark`/
+ * `.playScene`/`.homeScene` de RouteSkeletons.module.css. */
+.bg-scene {
+  background-color: var(--scene-bg);
+}
+
+/* Rutas utilitarias (crear/perfil/admin): papel, fiel a `ShellUtilitario` y a
+ * `.page` de RouteSkeletons.module.css. */
+.bg-paper {
+  background-color: var(--paper);
+}
+
+/* Home (issue #568, "sin hoja blanca"): escena FIJA a viewport, espejo de
+ * `.homeScene` — no fluye en el documento, así que el hueco debe cubrir el
+ * mismo área con position:fixed en vez de depender del flujo normal. */
+.fixed {
+  position: fixed;
+  inset: 0;
+  height: 100dvh;
+}

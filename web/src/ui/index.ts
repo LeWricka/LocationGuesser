@@ -97,6 +97,12 @@ export {
   HomeRouteSkeleton,
 } from './RouteSkeletons'
 
+// Envoltorio que retrasa el pintado de un fallback de carga hasta pasado un
+// umbral (issue #984, contrato nativo AC-3): evita el parpadeo de esqueleto en
+// cargas/chunks que resuelven rápido, sin dejar nunca un hueco en blanco.
+export { DelayedFallback } from './DelayedFallback'
+export { useDelayedFlag, SKELETON_DELAY_MS } from './useDelayedFlag'
+
 // ── Fase 1 del rediseño ────────────────────────────────────────────────────
 
 // Iconos custom de marca Momentu. Set propio con carácter (pin, globo, diana,
