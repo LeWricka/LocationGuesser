@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Info } from 'lucide-react'
 // Tipos SOLO (import type → cero coste en bundle). El runtime entra por import()
 // dinámico dentro del efecto para que maplibre quede en un chunk aparte.
@@ -554,7 +554,13 @@ export function TripMapGlobe({
   // cámara donde quedó es lo que hace instantáneo el regreso. Los datos que hayan
   // llegado mientras estaba oculto ya se pintaron (el efecto de `route` de abajo corre
   // aunque el viaje esté oculto: mutar markers en un contenedor `display:none` es barato).
-  useEffect(() => {
+  //
+  // `useLayoutEffect` (issue #982), no `useEffect`: con `useEffect` el navegador podía
+  // pintar un frame con el canvas aún a tamaño 0 (o mal encuadrado) antes de que el
+  // efecto corriera tras el paint — un flash del papel/escena de detrás asomando por el
+  // hueco. `resize` es una medición/repintado síncronos del propio MapLibre; corre ANTES
+  // del primer paint tras reaparecer, así ese frame intermedio nunca llega a pintarse.
+  useLayoutEffect(() => {
     const map = mapRef.current
     if (!map || !readyRef.current) return
     if (!active) {

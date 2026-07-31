@@ -36,7 +36,7 @@
 // sign-ins" apagado en el dashboard, ver docs/operativa.md), degradamos con
 // gracia al flujo de hoy (Landing + código OTP): nunca pantalla en blanco.
 
-import { lazy, Suspense, useContext, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useContext, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { isAdminEmail } from './lib/admin'
@@ -64,6 +64,7 @@ import { prefetchMainRoutes } from './lib/prefetch'
 import { KeepAliveHome } from './features/home/KeepAliveHome'
 import { KeepAliveTrip } from './features/trip/KeepAliveTrip'
 import { parseHash, groupHash, addMomentHash, addChallengeHash } from './lib/route'
+import { isDarkSceneHash, clearBootScene } from './lib/bootScene'
 import {
   BackHomeButton,
   Button,
@@ -112,6 +113,15 @@ const ProfileEditScreen = lazy(() =>
 const AdminPage = lazy(() => import('./features/admin').then((m) => ({ default: m.AdminPage })))
 
 function App() {
+  // Boot oscuro por hash (issue #982): la clase `boot-scene` la puso un script
+  // inline de index.html ANTES de que este bundle existiera (ver bootScene.ts).
+  // `useLayoutEffect` (no `useEffect`) para retirarla ANTES del primer paint de
+  // React — en ese mismo commit, `BootScreen` (más abajo) ya pinta su propio
+  // fondo oscuro equivalente si el destino lo pedía, así la retirada nunca se ve.
+  useLayoutEffect(() => {
+    clearBootScene()
+  }, [])
+
   useEffect(() => {
     // QW3 (prefetch): en cuanto el arranque termina, adelantamos en idle la
     // descarga de los chunks de las rutas MÁS transitadas desde la home (viaje,
@@ -281,9 +291,14 @@ function ExampleTripPublic({ route }: { route: ReturnType<typeof parseHash> }) {
 }
 
 // Spinner de arranque, mientras AuthProvider resuelve la sesión persistida.
+// Si el deep link apunta a una escena oscura (issue #982, ver bootScene.ts),
+// pinta su propio fondo oscuro equivalente al de `html.boot-scene` — la clase
+// se retira del `<html>` en cuanto App monta (más arriba), y sin este propio
+// fondo la retirada dejaría ver el papel por defecto de `body` a mitad de carga.
 function BootScreen() {
+  const dark = isDarkSceneHash(window.location.hash)
   return (
-    <main className={styles.boot}>
+    <main className={dark ? `${styles.boot} ${styles.bootSceneDark}` : styles.boot}>
       <Stack gap={3} align="center">
         <Spinner size={32} />
       </Stack>

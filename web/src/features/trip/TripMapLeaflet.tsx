@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import {
   AttributionControl,
   MapContainer,
@@ -125,10 +125,16 @@ function PanToSelected({
  * pero Leaflet no lo detecta solo — sin `invalidateSize()` el lienzo se queda con el
  * viewport viejo (gris/mal encuadrado). Al pasar `active` a `true` lo revalidamos SIN
  * reencuadrar (preservar la cámara donde quedó es lo que hace instantáneo el regreso).
+ *
+ * `useLayoutEffect` (issue #982), no `useEffect`: con `useEffect` el navegador podía
+ * PINTAR un frame con el lienzo aún al tamaño/viewport viejo (mal encuadrado, papel
+ * asomando en el hueco) antes de que el efecto corriera tras el paint. `invalidateSize`
+ * es una medición/repintado síncronos del propio Leaflet — corre ANTES del primer
+ * paint tras reaparecer, así ese frame intermedio nunca llega a pintarse.
  */
 function InvalidateOnActive({ active }: { active: boolean }) {
   const map = useMap()
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (active) map.invalidateSize()
   }, [active, map])
   return null
