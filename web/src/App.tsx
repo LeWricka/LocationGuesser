@@ -52,7 +52,7 @@ import { EXAMPLE_TRIP_GROUP_ID } from './lib/exampleTrip'
 import { ReceptorWelcomeGate } from './features/onboarding'
 import { AuthProvider } from './lib/session'
 import { OverlayBackProvider } from './lib/OverlayBackProvider'
-import { OverlayBackContext } from './lib/overlayBack'
+import { OverlayBackContext, isAtHistoryFloor } from './lib/overlayBack'
 import { useSession } from './lib/session-context'
 import { useAnalyticsIdentity } from './lib/useAnalyticsIdentity'
 import { GoogleMapsProvider } from './lib/GoogleMapsProvider'
@@ -811,7 +811,11 @@ function goHome() {
   // viaje…) "atrás" debe ATERRIZAR en la home sí o sí, así que se empuja.
   const previousIsHome =
     previousEntryHash === '' || previousEntryHash === '#' || previousEntryHash === '#/'
-  if (internalHashNavigations > 0 && previousIsHome) {
+  // GUARDA DE SUELO (issue #983): si estamos sobre la primera entrada de la app,
+  // `history.back()` no vuelve a la home: abandona el documento y lo recarga en
+  // blanco. En ese caso caemos al push de hash de abajo (que sí aterriza en la
+  // home dentro de la SPA), nunca al back.
+  if (internalHashNavigations > 0 && previousIsHome && !isAtHistoryFloor()) {
     window.history.back()
     return
   }

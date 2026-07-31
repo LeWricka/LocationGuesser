@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { isAtHistoryFloor, pushOverlaySentinel } from './overlayBack'
 
 // Política de navegación "atrás cierra la capa de encima" (issue #967, ola 3
 // en #972). En una SPA con enrutado por hash, las hojas/modales/lightbox que
@@ -75,8 +76,9 @@ export function useOverlayBack(depth: number | boolean, closeTopmost: () => void
     if (!active) return
 
     // Empuja la entrada-centinela SIN cambiar la URL (mismo hash → sin
-    // `hashchange`). Es la entrada que el atrás consumirá.
-    window.history.pushState({ ...window.history.state, lgOverlayBack: true }, '')
+    // `hashchange`) y SIN heredar la marca de suelo. Es la entrada que el atrás
+    // consumirá.
+    pushOverlaySentinel()
 
     // ¿El cierre lo provocó el atrás del navegador (`popstate`) o la UI
     // (Escape/scrim/botón)? Solo en el segundo caso hay que deshacer la entrada
@@ -92,7 +94,7 @@ export function useOverlayBack(depth: number | boolean, closeTopmost: () => void
       // Si era la última capa, marcamos que el navegador ya consumió la entrada
       // (nada que deshacer en la limpieza).
       if (depthRef.current > 1) {
-        window.history.pushState({ ...window.history.state, lgOverlayBack: true }, '')
+        pushOverlaySentinel()
       } else {
         closedByPop = true
       }
@@ -106,7 +108,17 @@ export function useOverlayBack(depth: number | boolean, closeTopmost: () => void
       // primer atrás tras cerrar "no haría nada"). El guard sobre
       // `lgOverlayBack` evita robar un back a otra navegación si por lo que sea
       // ya no somos el tope.
-      if (!closedByPop && window.history.state?.lgOverlayBack) {
+      //
+      // GUARDA DE SUELO (issue #983): jamás emitimos `history.back()` si la
+      // entrada actual es el SUELO de la app (la primera de la sesión). Ahí el
+      // back no cerraría una capa: sacaría al navegador del documento y lo
+      // recargaría en blanco. Puede pasar si la marca de suelo acabó fusionada
+      // con `lgOverlayBack` en la misma entrada (p.ej. un `replaceState` de
+      // terceros preservando el state mientras reescribe el hash). Preferimos
+      // dejar la entrada colgada (un atrás inerte) antes que una recarga: sin
+      // `back()`, un atrás posterior del usuario abandona la app con normalidad,
+      // sin frame en blanco intermedio.
+      if (!closedByPop && window.history.state?.lgOverlayBack && !isAtHistoryFloor()) {
         window.history.back()
       }
     }
