@@ -8,11 +8,12 @@
 // `useMapsLibrary`/`useMap` cuando lo necesitan, y para eso basta con tener este
 // <APIProvider> como ancestro.
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { APILoadingStatus, APIProvider, useApiLoadingStatus } from '@vis.gl/react-google-maps'
 import { Banner } from '../ui/Banner'
 import { Button } from '../ui/Button'
 import { reportSilentWarning } from './observability'
+import { track } from './analytics'
 import { MapsFailureContext } from './mapsGuard'
 import styles from './GoogleMapsProvider.module.css'
 
@@ -67,6 +68,25 @@ function MapsLoadGuard({ children }: Props) {
     status === APILoadingStatus.AUTH_FAILURE ||
     timedOut ||
     libraryFailed
+
+  // Telemetría del banner degradado (issue #990): Sentry solo ve la excepción
+  // rara — el colgado silencioso (timeout) no genera issue, así que sin esto no
+  // sabemos CUÁNTOS usuarios ni en qué plataforma (caso real: iPhones del grupo
+  // de Filipinas). Mixpanel adjunta $os/$browser por su cuenta; una vez por montaje.
+  const trackedRef = useRef(false)
+  useEffect(() => {
+    if (!failed || trackedRef.current) return
+    trackedRef.current = true
+    const reason =
+      status === APILoadingStatus.FAILED
+        ? 'failed'
+        : status === APILoadingStatus.AUTH_FAILURE
+          ? 'auth_failure'
+          : libraryFailed
+            ? 'library_timeout'
+            : 'load_timeout'
+    track('maps_degraded', { reason })
+  }, [failed, status, libraryFailed])
 
   if (failed) {
     return (

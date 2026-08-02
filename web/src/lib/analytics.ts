@@ -79,6 +79,11 @@ export type AnalyticsEvent =
   // ('shared'|'downloaded'), group_id, challenge_id, points, distance_km. SIN
   // ubicación: el evento nunca lleva lat/lng ni nombre del lugar.
   | 'result_shared'
+  // El mapa de Google no cargó y se mostró el banner degradado "Reintentar"
+  // (issue #988/#990): mide CUÁNTOS usuarios y en qué plataforma (Mixpanel ya
+  // adjunta $os/$browser) — Sentry solo ve la excepción rara, no el colgado
+  // silencioso. Props: reason ('failed'|'auth_failure'|'load_timeout'|'library_timeout').
+  | 'maps_degraded'
   // Eventos pre-declarados para las features en curso (tarjeta, onboarding,
   // home). Se declaran aquí de antemano para que esas features solo llamen a
   // track() sin editar este catálogo en paralelo (evita choques de merge).
