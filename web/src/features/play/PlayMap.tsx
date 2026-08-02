@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Map, Marker, Polyline, useApiIsLoaded, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
 import { avatarPinFromProfile, targetPinSvg, PIN_ANCHOR, PIN_SIZE } from '../../lib/avatarPin'
+import { useMapsLibraryGuarded } from '../../lib/mapsGuard'
 import type { MapPreset } from '../../lib/mapPresets'
 import { MapSkeleton } from '../../ui'
 import styles from './PlayMap.module.css'
@@ -348,6 +349,14 @@ export function PlayMap({
   // existe; hasta entonces NO montamos ningún pin (el `MapSkeleton` de abajo ya
   // cubre visualmente la espera).
   const apiLoaded = useApiIsLoaded()
+
+  // Issue #988 (Sentry LOCATIONGUESSER-1J, "Could not load 'marker'"): el
+  // <Marker> clásico de abajo dispara la carga de la librería 'marker' del SDK
+  // por su cuenta (fuera de nuestro control) y esa promesa va sin `catch` —
+  // si falla, no hay NINGUNA señal salvo pines que nunca aparecen. Pedimos la
+  // misma librería aquí (cacheada, no duplica la petición) solo para vigilarla:
+  // si no llega, escala al banner degradado del `<GoogleMapsProvider>` ancestro.
+  useMapsLibraryGuarded('marker')
 
   return (
     <div className={styles.wrap}>

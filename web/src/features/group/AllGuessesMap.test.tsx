@@ -72,6 +72,10 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   // beforeAll arriba) y esperan ver los iconos calculados, así que la guarda
   // de carga (issue #957, `useApiIsLoaded` en AllGuessesMap) debe dejarlos pasar.
   useApiIsLoaded: () => true,
+  // La guarda de librería (issue #988, `useMapsLibraryGuarded('marker')`) pide
+  // esto de fondo; el fallo de librería se cubre en GoogleMapsProvider.test.tsx,
+  // así que un doble fijo en `null` basta aquí.
+  useMapsLibrary: () => null,
 }))
 
 function guess(over: Partial<GuessMarker> & Pick<GuessMarker, 'userId' | 'name'>): GuessMarker {

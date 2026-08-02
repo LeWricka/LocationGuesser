@@ -1,6 +1,6 @@
 /// <reference types="google.maps" />
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { useMapsLibrary } from '@vis.gl/react-google-maps'
+import { useMapsLibraryGuarded } from '../../lib/mapsGuard'
 import type { LatLng } from '../../lib/geo'
 import { Spinner } from '../../ui'
 import styles from './StreetViewPano.module.css'
@@ -50,7 +50,11 @@ export const StreetViewPano = forwardRef<StreetViewPanoHandle, Props>(function S
   { panoId, position, heading, pitch, lockMove = false, lockRotate = false, onPovChanged },
   ref,
 ) {
-  const streetViewLib = useMapsLibrary('streetView')
+  // Guarded (issue #988, Sentry LOCATIONGUESSER-1J): si la librería 'streetView'
+  // no llega tras cargar el SDK (bloqueador, DNS privado, roaming), esto ya no
+  // se queda en spinner eterno — escala al banner "No se pudo cargar el mapa ·
+  // Reintentar" del `<GoogleMapsProvider>` ancestro tras un tope de espera.
+  const streetViewLib = useMapsLibraryGuarded('streetView')
   const containerRef = useRef<HTMLDivElement>(null)
   const panoRef = useRef<google.maps.StreetViewPanorama | null>(null)
   // Issue #978: al resolver la posición/panoId, Google puede asentar la vista en

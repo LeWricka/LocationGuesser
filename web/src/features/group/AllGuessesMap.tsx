@@ -2,6 +2,7 @@
 import { useEffect } from 'react'
 import { Map, Marker, Polyline, useApiIsLoaded, useMap } from '@vis.gl/react-google-maps'
 import type { LatLng } from '../../lib/geo'
+import { useMapsLibraryGuarded } from '../../lib/mapsGuard'
 import {
   avatarPinFromProfile,
   avatarPinFromProfileSelected,
@@ -254,6 +255,12 @@ export function AllGuessesMap({ answer, guesses, meUserId, selectedUserId }: Pro
   // guarda revientan si este mapa (dentro del mismo `<APIProvider>`) se monta
   // antes de que el SDK termine de cargar.
   const apiLoaded = useApiIsLoaded()
+  // Issue #988 (Sentry LOCATIONGUESSER-1J): mismo motivo que PlayMap — el
+  // <Marker> clásico de abajo pide la librería 'marker' por su cuenta y esa
+  // carga puede fallar sin dejar ninguna señal (spinner/mapa eterno). Vigilamos
+  // la misma librería aquí (petición cacheada, no duplicada) para escalar al
+  // banner degradado del `<GoogleMapsProvider>` ancestro si no llega.
+  useMapsLibraryGuarded('marker')
   return (
     <Map
       className="lg-map"
