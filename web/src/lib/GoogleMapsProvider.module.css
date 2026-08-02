@@ -1,0 +1,13 @@
+/* Banner degradado "No se pudo cargar el mapa" (issue #988): título + una
+   línea secundaria más discreta con la sugerencia accionable (bloqueadores/DNS/
+   red). `Banner` ya resuelve color/tono; aquí solo el tamaño/peso de cada línea. */
+.title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}

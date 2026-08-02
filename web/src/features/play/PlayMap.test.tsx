@@ -33,6 +33,10 @@ vi.mock('@vis.gl/react-google-maps', () => ({
   Polyline: () => null,
   useMap: () => mockMap.current,
   useApiIsLoaded: () => mockApiLoaded.current,
+  // La guarda de librería (issue #988, `useMapsLibraryGuarded('marker')`) pide
+  // esto de fondo; ninguno de estos tests cubre el fallo de librería (eso vive
+  // en GoogleMapsProvider.test.tsx), así que un doble fijo en `null` basta.
+  useMapsLibrary: () => null,
 }))
 
 // Misma clave que el toggle de MapPicker (ver comentario en PlayMap.tsx junto
