@@ -15,12 +15,7 @@ import { describeError } from '../../lib/errors'
 import { useSession } from '../../lib/session-context'
 import { getGroup } from '../../lib/groupData'
 import { computeDefaultDate, fetchLatestMomentDate, todayIso } from '../../lib/defaultDate'
-import {
-  DEFAULT_SCORE_SCALE,
-  DEFAULT_TIME_SCORING,
-  type LatLng,
-  type ScoreScale,
-} from '../../lib/geo'
+import { DEFAULT_TIME_SCORING, type LatLng } from '../../lib/geo'
 import {
   clearDraft,
   deserializeFile,
@@ -99,23 +94,10 @@ const GUESS_OPTIONS: { value: number | null; label: string }[] = [
 ]
 const DEFAULT_GUESS_INDEX = 1 // 30 s
 
-// Precisión del reto (issue #956): antes iba SIEMPRE fija a 'ciudad' (sin
-// selector ni aviso), y un fallo de país en esa escala daba 0 puntos secos —
-// origen del feedback real (viaje Filipinas) que motivó esta issue. Ahora hay
-// selector, EMPIEZA en 'mundo' (la más indulgente, recomendada) y cada opción
-// explica su exigencia para que nadie elija 'ciudad'/'barrio' sin saberlo.
-const SCALE_OPTIONS: { value: ScoreScale; label: string }[] = [
-  { value: 'mundo', label: 'Mundo' },
-  { value: 'pais', label: 'País' },
-  { value: 'ciudad', label: 'Ciudad' },
-  { value: 'barrio', label: 'Barrio' },
-]
-const SCALE_HINTS: Record<ScoreScale, string> = {
-  mundo: 'Vale con acertar el país o el continente — la más indulgente, recomendada.',
-  pais: 'Hay que acercarse a la región o el país — exigente.',
-  ciudad: 'Hay que acertar la ciudad — muy exigente, para grupos con buen ojo.',
-  barrio: 'Casi hay que clavar la calle — la más exigente, solo para expertos.',
-}
+// Precisión del reto: YA NO se elige (issue #994) — la exigencia se
+// auto-calibra en el servidor según el tamaño del viaje (estilo GeoGuessr:
+// la 'diagonal' de los puntos ubicados decide la curva). El selector de #956
+// (mundo/país/ciudad/barrio) confundía a los creadores reales y desapareció.
 
 // Centro y zoom inicial del mapa (España como fallback cuando no hay GPS).
 const DEFAULT_CENTER: LatLng = { lat: 40.4, lng: -3.7 }
@@ -148,9 +130,6 @@ interface LocationChallengeDraft {
   deadlineIndex: number
   guessIndex: number
   timeScoring: boolean
-  // Opcional: borradores de antes de la issue #956 no la traen (defensivo,
-  // ver `?? DEFAULT_SCORE_SCALE` al restaurar).
-  scoreScale?: ScoreScale
   photo: SerializedFile | null
 }
 
@@ -217,10 +196,6 @@ export function CreateLocationChallenge({
   // límite por jugada (el toggle se OCULTA en 'Libre'), pero conservamos el
   // valor aunque se oculte — al volver a un límite, reaparece con lo elegido.
   const [timeScoring, setTimeScoring] = useState(DEFAULT_TIME_SCORING)
-  // Precisión del reto (issue #956): arranca en 'mundo' — la más indulgente,
-  // recomendada — no en 'ciudad' como antes (hardcodeado, sin selector).
-  const [scoreScale, setScoreScale] = useState<ScoreScale>(DEFAULT_SCORE_SCALE)
-
   // Fecha ELEGIDA de cuándo OCURRIÓ el reto (`happened_on`, migración 0037):
   // sin esto, un reto nuevo cae por `created_at` (cuándo se lanza) y desordena
   // el diario si se documenta a posteriori — mismo reporte que motivó la fecha
@@ -393,7 +368,6 @@ export function CreateLocationChallenge({
         setDeadlineIndex(draft.deadlineIndex)
         setGuessIndex(draft.guessIndex)
         setTimeScoring(draft.timeScoring)
-        setScoreScale(draft.scoreScale ?? DEFAULT_SCORE_SCALE)
         if (draft.photo) pickPhoto(deserializeFile(draft.photo))
         // Re-lanza la búsqueda de Street View desde el punto guardado (no
         // resucitamos el panoId a ciegas, ver comentario de `draftKey`).
@@ -410,7 +384,6 @@ export function CreateLocationChallenge({
               setDeadlineIndex(DEFAULT_DEADLINE_INDEX)
               setGuessIndex(DEFAULT_GUESS_INDEX)
               setTimeScoring(DEFAULT_TIME_SCORING)
-              setScoreScale(DEFAULT_SCORE_SCALE)
               pickPhoto(null)
             },
           },
@@ -454,11 +427,10 @@ export function CreateLocationChallenge({
             deadlineIndex,
             guessIndex,
             timeScoring,
-            scoreScale,
             photo: draftPhoto,
           }
         : null,
-    [pickedPoint, deadlineIndex, guessIndex, timeScoring, scoreScale, draftPhoto],
+    [pickedPoint, deadlineIndex, guessIndex, timeScoring, draftPhoto],
   )
   // Con `skipDraft` (prefill/promoción/galería) tampoco SE GUARDA borrador: en
   // esos modos nunca se restauraría (el prefill manda) y, peor, se colaría en el
@@ -568,10 +540,6 @@ export function CreateLocationChallenge({
         // como PISTA junto al Street View, nunca sorpresa.
         // `PlayChallenge` ya sabe pintarla así (hintPhotoUrl) sin cambios ahí.
         photoIsHint: true,
-        // Precisión elegida en el selector del paso 2 (issue #956): ya no va
-        // fija a 'ciudad' — arranca en 'mundo' (indulgente) y el dueño puede
-        // subir la exigencia con conocimiento de causa (hint por opción).
-        scoreScale,
       }
 
       let challenge: ChallengeForPlay
@@ -614,7 +582,6 @@ export function CreateLocationChallenge({
         photo_is_hint: challenge.image_path ? true : null,
         duration_hours: DEADLINE_OPTIONS[deadlineIndex].minutes / 60,
         difficulty: 'streetview',
-        score_scale: scoreScale,
         location_source: 'map_pick',
         // Promoción de un recuerdo existente (issue #723) vs reto nuevo.
         promoted_from_moment: Boolean(promoteMomentId),
@@ -803,22 +770,8 @@ export function CreateLocationChallenge({
                   />
                 </div>
               )}
-              {/* Selector de precisión CLARO (issue #956): antes iba fija a
-                  'ciudad' sin avisar de la exigencia, y un fallo de país en esa
-                  escala dejaba al grupo con 0 puntos secos (feedback real del
-                  viaje Filipinas). El hint bajo el control dice EXACTAMENTE qué
-                  exige la opción elegida, para que nadie suba la exigencia sin
-                  saberlo. */}
-              <div className={styles.ruleRow}>
-                <label className={styles.ruleLabel}>Precisión</label>
-                <SegmentedControl
-                  label="Precisión del reto"
-                  options={SCALE_OPTIONS}
-                  value={scoreScale}
-                  onChange={setScoreScale}
-                />
-                <p className={styles.toggleHint}>{SCALE_HINTS[scoreScale]}</p>
-              </div>
+              {/* La precisión ya NO se elige (issue #994): se auto-calibra en
+                  el servidor según el tamaño del viaje (estilo GeoGuessr). */}
               <div className={styles.ruleRow}>
                 <label className={styles.ruleLabel}>Plazo</label>
                 <SegmentedControl

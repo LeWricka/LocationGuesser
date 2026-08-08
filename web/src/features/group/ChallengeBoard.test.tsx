@@ -23,6 +23,7 @@ function vote(
     elapsed_seconds: null,
     play_started_at: null,
     scored_seconds: null,
+    decay_km: null,
     created_at: '2026-01-01T00:00:00Z',
     avatar: null,
     ...over,
@@ -104,6 +105,7 @@ describe('ChallengeBoard — tiempo mostrado = tiempo que puntuó (issue #946)',
             points: 100,
             elapsed_seconds: 12,
             scored_seconds: null,
+            decay_km: null,
           }),
         ]}
         myUserId={null}

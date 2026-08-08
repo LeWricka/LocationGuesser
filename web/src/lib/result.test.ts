@@ -20,11 +20,11 @@ describe('computeResult', () => {
     expect(points).toBeLessThan(5000)
   })
 
-  test('puntos coherentes con la fórmula 5000·e^(−km/2000)', () => {
+  test('puntos coherentes con la fórmula 5000·e^(−km/decay) — respaldo 300 (issue #994)', () => {
     const a = { lat: 0, lng: 0 }
     const b = { lat: 0, lng: 1 }
     const { km, points } = computeResult(a, b)
-    expect(points).toBe(Math.round(5000 * Math.exp(-km / 2000)))
+    expect(points).toBe(Math.round(5000 * Math.exp(-km / 300)))
   })
 
   test('antípodas: distancia enorme, pero nunca baja del suelo (issue #956)', () => {
@@ -34,15 +34,15 @@ describe('computeResult', () => {
     expect(points).toBe(MIN_GUESS_POINTS)
   })
 
-  test('sin escala == "mundo": el cálculo no cambia para los retos de siempre', () => {
+  test('sin decay explícito usa el respaldo país (300 km) — issue #994', () => {
     const a = { lat: 40, lng: -3 }
     const b = { lat: 41, lng: -2 }
-    expect(computeResult(a, b).points).toBe(computeResult(a, b, 'mundo').points)
+    expect(computeResult(a, b).points).toBe(computeResult(a, b, 300).points)
   })
 
-  test('una escala más estricta da menos puntos a la misma distancia', () => {
+  test('un decay más estricto da menos puntos a la misma distancia', () => {
     const a = { lat: 40, lng: -3 }
     const b = { lat: 40.1, lng: -3 } // ~11 km
-    expect(computeResult(a, b, 'barrio').points).toBeLessThan(computeResult(a, b, 'mundo').points)
+    expect(computeResult(a, b, 25).points).toBeLessThan(computeResult(a, b, 2000).points)
   })
 })

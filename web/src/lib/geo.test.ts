@@ -5,9 +5,13 @@ import {
   fmtDist,
   fmtNumber,
   signedRelErrorPct,
-  SCORE_DECAY_KM,
-  DEFAULT_SCORE_SCALE,
   MIN_GUESS_POINTS,
+  SPEED_BONUS_MAX,
+  DECAY_MIN_KM,
+  DECAY_MAX_KM,
+  DECAY_FALLBACK_KM,
+  computeTripDecay,
+  speedBonusFor,
   scoreForNumber,
   NUMBER_DECAY_K,
   DEFAULT_NUMBER_TOLERANCE,
@@ -47,56 +51,101 @@ describe('geo', () => {
     expect(MIN_GUESS_POINTS).toBe(250)
   })
 
-  test('scoreFor: nunca por debajo del suelo, en ninguna escala, por lejos que falle', () => {
-    for (const scale of ['mundo', 'pais', 'ciudad', 'barrio'] as const) {
-      expect(scoreFor(100000, scale)).toBe(MIN_GUESS_POINTS)
-      expect(scoreFor(100000, scale)).toBeGreaterThanOrEqual(MIN_GUESS_POINTS)
+  test('scoreFor: nunca por debajo del suelo, con cualquier decay, por lejos que falle', () => {
+    for (const decay of [25, 300, 2000]) {
+      expect(scoreFor(100000, decay)).toBe(MIN_GUESS_POINTS)
     }
   })
 
   test('scoreFor: por encima del suelo, el cálculo crudo no cambia (el suelo no "infla" nada)', () => {
-    // A 0 km y a poca distancia el crudo ya supera 250: el suelo no interviene.
-    expect(scoreFor(0, 'mundo')).toBe(rawScore(0, SCORE_DECAY_KM.mundo))
-    expect(scoreFor(10, 'mundo')).toBe(rawScore(10, SCORE_DECAY_KM.mundo))
+    expect(scoreFor(0, 300)).toBe(rawScore(0, 300))
+    expect(scoreFor(10, 300)).toBe(rawScore(10, 300))
   })
 
-  // ── Precisión del reto (score_scale → D) ──────────────────────────────────
-  test('scoreFor: por defecto es "mundo" = el comportamiento histórico (D=2000) por encima del suelo', () => {
-    // Sin escala == escala 'mundo' == la fórmula de siempre 5000·e^(−km/2000).
-    expect(DEFAULT_SCORE_SCALE).toBe('mundo')
-    for (const km of [0, 50, 500, 2000]) {
-      expect(scoreFor(km)).toBe(scoreFor(km, 'mundo'))
-      expect(scoreFor(km, 'mundo')).toBe(rawScore(km, 2000))
-    }
+  // ── Scoring auto-calibrado (issue #994) — casos numéricos del experto ─────
+  // Validados contra GeoGuessr real y simulaciones con datos del grupo Filipinas.
+  test('casos del experto: distancia → puntos con cada decay', () => {
+    expect(scoreFor(19, 300)).toBe(4693) // país-escala, guess casi perfecto
+    expect(scoreFor(556, 300)).toBe(784)
+    expect(scoreFor(8931, 300)).toBe(250) // suelo: fallo de continente
+    expect(scoreFor(20, 25)).toBe(2247) // decay mínimo (viaje urbano)
+    expect(scoreFor(753, 2000)).toBe(3431) // decay máximo (viaje mundial)
+    expect(scoreFor(100, 300)).toBe(3583) // respaldo país (primer reto)
   })
 
-  test('scoreFor: a 0 km todas las escalas dan el máximo (5000)', () => {
-    expect(scoreFor(0, 'mundo')).toBe(5000)
-    expect(scoreFor(0, 'pais')).toBe(5000)
-    expect(scoreFor(0, 'ciudad')).toBe(5000)
-    expect(scoreFor(0, 'barrio')).toBe(5000)
+  test('computeTripDecay: <2 puntos → respaldo país (300)', () => {
+    expect(computeTripDecay([])).toBe(DECAY_FALLBACK_KM)
+    expect(computeTripDecay([{ lat: 40, lng: -3 }])).toBe(DECAY_FALLBACK_KM)
   })
 
-  test('scoreFor: a igual distancia, más estricto = menos puntos (barrio<ciudad<pais<mundo)', () => {
-    const km = 20 // misma distancia, distinta exigencia
-    expect(scoreFor(km, 'barrio')).toBeLessThan(scoreFor(km, 'ciudad'))
-    expect(scoreFor(km, 'ciudad')).toBeLessThan(scoreFor(km, 'pais'))
-    expect(scoreFor(km, 'pais')).toBeLessThan(scoreFor(km, 'mundo'))
+  test('computeTripDecay: clamps — nunca por debajo de 25 ni por encima de 2000', () => {
+    // Dos puntos casi pegados → diagonal ~0 → clamp al mínimo.
+    expect(
+      computeTripDecay([
+        { lat: 40, lng: -3 },
+        { lat: 40.001, lng: -3.001 },
+      ]),
+    ).toBe(DECAY_MIN_KM)
+    // Puntos en las antípodas → diagonal enorme → clamp al máximo.
+    expect(
+      computeTripDecay([
+        { lat: 40, lng: -3 },
+        { lat: -40, lng: 177 },
+      ]),
+    ).toBe(DECAY_MAX_KM)
   })
 
-  test('scoreFor: cada escala usa su D, con el suelo aplicado por igual (max(250, 5000·e^(−km/D)))', () => {
-    const km = 10
-    for (const scale of ['mundo', 'pais', 'ciudad', 'barrio'] as const) {
-      expect(scoreFor(km, scale)).toBe(
-        Math.max(MIN_GUESS_POINTS, rawScore(km, SCORE_DECAY_KM[scale])),
-      )
-    }
+  test('computeTripDecay: robusto a un OUTLIER (caso 9 del experto)', () => {
+    // 9 puntos en un radio de ~15 km + 1 outlier a ~800 km: el percentil-85
+    // debe ignorarlo (diagonal efectiva ≈173 km, NO ~807 como daría un bbox).
+    const cluster = Array.from({ length: 9 }, (_, i) => ({
+      lat: 40 + (i % 3) * 0.09,
+      lng: -3 + Math.floor(i / 3) * 0.09,
+    }))
+    const outlier = { lat: 47.2, lng: -1.55 } // ~800 km del cluster
+    const decay = computeTripDecay([...cluster, outlier])
+    // diagonal ≈173 km → decay ≈ 173/6 ≈ 29 km (lejos del ~134 que daría el bbox).
+    expect(decay).toBeGreaterThan(DECAY_MIN_KM)
+    expect(decay).toBeLessThan(40)
+  })
+
+  test('computeTripDecay: cruza el antimeridiano sin romperse (Filipinas↔Pacífico)', () => {
+    const decay = computeTripDecay([
+      { lat: 10, lng: 179 },
+      { lat: 10, lng: -179 },
+      { lat: 11, lng: 179.5 },
+    ])
+    // Puntos a ~200-300 km reales entre sí: el decay debe salir local (~<80),
+    // no el máximo (que saldría si el centroide de longitudes se calculara mal).
+    expect(decay).toBeLessThan(80)
   })
 
   test('fmtDist: metros, decimales y enteros', () => {
     expect(fmtDist(0.5)).toBe('500 m')
     expect(fmtDist(12.34)).toBe('12.3 km')
     expect(fmtDist(1500)).toBe('1500 km')
+  })
+})
+
+// ── Bonus ADITIVO de rapidez (issue #994): desempata, nunca voltea ───────────
+describe('speedBonusFor', () => {
+  test('instantáneo = bonus máximo (+250)', () => {
+    expect(speedBonusFor(0, 60)).toBe(SPEED_BONUS_MAX)
+  })
+
+  test('caso 7 del experto: 50% de tiempo restante → +125 (4000 base → 4125 total)', () => {
+    expect(speedBonusFor(30, 60)).toBe(125)
+    expect(4000 + speedBonusFor(30, 60)).toBe(4125)
+  })
+
+  test('caso 8 del experto: suelo 250 + 100% restante → 500 total', () => {
+    expect(250 + speedBonusFor(0, 60)).toBe(500)
+  })
+
+  test('al límite (o pasado) = 0; límite inválido = 0', () => {
+    expect(speedBonusFor(60, 60)).toBe(0)
+    expect(speedBonusFor(90, 60)).toBe(0)
+    expect(speedBonusFor(10, 0)).toBe(0)
   })
 })
 

@@ -83,6 +83,7 @@ const sampleVote: Vote = {
   elapsed_seconds: null,
   play_started_at: null,
   scored_seconds: null,
+  decay_km: null,
   created_at: '2026-06-19T00:00:00.000Z',
 }
 
@@ -104,6 +105,7 @@ describe('submitVote', () => {
           answer_lng: -3.1,
           speed_factor: 1,
           scored_seconds: null,
+          decay_km: null,
         },
       ],
       error: null,
@@ -126,6 +128,7 @@ describe('submitVote', () => {
       answerLng: -3.1,
       speedFactor: 1,
       scoredSeconds: null,
+      speedBonus: 0,
     })
   })
 
@@ -179,6 +182,7 @@ describe('submitVote', () => {
           answer_lng: null,
           speed_factor: 1,
           scored_seconds: null,
+          decay_km: null,
         },
       ],
       error: null,
@@ -198,6 +202,7 @@ describe('submitVote', () => {
       answerLng: null,
       speedFactor: 1,
       scoredSeconds: null,
+      speedBonus: 0,
     })
   })
 

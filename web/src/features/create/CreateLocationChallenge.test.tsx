@@ -476,8 +476,18 @@ describe('CreateLocationChallenge — "La velocidad puntúa" (#628)', () => {
 })
 
 // --- Selector de precisión (issue #956): default 'mundo' + aviso de exigencia ------
-describe('CreateLocationChallenge — selector de precisión (#956)', () => {
-  function launchResult() {
+describe('CreateLocationChallenge — sin selector de precisión (#994)', () => {
+  test('el selector de precisión ya NO existe: la exigencia se auto-calibra en el servidor', async () => {
+    const user = userEvent.setup()
+    renderScreen()
+    await advanceToRules(user)
+
+    // El paso de reglas ya no ofrece elegir escala (mundo/país/ciudad/barrio).
+    expect(screen.queryByRole('radio', { name: 'Mundo' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Precisión')).not.toBeInTheDocument()
+  })
+
+  test('lanzar NO manda scoreScale (el servidor auto-calibra, issue #994)', async () => {
     createChallengeMock.mockResolvedValue({
       challenge: {
         id: 'reto-precision',
@@ -486,21 +496,6 @@ describe('CreateLocationChallenge — selector de precisión (#956)', () => {
       } as ChallengeForPlay,
       groupId: 'g-1',
     })
-  }
-
-  test('arranca en "Mundo" (issue #956: antes iba fija a "Ciudad", sin selector)', async () => {
-    const user = userEvent.setup()
-    renderScreen()
-    await advanceToRules(user)
-
-    const mundo = screen.getByRole('radio', { name: 'Mundo' })
-    expect(mundo).toHaveAttribute('aria-checked', 'true')
-    // El hint explica la exigencia de la opción seleccionada por defecto.
-    expect(screen.getByText(/recomendada/i)).toBeInTheDocument()
-  })
-
-  test('lanzar sin tocar el selector: createChallenge recibe scoreScale="mundo"', async () => {
-    launchResult()
     const user = userEvent.setup()
     renderScreen()
     await advanceToRules(user)
@@ -508,34 +503,8 @@ describe('CreateLocationChallenge — selector de precisión (#956)', () => {
     await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
 
     await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
-    expect(createChallengeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ scoreScale: 'mundo' }),
-    )
-    expect(trackMock).toHaveBeenCalledWith(
-      'challenge_created',
-      expect.objectContaining({ score_scale: 'mundo' }),
-    )
-  })
-
-  test('elegir "Ciudad": el hint avisa de la exigencia y createChallenge recibe scoreScale="ciudad"', async () => {
-    launchResult()
-    const user = userEvent.setup()
-    renderScreen()
-    await advanceToRules(user)
-
-    await user.click(screen.getByRole('radio', { name: 'Ciudad' }))
-    expect(screen.getByText(/muy exigente/i)).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: /lanzar el reto a tu gente/i }))
-
-    await waitFor(() => expect(createChallengeMock).toHaveBeenCalledTimes(1))
-    expect(createChallengeMock).toHaveBeenCalledWith(
-      expect.objectContaining({ scoreScale: 'ciudad' }),
-    )
-    expect(trackMock).toHaveBeenCalledWith(
-      'challenge_created',
-      expect.objectContaining({ score_scale: 'ciudad' }),
-    )
+    const arg = createChallengeMock.mock.calls[0][0] as Record<string, unknown>
+    expect('scoreScale' in arg).toBe(false)
   })
 })
 
@@ -725,8 +694,6 @@ describe('CreateLocationChallenge — modo promoción (promoteMomentId)', () => 
         guessSeconds: 30,
         timeScoring: true,
         photoIsHint: true,
-        // Default 'mundo' (issue #956): ya no va fijo a 'ciudad'.
-        scoreScale: 'mundo',
         deadlineAt: expect.any(String),
         // Foto del recuerdo sin tocar: NO se manda (conservar), ni se re-sube.
         imagePath: undefined,

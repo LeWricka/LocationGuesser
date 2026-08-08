@@ -417,6 +417,9 @@ export interface Database {
           // factor no aplicó (Libre, time_scoring OFF, sin arranque, legacy) o
           // en voto de timeout. Migración 0047.
           scored_seconds: number | null
+          // Constante de caída (km) auto-calibrada por el viaje que puntuó este
+          // voto (issue #994, migración 0052). Null en votos pre-0052 y timeouts.
+          decay_km: number | null
           created_at: string
         }
         Insert: {
@@ -434,6 +437,7 @@ export interface Database {
           elapsed_seconds?: number | null
           play_started_at?: string | null
           scored_seconds?: number | null
+          decay_km?: number | null
           created_at?: string
         }
         Update: {
@@ -451,6 +455,7 @@ export interface Database {
           elapsed_seconds?: number | null
           play_started_at?: string | null
           scored_seconds?: number | null
+          decay_km?: number | null
           created_at?: string
         }
         Relationships: []
@@ -543,13 +548,15 @@ export interface Database {
           points: number
           answer_lat: number | null
           answer_lng: number | null
-          // Factor de velocidad REALMENTE aplicado (1 = no aplicó: 'Libre',
-          // time_scoring=false, legacy o sin arranque registrado). Migración 0034
-          // (#628); ver `speedFactor` en lib/geo.ts.
+          // LEGACY (issue #994): desde la 0052 siempre 1.0 — ya no hay factor
+          // multiplicativo. Se conserva por compatibilidad de deploy.
           speed_factor: number
-          // Tiempo EXACTO (1 decimal) que usó ese factor; null si no aplicó.
+          // Tiempo EXACTO (1 decimal) que puntuó; null si no aplicó.
           // Migración 0047 (#946) — el mismo valor que `votes.scored_seconds`.
           scored_seconds: number | null
+          // BONUS aditivo de rapidez sumado a los puntos (issue #994, 0052);
+          // 0 si no aplicó. Ver `speedBonusFor` en lib/geo.ts.
+          speed_bonus: number
         }[]
       }
       // Registra el arranque de la jugada (issue #628): lo llama el cliente al

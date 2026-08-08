@@ -191,31 +191,14 @@ describe('createChallenge', () => {
     expect(insertArg.sv_lock_rotate).toBe(true)
   })
 
-  test('la precisión por defecto es "mundo" (scoring histórico)', async () => {
+  test('ya NO se escribe score_scale al crear (issue #994: auto-calibrado en servidor)', async () => {
     results['challenges'] = { data: sampleChallenge, error: null }
     await createChallenge({ title: 'x', lat: 1, lng: 2, createdBy: 'u', groupId: 'g1' })
     const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
       string,
       unknown
     >
-    expect(insertArg.score_scale).toBe('mundo')
-  })
-
-  test('escribe la precisión elegida (score_scale) cuando se pasa', async () => {
-    results['challenges'] = { data: sampleChallenge, error: null }
-    await createChallenge({
-      title: 'x',
-      lat: 1,
-      lng: 2,
-      createdBy: 'u',
-      groupId: 'g1',
-      scoreScale: 'ciudad',
-    })
-    const insertArg = calls.insert.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
-      string,
-      unknown
-    >
-    expect(insertArg.score_scale).toBe('ciudad')
+    expect(insertArg.score_scale).toBeUndefined()
   })
 
   // Issue #628: la velocidad puntúa, activada por defecto.
@@ -475,24 +458,14 @@ describe('promoteToChallenge', () => {
     expect(new Date(updateArg.deadline_at as string).getTime()).toBeGreaterThan(Date.now())
   })
 
-  test('promociona con la precisión por defecto "mundo" si no se elige', async () => {
+  test('la promoción ya NO escribe score_scale (issue #994: auto-calibrado en servidor)', async () => {
     results['challenges'] = { data: { ...sampleChallenge, id: 'm1' }, error: null }
     await promoteToChallenge('m1', { lat: 1, lng: 2 })
     const updateArg = calls.update.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
       string,
       unknown
     >
-    expect(updateArg.score_scale).toBe('mundo')
-  })
-
-  test('promociona escribiendo la precisión elegida (barrio)', async () => {
-    results['challenges'] = { data: { ...sampleChallenge, id: 'm1' }, error: null }
-    await promoteToChallenge('m1', { lat: 1, lng: 2, scoreScale: 'barrio' })
-    const updateArg = calls.update.mock.calls.find((c) => c[0] === 'challenges')?.[1] as Record<
-      string,
-      unknown
-    >
-    expect(updateArg.score_scale).toBe('barrio')
+    expect(updateArg.score_scale).toBeUndefined()
   })
 })
 
