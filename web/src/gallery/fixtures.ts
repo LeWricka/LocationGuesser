@@ -466,6 +466,7 @@ function vote(
     elapsed_seconds: 18,
     play_started_at: null,
     scored_seconds: null,
+    decay_km: null,
     created_at: isoFromNow(-2 * DAY + HOUR),
     ...over,
   }

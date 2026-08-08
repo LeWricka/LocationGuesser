@@ -37,48 +37,79 @@ export function haversine(a: LatLng, b: LatLng): number {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(x)))
 }
 
-/**
- * PRECISIÓN del reto: calibra cómo de estricto es el conteo de distancia. Elige la
- * "distancia característica" D de la fórmula 5000·e^(−km/D). A menor D, la puntuación
- * cae más rápido con los km (más estricto). Coincide 1:1 con `challenges.score_scale`
- * (BD) y con el CASE de la RPC `submit_vote` (migración 0028): hay que cambiar ambos
- * a la vez. 'mundo' = D=2000 = comportamiento histórico (cero regresión).
- */
-export type ScoreScale = 'mundo' | 'pais' | 'ciudad' | 'barrio'
-
-/** Distancia característica D (km) por precisión. Debe replicar el CASE de submit_vote. */
-export const SCORE_DECAY_KM: Record<ScoreScale, number> = {
-  mundo: 2000, // indulgente: acertar el continente/país lejano (comportamiento actual)
-  pais: 300, // acertar el país / la región
-  ciudad: 25, // acertar la ciudad
-  barrio: 2, // muy estricto: casi la calle
-}
-
-/** Precisión por defecto: 'mundo' = exactamente el scoring de siempre. */
-export const DEFAULT_SCORE_SCALE: ScoreScale = 'mundo'
+// ── Scoring AUTO-CALIBRADO por viaje (issue #994, estilo GeoGuessr) ──────────
+// GeoGuessr puntúa 5000·e^(−10·d/D_mapa) con D_mapa = la diagonal del mapa que
+// juegas — el jugador nunca elige "precisión", sale sola del área de juego.
+// Aquí el "mapa" es EL VIAJE: la exigencia se deriva de cuánto se extienden sus
+// puntos ubicados. Sustituye al selector mundo/país/ciudad/barrio (score_scale,
+// hoy columna legacy), que confundía a los creadores reales.
+// ESPEJO EXACTO de la RPC `submit_vote` (migración 0052): cambiar una constante
+// implica cambiar la otra. La autoridad sigue siendo el servidor.
 
 /**
- * SUELO de puntos para todo voto ENVIADO (con adivinanza) — issue #956. Feedback
- * real de un grupo jugando (viaje Filipinas): un reto en 'ciudad' (D=25) daba 0
- * seco a quien fallaba el país, y eso se sentía como un bug/castigo injusto, no
- * como "quedaste lejos". Con guess, nunca menos de esto — falla el país y aun
- * así puntúa algo. NO aplica a timeouts (sin guess: siguen siendo 0, no pasan
- * por `scoreFor`). Espejo EXACTO de la constante en `submit_vote` (migración
- * 0050): cambiar una implica cambiar la otra.
+ * SUELO de puntos para todo voto ENVIADO (con adivinanza) — issue #956. Con
+ * guess, nunca menos de esto: falla el país y aun así puntúa algo. NO aplica a
+ * timeouts (sin guess: 0, no pasan por `scoreFor`).
  */
 export const MIN_GUESS_POINTS = 250
+/** Bonus máximo de rapidez (ADITIVO, issue #994): desempata entre adivinanzas
+ * parecidas; jamás voltea una diferencia real de distancia (el viejo factor
+ * multiplicativo ×0.5–×1.0 sí lo hacía). */
+export const SPEED_BONUS_MAX = 250
+/** Decay mínimo (km) — la vieja escala 'ciudad': viajes urbanos siguen jugables. */
+export const DECAY_MIN_KM = 25
+/** Decay máximo (km) — la vieja escala 'mundo'. */
+export const DECAY_MAX_KM = 2000
+/** decay = diagonal_del_viaje / divisor. /6 y no el /10 literal de GeoGuessr:
+ * su D es un mapa curado (generoso); el nuestro es data-driven de fotos reales
+ * (más compacto) — con /10 todo fallo >550 km caía al suelo sin discriminar
+ * (simulado con datos reales del grupo Filipinas). */
+export const DECAY_DIVISOR = 6
+/** Respaldo con <2 puntos ubicados (primer reto de un viaje): la vieja escala
+ * 'país' — el caso núcleo del producto es un viaje por un país. */
+export const DECAY_FALLBACK_KM = 300
 
 /**
- * Puntos del reto a partir de la distancia: max(SUELO, 5000·e^(−km/D)). D sale de
- * la precisión (`scale`); por defecto 'mundo' (D=2000) → la fórmula histórica
- * 5000·e^(−km/2000). El suelo `MIN_GUESS_POINTS` (issue #956) es válido aquí
- * porque `scoreFor` SIEMPRE representa un voto CON adivinanza (hay una distancia
- * `km` que medir); un timeout no tiene km y se puntúa 0 por otra vía, sin pasar
- * por esta función.
+ * Constante de caída (km) auto-calibrada por el tamaño del viaje: centroide
+ * esférico (lng vía atan2 de medias de sin/cos — seguro cruzando el
+ * antimeridiano) + 2×percentil-85 de las distancias al centroide como
+ * "diagonal efectiva". NO un bounding box min/max: un solo punto outlier (la
+ * foto del vuelo a 800 km) infla un bbox ×29 y trivializa el reto; el
+ * percentil lo ignora (×1,02 medido). Réplica exacta del cálculo de la RPC.
  */
-export function scoreFor(km: number, scale: ScoreScale = DEFAULT_SCORE_SCALE): number {
-  const decay = SCORE_DECAY_KM[scale]
-  return Math.max(MIN_GUESS_POINTS, Math.round(5000 * Math.exp(-km / decay)))
+export function computeTripDecay(points: LatLng[]): number {
+  if (points.length < 2) return DECAY_FALLBACK_KM
+  const cLat = points.reduce((s, p) => s + p.lat, 0) / points.length
+  const meanSin = points.reduce((s, p) => s + Math.sin(toRad(p.lng)), 0) / points.length
+  const meanCos = points.reduce((s, p) => s + Math.cos(toRad(p.lng)), 0) / points.length
+  const cLng = (Math.atan2(meanSin, meanCos) * 180) / Math.PI
+  const center = { lat: cLat, lng: cLng }
+  const radii = points.map((p) => haversine(center, p)).sort((a, b) => a - b)
+  const p85 = radii[Math.floor(0.85 * (radii.length - 1))]
+  const diagonal = 2 * p85
+  return Math.max(DECAY_MIN_KM, Math.min(DECAY_MAX_KM, diagonal / DECAY_DIVISOR))
+}
+
+/**
+ * Puntos de DISTANCIA: max(SUELO, round(5000·e^(−km/decay))). El decay viene de
+ * `computeTripDecay` (o del respaldo 'país' si el viaje aún no tiene puntos).
+ * El bonus de rapidez va aparte (`speedBonusFor`) y se SUMA: máximo teórico
+ * 5250. Válido solo para votos CON adivinanza (un timeout se puntúa 0 por otra
+ * vía, sin pasar por aquí).
+ */
+export function scoreFor(km: number, decayKm: number = DECAY_FALLBACK_KM): number {
+  return Math.max(MIN_GUESS_POINTS, Math.round(5000 * Math.exp(-km / decayKm)))
+}
+
+/**
+ * Bonus ADITIVO de rapidez (issue #994): round(250·restante/límite). Las
+ * condiciones de aplicación (time_scoring ON + límite + arranque registrado)
+ * las decide el servidor; esto es el espejo puro del cálculo.
+ */
+export function speedBonusFor(elapsedSeconds: number, guessSeconds: number): number {
+  if (guessSeconds <= 0) return 0
+  const clamped = Math.max(0, Math.min(guessSeconds, elapsedSeconds))
+  return Math.round((SPEED_BONUS_MAX * (guessSeconds - clamped)) / guessSeconds)
 }
 
 /**

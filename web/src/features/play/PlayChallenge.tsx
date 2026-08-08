@@ -53,7 +53,7 @@ import { aggregateLeaderboard, getGroupVotes, type VoteWithName } from '../../li
 import { upsertProfile } from '../../lib/profile'
 import { marcadorGroupHash } from '../../lib/route'
 import { type Result } from '../../lib/result'
-import { fmtDist, speedFactor, type LatLng } from '../../lib/geo'
+import { fmtDist, speedBonusFor, speedFactor, type LatLng } from '../../lib/geo'
 import { useOverlayLayer } from '../../lib/overlayBack'
 import { fmtElapsed, fmtElapsed1 } from '../../lib/time'
 import { track } from '../../lib/analytics'
@@ -198,6 +198,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
   const [speedInfo, setSpeedInfo] = useState<{
     seconds: number
     exact: boolean
+    /** Bonus ADITIVO (+N) del scoring nuevo (issue #994); null en votos legacy. */
+    bonus: number | null
+    /** Factor multiplicativo LEGACY (×0,9) de votos anteriores a la 0052; null en los nuevos. */
     factor: number | null
   } | null>(null)
   // Nombre del grupo para la tarjeta de "compartir mi resultado". El componente
@@ -398,9 +401,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
         // El servidor devuelve distancia + puntos + la respuesta real para el pin.
         const km = res.distanceKm ?? 0
         setResult({ km, points: res.points })
-        // Tiempo de respuesta + factor de velocidad (issue #628): solo con límite
-        // por jugada (sin límite, "Libre", no hay nada que medir). El factor viene
-        // del SERVIDOR (res.speedFactor): es la verdad de lo que se aplicó, no una
+        // Tiempo de respuesta + BONUS de rapidez (issue #994): solo con límite
+        // por jugada (sin límite, "Libre", no hay nada que medir). El bonus viene
+        // del SERVIDOR (res.speedBonus): es la verdad de lo que se sumó, no una
         // estimación del reloj local (que podría no coincidir si `start_play` falló).
         // El tiempo mostrado es el mismo que puntuó (issue #946): `res.scoredSeconds`
         // (1 decimal) si el servidor lo calculó, y solo si no, el entero de cliente.
@@ -408,7 +411,8 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
           setSpeedInfo({
             seconds: res.scoredSeconds ?? elapsedSeconds,
             exact: res.scoredSeconds != null,
-            factor: res.speedFactor,
+            bonus: res.speedBonus ?? null,
+            factor: null,
           })
         }
         // Gran acierto: patrón háptico de celebración (si lo soporta y no hay
@@ -674,11 +678,21 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
             // issue #946) si el voto ya lo tiene persistido, y solo si no
             // (voto anterior a la migración 0047), el entero de `elapsed_seconds`.
             if (c.guess_seconds != null && existing.elapsed_seconds != null) {
+              // Votos con `decay_km` (0052+) se puntuaron con BONUS aditivo: lo
+              // reconstruimos con el espejo puro. Votos anteriores llevaban el
+              // factor multiplicativo: se conserva su nota ×N legacy.
+              const isNewScoring = existing.decay_km != null
               setSpeedInfo({
                 seconds: existing.scored_seconds ?? existing.elapsed_seconds,
                 exact: existing.scored_seconds != null,
+                bonus:
+                  isNewScoring &&
+                  existing.play_started_at != null &&
+                  existing.scored_seconds != null
+                    ? speedBonusFor(Number(existing.scored_seconds), c.guess_seconds)
+                    : null,
                 factor:
-                  existing.play_started_at != null
+                  !isNewScoring && existing.play_started_at != null
                     ? speedFactor(existing.elapsed_seconds, c.guess_seconds, c.time_scoring)
                     : null,
               })
@@ -1495,10 +1509,10 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                           {rank.position}º de {rank.total}
                         </span>
                       )}
-                      {/* Tiempo de respuesta + nota del factor de velocidad (issue
-                      #628). La nota solo aparece cuando el factor confirmadamente
-                      aplicó (nunca es una estimación del reloj local) y se aleja
-                      de ×1,0 (sin desviación, no aporta nada nuevo que decir). */}
+                      {/* Tiempo de respuesta + nota de rapidez. Scoring nuevo
+                      (issue #994): BONUS aditivo "+N por rapidez". Votos legacy
+                      (pre-0052): la vieja nota del factor "×0,9". Solo aparece
+                      cuando confirmadamente aplicó (nunca estimación local). */}
                       {speedInfo && (
                         <span className={`${styles.rank} ${styles.distIn}`}>
                           <Icon icon={Timer} size={14} />
@@ -1506,6 +1520,9 @@ export function PlayChallenge({ challengeId, groupId }: Props) {
                           {speedInfo.exact
                             ? fmtElapsed1(speedInfo.seconds)
                             : fmtElapsed(speedInfo.seconds)}
+                          {speedInfo.bonus != null && speedInfo.bonus > 0 && (
+                            <> · +{speedInfo.bonus} por rapidez</>
+                          )}
                           {speedInfo.factor != null && Math.round(speedInfo.factor * 10) !== 10 && (
                             <>
                               {' · ×'}

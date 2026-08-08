@@ -195,6 +195,7 @@ function vote(
     elapsed_seconds: 14,
     play_started_at: null,
     scored_seconds: null,
+    decay_km: null,
     created_at: daysAgoIso(4),
     ...over,
   }

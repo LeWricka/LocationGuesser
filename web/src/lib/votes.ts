@@ -33,12 +33,17 @@ export interface SubmitVoteResultClient {
   answerLat: number | null
   answerLng: number | null
   /**
-   * Factor de velocidad REALMENTE aplicado por el servidor (issue #628): 1 si no
-   * aplicó ('Libre', `time_scoring` apagado, legacy o sin arranque registrado).
-   * Migración 0034. Se usa para la nota del revelado ("×0,9 por rapidez"), NUNCA
-   * para recalcular puntos — la autoridad es el servidor.
+   * Factor de velocidad LEGACY (issue #628→#994): desde la migración 0052 el
+   * servidor devuelve 1.0 fijo (ya no multiplica). Se conserva en el contrato
+   * por compatibilidad de la ventana de deploy.
    */
   speedFactor: number
+  /**
+   * BONUS aditivo de rapidez que el servidor SUMÓ a los puntos (issue #994,
+   * migración 0052): 0 si no aplicó ('Libre', time_scoring off, sin arranque).
+   * Para la nota del revelado ("+120 por rapidez") — la autoridad es el servidor.
+   */
+  speedBonus: number
   /**
    * Tiempo EXACTO (acotado a [0, guess_seconds], redondeado a 1 decimal) que el
    * servidor usó para calcular `speedFactor` (issue #946, migración 0047). Es
@@ -95,6 +100,7 @@ export async function submitVote(input: SubmitVoteInput): Promise<SubmitVoteResu
     answerLng: row.answer_lng,
     speedFactor: row.speed_factor,
     scoredSeconds: row.scored_seconds,
+    speedBonus: row.speed_bonus ?? 0,
   }
 }
 

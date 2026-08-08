@@ -120,6 +120,7 @@ function makeVote(overrides: Partial<Vote> = {}): Vote {
     elapsed_seconds: 30,
     play_started_at: null,
     scored_seconds: null,
+    decay_km: null,
     created_at: '2026-06-20T12:00:00.000Z',
     ...overrides,
   }

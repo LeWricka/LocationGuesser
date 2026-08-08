@@ -3,11 +3,9 @@ import { EXAMPLE_TRIP_GROUP_ID } from './exampleTrip'
 import type { Challenge, Database } from './database.types'
 import {
   DEFAULT_NUMBER_TOLERANCE,
-  DEFAULT_SCORE_SCALE,
   DEFAULT_TIME_SCORING,
   type LatLng,
   type NumberTolerance,
-  type ScoreScale,
 } from './geo'
 import { deadlineFromNow } from './time'
 
@@ -89,12 +87,6 @@ export interface NewChallengeInput {
   /** Candado de GIRO del Street View (true = no se puede mirar alrededor). (#187.) */
   svLockRotate?: boolean
   /**
-   * Precisión del reto: calibra cómo de estricto es el conteo de distancia (0028).
-   * Por defecto 'mundo' (D=2000 km) = el scoring de siempre. A menor escala, más
-   * estricto: pais=300, ciudad=25, barrio=2 km.
-   */
-  scoreScale?: ScoreScale
-  /**
    * ¿La velocidad puntúa en este reto? (issue #628). Por defecto true (ON): con
    * límite por jugada, responder rápido suma y tarde resta. Sin efecto si
    * `guessSeconds` es null ('Libre'): no hay nada que medir.
@@ -156,8 +148,6 @@ export async function createChallenge(
       sv_lock_rotate: input.svLockRotate ?? false,
       guess_seconds: input.guessSeconds ?? null,
       deadline_at: input.deadlineAt ?? deadlineFromNow(DEFAULT_DURATION_HOURS),
-      // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
-      score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
       // La velocidad puntúa; true (default) = activada, como pide el issue #628.
       time_scoring: input.timeScoring ?? DEFAULT_TIME_SCORING,
       happened_on: input.happenedOn ?? null,
@@ -374,8 +364,6 @@ export interface PromoteToChallengeInput {
   svLockRotate?: boolean
   /** Si hay foto, ¿pista visible al jugar (true) o sorpresa hasta el revelado (false)? */
   photoIsHint?: boolean
-  /** Precisión del reto (0028); por defecto 'mundo' = scoring histórico. */
-  scoreScale?: ScoreScale
   /**
    * Título del reto (issue #723: la promoción viene del asistente completo, que
    * propone el título del recuerdo pero deja cambiarlo). `undefined` = conservar
@@ -417,8 +405,6 @@ export async function promoteToChallenge(
     sv_pitch: input.svPitch ?? null,
     sv_lock_move: input.svLockMove ?? false,
     sv_lock_rotate: input.svLockRotate ?? false,
-    // Precisión del scoring; 'mundo' (default) = comportamiento histórico (0028).
-    score_scale: input.scoreScale ?? DEFAULT_SCORE_SCALE,
     // PRIVACIDAD (issue #649, defensa en profundidad): un reto NUNCA lleva vídeo,
     // aunque el recuerdo de origen tuviera un clip — un MP4 puede llevar su propio
     // GPS en los metadatos del contenedor, y `video_path` no debe sobrevivir a la
