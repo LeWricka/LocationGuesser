@@ -48,6 +48,7 @@ const dedicatedConfigSpecs = [
   /gallery-.*\.spec\.ts/,
   /landing-assets\.spec\.ts/,
   /prod-logged-smoke\.spec\.ts/,
+  /share-card-webkit\.spec\.ts/,
 ]
 
 export default defineConfig({

@@ -22,13 +22,29 @@ export function shareDomain(link: string): string {
 }
 
 // Rasteriza un nodo del DOM a PNG con html-to-image. pixelRatio 2 = nitidez en
-// pantallas retina y al ampliar en el chat. cacheBust evita imágenes cacheadas
-// de un render anterior. Devuelve un Blob listo para compartir/descargar.
+// pantallas retina y al ampliar en el chat. Devuelve un Blob listo para
+// compartir/descargar.
+//
+// TRES pasadas quedándonos con la ÚLTIMA (issue #992, tarjeta NEGRA en iOS):
+// WebKit/Safari tiene un bug conocido con html-to-image (upstream #361): en la
+// primera serialización a SVG/foreignObject las imágenes (background data-URL,
+// SVG anidado) aún no están en la caché interna y el PNG sale SIN ellas — solo
+// el texto sobre el fondo (nuestra tarjeta se veía negra en iPhone; en Android
+// salía bien). Repetir la rasterización sobre el mismo nodo deja los recursos
+// cacheados y la última pasada sale completa. Es barato: el nodo está
+// off-viewport y son ~decenas de ms por pasada. Se hace SIEMPRE (no solo en
+// Safari): detectar el motor es frágil y en Chromium las pasadas extra son
+// inocuas. `cacheBust` se QUITA: rompía justo la caché de la que depende este
+// workaround, y no aporta nada (las imágenes de las tarjetas ya viajan como
+// data URLs únicos por render, no hay caché HTTP que invalidar).
 export async function nodeToPngBlob(node: HTMLElement): Promise<Blob> {
   // import dinámico: html-to-image (~30 KB) solo se carga cuando el usuario va a
   // compartir, no en el bundle inicial. Sale a su propio chunk en el build.
   const { toPng } = await import('html-to-image')
-  const dataUrl = await toPng(node, { pixelRatio: 2, cacheBust: true })
+  let dataUrl = ''
+  for (let i = 0; i < 3; i++) {
+    dataUrl = await toPng(node, { pixelRatio: 2 })
+  }
   const res = await fetch(dataUrl)
   return res.blob()
 }

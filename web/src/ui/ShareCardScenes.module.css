@@ -92,7 +92,10 @@
       color-mix(in srgb, var(--route-gold) 12%, transparent) 0%,
       transparent 55%
     ),
-    linear-gradient(160deg, var(--accent-deep) 0%, var(--scene-bg) 74%);
+    /* Issue #992: el degradado moría en `--scene-bg` (#0b1016, casi negro) y en
+       miniatura la mitad baja se leía como tarjeta negra — mismo motivo que la
+       viñeta del globo en #974. Muere en el mismo grafito-azul de escena. */
+    linear-gradient(160deg, var(--accent-deep) 0%, #16242f 74%); /* design-lint-allow: grafito-azul de escena bespoke (issue #974/#992), no es color de tema */
 }
 
 /* Mark héroe: mismo obturador de marca, escalado grande, centrado en el tercio
