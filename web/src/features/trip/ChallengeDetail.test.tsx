@@ -24,6 +24,12 @@ vi.mock('../../lib/challenges', async (importActual) => {
   }
 })
 
+// La espera de membresía (#997) se prueba en lib (membership.test); aquí el
+// detalle solo necesita "reto o null", así que se delega en el mismo mock.
+vi.mock('../../lib/membership', () => ({
+  getChallengeOrNullAwaitingMembership: () => getChallengeOrNullMock(),
+}))
+
 const getVotesWithNamesMock = vi.fn<() => Promise<VoteWithName[]>>()
 vi.mock('../../lib/votes', () => ({
   getVotesWithNames: () => getVotesWithNamesMock(),
@@ -165,7 +171,7 @@ describe('ChallengeDetail (issue #800)', () => {
     getProfileMock.mockResolvedValue(makeProfile())
     signedImageUrlMock.mockResolvedValue('https://x/foto.jpg')
 
-    render(<ChallengeDetail challengeId="c1" myUserId="u-me" onClose={vi.fn()} />)
+    render(<ChallengeDetail groupId="g-1" challengeId="c1" myUserId="u-me" onClose={vi.fn()} />)
 
     expect(await screen.findByText('El bosque de bambú')).toBeInTheDocument()
     expect(screen.getByText('Cerrado')).toBeInTheDocument()
@@ -199,7 +205,7 @@ describe('ChallengeDetail (issue #800)', () => {
   test('reto ya no existe (borrado): estado amable, no revienta', async () => {
     getChallengeOrNullMock.mockResolvedValue(null)
 
-    render(<ChallengeDetail challengeId="c1" myUserId="u-me" onClose={vi.fn()} />)
+    render(<ChallengeDetail groupId="g-1" challengeId="c1" myUserId="u-me" onClose={vi.fn()} />)
 
     expect(await screen.findByText('Este reto ya no existe')).toBeInTheDocument()
   })
@@ -221,7 +227,7 @@ describe('ChallengeDetail (issue #800)', () => {
     getProfileMock.mockResolvedValue(makeProfile({ id: 'u-me', display_name: 'Yo' }))
     signedImageUrlMock.mockResolvedValue(null)
 
-    render(<ChallengeDetail challengeId="c1" myUserId="u-me" onClose={vi.fn()} />)
+    render(<ChallengeDetail groupId="g-1" challengeId="c1" myUserId="u-me" onClose={vi.fn()} />)
 
     expect(await screen.findByText('EN JUEGO')).toBeInTheDocument()
     expect(screen.getByText('El mapa se revela al cerrarse el reto.')).toBeInTheDocument()
@@ -245,7 +251,7 @@ describe('ChallengeDetail (issue #800)', () => {
     getProfileMock.mockResolvedValue(makeProfile())
     signedImageUrlMock.mockResolvedValue(null)
 
-    render(<ChallengeDetail challengeId="c1" myUserId="u-me" onClose={vi.fn()} />)
+    render(<ChallengeDetail groupId="g-1" challengeId="c1" myUserId="u-me" onClose={vi.fn()} />)
 
     expect(await screen.findByText('¿Cuántos escalones tiene el templo?')).toBeInTheDocument()
     expect(screen.getByText(/La respuesta era/)).toHaveTextContent('131 escalones')
@@ -263,7 +269,7 @@ describe('ChallengeDetail (issue #800)', () => {
     signedImageUrlMock.mockResolvedValue(null)
     const onClose = vi.fn()
 
-    render(<ChallengeDetail challengeId="c1" myUserId="u-me" onClose={onClose} />)
+    render(<ChallengeDetail groupId="g-1" challengeId="c1" myUserId="u-me" onClose={onClose} />)
     await screen.findByText('El bosque de bambú')
 
     await user.click(screen.getByRole('button', { name: 'Cerrar detalle del reto' }))

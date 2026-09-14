@@ -45,16 +45,20 @@ export interface PendingChallenge {
 /**
  * Auto-join idempotente: al abrir un link `#g=CODE` con sesión, inserta (o deja
  * intacta) la fila propia en group_members. `onConflict: 'group_id,user_id'`
- * hace que reentrar no duplique ni falle. Solo escribe la fila propia (RLS lo
- * exige). Por defecto role='member' (el dueño se inserta como 'owner' al crear).
+ * hace que reentrar no duplique ni falle. Por defecto role='member' (el dueño
+ * se inserta como 'owner' al crear).
+ *
+ * El `user_id` NO se manda (issue #997, Sentry LOCATIONGUESSER-1N): lo pone el
+ * servidor con el default `auth.uid()` (migración 0053). Antes viajaba el uid
+ * del estado de React y, si la sesión anónima rotaba entre render y ejecución
+ * (doble signInAnonymously, refresh, volver de segundo plano en iOS), el
+ * insert violaba la RLS `user_id = auth.uid()` (42501) — mismo criterio de
+ * autoridad-servidor que `submit_vote`: la identidad no viaja desde el cliente.
  */
-export async function joinGroup(groupId: string, userId: string): Promise<void> {
+export async function joinGroup(groupId: string): Promise<void> {
   const { error } = await supabase
     .from('group_members')
-    .upsert(
-      { group_id: groupId, user_id: userId },
-      { onConflict: 'group_id,user_id', ignoreDuplicates: true },
-    )
+    .upsert({ group_id: groupId }, { onConflict: 'group_id,user_id', ignoreDuplicates: true })
   if (error) {
     // 23503 (issue #760, LOCATIONGUESSER-5): el viaje se borró entre que se
     // compartió el enlace y que el receptor lo abrió — el insert viola la FK
@@ -69,12 +73,13 @@ export async function joinGroup(groupId: string, userId: string): Promise<void> 
  * Alta del creador como dueño del grupo (role='owner'), al crearlo. Igual que
  * joinGroup pero con rol owner; idempotente. Se separa de joinGroup (que es el
  * auto-join de invitados, siempre 'member') para no mezclar responsabilidades.
+ * `user_id` tampoco viaja aquí: default `auth.uid()` (0053, ver joinGroup).
  */
-export async function joinGroupAsOwner(groupId: string, userId: string): Promise<void> {
+export async function joinGroupAsOwner(groupId: string): Promise<void> {
   const { error } = await supabase
     .from('group_members')
     .upsert(
-      { group_id: groupId, user_id: userId, role: 'owner' },
+      { group_id: groupId, role: 'owner' },
       { onConflict: 'group_id,user_id', ignoreDuplicates: true },
     )
   if (error) throw error

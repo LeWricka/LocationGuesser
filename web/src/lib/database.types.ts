@@ -92,7 +92,10 @@ export interface Database {
         }
         Insert: {
           group_id: string
-          user_id: string
+          // Opcional desde 0053 (issue #997): default `auth.uid()` en servidor.
+          // El join propio NO debe mandarlo — un uid de estado desfasado viola
+          // la RLS `user_id = auth.uid()` (42501, Sentry LOCATIONGUESSER-1N).
+          user_id?: string
           role?: string
           joined_at?: string
         }
