@@ -64,19 +64,19 @@ beforeEach(() => {
 })
 
 describe('joinGroup', () => {
-  test('upsert idempotente de la fila propia con onConflict group_id,user_id', async () => {
+  test('upsert idempotente SIN user_id: lo pone el servidor (auth.uid(), 0053/#997)', async () => {
     results['group_members'] = { data: null, error: null }
-    await joinGroup('g1', 'u1')
+    await joinGroup('g1')
     expect(upsertCalls).toHaveBeenCalledWith(
       'group_members',
-      { group_id: 'g1', user_id: 'u1' },
+      { group_id: 'g1' },
       { onConflict: 'group_id,user_id', ignoreDuplicates: true },
     )
   })
 
   test('propaga el error', async () => {
     results['group_members'] = { data: null, error: new Error('boom') }
-    await expect(joinGroup('g1', 'u1')).rejects.toThrow('boom')
+    await expect(joinGroup('g1')).rejects.toThrow('boom')
   })
 
   // Issue #760 (LOCATIONGUESSER-5, 4 usuarios/22 eventos): el viaje se borró
@@ -89,7 +89,7 @@ describe('joinGroup', () => {
       data: null,
       error: { code: '23503', message: 'insert or update on table "group_members" violates FK' },
     }
-    await expect(joinGroup('g-borrado', 'u1')).rejects.toThrow(ResourceGoneError)
+    await expect(joinGroup('g-borrado')).rejects.toThrow(ResourceGoneError)
   })
 })
 

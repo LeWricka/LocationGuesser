@@ -1927,6 +1927,7 @@ export function TripPage({
       {viewingChallengeId && (
         <ChallengeDetail
           challengeId={viewingChallengeId}
+          groupId={groupId}
           myUserId={user?.id ?? null}
           onClose={() => setViewingChallengeId(null)}
         />

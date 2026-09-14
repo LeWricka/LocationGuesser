@@ -236,7 +236,7 @@ export function CreateGroup({ onBack }: Props) {
       })
       // Membresía 'owner' para que el viaje aparezca en "Tus viajes" (la home se
       // nutre de group_members). La fila propia la permite el RLS de inserción.
-      await joinGroupAsOwner(groupId, user.id)
+      await joinGroupAsOwner(groupId)
       // Viaje creado con éxito: el borrador ya cumplió su función (issue #718).
       void clearDraft(DRAFT_KEY)
       track('group_created', {

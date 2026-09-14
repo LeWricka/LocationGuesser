@@ -3,12 +3,8 @@ import { Check, Clock, X } from 'lucide-react'
 import { Badge, ChallengePhoto, EmptyState, Icon, Spinner } from '../../ui'
 import { AllGuessesMap, type GuessMarker } from '../group/AllGuessesMap'
 import { ChallengeBoard, rankByUserId } from '../group/ChallengeBoard'
-import {
-  getAnswer,
-  getChallengeOrNull,
-  getNumberAnswer,
-  type ChallengeForPlay,
-} from '../../lib/challenges'
+import { getAnswer, getNumberAnswer, type ChallengeForPlay } from '../../lib/challenges'
+import { getChallengeOrNullAwaitingMembership } from '../../lib/membership'
 import { getVotesWithNames } from '../../lib/votes'
 import type { VoteWithName } from '../../lib/leaderboard'
 import { getProfile } from '../../lib/profile'
@@ -21,6 +17,9 @@ import styles from './ChallengeDetail.module.css'
 
 interface Props {
   challengeId: string
+  /** Grupo del reto (issue #997): permite tolerar la carrera del auto-join de un
+   * deep link antes de declarar el reto 'gone' (ver efecto de carga). */
+  groupId: string
   /** userId del usuario en sesión: resalta su fila en la clasificación y decide
    * el pin propio del mapa. Null en una sesión anónima sin cuenta. */
   myUserId: string | null
@@ -71,7 +70,7 @@ function guessMarkersOf(votes: VoteWithName[], myUserId: string | null): GuessMa
  * en vez de reventar (la lista de "Retos anteriores" ya evita mandar aquí un
  * reto EN JUEGO sin jugar; esto es una defensa extra, no el camino normal).
  */
-export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
+export function ChallengeDetail({ challengeId, groupId, myUserId, onClose }: Props) {
   const [phase, setPhase] = useState<Phase>('loading')
   const [challenge, setChallenge] = useState<ChallengeForPlay | null>(null)
   const [votes, setVotes] = useState<VoteWithName[]>([])
@@ -96,7 +95,17 @@ export function ChallengeDetail({ challengeId, myUserId, onClose }: Props) {
 
     void (async () => {
       try {
-        const ch = await getChallengeOrNull(challengeId)
+        // Tolera la carrera del auto-join (issue #997, mismo criterio que #940
+        // en los players): quien abre un enlace compartido puede llegar aquí
+        // ANTES de que su alta en group_members aterrice — la RLS devuelve 0
+        // filas y eso es INDISTINGUIBLE de un reto borrado. Antes de declarar
+        // 'gone', se espera (acotado) a la membresía y se reintenta una vez.
+        const ch = await getChallengeOrNullAwaitingMembership(
+          challengeId,
+          groupId,
+          myUserId ?? undefined,
+          () => cancelled,
+        )
         if (cancelled) return
         if (!ch) {
           setPhase('gone')

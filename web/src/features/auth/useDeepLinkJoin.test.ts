@@ -2,10 +2,10 @@ import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { act, renderHook } from '@testing-library/react'
 
 // membership.ts importa ./supabase; mockeamos lo que usa el hook (join + isMember).
-const joinGroup = vi.fn<(groupId: string, userId: string) => Promise<void>>(async () => {})
+const joinGroup = vi.fn<(groupId: string) => Promise<void>>(async () => {})
 const isMember = vi.fn<(groupId: string, userId: string) => Promise<boolean>>(async () => false)
 vi.mock('../../lib/membership', () => ({
-  joinGroup: (groupId: string, userId: string) => joinGroup(groupId, userId),
+  joinGroup: (groupId: string) => joinGroup(groupId),
   isMember: (groupId: string, userId: string) => isMember(groupId, userId),
 }))
 
@@ -39,6 +39,15 @@ vi.mock('../../lib/observability', () => ({
   addBreadcrumb: (...args: unknown[]) => addBreadcrumb(...args),
 }))
 
+// Auto-curación del 42501 (#997): el hook re-comprueba membresía con la sesión
+// VIVA, no con el userId del render — mockeamos getSession con un uid distinto.
+const getSession = vi.fn(async () => ({
+  data: { session: { user: { id: 'u-live' } } },
+}))
+vi.mock('../../lib/supabase', () => ({
+  supabase: { auth: { getSession: () => getSession() } },
+}))
+
 import { useDeepLinkJoin } from './useDeepLinkJoin'
 import { ResourceGoneError } from '../../lib/errors'
 import { EXAMPLE_TRIP_GROUP_ID } from '../../lib/exampleTrip'
@@ -70,14 +79,14 @@ describe('useDeepLinkJoin', () => {
   test('destino de grupo: hace join y restaura el hash', async () => {
     const { result } = renderHook(() => useDeepLinkJoin('u1'))
     await join(result, '#g=ABC&c=uuid-1')
-    expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+    expect(joinGroup).toHaveBeenCalledWith('ABC')
     expect(window.location.hash).toBe('#g=ABC&c=uuid-1')
   })
 
   test('destino de grupo sin reto: join y hash solo con grupo', async () => {
     const { result } = renderHook(() => useDeepLinkJoin('u1'))
     await join(result, '#g=ABC')
-    expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+    expect(joinGroup).toHaveBeenCalledWith('ABC')
     expect(window.location.hash).toBe('#g=ABC')
   })
 
@@ -115,7 +124,7 @@ describe('useDeepLinkJoin', () => {
     isMember.mockResolvedValue(true)
     const { result } = renderHook(() => useDeepLinkJoin('u1'))
     await join(result, '#g=ABC')
-    expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+    expect(joinGroup).toHaveBeenCalledWith('ABC')
     expect(track).not.toHaveBeenCalled()
   })
 
@@ -129,7 +138,7 @@ describe('useDeepLinkJoin', () => {
     window.location.hash = '#g=ABC&add=reto'
     const { result } = renderHook(() => useDeepLinkJoin('u1'))
     await join(result, window.location.hash)
-    expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+    expect(joinGroup).toHaveBeenCalledWith('ABC')
     expect(window.location.hash).toBe('#g=ABC&add=reto')
   })
 
@@ -153,7 +162,7 @@ describe('useDeepLinkJoin', () => {
     window.location.hash = ''
     const { result } = renderHook(() => useDeepLinkJoin('u1'))
     await join(result, '#g=ABC&add=reto&from=momento-1')
-    expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+    expect(joinGroup).toHaveBeenCalledWith('ABC')
     expect(window.location.hash).toBe('#g=ABC&add=reto&from=momento-1')
   })
 
@@ -180,7 +189,7 @@ describe('useDeepLinkJoin', () => {
       await join(result, '#g=ABC&adm=tok-1')
       expect(redeemOwnerInvite).toHaveBeenCalledWith('tok-1')
       // Fallback: el camino normal de miembro se ejecuta igual que sin `adm`.
-      expect(joinGroup).toHaveBeenCalledWith('ABC', 'u1')
+      expect(joinGroup).toHaveBeenCalledWith('ABC')
       expect(toastShow).toHaveBeenCalledWith(
         expect.stringContaining('ya se ha usado'),
         expect.objectContaining({ tone: 'danger' }),
@@ -267,6 +276,39 @@ describe('useDeepLinkJoin', () => {
   // existe una fila real en `groups` — sin este corte, `joinGroup` violaría la
   // FK (23503) y dejaría al usuario en JoinErrorScreen. El guarda debe cortar
   // ANTES de intentar unirse, para cualquier sesión (logueada o anónima).
+  describe('auto-curación del 42501 (#997, Sentry LOCATIONGUESSER-1N)', () => {
+    // Un 42501 en el join casi siempre es la carrera de sesión: el uid del
+    // estado quedó viejo respecto a auth.uid() y el caso real demostró que el
+    // usuario YA era miembro por un join anterior.
+    const rlsError = { code: '42501', message: 'new row violates row-level security policy' }
+
+    test('42501 con membresía viva: navega sin error (breadcrumb, no excepción)', async () => {
+      joinGroup.mockRejectedValueOnce(rlsError)
+      // La re-comprobación usa el uid VIVO ('u-live'), no el del hook ('u1').
+      isMember.mockImplementation(async (_g, uid) => uid === 'u-live')
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await join(result, '#g=ABC')
+
+      expect(window.location.hash).toBe('#g=ABC')
+      expect(result.current.error).toBeNull()
+      expect(addBreadcrumb).toHaveBeenCalledWith('join_rls_self_healed', { groupId: 'ABC' })
+      expect(reportError).not.toHaveBeenCalled()
+    })
+
+    test('42501 SIN membresía: sí es un fallo real — se reporta y se expone el error', async () => {
+      joinGroup.mockRejectedValueOnce(rlsError)
+      isMember.mockResolvedValue(false)
+      const { result } = renderHook(() => useDeepLinkJoin('u1'))
+      await join(result, '#g=ABC')
+
+      expect(result.current.error).not.toBeNull()
+      expect(reportError).toHaveBeenCalledWith(rlsError, {
+        area: 'deep_link_join',
+        groupId: 'ABC',
+      })
+    })
+  })
+
   describe('viaje de EJEMPLO (id centinela, onboarding nuevo pieza 4/4)', () => {
     test('#g=ejemplo: no hace join ni consulta membresía, solo restaura el hash', async () => {
       const { result } = renderHook(() => useDeepLinkJoin('u1'))

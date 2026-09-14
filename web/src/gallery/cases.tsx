@@ -558,7 +558,14 @@ export const cases: GalleryCase[] = [
     id: 'detalle-reto-marcador',
     title: 'Marcador · Detalle de un reto (clasificación + mapa + foto)',
     section: 'Viaje',
-    render: () => <ChallengeDetail challengeId={CH_CLOSED_OTHER} myUserId={ME_ID} onClose={noop} />,
+    render: () => (
+      <ChallengeDetail
+        groupId="g-ejemplo"
+        challengeId={CH_CLOSED_OTHER}
+        myUserId={ME_ID}
+        onClose={noop}
+      />
+    ),
   },
   {
     // Issue #607: el pie (Copiar enlace / Compartir) desbordaba el panel a

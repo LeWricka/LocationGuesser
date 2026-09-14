@@ -5,11 +5,12 @@
 // idempotente: reentrar no duplica ni falla.
 
 import { useCallback, useRef, useState } from 'react'
+import { supabase } from '../../lib/supabase'
 import { isMember, joinGroup } from '../../lib/membership'
 import { parseHash, stripOwnerInviteToken } from '../../lib/route'
 import { track } from '../../lib/analytics'
 import { redeemOwnerInvite } from '../../lib/ownerInvites'
-import { ResourceGoneError, describeError } from '../../lib/errors'
+import { ResourceGoneError, describeError, getErrorCode } from '../../lib/errors'
 import { addBreadcrumb, reportError } from '../../lib/observability'
 import { EXAMPLE_TRIP_GROUP_ID } from '../../lib/exampleTrip'
 import { useToast } from '../../ui'
@@ -90,8 +91,10 @@ export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false)
           // ¿Ya soy miembro? Lo comprobamos ANTES del upsert para distinguir un
           // alta real (interesa para analítica) de una reentrada idempotente.
           const alreadyMember = await isMember(route.group, userId)
-          // Auto-join idempotente: alta en group_members (o no-op si ya soy miembro).
-          await joinGroup(route.group, userId)
+          // Auto-join idempotente: alta en group_members (o no-op si ya soy
+          // miembro). El user_id lo pone el servidor (`auth.uid()`, 0053/#997):
+          // no viaja desde aquí, así una sesión rotada no puede violar la RLS.
+          await joinGroup(route.group)
           // Solo contamos `group_joined` cuando el usuario REALMENTE se une (no en
           // reentradas: abrir el mismo link otra vez no es un join nuevo).
           if (!alreadyMember) {
@@ -139,6 +142,25 @@ export function useDeepLinkJoin(userId: string | undefined, isAnonymous = false)
           // se abrió. Breadcrumb, NO excepción — no es un fallo real de la app.
           addBreadcrumb('group_gone_on_join', { groupId: route.group })
           setError(err.message)
+        } else if (getErrorCode(err) === '42501') {
+          // AUTO-CURACIÓN (issue #997, Sentry LOCATIONGUESSER-1N): un 42501 en
+          // el join casi siempre es la carrera de sesión (el uid del estado se
+          // quedó viejo respecto a `auth.uid()`), y el caso real demostró que
+          // el usuario YA ERA miembro por un join anterior. Re-comprobamos con
+          // la sesión VIVA (no con el `userId` del hook, que es justo el
+          // sospechoso): si ya está dentro, seguimos a la pantalla del viaje en
+          // vez de castigar con un error a quien de hecho puede entrar.
+          const { data } = await supabase.auth.getSession()
+          const liveUid = data.session?.user.id
+          const member = liveUid ? await isMember(route.group, liveUid).catch(() => false) : false
+          if (member) {
+            addBreadcrumb('join_rls_self_healed', { groupId: route.group })
+            const target = stripOwnerInviteToken(hash)
+            if (window.location.hash !== target) window.location.hash = target
+          } else {
+            reportError(err, { area: 'deep_link_join', groupId: route.group })
+            setError(describeError(err))
+          }
         } else {
           reportError(err, { area: 'deep_link_join', groupId: route.group })
           setError(describeError(err))
